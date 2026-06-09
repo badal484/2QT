@@ -14,6 +14,7 @@ import uploadRoutes from './upload';
 import webhookRoutes from './webhooks';
 import bannersRoutes from './banners';
 import notificationsRoutes from './notifications';
+import serviceRequestsRoutes from './service-requests';
 // ... other routes
 
 const router = Router();
@@ -34,6 +35,7 @@ router.use('/upload', uploadRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/banners', bannersRoutes);
 router.use('/notifications', notificationsRoutes);
+router.use('/service-requests', serviceRequestsRoutes);
 // ...
 
 export default router;

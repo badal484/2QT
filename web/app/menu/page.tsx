@@ -114,6 +114,12 @@ export default function MenuPage() {
   const [pricing, setPricing] = useState<any>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<[number, number]>([12.9716, 77.5946]);
+  const [currentZoneName, setCurrentZoneName] = useState("Fetching location...");
+  // Service request states (used when area is not serviceable)
+  const [requestStep, setRequestStep] = useState<'info' | 'form' | 'done'>('info');
+  const [reqForm, setReqForm] = useState({ area_name: '', pincode: '' });
+  const [reqLoading, setReqLoading] = useState(false);
+  const [reqError, setReqError] = useState('');
 
   const { user } = useAuth()!;
   const { items: cartItems, addItem, removeItem, total, clearCart } = useCart()!;
@@ -135,6 +141,7 @@ export default function MenuPage() {
         if (check.serviceable && check.zone) {
           setServiceable(true);
           setZoneId(check.zone.id);
+          setCurrentZoneName(check.zone.name);
 
           // Serve cached menu instantly, then refresh in background
           const cacheKey = `2qt_menu_${check.zone.id}`;
@@ -173,6 +180,7 @@ export default function MenuPage() {
       } catch {
         // Backend offline — load demo menu so UI is always functional
         setServiceable(true);
+        setCurrentZoneName("Demo Zone");
         setItems([
           { id: "1", name: "Premium Butter Naan", description: "Soft, buttery, baked in a traditional tandoor.", price_paise: 9000, category: "Breads", available: true },
           { id: "2", name: "Classic Chicken Biryani", description: "Aromatic basmati rice with tender chicken.", price_paise: 35000, category: "Main Course", available: true },
@@ -200,22 +208,45 @@ export default function MenuPage() {
       } catch {}
     }
 
-    // 1. Optimistically load the menu INSTANTLY (0ms delay for the user)
-    loadMenu(initialLat, initialLng);
+    if (hasCache) {
+      // User has visited before — load their cached location instantly
+      loadMenu(initialLat, initialLng);
+      // Silently refresh with real GPS in background
+      if (typeof window !== "undefined" && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
+            loadMenu(pos.coords.latitude, pos.coords.longitude);
+          },
+          () => { /* Ignore — cached location still used */ },
+          { timeout: 5000, maximumAge: 3600000 }
+        );
+      }
+    } else {
+      // First-time visitor — wait for real GPS (max 4s), then fall back to Bengaluru default
+      if (typeof window !== "undefined" && navigator.geolocation) {
+        let resolved = false;
+        const fallback = setTimeout(() => {
+          if (!resolved) { resolved = true; loadMenu(initialLat, initialLng); }
+        }, 4000);
 
-    // 2. Silently fetch exact location in the background to refine the menu
-    if (typeof window !== "undefined" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
-          // Only reload if the coordinates are significantly different (optional, but calling loadMenu again is fine as it's silent)
-          loadMenu(pos.coords.latitude, pos.coords.longitude);
-        },
-        () => {
-          // Ignore location denial, we already loaded the fallback menu
-        },
-        { timeout: 5000, maximumAge: 3600000 } // 1 hour browser cache
-      );
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(fallback);
+              localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
+              loadMenu(pos.coords.latitude, pos.coords.longitude);
+            }
+          },
+          () => {
+            if (!resolved) { resolved = true; clearTimeout(fallback); loadMenu(initialLat, initialLng); }
+          },
+          { timeout: 4000, maximumAge: 0 }
+        );
+      } else {
+        loadMenu(initialLat, initialLng);
+      }
     }
   }, []);
 
@@ -414,8 +445,17 @@ export default function MenuPage() {
 
   if (loading) return (
     <div className="min-h-screen bg-brand-light p-6 pt-24 font-sans animate-pulse">
+      {/* Location Detection Notice */}
+      <div className="max-w-md mx-auto mb-6 flex items-center gap-3 bg-white border border-orange-100 rounded-2xl px-4 py-3 shadow-sm not-italic" style={{animationName: 'none'}}>
+        <div className="w-7 h-7 rounded-full bg-brand-primary/10 flex items-center justify-center shrink-0">
+          <MapPin className="w-4 h-4 text-brand-primary" />
+        </div>
+        <p className="text-xs font-semibold text-zinc-600">Detecting your location to check service availability...</p>
+      </div>
+
       {/* Search Bar Skeleton */}
       <div className="h-12 bg-black/5 rounded-2xl w-full max-w-md mx-auto mb-8" />
+
       
       {/* Categories Skeleton */}
       <div className="flex gap-4 overflow-x-auto pb-4 mb-8 no-scrollbar">
@@ -446,34 +486,154 @@ export default function MenuPage() {
     </div>
   );
 
-  if (serviceable === false) return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center p-8 text-center">
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 20 }}
-        className="w-24 h-24 rounded-3xl bg-brand-primary/10 flex items-center justify-center mb-8 shadow-lg"
-      >
-        <MapPin className="w-12 h-12 text-brand-primary" />
-      </motion.div>
-      <h1 className="text-3xl font-bold text-zinc-900 mb-3">Not in our zone yet</h1>
-      <p className="text-zinc-500 font-medium max-w-sm mb-2">
-        We're currently delivering only within select areas of Bengaluru.
-      </p>
-      <p className="text-zinc-400 text-sm max-w-xs mb-10">
-        We're expanding fast — leave your number and we'll notify you the day we reach your area.
-      </p>
-      <a
-        href="https://wa.me/918867000000?text=Hi%2C%20I%20want%202QT%20to%20deliver%20in%20my%20area%21"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="bg-brand-primary text-white px-8 py-4 rounded-2xl font-semibold text-sm shadow-lg shadow-brand-primary/25 hover:bg-brand-dark transition-colors"
-      >
-        Notify Me When You're Here
-      </a>
-      <p className="text-xs text-zinc-400 mt-6">Currently serving: Kundanahalli, Whitefield area</p>
-    </div>
-  );
+  if (serviceable === false) {
+    const handleRequestService = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!user) { router.push('/login?redirect=/menu'); return; }
+      if (!/^\d{6}$/.test(reqForm.pincode)) { setReqError('Please enter a valid 6-digit pincode'); return; }
+      setReqLoading(true); setReqError('');
+      try {
+        await api.post('/service-requests', {
+          area_name: reqForm.area_name,
+          pincode: reqForm.pincode,
+          lat: currentLocation[0],
+          lng: currentLocation[1],
+        });
+        setRequestStep('done');
+      } catch (err: any) {
+        setReqError(err.message || 'Something went wrong. Please try again.');
+      } finally {
+        setReqLoading(false);
+      }
+    };
+
+
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        {/* Top nav */}
+        <nav className="px-6 py-4 flex items-center justify-between border-b border-zinc-100">
+          <Link href="/" className="text-2xl font-black tracking-tighter font-outfit">
+            2QT<span className="text-brand-primary">.</span>
+          </Link>
+          <Link href="/login" className="text-sm font-semibold text-zinc-500 hover:text-zinc-900 transition-colors">
+            {user ? user.name?.split(' ')[0] : 'Sign In'}
+          </Link>
+        </nav>
+
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center max-w-md mx-auto">
+          <AnimatePresence mode="wait">
+            {requestStep === 'done' ? (
+              <motion.div key="done" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-6">
+                <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle2 className="w-10 h-10 text-green-500" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black text-zinc-900 mb-2">You're on the list! 🎉</h1>
+                  <p className="text-zinc-500 font-medium text-sm leading-relaxed">
+                    We've recorded your request for <span className="font-bold text-zinc-800">{reqForm.area_name}</span>. You'll get a notification the day we launch in your area!
+                  </p>
+                </div>
+                <Link href="/" className="text-brand-primary font-semibold text-sm hover:underline">← Back to Home</Link>
+              </motion.div>
+            ) : requestStep === 'form' ? (
+              <motion.div key="form" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="w-full">
+                <button onClick={() => setRequestStep('info')} className="flex items-center gap-2 text-zinc-400 text-sm font-medium mb-6 hover:text-zinc-700 transition-colors">
+                  <ArrowLeft className="w-4 h-4" /> Back
+                </button>
+                <h1 className="text-2xl font-black text-zinc-900 mb-2">Request service in your area</h1>
+                <p className="text-zinc-500 text-sm mb-8">
+                  {user ? `Submitting as ${user.name}` : 'You\'ll need to sign in first — it\'s quick!'}
+                </p>
+                {!user ? (
+                  <button
+                    onClick={() => router.push('/login?redirect=/menu')}
+                    className="w-full bg-brand-primary text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-brand-primary/25 hover:bg-brand-dark transition-colors"
+                  >
+                    Sign In to Request Service
+                  </button>
+                ) : (
+                  <form onSubmit={handleRequestService} className="space-y-4">
+                    <div className="text-left">
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Area / Locality *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Indiranagar, Koramangala"
+                        value={reqForm.area_name}
+                        onChange={e => setReqForm(p => ({ ...p, area_name: e.target.value }))}
+                        required
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3.5 px-4 text-sm font-medium focus:bg-white focus:border-brand-primary outline-none transition-all"
+                      />
+                    </div>
+                    <div className="text-left">
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Pincode *</label>
+                      <input
+                        type="text"
+                        placeholder="6-digit pincode"
+                        value={reqForm.pincode}
+                        onChange={e => setReqForm(p => ({ ...p, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                        required
+                        maxLength={6}
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3.5 px-4 text-sm font-medium focus:bg-white focus:border-brand-primary outline-none transition-all"
+                      />
+                    </div>
+                    {reqError && <p className="text-red-500 text-sm font-medium">{reqError}</p>}
+                    <button
+                      type="submit"
+                      disabled={reqLoading}
+                      className="w-full bg-brand-primary text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-brand-primary/25 hover:bg-brand-dark transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {reqLoading ? 'Submitting...' : 'Submit Request'}
+                    </button>
+                  </form>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div key="info" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-6">
+                {/* Animated map pin */}
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full bg-orange-50 flex items-center justify-center">
+                    <MapPin className="w-12 h-12 text-brand-primary" />
+                  </div>
+                  <motion.div
+                    animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0, 0.4] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                    className="absolute inset-0 rounded-full bg-brand-primary/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <h1 className="text-2xl font-black text-zinc-900">Not in our zone yet</h1>
+                  <p className="text-zinc-500 font-medium text-sm leading-relaxed">
+                    We're currently delivering only within select areas of Bengaluru.
+                  </p>
+                  <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-4 py-2 text-xs font-semibold text-zinc-600 mt-2">
+                    <MapPin className="w-3.5 h-3.5 text-brand-primary" />
+                    Currently serving: Kundanahalli, Whitefield &amp; ITPL area
+                  </div>
+                </div>
+
+                {/* CTA */}
+                <div className="w-full space-y-3">
+                  <button
+                    onClick={() => setRequestStep('form')}
+                    className="w-full bg-brand-primary text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-brand-primary/25 hover:bg-brand-dark transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    🙋 Request Service in My Area
+                  </button>
+                  <Link
+                    href="/"
+                    className="block w-full text-center py-3 text-zinc-400 text-sm font-medium hover:text-zinc-700 transition-colors"
+                  >
+                    Go back home
+                  </Link>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
 
   if (orderSuccessId) return <OrderSuccess onDone={() => router.push(`/orders/${orderSuccessId}`)} />;
 
