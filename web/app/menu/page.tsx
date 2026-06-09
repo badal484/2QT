@@ -224,13 +224,13 @@ export default function MenuPage() {
           if (!resolved) {
             resolved = true;
             if (fallbackTimer) clearTimeout(fallbackTimer);
-            if (!hasCache) loadMenu(initialLat, initialLng);
+            loadMenu(initialLat, initialLng);
           }
         },
         { timeout: 3000, maximumAge: 3600000 } // 1 hour browser cache
       );
-    } else if (!hasCache) {
-      loadMenu(initialLat, initialLng);
+    } else {
+      if (!hasCache) loadMenu(initialLat, initialLng);
     }
   }, []);
 
