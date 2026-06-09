@@ -97,10 +97,9 @@ export default function HomePage() {
       {/* Stats Section */}
       <section className="py-20 border-y border-black/5 bg-zinc-50 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
-        <div className="max-w-7xl mx-auto px-6 sm:px-10 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-12 relative z-10">
+        <div className="max-w-7xl mx-auto px-6 sm:px-10 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12 relative z-10">
           {[
             { label: "Quality Rating", val: "4.9" },
-            { label: "Delivery Fee", val: "₹0" },
             { label: "Curated Dishes", val: "150+" },
             { label: "Happy Diners", val: "50k+" },
           ].map((stat, i) => (
