@@ -21,8 +21,8 @@ export default function HomePage() {
           
           <div className="flex items-center gap-4 md:gap-10">
             <div className="hidden md:flex items-center gap-10">
-              <Link href="#features" className="text-sm font-medium text-black/60 hover:text-brand-primary transition-colors">Our Kitchens</Link>
-              <Link href="#app" className="text-sm font-medium text-black/60 hover:text-brand-primary transition-colors">The App</Link>
+              <Link href="/#features" className="text-sm font-medium text-black/60 hover:text-brand-primary transition-colors">Our Kitchens</Link>
+              <Link href="/#app" className="text-sm font-medium text-black/60 hover:text-brand-primary transition-colors">The App</Link>
               {user ? (
                 <Link href="/profile" className="text-sm font-medium text-brand-primary hover:text-brand-primary-dark transition-colors">My Account</Link>
               ) : (
