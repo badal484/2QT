@@ -181,10 +181,10 @@ export default function HomePage() {
             
             <ul className="space-y-4 mb-10">
               {[
-                "Live 60FPS GPS tracking",
-                "Sensory Haptic Engine feedback",
-                "Full Offline-Mode support",
-                "Silent Over-The-Air updates"
+                "Live turn-by-turn order tracking",
+                "Instant push notifications on your phone",
+                "Uses zero megabytes of storage space",
+                "Lightning fast browsing & checkout"
               ].map((feature, idx) => (
                 <li key={idx} className="flex items-center gap-3 text-white/90 font-medium">
                   <div className="w-6 h-6 rounded-full bg-brand-primary/20 flex items-center justify-center shrink-0">
