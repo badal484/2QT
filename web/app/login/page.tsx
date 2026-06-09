@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Smartphone, Shield } from "lucide-react";
+import { ArrowLeft, Smartphone, Shield } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "../lib/api";
@@ -18,20 +18,41 @@ function LoginForm() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
   const { login } = useAuth()!;
 
-  const handleSendOtp = async (e: { preventDefault(): void }) => {
+  // Pre-warm Render backend on page load so it's awake when the user taps Continue
+  useEffect(() => {
+    fetch('/api/proxy/health').catch(() => {});
+  }, []);
+
+  const handleSendOtp = async (e: { preventDefault(): void }, isRetry = false) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setLoadingMsg(isRetry ? "Retrying..." : "");
+
+    // After 8s show a hint that the server may be cold-starting
+    const hintTimer = setTimeout(() => {
+      setLoadingMsg("Server is starting up, please wait...");
+    }, 8000);
+
     try {
       await api.sendOtp(phone);
       setStep("otp");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      if (msg === 'SERVER_TIMEOUT' && !isRetry) {
+        setLoadingMsg("Server is waking up. Retrying in 5s...");
+        setTimeout(() => handleSendOtp(e, true), 5000);
+        return;
+      }
+      setError(msg === 'SERVER_TIMEOUT' ? "Server is offline. Try again in a minute." : msg);
     } finally {
+      clearTimeout(hintTimer);
       setLoading(false);
+      setLoadingMsg("");
     }
   };
 
@@ -209,6 +230,12 @@ function LoginForm() {
                 {error && (
                   <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-red-400 font-medium text-center">
                     {error}
+                  </motion.p>
+                )}
+
+                {loadingMsg && (
+                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-zinc-400 text-center">
+                    {loadingMsg}
                   </motion.p>
                 )}
 

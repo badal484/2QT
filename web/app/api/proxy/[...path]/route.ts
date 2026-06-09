@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Server-side env var — NOT NEXT_PUBLIC — read at request time on Vercel.
-// Change BACKEND_URL in the Vercel dashboard; no code push or rebuild needed.
+// Edge runtime: no 10s serverless cap — handles Render free-tier cold start (~50s)
+export const runtime = 'edge';
+export const maxDuration = 60;
+
 const BACKEND = (process.env.BACKEND_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 
 async function handler(

@@ -15,8 +15,8 @@ async function refreshAccessToken(): Promise<string | null> {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+
     const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,20 +55,20 @@ class ApiClient {
     let response;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      
+      const timeoutId = setTimeout(() => controller.abort(), 55000);
+
       response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers,
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
     } catch (e: any) {
       if (e.name === 'AbortError') {
-         throw new Error(`Request timed out. Server is unreachable.`);
+        throw new Error('SERVER_TIMEOUT');
       }
-      throw new Error(`Network error on ${endpoint}. Make sure the backend server is running.`);
+      throw new Error(`Network error on ${endpoint}.`);
     }
 
     // Auto-refresh on 401
