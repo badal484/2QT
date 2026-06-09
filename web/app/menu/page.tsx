@@ -215,7 +215,7 @@ export default function MenuPage() {
       if (typeof window !== "undefined" && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
+            try { localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude })); } catch {}
             loadMenu(pos.coords.latitude, pos.coords.longitude);
           },
           () => { /* Ignore — cached location still used */ },
@@ -235,7 +235,7 @@ export default function MenuPage() {
             if (!resolved) {
               resolved = true;
               clearTimeout(fallback);
-              localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
+              try { localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude })); } catch {}
               loadMenu(pos.coords.latitude, pos.coords.longitude);
             }
           },

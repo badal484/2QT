@@ -9,6 +9,8 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 
 export function MenuTab() {
   const [items, setItems] = useState<any[]>([]);
+  const [zones, setZones] = useState<any[]>([]);
+  const [selectedZone, setSelectedZone] = useState<string>("All");
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -27,8 +29,12 @@ export function MenuTab() {
 
   const load = async () => {
     try {
-      const d = await api.get("/admin/menu");
-      setItems(d.items ?? []);
+      const [menuRes, zonesRes] = await Promise.all([
+        api.get("/admin/menu"),
+        api.get("/admin/zones")
+      ]);
+      setItems(menuRes.items ?? []);
+      setZones(zonesRes.zones ?? []);
     } finally {
       setLoading(false);
     }
@@ -73,11 +79,12 @@ export function MenuTab() {
     const matchSearch = i.name.toLowerCase().includes(search.toLowerCase()) ||
       i.category.toLowerCase().includes(search.toLowerCase());
     const matchCat = activeCategory === "All" || i.category === activeCategory;
-    return matchSearch && matchCat;
+    const matchZone = selectedZone === "All" || i.zone_id === selectedZone;
+    return matchSearch && matchCat && matchZone;
   });
 
-  const liveCount = items.filter(i => i.available).length;
-  const offCount = items.filter(i => !i.available).length;
+  const liveCount = filtered.filter(i => i.available).length;
+  const offCount = filtered.filter(i => !i.available).length;
 
   return (
     <div>
@@ -90,10 +97,20 @@ export function MenuTab() {
             <span className="mx-2 text-zinc-600">·</span>
             <span className="text-red-400 font-bold">{offCount} off</span>
             <span className="mx-2 text-zinc-600">·</span>
-            {items.length} total
+            {filtered.length} total
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Zone Selector */}
+          <select 
+            value={selectedZone} 
+            onChange={(e) => setSelectedZone(e.target.value)}
+            className="px-4 py-2.5 rounded-xl bg-white/[0.03] backdrop-blur-2xl border border-white/10 text-sm font-bold text-white focus:outline-none focus:ring-2 ring-swish-green/20 appearance-none min-w-[160px]"
+          >
+            <option value="All" className="bg-zinc-900">All Zones</option>
+            {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">{z.name}</option>)}
+          </select>
+
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <input
@@ -216,7 +233,12 @@ export function MenuTab() {
                 <h3 className="font-black text-sm text-white line-clamp-1 mb-0.5">{item.name}</h3>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-swish-green font-black text-sm">₹{(item.price_paise / 100).toLocaleString("en-IN")}</span>
-                  <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 truncate ml-2">{item.category}</span>
+                  <div className="flex items-center gap-1.5 ml-2">
+                    {selectedZone === "All" && (
+                      <span className="text-[8px] font-black uppercase tracking-widest text-brand-primary truncate">{item.zone_name}</span>
+                    )}
+                    <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 truncate">{item.category}</span>
+                  </div>
                 </div>
                 {/* Hover Actions */}
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all" onClick={e => e.stopPropagation()}>
@@ -281,7 +303,12 @@ export function MenuTab() {
                   </div>
                 </div>
               </div>
-              <span className="text-xs font-bold text-zinc-400 truncate">{item.category}</span>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-bold text-zinc-400 truncate">{item.category}</span>
+                {selectedZone === "All" && (
+                  <span className="text-[9px] font-black uppercase tracking-widest text-brand-primary truncate">{item.zone_name}</span>
+                )}
+              </div>
               <span className="text-sm font-black text-swish-green">₹{(item.price_paise / 100).toLocaleString("en-IN")}</span>
               <span className={`text-[9px] font-black uppercase tracking-widest ${item.available ? "text-swish-green" : "text-red-400"}`}>
                 {item.available ? "Live" : "Off"}
@@ -336,6 +363,7 @@ export function MenuTab() {
                     const formData = new FormData(e.currentTarget);
                     const data = {
                       name: formData.get("name"),
+                      zone_id: formData.get("zone_id"),
                       description: formData.get("description"),
                       category: formData.get("category"),
                       price_paise: Math.round(parseFloat(formData.get("price") as string) * 100),
@@ -405,6 +433,15 @@ export function MenuTab() {
                         }} />
                       </label>
                     )}
+                  </div>
+
+                  {/* Zone Selector */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Menu Zone</label>
+                    <select name="zone_id" defaultValue={editingItem?.zone_id || (selectedZone !== "All" ? selectedZone : "")} required className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none">
+                      <option value="" disabled className="bg-zinc-900">Select Delivery Zone…</option>
+                      {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">{z.name}</option>)}
+                    </select>
                   </div>
 
                   {/* Name + Category */}

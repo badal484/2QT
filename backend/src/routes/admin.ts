@@ -20,6 +20,7 @@ const validate = (schema: ZodSchema) => (req: Request, res: Response, next: Next
 
 const MenuItemSchema = z.object({
     name: z.string().min(1).max(120),
+    zone_id: z.string().uuid(),
     description: z.string().max(500).optional(),
     price_paise: z.number().int().positive(),
     cost_price_paise: z.number().int().positive().optional(),
@@ -45,7 +46,7 @@ const ZoneSchema = z.object({
     city: z.string().default('Bengaluru'),
     kitchen_lat: z.number(),
     kitchen_lng: z.number(),
-    radius_km: z.number().positive().optional().default(4),
+    radius_km: z.number().nonnegative().optional().default(4),
     delivery_fee_base_paise: z.number().int().nonnegative().optional().default(2500),
     opening_time: z.string().regex(/^\d{2}:\d{2}$/).optional().default('10:00'),
     closing_time: z.string().regex(/^\d{2}:\d{2}$/).optional().default('22:00'),
@@ -126,7 +127,12 @@ router.get('/orders/scheduled', authenticate, requireRole('super_admin', 'admin'
 });
 
 router.get('/menu', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const { rows } = await query('SELECT * FROM menu_items ORDER BY category, name');
+    const { rows } = await query(`
+        SELECT m.*, z.name as zone_name 
+        FROM menu_items m 
+        JOIN zones z ON m.zone_id = z.id 
+        ORDER BY m.category, m.name
+    `);
     res.json({ items: rows });
 });
 
@@ -432,20 +438,13 @@ router.post('/payouts/:id/approve', authenticate, requireRole('super_admin', 'ad
 
 router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema), async (req: AuthRequest, res) => {
     try {
-        const { name, description, price_paise, category, photo_url, available, is_veg } = req.body;
-        
-        let zoneId = req.user!.zoneId;
-        
-        if (!zoneId) {
-            const zRows = await query('SELECT id FROM zones LIMIT 1');
-            if (zRows.rows.length > 0) zoneId = zRows.rows[0].id;
-        }
+        const { name, zone_id, description, price_paise, category, photo_url, available, is_veg } = req.body;
         
         const cost_price_paise = req.body.cost_price_paise ?? Math.floor(price_paise * 0.7);
 
         const { rows } = await query(
             'INSERT INTO menu_items (zone_id, name, description, price_paise, cost_price_paise, category, photo_url, available, is_veg) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-            [zoneId, name, description || null, price_paise, cost_price_paise, category, photo_url || null, available ?? true, is_veg ?? false]
+            [zone_id, name, description || null, price_paise, cost_price_paise, category, photo_url || null, available ?? true, is_veg ?? false]
         );
         
         // Clear menu cache for all zones
@@ -500,18 +499,19 @@ router.delete('/menu/:id', authenticate, requireRole('super_admin', 'admin'), as
 router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema.partial()), async (req: AuthRequest, res) => {
     try {
         const { id } = req.params;
-        const { name, description, price_paise, category, photo_url, available, is_veg } = req.body;
+        const { zone_id, name, description, price_paise, category, photo_url, available, is_veg } = req.body;
         const { rows } = await query(
             `UPDATE menu_items SET
-                name = COALESCE($1, name),
-                description = COALESCE($2, description),
-                price_paise = COALESCE($3, price_paise),
-                category = COALESCE($4, category),
-                photo_url = COALESCE($5, photo_url),
-                available = COALESCE($6, available),
-                is_veg = COALESCE($7, is_veg)
-             WHERE id = $8 RETURNING *`,
-            [name ?? null, description ?? null, price_paise ?? null, category ?? null,
+                zone_id = COALESCE($1, zone_id),
+                name = COALESCE($2, name),
+                description = COALESCE($3, description),
+                price_paise = COALESCE($4, price_paise),
+                category = COALESCE($5, category),
+                photo_url = COALESCE($6, photo_url),
+                available = COALESCE($7, available),
+                is_veg = COALESCE($8, is_veg)
+             WHERE id = $9 RETURNING *`,
+            [zone_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null,
              photo_url ?? null, available ?? null, is_veg ?? null, id]
         );
 

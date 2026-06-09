@@ -11,11 +11,17 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
     const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       localStorage.removeItem('2qt_token');
@@ -44,11 +50,20 @@ class ApiClient {
 
     let response;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers,
+        signal: controller.signal
       });
-    } catch (e) {
+      
+      clearTimeout(timeoutId);
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+         throw new Error(`Request timed out. Server is unreachable.`);
+      }
       throw new Error(`Network error on ${endpoint}. Make sure the backend server is running.`);
     }
 
