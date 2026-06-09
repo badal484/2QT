@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
+import PushNotifier from "../../components/PushNotifier";
 
 const TABS = [
   { id: "overview", label: "Profile", icon: User },
@@ -95,6 +96,7 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
                     <Clock className="w-4 h-4 text-brand-primary" />
                     Member Since {new Date(user?.created_at || Date.now()).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
                   </span>
+                  <PushNotifier />
                 </div>
               </>
             )}

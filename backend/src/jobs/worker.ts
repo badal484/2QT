@@ -60,9 +60,15 @@ const ordersWorker = new Worker('orders', async (job) => {
     if (type === 'process_scheduled_order') {
         await query('UPDATE orders SET status = \'confirmed\' WHERE id = $1', [orderId]);
         // Trigger subsequent logic like notifying kitchen
-        const { rows } = await query('SELECT kitchen_id, display_id FROM orders WHERE id = $1', [orderId]);
+        const { rows } = await query('SELECT kitchen_id, display_id, customer_id FROM orders WHERE id = $1', [orderId]);
         const { emitToKitchen } = require('../socket');
         emitToKitchen(rows[0].kitchen_id, 'new_order', { orderId, displayId: rows[0].display_id });
+        
+        const { pushService } = require('../services/push.service');
+        await pushService.sendNotificationToUser(rows[0].customer_id, {
+            title: "Order Confirmed! 👨‍🍳",
+            body: `Your order ${rows[0].display_id} has been confirmed and is being prepared!`
+        });
     }
 }, { 
     connection,

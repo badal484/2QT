@@ -42,6 +42,7 @@
     "razorpay": "^2.9.6",
     "redis": "4.6",
     "socket.io": "4.6",
+    "web-push": "^3.6.7",
     "zod": "3.22"
   },
   "devDependencies": {
@@ -54,6 +55,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.20.0",
+    "@types/web-push": "^3.6.4",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "5.3"

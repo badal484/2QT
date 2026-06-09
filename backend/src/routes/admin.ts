@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { z, ZodSchema } from 'zod';
 import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
@@ -7,6 +8,50 @@ import { notificationsQueue } from '../jobs/queues';
 import { logSystemEvent } from '../utils/logger';
 import ImageKit from '@imagekit/nodejs';
 import multer from 'multer';
+
+const validate = (schema: ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+        return res.status(400).json({ error: 'VALIDATION_ERROR', issues: result.error.flatten().fieldErrors });
+    }
+    req.body = result.data;
+    next();
+};
+
+const MenuItemSchema = z.object({
+    name: z.string().min(1).max(120),
+    description: z.string().max(500).optional(),
+    price_paise: z.number().int().positive(),
+    cost_price_paise: z.number().int().positive().optional(),
+    category: z.string().min(1).max(60),
+    photo_url: z.string().url().optional().nullable(),
+    available: z.boolean().optional().default(true),
+    is_veg: z.boolean().optional().default(false),
+});
+
+const KitchenSchema = z.object({
+    name: z.string().min(1).max(120),
+    zone_ids: z.array(z.string().uuid()).min(1, 'At least one zone is required'),
+    address: z.string().max(300).optional(),
+    fssai_license: z.string().max(20).optional(),
+    gstin: z.string().max(20).optional(),
+    lat: z.number().optional().default(12.9716),
+    lng: z.number().optional().default(77.5946),
+});
+
+const ZoneSchema = z.object({
+    name: z.string().min(1).max(80),
+    city: z.string().default('Bengaluru'),
+    kitchen_lat: z.number(),
+    kitchen_lng: z.number(),
+    radius_km: z.number().positive().optional().default(4),
+    delivery_fee_base_paise: z.number().int().nonnegative().optional().default(2500),
+    opening_time: z.string().regex(/^\d{2}:\d{2}$/).optional().default('10:00'),
+    closing_time: z.string().regex(/^\d{2}:\d{2}$/).optional().default('22:00'),
+    max_orders_per_hour: z.number().int().positive().optional().default(60),
+    realistic_delivery_minutes: z.number().int().positive().optional().default(30),
+    polygon_points: z.array(z.object({ lat: z.number(), lng: z.number() })).optional().nullable(),
+});
 
 const imagekit = new ImageKit({
   // @ts-ignore
@@ -276,12 +321,12 @@ router.get('/riders', authenticate, requireRole('super_admin', 'admin'), async (
         WHERE u.role = 'rider'
     `);
 
-    for (const rider of riders) {
-        const loc = await redis.get(keys.riderLocation(rider.id));
-        if (loc) {
-            rider.location = JSON.parse(loc);
-        }
-    }
+    const locations = await Promise.all(
+        riders.map(r => redis.get(keys.riderLocation(r.id)))
+    );
+    locations.forEach((loc, i) => {
+        if (loc) riders[i].location = JSON.parse(loc);
+    });
 
     res.json({ riders });
 });
@@ -384,7 +429,7 @@ router.post('/payouts/:id/approve', authenticate, requireRole('super_admin', 'ad
     res.json({ success: true });
 });
 
-router.post('/menu', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema), async (req: AuthRequest, res) => {
     try {
         const { name, description, price_paise, category, photo_url, available, is_veg } = req.body;
         
@@ -451,7 +496,7 @@ router.delete('/menu/:id', authenticate, requireRole('super_admin', 'admin'), as
     }
 });
 
-router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema.partial()), async (req: AuthRequest, res) => {
     try {
         const { id } = req.params;
         const { name, description, price_paise, category, photo_url, available, is_veg } = req.body;
@@ -474,8 +519,40 @@ router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), async
 });
 
 router.get('/users', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const { rows } = await query('SELECT id, name, phone, role, is_active, is_online, onboarding_complete, created_at FROM users ORDER BY created_at DESC');
-    res.json({ users: rows });
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const search = (req.query.search as string || '').trim();
+    const role = req.query.role as string | undefined;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (search) {
+        params.push(`%${search}%`);
+        conditions.push(`(name ILIKE $${params.length} OR phone ILIKE $${params.length})`);
+    }
+    if (role) {
+        params.push(role);
+        conditions.push(`role = $${params.length}`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    params.push(limit, offset);
+
+    const { rows } = await query(
+        `SELECT id, name, phone, role, is_active, is_online, onboarding_complete, created_at
+         FROM users ${where}
+         ORDER BY created_at DESC
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params
+    );
+
+    const { rows: countRows } = await query(
+        `SELECT COUNT(*) FROM users ${where}`,
+        params.slice(0, params.length - 2)
+    );
+
+    res.json({ users: rows, total: parseInt(countRows[0].count), limit, offset });
 });
 
 router.patch('/users/:id/status', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
@@ -549,15 +626,10 @@ router.get('/zones', authenticate, requireRole('super_admin', 'admin'), async (r
     res.json({ zones: rows });
 });
 
-router.post('/zones', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const {
-        name, city = 'Bengaluru', kitchen_lat, kitchen_lng, radius_km = 4,
-        delivery_fee_base_paise = 2500, opening_time = '10:00', closing_time = '22:00',
-        max_orders_per_hour = 60, realistic_delivery_minutes = 30, polygon_points = null
-    } = req.body;
-    if (!name || !kitchen_lat || !kitchen_lng) {
-        return res.status(400).json({ error: 'name, kitchen_lat, kitchen_lng are required' });
-    }
+router.post('/zones', authenticate, requireRole('super_admin', 'admin'), validate(ZoneSchema), async (req: AuthRequest, res) => {
+    const { name, city, kitchen_lat, kitchen_lng, radius_km,
+            delivery_fee_base_paise, opening_time, closing_time,
+            max_orders_per_hour, realistic_delivery_minutes, polygon_points } = req.body;
     try {
         const { rows } = await query(`
             INSERT INTO zones (name, city, kitchen_lat, kitchen_lng, radius_km,
@@ -638,48 +710,46 @@ router.get('/kitchens', authenticate, requireRole('super_admin', 'admin'), async
     res.json({ kitchens: rows });
 });
 
-router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), validate(KitchenSchema), async (req: AuthRequest, res) => {
     const { name, zone_ids, address, fssai_license, gstin, lat = 12.9716, lng = 77.5946 } = req.body;
-    try {
-        await query('BEGIN');
-        const { rows } = await query(`
+
+    const kitchenId = await withTransaction(async (client) => {
+        const { rows } = await client.query(`
             INSERT INTO kitchens (name, address, fssai_license, gstin, lat, lng)
             VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
+            RETURNING id
         `, [name, address, fssai_license, gstin, lat, lng]);
-        
-        const kitchen = rows[0];
-        
+        const id = rows[0].id;
         if (zone_ids && Array.isArray(zone_ids)) {
             for (const zId of zone_ids) {
-                await query('INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [kitchen.id, zId]);
+                await client.query(
+                    'INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                    [id, zId]
+                );
             }
         }
-        await query('COMMIT');
-        
-        const { rows: updated } = await query(`
-            SELECT k.*, 
-                   COALESCE(json_agg(json_build_object('id', z.id, 'name', z.name)) FILTER (WHERE z.id IS NOT NULL), '[]') as zones
-            FROM kitchens k 
-            LEFT JOIN kitchen_zones kz ON k.id = kz.kitchen_id
-            LEFT JOIN zones z ON kz.zone_id = z.id
-            WHERE k.id = $1
-            GROUP BY k.id
-        `, [kitchen.id]);
-        
-        res.status(201).json({ kitchen: updated[0] });
-    } catch (err: any) {
-        await query('ROLLBACK');
-        res.status(500).json({ error: 'Failed to create kitchen', details: err.message });
-    }
+        return id;
+    });
+
+    const { rows: updated } = await query(`
+        SELECT k.*,
+               COALESCE(json_agg(json_build_object('id', z.id, 'name', z.name)) FILTER (WHERE z.id IS NOT NULL), '[]') as zones
+        FROM kitchens k
+        LEFT JOIN kitchen_zones kz ON k.id = kz.kitchen_id
+        LEFT JOIN zones z ON kz.zone_id = z.id
+        WHERE k.id = $1
+        GROUP BY k.id
+    `, [kitchenId]);
+
+    res.status(201).json({ kitchen: updated[0] });
 });
 
-router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), validate(KitchenSchema.partial()), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { name, zone_ids, address, fssai_license, gstin, is_active } = req.body;
-    try {
-        await query('BEGIN');
-        const { rows } = await query(`
+
+    await withTransaction(async (client) => {
+        const { rows } = await client.query(`
             UPDATE kitchens SET
                 name = COALESCE($1, name),
                 address = COALESCE($2, address),
@@ -687,37 +757,37 @@ router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'),
                 gstin = COALESCE($4, gstin),
                 is_active = COALESCE($5, is_active)
             WHERE id = $6
-            RETURNING *
+            RETURNING id
         `, [name, address, fssai_license, gstin, is_active, id]);
-        
+
         if (rows.length === 0) {
-            await query('ROLLBACK');
-            return res.status(404).json({ error: 'NOT_FOUND' });
+            const err: any = new Error('NOT_FOUND');
+            err.status = 404;
+            throw err;
         }
-        
+
         if (zone_ids !== undefined && Array.isArray(zone_ids)) {
-            await query('DELETE FROM kitchen_zones WHERE kitchen_id = $1', [id]);
+            await client.query('DELETE FROM kitchen_zones WHERE kitchen_id = $1', [id]);
             for (const zId of zone_ids) {
-                await query('INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, zId]);
+                await client.query(
+                    'INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                    [id, zId]
+                );
             }
         }
-        await query('COMMIT');
-        
-        const { rows: updated } = await query(`
-            SELECT k.*, 
-                   COALESCE(json_agg(json_build_object('id', z.id, 'name', z.name)) FILTER (WHERE z.id IS NOT NULL), '[]') as zones
-            FROM kitchens k 
-            LEFT JOIN kitchen_zones kz ON k.id = kz.kitchen_id
-            LEFT JOIN zones z ON kz.zone_id = z.id
-            WHERE k.id = $1
-            GROUP BY k.id
-        `, [id]);
-        
-        res.json({ kitchen: updated[0] });
-    } catch (err: any) {
-        await query('ROLLBACK');
-        res.status(500).json({ error: 'Failed to update kitchen', details: err.message });
-    }
+    });
+
+    const { rows: updated } = await query(`
+        SELECT k.*,
+               COALESCE(json_agg(json_build_object('id', z.id, 'name', z.name)) FILTER (WHERE z.id IS NOT NULL), '[]') as zones
+        FROM kitchens k
+        LEFT JOIN kitchen_zones kz ON k.id = kz.kitchen_id
+        LEFT JOIN zones z ON kz.zone_id = z.id
+        WHERE k.id = $1
+        GROUP BY k.id
+    `, [id]);
+
+    res.json({ kitchen: updated[0] });
 });
 
 router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {

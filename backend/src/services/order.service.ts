@@ -195,6 +195,12 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
             minutes: 25
         });
 
+        const { pushService } = require('./push.service');
+        await pushService.sendNotificationToUser(newOrder.customer_id, {
+            title: "Order Confirmed! 👨‍🍳",
+            body: `Your order ${newOrder.display_id} is confirmed and our chefs are on it!`
+        });
+
         return { status: 'order_created', orderId: newOrder.id };
     } catch (err) {
         console.error('Order finalization failed:', err);

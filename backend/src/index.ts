@@ -1,4 +1,5 @@
 import './jobs/worker'; // Start background job processing
+import 'express-async-errors';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';

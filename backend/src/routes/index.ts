@@ -13,6 +13,7 @@ import subscriptionRoutes from './subscription';
 import uploadRoutes from './upload';
 import webhookRoutes from './webhooks';
 import bannersRoutes from './banners';
+import notificationsRoutes from './notifications';
 // ... other routes
 
 const router = Router();
@@ -32,6 +33,7 @@ router.use('/subscriptions', subscriptionRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/banners', bannersRoutes);
+router.use('/notifications', notificationsRoutes);
 // ...
 
 export default router;

@@ -6,6 +6,7 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToRiders, emitToAdmin, emitToOrder } from '../socket';
 import { notificationsQueue, invoicesQueue } from '../jobs/queues';
 import { 2QT } from '../config/constants';
+import { pushService } from '../services/push.service';
 
 const router = Router();
 const DEV_TEST_DELIVERY_OTP = process.env.TEST_DELIVERY_OTP || '654321';
@@ -153,6 +154,10 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
                 phone: customerPhone,
                 riderName: riderName,
                 otp: order.delivery_otp
+            });
+            await pushService.sendNotificationToUser(order.customer_id, {
+                title: "Out for Delivery! 🛵",
+                body: `${riderName} is on the way with your order! Please share OTP ${order.delivery_otp} on delivery.`
             });
         }
     }
