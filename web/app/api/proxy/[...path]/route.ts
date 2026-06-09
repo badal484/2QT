@@ -51,4 +51,3 @@ export const PATCH   = handler;
 export const PUT     = handler;
 export const DELETE  = handler;
 export const OPTIONS = handler;
-# proxy-route
