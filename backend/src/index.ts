@@ -35,7 +35,7 @@ if (process.env.SENTRY_DSN) {
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || '*' }));
+app.use(cors());
 app.use((req, res, next) => { console.log('[HTTP]', req.method, req.url); next(); });
 app.use(express.json({
     verify: (req: any, res, buf) => {
