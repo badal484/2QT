@@ -1,5 +1,5 @@
 const getApiUrl = () => {
-  return 'https://xsgma-117-96-21-221.run.pinggy-free.link/api/v1';
+  return 'https://yicfp-117-96-21-221.run.pinggy-free.link/api/v1';
 };
 
 const API_BASE_URL = getApiUrl();
