@@ -200,14 +200,17 @@ export default function MenuPage() {
       return;
     }
     setPricingLoading(true);
-    api.post("/payments/create-order", {
-      addressId: deliveryAddress.id,
-      items: cartItems.map(i => ({ menuItemId: i.id, quantity: i.quantity })),
-      promoCode: promoApplied || undefined,
-      useWallet,
-      useLoyalty,
-      dryRun: true,
-    }).then(d => setPricing(d.pricing ?? null)).catch(() => setPricing(null)).finally(() => setPricingLoading(false));
+    const timer = setTimeout(() => {
+      api.post("/payments/create-order", {
+        addressId: deliveryAddress.id,
+        items: cartItems.map(i => ({ menuItemId: i.id, quantity: i.quantity })),
+        promoCode: promoApplied || undefined,
+        useWallet,
+        useLoyalty,
+        dryRun: true,
+      }).then(d => setPricing(d.pricing ?? null)).catch(() => setPricing(null)).finally(() => setPricingLoading(false));
+    }, 600);
+    return () => clearTimeout(timer);
   }, [isCartOpen, cartItems, deliveryAddress, promoApplied, useWallet, useLoyalty]);
 
   const filtered = items.filter(item =>
@@ -673,10 +676,9 @@ export default function MenuPage() {
                     <p className="text-sm mt-2">Add some delicious meals to get started!</p>
                   </div>
                 )}
-              </div>
 
-              {cartItems.length > 0 && (
-                <div className="p-6 bg-white border-t border-black/5 shrink-0">
+                {cartItems.length > 0 && (
+                  <div className="pt-6 border-t border-black/5 space-y-6 mt-6">
                     {deliveryAddress ? (
                       <div className="flex items-center gap-3 mb-6 p-4 rounded-xl bg-zinc-50 border border-zinc-100">
                          <div className="w-8 h-8 rounded-full bg-brand-primary/10 flex items-center justify-center shrink-0">
@@ -837,12 +839,18 @@ export default function MenuPage() {
                         )}
                       </div>
 
-                      <div className="flex justify-between items-end pt-4 border-t border-black/5">
-                         <span className="text-base font-bold text-brand-dark">Total Amount</span>
-                         <span className="text-3xl font-bold text-brand-dark">
-                           {pricing ? `₹${pricing.totalAmountPaise / 100}` : `₹${Math.round(total + 2500 + (total * 0.05)) / 100}`}
-                         </span>
-                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {cartItems.length > 0 && (
+                <div className="p-5 bg-white border-t border-black/5 shrink-0 flex flex-col gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+                   <div className="flex justify-between items-end px-1">
+                      <span className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Total Amount</span>
+                      <span className="text-2xl font-black text-brand-dark">
+                        {pricing ? `₹${pricing.totalAmountPaise / 100}` : `₹${Math.round(total + 2500 + (total * 0.05)) / 100}`}
+                      </span>
                    </div>
                    
                    <button

@@ -10,6 +10,7 @@ const upload = multer({ dest: 'uploads/' });
 
 router.get('/zones', async (req, res) => {
     const { rows } = await query('SELECT id, name, radius_km, kitchen_lat, kitchen_lng FROM zones WHERE is_active = true ORDER BY name');
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
     res.json({ zones: rows });
 });
 
@@ -29,6 +30,7 @@ router.get('/', async (req, res) => {
     }
     
     if (cached) {
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
         return res.json({ ...JSON.parse(cached as string), fromCache: true });
     }
 
@@ -60,6 +62,7 @@ router.get('/', async (req, res) => {
 
     await redis.set(cacheKey, JSON.stringify(response), { EX: 300 }); // 5 mins
 
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json({ ...response, fromCache: false });
 });
 

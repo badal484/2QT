@@ -652,7 +652,7 @@ function MenuTab() {
               {/* Photo */}
               <div className="relative aspect-[4/3] bg-zinc-900">
                 {item.photo_url ? (
-                  <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" />
+                  <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-white/[0.02]">
                     <Camera className="w-8 h-8 text-zinc-700" />
@@ -735,7 +735,7 @@ function MenuTab() {
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 rounded-xl overflow-hidden bg-zinc-800 flex-shrink-0">
                   {item.photo_url
-                    ? <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" />
+                    ? <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
                     : <div className="w-full h-full flex items-center justify-center"><Camera className="w-4 h-4 text-zinc-600" /></div>
                   }
                 </div>

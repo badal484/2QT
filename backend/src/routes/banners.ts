@@ -10,6 +10,7 @@ router.get('/', async (req, res) => {
         const { rows } = await query(
             'SELECT * FROM promotional_banners WHERE is_active = true ORDER BY display_order ASC, created_at DESC'
         );
+        res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
         res.json({ banners: rows });
     } catch (err: any) {
         console.error(err);

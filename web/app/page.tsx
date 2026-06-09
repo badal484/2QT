@@ -74,7 +74,7 @@ export default function HomePage() {
           >
             <div className="relative z-10 w-full aspect-square md:aspect-[4/5] bg-white rounded-[32px] md:rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] p-3 md:p-4 overflow-hidden border border-black/5 hover:scale-[1.02] transition-transform duration-700">
                <div className="relative w-full h-full rounded-[24px] md:rounded-[32px] overflow-hidden bg-brand-light shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]">
-                 <Image src="/premium_healthy_bowl_1777968667530.png" alt="Gourmet Bowl" fill className="object-cover" />
+                 <Image src="/premium_healthy_bowl_1777968667530.png" alt="Gourmet Bowl" fill className="object-cover" priority />
                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                  <div className="absolute bottom-6 md:bottom-8 left-6 md:left-8 right-6 md:right-8 text-white">
                     <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] md:text-xs font-semibold mb-3 shadow-lg">
