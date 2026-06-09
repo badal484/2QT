@@ -73,38 +73,22 @@ function OverviewTab() {
   const [stats, setStats] = useState<any>(null);
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [riders, setRiders] = useState<any[]>([]);
-  const [showAssign, setShowAssign] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, o, r] = await Promise.all([
+      const [s, o] = await Promise.all([
         api.get("/admin/dashboard"),
         api.get("/admin/orders/live"),
-        api.get("/admin/riders"),
       ]);
       setStats(s);
       setLiveOrders(o.orders ?? []);
-      setRiders(r.riders ?? []);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const assignRider = async (orderId: string, riderId: string) => {
-    setAssigningId(orderId);
-    try {
-      await api.post(`/admin/orders/${orderId}/assign`, { riderId });
-      setShowAssign(null);
-      await load();
-    } finally {
-      setAssigningId(null);
-    }
-  };
 
   const rev = (stats?.todayRevenuePaise ?? 0) / 100;
   const revData = [45, 60, 40, 80, 55, 90, rev > 0 ? 100 : 30]; // 7 days data
@@ -262,9 +246,9 @@ function OverviewTab() {
         <h3 className="text-lg font-bold text-white mb-6">Recent activity</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {[
-            { icon: Wallet, color: "text-emerald-400", bg: "bg-emerald-500/10", text: "Payment received to sent ₹FF6B30", time: "1 minute ago" },
-            { icon: ShoppingBag, color: "text-brand-primary", bg: "bg-brand-primary/10", text: "New order forsent ₹FF6B30", time: "2 minutes ago" },
-            { icon: RefreshCw, color: "text-blue-400", bg: "bg-blue-500/10", text: "Integration updated in Alex Randamy", time: "5 minutes ago" },
+            { icon: Wallet, color: "text-emerald-400", bg: "bg-emerald-500/10", text: `Today's revenue: ₹${((stats?.todayRevenuePaise ?? 0) / 100).toLocaleString("en-IN")}`, time: "Updated just now" },
+            { icon: ShoppingBag, color: "text-brand-primary", bg: "bg-brand-primary/10", text: `${stats?.activeOrders ?? 0} active orders in the pipeline`, time: "Live" },
+            { icon: RefreshCw, color: "text-blue-400", bg: "bg-blue-500/10", text: `${stats?.ridersOnline ?? 0} riders online and ready`, time: "Live" },
           ].map((act, i) => (
             <div key={i} className="flex items-start gap-4">
               <div className="flex flex-col items-center">
@@ -469,6 +453,15 @@ function OrdersTab() {
           ))}
         </div>
       )}
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        title="Cancel Order?"
+        message="Are you sure you want to cancel this order? The customer will be refunded if payment was collected."
+        confirmText="Cancel Order"
+        onConfirm={processCancel}
+        onCancel={() => setConfirmDialog({ isOpen: false, id: null })}
+        isDanger={true}
+      />
     </div>
   );
 }

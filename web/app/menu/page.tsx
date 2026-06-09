@@ -144,44 +144,51 @@ export default function MenuPage() {
       }
     };
 
+    let initialLat = 12.9716;
+    let initialLng = 77.5946;
+    let hasCache = false;
+
     const cachedLoc = typeof window !== "undefined" ? localStorage.getItem("2qt_last_location") : null;
     if (cachedLoc) {
       try {
         const { lat, lng } = JSON.parse(cachedLoc);
-        loadMenu(lat, lng);
-        return;
+        initialLat = lat;
+        initialLng = lng;
+        hasCache = true;
+        loadMenu(lat, lng); // Instantly load UI
       } catch {}
     }
 
     if (typeof window !== "undefined" && navigator.geolocation) {
       let resolved = false;
-      const fallbackTimer = setTimeout(() => {
+      const fallbackTimer = hasCache ? null : setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          loadMenu(12.9716, 77.5946);
+          loadMenu(initialLat, initialLng);
         }
-      }, 3000); // Reduced fallback to 3s for even faster speed
+      }, 3000);
 
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           if (!resolved) {
             resolved = true;
-            clearTimeout(fallbackTimer);
+            if (fallbackTimer) clearTimeout(fallbackTimer);
             localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
+            // Silently update the menu in the background with the freshest coordinates
             loadMenu(pos.coords.latitude, pos.coords.longitude);
           }
         },
         () => {
           if (!resolved) {
             resolved = true;
-            clearTimeout(fallbackTimer);
-            loadMenu(12.9716, 77.5946);
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            if (!hasCache) loadMenu(initialLat, initialLng);
           }
         },
         { timeout: 3000, maximumAge: 3600000 } // 1 hour browser cache
       );
-    } else {
-      loadMenu(12.9716, 77.5946);
+    } else if (!hasCache) {
+      loadMenu(initialLat, initialLng);
     }
   }, []);
 
