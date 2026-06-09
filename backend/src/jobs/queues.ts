@@ -4,10 +4,12 @@ import { NotificationService } from '../services/notification.service';
 import { generateInvoicePDF } from '../services/invoice.service';
 import { query } from '../db';
 
-const connection = {
-    host: process.env.REDIS_URL ? new URL(process.env.REDIS_URL).hostname : 'localhost',
-    port: process.env.REDIS_URL ? parseInt(new URL(process.env.REDIS_URL).port) : 6379,
-};
+import IORedis from 'ioredis';
+
+const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+    tls: process.env.REDIS_URL?.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined
+});
 
 // Queues
 export const notificationsQueue = new Queue('velto:notifications', { connection });

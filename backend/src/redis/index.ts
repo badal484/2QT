@@ -5,9 +5,14 @@ dotenv.config();
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-export const redis = createClient({ url: redisUrl });
-export const redisPub = createClient({ url: redisUrl });
-export const redisSub = createClient({ url: redisUrl });
+const redisConfig = {
+    url: redisUrl,
+    socket: redisUrl.startsWith('rediss://') ? { tls: true, rejectUnauthorized: false } : undefined
+};
+
+export const redis = createClient(redisConfig);
+export const redisPub = createClient(redisConfig);
+export const redisSub = createClient(redisConfig);
 
 redis.on('error', (err) => console.error('Redis Client Error', err));
 redisPub.on('error', (err) => console.error('Redis Pub Error', err));
