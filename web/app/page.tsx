@@ -1,10 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, ShoppingBag, MapPin, Star, Heart, Clock, ChevronRight, Utensils } from "lucide-react";
+import { ArrowRight, ShoppingBag, MapPin, Star, Heart, Clock, ChevronRight, Utensils, Smartphone, Download } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "./providers";
 import Image from "next/image";
+import { toast } from "sonner";
 
 export default function HomePage() {
   const { user } = useAuth()!;
@@ -147,6 +148,93 @@ export default function HomePage() {
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* App Download Section */}
+      <section id="app" className="py-24 px-6 sm:px-10 bg-brand-dark text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.05]" />
+        
+        {/* Glow Effects */}
+        <div className="absolute top-1/2 left-0 w-96 h-96 bg-brand-primary/20 rounded-full blur-[100px] -translate-y-1/2 -z-0 pointer-events-none" />
+        
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center relative z-10">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-xs font-semibold text-white mb-6 border border-white/10 w-fit">
+               <Smartphone className="w-3.5 h-3.5" />
+               Zero Storage Space Required
+            </div>
+            
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 tracking-tight">
+              Instant App.<br/>
+              <span className="text-brand-primary">Infinite Flavor.</span>
+            </h2>
+            
+            <p className="text-white/70 text-lg md:text-xl font-medium mb-10 max-w-md leading-relaxed">
+              We engineered the 2QT App using Next-Gen PWA technology. That means no App Store downloads, zero updates to manage, and it takes up literally 0MB of storage on your phone.
+            </p>
+            
+            <ul className="space-y-4 mb-10">
+              {[
+                "Live 60FPS GPS tracking",
+                "Sensory Haptic Engine feedback",
+                "Full Offline-Mode support",
+                "Silent Over-The-Air updates"
+              ].map((feature, idx) => (
+                <li key={idx} className="flex items-center gap-3 text-white/90 font-medium">
+                  <div className="w-6 h-6 rounded-full bg-brand-primary/20 flex items-center justify-center shrink-0">
+                    <Star className="w-3.5 h-3.5 text-brand-primary fill-current" />
+                  </div>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button 
+                onClick={() => {
+                  // Trigger the browser's install prompt if available, or simulate it.
+                  toast.success("Tap the Share icon [↑] and 'Add to Home Screen' to install!");
+                }}
+                className="group flex items-center justify-center gap-3 bg-brand-primary text-white px-8 py-4 rounded-2xl text-[15px] font-bold hover:bg-brand-primary-dark transition-all shadow-[0_10px_30px_rgba(255,107,53,0.3)]"
+              >
+                <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                Install 2QT App Now
+              </button>
+            </div>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className="relative flex justify-center lg:justify-end"
+          >
+            {/* Abstract Phone Mockup */}
+            <div className="relative w-[280px] md:w-[320px] aspect-[1/2.1] bg-black rounded-[48px] p-2 shadow-2xl border-4 border-zinc-800 transform rotate-[-5deg] hover:rotate-0 transition-transform duration-700 group">
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-20" /> {/* Notch */}
+              <div className="relative w-full h-full bg-brand-light rounded-[38px] overflow-hidden">
+                <Image src="/premium_healthy_bowl_1777968667530.png" alt="App Preview" fill className="object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+                <div className="absolute bottom-10 left-6 right-6">
+                  <div className="text-white text-2xl font-bold mb-2">Track Order</div>
+                  <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden mb-4">
+                    <div className="w-2/3 h-full bg-brand-primary rounded-full animate-pulse" />
+                  </div>
+                  <div className="flex justify-between text-xs font-bold text-white/70 uppercase">
+                    <span>Kitchen</span>
+                    <span className="text-brand-primary">Arriving</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
