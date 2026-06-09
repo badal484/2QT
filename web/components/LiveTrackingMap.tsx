@@ -44,7 +44,7 @@ function MapUpdater({ riderLat, riderLng }: { riderLat?: number | null, riderLng
 function SmoothRiderMarker({ targetLat, targetLng }: { targetLat: number, targetLng: number }) {
   const markerRef = useRef<L.Marker>(null);
   const map = useMap();
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | null>(null);
   const currentPos = useRef<{ lat: number, lng: number }>({ lat: targetLat, lng: targetLng });
 
   useEffect(() => {
