@@ -12,14 +12,16 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
-import { MarketingTab } from "./MarketingTab";
 import { api } from "../lib/api";
 import { socket } from "../lib/socket";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import dynamic from "next/dynamic";
 
-const MapPolygonPicker = dynamic(() => import('../../components/MapPolygonPicker'), { ssr: false });
+const MarketingTab = dynamic(() => import("./MarketingTab").then(m => ({ default: m.MarketingTab })), { ssr: false });
+const MenuTab = dynamic(() => import("./MenuTab").then(m => ({ default: m.MenuTab })), { ssr: false });
+const ZonesTab = dynamic(() => import("./ZonesTab").then(m => ({ default: m.ZonesTab })), { ssr: false });
+const KitchensTab = dynamic(() => import("./KitchensTab").then(m => ({ default: m.KitchensTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -471,9 +473,9 @@ function OrdersTab() {
   );
 }
 
-// ─── Menu Tab ─────────────────────────────────────────────────────────────────
+// MenuTab extracted to ./MenuTab.tsx (dynamic import above)
 
-function MenuTab() {
+function _MenuTab_placeholder() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);

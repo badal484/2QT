@@ -174,7 +174,7 @@ export default function HomePage() {
                 <li><Link href="#" className="hover:text-brand-primary transition-colors">Help Center</Link></li>
                 <li><Link href="#" className="hover:text-brand-primary transition-colors">Partner with us</Link></li>
                 <li><Link href="/become-a-rider/apply" className="hover:text-brand-primary transition-colors">Become a Rider</Link></li>
-                <li><Link href="mailto:hello@2qt.in" className="text-brand-primary">hello@2qt.in</Link></li>
+                <li><Link href="mailto:hello@2qthello.com" className="text-brand-primary">hello@2qthello.com</Link></li>
               </ul>
             </div>
           </div>
