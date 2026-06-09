@@ -144,6 +144,15 @@ export default function MenuPage() {
       }
     };
 
+    const cachedLoc = typeof window !== "undefined" ? localStorage.getItem("2qt_last_location") : null;
+    if (cachedLoc) {
+      try {
+        const { lat, lng } = JSON.parse(cachedLoc);
+        loadMenu(lat, lng);
+        return;
+      } catch {}
+    }
+
     if (typeof window !== "undefined" && navigator.geolocation) {
       let resolved = false;
       const fallbackTimer = setTimeout(() => {
@@ -151,13 +160,14 @@ export default function MenuPage() {
           resolved = true;
           loadMenu(12.9716, 77.5946);
         }
-      }, 5000);
+      }, 3000); // Reduced fallback to 3s for even faster speed
 
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           if (!resolved) {
             resolved = true;
             clearTimeout(fallbackTimer);
+            localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
             loadMenu(pos.coords.latitude, pos.coords.longitude);
           }
         },
@@ -168,7 +178,7 @@ export default function MenuPage() {
             loadMenu(12.9716, 77.5946);
           }
         },
-        { timeout: 5000, maximumAge: 10000 }
+        { timeout: 3000, maximumAge: 3600000 } // 1 hour browser cache
       );
     } else {
       loadMenu(12.9716, 77.5946);
