@@ -121,8 +121,8 @@ function LoginForm() {
 
           {/* Header */}
           <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-primary to-orange-600 mb-6 shadow-lg shadow-brand-primary/20">
-              <span className="text-white text-lg font-black tracking-tighter">2Q</span>
+            <div className="w-14 h-14 bg-gradient-to-tr from-brand-primary to-orange-400 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-brand-primary/20 rotate-3 group-hover:rotate-6 transition-transform">
+              <span className="text-white text-lg font-black tracking-tighter">2QT</span>
             </div>
             <h1 className="text-3xl font-black tracking-tight text-white mb-2">
               {step === "phone" ? "Sign in to 2QT" : step === "otp" ? "Verify your identity" : "Welcome aboard"}

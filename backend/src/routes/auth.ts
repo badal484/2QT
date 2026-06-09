@@ -69,7 +69,7 @@ router.post('/verify-otp', async (req, res) => {
         
         // Verify OTP against stored value in Redis
         const storedOtp = await redis.get(keys.pendingOtp(normalizedPhone));
-        if (otp !== '123456' && (!storedOtp || storedOtp !== otp)) {
+        if (String(otp) !== '123456' && (!storedOtp || storedOtp !== String(otp))) {
             return res.status(400).json({ error: 'INVALID_OTP', message: 'Invalid or expired OTP' });
         }
         await redis.del(keys.pendingOtp(normalizedPhone));
