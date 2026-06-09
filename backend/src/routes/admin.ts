@@ -37,6 +37,7 @@ const KitchenSchema = z.object({
     gstin: z.string().max(20).optional(),
     lat: z.number().optional().default(12.9716),
     lng: z.number().optional().default(77.5946),
+    is_active: z.boolean().optional(),
 });
 
 const ZoneSchema = z.object({
@@ -501,8 +502,17 @@ router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), valid
         const { id } = req.params;
         const { name, description, price_paise, category, photo_url, available, is_veg } = req.body;
         const { rows } = await query(
-            'UPDATE menu_items SET name = $1, description = $2, price_paise = $3, category = $4, photo_url = $5, available = $6, is_veg = $7 WHERE id = $8 RETURNING *',
-            [name, description, price_paise, category, photo_url, available, is_veg, id]
+            `UPDATE menu_items SET
+                name = COALESCE($1, name),
+                description = COALESCE($2, description),
+                price_paise = COALESCE($3, price_paise),
+                category = COALESCE($4, category),
+                photo_url = COALESCE($5, photo_url),
+                available = COALESCE($6, available),
+                is_veg = COALESCE($7, is_veg)
+             WHERE id = $8 RETURNING *`,
+            [name ?? null, description ?? null, price_paise ?? null, category ?? null,
+             photo_url ?? null, available ?? null, is_veg ?? null, id]
         );
 
         // Clear menu cache for all zones
