@@ -1,10 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 
 const getSocketUrl = () => {
-  if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
-  }
-  return process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8000';
+  return process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8000';
 };
 
 export const socket: Socket = io(getSocketUrl(), {
