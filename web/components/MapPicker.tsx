@@ -62,6 +62,11 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
     }
   };
 
+  useEffect(() => {
+    reverseGeocode(defaultCenter[0], defaultCenter[1]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const eventHandlers = useMemo(
     () => ({
       dragend() {

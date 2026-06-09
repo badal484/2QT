@@ -106,6 +106,7 @@ export default function MenuPage() {
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [pricing, setPricing] = useState<any>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<[number, number]>([12.9716, 77.5946]);
 
   const { user } = useAuth()!;
   const { items: cartItems, addItem, removeItem, total, clearCart } = useCart()!;
@@ -113,6 +114,7 @@ export default function MenuPage() {
 
   useEffect(() => {
     const loadMenu = async (lat: number, lng: number) => {
+      setCurrentLocation([lat, lng]);
       try {
         const check = await api.get(`/menu/zones/check?lat=${lat}&lng=${lng}`);
         if (check.serviceable && check.zone) {
@@ -1057,6 +1059,7 @@ export default function MenuPage() {
                     {/* Interactive Map Picker */}
                     <div className="h-48 rounded-2xl relative overflow-hidden">
                        <MapPicker 
+                         defaultCenter={currentLocation}
                          onLocationSelect={({ area, landmark, lat, lng }) => {
                            setNewAddressDetails(prev => ({
                              ...prev,
