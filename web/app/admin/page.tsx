@@ -11,7 +11,7 @@ import {
   LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../layout";
+import { useAuth } from "../providers";
 import { MarketingTab } from "./MarketingTab";
 import { api } from "../lib/api";
 import { socket } from "../lib/socket";

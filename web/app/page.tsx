@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, ShoppingBag, MapPin, Star, Heart, Clock, ChevronRight, Utensils } from "lucide-react";
 import Link from "next/link";
-import { useAuth } from "./layout";
+import { useAuth } from "./providers";
 import Image from "next/image";
 
 export default function HomePage() {

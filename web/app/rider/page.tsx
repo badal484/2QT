@@ -8,7 +8,7 @@ const MapViewer = dynamic(() => import("../../components/MapViewer"), {
   ssr: false,
   loading: () => <div className="w-full h-full bg-zinc-900" />,
 });
-import { useAuth } from "../layout";
+import { useAuth } from "../providers";
 import { api } from "../lib/api";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";

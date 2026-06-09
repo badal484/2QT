@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { useAuth } from "../layout";
+import { useAuth } from "../providers";
 import { socket } from "../lib/socket";
 
 interface OrderItem {

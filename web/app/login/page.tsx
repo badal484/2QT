@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Smartphone, Shield } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "../lib/api";
-import { useAuth } from "../layout";
+import { useAuth } from "../providers";
 
 import { Suspense } from 'react';
 

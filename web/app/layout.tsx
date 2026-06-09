@@ -1,187 +1,126 @@
-"use client";
-
-import { createContext, useContext, useState, useEffect } from "react";
-import "./globals.css";
+import type { Metadata, Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
-import { Metadata } from "next";
-import { Toaster } from "sonner";
-import { api } from "./lib/api";
+import Script from "next/script";
+import "./globals.css";
+import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
 
-interface AuthContextType {
-  user: any;
-  loading: boolean;
-  login: (user: any) => void;
-  logout: () => void;
-}
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://velto.in";
+const SITE_NAME = "VELTO Food Palace";
+const SITE_DESC =
+  "Premium gourmet food delivered in 30 minutes across Bengaluru. Fresh ingredients, chef-crafted recipes, zero compromises.";
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — Gourmet Delivery in Bengaluru`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESC,
+  keywords: [
+    "food delivery Bengaluru",
+    "gourmet food delivery",
+    "online food order Bangalore",
+    "premium meal delivery",
+    "chef crafted food Bangalore",
+    "fast food delivery 30 minutes",
+    "meal subscription Bangalore",
+    "VELTO food",
+  ],
+  authors: [{ name: "VELTO Food Palace", url: SITE_URL }],
+  creator: "VELTO Food Palace",
+  publisher: "VELTO Food Palace",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — Gourmet Delivery in Bengaluru`,
+    description: SITE_DESC,
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "VELTO Food Palace — Premium Gourmet Delivery",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — Gourmet Delivery in Bengaluru`,
+    description: SITE_DESC,
+    images: ["/og-image.jpg"],
+    creator: "@velto_food",
+  },
+  alternates: {
+    canonical: SITE_URL,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  manifest: "/manifest.json",
+  category: "food",
+};
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const saved = localStorage.getItem("2qt_user");
-        const token = localStorage.getItem("2qt_token");
-        if (saved) {
-          setUser(JSON.parse(saved));
-        }
-        
-        // Refresh from server if token exists
-        if (token) {
-          try {
-            const data = await api.getProfile();
-            if (data?.user) {
-              login(data.user);
-            }
-          } catch (serverErr) {
-            console.warn("Failed to refresh user profile from server");
-            // Don't auto-logout here, might just be network error
-          }
-        }
-      } catch (e) {
-        console.error("localStorage access denied or parse error", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initAuth();
-
-    // Fallback just in case
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const login = (userData: any) => {
-    setUser(userData);
-    try {
-      localStorage.setItem("2qt_user", JSON.stringify(userData));
-    } catch (e) {}
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("2qt_user");
-    localStorage.removeItem("2qt_token");
-    localStorage.removeItem("2qt_refresh_token");
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
-}
-
-interface CartItem {
-  id: string;
-  name: string;
-  price_paise: number;
-  quantity: number;
-  category: string;
-}
-
-interface CartContextType {
-  items: CartItem[];
-  addItem: (item: Omit<CartItem, 'quantity'>) => void;
-  removeItem: (id: string) => void;
-  clearCart: () => void;
-  total: number;
-}
-
-// Cart Context
-const CartContext = createContext<CartContextType | null>(null);
-
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    try {
-      const savedCart = localStorage.getItem("2qt_cart");
-      if (savedCart) {
-        setItems(JSON.parse(savedCart));
-      }
-    } catch (e) {
-      console.error("Failed to parse cart from local storage", e);
-    }
-    setIsLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (isLoaded) {
-      try {
-        localStorage.setItem("2qt_cart", JSON.stringify(items));
-      } catch (e) {
-        console.error("Failed to save cart to local storage", e);
-      }
-    }
-  }, [items, isLoaded]);
-
-  const addItem = (item: Omit<CartItem, 'quantity'>) => {
-    setItems(prev => {
-      const existing = prev.find(i => i.id === item.id);
-      if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-      }
-      return [...prev, { ...item, quantity: 1 }];
-    });
-  };
-
-  const removeItem = (id: string) => {
-    setItems(prev => {
-      const existing = prev.find(i => i.id === id);
-      if (existing && existing.quantity > 1) {
-        return prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i);
-      }
-      return prev.filter(i => i.id !== id);
-    });
-  };
-
-  const clearCart = () => setItems([]);
-
-  const total = items.reduce((sum, item) => sum + (item.price_paise * item.quantity), 0);
-
-  return (
-    <CartContext.Provider value={{ items, addItem, removeItem, clearCart, total }}>
-      {children}
-    </CartContext.Provider>
-  );
-}
-
-export const useCart = () => useContext(CartContext);
+export const viewport: Viewport = {
+  themeColor: "#FF6B35",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`h-full antialiased ${inter.variable} ${outfit.variable}`}>
       <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#18181b" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="VELTO" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
       </head>
       <body className="min-h-full flex flex-col bg-white text-zinc-900 selection:bg-swish-green/20">
-        <AuthProvider>
-          <CartProvider>
-            {children}
-            <Toaster position="top-center" richColors />
-          </CartProvider>
-        </AuthProvider>
+        <Script
+          id="org-jsonld"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "VELTO Food Palace",
+              url: SITE_URL,
+              logo: `${SITE_URL}/icon-512x512.png`,
+              description: SITE_DESC,
+              areaServed: { "@type": "City", name: "Bengaluru" },
+              contactPoint: {
+                "@type": "ContactPoint",
+                telephone: "+91-886-700-0000",
+                contactType: "customer service",
+                availableLanguage: ["English", "Kannada", "Hindi"],
+              },
+              sameAs: [
+                "https://instagram.com/velto_food",
+                "https://twitter.com/velto_food",
+              ],
+            }),
+          }}
+        />
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

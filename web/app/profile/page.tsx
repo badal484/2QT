@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "../layout";
+import { useAuth } from "../providers";
 import { api } from "../lib/api";
 
 const TABS = [

@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useCart, useAuth } from "../layout";
+import { useCart, useAuth } from "../providers";
 import { api } from "../lib/api";
 import { Toaster, toast } from "sonner";
 
@@ -145,10 +145,30 @@ export default function MenuPage() {
     };
 
     if (typeof window !== "undefined" && navigator.geolocation) {
+      let resolved = false;
+      const fallbackTimer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          loadMenu(12.9716, 77.5946);
+        }
+      }, 5000);
+
       navigator.geolocation.getCurrentPosition(
-        (pos) => loadMenu(pos.coords.latitude, pos.coords.longitude),
-        () => loadMenu(12.9716, 77.5946), // Bangalore center fallback if denied
-        { timeout: 5000 }
+        (pos) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(fallbackTimer);
+            loadMenu(pos.coords.latitude, pos.coords.longitude);
+          }
+        },
+        () => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(fallbackTimer);
+            loadMenu(12.9716, 77.5946);
+          }
+        },
+        { timeout: 5000, maximumAge: 10000 }
       );
     } else {
       loadMenu(12.9716, 77.5946);

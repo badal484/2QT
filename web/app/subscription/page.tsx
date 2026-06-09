@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Loader2, Zap } from "lucide-react";
-import { useAuth } from "../layout";
+import { useAuth } from "../providers";
 import { api } from "../lib/api";
 import { toast, Toaster } from "sonner";
 
