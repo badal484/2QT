@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 import OTAUpdater from "../components/OTAUpdater";
+import InstallPrompt from "../components/InstallPrompt";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit", display: "swap" });
@@ -93,7 +94,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="2QT" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://ik.imagekit.io" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
+        <link rel="dns-prefetch" href="https://api.razorpay.com" />
       </head>
       <body className="min-h-full flex flex-col bg-white text-zinc-900 selection:bg-swish-green/20">
         <Script
@@ -123,6 +127,7 @@ export default function RootLayout({
         />
         <Providers>{children}</Providers>
         <OTAUpdater />
+        <InstallPrompt />
       </body>
     </html>
   );

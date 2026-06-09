@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { api } from '../utils/api';
+import { useAuth } from '../app/providers';
+import { api } from '../app/lib/api';
 import { Bell, BellRing } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -82,8 +82,7 @@ export default function PushNotifier() {
                     reg.showNotification("Notifications Enabled", {
                         body: "You will now receive live updates for your orders!",
                         icon: "/icon-192x192.png",
-                        vibrate: [200, 100, 200]
-                    });
+                    } as NotificationOptions);
                  });
             }
 

@@ -41,6 +41,52 @@ function MapUpdater({ riderLat, riderLng }: { riderLat?: number | null, riderLng
   return null;
 }
 
+function SmoothRiderMarker({ targetLat, targetLng }: { targetLat: number, targetLng: number }) {
+  const markerRef = useRef<L.Marker>(null);
+  const map = useMap();
+  const requestRef = useRef<number>();
+  const currentPos = useRef<{ lat: number, lng: number }>({ lat: targetLat, lng: targetLng });
+
+  useEffect(() => {
+    map.flyTo([targetLat, targetLng], 15, { animate: true, duration: 1 });
+  }, [targetLat, targetLng, map]);
+
+  useEffect(() => {
+    const animateMarker = () => {
+      if (!markerRef.current) return;
+      
+      const latDiff = targetLat - currentPos.current.lat;
+      const lngDiff = targetLng - currentPos.current.lng;
+      
+      // Stop animating if we're extremely close
+      if (Math.abs(latDiff) < 0.00001 && Math.abs(lngDiff) < 0.00001) {
+        currentPos.current = { lat: targetLat, lng: targetLng };
+        markerRef.current.setLatLng([targetLat, targetLng]);
+        return;
+      }
+
+      // Linear interpolation factor (speed)
+      const lerpFactor = 0.05;
+      
+      currentPos.current = {
+        lat: currentPos.current.lat + latDiff * lerpFactor,
+        lng: currentPos.current.lng + lngDiff * lerpFactor
+      };
+
+      markerRef.current.setLatLng([currentPos.current.lat, currentPos.current.lng]);
+      requestRef.current = requestAnimationFrame(animateMarker);
+    };
+
+    requestRef.current = requestAnimationFrame(animateMarker);
+
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [targetLat, targetLng]);
+
+  return <Marker ref={markerRef} position={[currentPos.current.lat, currentPos.current.lng]} icon={riderIcon} zIndexOffset={1000} />;
+}
+
 export default function LiveTrackingMap({
   kitchenLat,
   kitchenLng,
@@ -99,10 +145,7 @@ export default function LiveTrackingMap({
         )}
 
         {currentRiderLat && currentRiderLng && (
-          <>
-            <Marker position={[currentRiderLat, currentRiderLng]} icon={riderIcon} zIndexOffset={1000} />
-            <MapUpdater riderLat={currentRiderLat} riderLng={currentRiderLng} />
-          </>
+          <SmoothRiderMarker targetLat={currentRiderLat} targetLng={currentRiderLng} />
         )}
 
         {/* Draw a subtle dotted line from Kitchen to Customer */}

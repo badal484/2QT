@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initAuth();
-    const timer = setTimeout(() => setLoading(false), 2000);
+    const timer = setTimeout(() => setLoading(false), 300);
     return () => clearTimeout(timer);
   }, []);
 
@@ -72,6 +72,8 @@ export function useAuth() {
 
 // ─── Cart ─────────────────────────────────────────────────────────────────────
 
+import { useHaptics } from "../hooks/useHaptics";
+
 interface CartItem {
   id: string;
   name: string;
@@ -93,6 +95,7 @@ const CartContext = createContext<CartContextType | null>(null);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const haptics = useHaptics();
 
   useEffect(() => {
     try {
@@ -109,6 +112,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items, isLoaded]);
 
   const addItem = (item: Omit<CartItem, "quantity">) => {
+    haptics.tap();
     setItems(prev => {
       const existing = prev.find(i => i.id === item.id);
       if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
@@ -117,6 +121,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeItem = (id: string) => {
+    haptics.tap();
     setItems(prev => {
       const existing = prev.find(i => i.id === id);
       if (existing && existing.quantity > 1) return prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i);

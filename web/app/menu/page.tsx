@@ -14,6 +14,7 @@ import dynamic from "next/dynamic";
 import { useCart, useAuth } from "../providers";
 import { api } from "../lib/api";
 import PushNotifier from "../../components/PushNotifier";
+import { useHaptics } from "../../hooks/useHaptics";
 import { Toaster, toast } from "sonner";
 
 const MapPicker = dynamic(() => import('../../components/MapPicker'), { 
@@ -83,6 +84,7 @@ function OrderSuccess({ onDone }: { onDone: () => void }) {
 }
 
 export default function MenuPage() {
+  const haptics = useHaptics();
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
@@ -118,20 +120,53 @@ export default function MenuPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const loadMenu = async (lat: number, lng: number) => {
+    const MENU_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  const applyMenuData = (items: MenuItem[], banners: any[]) => {
+    setItems(items);
+    setCategories(["All", ...Array.from(new Set(items.map((i: MenuItem) => i.category))) as string[]]);
+    setBanners(banners);
+  };
+
+  const loadMenu = async (lat: number, lng: number) => {
       setCurrentLocation([lat, lng]);
       try {
         const check = await api.get(`/menu/zones/check?lat=${lat}&lng=${lng}`);
         if (check.serviceable && check.zone) {
           setServiceable(true);
           setZoneId(check.zone.id);
+
+          // Serve cached menu instantly, then refresh in background
+          const cacheKey = `2qt_menu_${check.zone.id}`;
+          const cached = localStorage.getItem(cacheKey);
+          if (cached) {
+            try {
+              const { ts, items: cachedItems, banners: cachedBanners } = JSON.parse(cached);
+              if (Date.now() - ts < MENU_CACHE_TTL) {
+                applyMenuData(cachedItems, cachedBanners);
+                setLoading(false);
+                // Refresh in background — don't await
+                api.get(`/menu?zoneId=${check.zone.id}`).then((r: any) => {
+                  const freshItems = r.items ?? [];
+                  setItems(freshItems);
+                  setCategories(["All", ...Array.from(new Set(freshItems.map((i: MenuItem) => i.category))) as string[]]);
+                  localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), items: freshItems, banners: cachedBanners }));
+                }).catch(() => {});
+                return;
+              }
+            } catch {}
+          }
+
           const [menuRes, bannerRes] = await Promise.all([
             api.get(`/menu?zoneId=${check.zone.id}`),
             api.get(`/banners`)
           ]);
-          setItems(menuRes.items ?? []);
-          setCategories(["All", ...Array.from(new Set((menuRes.items ?? []).map((i: MenuItem) => i.category))) as string[]]);
-          setBanners(bannerRes.banners ?? []);
+          const freshItems = menuRes.items ?? [];
+          const freshBanners = bannerRes.banners ?? [];
+          applyMenuData(freshItems, freshBanners);
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), items: freshItems, banners: freshBanners }));
+          } catch {}
         } else {
           setServiceable(false);
         }
@@ -313,6 +348,7 @@ export default function MenuPage() {
   }, []);
 
   const placeOrder = async (method: "online" | "cod" = "online") => {
+    haptics.heavyTap();
     if (!user) { router.push("/login"); return; }
     if (!deliveryAddress) {
       toast.error("Please select a delivery address first!");
@@ -331,6 +367,7 @@ export default function MenuPage() {
       });
 
       if (res.status === "confirmed") {
+        haptics.success();
         setOrderSuccessId(res.orderId);
         clearCart();
         toast.success("Order Confirmed!");
@@ -352,10 +389,12 @@ export default function MenuPage() {
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature
               });
+              haptics.success();
               setOrderSuccessId(res.orderId);
               clearCart();
               toast.success("Payment Successful!");
             } catch (err: any) {
+              haptics.error();
               toast.error("Payment verification failed: " + err.message);
             }
           },
@@ -369,12 +408,14 @@ export default function MenuPage() {
         };
 
         if (typeof (window as any).Razorpay === 'undefined') {
+          haptics.error();
           toast.error("Payment gateway failed to load. Please check your connection or disable adblockers.");
           return;
         }
 
         const rzp = new (window as any).Razorpay(options);
         rzp.on('payment.failed', function (response: any){
+          haptics.error();
           toast.error(response.error.description || "Payment failed");
         });
         rzp.open();
@@ -387,9 +428,36 @@ export default function MenuPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-brand-light flex flex-col items-center justify-center gap-6">
-      <Loader2 className="w-12 h-12 text-brand-primary animate-spin" />
-      <div className="text-sm font-medium text-black/40">Finding your location…</div>
+    <div className="min-h-screen bg-brand-light p-6 pt-24 font-sans animate-pulse">
+      {/* Search Bar Skeleton */}
+      <div className="h-12 bg-black/5 rounded-2xl w-full max-w-md mx-auto mb-8" />
+      
+      {/* Categories Skeleton */}
+      <div className="flex gap-4 overflow-x-auto pb-4 mb-8 no-scrollbar">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="h-10 w-24 bg-black/5 rounded-full shrink-0" />
+        ))}
+      </div>
+
+      {/* Hero Banner Skeleton */}
+      <div className="w-full aspect-[21/9] md:aspect-[21/6] bg-black/5 rounded-3xl mb-12" />
+
+      {/* Menu Items Skeleton */}
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-black/5 rounded-lg mb-4" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="bg-white p-4 rounded-3xl flex gap-4">
+              <div className="flex-1 space-y-3">
+                <div className="h-6 bg-black/5 rounded-md w-3/4" />
+                <div className="h-4 bg-black/5 rounded-md w-1/2" />
+                <div className="h-10 bg-black/5 rounded-xl w-24 mt-4" />
+              </div>
+              <div className="w-32 h-32 bg-black/5 rounded-2xl shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 
