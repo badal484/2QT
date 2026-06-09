@@ -38,9 +38,10 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
     const otp = '123456'; // Hardcoded as requested
     await redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 });
 
-    if (process.env.NODE_ENV === 'development' || !process.env.MSG91_AUTH_KEY) {
-        console.log(`[DEV/SIMULATOR] OTP for ${normalizedPhone}: ${otp}`);
-    } else {
+    // Always log so OTP is visible in Render dashboard logs
+    console.log(`[OTP] ${normalizedPhone} → ${otp}`);
+
+    if (process.env.MSG91_AUTH_KEY) {
         try {
             await axios.post(
                 'https://control.msg91.com/api/v5/otp',
@@ -52,7 +53,6 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
                 },
                 { headers: { 'Content-Type': 'application/json' } }
             );
-            console.log(`[PROD] MSG91 OTP sent to ${normalizedPhone}`);
         } catch (error: any) {
             console.error('[MSG91_ERROR]', error?.response?.data || error.message);
         }
