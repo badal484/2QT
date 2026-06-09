@@ -1,6 +1,6 @@
 const getApiUrl = () => {
   // Hardcoded Pinggy tunnel to bypass Vercel environment variables temporarily.
-  return 'https://gnobw-2401-4900-73d7-88c4-b87f-dfa8-7233-522f.run.pinggy-free.link/api/v1';
+  return 'https://qhlby-117-96-21-221.run.pinggy-free.link/api/v1';
 };
 
 const API_BASE_URL = getApiUrl();
