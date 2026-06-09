@@ -197,40 +197,25 @@ export default function MenuPage() {
         initialLat = lat;
         initialLng = lng;
         hasCache = true;
-        loadMenu(lat, lng); // Instantly load UI
       } catch {}
     }
 
-    if (typeof window !== "undefined" && navigator.geolocation) {
-      let resolved = false;
-      const fallbackTimer = hasCache ? null : setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          loadMenu(initialLat, initialLng);
-        }
-      }, 3000);
+    // 1. Optimistically load the menu INSTANTLY (0ms delay for the user)
+    loadMenu(initialLat, initialLng);
 
+    // 2. Silently fetch exact location in the background to refine the menu
+    if (typeof window !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          if (!resolved) {
-            resolved = true;
-            if (fallbackTimer) clearTimeout(fallbackTimer);
-            localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
-            // Silently update the menu in the background with the freshest coordinates
-            loadMenu(pos.coords.latitude, pos.coords.longitude);
-          }
+          localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
+          // Only reload if the coordinates are significantly different (optional, but calling loadMenu again is fine as it's silent)
+          loadMenu(pos.coords.latitude, pos.coords.longitude);
         },
         () => {
-          if (!resolved) {
-            resolved = true;
-            if (fallbackTimer) clearTimeout(fallbackTimer);
-            loadMenu(initialLat, initialLng);
-          }
+          // Ignore location denial, we already loaded the fallback menu
         },
-        { timeout: 3000, maximumAge: 3600000 } // 1 hour browser cache
+        { timeout: 5000, maximumAge: 3600000 } // 1 hour browser cache
       );
-    } else {
-      if (!hasCache) loadMenu(initialLat, initialLng);
     }
   }, []);
 
