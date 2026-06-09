@@ -1,5 +1,5 @@
 // 2QT Business Constants
-export const 2QT = {
+export const TWO_QT = {
     DELIVERY: {
         BASE_FEE_PAISE: 2500, // Rs.25
         SUBSCRIBER_FEE_PAISE: 0, // Free for subscribers

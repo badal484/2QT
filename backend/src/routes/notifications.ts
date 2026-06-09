@@ -1,11 +1,11 @@
-import { Router } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { Router, Response } from 'express';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import db from '../db';
 import { z } from 'zod';
 
 const router = Router();
 
-router.post('/subscribe', requireAuth('customer'), async (req, res) => {
+router.post('/subscribe', authenticate, requireRole('customer', 'rider', 'chef', 'super_admin'), async (req: AuthRequest, res: Response) => {
     try {
         const schema = z.object({
             subscription: z.object({

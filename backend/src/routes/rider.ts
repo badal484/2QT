@@ -5,7 +5,7 @@ import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToRiders, emitToAdmin, emitToOrder } from '../socket';
 import { notificationsQueue, invoicesQueue } from '../jobs/queues';
-import { 2QT } from '../config/constants';
+import { TWO_QT } from '../config/constants';
 import { pushService } from '../services/push.service';
 
 const router = Router();
@@ -191,7 +191,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         const cashToRecord = isCOD ? order.total_amount_paise : 0;
 
         // Systematic Financial Split
-        const basePay = 2QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
+        const basePay = TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
         const distanceBonus = 1000; // Rs. 10 (Systematic calculation would go here)
         const platformFee = Math.floor(basePay * 0.1); // 10% 2QT Commission
         const netEarnings = basePay + distanceBonus - platformFee;
@@ -216,7 +216,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     });
 
     // Notify Rider of net earnings update
-    emitToUser(riderId, 'earnings_updated', { earningsPaise: 2QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE + 1000 - Math.floor(2QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE * 0.1) });
+    emitToUser(riderId, 'earnings_updated', { earningsPaise: TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE + 1000 - Math.floor(TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE * 0.1) });
 
     emitToUser(order.customer_id, 'order_status_update', { orderId, status: 'delivered' });
     emitToOrder(orderId, 'order_status_update', { orderId, status: 'delivered' });

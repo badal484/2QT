@@ -8,7 +8,7 @@ import { redis, keys } from '../redis';
 import { paymentLimiter } from '../middleware/rateLimiter';
 import { query } from '../db';
 import { finalizeOrder, createPendingOrder, finalizeWalletRecharge } from '../services/order.service';
-import { 2QT } from '../config/constants';
+import { TWO_QT } from '../config/constants';
 
 const router = Router();
 
@@ -178,7 +178,7 @@ router.post('/subscription/purchase', authenticate, async (req: AuthRequest, res
     const customerId = req.user!.userId;
     const { planId } = req.body;
 
-    const plans = 2QT.SUBSCRIPTION.PLANS;
+    const plans = TWO_QT.SUBSCRIPTION.PLANS;
     const plan = plans.find(p => p.id === planId);
     if (!plan) return res.status(400).json({ error: 'INVALID_PLAN' });
 

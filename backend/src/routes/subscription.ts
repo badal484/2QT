@@ -2,12 +2,12 @@ import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { handleSubscriptionRenewal } from '../services/subscription.service';
-import { 2QT } from '../config/constants';
+import { TWO_QT } from '../config/constants';
 
 const router = Router();
 
 router.get('/plans', async (req, res) => {
-    res.json({ plans: 2QT.SUBSCRIPTION.PLANS });
+    res.json({ plans: TWO_QT.SUBSCRIPTION.PLANS });
 });
 
 router.get('/me', authenticate, async (req: AuthRequest, res) => {

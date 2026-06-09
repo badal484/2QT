@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { 2QT } from '../config/constants';
+import { TWO_QT } from '../config/constants';
 import { emitToAdmin } from '../socket';
 
 const router = Router();
@@ -94,7 +94,7 @@ router.get('/referrals/stats', authenticate, async (req: AuthRequest, res) => {
     res.json({
         referralCode: user[0].referral_code,
         totalReferrals: parseInt(referrals[0].count),
-        rewardAmountPaise: parseInt(referrals[0].count) * 2QT.REFERRAL.REFERRER_REWARD_PAISE
+        rewardAmountPaise: parseInt(referrals[0].count) * TWO_QT.REFERRAL.REFERRER_REWARD_PAISE
     });
 });
 

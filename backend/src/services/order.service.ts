@@ -3,7 +3,7 @@ import { redis, keys } from '../redis';
 import { notificationsQueue } from '../jobs/queues';
 import { emitToKitchen, emitToUser, emitToAdmin, emitToRiders } from '../socket';
 import { processReferral } from '../services/referral.service';
-import { 2QT } from '../config/constants';
+import { TWO_QT } from '../config/constants';
 
 const getDeliveryOtpForOrder = () => {
     if (process.env.NODE_ENV === 'development') {
@@ -146,7 +146,7 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
             }
 
             // 7. Award Loyalty Points
-            const pointsToAward = Math.floor((finalizedOrder.total_amount_paise / 100) * 2QT.LOYALTY.POINTS_PER_HUNDRED_PAISE);
+            const pointsToAward = Math.floor((finalizedOrder.total_amount_paise / 100) * TWO_QT.LOYALTY.POINTS_PER_HUNDRED_PAISE);
             if (pointsToAward > 0) {
                 await client.query(`
                     INSERT INTO loyalty_transactions (customer_id, points, type, order_id, expires_at)
