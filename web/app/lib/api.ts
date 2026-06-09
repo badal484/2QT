@@ -1,6 +1,6 @@
 const getApiUrl = () => {
-  // Temporary Pinggy tunnel so the user can test the live Vercel app on their phone. Expires in 60 mins.
-  return process.env.NEXT_PUBLIC_API_URL || 'https://gnobw-2401-4900-73d7-88c4-b87f-dfa8-7233-522f.run.pinggy-free.link/api/v1';
+  // Hardcoded Pinggy tunnel to bypass Vercel environment variables temporarily.
+  return 'https://gnobw-2401-4900-73d7-88c4-b87f-dfa8-7233-522f.run.pinggy-free.link/api/v1';
 };
 
 const API_BASE_URL = getApiUrl();
