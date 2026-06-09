@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: velto-postgres
+    environment:
+      POSTGRES_USER: velto
+      POSTGRES_PASSWORD: velto_password
+      POSTGRES_DB: velto
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: velto-redis
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: velto-backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://velto:velto_password@postgres:5432/velto
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-supersecret}
+    ports:
+      - "8000:3000"
+    depends_on:
+      - postgres
+      - redis
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: velto-web
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:3000/api/v1
+    ports:
+      - "80:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

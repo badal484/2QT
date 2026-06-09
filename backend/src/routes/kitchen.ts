@@ -1,0 +1,211 @@
+// @ts-nocheck
+import { Router } from 'express';
+import { query } from '../db';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { emitToUser, emitToKitchen, emitToRiders, emitToAdmin, emitToOrder } from '../socket';
+import { notificationsQueue } from '../jobs/queues';
+
+async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> {
+    if (req.user!.kitchenId) return req.user!.kitchenId;
+    if (req.user!.role === 'super_admin') {
+        const { rows } = await query('SELECT id FROM kitchens LIMIT 1');
+        if (rows.length > 0) return rows[0].id;
+    }
+    res.status(400).json({ error: 'KITCHEN_NOT_ASSIGNED' });
+    return null;
+}
+
+const router = Router();
+
+router.get('/orders', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    let rows: any[] = [];
+    
+    if (req.user!.role === 'super_admin') {
+        const result = await query(
+            `SELECT o.*, u.name as customer_name
+             FROM orders o
+             JOIN users u ON o.customer_id = u.id
+             WHERE o.status IN ('confirmed', 'preparing', 'ready_for_pickup')
+             ORDER BY o.created_at ASC`
+        );
+        rows = result.rows;
+    } else {
+        const kitchenId = await getKitchenId(req, res);
+        if (!kitchenId) return;
+        
+        const result = await query(
+            `SELECT o.*, u.name as customer_name
+             FROM orders o
+             JOIN users u ON o.customer_id = u.id
+             WHERE o.kitchen_id = $1 AND o.status IN ('confirmed', 'preparing', 'ready_for_pickup')
+             ORDER BY o.created_at ASC`,
+            [kitchenId]
+        );
+        rows = result.rows;
+    }
+
+    for (const order of rows) {
+        const { rows: items } = await query(
+            'SELECT menu_item_name as name, quantity, price_paise, station FROM order_items WHERE order_id = $1',
+            [order.id]
+        );
+        order.items = items;
+    }
+
+    res.json({ orders: rows });
+});
+
+router.post('/orders/:id/claim', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const chefId = req.user!.userId;
+
+    const { rowCount, rows } = await query(
+        'UPDATE orders SET status = \'preparing\', claimed_by_chef_id = $1, claimed_at = NOW() WHERE id = $2 AND status = \'confirmed\' AND claimed_by_chef_id IS NULL RETURNING kitchen_id',
+        [chefId, id]
+    );
+
+    if (rowCount === 0) return res.status(400).json({ error: 'ORDER_ALREADY_CLAIMED' });
+
+    const kitchenId = rows[0]?.kitchen_id;
+    if (kitchenId) {
+        emitToKitchen(kitchenId, 'order_updated', { orderId: id, status: 'preparing' });
+        emitToAdmin('order_status_update', { orderId: id, status: 'preparing' });
+    }
+    
+    res.json({ success: true });
+});
+
+router.patch('/orders/:id/status', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    try {
+        const { rows } = await query(
+            `UPDATE orders SET status = $1 WHERE id = $2 
+             RETURNING id, display_id, customer_id, kitchen_id, zone_id, status`,
+            [status, id]
+        );
+        const order = rows[0];
+
+        // 1. WebSocket Updates
+        emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });
+        emitToOrder(id, 'order_status_update', { orderId: id, status });
+        emitToKitchen(order.kitchen_id, 'order_updated', { orderId: id, status });
+        emitToAdmin('order_status_update', { orderId: id, status, display_id: order.display_id });
+
+        // 2. Notification Queue
+        const { rows: userRows } = await query('SELECT phone FROM users WHERE id = $1', [order.customer_id]);
+        const customerPhone = userRows[0]?.phone;
+
+        if (customerPhone) {
+            let notificationType: any = null;
+            if (status === 'preparing') notificationType = 'order_preparing';
+            if (status === 'ready_for_pickup') {
+                notificationType = 'order_ready';
+                emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id }, order.zone_id);
+            }
+            
+            if (notificationType) {
+                await notificationsQueue.add(notificationType, { 
+                    phone: customerPhone,
+                    displayId: order.display_id 
+                });
+            }
+        }
+
+        res.json({ order });
+    } catch (err: any) {
+        res.status(400).json({ error: 'INVALID_TRANSITION', message: err.message });
+    }
+});
+
+router.get('/inventory', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+    const { rows } = await query('SELECT * FROM ingredients WHERE kitchen_id = $1 ORDER BY name', [kitchenId]);
+    res.json({ inventory: rows });
+});
+
+router.patch('/inventory/:id', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { current_stock } = req.body;
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+
+    const { rowCount } = await query(
+        'UPDATE ingredients SET current_stock_grams = $1 WHERE id = $2 AND kitchen_id = $3',
+        [current_stock, id, kitchenId]
+    );
+
+    if (rowCount === 0) return res.status(404).json({ error: 'INGREDIENT_NOT_FOUND' });
+    res.json({ success: true });
+});
+
+router.get('/batches', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+    const { rows } = await query('SELECT * FROM production_batches WHERE kitchen_id = $1 AND status != \'completed\'', [kitchenId]);
+    res.json({ batches: rows });
+});
+
+router.post('/batches', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { item_name, target_quantity } = req.body;
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+    
+    await query(`
+        INSERT INTO production_batches (kitchen_id, item_name, target_quantity, current_quantity, status)
+        VALUES ($1, $2, $3, 0, 'active')
+    `, [kitchenId, item_name, target_quantity]);
+
+    res.json({ success: true });
+});
+
+router.post('/batches/:id/complete', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    await query('UPDATE production_batches SET status = \'completed\', completed_at = NOW() WHERE id = $1', [id]);
+    res.json({ success: true });
+});
+
+router.get('/prep-list', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+    const { rows } = await query('SELECT * FROM prep_tasks WHERE kitchen_id = $1 AND date = CURRENT_DATE', [kitchenId]);
+    res.json({ tasks: rows });
+});
+
+router.post('/prep-list/:id/toggle', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    await query('UPDATE prep_tasks SET completed = NOT completed, completed_at = CASE WHEN NOT completed THEN NOW() ELSE NULL END WHERE id = $1', [id]);
+    res.json({ success: true });
+});
+
+router.get('/feedback', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+    const { rows: feedbacks } = await query(`
+        SELECT f.*, o.display_id as order_display_id
+        FROM order_feedback f
+        JOIN orders o ON f.order_id = o.id
+        WHERE o.kitchen_id = $1
+        ORDER BY f.created_at DESC
+        LIMIT 50
+    `, [kitchenId]);
+
+    const { rows: avg } = await query('SELECT AVG(f.rating) as average FROM order_feedback f JOIN orders o ON f.order_id = o.id WHERE o.kitchen_id = $1', [kitchenId]);
+
+    res.json({ feedbacks, averageRating: parseFloat(avg[0].average || '0').toFixed(1) });
+});
+
+router.post('/shift-handover', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { notes, cleaningStatus, gasStatus } = req.body;
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+    await query(`
+        INSERT INTO shift_handovers (kitchen_id, chef_id, notes, cleaning_completed, gas_safety_checked)
+        VALUES ($1, $2, $3, $4, $5)
+    `, [kitchenId, req.user!.userId, notes, cleaningStatus, gasStatus]);
+    res.json({ success: true });
+});
+
+export default router;

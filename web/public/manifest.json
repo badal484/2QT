@@ -1,0 +1,23 @@
+{
+  "name": "2QT Delivery Rider",
+  "short_name": "2QT Rider",
+  "description": "Delivery partner portal for 2QT Food",
+  "start_url": "/rider",
+  "display": "standalone",
+  "background_color": "#18181b",
+  "theme_color": "#18181b",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

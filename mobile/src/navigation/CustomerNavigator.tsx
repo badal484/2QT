@@ -1,0 +1,118 @@
+import React from 'react';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import { UtensilsCrossed, PackageSearch, UserRound } from 'lucide-react-native';
+
+import HomeScreen from '../screens/HomeScreen';
+import SearchScreen from '../screens/SearchScreen';
+import ItemDetailScreen from '../screens/ItemDetailScreen';
+import CartScreen from '../screens/CartScreen';
+import AddressScreen from '../screens/AddressScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
+import OrderConfirmedScreen from '../screens/OrderConfirmedScreen';
+import OrderTrackingScreen from '../screens/OrderTrackingScreen';
+import RateOrderScreen from '../screens/RateOrderScreen';
+import OrderHistoryScreen from '../screens/OrderHistoryScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import MyPlansScreen from '../screens/MyPlansScreen';
+import ReferralScreen from '../screens/ReferralScreen';
+import SupportScreen from '../screens/SupportScreen';
+import SubscriptionDetailScreen from '../screens/SubscriptionDetailScreen';
+import AddressBookScreen from '../screens/AddressBookScreen';
+import WalletScreen from '../screens/WalletScreen';
+import LoyaltyScreen from '../screens/LoyaltyScreen';
+import HelpScreen from '../screens/HelpScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import RenewSubscriptionScreen from '../screens/RenewSubscriptionScreen';
+
+const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+
+const MenuStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Home" component={HomeScreen} />
+    <Stack.Screen name="Search" component={SearchScreen} />
+  </Stack.Navigator>
+);
+
+const OrdersStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
+    <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
+  </Stack.Navigator>
+);
+
+const ProfileStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Profile" component={ProfileScreen} />
+    <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+    <Stack.Screen name="MyPlans" component={MyPlansScreen} />
+    <Stack.Screen name="Referral" component={ReferralScreen} />
+    <Stack.Screen name="Wallet" component={WalletScreen} />
+    <Stack.Screen name="Loyalty" component={LoyaltyScreen} />
+    <Stack.Screen name="Support" component={SupportScreen} />
+    <Stack.Screen name="Help" component={HelpScreen} />
+    <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+    <Stack.Screen name="SubscriptionDetail" component={SubscriptionDetailScreen} />
+    <Stack.Screen name="RenewSubscription" component={RenewSubscriptionScreen} />
+  </Stack.Navigator>
+);
+
+const TabNavigator = () => (
+  <Tab.Navigator 
+    screenOptions={{ 
+      headerShown: false,
+      tabBarActiveTintColor: '#FF6B35',
+      tabBarInactiveTintColor: '#9CA3AF',
+      tabBarStyle: {
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+        paddingTop: 8,
+        paddingBottom: 8,
+        height: 60,
+      },
+      tabBarLabelStyle: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        marginTop: 4,
+      }
+    }}
+  >
+    <Tab.Screen 
+      name="MenuTab" 
+      component={MenuStack} 
+      options={{ tabBarLabel: 'Menu', tabBarIcon: ({ color }) => <UtensilsCrossed size={24} color={color} /> }} 
+    />
+    <Tab.Screen 
+      name="OrdersTab" 
+      component={OrdersStack} 
+      options={{ tabBarLabel: 'Orders', tabBarIcon: ({ color }) => <PackageSearch size={24} color={color} /> }} 
+    />
+    <Tab.Screen 
+      name="ProfileTab" 
+      component={ProfileStack} 
+      options={{ tabBarLabel: 'Profile', tabBarIcon: ({ color }) => <UserRound size={24} color={color} /> }} 
+    />
+  </Tab.Navigator>
+);
+
+const CustomerNavigator = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={TabNavigator} />
+      <Stack.Screen name="AddressBook" component={AddressBookScreen} />
+      <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
+      <Stack.Screen name="Cart" component={CartScreen} />
+      <Stack.Screen name="Address" component={AddressScreen} />
+      <Stack.Screen name="Checkout" component={CheckoutScreen} />
+      <Stack.Screen name="OrderConfirmed" component={OrderConfirmedScreen} />
+      <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
+      <Stack.Screen name="RateOrder" component={RateOrderScreen} />
+    </Stack.Navigator>
+  );
+};
+
+export default CustomerNavigator;
+
+export default CustomerNavigator;
