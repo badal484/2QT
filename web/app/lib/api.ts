@@ -1,5 +1,8 @@
 const getApiUrl = () => {
-  return 'https://yicfp-117-96-21-221.run.pinggy-free.link/api/v1';
+  // In the browser, call through the Next.js proxy (same-origin — no CORS, no Pinggy timeouts)
+  if (typeof window !== 'undefined') return '/api/proxy';
+  // Server-side (SSR) calls go directly to the backend
+  return process.env.BACKEND_URL || 'http://localhost:8000/api/v1';
 };
 
 const API_BASE_URL = getApiUrl();
