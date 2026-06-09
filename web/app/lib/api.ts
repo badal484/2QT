@@ -1,5 +1,5 @@
 const getApiUrl = () => {
-  return 'https://dhxrv-2401-4900-73e5-f564-84f2-d96b-267a-5877.run.pinggy-free.link/api/v1';
+  return 'https://njzgz-117-96-21-221.run.pinggy-free.link/api/v1';
 };
 
 const API_BASE_URL = getApiUrl();
