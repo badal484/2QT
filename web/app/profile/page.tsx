@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send } from "lucide-react";
 import Link from "next/link";
@@ -605,7 +605,7 @@ function SupportTab() {
 }
 
 // ── Root ──────────────────────────────────────────────────────────────────────
-export default function ProfilePage() {
+function ProfileContent() {
   const { user, logout, loading: authLoading } = useAuth()!;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -676,5 +676,17 @@ export default function ProfilePage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+      </div>
+    }>
+      <ProfileContent />
+    </Suspense>
   );
 }
