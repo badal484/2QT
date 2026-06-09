@@ -35,7 +35,7 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
     }
 
     // Generate OTP and store in Redis with 10-minute TTL
-    const otp = process.env.NODE_ENV === 'development' ? '123456' : String(Math.floor(100000 + Math.random() * 900000));
+    const otp = '123456'; // Hardcoded as requested
     await redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 });
 
     if (process.env.NODE_ENV === 'development' || !process.env.MSG91_AUTH_KEY) {
