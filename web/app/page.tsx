@@ -176,7 +176,7 @@ export default function HomePage() {
             </h2>
             
             <p className="text-white/70 text-lg md:text-xl font-medium mb-10 max-w-md leading-relaxed">
-              We engineered the 2QT App using Next-Gen PWA technology. That means no App Store downloads, zero updates to manage, and it takes up literally 0MB of storage on your phone.
+              We engineered the 2QT App using Next-Gen PWA technology. That means no App Store or Play Store downloads, zero updates to manage, and it takes up literally 0MB of storage on your phone.
             </p>
             
             <ul className="space-y-4 mb-10">
