@@ -12,12 +12,12 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379'
 });
 
 // Queues
-export const notificationsQueue = new Queue('velto:notifications', { connection });
-export const invoicesQueue = new Queue('velto:invoices', { connection });
-export const emailsQueue = new Queue('velto:emails', { connection });
+export const notificationsQueue = new Queue('2qt:notifications', { connection });
+export const invoicesQueue = new Queue('2qt:invoices', { connection });
+export const emailsQueue = new Queue('2qt:emails', { connection });
 
 // Workers
-new Worker('velto:notifications', async (job: Job) => {
+new Worker('2qt:notifications', async (job: Job) => {
     const type = job.name as any;
     const data = job.data;
     try {
@@ -28,7 +28,7 @@ new Worker('velto:notifications', async (job: Job) => {
     }
 }, { connection });
 
-new Worker('velto:invoices', async (job: Job) => {
+new Worker('2qt:invoices', async (job: Job) => {
     const { orderId } = job.data;
     try {
         const invoiceUrl = await generateInvoicePDF(orderId);
@@ -40,7 +40,7 @@ new Worker('velto:invoices', async (job: Job) => {
     }
 }, { connection });
 
-new Worker('velto:emails', async (job: Job) => {
+new Worker('2qt:emails', async (job: Job) => {
     const { orderId, email } = job.data;
     console.log(`[JOB] Sending GST invoice email to: ${email}`);
     // Use nodemailer or SendGrid here

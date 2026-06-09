@@ -6,7 +6,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        velto: {
+        2qt: {
           orange: "#FF6B35",
           "orange-dark": "#E55A2B",
           dark: "#1A1A2E",

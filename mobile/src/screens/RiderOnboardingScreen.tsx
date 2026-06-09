@@ -11,13 +11,13 @@ const RiderOnboardingScreen = ({ navigation }: any) => {
           <Package size={48} color="#FF6B35" />
         </View>
         <Text style={styles.heroLabel}>Welcome to the Fleet</Text>
-        <Text style={styles.heroTitle}>VELTO RIDER</Text>
+        <Text style={styles.heroTitle}>2QT RIDER</Text>
       </View>
 
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Operational Protocol</Text>
         <Text style={styles.sectionDesc}>
-          Before you start accepting missions, please review our core delivery standards. Velto is a premium service, and our riders are the face of the brand.
+          Before you start accepting missions, please review our core delivery standards. 2QT is a premium service, and our riders are the face of the brand.
         </Text>
 
         <View style={styles.stepsContainer}>
@@ -39,7 +39,7 @@ const RiderOnboardingScreen = ({ navigation }: any) => {
             </View>
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Thermal Bag Mandatory</Text>
-              <Text style={styles.stepDesc}>Food must always be transported in your Velto-issued thermal bag to maintain temperature.</Text>
+              <Text style={styles.stepDesc}>Food must always be transported in your 2QT-issued thermal bag to maintain temperature.</Text>
             </View>
           </View>
 
@@ -57,7 +57,7 @@ const RiderOnboardingScreen = ({ navigation }: any) => {
 
         <View style={styles.termsBox}>
           <CheckCircle2 size={20} color="#10B981" />
-          <Text style={styles.termsText}>By continuing, I agree to the Velto Terms of Service and Code of Conduct.</Text>
+          <Text style={styles.termsText}>By continuing, I agree to the 2QT Terms of Service and Code of Conduct.</Text>
         </View>
 
         <TouchableOpacity 

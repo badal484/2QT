@@ -1527,7 +1527,7 @@ function RiderApplicationsTab() {
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {apps.map(app => {
-            const displayName = app.name.replace(/VELTO/gi, "2QT");
+            const displayName = app.name.replace(/2QT/gi, "2QT");
             return (
               <div key={app.id} className="group relative bg-zinc-900/40 hover:bg-zinc-900/80 backdrop-blur-2xl border border-white/5 hover:border-white/10 rounded-[32px] p-8 shadow-2xl transition-all duration-500 flex flex-col justify-between overflow-hidden">
                 {/* Glow Effect */}

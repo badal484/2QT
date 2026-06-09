@@ -25,7 +25,7 @@ async function seed() {
         const kitchenId = 'kitchen_indiranagar';
         await client.query(`
             INSERT INTO kitchens (id, name, address, lat, lng, contact_number, status)
-            VALUES ($1, 'Velto Indiranagar Kitchen', 'Indiranagar, Bengaluru', 12.9716, 77.5946, '9876543210', 'active')
+            VALUES ($1, '2QT Indiranagar Kitchen', 'Indiranagar, Bengaluru', 12.9716, 77.5946, '9876543210', 'active')
             ON CONFLICT (id) DO NOTHING
         `, [kitchenId]);
 
@@ -106,7 +106,7 @@ async function seed() {
                 VALUES ($1, $2, $3, 'rider', 'hashed_password')
                 ON CONFLICT (phone) DO UPDATE SET role = 'rider'
                 RETURNING id
-            `, [`${r.name.toLowerCase().replace(' ', '.')}@velto.app`, r.phone, r.name]);
+            `, [`${r.name.toLowerCase().replace(' ', '.')}@2qt.app`, r.phone, r.name]);
 
             const userId = res.rows[0].id;
 

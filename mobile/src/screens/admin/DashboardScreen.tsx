@@ -92,7 +92,7 @@ const DashboardScreen = ({ navigation }: any) => {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Velto Ops</Text>
+            <Text style={styles.headerTitle}>2QT Ops</Text>
           </View>
         </View>
         <View style={styles.errorContainer}>
@@ -125,7 +125,7 @@ const DashboardScreen = ({ navigation }: any) => {
              <View style={styles.statusDot} />
              <Text style={styles.statusText}>System Status: Operational</Text>
           </View>
-          <Text style={styles.headerTitle}>Velto Ops</Text>
+          <Text style={styles.headerTitle}>2QT Ops</Text>
         </View>
         
         <TouchableOpacity 

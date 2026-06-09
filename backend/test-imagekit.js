@@ -13,7 +13,7 @@ async function run() {
         const response = await imagekit.upload({
             file: Buffer.from('hello world').toString('base64'),
             fileName: 'test.txt',
-            folder: '/velto/uploads',
+            folder: '/2qt/uploads',
         });
         console.log("Success:", response);
     } catch (e) {

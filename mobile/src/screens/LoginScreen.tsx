@@ -28,10 +28,10 @@ const LoginScreen = ({ navigation }: any) => {
 
   const getAppBranding = () => {
     switch (BUILD_ROLE) {
-      case 'rider': return { name: 'VELTO CAPTAIN', color: '#1A1A2E', sub: 'Rider Portal' };
-      case 'kitchen': return { name: 'VELTO PARTNER', color: '#10B981', sub: 'Kitchen Command' };
-      case 'admin': return { name: 'VELTO ADMIN', color: '#EF4444', sub: 'Operations Deck' };
-      default: return { name: 'VELTO', color: '#FF6B35', sub: 'Gourmet Delivery' };
+      case 'rider': return { name: '2QT CAPTAIN', color: '#1A1A2E', sub: 'Rider Portal' };
+      case 'kitchen': return { name: '2QT PARTNER', color: '#10B981', sub: 'Kitchen Command' };
+      case 'admin': return { name: '2QT ADMIN', color: '#EF4444', sub: 'Operations Deck' };
+      default: return { name: '2QT', color: '#FF6B35', sub: 'Gourmet Delivery' };
     }
   };
 
@@ -93,7 +93,7 @@ const LoginScreen = ({ navigation }: any) => {
           </View>
         )}
         
-        <Text style={styles.secureText}>Secured by Velto Shield</Text>
+        <Text style={styles.secureText}>Secured by 2QT Shield</Text>
       </View>
     </View>
   );

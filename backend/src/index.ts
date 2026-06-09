@@ -58,7 +58,7 @@ app.get('/api/v1/health', (req, res) => {
 app.use('/api/v1', apiRouter);
 
 app.get('/', (req, res) => {
-    res.send('VELTO API Server Running');
+    res.send('2QT API Server Running');
 });
 
 // Error Handling

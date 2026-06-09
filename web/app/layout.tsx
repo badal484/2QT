@@ -7,8 +7,8 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://velto.in";
-const SITE_NAME = "VELTO Food Palace";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://2qt.in";
+const SITE_NAME = "2QT";
 const SITE_DESC =
   "Premium gourmet food delivered in 30 minutes across Bengaluru. Fresh ingredients, chef-crafted recipes, zero compromises.";
 
@@ -27,11 +27,11 @@ export const metadata: Metadata = {
     "chef crafted food Bangalore",
     "fast food delivery 30 minutes",
     "meal subscription Bangalore",
-    "VELTO food",
+    "2QT food",
   ],
-  authors: [{ name: "VELTO Food Palace", url: SITE_URL }],
-  creator: "VELTO Food Palace",
-  publisher: "VELTO Food Palace",
+  authors: [{ name: "2QT", url: SITE_URL }],
+  creator: "2QT",
+  publisher: "2QT",
   robots: {
     index: true,
     follow: true,
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "VELTO Food Palace — Premium Gourmet Delivery",
+        alt: "2QT — Premium Gourmet Delivery",
       },
     ],
   },
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     title: `${SITE_NAME} — Gourmet Delivery in Bengaluru`,
     description: SITE_DESC,
     images: ["/og-image.jpg"],
-    creator: "@velto_food",
+    creator: "@2qt_food",
   },
   alternates: {
     canonical: SITE_URL,
@@ -90,7 +90,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="VELTO" />
+        <meta name="apple-mobile-web-app-title" content="2QT" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
       </head>
@@ -102,7 +102,7 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
-              name: "VELTO Food Palace",
+              name: "2QT",
               url: SITE_URL,
               logo: `${SITE_URL}/icon-512x512.png`,
               description: SITE_DESC,
@@ -114,8 +114,8 @@ export default function RootLayout({
                 availableLanguage: ["English", "Kannada", "Hindi"],
               },
               sameAs: [
-                "https://instagram.com/velto_food",
-                "https://twitter.com/velto_food",
+                "https://instagram.com/2qt_food",
+                "https://twitter.com/2qt_food",
               ],
             }),
           }}

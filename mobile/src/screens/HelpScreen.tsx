@@ -6,7 +6,7 @@ const HelpScreen = ({ navigation }: any) => {
   const faqs = [
     { q: 'Where is my order?', a: 'You can track your order in real-time from the active orders section.' },
     { q: 'How to cancel?', a: 'Orders can be cancelled before they enter the "Preparing" state.' },
-    { q: 'Refund policy', a: 'Refunds for cancelled orders are instantly credited to your Velto Wallet.' },
+    { q: 'Refund policy', a: 'Refunds for cancelled orders are instantly credited to your 2QT Wallet.' },
     { q: 'Subscription pause', a: 'You can pause your plan anytime from the Subscription screen.' },
   ];
 

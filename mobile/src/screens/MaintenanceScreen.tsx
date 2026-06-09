@@ -26,7 +26,7 @@ const MaintenanceScreen = () => {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>VELTO BENGALURU PILOT</Text>
+          <Text style={styles.footerText}>2QT BENGALURU PILOT</Text>
         </View>
       </SafeAreaView>
     </View>

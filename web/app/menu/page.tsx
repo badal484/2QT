@@ -406,7 +406,7 @@ export default function MenuPage() {
         We're expanding fast — leave your number and we'll notify you the day we reach your area.
       </p>
       <a
-        href="https://wa.me/918867000000?text=Hi%2C%20I%20want%20Velto%20to%20deliver%20in%20my%20area%21"
+        href="https://wa.me/918867000000?text=Hi%2C%20I%20want%202QT%20to%20deliver%20in%20my%20area%21"
         target="_blank"
         rel="noopener noreferrer"
         className="bg-brand-primary text-white px-8 py-4 rounded-2xl font-semibold text-sm shadow-lg shadow-brand-primary/25 hover:bg-brand-dark transition-colors"

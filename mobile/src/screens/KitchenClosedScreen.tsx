@@ -11,7 +11,7 @@ const KitchenClosedScreen = ({ navigation }: any) => {
       
       <Text style={styles.title}>Kitchen Offline</Text>
       <Text style={styles.description}>
-        The kitchen is currently disconnected from the Velto network. You are not receiving new orders.
+        The kitchen is currently disconnected from the 2QT network. You are not receiving new orders.
       </Text>
 
       <View style={styles.checklistCard}>

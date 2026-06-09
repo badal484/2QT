@@ -347,7 +347,7 @@ router.post('/orders/:id/refund', authenticate, requireRole('super_admin', 'admi
             emitToUser(order.customer_id, 'wallet_updated', { balancePaise: refundAmount });
             await notificationsQueue.add('broadcast_message', {
                 phone: (await query('SELECT phone FROM users WHERE id = $1', [order.customer_id])).rows[0]?.phone,
-                message: `Velto: A refund of ₹${refundAmount/100} has been credited to your wallet for Order #${order.display_id}. We apologize for the inconvenience!`
+                message: `2QT: A refund of ₹${refundAmount/100} has been credited to your wallet for Order #${order.display_id}. We apologize for the inconvenience!`
             });
         });
 

@@ -31,17 +31,17 @@ const WalletScreen = ({ navigation }: any) => {
     mutationFn: (amount: number) => api.post('/payment/wallet/recharge', { amountPaise: amount * 100 }),
     onSuccess: async (data, amount) => {
         const options = {
-            description: 'Velto Wallet Recharge',
-            image: 'https://velto.app/logo.png',
+            description: '2QT Wallet Recharge',
+            image: 'https://2qt.app/logo.png',
             currency: 'INR',
             key: data.keyId,
             amount: data.amount,
-            name: 'Velto Food Palace',
+            name: '2QT Food Palace',
             order_id: data.razorpayOrderId,
             prefill: {
                 email: 'customer@example.com',
                 contact: '9100000000',
-                name: 'Velto User'
+                name: '2QT User'
             },
             theme: { color: '#FF6B35' }
         };
@@ -76,7 +76,7 @@ const WalletScreen = ({ navigation }: any) => {
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
         
-        <Text style={styles.headerLabel}>Velto Wallet</Text>
+        <Text style={styles.headerLabel}>2QT Wallet</Text>
         <Text style={styles.balanceValue}>₹{wallet?.balancePaise / 100 || '0.00'}</Text>
         
         <View style={styles.actionRow}>

@@ -114,15 +114,15 @@ const CheckoutScreen = ({ navigation, route }: any) => {
       }
 
       const options = {
-        description: 'Velto Food Order',
-        image: 'https://velto.app/logo.png',
+        description: '2QT Food Order',
+        image: 'https://2qt.app/logo.png',
         currency: 'INR',
         key: res.keyId,
         amount: res.amount,
-        name: 'VELTO',
+        name: '2QT',
         order_id: res.razorpayOrderId,
         prefill: {
-          email: user?.email || 'customer@velto.app',
+          email: user?.email || 'customer@2qt.app',
           contact: user?.phone || '',
           name: user?.name || 'Customer'
         },
@@ -282,7 +282,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
                 <CreditCard size={24} color="#1A1A2E" />
               </View>
               <View>
-                <Text style={styles.toggleTitle}>Velto Wallet</Text>
+                <Text style={styles.toggleTitle}>2QT Wallet</Text>
                 <Text style={styles.toggleSub}>Bal: ₹{pricing?.availableWallet / 100 || 0}</Text>
               </View>
             </View>
@@ -303,7 +303,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
                 <Sparkles size={24} color={useLoyalty ? "#FF6B35" : "#1A1A2E"} />
               </View>
               <View>
-                <Text style={styles.toggleTitle}>Velto Points</Text>
+                <Text style={styles.toggleTitle}>2QT Points</Text>
                 <Text style={styles.toggleSub}>Bal: {loyaltyData?.points || 0} pts</Text>
               </View>
             </View>
@@ -326,11 +326,11 @@ const CheckoutScreen = ({ navigation, route }: any) => {
             <TouchableOpacity 
               style={styles.promoApplyBtn}
               onPress={() => {
-                if (promoCode.toUpperCase() === 'VELTO50') {
+                if (promoCode.toUpperCase() === '2QT50') {
                   dispatch(setPromoCodeAction(promoCode.toUpperCase()));
                   Alert.alert('Success', 'Promo code applied! You get 50% off.');
                 } else {
-                  Alert.alert('Invalid Code', 'Try VELTO50 for a discount.');
+                  Alert.alert('Invalid Code', 'Try 2QT50 for a discount.');
                 }
               }} 
             >

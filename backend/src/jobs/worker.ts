@@ -9,7 +9,7 @@ const connection = {
     port: process.env.REDIS_URL ? parseInt(new URL(process.env.REDIS_URL).port) || 6379 : 6379,
 };
 
-console.log('--- VELTO BACKGROUND WORKER INITIALIZING ---');
+console.log('--- 2QT BACKGROUND WORKER INITIALIZING ---');
 
 // 1. Notifications Worker (WhatsApp/SMS)
 const notificationsWorker = new Worker('notifications', async (job) => {
@@ -28,7 +28,7 @@ const notificationsWorker = new Worker('notifications', async (job) => {
                 phoneNumber: phone,
                 type: 'Template',
                 template: {
-                    name: type === 'order_confirmed' ? 'velto_order_confirm' : 'velto_general',
+                    name: type === 'order_confirmed' ? '2qt_order_confirm' : '2qt_general',
                     languageCode: 'en',
                     bodyValues: [displayId || 'User']
                 }
@@ -97,7 +97,7 @@ const subscriptionsWorker = new Worker('subscriptions', async (job) => {
             await notificationsQueue.add('renewal_reminder', {
                 phone: user.phone,
                 type: 'renewal_prompt',
-                message: 'Your Velto Plan expires tomorrow! Renew now to keep the deliciousness coming.'
+                message: 'Your 2QT Plan expires tomorrow! Renew now to keep the deliciousness coming.'
             });
         }
         console.log(`[WORKER:SUBS] Queued renewal reminders for ${rows.length} users.`);

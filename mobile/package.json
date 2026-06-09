@@ -1,13 +1,13 @@
 {
-  "name": "VeltoMobile",
+  "name": "2QTMobile",
   "version": "0.0.1",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
-    "android:buyer": "react-native run-android --mode buyerDebug --appId com.veltomobile.buyer",
-    "android:rider": "react-native run-android --mode riderDebug --appId com.veltomobile.rider",
-    "android:kitchen": "react-native run-android --mode kitchenDebug --appId com.veltomobile.kitchen",
-    "android:admin": "react-native run-android --mode adminDebug --appId com.veltomobile.admin",
+    "android:buyer": "react-native run-android --mode buyerDebug --appId com.2qtmobile.buyer",
+    "android:rider": "react-native run-android --mode riderDebug --appId com.2qtmobile.rider",
+    "android:kitchen": "react-native run-android --mode kitchenDebug --appId com.2qtmobile.kitchen",
+    "android:admin": "react-native run-android --mode adminDebug --appId com.2qtmobile.admin",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",

@@ -1,5 +1,5 @@
-// VELTO Business Constants
-export const VELTO = {
+// 2QT Business Constants
+export const 2QT = {
     DELIVERY: {
         BASE_FEE_PAISE: 2500, // Rs.25
         SUBSCRIBER_FEE_PAISE: 0, // Free for subscribers

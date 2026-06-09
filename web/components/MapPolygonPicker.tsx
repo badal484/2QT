@@ -56,7 +56,7 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`, {
         headers: {
           'Accept-Language': 'en-US,en;q=0.9',
-          'User-Agent': 'VeltoFoodPalace/1.0'
+          'User-Agent': '2QTFoodPalace/1.0'
         }
       });
       const data = await res.json();

@@ -135,7 +135,7 @@ const CartScreen = ({ navigation }: any) => {
                 <Sparkles size={24} color="#FF6B35" />
               </View>
               <View style={styles.proTextColumn}>
-                <Text style={styles.proTitle}>Velto Pro Member</Text>
+                <Text style={styles.proTitle}>2QT Pro Member</Text>
                 <Text style={styles.proSub}>You're saving ₹{(p.discountPaise + p.loyaltyDiscountPaise) / 100} on this order!</Text>
               </View>
             </View>

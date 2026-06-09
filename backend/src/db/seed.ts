@@ -25,7 +25,7 @@ const seed = async () => {
       // 2. Create Kitchen
       const { rows: kitchens } = await client.query(`
         INSERT INTO kitchens (name, address, lat, lng)
-        VALUES ('VELTO Central Kitchen', 'Kundanahalli Main Road, Near ITPL', 12.9716, 77.5946)
+        VALUES ('2QT Central Kitchen', 'Kundanahalli Main Road, Near ITPL', 12.9716, 77.5946)
         ON CONFLICT DO NOTHING
         RETURNING id
       `);
@@ -34,7 +34,7 @@ const seed = async () => {
       if (kitchens.length > 0) {
         kitchenId = kitchens[0].id;
       } else {
-        const existingKitchen = await client.query("SELECT id FROM kitchens WHERE name = 'VELTO Central Kitchen'");
+        const existingKitchen = await client.query("SELECT id FROM kitchens WHERE name = '2QT Central Kitchen'");
         kitchenId = existingKitchen.rows[0].id;
       }
 
@@ -59,13 +59,13 @@ const seed = async () => {
         { name: 'Avocado Quinoa Salad', price: 35000, cat: 'Healthy', veg: true, station: 'Salad' },
         { name: 'Belgian Chocolate Lava Cake', price: 25000, cat: 'Desserts', veg: true, station: 'Dessert' },
         { name: 'Paneer Tikka Platter', price: 32000, cat: 'Appetizers', veg: true, station: 'Tandoor' },
-        { name: 'Velto Special Cold Brew', price: 18000, cat: 'Beverages', veg: true, station: 'Beverage' }
+        { name: '2QT Special Cold Brew', price: 18000, cat: 'Beverages', veg: true, station: 'Beverage' }
       ];
 
       for (const item of menuItems) {
         await client.query(`
           INSERT INTO menu_items (zone_id, name, description, price_paise, cost_price_paise, category, station, available, daily_limit, is_veg)
-          VALUES ($1, $2, 'Premium selection from Velto Palace.', $3, $4, $5, $6, true, 50, $7)
+          VALUES ($1, $2, 'Premium selection from 2QT Palace.', $3, $4, $5, $6, true, 50, $7)
           ON CONFLICT (name) DO UPDATE SET price_paise = $3
         `, [zoneId, item.name, item.price, Math.round(item.price * 0.35), item.cat, item.station, item.veg]);
       }
@@ -73,7 +73,7 @@ const seed = async () => {
       // 5. Create Promo Code
       await client.query(`
         INSERT INTO promo_codes (code, discount_type, discount_percent, min_order_paise, max_discount_paise, expires_at, max_uses)
-        VALUES ('VELTO50', 'percent', 50, 10000, 5000, NOW() + interval '1 month', 1000)
+        VALUES ('2QT50', 'percent', 50, 10000, 5000, NOW() + interval '1 month', 1000)
         ON CONFLICT DO NOTHING
       `);
 

@@ -201,7 +201,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
         <View style={styles.helpRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Info size={14} color="#D1D5DB" />
-            <Text style={styles.helpText}>Contact Velto Support for assistance</Text>
+            <Text style={styles.helpText}>Contact 2QT Support for assistance</Text>
           </View>
           <TouchableOpacity 
             onPress={() => {

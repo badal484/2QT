@@ -29,19 +29,19 @@ export const connectRedis = async () => {
 };
 
 export const keys = {
-    menu: (zoneId: string) => `velto:menu:${zoneId}`,
-    pendingOtp: (phone: string) => `velto:otp:${phone}`,
-    pendingPayment: (customerId: string) => `velto:pending_payment:${customerId}`,
-    pendingOrder: (cfOrderId: string) => `velto:pending_order:${cfOrderId}`,
-    processedWebhook: (cfOrderId: string) => `velto:webhook_done:${cfOrderId}`,
-    riderLocation: (riderId: string) => `velto:rider_loc:${riderId}`,
-    otpAttempts: (phone: string) => `velto:otp_attempts:${phone}`,
-    revokedToken: (jti: string) => `velto:revoked:${jti}`,
-    cfPayoutToken: () => 'velto:cf_payout_token',
-    deliveryOtpAttempts: (orderId: string) => `velto:otp_fail:${orderId}`,
-    walletTopup: (cfOrderId: string) => `velto:wallet_topup:${cfOrderId}`,
-    orderByCf: (cfOrderId: string) => `velto:order_by_cf:${cfOrderId}`,
-    activeRidersInZone: (zoneId: string) => `velto:active_riders:${zoneId}`,
+    menu: (zoneId: string) => `2qt:menu:${zoneId}`,
+    pendingOtp: (phone: string) => `2qt:otp:${phone}`,
+    pendingPayment: (customerId: string) => `2qt:pending_payment:${customerId}`,
+    pendingOrder: (cfOrderId: string) => `2qt:pending_order:${cfOrderId}`,
+    processedWebhook: (cfOrderId: string) => `2qt:webhook_done:${cfOrderId}`,
+    riderLocation: (riderId: string) => `2qt:rider_loc:${riderId}`,
+    otpAttempts: (phone: string) => `2qt:otp_attempts:${phone}`,
+    revokedToken: (jti: string) => `2qt:revoked:${jti}`,
+    cfPayoutToken: () => '2qt:cf_payout_token',
+    deliveryOtpAttempts: (orderId: string) => `2qt:otp_fail:${orderId}`,
+    walletTopup: (cfOrderId: string) => `2qt:wallet_topup:${cfOrderId}`,
+    orderByCf: (cfOrderId: string) => `2qt:order_by_cf:${cfOrderId}`,
+    activeRidersInZone: (zoneId: string) => `2qt:active_riders:${zoneId}`,
 };
 
 export default redis;

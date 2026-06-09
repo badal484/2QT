@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://velto.in";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://2qt.in";
 
 export const metadata: Metadata = {
   title: "Order Food Online — Bengaluru's Premium Gourmet Menu",
   description:
-    "Browse VELTO's chef-crafted menu — biryanis, curries, healthy bowls, desserts and more. Fresh daily, delivered in 30 minutes across Bengaluru.",
+    "Browse 2QT's chef-crafted menu — biryanis, curries, healthy bowls, desserts and more. Fresh daily, delivered in 30 minutes across Bengaluru.",
   keywords: [
     "order food online Bengaluru",
     "gourmet menu Bangalore",
@@ -17,15 +17,15 @@ export const metadata: Metadata = {
   ],
   alternates: { canonical: `${SITE_URL}/menu` },
   openGraph: {
-    title: "VELTO Menu — Gourmet Delivery in 30 Min",
+    title: "2QT Menu — Gourmet Delivery in 30 Min",
     description:
       "Chef-crafted meals delivered fresh to your door. Biryanis, curries, healthy bowls and more.",
     url: `${SITE_URL}/menu`,
-    images: [{ url: "/og-menu.jpg", width: 1200, height: 630, alt: "VELTO Gourmet Menu" }],
+    images: [{ url: "/og-menu.jpg", width: 1200, height: 630, alt: "2QT Gourmet Menu" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "VELTO Menu — Gourmet Delivery in 30 Min",
+    title: "2QT Menu — Gourmet Delivery in 30 Min",
     description: "Chef-crafted meals delivered fresh to your door.",
     images: ["/og-menu.jpg"],
   },
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "FoodEstablishment",
-  name: "VELTO Food Palace",
+  name: "2QT",
   description: "Premium gourmet food delivery in Bengaluru",
   url: SITE_URL,
   servesCuisine: ["Indian", "Continental", "Healthy"],

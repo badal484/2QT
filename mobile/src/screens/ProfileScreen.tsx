@@ -163,7 +163,7 @@ const ProfileScreen = ({ navigation }: any) => {
           >
             <View style={styles.referralTextCol}>
               <Text style={styles.referralTitle}>Earn Rewards</Text>
-              <Text style={styles.referralSub}>Get ₹50 for every friend who joins the Velto community.</Text>
+              <Text style={styles.referralSub}>Get ₹50 for every friend who joins the 2QT community.</Text>
             </View>
             <View style={styles.referralIconWrapper}>
               <Gift size={32} color="#FF6B35" />
@@ -225,7 +225,7 @@ const ProfileScreen = ({ navigation }: any) => {
         )}
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Velto v1.0.0 Stable</Text>
+          <Text style={styles.footerText}>2QT v1.0.0 Stable</Text>
         </View>
       </ScrollView>
     </View>

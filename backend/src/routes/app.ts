@@ -13,7 +13,7 @@ router.get('/version', async (req, res) => {
         minRequiredVersion: settings.min_app_version || '1.0.0',
         forceUpdate: settings.force_update === 'true',
         maintenanceMode: settings.maintenance_mode === 'true',
-        updateUrl: 'https://velto.in/download'
+        updateUrl: 'https://2qt.in/download'
     });
 });
 

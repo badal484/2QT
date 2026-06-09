@@ -22,12 +22,12 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
     mutationFn: (planId: string) => api.post('/payments/subscription/purchase', { planId }),
     onSuccess: async (data) => {
         const options = {
-            description: 'Velto Pro Membership Renewal',
-            image: 'https://velto.app/logo.png',
+            description: '2QT Pro Membership Renewal',
+            image: 'https://2qt.app/logo.png',
             currency: 'INR',
             key: data.keyId,
             amount: data.amount,
-            name: 'VELTO PRO',
+            name: '2QT PRO',
             order_id: data.razorpayOrderId,
             prefill: {
                 email: user?.email || '',
@@ -85,7 +85,7 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
             </View>
             <View>
               <Text style={styles.statusLabel}>Current Status</Text>
-              <Text style={styles.statusTitle}>Velto Pro Active</Text>
+              <Text style={styles.statusTitle}>2QT Pro Active</Text>
             </View>
           </View>
           <Text style={styles.statusDesc}>

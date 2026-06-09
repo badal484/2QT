@@ -146,7 +146,7 @@ const HomeScreen = ({ navigation }: any) => {
               <View style={{ flex: 1 }}>
                 <View style={styles.proBadgeRow}>
                   <Sparkles size={14} color="#FF6B35" />
-                  <Text style={styles.proBadgeText}>Velto Pro Member</Text>
+                  <Text style={styles.proBadgeText}>2QT Pro Member</Text>
                 </View>
                 <Text style={styles.planName}>{activeSub.plan_id?.replace('sub_', '').toUpperCase() || 'ACTIVE PLAN'}</Text>
                 <Text style={styles.planStatus}>{activeSub.remaining_meals} meals left • {activeSub.current_day_credits} credit today</Text>

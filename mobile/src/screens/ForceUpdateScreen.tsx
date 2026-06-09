@@ -6,13 +6,13 @@ const ForceUpdateScreen = () => {
   const handleUpdate = () => {
     const link = Platform.OS === 'ios' 
       ? 'https://apps.apple.com/app/id123456789' 
-      : 'market://details?id=com.veltomobile';
+      : 'market://details?id=com.2qtmobile';
       
     Linking.canOpenURL(link).then(supported => {
       if (supported) {
         Linking.openURL(link);
       } else {
-        Linking.openURL('https://velto.com/download');
+        Linking.openURL('https://2qt.com/download');
       }
     });
   };
@@ -32,7 +32,7 @@ const ForceUpdateScreen = () => {
       
       <Text style={styles.title}>Time to Upgrade</Text>
       <Text style={styles.description}>
-        We've supercharged the Velto experience! You're using an older version that is no longer supported by our kitchen servers. Please update to continue.
+        We've supercharged the 2QT experience! You're using an older version that is no longer supported by our kitchen servers. Please update to continue.
       </Text>
 
       <TouchableOpacity 

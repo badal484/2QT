@@ -58,7 +58,7 @@ function LoginForm() {
       const data = await api.verifyOtp(phone, otp, undefined);
       login(data.user);
       
-      if (!data.user.name || data.user.name === "VELTO User" || data.user.name === "2QT User") {
+      if (!data.user.name || data.user.name === "2QT User" || data.user.name === "2QT User") {
         setStep("onboarding");
       } else {
         redirectUser(data.user.role);

@@ -43,7 +43,7 @@ const stressTest = async () => {
         data: {
           order: {
             cf_order_id: cfOrderId,
-            order_id: `VELTO_${Date.now()}_${i}`,
+            order_id: `2QT_${Date.now()}_${i}`,
             order_amount: item.price_paise / 100
           },
           payment: {

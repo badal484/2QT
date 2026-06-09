@@ -106,7 +106,7 @@ router.post('/verify-otp', async (req, res) => {
 
     const { rows } = await query(
         `INSERT INTO users (phone, name, role, is_verified) VALUES ($1, $2, $3, $4) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified`,
-        [normalizedPhone, name || 'VELTO User', insertRole, insertVerified]
+        [normalizedPhone, name || '2QT User', insertRole, insertVerified]
     );
 
     const user = rows[0];

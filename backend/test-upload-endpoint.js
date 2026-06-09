@@ -9,7 +9,7 @@ fetch('http://localhost:8000/api/v1/upload/image', {
     body: (() => {
         const FormData = require('form-data');
         const form = new FormData();
-        form.append('image', fs.createReadStream('/Users/badal11/Desktop/VELTO_FOOD_PALACE/web/public/window.svg'));
+        form.append('image', fs.createReadStream('/Users/badal11/Desktop/2QT_FOOD_PALACE/web/public/window.svg'));
         return form;
     })()
 }).then(async r => {

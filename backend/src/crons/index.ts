@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { query, withTransaction } from '../db';
 import { notificationsQueue } from '../jobs/queues';
-import { VELTO } from '../config/constants';
+import { 2QT } from '../config/constants';
 import { emitToKitchen, emitToAdmin, emitToRiders } from '../socket';
 
 export const initCrons = () => {
@@ -39,10 +39,10 @@ export const initCrons = () => {
             WHERE date = CURRENT_DATE 
             AND online_minutes >= $1
             AND total_paise < $2
-        `, [VELTO.RIDER.GUARANTEE_MIN_ONLINE_HOURS * 60, VELTO.RIDER.GUARANTEE_MINIMUM_PAISE]);
+        `, [2QT.RIDER.GUARANTEE_MIN_ONLINE_HOURS * 60, 2QT.RIDER.GUARANTEE_MINIMUM_PAISE]);
 
         for (const rider of riders) {
-            const topup = VELTO.RIDER.GUARANTEE_MINIMUM_PAISE - rider.total_paise;
+            const topup = 2QT.RIDER.GUARANTEE_MINIMUM_PAISE - rider.total_paise;
             if (topup > 0) {
                 console.log(`[CRON] Topping up rider ${rider.rider_id} with Rs. ${topup/100}`);
                 await withTransaction(async (client) => {

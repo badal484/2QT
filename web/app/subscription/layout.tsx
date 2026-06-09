@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://velto.in";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://2qt.in";
 
 export const metadata: Metadata = {
   title: "Meal Subscription Plans — Save Up to 30% on Gourmet Delivery",
@@ -18,15 +18,15 @@ export const metadata: Metadata = {
   ],
   alternates: { canonical: `${SITE_URL}/subscription` },
   openGraph: {
-    title: "VELTO Meal Plans — Save 30% on Gourmet Delivery",
+    title: "2QT Meal Plans — Save 30% on Gourmet Delivery",
     description:
       "20 or 30-meal subscription plans with priority delivery. Lunch from ₹1,999 · Dinner from ₹2,199.",
     url: `${SITE_URL}/subscription`,
-    images: [{ url: "/og-subscription.jpg", width: 1200, height: 630, alt: "VELTO Meal Subscription Plans" }],
+    images: [{ url: "/og-subscription.jpg", width: 1200, height: 630, alt: "2QT Meal Subscription Plans" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "VELTO Meal Plans — Save 30% on Gourmet Delivery",
+    title: "2QT Meal Plans — Save 30% on Gourmet Delivery",
     description: "20 or 30-meal plans. Lunch from ₹1,999 · Dinner from ₹2,199.",
     images: ["/og-subscription.jpg"],
   },
@@ -35,9 +35,9 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Product",
-  name: "VELTO Meal Subscription Plans",
+  name: "2QT Meal Subscription Plans",
   description: "Pre-paid meal subscription plans for gourmet lunch and dinner delivery in Bengaluru",
-  brand: { "@type": "Brand", name: "VELTO Food Palace" },
+  brand: { "@type": "Brand", name: "2QT" },
   offers: [
     {
       "@type": "Offer",

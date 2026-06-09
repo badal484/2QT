@@ -71,7 +71,7 @@ const RootNavigator = () => {
 
   // SYSTEMATIC INTEGRATION: Deep Linking Configuration
   const linking = {
-    prefixes: ['velto://', 'https://velto.app'],
+    prefixes: ['2qt://', 'https://2qt.app'],
     config: {
       screens: {
         Customer: {

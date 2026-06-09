@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Sign In",
-  description: "Sign in to your VELTO account.",
+  description: "Sign in to your 2QT account.",
   robots: { index: false, follow: false },
 };
 

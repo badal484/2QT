@@ -10,9 +10,9 @@ async function run() {
     try {
         console.log("Uploading...");
         const response = await imagekit.upload({
-            file: fs.readFileSync('/Users/badal11/Desktop/VELTO_FOOD_PALACE/web/public/window.svg').toString('base64'),
+            file: fs.readFileSync('/Users/badal11/Desktop/2QT_FOOD_PALACE/web/public/window.svg').toString('base64'),
             fileName: 'window.svg',
-            folder: '/velto/uploads',
+            folder: '/2qt/uploads',
         });
         console.log("Success:", response);
     } catch (e) {

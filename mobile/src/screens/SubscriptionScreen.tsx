@@ -44,7 +44,7 @@ const SubscriptionScreen = ({ navigation }: any) => {
             <ArrowLeft size={24} color="#1A1A2E" />
           </TouchableOpacity>
           <Text style={styles.headerLabel}>Your Membership</Text>
-          <Text style={styles.headerTitle}>VELTO PRO</Text>
+          <Text style={styles.headerTitle}>2QT PRO</Text>
         </View>
 
         <View style={styles.content}>

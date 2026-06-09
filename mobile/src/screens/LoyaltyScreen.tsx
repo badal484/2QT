@@ -45,7 +45,7 @@ const LoyaltyScreen = ({ navigation }: any) => {
         
         <View style={styles.headerContentRow}>
           <View>
-            <Text style={styles.tierText}>Velto {tier}</Text>
+            <Text style={styles.tierText}>2QT {tier}</Text>
             <Text style={styles.pointsValue}>{points}</Text>
             <Text style={styles.pointsLabel}>Points Balance</Text>
           </View>

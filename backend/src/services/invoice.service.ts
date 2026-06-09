@@ -37,7 +37,7 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
     doc.pipe(stream);
 
     // Header
-    doc.fontSize(20).text('VELTO FOOD PALACE', { align: 'center' });
+    doc.fontSize(20).text('2QT FOOD PALACE', { align: 'center' });
     doc.fontSize(10).text('Kundanahalli Central, Bengaluru', { align: 'center' });
     doc.moveDown();
 
@@ -98,7 +98,7 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
     doc.text(`₹${(order.total_amount_paise / 100).toFixed(2)}`, 500, y);
 
     // Footer
-    doc.fontSize(8).text('Thank you for ordering with VELTO!', 50, 700, { align: 'center' });
+    doc.fontSize(8).text('Thank you for ordering with 2QT!', 50, 700, { align: 'center' });
 
     doc.end();
 

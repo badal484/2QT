@@ -14,12 +14,12 @@ const ReferralScreen = ({ navigation }: any) => {
     queryFn: () => api.get('/customers/referrals/stats'),
   });
 
-  const referralCode = stats?.referralCode || user?.phone?.slice(-6).toUpperCase() || 'VELTO50';
+  const referralCode = stats?.referralCode || user?.phone?.slice(-6).toUpperCase() || '2QT50';
 
   const onShare = async () => {
     try {
       await Share.share({
-        message: `Order fresh, home-style food from VELTO and get ₹50 off on your first order! Use my code: ${referralCode}. Download here: https://velto.in/app`,
+        message: `Order fresh, home-style food from 2QT and get ₹50 off on your first order! Use my code: ${referralCode}. Download here: https://2qt.in/app`,
       });
     } catch (error) {
       console.error(error);
@@ -45,7 +45,7 @@ const ReferralScreen = ({ navigation }: any) => {
       <View style={styles.content}>
         <Text style={styles.promoTitle}>Give ₹50, Get ₹50</Text>
         <Text style={styles.promoDesc}>
-          When your friend signs up with your code and places their first order, you both get ₹50 in your VELTO wallet.
+          When your friend signs up with your code and places their first order, you both get ₹50 in your 2QT wallet.
         </Text>
 
         <View style={styles.statsRow}>
@@ -80,7 +80,7 @@ const ReferralScreen = ({ navigation }: any) => {
             <View style={styles.stepNumWrapper}>
               <Text style={styles.stepNum}>1</Text>
             </View>
-            <Text style={styles.stepText}>Share your code with friends who haven't tried VELTO.</Text>
+            <Text style={styles.stepText}>Share your code with friends who haven't tried 2QT.</Text>
           </View>
 
           <View style={styles.stepRow}>

@@ -1,5 +1,5 @@
 import { query, withTransaction } from '../db';
-import { VELTO } from '../config/constants';
+import { 2QT } from '../config/constants';
 import { emitToUser } from '../socket';
 import { notificationsQueue } from '../jobs/queues';
 
@@ -11,7 +11,7 @@ export const processReferral = async (referredId: string, firstOrderId: string) 
 
     const { rows: orders } = await query('SELECT total_amount_paise FROM orders WHERE id = $1', [firstOrderId]);
     const orderAmount = orders[0].total_amount_paise;
-    const { REFERRAL } = VELTO;
+    const { REFERRAL } = 2QT;
 
     // RULE: Reward after Friend's first order > Threshold
     if (orderAmount < REFERRAL.MIN_FIRST_ORDER_PAISE) {
@@ -82,7 +82,7 @@ export const processReferral = async (referredId: string, firstOrderId: string) 
     if (referrer[0]?.phone) {
         await notificationsQueue.add('broadcast_message', {
             phone: referrer[0].phone,
-            message: `Velto: Great news! Your referral reward of ₹50 is now in your wallet. Keep sharing and earning!`
+            message: `2QT: Great news! Your referral reward of ₹50 is now in your wallet. Keep sharing and earning!`
         });
     }
 

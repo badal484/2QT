@@ -30,7 +30,7 @@ router.post('/image', generalLimiter, upload.single('image'), async (req: any, r
         const response = await imagekit.upload({
             file: req.file.buffer,
             fileName: `${Date.now()}_${req.file.originalname}`,
-            folder: '/velto/uploads',
+            folder: '/2qt/uploads',
         });
 
         res.json({ url: response.url });

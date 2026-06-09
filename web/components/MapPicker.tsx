@@ -30,7 +30,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
   const reverseGeocode = async (lat: number, lng: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&email=admin@velto.com`, {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&email=admin@2qt.com`, {
         headers: {
           'Accept-Language': 'en-US,en;q=0.9'
         }
@@ -133,7 +133,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
     
     setLoading(true);
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&email=admin@velto.com`, {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&email=admin@2qt.com`, {
         headers: {
           'Accept-Language': 'en-US,en;q=0.9'
         }

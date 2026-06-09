@@ -11,7 +11,7 @@ async function run() {
         const response = await imagekit.upload({
             file: "NOT_BASE_64", // Invalid file
             fileName: 'test.png',
-            folder: '/velto/uploads',
+            folder: '/2qt/uploads',
         });
         console.log("Success:", response);
     } catch (e) {

@@ -42,21 +42,21 @@ export class NotificationService {
     private static getMessageTemplate(type: NotificationType, data: NotificationPayload): string | null {
         switch (type) {
             case 'order_confirmed':
-                return `Velto: Your order #${data.displayId} is confirmed! Our chefs are starting to prep it. ETA: ${data.minutes} mins.`;
+                return `2QT: Your order #${data.displayId} is confirmed! Our chefs are starting to prep it. ETA: ${data.minutes} mins.`;
             case 'order_preparing':
-                return `Velto: Chef is currently preparing your meal with fresh ingredients!`;
+                return `2QT: Chef is currently preparing your meal with fresh ingredients!`;
             case 'order_ready':
-                return `Velto: Your order is ready and waiting for the rider!`;
+                return `2QT: Your order is ready and waiting for the rider!`;
             case 'order_out_for_delivery':
-                return `Velto: Your rider ${data.riderName} is on the way! Your delivery OTP is ${data.otp}. Track in the app.`;
+                return `2QT: Your rider ${data.riderName} is on the way! Your delivery OTP is ${data.otp}. Track in the app.`;
             case 'order_delivered':
-                return `Velto: Delivered! Hope you enjoy your meal. Please rate us in the app.`;
+                return `2QT: Delivered! Hope you enjoy your meal. Please rate us in the app.`;
             case 'order_cancelled':
-                return `Velto: Your order #${data.displayId} has been cancelled. A refund of ₹${data.amount} has been added to your wallet.`;
+                return `2QT: Your order #${data.displayId} has been cancelled. A refund of ₹${data.amount} has been added to your wallet.`;
             case 'low_subscription_meals':
-                return `Velto: Heads up! You only have ${data.count} meals left in your plan. Renew soon to keep the hunger away!`;
+                return `2QT: Heads up! You only have ${data.count} meals left in your plan. Renew soon to keep the hunger away!`;
             case 'rider_payout_sent':
-                return `Velto: Your payout of ₹${data.amount} has been sent to your UPI ${data.upiId}. Great work!`;
+                return `2QT: Your payout of ₹${data.amount} has been sent to your UPI ${data.upiId}. Great work!`;
             case 'broadcast_message':
                 return data.message || null;
             default:

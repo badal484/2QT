@@ -1,5 +1,5 @@
 import { query } from '../db';
-import { VELTO } from '../config/constants';
+import { 2QT } from '../config/constants';
 
 export interface CartItem {
     menuItemId: string;
@@ -90,17 +90,17 @@ export const calculatePricing = async ({
         const totalPoints = parseInt(loyaltyRes[0].total_points || '0');
         
         if (totalPoints > 0) {
-            const pointValuePaise = VELTO.LOYALTY.DISCOUNT_PER_HUNDRED_POINTS_PAISE / VELTO.LOYALTY.POINTS_FOR_DISCOUNT;
+            const pointValuePaise = 2QT.LOYALTY.DISCOUNT_PER_HUNDRED_POINTS_PAISE / 2QT.LOYALTY.POINTS_FOR_DISCOUNT;
             loyaltyDiscountPaise = Math.floor(totalPoints * pointValuePaise);
             
             // Apply max discount cap if defined
-            const cap = Math.floor((subtotalPaise - subscriptionDiscountPaise - discountPaise) * (VELTO.LOYALTY.MAX_DISCOUNT_PERCENT / 100));
+            const cap = Math.floor((subtotalPaise - subscriptionDiscountPaise - discountPaise) * (2QT.LOYALTY.MAX_DISCOUNT_PERCENT / 100));
             loyaltyDiscountPaise = Math.min(loyaltyDiscountPaise, cap);
         }
     }
 
     // 4. Delivery Fee
-    let deliveryFeePaise = isSubscriptionOrder ? VELTO.DELIVERY.SUBSCRIBER_FEE_PAISE : VELTO.DELIVERY.BASE_FEE_PAISE;
+    let deliveryFeePaise = isSubscriptionOrder ? 2QT.DELIVERY.SUBSCRIBER_FEE_PAISE : 2QT.DELIVERY.BASE_FEE_PAISE;
 
     // 5. Surge (Stub for now - needs zoneId)
     let surgePaise = 0;

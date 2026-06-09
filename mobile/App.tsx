@@ -5,7 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { store } from './src/store/index';
 import RootNavigator from './src/navigation/RootNavigator';
 
-console.log('--- VELTO SYSTEM INITIALIZING ---');
+console.log('--- 2QT SYSTEM INITIALIZING ---');
 console.log('STORE_STATUS:', !!store);
 
 const queryClient = new QueryClient();
