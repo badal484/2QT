@@ -184,7 +184,7 @@ router.get('/broadcasts', authenticate, requireRole('super_admin', 'admin'), asy
 
 router.get('/support/tickets', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(`
-        SELECT t.*, u.name as customer_name
+        SELECT t.*, t.issue_type as subject, u.name as customer_name
         FROM support_tickets t
         JOIN users u ON t.customer_id = u.id
         ORDER BY t.created_at DESC
