@@ -12,7 +12,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     
     const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
@@ -52,7 +52,7 @@ class ApiClient {
     let response;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       
       response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
