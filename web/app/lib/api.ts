@@ -42,11 +42,12 @@ class ApiClient {
   public async request(endpoint: string, options: RequestInit = {}, retry = true): Promise<any> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('2qt_token') : null;
 
-    const headers: Record<string, string> = {
+    const headers = new Headers({
       ...((!options.body || typeof options.body === 'string') && { 'Content-Type': 'application/json' }),
+      'X-Pinggy-No-Screen': 'true',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...(options.headers as Record<string, string> || {}),
-    };
+    });
 
     let response;
     try {
