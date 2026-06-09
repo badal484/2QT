@@ -1,20 +1,18 @@
 import webpush from 'web-push';
 import db from '../db';
 
-const publicVapidKey = process.env.VAPID_PUBLIC_KEY!;
-const privateVapidKey = process.env.VAPID_PRIVATE_KEY!;
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY;
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY;
 
-// Initialize web-push
-webpush.setVapidDetails(
-    'mailto:hello@2qthello.com',
-    publicVapidKey,
-    privateVapidKey
-);
+if (publicVapidKey && privateVapidKey) {
+    webpush.setVapidDetails('mailto:hello@2qthello.com', publicVapidKey, privateVapidKey);
+} else {
+    console.warn('VAPID keys not set — push notifications disabled');
+}
 
 export const pushService = {
     async sendNotificationToUser(userId: string, payload: { title: string; body: string; url?: string; icon?: string }) {
         if (!publicVapidKey || !privateVapidKey) {
-            console.warn('Push notification skipped: VAPID keys not configured');
             return;
         }
 
