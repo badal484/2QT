@@ -87,17 +87,27 @@ function formatETA(meters: number): string {
 }
 
 // ---------- Sub-components ----------
-function MapFollower({ lat, lng }: { lat: number; lng: number }) {
+// Keeps both rider and customer visible by re-fitting bounds whenever the rider moves >10m
+function MapBoundsFitter({
+  riderLat, riderLng,
+  customerLat, customerLng,
+}: {
+  riderLat: number; riderLng: number;
+  customerLat: number; customerLng: number;
+}) {
   const map = useMap();
   const prevRef = useRef<[number, number] | null>(null);
   useEffect(() => {
     const prev = prevRef.current;
-    // Only pan if the rider has actually moved meaningfully (>10m)
-    if (!prev || haversineMeters(prev[0], prev[1], lat, lng) > 10) {
-      map.panTo([lat, lng], { animate: true, duration: 1.2 });
-      prevRef.current = [lat, lng];
+    if (!prev || haversineMeters(prev[0], prev[1], riderLat, riderLng) > 10) {
+      prevRef.current = [riderLat, riderLng];
+      const bounds = L.latLngBounds(
+        [riderLat, riderLng],
+        [customerLat, customerLng]
+      );
+      map.fitBounds(bounds, { padding: [70, 70], animate: true, duration: 1.2, maxZoom: 16 });
     }
-  }, [lat, lng, map]);
+  }, [riderLat, riderLng, customerLat, customerLng, map]);
   return null;
 }
 
@@ -334,9 +344,14 @@ export default function LiveTrackingMap({
           />
         )}
 
-        {/* Auto-pan map to follow rider on live updates */}
+        {/* Keep both rider and customer in view on live updates */}
         {liveRiderLat != null && liveRiderLng != null && (
-          <MapFollower lat={liveRiderLat} lng={liveRiderLng} />
+          <MapBoundsFitter
+            riderLat={liveRiderLat}
+            riderLng={liveRiderLng}
+            customerLat={customerLat!}
+            customerLng={customerLng!}
+          />
         )}
       </MapContainer>
     </div>
