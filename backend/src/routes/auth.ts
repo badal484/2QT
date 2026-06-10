@@ -71,6 +71,7 @@ router.post('/send-otp', async (req, res) => {
         return res.status(429).json({ error: 'TOO_MANY_OTP', message: 'Too many OTP requests, please try again in 10 minutes.' });
     }
 
+    let smsSent = false;
     if (process.env.MSG91_AUTH_KEY) {
         try {
             await axios.post(
@@ -83,12 +84,22 @@ router.post('/send-otp', async (req, res) => {
                 },
                 { headers: { 'Content-Type': 'application/json' } }
             );
+            smsSent = true;
+            console.log('[MSG91] SMS dispatched to', normalizedPhone);
         } catch (error: any) {
             console.error('[MSG91_ERROR]', error?.response?.data || error.message);
         }
+    } else {
+        console.log('[OTP_FALLBACK] No MSG91 key — returning OTP in response body');
     }
 
-    res.json({ sent: true, phone: normalizedPhone });
+    // Return OTP in response only when SMS delivery is not configured/working
+    // so the frontend can auto-fill it during development / testing
+    res.json({
+        sent: true,
+        phone: normalizedPhone,
+        ...(!smsSent && { devOtp: otp }),
+    });
     } catch (err: any) {
         console.error('[SEND_OTP] Unhandled error:', err.message, err.stack);
         res.status(500).json({ error: 'SERVER_ERROR', message: 'OTP send failed' });

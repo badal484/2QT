@@ -21,6 +21,7 @@ function LoginForm() {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
   const [serverReady, setServerReady] = useState(false);
+  const [devOtp, setDevOtp] = useState("");
   const { login } = useAuth()!;
 
   // Pre-warm Render backend — poll /health until it responds, then unlock the form
@@ -41,18 +42,32 @@ function LoginForm() {
     return () => { cancelled = true; };
   }, []);
 
+  // Keep Render warm after server is ready — pings every 45s so it never sleeps mid-session
+  useEffect(() => {
+    if (!serverReady) return;
+    const id = setInterval(() => {
+      fetch('/api/proxy/health', { signal: AbortSignal.timeout(5000) }).catch(() => {});
+    }, 45_000);
+    return () => clearInterval(id);
+  }, [serverReady]);
+
   const handleSendOtp = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setLoadingMsg("");
+    setDevOtp("");
 
     const hintTimer = setTimeout(() => {
       setLoadingMsg("Server is starting up, please wait...");
     }, 8000);
 
     try {
-      await api.sendOtp(phone);
+      const data = await api.sendOtp(phone);
+      if (data?.devOtp) {
+        setOtp(data.devOtp);   // auto-fill so user can just tap Verify
+        setDevOtp(data.devOtp);
+      }
       setStep("otp");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
@@ -277,6 +292,17 @@ function LoginForm() {
                 onSubmit={handleVerifyOtp}
                 className="space-y-6"
               >
+                {devOtp && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="px-4 py-3 rounded-xl bg-brand-primary/15 border border-brand-primary/40 text-center"
+                  >
+                    <p className="text-xs text-zinc-400 mb-1">SMS not configured — your OTP:</p>
+                    <p className="text-3xl font-black tracking-[0.5em] text-brand-primary">{devOtp}</p>
+                  </motion.div>
+                )}
+
                 <div>
                   <input
                     type="text"
