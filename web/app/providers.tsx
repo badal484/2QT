@@ -59,6 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("2qt_refresh_token");
   };
 
+  useEffect(() => {
+    if (user && ['rider', 'rider_captain'].includes(user.role)) {
+      const path = window.location.pathname;
+      if (!path.startsWith('/rider')) {
+        window.location.href = '/rider';
+      }
+    }
+  }, [user]);
+
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
