@@ -216,7 +216,7 @@ export function KitchensTab() {
             <div key={k.id} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
               <div className="flex items-center justify-between p-5 border-b border-white/5">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2.5 h-2.5 rounded-full ${k.is_active ? "bg-green-400 animate-pulse" : "bg-zinc-600"}`} />
+                  <div className={`w-2.5 h-2.5 rounded-full ${!k.is_paused ? "bg-green-400 animate-pulse" : "bg-zinc-600"}`} />
                   <div>
                     <div className="font-black text-white text-lg flex items-center gap-2">
                       {k.name}
