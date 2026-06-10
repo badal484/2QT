@@ -70,7 +70,10 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
         if (loc) riderLocation = JSON.parse(loc);
     }
     
-    order.riderLocation = riderLocation;
+    if (riderLocation) {
+        order.rider_lat = riderLocation.lat;
+        order.rider_lng = riderLocation.lng;
+    }
 
     res.json({ order });
 });

@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, X, Trash2 } from "lucide-react";
+import { Plus, X, Trash2, MapPin } from "lucide-react";
+import dynamic from "next/dynamic";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
+
+const MapPicker = dynamic(() => import("../../components/MapPicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-56 bg-white/[0.03] border border-white/10 rounded-xl flex items-center justify-center text-zinc-500 text-xs">
+      Loading map…
+    </div>
+  ),
+});
 
 export function KitchensTab() {
   const [kitchens, setKitchens] = useState<any[]>([]);
@@ -34,11 +44,16 @@ export function KitchensTab() {
 
   const save = async () => {
     try {
+      const payload = {
+        ...form,
+        lat: form.lat ? Number(form.lat) : undefined,
+        lng: form.lng ? Number(form.lng) : undefined,
+      };
       if (editing) {
-        await api.patch(`/admin/kitchens/${editing}`, form);
+        await api.patch(`/admin/kitchens/${editing}`, payload);
         toast.success("Kitchen updated");
       } else {
-        await api.post("/admin/kitchens", form);
+        await api.post("/admin/kitchens", payload);
         toast.success("Kitchen created");
       }
       setEditing(null);
@@ -103,6 +118,12 @@ export function KitchensTab() {
     </div>
   );
 
+  // Map picker center: use existing kitchen coords when editing, default otherwise
+  const mapCenter: [number, number] = [
+    form.lat ? Number(form.lat) : 12.9716,
+    form.lng ? Number(form.lng) : 77.5946,
+  ];
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -157,6 +178,31 @@ export function KitchensTab() {
             {field("Address", "address")}
           </div>
 
+          {/* Kitchen Location Picker */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
+                <MapPin className="w-3 h-3" /> Kitchen Location
+              </div>
+              {form.lat && form.lng && (
+                <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded-lg border border-white/10">
+                  {Number(form.lat).toFixed(5)}, {Number(form.lng).toFixed(5)}
+                </span>
+              )}
+            </div>
+            <div className="h-56 rounded-xl overflow-hidden">
+              {/* key forces remount with correct center when switching between edit/create */}
+              <MapPicker
+                key={editing || "new"}
+                defaultCenter={mapCenter}
+                onLocationSelect={({ lat, lng }) => {
+                  setForm((prev: any) => ({ ...prev, lat, lng }));
+                }}
+              />
+            </div>
+            <p className="text-[10px] text-zinc-500 mt-1.5">Click on the map or drag the pin to set the kitchen's exact location.</p>
+          </div>
+
           <div className="flex justify-end">
             <button onClick={save} disabled={!form.name || !form.zone_ids || form.zone_ids.length === 0}
               className="bg-brand-primary text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-brand-dark disabled:opacity-50">
@@ -179,7 +225,15 @@ export function KitchensTab() {
                         {(!k.zones || k.zones.length === 0) && <span className="px-2 py-0.5 rounded bg-white/10 text-white/50 text-[9px] font-black uppercase">No Zone</span>}
                       </div>
                     </div>
-                    <div className="text-[10px] font-semibold text-zinc-400 tracking-wider">FSSAI: {k.fssai_license || 'N/A'}</div>
+                    <div className="text-[10px] font-semibold text-zinc-400 tracking-wider flex items-center gap-3">
+                      <span>FSSAI: {k.fssai_license || 'N/A'}</span>
+                      {k.lat && k.lng && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {Number(k.lat).toFixed(4)}, {Number(k.lng).toFixed(4)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
