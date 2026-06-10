@@ -15,6 +15,16 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh_secret';
 
 const phoneSchema = z.string().regex(/^91\d{10}$/);
 
+// In-memory OTP fallback — works even when Redis is slow/down on Render free tier
+const memOtp = new Map<string, { otp: string; exp: number }>();
+const setMemOtp  = (phone: string, otp: string) => memOtp.set(phone, { otp, exp: Date.now() + 600_000 });
+const getMemOtp  = (phone: string): string | null => {
+    const e = memOtp.get(phone);
+    if (!e || e.exp < Date.now()) { memOtp.delete(phone); return null; }
+    return e.otp;
+};
+const delMemOtp  = (phone: string) => memOtp.delete(phone);
+
 router.post('/send-otp', async (req, res) => {
     try {
     console.log('[SEND_OTP] Hit — body:', JSON.stringify(req.body));
@@ -32,8 +42,9 @@ router.post('/send-otp', async (req, res) => {
         return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
     }
 
-    // Generate OTP and log it IMMEDIATELY before anything async can block
+    // Generate OTP — store in memory FIRST (instant, no network), then try Redis
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    setMemOtp(normalizedPhone, otp);          // always succeeds, no await
     console.log(`[OTP] ${normalizedPhone} → ${otp}`);
     try {
         await Promise.race([
@@ -41,7 +52,7 @@ router.post('/send-otp', async (req, res) => {
             new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 3000)),
         ]);
     } catch (redisErr: any) {
-        console.error('[SEND_OTP] Redis error saving OTP:', redisErr.message);
+        console.error('[SEND_OTP] Redis slow/down — OTP stored in memory only:', redisErr.message);
     }
 
     // Rate limit check (count only, OTP already logged above so you can always find it)
@@ -90,12 +101,21 @@ router.post('/verify-otp', async (req, res) => {
         let normalizedPhone = phone.replace(/\D/g, '');
         if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
         
-        // Verify OTP against stored value in Redis
-        const storedOtp = await redis.get(keys.pendingOtp(normalizedPhone));
+        // Check memory first (works even when Redis is down), then Redis
+        let storedOtp: string | null = getMemOtp(normalizedPhone);
+        if (!storedOtp) {
+            try {
+                storedOtp = await Promise.race([
+                    redis.get(keys.pendingOtp(normalizedPhone)),
+                    new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 3000)),
+                ]) as string | null;
+            } catch { storedOtp = null; }
+        }
         if (!storedOtp || storedOtp !== String(otp)) {
             return res.status(400).json({ error: 'INVALID_OTP', message: 'Invalid or expired OTP' });
         }
-        await redis.del(keys.pendingOtp(normalizedPhone));
+        delMemOtp(normalizedPhone);
+        redis.del(keys.pendingOtp(normalizedPhone)).catch(() => {});
 
     let roleUpdate = '';
     let insertRole = 'customer';
