@@ -304,7 +304,7 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
         JOIN users u ON o.customer_id = u.id
         LEFT JOIN addresses a ON o.address_id = a.id
         LEFT JOIN kitchens k ON o.kitchen_id = k.id
-        WHERE o.status IN ('ready_for_pickup', 'confirmed') AND o.rider_id IS NULL
+        WHERE o.status IN ('ready_for_pickup', 'confirmed', 'preparing') AND o.rider_id IS NULL
         ORDER BY o.created_at ASC
     `);
     

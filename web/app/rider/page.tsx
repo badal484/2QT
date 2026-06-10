@@ -143,18 +143,22 @@ export default function RiderPage() {
   // ── Fetch orders ────────────────────────────────────────────────────────────
   const fetchOrders = useCallback(async () => {
     try {
+      // active returns { order: singular }, pool returns { orders: array }
       const [poolRes, activeRes] = await Promise.all([
-        api.get("/riders/orders/pool").catch(() => ({ orders: [] })),
-        api.get("/riders/orders/active").catch(() => ({ orders: [] })),
+        api.get("/riders/orders/pool").catch((e: any) => { console.error("[POOL]", e.message); return { orders: [] }; }),
+        api.get("/riders/orders/active").catch((e: any) => { console.error("[ACTIVE]", e.message); return { order: null }; }),
       ]);
       const all: Order[] = [];
-      if (activeRes.orders?.length > 0) all.push(...activeRes.orders);
+      if (activeRes.order) all.push(activeRes.order);
       if (poolRes.orders?.length > 0) {
-        const ids = new Set(activeRes.orders?.map((o: any) => o.id) || []);
+        const ids = new Set(all.map((o: any) => o.id));
         all.push(...poolRes.orders.filter((o: any) => !ids.has(o.id)));
       }
       setOrders(all);
-    } catch { setOrders([]); }
+    } catch (e: any) {
+      console.error("[fetchOrders]", e.message);
+      setOrders([]);
+    }
     finally { setLoading(false); }
   }, []);
 
