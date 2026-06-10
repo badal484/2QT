@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { api } from "./lib/api";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
