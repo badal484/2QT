@@ -47,7 +47,6 @@ export default function RiderLiveMap({ riderLat, riderLng, destLat, destLng, des
         scrollWheelZoom: false,
         dragging: false,
         attributionControl: false,
-        tap: false,
       });
 
       // Dark premium tiles
