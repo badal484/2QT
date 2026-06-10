@@ -27,13 +27,12 @@ function LoginForm() {
     fetch('/api/proxy/health').catch(() => {});
   }, []);
 
-  const handleSendOtp = async (e: { preventDefault(): void }, isRetry = false) => {
+  const handleSendOtp = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setLoadingMsg(isRetry ? "Retrying..." : "");
+    setLoadingMsg("");
 
-    // After 8s show a hint that the server may be cold-starting
     const hintTimer = setTimeout(() => {
       setLoadingMsg("Server is starting up, please wait...");
     }, 8000);
@@ -43,12 +42,7 @@ function LoginForm() {
       setStep("otp");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
-      if (msg === 'SERVER_TIMEOUT' && !isRetry) {
-        setLoadingMsg("Server is waking up. Retrying in 5s...");
-        setTimeout(() => handleSendOtp(e, true), 5000);
-        return;
-      }
-      setError(msg === 'SERVER_TIMEOUT' ? "Server is offline. Try again in a minute." : msg);
+      setError(msg === 'SERVER_TIMEOUT' ? "Server took too long. Tap Continue to try again." : msg);
     } finally {
       clearTimeout(hintTimer);
       setLoading(false);
