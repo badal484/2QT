@@ -192,7 +192,7 @@ export default function RiderPage() {
     }
   }, [activeTab, user, fetchEarnings]);
 
-  // ── Socket: new order notifications ────────────────────────────────────────
+  // ── Socket: new order notifications + 30s fallback poll ────────────────────
   useEffect(() => {
     if (!user || (user.role !== "rider" && user.role !== "super_admin")) return;
 
@@ -210,11 +210,17 @@ export default function RiderPage() {
       fetchOrders();
     });
 
+    // Fallback: poll every 30s so missed socket events don't leave pool stale
+    const pollPool = setInterval(() => {
+      if (isOnline) fetchOrders();
+    }, 30000);
+
     return () => {
       socket.off("new_available_mission");
       socket.disconnect();
+      clearInterval(pollPool);
     };
-  }, [user, fetchOrders]);
+  }, [user, isOnline, fetchOrders]);
 
   // ── Countdown timer for incoming order ─────────────────────────────────────
   useEffect(() => {

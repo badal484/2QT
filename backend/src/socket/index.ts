@@ -81,10 +81,11 @@ export const emitToAdmin = (event: string, data: any) => {
 
 export const emitToRiders = (event: string, data: any, zoneId?: string) => {
     if (io) {
+        // Always emit to global riders room — catches riders with no zone_id set
+        io.to('riders').emit(event, data);
+        // Also emit to zone-specific room for targeted delivery
         if (zoneId) {
             io.to(`riders:${zoneId}`).emit(event, data);
-        } else {
-            io.to('riders').emit(event, data);
         }
     }
 };
