@@ -30,6 +30,5 @@ CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_kitchen_id ON orders(kitchen_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_customer_id ON wallet_transactions(customer_id);
-CREATE INDEX IF NOT EXISTS idx_ratings_order_id ON ratings(order_id);
 CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_customer_id ON loyalty_transactions(customer_id);
 CREATE INDEX IF NOT EXISTS idx_addresses_customer_id ON addresses(customer_id);
