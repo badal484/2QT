@@ -168,6 +168,7 @@ interface LiveTrackingMapProps {
   initialRiderLng?: number;
   liveRiderLat?: number | null;
   liveRiderLng?: number | null;
+  onEtaChange?: (eta: string | null) => void;
 }
 
 export default function LiveTrackingMap({
@@ -175,11 +176,11 @@ export default function LiveTrackingMap({
   customerLat, customerLng,
   initialRiderLat, initialRiderLng,
   liveRiderLat, liveRiderLng,
+  onEtaChange,
 }: LiveTrackingMapProps) {
   const [mounted, setMounted] = useState(false);
   const [route, setRoute] = useState<[number, number][] | null>(null);
   const [eta, setEta] = useState<string | null>(null);
-  const [totalDistance, setTotalDistance] = useState(0);
   const [routeIdx, setRouteIdx] = useState(0);
   const [loadingRoute, setLoadingRoute] = useState(true);
 
@@ -188,6 +189,9 @@ export default function LiveTrackingMap({
   const prevIdxRef = useRef(-1);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Bubble ETA up to the parent page so it can show it prominently in the bottom sheet
+  useEffect(() => { onEtaChange?.(eta); }, [eta, onEtaChange]);
 
   useEffect(() => {
     if (!kitchenLat || !kitchenLng || !customerLat || !customerLng) {
@@ -199,7 +203,6 @@ export default function LiveTrackingMap({
       if (result) {
         setRoute(result.coords);
         routeRef.current = result.coords;
-        setTotalDistance(result.distance);
         setEta(formatETA(result.distance));
       }
       setLoadingRoute(false);
@@ -269,22 +272,7 @@ export default function LiveTrackingMap({
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden">
 
-      {/* ETA pill — top center */}
-      {eta && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-zinc-900/90 backdrop-blur-sm text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#FF5722] animate-pulse shrink-0" />
-          {eta}
-        </div>
-      )}
-
-      {/* Route distance — bottom left */}
-      {totalDistance > 0 && (
-        <div className="absolute bottom-3 left-3 z-[1000] bg-white/90 backdrop-blur-sm text-zinc-600 text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-sm pointer-events-none border border-zinc-100">
-          {(totalDistance / 1000).toFixed(1)} km route
-        </div>
-      )}
-
-      {/* Route loading spinner — top right */}
+      {/* Route loading indicator */}
       {loadingRoute && (
         <div className="absolute top-3 right-3 z-[1000] bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-[10px] font-medium text-zinc-500 flex items-center gap-1.5 pointer-events-none">
           <Loader2 className="w-3 h-3 animate-spin" /> Plotting route…
