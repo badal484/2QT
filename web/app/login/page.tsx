@@ -20,11 +20,25 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
+  const [serverReady, setServerReady] = useState(false);
   const { login } = useAuth()!;
 
-  // Pre-warm Render backend on page load so it's awake when the user taps Continue
+  // Pre-warm Render backend — poll /health until it responds, then unlock the form
   useEffect(() => {
-    fetch('/api/proxy/health').catch(() => {});
+    let cancelled = false;
+    const warmUp = async () => {
+      for (let i = 0; i < 20; i++) {
+        try {
+          const res = await fetch('/api/proxy/health', { signal: AbortSignal.timeout(5000) });
+          if (res.ok && !cancelled) { setServerReady(true); return; }
+        } catch {}
+        if (cancelled) return;
+        await new Promise(r => setTimeout(r, 3000));
+      }
+      if (!cancelled) setServerReady(true); // give up after ~60s, let them try anyway
+    };
+    warmUp();
+    return () => { cancelled = true; };
   }, []);
 
   const handleSendOtp = async (e: { preventDefault(): void }) => {
@@ -227,6 +241,12 @@ function LoginForm() {
                   </motion.p>
                 )}
 
+                {!serverReady && (
+                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-zinc-400 text-center">
+                    Connecting to server...
+                  </motion.p>
+                )}
+
                 {loadingMsg && (
                   <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-zinc-400 text-center">
                     {loadingMsg}
@@ -235,10 +255,12 @@ function LoginForm() {
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !serverReady}
                   className="w-full bg-brand-primary text-white py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 hover:bg-orange-500 transition-all disabled:opacity-50 active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                 >
                   {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : !serverReady ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     "Continue"
