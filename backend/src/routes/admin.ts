@@ -774,7 +774,7 @@ router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), vali
 
 router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), validate(KitchenSchema.partial()), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { name, zone_ids, address, fssai_license, gstin, is_active } = req.body;
+    const { name, zone_ids, address, fssai_license, gstin, is_active, lat, lng } = req.body;
 
     await withTransaction(async (client) => {
         const { rows } = await client.query(`
@@ -783,10 +783,12 @@ router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'),
                 address = COALESCE($2, address),
                 fssai_license = COALESCE($3, fssai_license),
                 gstin = COALESCE($4, gstin),
-                is_active = COALESCE($5, is_active)
+                is_active = COALESCE($5, is_active),
+                lat = COALESCE($7, lat),
+                lng = COALESCE($8, lng)
             WHERE id = $6
             RETURNING id
-        `, [name, address, fssai_license, gstin, is_active, id]);
+        `, [name, address, fssai_license, gstin, is_active, id, lat, lng]);
 
         if (rows.length === 0) {
             const err: any = new Error('NOT_FOUND');
