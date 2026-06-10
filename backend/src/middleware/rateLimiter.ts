@@ -20,7 +20,7 @@ const createLimiter = (windowMs: number, max: number, message: string) => {
 };
 
 export const generalLimiter = createLimiter(60 * 1000, 100, 'Too many requests, please try again later.');
-export const otpLimiter = createLimiter(10 * 60 * 1000, 5, 'Too many OTP requests, please try again in 10 minutes.');
+export const otpLimiter = createLimiter(10 * 60 * 1000, 20, 'Too many OTP requests, please try again in 10 minutes.');
 export const paymentLimiter = createLimiter(60 * 1000, 50, 'Too many payment attempts.');
 export const gpsLimiter = createLimiter(60 * 1000, 120, 'GPS update limit exceeded.');
 export const broadcastLimiter = createLimiter(24 * 60 * 60 * 1000, 5, 'Broadcast limit reached for today.');
