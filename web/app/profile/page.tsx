@@ -108,7 +108,28 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
         </div>
       </section>
 
-      {riderApp && (
+      {['rider', 'rider_captain', 'super_admin'].includes(user?.role) && (
+        <section className="rounded-3xl p-6 relative overflow-hidden shadow-sm border bg-brand-primary/5 border-brand-primary/20">
+          <div className="flex items-center gap-4">
+             <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 bg-brand-primary text-white">
+                <CheckCircle2 className="w-7 h-7" />
+             </div>
+             <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold truncate text-brand-dark">
+                  2QT Rider
+                </h3>
+                <p className="text-sm font-medium mt-1 text-black/60">
+                  You are an active member of the 2QT Delivery Fleet.
+                </p>
+             </div>
+             <Link href="/rider" className="px-6 py-3 bg-brand-dark hover:bg-black text-white text-sm font-bold rounded-xl shadow-md transition-all shrink-0">
+               Open Dashboard
+             </Link>
+          </div>
+        </section>
+      )}
+
+      {riderApp && !['rider', 'rider_captain', 'super_admin'].includes(user?.role) && (
         <section className={`rounded-3xl p-6 relative overflow-hidden shadow-sm border ${
           riderApp.status === "pending" ? "bg-amber-50 border-amber-200" :
           riderApp.status === "approved" ? "bg-green-50 border-green-200" :
