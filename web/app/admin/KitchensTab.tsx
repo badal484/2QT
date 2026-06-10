@@ -118,11 +118,16 @@ export function KitchensTab() {
     </div>
   );
 
-  // Map picker center: use existing kitchen coords when editing, default otherwise
-  const mapCenter: [number, number] = [
-    form.lat ? Number(form.lat) : 12.9716,
-    form.lng ? Number(form.lng) : 77.5946,
-  ];
+  // Map center: existing kitchen coords > selected zone centroid > first zone centroid > null (MapPicker uses browser GPS)
+  const selectedZone = zones.find((z: any) => (form.zone_ids || []).includes(z.id));
+  const fallbackLat = selectedZone?.kitchen_lat ?? zones[0]?.kitchen_lat;
+  const fallbackLng = selectedZone?.kitchen_lng ?? zones[0]?.kitchen_lng;
+  const mapCenter: [number, number] | undefined =
+    form.lat && form.lng
+      ? [Number(form.lat), Number(form.lng)]
+      : fallbackLat && fallbackLng
+      ? [Number(fallbackLat), Number(fallbackLng)]
+      : undefined;
 
   return (
     <div>
@@ -193,7 +198,7 @@ export function KitchensTab() {
             <div className="h-56 rounded-xl overflow-hidden">
               {/* key forces remount with correct center when switching between edit/create */}
               <MapPicker
-                key={editing || "new"}
+                key={`${editing || "new"}-${mapCenter?.join(",") ?? "gps"}`}
                 defaultCenter={mapCenter}
                 onLocationSelect={({ lat, lng }) => {
                   setForm((prev: any) => ({ ...prev, lat, lng }));
