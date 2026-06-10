@@ -22,6 +22,7 @@ CREATE TABLE users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger for referral code generation
@@ -43,6 +44,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_generate_referral_code ON users;
 CREATE TRIGGER trigger_generate_referral_code
 BEFORE INSERT ON users
 FOR EACH ROW EXECUTE FUNCTION generate_referral_code();
@@ -77,6 +79,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_normalize_phone ON users;
 CREATE TRIGGER trigger_normalize_phone
 BEFORE INSERT OR UPDATE OF phone ON users
 FOR EACH ROW EXECUTE FUNCTION normalize_phone();

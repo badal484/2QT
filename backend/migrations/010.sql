@@ -8,6 +8,7 @@ CREATE TABLE customer_wallet (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_customer_wallet_updated_at ON customer_wallet;
 CREATE TRIGGER update_customer_wallet_updated_at BEFORE UPDATE ON customer_wallet FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE wallet_transactions (
@@ -46,6 +47,7 @@ CREATE TABLE referrals (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_referrals_updated_at ON referrals;
 CREATE TRIGGER update_referrals_updated_at BEFORE UPDATE ON referrals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE promo_codes (
@@ -66,4 +68,5 @@ CREATE TABLE promo_codes (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_promo_codes_updated_at ON promo_codes;
 CREATE TRIGGER update_promo_codes_updated_at BEFORE UPDATE ON promo_codes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
