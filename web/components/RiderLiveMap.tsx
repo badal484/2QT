@@ -100,12 +100,15 @@ export default function RiderLiveMap({ riderLat, riderLng, destLat, destLng, des
 
     // Destination marker
     const isKitchen = destType === 'kitchen';
-    const bg    = isKitchen ? '#3B82F6' : '#10B981';
-    const emoji = isKitchen ? '🍳' : '🏠';
+    const bg     = isKitchen ? '#3B82F6' : '#10B981';
     const radius = isKitchen ? '10px' : '50%';
+    // Inline SVG icons — no emoji dependency
+    const svgIcon = isKitchen
+      ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" x2="18" y1="17" y2="17"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
     const dIcon = L.divIcon({
       className: '',
-      html: `<div style="width:36px;height:36px;background:${bg};border-radius:${radius};border:3px solid white;box-shadow:0 4px 14px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:16px;">${emoji}</div>`,
+      html: `<div style="width:36px;height:36px;background:${bg};border-radius:${radius};border:3px solid white;box-shadow:0 4px 14px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">${svgIcon}</div>`,
       iconSize: [36, 36],
       iconAnchor: [18, 18],
     });

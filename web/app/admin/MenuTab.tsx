@@ -493,8 +493,8 @@ export function MenuTab() {
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Dietary Type</label>
                     <select name="is_veg" defaultValue={editingItem?.is_veg ? "true" : "false"} className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none">
-                      <option value="true" className="bg-zinc-900">🟢 Veg</option>
-                      <option value="false" className="bg-zinc-900">🔴 Non-Veg</option>
+                      <option value="true" className="bg-zinc-900">Veg</option>
+                      <option value="false" className="bg-zinc-900">Non-Veg</option>
                     </select>
                   </div>
 

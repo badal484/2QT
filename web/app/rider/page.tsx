@@ -12,6 +12,7 @@ import {
   Package, CheckCircle2, ChevronRight,
   LogOut, Bike, Phone, Wallet, Clock, TrendingUp,
   ArrowRight, Zap, MapPin, Navigation, Lock,
+  ChefHat, Home, Trophy,
 } from "lucide-react";
 
 const RiderLiveMap = dynamic(() => import("../../components/RiderLiveMap"), {
@@ -61,25 +62,28 @@ function CountdownRing({ seconds, total }: { seconds: number; total: number }) {
 // ─── Delivery Step Bar ────────────────────────────────────────────────────────
 
 function DeliverySteps({ status }: { status: string }) {
-  const steps = [
-    { label: 'Kitchen',   emoji: '🍳' },
-    { label: 'Picked Up', emoji: '🛵' },
-    { label: 'Delivered', emoji: '🏠' },
+  const steps: { label: string; icon: React.FC<{ className?: string }> }[] = [
+    { label: 'Kitchen',   icon: ChefHat },
+    { label: 'Picked Up', icon: Bike    },
+    { label: 'Delivered', icon: Home    },
   ];
   const active = status === 'out_for_delivery' ? 1 : status === 'delivered' ? 2 : 0;
   return (
     <div className="flex items-center gap-1 px-5 py-3 border-t border-white/[0.06]">
-      {steps.map((s, i) => (
-        <div key={s.label} className="flex items-center gap-1 flex-1 last:flex-none">
-          <div className={`flex flex-col items-center transition-opacity ${i <= active ? 'opacity-100' : 'opacity-25'}`}>
-            <span className="text-lg leading-none">{s.emoji}</span>
-            <span className="text-[8px] font-black uppercase tracking-widest text-zinc-400 mt-0.5">{s.label}</span>
+      {steps.map((s, i) => {
+        const Icon = s.icon;
+        return (
+          <div key={s.label} className="flex items-center gap-1 flex-1 last:flex-none">
+            <div className={`flex flex-col items-center transition-opacity ${i <= active ? 'opacity-100' : 'opacity-25'}`}>
+              <Icon className="w-4 h-4 text-zinc-300" />
+              <span className="text-[8px] font-black uppercase tracking-widest text-zinc-400 mt-0.5">{s.label}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`flex-1 h-0.5 rounded-full mx-1 ${i < active ? 'bg-brand-primary' : 'bg-zinc-700'}`} />
+            )}
           </div>
-          {i < steps.length - 1 && (
-            <div className={`flex-1 h-0.5 rounded-full mx-1 ${i < active ? 'bg-brand-primary' : 'bg-zinc-700'}`} />
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -94,7 +98,9 @@ function EarningsFlash({ amount, onDone }: { amount: number; onDone: () => void 
       <motion.div initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 220, damping: 16 }} className="text-center px-8">
         <motion.div animate={{ rotate: [0, -10, 10, -10, 10, 0] }} transition={{ delay: 0.3, duration: 0.6 }}
-          className="text-7xl mb-6">🎉</motion.div>
+          className="mb-6 flex items-center justify-center">
+          <Trophy className="w-20 h-20 text-yellow-400" />
+        </motion.div>
         <p className="text-zinc-400 text-sm font-black uppercase tracking-widest mb-3">Delivery Complete</p>
         <p className="text-7xl font-black text-green-400">+₹{(amount / 100).toFixed(0)}</p>
         <p className="text-zinc-500 text-sm mt-3 font-semibold">Earned · Great work!</p>
@@ -365,9 +371,9 @@ export default function RiderPage() {
   const mapLng = riderLoc?.lng ?? 77.5946;
 
   // ── Zone demand proxy ───────────────────────────────────────────────────────
-  const demandLevel = orders.length >= 3 ? { label: '🔥 High Demand', color: 'text-orange-400' }
-    : orders.length >= 1 ? { label: '🟡 Active Zone', color: 'text-amber-400' }
-    : { label: '⚪ Quiet Now', color: 'text-zinc-400' };
+  const demandLevel = orders.length >= 3 ? { label: 'High Demand', color: 'text-orange-400' }
+    : orders.length >= 1 ? { label: 'Active Zone', color: 'text-amber-400' }
+    : { label: 'Quiet Now', color: 'text-zinc-400' };
 
   if (authLoading) return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -584,7 +590,7 @@ export default function RiderPage() {
                 {[
                   { label: "Deliveries", val: String(todayEarnings?.deliveriesCount ?? 0) },
                   { label: "This Week",  val: `₹${((riderStats?.weekEarnings ?? 0) / 100).toFixed(0)}` },
-                  { label: "Rating",     val: `${(riderStats?.rating ?? 5.0).toFixed(1)}★` },
+                  { label: "Rating",     val: `${(riderStats?.rating ?? 5.0).toFixed(1)}` },
                 ].map(s => (
                   <div key={s.label}>
                     <p className="text-[9px] font-black uppercase tracking-widest text-white/60 mb-0.5">{s.label}</p>
@@ -688,7 +694,7 @@ export default function RiderPage() {
               {/* Route preview */}
               <div className="bg-zinc-800/60 border border-white/[0.06] rounded-2xl p-4 mb-5 space-y-2.5">
                 <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center text-sm">🍳</div>
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center"><ChefHat className="w-4 h-4 text-blue-400" /></div>
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Pickup from</p>
                     <p className="text-sm font-bold text-white truncate">
@@ -698,7 +704,7 @@ export default function RiderPage() {
                 </div>
                 <div className="ml-3.5 w-px h-3 bg-zinc-700" />
                 <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-green-500/20 flex items-center justify-center text-sm">🏠</div>
+                  <div className="w-7 h-7 rounded-lg bg-green-500/20 flex items-center justify-center"><Home className="w-4 h-4 text-green-400" /></div>
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Deliver to</p>
                     <p className="text-sm font-bold text-white truncate">
@@ -940,7 +946,7 @@ function SwipeButton({ text, onComplete, isVerifying, color = "orange", resetKey
   return (
     <div ref={containerRef} className={`relative h-14 rounded-2xl overflow-hidden flex items-center justify-center border ${track}`}>
       <span className={`text-sm font-black uppercase tracking-widest z-0 select-none pointer-events-none ${txt}`}>
-        {isCompleted ? "✓ Done!" : text}
+        {isCompleted ? "Done!" : text}
       </span>
       <motion.div drag={isCompleted ? false : "x"} dragConstraints={containerRef}
         dragElastic={0.03} dragMomentum={false} onDragEnd={handleDragEnd} animate={controls}

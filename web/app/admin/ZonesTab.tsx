@@ -252,8 +252,8 @@ export function ZonesTab() {
                     { label: "Max Orders/hr", value: zone.max_orders_per_hour },
                     { label: "Est. Delivery", value: `${zone.realistic_delivery_minutes} min` },
                     { label: "Surge", value: zone.surge_enabled ? "On" : "Off" },
-                    { label: "Kitchen Lat", value: zone.kitchen_lat ? Number(zone.kitchen_lat).toFixed(4) : "⚠️ not set" },
-                    { label: "Kitchen Lng", value: zone.kitchen_lng ? Number(zone.kitchen_lng).toFixed(4) : "⚠️ not set" },
+                    { label: "Kitchen Lat", value: zone.kitchen_lat ? Number(zone.kitchen_lat).toFixed(4) : "— not set" },
+                    { label: "Kitchen Lng", value: zone.kitchen_lng ? Number(zone.kitchen_lng).toFixed(4) : "— not set" },
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">{label}</div>

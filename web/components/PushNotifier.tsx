@@ -74,7 +74,7 @@ export default function PushNotifier() {
             });
 
             setIsSubscribed(true);
-            toast.success("Live order updates enabled! 🚀");
+            toast.success("Live order updates enabled!");
             
             // Show a test notification immediately
             if (Notification.permission === 'granted') {

@@ -611,9 +611,9 @@ function AddressesTab() {
               </div>
               {pinLat && pinLng ? (
                 <p className="text-xs text-center font-mono text-zinc-500">
-                  📍 {pinLat.toFixed(5)}, {pinLng.toFixed(5)}
-                  {zoneId ? <span className="ml-2 text-green-600 font-bold">✓ In delivery zone</span>
-                           : <span className="ml-2 text-red-500 font-bold">⚠ Outside zone</span>}
+                  {pinLat.toFixed(5)}, {pinLng.toFixed(5)}
+                  {zoneId ? <span className="ml-2 text-green-600 font-bold">In delivery zone</span>
+                           : <span className="ml-2 text-red-500 font-bold">Outside zone</span>}
                 </p>
               ) : (
                 <p className="text-xs text-center text-zinc-400">Tap the map to pin your exact delivery location</p>

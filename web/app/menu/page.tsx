@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Plus, Minus, ShoppingBag, X, ChevronRight, 
-  Star, Clock, Zap, CheckCircle2, Search, 
-  ArrowLeft, Filter, Heart, Info, Loader2, MapPin
+import {
+  Plus, Minus, ShoppingBag, X, ChevronRight,
+  Star, Clock, Zap, CheckCircle2, Search,
+  ArrowLeft, Filter, Heart, Info, Loader2, MapPin, Check
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -541,7 +541,7 @@ export default function MenuPage() {
                   <CheckCircle2 className="w-10 h-10 text-green-500" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-black text-zinc-900 mb-2">You're on the list! 🎉</h1>
+                  <h1 className="text-2xl font-black text-zinc-900 mb-2">You're on the list!</h1>
                   <p className="text-zinc-500 font-medium text-sm leading-relaxed">
                     We've recorded your request for <span className="font-bold text-zinc-800">{reqForm.area_name}</span>. You'll get a notification the day we launch in your area!
                   </p>
@@ -631,7 +631,7 @@ export default function MenuPage() {
                     onClick={() => setRequestStep('form')}
                     className="w-full bg-brand-primary text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-brand-primary/25 hover:bg-brand-dark transition-all hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    🙋 Request Service in My Area
+                    Request Service in My Area
                   </button>
                   <Link
                     href="/"
@@ -999,7 +999,7 @@ export default function MenuPage() {
                           >
                             <span>Use Wallet (₹{(walletBalance / 100).toFixed(2)} available)</span>
                             <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${useWallet ? "bg-green-500 border-green-500" : "border-black/20"}`}>
-                              {useWallet && <span className="text-white text-[10px]">✓</span>}
+                              {useWallet && <Check className="w-3 h-3 text-white" />}
                             </span>
                           </button>
                         )}
@@ -1010,7 +1010,7 @@ export default function MenuPage() {
                           >
                             <span>Use {loyaltyPoints} Loyalty Points</span>
                             <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${useLoyalty ? "bg-amber-500 border-amber-500" : "border-black/20"}`}>
-                              {useLoyalty && <span className="text-white text-[10px]">✓</span>}
+                              {useLoyalty && <Check className="w-3 h-3 text-white" />}
                             </span>
                           </button>
                         )}
