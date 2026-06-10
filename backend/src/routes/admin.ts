@@ -680,8 +680,18 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
     const {
         name, radius_km, delivery_fee_base_paise, surge_fee_paise,
         opening_time, closing_time, max_orders_per_hour, is_active,
-        realistic_delivery_minutes, surge_enabled, polygon_points
+        realistic_delivery_minutes, surge_enabled, polygon_points,
+        kitchen_lat, kitchen_lng,
     } = req.body;
+
+    // Auto-compute zone center from polygon centroid when polygon changes
+    let computedKitchenLat = kitchen_lat;
+    let computedKitchenLng = kitchen_lng;
+    if (polygon_points && polygon_points.length > 0 && computedKitchenLat == null) {
+        computedKitchenLat = polygon_points.reduce((s: number, p: any) => s + p.lat, 0) / polygon_points.length;
+        computedKitchenLng = polygon_points.reduce((s: number, p: any) => s + p.lng, 0) / polygon_points.length;
+    }
+
     try {
         const { rows } = await query(`
             UPDATE zones SET
@@ -696,15 +706,26 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
                 realistic_delivery_minutes = COALESCE($9, realistic_delivery_minutes),
                 surge_enabled = COALESCE($10, surge_enabled),
                 polygon_points = COALESCE($11, polygon_points),
+                kitchen_lat = COALESCE($13, kitchen_lat),
+                kitchen_lng = COALESCE($14, kitchen_lng),
                 updated_at = NOW()
             WHERE id = $12
             RETURNING *
         `, [name, radius_km, delivery_fee_base_paise, surge_fee_paise,
             opening_time, closing_time, max_orders_per_hour, is_active,
-            realistic_delivery_minutes, surge_enabled, 
-            polygon_points ? JSON.stringify(polygon_points) : null, id]);
+            realistic_delivery_minutes, surge_enabled,
+            polygon_points ? JSON.stringify(polygon_points) : null, id,
+            computedKitchenLat ?? null, computedKitchenLng ?? null]);
         if (rows.length === 0) return res.status(404).json({ error: 'ZONE_NOT_FOUND' });
-        // Clear menu cache for this zone
+
+        // Sync kitchen lat/lng to the new zone center so maps show the correct spot
+        if (computedKitchenLat != null) {
+            await query(`
+                UPDATE kitchens k SET lat = $1, lng = $2, updated_at = NOW()
+                FROM kitchen_zones kz WHERE kz.kitchen_id = k.id AND kz.zone_id = $3
+            `, [computedKitchenLat, computedKitchenLng, id]);
+        }
+
         await redis.del(keys.menu(id));
         res.json({ zone: rows[0] });
     } catch (err: any) {
