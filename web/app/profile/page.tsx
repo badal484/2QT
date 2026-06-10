@@ -2,12 +2,19 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
 import PushNotifier from "../../components/PushNotifier";
+import dynamic from "next/dynamic";
+import { toast } from "sonner";
+
+const MapPicker = dynamic(() => import("../../components/MapPicker"), {
+  ssr: false,
+  loading: () => <div className="w-full h-52 bg-zinc-100 rounded-2xl animate-pulse flex items-center justify-center text-zinc-400 text-sm">Loading map…</div>,
+});
 
 const TABS = [
   { id: "overview", label: "Profile", icon: User },
@@ -469,6 +476,10 @@ function AddressesTab() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ label: "Home", addressText: "" });
+  const [pinLat, setPinLat] = useState<number | null>(null);
+  const [pinLng, setPinLng] = useState<number | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]); // India center default
+  const [gpsLoading, setGpsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [zoneId, setZoneId] = useState<string | null>(null);
 
@@ -484,26 +495,52 @@ function AddressesTab() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-    api.get("/menu/zones/check?lat=12.9716&lng=77.5946").then(d => { if (d.serviceable) setZoneId(d.zone.id); });
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  const del = async (id: string) => { 
-    await api.delete(`/customers/addresses/${id}`); 
-    load(); 
+  // Check zone from real pin location whenever it changes
+  useEffect(() => {
+    if (!pinLat || !pinLng) return;
+    api.get(`/menu/zones/check?lat=${pinLat}&lng=${pinLng}`)
+      .then(d => { if (d.serviceable) setZoneId(d.zone.id); else setZoneId(null); })
+      .catch(() => {});
+  }, [pinLat, pinLng]);
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { toast.error("GPS not supported on this device"); return; }
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setPinLat(lat);
+        setPinLng(lng);
+        setMapCenter([lat, lng]);
+        setGpsLoading(false);
+        toast.success("Location detected!");
+      },
+      () => { toast.error("Could not get GPS location. Pin it manually on the map."); setGpsLoading(false); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const del = async (id: string) => {
+    await api.delete(`/customers/addresses/${id}`);
+    load();
   };
 
   const add = async () => {
-    if (!form.addressText || !zoneId) return;
+    if (!form.addressText) { toast.error("Enter your address details"); return; }
+    if (!pinLat || !pinLng) { toast.error("Pin your location on the map first"); return; }
+    if (!zoneId) { toast.error("This location is outside our delivery zone"); return; }
     setSaving(true);
     try {
-      await api.post("/customers/addresses", { ...form, lat: 12.9716, lng: 77.5946, zoneId });
+      await api.post("/customers/addresses", { ...form, lat: pinLat, lng: pinLng, zoneId });
       setShowForm(false);
       setForm({ label: "Home", addressText: "" });
+      setPinLat(null); setPinLng(null);
       load();
-    } catch (e) {
-      console.error(e);
+      toast.success("Address saved!");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save address");
     } finally {
       setSaving(false);
     }
@@ -522,17 +559,20 @@ function AddressesTab() {
             <div className="flex-1 min-w-0">
               <p className="text-lg font-bold text-zinc-900">{a.label}</p>
               <p className="text-sm text-zinc-500 font-medium leading-relaxed mt-1 line-clamp-2">{a.address_text}</p>
+              {a.lat && a.lng && (
+                <p className="text-[10px] font-mono text-zinc-400 mt-1">{Number(a.lat).toFixed(4)}, {Number(a.lng).toFixed(4)}</p>
+              )}
             </div>
             <button onClick={() => del(a.id)} className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-100">
               <Trash2 className="w-5 h-5" />
             </button>
           </div>
         ))}
-        
-        <button onClick={() => setShowForm(true)}
+
+        <button onClick={() => { setShowForm(true); useMyLocation(); }}
           className="h-full min-h-[120px] border-2 border-dashed border-zinc-300 rounded-3xl flex flex-col items-center justify-center gap-2 group hover:border-brand-primary hover:bg-brand-primary/5 transition-all bg-zinc-50">
           <div className="w-10 h-10 rounded-full bg-zinc-200 flex items-center justify-center group-hover:bg-brand-primary group-hover:text-white transition-all text-zinc-500">
-             <Plus className="w-5 h-5" />
+            <Plus className="w-5 h-5" />
           </div>
           <span className="text-sm font-semibold text-zinc-500 group-hover:text-brand-primary transition-all">Add New Location</span>
         </button>
@@ -542,23 +582,55 @@ function AddressesTab() {
         {showForm && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
             className="bg-white rounded-3xl border border-zinc-200 p-8 shadow-lg">
-            <h3 className="text-2xl font-bold mb-6 text-zinc-900">Set Delivery Destination</h3>
-            <div className="space-y-6">
+            <h3 className="text-2xl font-bold mb-6 text-zinc-900">Set Delivery Location</h3>
+            <div className="space-y-5">
+              {/* Label */}
               <div className="grid grid-cols-4 gap-3">
                 {["Home", "Work", "Office", "Other"].map(l => (
-                   <button key={l} onClick={() => setForm({ ...form, label: l })} className={`py-3 rounded-xl text-sm font-bold transition-all ${form.label === l ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
-                      {l}
-                   </button>
+                  <button key={l} onClick={() => setForm({ ...form, label: l })}
+                    className={`py-3 rounded-xl text-sm font-bold transition-all ${form.label === l ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                    {l}
+                  </button>
                 ))}
               </div>
+
+              {/* GPS button */}
+              <button onClick={useMyLocation} disabled={gpsLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-brand-primary/10 text-brand-primary font-bold text-sm hover:bg-brand-primary/20 transition-colors disabled:opacity-50">
+                {gpsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
+                {gpsLoading ? "Detecting location…" : "Use My Current Location"}
+              </button>
+
+              {/* Map picker */}
+              <div className="rounded-2xl overflow-hidden border border-zinc-200">
+                <MapPicker
+                  key={mapCenter.join(",")}
+                  defaultCenter={mapCenter}
+                  onLocationSelect={({ lat, lng }) => { setPinLat(lat); setPinLng(lng); }}
+                />
+              </div>
+              {pinLat && pinLng ? (
+                <p className="text-xs text-center font-mono text-zinc-500">
+                  📍 {pinLat.toFixed(5)}, {pinLng.toFixed(5)}
+                  {zoneId ? <span className="ml-2 text-green-600 font-bold">✓ In delivery zone</span>
+                           : <span className="ml-2 text-red-500 font-bold">⚠ Outside zone</span>}
+                </p>
+              ) : (
+                <p className="text-xs text-center text-zinc-400">Tap the map to pin your exact delivery location</p>
+              )}
+
+              {/* Address text */}
               <textarea value={form.addressText} onChange={e => setForm({ ...form, addressText: e.target.value })}
-                placeholder="Enter complete address details..." className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-5 text-sm font-medium outline-none focus:ring-2 ring-brand-primary/20 transition-all h-28 resize-none text-zinc-900" />
+                placeholder="Flat / building / landmark details…"
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-5 text-sm font-medium outline-none focus:ring-2 ring-brand-primary/20 transition-all h-24 resize-none text-zinc-900" />
+
               <div className="flex gap-3">
-                <button onClick={add} disabled={saving || !form.addressText}
+                <button onClick={add} disabled={saving || !form.addressText || !pinLat || !zoneId}
                   className="flex-1 bg-brand-primary text-white py-4 rounded-xl text-sm font-bold disabled:opacity-50 transition-all shadow-md hover:bg-brand-dark">
-                  {saving ? "Saving..." : "Confirm Location"}
+                  {saving ? "Saving…" : "Save Location"}
                 </button>
-                <button onClick={() => setShowForm(false)} className="px-8 py-4 rounded-xl bg-zinc-100 text-zinc-700 text-sm font-bold hover:bg-zinc-200 transition-colors">
+                <button onClick={() => { setShowForm(false); setPinLat(null); setPinLng(null); }}
+                  className="px-8 py-4 rounded-xl bg-zinc-100 text-zinc-700 text-sm font-bold hover:bg-zinc-200 transition-colors">
                   Cancel
                 </button>
               </div>

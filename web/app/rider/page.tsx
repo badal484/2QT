@@ -123,6 +123,7 @@ export default function RiderPage() {
   const [orderHistory,    setOrderHistory]    = useState<any[]>([]);
   const [historyLoading,  setHistoryLoading]  = useState(false);
   const [earningsFlash,   setEarningsFlash]   = useState<{ amount: number } | null>(null);
+  const [swipeErrorMap,   setSwipeErrorMap]   = useState<Record<string, number>>({});
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -150,7 +151,9 @@ export default function RiderPage() {
       ]);
       const all: Order[] = [];
       if (activeRes.order) all.push(activeRes.order);
-      if (poolRes.orders?.length > 0) {
+      // Don't show pool orders while rider is already out_for_delivery (RIDER_BUSY scenario)
+      const isDelivering = activeRes.order?.status === "out_for_delivery";
+      if (!isDelivering && poolRes.orders?.length > 0) {
         const ids = new Set(all.map((o: any) => o.id));
         all.push(...poolRes.orders.filter((o: any) => !ids.has(o.id)));
       }
@@ -289,7 +292,10 @@ export default function RiderPage() {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
         toast.success("Order picked up! Head to customer.");
       }
-    } catch (err: any) { toast.error(err.message || "Failed to update"); }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update");
+      setSwipeErrorMap(prev => ({ ...prev, [orderId]: (prev[orderId] ?? 0) + 1 }));
+    }
   };
 
   const handleVerifyOtp = async () => {
@@ -521,6 +527,7 @@ export default function RiderPage() {
                   {orders.map((order, i) => (
                     <OrderCard key={order.id} order={order} index={i}
                       isVerifying={verifyOtpFor === order.id}
+                      swipeErrorKey={swipeErrorMap[order.id] ?? 0}
                       onUpdate={(id, status) => {
                         if (status === "delivered") setVerifyOtpFor(id);
                         else updateStatus(id, status);
@@ -774,11 +781,12 @@ export default function RiderPage() {
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-function OrderCard({ order, onUpdate, isVerifying, index }: {
+function OrderCard({ order, onUpdate, isVerifying, index, swipeErrorKey }: {
   order: Order;
   onUpdate: (id: string, s: "out_for_delivery" | "delivered") => void;
   isVerifying: boolean;
   index: number;
+  swipeErrorKey?: number;
 }) {
   const isPending = order.status === "confirmed" || order.status === "preparing";
   const isReady   = order.status === "ready_for_pickup" || (order.status as any) === "ready";
@@ -858,6 +866,7 @@ function OrderCard({ order, onUpdate, isVerifying, index }: {
             color={isReady ? "orange" : "green"}
             onComplete={() => onUpdate(order.id, nextStatus)}
             isVerifying={isVerifying}
+            resetKey={swipeErrorKey}
           />
         )}
       </div>
@@ -867,8 +876,8 @@ function OrderCard({ order, onUpdate, isVerifying, index }: {
 
 // ─── Swipe Button ─────────────────────────────────────────────────────────────
 
-function SwipeButton({ text, onComplete, isVerifying, color = "orange" }: {
-  text: string; onComplete: () => void; isVerifying?: boolean; color?: "orange" | "green";
+function SwipeButton({ text, onComplete, isVerifying, color = "orange", resetKey }: {
+  text: string; onComplete: () => void; isVerifying?: boolean; color?: "orange" | "green"; resetKey?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const controls = useAnimation();
@@ -877,6 +886,10 @@ function SwipeButton({ text, onComplete, isVerifying, color = "orange" }: {
   useEffect(() => {
     if (isVerifying === false) { setIsCompleted(false); controls.set({ x: 0 }); }
   }, [text, controls, isVerifying]);
+
+  useEffect(() => {
+    if (resetKey) { setIsCompleted(false); controls.set({ x: 0 }); }
+  }, [resetKey, controls]);
 
   const handleDragEnd = async (_: any, info: PanInfo) => {
     if (isCompleted) return;
