@@ -39,7 +39,7 @@ const KitchenSchema = z.object({
     gstin: z.string().max(20).optional(),
     lat: z.number().optional().default(12.9716),
     lng: z.number().optional().default(77.5946),
-    is_active: z.boolean().optional(),
+    is_paused: z.boolean().optional(),
 });
 
 const ZoneSchema = z.object({
@@ -774,7 +774,7 @@ router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), vali
 
 router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), validate(KitchenSchema.partial()), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { name, zone_ids, address, fssai_license, gstin, is_active, lat, lng } = req.body;
+    const { name, zone_ids, address, fssai_license, gstin, is_paused, lat, lng } = req.body;
 
     await withTransaction(async (client) => {
         const { rows } = await client.query(`
@@ -783,12 +783,12 @@ router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'),
                 address = COALESCE($2, address),
                 fssai_license = COALESCE($3, fssai_license),
                 gstin = COALESCE($4, gstin),
-                is_active = COALESCE($5, is_active),
+                is_paused = COALESCE($5, is_paused),
                 lat = COALESCE($7, lat),
                 lng = COALESCE($8, lng)
             WHERE id = $6
             RETURNING id
-        `, [name, address, fssai_license, gstin, is_active, id, lat, lng]);
+        `, [name, address, fssai_license, gstin, is_paused, id, lat, lng]);
 
         if (rows.length === 0) {
             const err: any = new Error('NOT_FOUND');
