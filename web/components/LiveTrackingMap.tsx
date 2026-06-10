@@ -212,9 +212,9 @@ export default function LiveTrackingMap({
       return;
     }
 
-    // Throttle: skip the OSRM call if we haven't moved >150 m since last fetch
+    // Throttle: skip the OSRM call if we haven't moved >50 m since last fetch
     const last = lastRouteFetchRef.current;
-    if (last && haversineMeters(last[0], last[1], fromLat, fromLng) < 150) return;
+    if (last && haversineMeters(last[0], last[1], fromLat, fromLng) < 50) return;
 
     lastRouteFetchRef.current = [fromLat, fromLng];
     prevIdxRef.current = -1; // reset closest-point cursor for new route
@@ -236,11 +236,13 @@ export default function LiveTrackingMap({
   }, [liveRiderLat, liveRiderLng, initialRiderLat, initialRiderLng, kitchenLat, kitchenLng, customerLat, customerLng]);
 
   // Called on every animation frame from SmoothRiderMarker — cheap: only triggers
-  // React re-render when the rider crosses to the next route segment
+  // React re-render when the rider crosses to the next route segment.
+  // Cap idx at route.length - 2 so remainingPath always has at least 2 points.
   const handleRiderPositionChange = useCallback((lat: number, lng: number) => {
     const r = routeRef.current;
-    if (!r || r.length === 0) return;
-    const idx = closestPointIndex(r, lat, lng);
+    if (!r || r.length < 2) return;
+    const raw = closestPointIndex(r, lat, lng);
+    const idx = Math.min(raw, r.length - 2); // always keep ≥1 segment ahead
     if (idx !== prevIdxRef.current) {
       prevIdxRef.current = idx;
       setRouteIdx(idx);
@@ -322,19 +324,17 @@ export default function LiveTrackingMap({
           <Marker position={[customerLat, customerLng]} icon={customerIcon} />
         )}
 
-        {/* Route: orange line rider → customer only */}
-        {route ? (
-          remainingPath.length > 1 && (
-            <Polyline positions={remainingPath} color="#FF5722" weight={5} opacity={0.92} />
-          )
-        ) : !loadingRoute && hasRider ? (
-          /* OSRM unavailable — fallback dashed line rider → customer */
+        {/* Route: solid orange road line when OSRM data is ready,
+            dashed straight line as fallback so something is ALWAYS visible */}
+        {route && remainingPath.length > 1 ? (
+          <Polyline positions={remainingPath} color="#FF5722" weight={5} opacity={0.92} />
+        ) : hasRider ? (
           <Polyline
             positions={[[currentRiderLat!, currentRiderLng!], [customerLat, customerLng!]]}
             color="#FF5722"
             dashArray="8,14"
             weight={3}
-            opacity={0.6}
+            opacity={0.7}
           />
         ) : null}
 
