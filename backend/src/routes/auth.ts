@@ -32,20 +32,26 @@ router.post('/send-otp', async (req, res) => {
         return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
     }
 
-    // Generate OTP and log it FIRST — always visible in Render logs regardless of rate limit
+    // Generate OTP and log it IMMEDIATELY before anything async can block
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`[OTP] ${normalizedPhone} → ${otp}`);
     try {
-        await redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 });
+        await Promise.race([
+            redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 3000)),
+        ]);
     } catch (redisErr: any) {
         console.error('[SEND_OTP] Redis error saving OTP:', redisErr.message);
     }
-    console.log(`[OTP] ${normalizedPhone} → ${otp}`);
 
     // Rate limit check (count only, OTP already logged above so you can always find it)
     let attempts = 0;
     try {
-        attempts = await redis.incr(keys.otpAttempts(normalizedPhone));
-        if (attempts === 1) await redis.expire(keys.otpAttempts(normalizedPhone), 600);
+        attempts = await Promise.race([
+            redis.incr(keys.otpAttempts(normalizedPhone)),
+            new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 3000)),
+        ]) as number;
+        if (attempts === 1) await redis.expire(keys.otpAttempts(normalizedPhone), 600).catch(() => {});
         console.log('[SEND_OTP] Rate limit count:', attempts);
     } catch (redisErr: any) {
         console.error('[SEND_OTP] Redis error on rate-limit check:', redisErr.message);
