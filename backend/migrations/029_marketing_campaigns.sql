@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS marketing_campaigns (
 );
 
 -- Index for analytics fetching
-CREATE INDEX idx_marketing_campaigns_created_at ON marketing_campaigns(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_created_at ON marketing_campaigns(created_at DESC);
