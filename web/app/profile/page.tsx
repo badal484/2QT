@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send } from "lucide-react";
+import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
@@ -35,10 +35,14 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
   const [email, setEmail] = useState(user?.email ?? "");
   const [saving, setSaving] = useState(false);
   const [referral, setReferral] = useState<any>(null);
+  const [riderApp, setRiderApp] = useState<any>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => { 
-    api.get("/customers/referrals/stats").then(setReferral); 
+    api.get("/customers/referrals/stats").then(setReferral).catch(() => {}); 
+    api.getApplicationStatus().then(d => {
+      if (d && d.application) setRiderApp(d.application);
+    }).catch(() => {});
   }, []);
 
   const save = async () => {
@@ -103,6 +107,49 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
           </div>
         </div>
       </section>
+
+      {riderApp && (
+        <section className={`rounded-3xl p-6 relative overflow-hidden shadow-sm border ${
+          riderApp.status === "pending" ? "bg-amber-50 border-amber-200" :
+          riderApp.status === "approved" ? "bg-green-50 border-green-200" :
+          "bg-red-50 border-red-200"
+        }`}>
+          <div className="flex items-center gap-4">
+             <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 ${
+               riderApp.status === "pending" ? "bg-amber-100 text-amber-600" :
+               riderApp.status === "approved" ? "bg-green-100 text-green-600" :
+               "bg-red-100 text-red-600"
+             }`}>
+                {riderApp.status === "pending" ? <Clock className="w-7 h-7" /> :
+                 riderApp.status === "approved" ? <CheckCircle2 className="w-7 h-7" /> :
+                 <AlertCircle className="w-7 h-7" />}
+             </div>
+             <div className="flex-1 min-w-0">
+                <h3 className={`text-lg font-bold truncate ${
+                  riderApp.status === "pending" ? "text-amber-800" :
+                  riderApp.status === "approved" ? "text-green-800" :
+                  "text-red-800"
+                }`}>
+                  Rider Application {riderApp.status === "pending" ? "Pending Approval" : riderApp.status === "approved" ? "Approved!" : "Rejected"}
+                </h3>
+                <p className={`text-sm font-medium mt-1 ${
+                  riderApp.status === "pending" ? "text-amber-700/80" :
+                  riderApp.status === "approved" ? "text-green-700/80" :
+                  "text-red-700/80"
+                }`}>
+                  {riderApp.status === "pending" ? "Your application to join the 2QT fleet is currently under review by our operations team." :
+                   riderApp.status === "approved" ? "Congratulations! You can now access the Rider App." :
+                   `Reason: ${riderApp.rejection_reason || "Not specified. Please contact support."}`}
+                </p>
+             </div>
+             {riderApp.status === "approved" && (
+                <Link href="/rider" className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-md transition-all shrink-0">
+                  Open Rider App
+                </Link>
+             )}
+          </div>
+        </section>
+      )}
 
       {referral && (
         <section className="bg-brand-primary rounded-3xl p-8 text-white relative overflow-hidden shadow-lg shadow-brand-primary/20">
