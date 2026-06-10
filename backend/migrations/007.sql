@@ -1,5 +1,5 @@
 -- Migration 007: Orders
-CREATE SEQUENCE invoice_number_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1;
 
 CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
