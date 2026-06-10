@@ -1125,7 +1125,7 @@ function SupportTab() {
         <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 bg-white/[0.04] backdrop-blur-xl rounded-[32px] animate-pulse" />)}</div>
       ) : tickets.length === 0 ? (
         <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[32px] p-16 text-center shadow-2xl shadow-black/40">
-          <div className="text-5xl mb-4">🎉</div>
+          <div className="flex items-center justify-center mb-4"><CheckCircle2 className="w-14 h-14 text-green-400" /></div>
           <p className="text-white font-black italic tracking-tighter text-2xl mb-2">All Clear!</p>
           <p className="text-zinc-400 text-sm font-medium">No open support tickets. Customers are happy.</p>
         </div>

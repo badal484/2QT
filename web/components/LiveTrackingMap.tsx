@@ -324,19 +324,22 @@ export default function LiveTrackingMap({
           <Marker position={[customerLat, customerLng]} icon={customerIcon} />
         )}
 
-        {/* Route: solid orange road line when OSRM data is ready,
-            dashed straight line as fallback so something is ALWAYS visible */}
-        {route && remainingPath.length > 1 ? (
-          <Polyline positions={remainingPath} color="#FF5722" weight={5} opacity={0.92} />
-        ) : hasRider ? (
+        {/* Layer 1 — straight dashed line: always rendered immediately,
+            fades once the OSRM route loads so the two don't compete */}
+        {currentRiderLat && currentRiderLng && customerLat && customerLng && (
           <Polyline
-            positions={[[currentRiderLat!, currentRiderLng!], [customerLat, customerLng!]]}
+            positions={[[currentRiderLat, currentRiderLng], [customerLat, customerLng]]}
             color="#FF5722"
-            dashArray="8,14"
-            weight={3}
-            opacity={0.7}
+            dashArray="6,12"
+            weight={route && remainingPath.length > 1 ? 1.5 : 4}
+            opacity={route && remainingPath.length > 1 ? 0.22 : 0.65}
           />
-        ) : null}
+        )}
+
+        {/* Layer 2 — OSRM road-following route on top (when available) */}
+        {route && remainingPath.length > 1 && (
+          <Polyline positions={remainingPath} color="#FF5722" weight={5} opacity={0.92} />
+        )}
 
         {/* Animated scooter marker */}
         {hasRider && (
