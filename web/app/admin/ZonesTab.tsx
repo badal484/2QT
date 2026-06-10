@@ -162,7 +162,7 @@ export function ZonesTab() {
             </div>
             {[
               { label: "Zone Name", key: "name", type: "text", placeholder: "e.g. Koramangala" },
-              { label: "City", key: "city", type: "text", placeholder: "Bengaluru" },
+              { label: "City", key: "city", type: "text", placeholder: "City name" },
               { label: "Delivery Fee (paise)", key: "delivery_fee_base_paise", type: "number", placeholder: "2500" },
               { label: "Opens At", key: "opening_time", type: "time", placeholder: "" },
               { label: "Closes At", key: "closing_time", type: "time", placeholder: "" },

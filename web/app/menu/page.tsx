@@ -236,7 +236,7 @@ export default function MenuPage() {
         );
       }
     } else {
-      // First-time visitor — wait for real GPS (max 4s), then fall back to Bengaluru default
+      // First-time visitor — wait for real GPS (max 4s), then fall back to generic India center
       if (typeof window !== "undefined" && navigator.geolocation) {
         let resolved = false;
         const fallback = setTimeout(() => {
@@ -346,7 +346,7 @@ export default function MenuPage() {
       const res = await api.post("/customers/addresses", {
         label: newAddressDetails.label,
         addressText: fullText,
-        lat: 12.9716, lng: 77.5946, // fallback coordinates
+        lat: currentLocation[0], lng: currentLocation[1],
         zoneId,
       });
       if (res.address) {
@@ -617,11 +617,11 @@ export default function MenuPage() {
                 <div className="space-y-2">
                   <h1 className="text-2xl font-black text-zinc-900">Not in our zone yet</h1>
                   <p className="text-zinc-500 font-medium text-sm leading-relaxed">
-                    We're currently delivering only within select areas of Bengaluru.
+                    We're not in your area yet, but we're expanding fast!
                   </p>
                   <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-4 py-2 text-xs font-semibold text-zinc-600 mt-2">
                     <MapPin className="w-3.5 h-3.5 text-brand-primary" />
-                    Currently serving: Kundanahalli, Whitefield &amp; ITPL area
+                    More zones coming soon
                   </div>
                 </div>
 
