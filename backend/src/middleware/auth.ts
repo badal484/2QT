@@ -59,6 +59,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         }
 
         if (!userData || !userData.is_active) {
+            console.log(`[AUTH] Rejected userId=${decoded.userId} — userData=${JSON.stringify(userData)}`);
             return res.status(401).json({ error: 'UNAUTHORIZED', message: 'User deactivated or not found' });
         }
 
@@ -70,7 +71,8 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             jti: decoded.jti
         };
         next();
-    } catch (err) {
+    } catch (err: any) {
+        console.log(`[AUTH] Token verify failed: ${err.message}`);
         return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Invalid token' });
     }
 };
