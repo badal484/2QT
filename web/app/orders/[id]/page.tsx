@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, MapPin, Bike, ShoppingBag, ChefHat, CheckCircle2,
-  Phone, Download, Package, Lock, Star, Loader2,
+  Phone, Download, Package, Lock, Star, Loader2, XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -59,12 +59,13 @@ const STEPS = [
   { id: "delivered",        label: "Delivered",   icon: CheckCircle2},
 ];
 
-const STATUS_HERO: Record<string, { emoji: string; bg: string; heading: string; sub: string }> = {
-  confirmed:        { emoji: "🛒", bg: "from-blue-50 to-indigo-100",   heading: "Order Confirmed!",      sub: "We've received your order"     },
-  preparing:        { emoji: "👨‍🍳", bg: "from-amber-50 to-orange-100", heading: "Being Prepared",         sub: "Chef is cooking your meal"     },
-  ready_for_pickup: { emoji: "📦", bg: "from-purple-50 to-violet-100", heading: "Ready for Pickup",       sub: "Looking for a rider near you"  },
-  delivered:        { emoji: "✅", bg: "from-green-50 to-emerald-100", heading: "Delivered!",             sub: "Enjoy your meal 🎉"            },
-  cancelled:        { emoji: "❌", bg: "from-red-50 to-rose-100",       heading: "Order Cancelled",        sub: "Refund will go to your wallet" },
+type HeroEntry = { icon: React.FC<{ className?: string }>; iconClass: string; bg: string; heading: string; sub: string };
+const STATUS_HERO: Record<string, HeroEntry> = {
+  confirmed:        { icon: ShoppingBag,  iconClass: "text-blue-500",   bg: "from-blue-50 to-indigo-100",   heading: "Order Confirmed!",  sub: "We have received your order"    },
+  preparing:        { icon: ChefHat,      iconClass: "text-amber-500",  bg: "from-amber-50 to-orange-100",  heading: "Being Prepared",    sub: "Chef is cooking your meal"      },
+  ready_for_pickup: { icon: Package,      iconClass: "text-purple-500", bg: "from-purple-50 to-violet-100", heading: "Ready for Pickup",  sub: "Looking for a rider near you"   },
+  delivered:        { icon: CheckCircle2, iconClass: "text-green-500",  bg: "from-green-50 to-emerald-100", heading: "Delivered!",        sub: "Enjoy your meal"                },
+  cancelled:        { icon: XCircle,      iconClass: "text-red-500",    bg: "from-red-50 to-rose-100",      heading: "Order Cancelled",   sub: "Refund will go to your wallet"  },
 };
 
 function stepIndex(status: Order["status"]) {
@@ -231,13 +232,14 @@ export default function OrderTrackingPage() {
           ) : (
             <motion.div key="hero" className={`w-full h-full bg-gradient-to-b ${hero?.bg ?? "from-zinc-50 to-zinc-100"} flex flex-col items-center justify-center gap-3`}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <motion.span
-                className="text-7xl select-none"
-                animate={{ scale: [1, 1.06, 1] }}
-                transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
-              >
-                {hero?.emoji}
-              </motion.span>
+              {hero && (
+                <motion.div
+                  animate={{ scale: [1, 1.06, 1] }}
+                  transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
+                >
+                  <hero.icon className={`w-20 h-20 ${hero.iconClass}`} />
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -279,8 +281,8 @@ export default function OrderTrackingPage() {
         {order.rider_name && (
           <div className="mx-5 mt-4 bg-zinc-50 rounded-2xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-2xl shadow-md">
-                🛵
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center shadow-md">
+                <Bike className="w-5 h-5 text-white" />
               </div>
               <div>
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Your Rider</p>
@@ -305,7 +307,7 @@ export default function OrderTrackingPage() {
                   <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.15em]">Delivery OTP</p>
                   <p className="text-3xl font-black tracking-[0.35em] text-white mt-1">{order.delivery_otp}</p>
                 </div>
-                <span className="text-3xl">🔐</span>
+                <Lock className="w-6 h-6 text-zinc-500" />
               </div>
             ) : (
               <div className="bg-zinc-100 rounded-2xl px-5 py-4 flex items-center gap-3">
@@ -399,7 +401,7 @@ export default function OrderTrackingPage() {
           <div className="px-5 pt-4">
             {feedbackSubmitted ? (
               <div className="flex flex-col items-center gap-2 py-6">
-                <span className="text-4xl">🙏</span>
+                <CheckCircle2 className="w-10 h-10 text-green-500" />
                 <p className="text-sm font-bold text-zinc-900">Thanks for your feedback!</p>
                 <p className="text-xs text-zinc-400">+10 loyalty points earned</p>
               </div>
