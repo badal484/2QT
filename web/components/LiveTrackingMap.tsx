@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 // ---------- Icons ----------
 const riderIcon = L.divIcon({
   className: '',
-  html: `<div style="width:40px;height:40px;background:linear-gradient(135deg,#FF5722,#FF8A65);border-radius:50%;border:3px solid white;box-shadow:0 4px 16px rgba(255,87,34,0.5);display:flex;align-items:center;justify-content:center;font-size:18px;transition:all 0.3s;">🛵</div>`,
+  html: `<div style="width:40px;height:40px;background:linear-gradient(135deg,#FF5722,#FF8A65);border-radius:50%;border:3px solid white;box-shadow:0 4px 16px rgba(255,87,34,0.5);display:flex;align-items:center;justify-content:center;transition:all 0.3s;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 0 0-1 1v5.5a1 1 0 0 0 1 1h5"/><path d="m9 12 2 2h5.5"/><path d="M5.5 17.5 9 12V9"/><path d="M7 5h3l2 6"/></svg></div>`,
   iconSize: [40, 40],
   iconAnchor: [20, 20],
 });
@@ -24,11 +24,11 @@ const customerIcon = L.divIcon({
 
 // ---------- OSRM ----------
 async function fetchOsrmRoute(
-  kitchenLat: number, kitchenLng: number,
-  customerLat: number, customerLng: number
+  fromLat: number, fromLng: number,
+  toLat: number, toLng: number
 ): Promise<{ coords: [number, number][]; distance: number } | null> {
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${kitchenLng},${kitchenLat};${customerLng},${customerLat}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
     const res = await fetch(url, { signal: AbortSignal.timeout(9000) });
     if (!res.ok) return null;
     const data = await res.json();
@@ -181,27 +181,59 @@ export default function LiveTrackingMap({
   // Refs to avoid stale closures in RAF callbacks
   const routeRef = useRef<[number, number][] | null>(null);
   const prevIdxRef = useRef(-1);
+  // Where the last OSRM fetch started — used to throttle refetches
+  const lastRouteFetchRef = useRef<[number, number] | null>(null);
+  // Show spinner only on the very first fetch, not on live re-fetches
+  const initialLoadDoneRef = useRef(false);
 
   useEffect(() => { setMounted(true); }, []);
 
   // Bubble ETA up to the parent page so it can show it prominently in the bottom sheet
   useEffect(() => { onEtaChange?.(eta); }, [eta, onEtaChange]);
 
+  // Re-fetch route from rider's CURRENT position → customer every time the rider
+  // moves >150 m from the last fetch point.  This is what Swiggy/Zomato do:
+  // the route line always starts exactly at the scooter and re-draws as the
+  // rider navigates, so ETA stays accurate and the polyline never lags behind.
   useEffect(() => {
-    if (!kitchenLat || !kitchenLng || !customerLat || !customerLng) {
-      setLoadingRoute(false); // no coords — show fallback immediately
+    if (!customerLat || !customerLng) {
+      setLoadingRoute(false);
       return;
     }
-    setLoadingRoute(true);
-    fetchOsrmRoute(kitchenLat, kitchenLng, customerLat, customerLng).then((result) => {
+
+    // Start from rider if we have a position, otherwise fall back to kitchen
+    const rLat = liveRiderLat ?? initialRiderLat;
+    const rLng = liveRiderLng ?? initialRiderLng;
+    const fromLat = rLat ?? kitchenLat;
+    const fromLng = rLng ?? kitchenLng;
+
+    if (!fromLat || !fromLng) {
+      setLoadingRoute(false);
+      return;
+    }
+
+    // Throttle: skip the OSRM call if we haven't moved >150 m since last fetch
+    const last = lastRouteFetchRef.current;
+    if (last && haversineMeters(last[0], last[1], fromLat, fromLng) < 150) return;
+
+    lastRouteFetchRef.current = [fromLat, fromLng];
+    prevIdxRef.current = -1; // reset closest-point cursor for new route
+
+    if (!initialLoadDoneRef.current) setLoadingRoute(true);
+
+    fetchOsrmRoute(fromLat, fromLng, customerLat, customerLng).then((result) => {
       if (result) {
         setRoute(result.coords);
         routeRef.current = result.coords;
+        setRouteIdx(0); // new route always starts at the rider's current position
         setEta(formatETA(result.distance));
       }
-      setLoadingRoute(false);
+      if (!initialLoadDoneRef.current) {
+        setLoadingRoute(false);
+        initialLoadDoneRef.current = true;
+      }
     });
-  }, [kitchenLat, kitchenLng, customerLat, customerLng]);
+  }, [liveRiderLat, liveRiderLng, initialRiderLat, initialRiderLng, kitchenLat, kitchenLng, customerLat, customerLng]);
 
   // Called on every animation frame from SmoothRiderMarker — cheap: only triggers
   // React re-render when the rider crosses to the next route segment
@@ -260,8 +292,8 @@ export default function LiveTrackingMap({
   if (hasRider) bounds.extend([currentRiderLat!, currentRiderLng!]);
   else if (kitchenLat && kitchenLng) bounds.extend([kitchenLat, kitchenLng!]);
 
-  // Show only the remaining (orange) segment — rider→customer
-  // The full kitchen→customer route is still used internally for ETA accuracy
+  // Route always starts at the rider's position — routeIdx advances as the
+  // rider moves forward so the orange line "shrinks" from the rear in real time
   const remainingPath: [number, number][] = route ? route.slice(routeIdx) : [];
 
   return (
