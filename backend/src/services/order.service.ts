@@ -20,7 +20,7 @@ export async function createPendingOrder(data: any) {
                 subtotal_paise, delivery_fee_paise, discount_paise,
                 loyalty_discount_paise, wallet_deduction_paise, surge_paise,
                 cgst_paise, sgst_paise, total_amount_paise, gateway_amount_paise,
-                payment_method, payment_status, promo_code_id,
+                payment_method, payment_status, promo_code_used,
                 is_subscription_order, special_instructions
             ) VALUES ('ORD-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT) FROM 1 FOR 6)), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18)
             RETURNING id, display_id
@@ -32,7 +32,7 @@ export async function createPendingOrder(data: any) {
             data.pricing.cgstPaise, data.pricing.sgstPaise,
             data.pricing.totalAmountPaise, data.pricing.gatewayAmountPaise,
             data.paymentMethod || 'online',
-            data.pricing.promoCodeId ?? null,
+            data.promoCode || null,
             data.isSubscriptionOrder || false,
             data.instructions || null
         ]);
