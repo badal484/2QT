@@ -11,6 +11,7 @@ CREATE TABLE ingredients (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_ingredients_updated_at ON ingredients;
 CREATE TRIGGER update_ingredients_updated_at BEFORE UPDATE ON ingredients FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE menu_items (
@@ -40,6 +41,7 @@ CREATE TABLE menu_items (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_menu_items_updated_at ON menu_items;
 CREATE TRIGGER update_menu_items_updated_at BEFORE UPDATE ON menu_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Search vector trigger
@@ -51,11 +53,12 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_menu_items_search ON menu_items;
 CREATE TRIGGER trigger_menu_items_search
 BEFORE INSERT OR UPDATE ON menu_items
 FOR EACH ROW EXECUTE FUNCTION menu_items_search_trigger();
 
-CREATE INDEX idx_menu_items_search ON menu_items USING GIN(search_vector);
+CREATE INDEX IF NOT EXISTS idx_menu_items_search ON menu_items USING GIN(search_vector);
 
 CREATE TABLE recipes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,6 +68,7 @@ CREATE TABLE recipes (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_recipes_updated_at ON recipes;
 CREATE TRIGGER update_recipes_updated_at BEFORE UPDATE ON recipes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE recipe_ingredients (
@@ -77,4 +81,5 @@ CREATE TABLE recipe_ingredients (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_recipe_ingredients_updated_at ON recipe_ingredients;
 CREATE TRIGGER update_recipe_ingredients_updated_at BEFORE UPDATE ON recipe_ingredients FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

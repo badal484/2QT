@@ -14,6 +14,7 @@ CREATE TABLE rider_daily_earnings (
     UNIQUE(rider_id, date)
 );
 
+DROP TRIGGER IF EXISTS update_rider_daily_earnings_updated_at ON rider_daily_earnings;
 CREATE TRIGGER update_rider_daily_earnings_updated_at BEFORE UPDATE ON rider_daily_earnings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE weekly_payouts (
@@ -33,4 +34,5 @@ CREATE TABLE weekly_payouts (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_weekly_payouts_updated_at ON weekly_payouts;
 CREATE TRIGGER update_weekly_payouts_updated_at BEFORE UPDATE ON weekly_payouts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

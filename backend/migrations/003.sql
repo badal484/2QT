@@ -14,6 +14,7 @@ CREATE TABLE zones (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_zones_updated_at ON zones;
 CREATE TRIGGER update_zones_updated_at BEFORE UPDATE ON zones FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE kitchens (
@@ -30,6 +31,7 @@ CREATE TABLE kitchens (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_kitchens_updated_at ON kitchens;
 CREATE TRIGGER update_kitchens_updated_at BEFORE UPDATE ON kitchens FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Seed one zone and one kitchen

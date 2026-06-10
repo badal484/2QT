@@ -51,6 +51,7 @@ CREATE TABLE orders (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- State machine trigger
@@ -74,6 +75,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_order_status_machine ON orders;
 CREATE TRIGGER trigger_order_status_machine
 BEFORE UPDATE OF status ON orders
 FOR EACH ROW EXECUTE FUNCTION enforce_order_status_machine();
@@ -96,6 +98,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_order_ids ON orders;
 CREATE TRIGGER trigger_order_ids
 BEFORE INSERT OR UPDATE ON orders
 FOR EACH ROW EXECUTE FUNCTION generate_order_ids();
@@ -112,4 +115,5 @@ CREATE TABLE order_items (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_order_items_updated_at ON order_items;
 CREATE TRIGGER update_order_items_updated_at BEFORE UPDATE ON order_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

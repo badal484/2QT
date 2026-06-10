@@ -19,6 +19,7 @@ CREATE TABLE scheduled_orders (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_scheduled_orders_updated_at ON scheduled_orders;
 CREATE TRIGGER update_scheduled_orders_updated_at BEFORE UPDATE ON scheduled_orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE recurring_meal_plans (
@@ -36,6 +37,7 @@ CREATE TABLE recurring_meal_plans (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_recurring_meal_plans_updated_at ON recurring_meal_plans;
 CREATE TRIGGER update_recurring_meal_plans_updated_at BEFORE UPDATE ON recurring_meal_plans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE recurring_plan_day_configs (
@@ -49,6 +51,7 @@ CREATE TABLE recurring_plan_day_configs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_recurring_plan_day_configs_updated_at ON recurring_plan_day_configs;
 CREATE TRIGGER update_recurring_plan_day_configs_updated_at BEFORE UPDATE ON recurring_plan_day_configs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE recurring_plan_exceptions (
@@ -64,4 +67,5 @@ CREATE TABLE recurring_plan_exceptions (
     UNIQUE(plan_id, exception_date)
 );
 
+DROP TRIGGER IF EXISTS update_recurring_plan_exceptions_updated_at ON recurring_plan_exceptions;
 CREATE TRIGGER update_recurring_plan_exceptions_updated_at BEFORE UPDATE ON recurring_plan_exceptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

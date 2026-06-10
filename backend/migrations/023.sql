@@ -1,22 +1,24 @@
 -- Migration 023: Systematic Audit Logging
-CREATE TYPE log_severity AS ENUM ('info', 'warning', 'error', 'critical');
+DO $$ BEGIN
+    CREATE TYPE log_severity AS ENUM ('info', 'warning', 'error', 'critical');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TABLE system_audit_logs (
+CREATE TABLE IF NOT EXISTS system_audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     severity log_severity NOT NULL DEFAULT 'info',
-    component TEXT NOT NULL, -- e.g., 'WORKER', 'API', 'PAYMENT', 'LOGISTICS'
-    event_type TEXT NOT NULL, -- e.g., 'ORDER_FAILED', 'INVOICE_GENERATED', 'REFERRAL_REWARDED'
+    component TEXT NOT NULL,
+    event_type TEXT NOT NULL,
     message TEXT NOT NULL,
-    metadata JSONB, -- Contextual data: { orderId, userId, stackTrace, jobId }
+    metadata JSONB,
     source_ip TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_logs_severity ON system_audit_logs(severity);
-CREATE INDEX idx_logs_component ON system_audit_logs(component);
-CREATE INDEX idx_logs_created_at ON system_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_logs_severity ON system_audit_logs(severity);
+CREATE INDEX IF NOT EXISTS idx_logs_component ON system_audit_logs(component);
+CREATE INDEX IF NOT EXISTS idx_logs_created_at ON system_audit_logs(created_at DESC);
 
--- Helper function for systematic logging from other PG functions
 CREATE OR REPLACE FUNCTION log_system_event(
     p_severity log_severity,
     p_component TEXT,
