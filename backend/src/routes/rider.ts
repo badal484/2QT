@@ -46,7 +46,7 @@ router.post('/location', authenticate, requireRole('rider', 'rider_captain', 'su
     const zoneId = req.user!.zoneId;
 
     // 1. Individual Location Key (for customer tracking)
-    await redis.set(keys.riderLocation(riderId), JSON.stringify({ lat, lng, updatedAt: new Date() }), { EX: 30 });
+    await redis.set(keys.riderLocation(riderId), JSON.stringify({ lat, lng, updatedAt: new Date() }), { EX: 60 });
 
     // 2. SYSTEMATIC INTEGRATION: Zone Capacity Heartbeat
     if (zoneId) {
