@@ -17,24 +17,42 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh_secret';
 const phoneSchema = z.string().regex(/^91\d{10}$/);
 
 router.post('/send-otp', otpLimiter, async (req, res) => {
+    try {
+    console.log('[SEND_OTP] Hit — body:', JSON.stringify(req.body));
     const { phone } = req.body;
+    if (!phone) {
+        console.log('[SEND_OTP] ERROR: phone missing from body');
+        return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone is required' });
+    }
     let normalizedPhone = phone.replace(/\D/g, '');
     if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
+    console.log('[SEND_OTP] Normalized phone:', normalizedPhone);
 
     if (!phoneSchema.safeParse(normalizedPhone).success) {
+        console.log('[SEND_OTP] Phone failed schema validation:', normalizedPhone);
         return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
     }
 
-    // Rate limit: 20 per 10 minutes (generous for testing; tighten when SMS is live)
-    const attempts = await redis.incr(keys.otpAttempts(normalizedPhone));
-    if (attempts === 1) await redis.expire(keys.otpAttempts(normalizedPhone), 600);
+    // Rate limit: 20 per 10 minutes
+    let attempts = 0;
+    try {
+        attempts = await redis.incr(keys.otpAttempts(normalizedPhone));
+        if (attempts === 1) await redis.expire(keys.otpAttempts(normalizedPhone), 600);
+    } catch (redisErr: any) {
+        console.error('[SEND_OTP] Redis error on rate-limit check:', redisErr.message);
+        // Redis down — allow the request through so OTP still works
+    }
     if (attempts > 20) {
         return res.status(429).json({ error: 'TOO_MANY_OTP', message: 'Too many OTP requests, please try again in 10 minutes.' });
     }
 
     // Generate random 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    await redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 });
+    try {
+        await redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 });
+    } catch (redisErr: any) {
+        console.error('[SEND_OTP] Redis error saving OTP:', redisErr.message);
+    }
 
     // Always visible in Render logs
     console.log(`[OTP] ${normalizedPhone} → ${otp}`);
@@ -57,6 +75,10 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
     }
 
     res.json({ sent: true, phone: normalizedPhone });
+    } catch (err: any) {
+        console.error('[SEND_OTP] Unhandled error:', err.message, err.stack);
+        res.status(500).json({ error: 'SERVER_ERROR', message: 'OTP send failed' });
+    }
 });
 
 router.post('/verify-otp', async (req, res) => {
