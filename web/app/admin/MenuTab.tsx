@@ -372,15 +372,19 @@ export function MenuTab() {
                       is_veg: formData.get("is_veg") === "true",
                       available: true
                     };
-                    if (editingItem) {
-                      await api.put(`/admin/menu/${editingItem.id}`, data);
-                    } else {
-                      await api.post("/admin/menu", data);
+                    try {
+                      if (editingItem) {
+                        await api.put(`/admin/menu/${editingItem.id}`, data);
+                      } else {
+                        await api.post("/admin/menu", data);
+                      }
+                      setShowAddModal(false);
+                      setEditingItem(null);
+                      load();
+                      toast.success(editingItem ? "Item updated!" : "Item published to menu!");
+                    } catch (err: any) {
+                      toast.error(`Failed to save: ${err.message || 'Unknown error'}`);
                     }
-                    setShowAddModal(false);
-                    setEditingItem(null);
-                    load();
-                    toast.success(editingItem ? "Item updated!" : "Item published to menu!");
                   }}
                   className="space-y-6"
                 >

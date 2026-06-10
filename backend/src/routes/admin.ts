@@ -25,6 +25,7 @@ const MenuItemSchema = z.object({
     price_paise: z.number().int().positive(),
     cost_price_paise: z.number().int().positive().optional(),
     category: z.string().min(1).max(60),
+    station: z.string().optional(),
     photo_url: z.string().url().optional().nullable(),
     available: z.boolean().optional().default(true),
     is_veg: z.boolean().optional().default(false),
@@ -438,13 +439,20 @@ router.post('/payouts/:id/approve', authenticate, requireRole('super_admin', 'ad
 
 router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema), async (req: AuthRequest, res) => {
     try {
-        const { name, zone_id, description, price_paise, category, photo_url, available, is_veg } = req.body;
+        const { name, zone_id, description, price_paise, category, station, photo_url, available, is_veg } = req.body;
         
         const cost_price_paise = req.body.cost_price_paise ?? Math.floor(price_paise * 0.7);
 
+        // Fetch kitchen_id associated with the zone
+        const { rows: kitchenRows } = await query('SELECT kitchen_id FROM kitchen_zones WHERE zone_id = $1 LIMIT 1', [zone_id]);
+        if (kitchenRows.length === 0) {
+            return res.status(400).json({ error: 'No kitchen is assigned to this zone.' });
+        }
+        const kitchen_id = kitchenRows[0].kitchen_id;
+
         const { rows } = await query(
-            'INSERT INTO menu_items (zone_id, name, description, price_paise, cost_price_paise, category, photo_url, available, is_veg) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-            [zone_id, name, description || null, price_paise, cost_price_paise, category, photo_url || null, available ?? true, is_veg ?? false]
+            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, available, is_veg) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+            [zone_id, kitchen_id, name, description || null, price_paise, cost_price_paise, category, station || 'hot_section', photo_url || null, available ?? true, is_veg ?? false]
         );
         
         // Clear menu cache for all zones
@@ -499,20 +507,30 @@ router.delete('/menu/:id', authenticate, requireRole('super_admin', 'admin'), as
 router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema.partial()), async (req: AuthRequest, res) => {
     try {
         const { id } = req.params;
-        const { zone_id, name, description, price_paise, category, photo_url, available, is_veg } = req.body;
+        const { zone_id, name, description, price_paise, category, station, photo_url, available, is_veg } = req.body;
+        
+        let kitchen_id = undefined;
+        if (zone_id) {
+            const { rows: kitchenRows } = await query('SELECT kitchen_id FROM kitchen_zones WHERE zone_id = $1 LIMIT 1', [zone_id]);
+            if (kitchenRows.length > 0) {
+                kitchen_id = kitchenRows[0].kitchen_id;
+            }
+        }
+
         const { rows } = await query(
             `UPDATE menu_items SET
                 zone_id = COALESCE($1, zone_id),
-                name = COALESCE($2, name),
-                description = COALESCE($3, description),
-                price_paise = COALESCE($4, price_paise),
-                category = COALESCE($5, category),
-                photo_url = COALESCE($6, photo_url),
-                available = COALESCE($7, available),
-                is_veg = COALESCE($8, is_veg)
-             WHERE id = $9 RETURNING *`,
-            [zone_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null,
-             photo_url ?? null, available ?? null, is_veg ?? null, id]
+                kitchen_id = COALESCE($2, kitchen_id),
+                name = COALESCE($3, name),
+                description = COALESCE($4, description),
+                price_paise = COALESCE($5, price_paise),
+                category = COALESCE($6, category),
+                station = COALESCE($7, station),
+                photo_url = COALESCE($8, photo_url),
+                available = COALESCE($9, available),
+                is_veg = COALESCE($10, is_veg)
+             WHERE id = $11 RETURNING *`,
+            [zone_id ?? null, kitchen_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null, station ?? null, photo_url ?? null, available ?? null, is_veg ?? null, id]
         );
 
         // Clear menu cache for all zones
