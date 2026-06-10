@@ -10,4 +10,5 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     UNIQUE(endpoint)
 );
 
+DROP TRIGGER IF EXISTS update_push_subscriptions_updated_at ON push_subscriptions;
 CREATE TRIGGER update_push_subscriptions_updated_at BEFORE UPDATE ON push_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
