@@ -332,11 +332,12 @@ export default function LiveTrackingMap({
           />
         )}
 
-        {/* Keep both rider and customer in view on live updates */}
-        {liveRiderLat != null && liveRiderLng != null && (
+        {/* Keep both rider and customer in view — fires on initial render
+            (initialRider) and every time the live position changes */}
+        {currentRiderLat != null && currentRiderLng != null && (
           <MapBoundsFitter
-            riderLat={liveRiderLat}
-            riderLng={liveRiderLng}
+            riderLat={currentRiderLat!}
+            riderLng={currentRiderLng!}
             customerLat={customerLat!}
             customerLng={customerLng!}
           />
