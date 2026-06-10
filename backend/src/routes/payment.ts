@@ -59,7 +59,7 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             SELECT k.id, k.lat, k.lng 
             FROM kitchens k
             JOIN kitchen_zones kz ON k.id = kz.kitchen_id
-            WHERE kz.zone_id = $1 AND k.is_active = true AND k.is_paused = false
+            WHERE kz.zone_id = $1 AND k.is_paused = false
         `, [zoneId]);
         
         if (kitchens.length === 0) throw new Error('NO_KITCHENS_AVAILABLE_FOR_ZONE');
