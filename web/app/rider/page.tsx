@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import {
   Package, CheckCircle2, ChevronRight,
   LogOut, Bike, Phone, Wallet, Clock, TrendingUp,
-  ArrowRight, Zap, MapPin, Navigation,
+  ArrowRight, Zap, MapPin, Navigation, Lock,
 } from "lucide-react";
 
 const RiderLiveMap = dynamic(() => import("../../components/RiderLiveMap"), {
@@ -158,6 +158,14 @@ export default function RiderPage() {
         all.push(...poolRes.orders.filter((o: any) => !ids.has(o.id)));
       }
       setOrders(all);
+
+      // Layer 3: crash / app-reload recovery — if an active delivery exists the
+      // rider must be online. Force the flag so the UI never shows "You're offline"
+      // while a delivery is in progress.
+      if (isDelivering) {
+        setIsOnline(true);
+        if (typeof window !== "undefined") localStorage.setItem("rider_is_online", "true");
+      }
     } catch (e: any) {
       console.error("[fetchOrders]", e.message);
       setOrders([]);
@@ -312,13 +320,21 @@ export default function RiderPage() {
 
   const toggleOnline = async () => {
     const next = !isOnline;
+    // Layer 1: hard-block going offline while actively delivering
+    if (!next && orders.some(o => o.status === 'out_for_delivery')) {
+      toast.error("Complete your current delivery before going offline.");
+      return;
+    }
     try {
       await api.post(next ? "/riders/online" : "/riders/offline");
       setIsOnline(next);
       localStorage.setItem("rider_is_online", String(next));
       if (next) toast.success("You're online! Orders will come in.");
       else toast("You're now offline.");
-    } catch (err: any) { toast.error(err.message || "Failed to update online status"); }
+    } catch (err: any) {
+      // Layer 2 response: server rejected the offline request mid-delivery
+      toast.error(err.message || "Failed to update online status");
+    }
   };
 
   const acceptIncoming = () => {
@@ -419,16 +435,29 @@ export default function RiderPage() {
 
           {/* Online toggle + logout */}
           <div className="flex items-center gap-2">
-            <button onClick={toggleOnline}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg border ${
-                isOnline
-                  ? "bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30"
-                  : "bg-brand-primary text-white border-brand-primary/50 hover:bg-brand-primary/90"
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-400 animate-pulse" : "bg-white/60"}`} />
-              {isOnline ? "Online" : "Go Online"}
-            </button>
+            {(() => {
+              const lockedOffline = isOnline && orders.some(o => o.status === 'out_for_delivery');
+              return (
+                <button
+                  onClick={toggleOnline}
+                  disabled={lockedOffline}
+                  title={lockedOffline ? "Complete your current delivery first" : undefined}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg border ${
+                    lockedOffline
+                      ? "bg-zinc-700/60 text-zinc-400 border-zinc-600/40 cursor-not-allowed"
+                      : isOnline
+                        ? "bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30"
+                        : "bg-brand-primary text-white border-brand-primary/50 hover:bg-brand-primary/90"
+                  }`}
+                >
+                  {lockedOffline
+                    ? <Lock className="w-3 h-3" />
+                    : <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-400 animate-pulse" : "bg-white/60"}`} />
+                  }
+                  {lockedOffline ? "Delivering" : isOnline ? "Online" : "Go Online"}
+                </button>
+              );
+            })()}
             <button onClick={logout}
               className="w-10 h-10 rounded-2xl bg-zinc-900/80 backdrop-blur-xl border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
               <LogOut className="w-4 h-4" />

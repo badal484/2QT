@@ -83,6 +83,17 @@ router.post('/online', authenticate, requireRole('rider', 'rider_captain', 'supe
 });
 
 router.post('/offline', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    // Hard block: cannot go offline while actively delivering an order
+    const { rows: active } = await query(
+        "SELECT id FROM orders WHERE rider_id = $1 AND status = 'out_for_delivery' LIMIT 1",
+        [req.user!.userId]
+    );
+    if (active.length > 0) {
+        return res.status(409).json({
+            error: 'ACTIVE_DELIVERY',
+            message: 'Complete your current delivery before going offline.',
+        });
+    }
     await query('UPDATE users SET is_online = false WHERE id = $1', [req.user!.userId]);
     await redis.del(keys.riderLocation(req.user!.userId));
     res.json({ success: true });
