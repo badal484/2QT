@@ -32,7 +32,16 @@ router.post('/send-otp', async (req, res) => {
         return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
     }
 
-    // Rate limit: 100 per 10 minutes (generous during testing)
+    // Generate OTP and log it FIRST — always visible in Render logs regardless of rate limit
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+        await redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 });
+    } catch (redisErr: any) {
+        console.error('[SEND_OTP] Redis error saving OTP:', redisErr.message);
+    }
+    console.log(`[OTP] ${normalizedPhone} → ${otp}`);
+
+    // Rate limit check (count only, OTP already logged above so you can always find it)
     let attempts = 0;
     try {
         attempts = await redis.incr(keys.otpAttempts(normalizedPhone));
@@ -44,17 +53,6 @@ router.post('/send-otp', async (req, res) => {
     if (attempts > 100) {
         return res.status(429).json({ error: 'TOO_MANY_OTP', message: 'Too many OTP requests, please try again in 10 minutes.' });
     }
-
-    // Generate random 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    try {
-        await redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 });
-    } catch (redisErr: any) {
-        console.error('[SEND_OTP] Redis error saving OTP:', redisErr.message);
-    }
-
-    // Always visible in Render logs
-    console.log(`[OTP] ${normalizedPhone} → ${otp}`);
 
     if (process.env.MSG91_AUTH_KEY) {
         try {
