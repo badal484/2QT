@@ -6,7 +6,6 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { query } from '../db';
 import { redis, keys } from '../redis';
-import { otpLimiter } from '../middleware/rateLimiter';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import axios from 'axios';
 
@@ -16,7 +15,7 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh_secret';
 
 const phoneSchema = z.string().regex(/^91\d{10}$/);
 
-router.post('/send-otp', otpLimiter, async (req, res) => {
+router.post('/send-otp', async (req, res) => {
     try {
     console.log('[SEND_OTP] Hit — body:', JSON.stringify(req.body));
     const { phone } = req.body;
