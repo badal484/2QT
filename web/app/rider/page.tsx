@@ -112,13 +112,7 @@ export default function RiderPage() {
 
     const sendLocation = async (lat: number, lng: number) => {
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("2qt_token") : null;
-        if (!token) return;
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/riders/location`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ lat, lng }),
-        });
+        await api.post("/riders/location", { lat, lng });
       } catch { /* silent */ }
     };
 
