@@ -214,10 +214,10 @@ export default function ApplyToRide() {
                   <h2 className="text-3xl font-bold mb-4 tracking-tight">Application Rejected</h2>
                   <p className="text-black/60 mb-10 font-medium leading-relaxed">{error}</p>
                   <button 
-                    onClick={() => router.push("/menu")}
+                    onClick={() => router.push("/profile")}
                     className="w-full bg-brand-dark hover:bg-black text-white font-bold py-5 rounded-full transition-all shadow-xl"
                   >
-                    Return to Menu
+                    View Status in Profile
                   </button>
                 </>
               ) : (
@@ -230,10 +230,10 @@ export default function ApplyToRide() {
                     Your application has been received and is currently under review by our operations team. We will notify you once approved.
                   </p>
                   <button 
-                    onClick={() => router.push("/menu")}
+                    onClick={() => router.push("/profile")}
                     className="w-full bg-brand-dark hover:bg-black text-white font-bold py-5 rounded-full transition-all shadow-xl"
                   >
-                    Return to Menu
+                    View Status in Profile
                   </button>
                 </>
               )}
