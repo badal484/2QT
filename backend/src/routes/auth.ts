@@ -25,20 +25,18 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
         return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
     }
 
-    // Rate limit check in Redis (relaxed in development)
+    // Rate limit: 20 per 10 minutes (generous for testing; tighten when SMS is live)
     const attempts = await redis.incr(keys.otpAttempts(normalizedPhone));
-    if (attempts === 1) await redis.expire(keys.otpAttempts(normalizedPhone), 600); // 10 mins
-
-    const otpLimit = process.env.NODE_ENV === 'development' ? 100 : 5;
-    if (attempts > otpLimit) {
-        return res.status(429).json({ error: 'TOO_MANY_OTP', message: 'Try again in 10 minutes' });
+    if (attempts === 1) await redis.expire(keys.otpAttempts(normalizedPhone), 600);
+    if (attempts > 20) {
+        return res.status(429).json({ error: 'TOO_MANY_OTP', message: 'Too many OTP requests, please try again in 10 minutes.' });
     }
 
-    // Generate OTP and store in Redis with 10-minute TTL
-    const otp = '123456'; // Hardcoded as requested
+    // Generate random 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     await redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 });
 
-    // Always log so OTP is visible in Render dashboard logs
+    // Always visible in Render logs
     console.log(`[OTP] ${normalizedPhone} → ${otp}`);
 
     if (process.env.MSG91_AUTH_KEY) {
@@ -69,7 +67,7 @@ router.post('/verify-otp', async (req, res) => {
         
         // Verify OTP against stored value in Redis
         const storedOtp = await redis.get(keys.pendingOtp(normalizedPhone));
-        if (String(otp) !== '123456' && (!storedOtp || storedOtp !== String(otp))) {
+        if (!storedOtp || storedOtp !== String(otp)) {
             return res.status(400).json({ error: 'INVALID_OTP', message: 'Invalid or expired OTP' });
         }
         await redis.del(keys.pendingOtp(normalizedPhone));
