@@ -66,7 +66,7 @@ const seed = async () => {
         await client.query(`
           INSERT INTO menu_items (zone_id, name, description, price_paise, cost_price_paise, category, station, available, daily_limit, is_veg)
           VALUES ($1, $2, 'Premium selection from 2QT Palace.', $3, $4, $5, $6, true, 50, $7)
-          ON CONFLICT (name) DO UPDATE SET price_paise = $3
+          ON CONFLICT (zone_id, name) DO UPDATE SET price_paise = $3
         `, [zoneId, item.name, item.price, Math.round(item.price * 0.35), item.cat, item.station, item.veg]);
       }
 
