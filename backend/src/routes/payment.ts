@@ -46,7 +46,7 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
         const { zone_id: zoneId, lat: custLat, lng: custLng } = addrInfo[0];
 
         // 1.1 Cross-Zone Validation: Ensure all cart items belong to the selected delivery zone
-        const itemIds = items.map(i => i.menuItemId);
+        const itemIds = items.map((i: any) => i.menuItemId);
         const { rows: itemZones } = await query('SELECT DISTINCT zone_id FROM menu_items WHERE id = ANY($1)', [itemIds]);
         if (itemZones.length > 1) {
             throw new Error('CART_MULTIPLE_ZONES: You cannot order items from multiple zones. Please clear your cart.');
