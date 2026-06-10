@@ -150,7 +150,7 @@ router.post('/verify-otp', async (req, res) => {
     const accessToken = jwt.sign(
         { userId: user.id, role: user.role, kitchenId: user.kitchen_id ?? null, zoneId: user.zone_id ?? null, jti },
         JWT_SECRET,
-        { expiresIn: '15m' }
+        { expiresIn: '2h' }
     );
 
     const refreshToken = jwt.sign(
@@ -215,7 +215,7 @@ router.post('/refresh', async (req, res) => {
         const accessToken = jwt.sign(
             { userId: decoded.userId, role: user.role, kitchenId: user.kitchen_id, zoneId: user.zone_id, jti },
             JWT_SECRET,
-            { expiresIn: '15m' }
+            { expiresIn: '2h' }
         );
 
         res.json({ accessToken });
