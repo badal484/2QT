@@ -14,6 +14,14 @@ const getDeliveryOtpForOrder = () => {
 
 export async function createPendingOrder(data: any) {
     return await withTransaction(async (client) => {
+        // Snapshot delivery coordinates from the address at placement time so
+        // a later address update or migration never corrupts an in-flight order.
+        const { rows: addrRows } = await client.query(
+            'SELECT lat, lng FROM addresses WHERE id = $1', [data.addressId]
+        );
+        const deliveryLat = addrRows[0]?.lat ?? null;
+        const deliveryLng = addrRows[0]?.lng ?? null;
+
         const { rows: orderRows } = await client.query(`
             INSERT INTO orders (
                 display_id, customer_id, kitchen_id, zone_id, address_id, status,
@@ -21,8 +29,9 @@ export async function createPendingOrder(data: any) {
                 loyalty_discount_paise, wallet_deduction_paise, surge_paise,
                 cgst_paise, sgst_paise, total_amount_paise, gateway_amount_paise,
                 payment_method, payment_status, promo_code_used,
-                is_subscription_order, special_instructions
-            ) VALUES ('ORD-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT) FROM 1 FOR 6)), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18)
+                is_subscription_order, special_instructions,
+                delivery_location_lat, delivery_location_lng
+            ) VALUES ('ORD-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT) FROM 1 FOR 6)), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20)
             RETURNING id, display_id
         `, [
             data.customerId, data.kitchenId, data.zoneId, data.addressId,
@@ -34,7 +43,8 @@ export async function createPendingOrder(data: any) {
             data.paymentMethod || 'online',
             data.promoCode || null,
             data.isSubscriptionOrder || false,
-            data.instructions || null
+            data.instructions || null,
+            deliveryLat, deliveryLng,
         ]);
 
         const newOrder = orderRows[0];

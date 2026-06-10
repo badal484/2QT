@@ -38,8 +38,8 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
                 r.phone as rider_phone,
                 a.address_text as delivery_address_text,
                 a.label as delivery_address_label,
-                a.lat as customer_lat,
-                a.lng as customer_lng,
+                COALESCE(o.delivery_location_lat, a.lat) as customer_lat,
+                COALESCE(o.delivery_location_lng, a.lng) as customer_lng,
                 k.lat as kitchen_lat,
                 k.lng as kitchen_lng,
                 k.name as kitchen_name
