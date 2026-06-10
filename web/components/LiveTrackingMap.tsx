@@ -21,12 +21,6 @@ const customerIcon = L.divIcon({
   iconAnchor: [16, 40],
 });
 
-const kitchenIcon = L.divIcon({
-  className: '',
-  html: `<div style="width:36px;height:36px;background:linear-gradient(135deg,#3B82F6,#60A5FA);border-radius:10px;border:2.5px solid white;box-shadow:0 4px 12px rgba(59,130,246,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;">🍳</div>`,
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-});
 
 // ---------- OSRM ----------
 async function fetchOsrmRoute(
@@ -250,7 +244,6 @@ export default function LiveTrackingMap({
       : 'Rider location updating…';
     return (
       <div className="w-full h-full bg-zinc-50 rounded-2xl flex flex-col items-center justify-center gap-2 px-6 text-center border border-zinc-200">
-        <span className="text-2xl">📍</span>
         <p className="text-sm font-bold text-zinc-700">Rider is on the way</p>
         <p className="text-xs text-zinc-400">{riderPosStr}</p>
         <p className="text-[10px] text-zinc-300 mt-1">Map will show once address is updated</p>
@@ -262,11 +255,13 @@ export default function LiveTrackingMap({
   const currentRiderLng = liveRiderLng ?? initialRiderLng;
   const hasRider = !!(currentRiderLat && currentRiderLng);
 
-  const bounds = L.latLngBounds([[kitchenLat, kitchenLng!], [customerLat, customerLng!]]);
+  // Bounds: rider + customer only — kitchen is irrelevant once out for delivery
+  const bounds = L.latLngBounds([[customerLat, customerLng!]]);
   if (hasRider) bounds.extend([currentRiderLat!, currentRiderLng!]);
+  else if (kitchenLat && kitchenLng) bounds.extend([kitchenLat, kitchenLng!]);
 
-  // Split route into completed (grey) and remaining (orange) segments
-  const completedPath: [number, number][] = route && routeIdx > 0 ? route.slice(0, routeIdx + 1) : [];
+  // Show only the remaining (orange) segment — rider→customer
+  // The full kitchen→customer route is still used internally for ETA accuracy
   const remainingPath: [number, number][] = route ? route.slice(routeIdx) : [];
 
   return (
@@ -290,33 +285,21 @@ export default function LiveTrackingMap({
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
 
-        {/* Kitchen pin (start) */}
-        {kitchenLat && kitchenLng && (
-          <Marker position={[kitchenLat, kitchenLng]} icon={kitchenIcon} />
-        )}
-
         {/* Customer / home pin (destination) */}
         {customerLat && customerLng && (
           <Marker position={[customerLat, customerLng]} icon={customerIcon} />
         )}
 
-        {/* Road route polylines */}
+        {/* Route: orange line rider → customer only */}
         {route ? (
-          <>
-            {/* Completed segment — grey, faded */}
-            {completedPath.length > 1 && (
-              <Polyline positions={completedPath} color="#9CA3AF" weight={5} opacity={0.45} />
-            )}
-            {/* Remaining segment — vivid orange */}
-            {remainingPath.length > 1 && (
-              <Polyline positions={remainingPath} color="#FF5722" weight={5} opacity={0.92} />
-            )}
-          </>
-        ) : !loadingRoute ? (
-          /* OSRM unavailable — fallback straight dashed line */
+          remainingPath.length > 1 && (
+            <Polyline positions={remainingPath} color="#FF5722" weight={5} opacity={0.92} />
+          )
+        ) : !loadingRoute && hasRider ? (
+          /* OSRM unavailable — fallback dashed line rider → customer */
           <Polyline
-            positions={[[kitchenLat, kitchenLng!], [customerLat, customerLng!]]}
-            color="#9CA3AF"
+            positions={[[currentRiderLat!, currentRiderLng!], [customerLat, customerLng!]]}
+            color="#FF5722"
             dashArray="8,14"
             weight={3}
             opacity={0.6}
