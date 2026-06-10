@@ -10,7 +10,7 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 const MapPolygonPicker = dynamic(() => import("../../components/MapPolygonPicker"), { ssr: false });
 
 const EMPTY_ZONE = {
-  name: "", city: "Bengaluru",
+  name: "", city: "",
   polygon_points: [], delivery_fee_base_paise: "2500",
   opening_time: "10:00", closing_time: "22:00",
   max_orders_per_hour: "60", realistic_delivery_minutes: "15",

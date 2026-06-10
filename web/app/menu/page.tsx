@@ -114,7 +114,7 @@ export default function MenuPage() {
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [pricing, setPricing] = useState<any>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState<[number, number]>([12.9716, 77.5946]);
+  const [currentLocation, setCurrentLocation] = useState<[number, number]>([20.5937, 78.9629]);
   const [currentZoneName, setCurrentZoneName] = useState("Fetching location...");
   // Service request states (used when area is not serviceable)
   const [requestStep, setRequestStep] = useState<'info' | 'form' | 'done'>('info');
@@ -207,8 +207,8 @@ export default function MenuPage() {
       }
     };
 
-    let initialLat = 12.9716;
-    let initialLng = 77.5946;
+    let initialLat = 20.5937;
+    let initialLng = 78.9629;
     let hasCache = false;
 
     const cachedLoc = typeof window !== "undefined" ? localStorage.getItem("2qt_last_location") : null;

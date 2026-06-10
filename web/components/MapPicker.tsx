@@ -20,8 +20,9 @@ interface MapPickerProps {
   defaultCenter?: [number, number];
 }
 
-export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 77.5946] }: MapPickerProps) {
-  const [position, setPosition] = useState<[number, number]>(defaultCenter);
+export default function MapPicker({ onLocationSelect, defaultCenter }: MapPickerProps) {
+  const [position, setPosition] = useState<[number, number] | null>(defaultCenter ?? null);
+  const [gpsLoading, setGpsLoading] = useState(!defaultCenter);
   const [loading, setLoading] = useState(false);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,15 +37,14 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
         }
       });
       const data = await res.json();
-      
+
       if (data && data.address) {
-        // Extract relevant parts for Area and Landmark
         const { road, suburb, neighbourhood, city_district, city } = data.address;
-        
+
         let areaParts = [];
         if (suburb || neighbourhood) areaParts.push(suburb || neighbourhood);
         if (city_district || city) areaParts.push(city_district || city);
-        
+
         const area = areaParts.join(', ') || data.display_name.split(',').slice(0, 2).join(', ');
         const landmark = road || '';
 
@@ -62,10 +62,31 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
     }
   };
 
+  // On mount: if a center was provided use it; otherwise ask the browser for GPS.
+  // Falls back to a generic subcontinent center if GPS is denied or unavailable.
   useEffect(() => {
-    reverseGeocode(defaultCenter[0], defaultCenter[1]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (defaultCenter) {
+      reverseGeocode(defaultCenter[0], defaultCenter[1]);
+      return;
+    }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setPosition([20, 78]);
+      setGpsLoading(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setPosition([coords.latitude, coords.longitude]);
+        setGpsLoading(false);
+        reverseGeocode(coords.latitude, coords.longitude);
+      },
+      () => {
+        setPosition([20, 78]);
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const eventHandlers = useMemo(
     () => ({
@@ -88,12 +109,12 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
         reverseGeocode(e.latlng.lat, e.latlng.lng);
       },
     });
-    
+
     const map = useMap();
     useEffect(() => {
       setMapInstance(map);
     }, [map]);
-    
+
     return null;
   };
 
@@ -102,7 +123,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
       toast.error("Geolocation is not supported by your browser");
       return;
     }
-    
+
     setLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -127,10 +148,10 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
     );
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    
+
     setLoading(true);
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&email=admin@2qt.com`, {
@@ -139,7 +160,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
         }
       });
       const data = await res.json();
-      
+
       if (data && data.length > 0) {
         const lat = parseFloat(data[0].lat);
         const lon = parseFloat(data[0].lon);
@@ -159,10 +180,17 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
     }
   };
 
-  // Initial geocode on mount
-  useEffect(() => {
-    reverseGeocode(defaultCenter[0], defaultCenter[1]);
-  }, []);
+  // Show GPS-detecting spinner while waiting for the initial location
+  if (gpsLoading || !position) {
+    return (
+      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-zinc-200 shadow-inner flex items-center justify-center bg-zinc-50">
+        <div className="flex flex-col items-center gap-2 text-zinc-400">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="text-xs font-medium">Detecting location…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-zinc-200 shadow-inner">
@@ -171,11 +199,11 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
           <Loader2 className="w-4 h-4 text-brand-primary animate-spin" />
         </div>
       )}
-      
+
       {/* Search Bar Overlay */}
       <div className="absolute top-2 left-2 right-12 z-[1000]">
         <form onSubmit={handleSearch} className="relative shadow-sm rounded-lg overflow-hidden flex bg-white/95 backdrop-blur-sm border border-zinc-200 focus-within:ring-2 ring-brand-primary/20 transition-all">
-          <input 
+          <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -187,9 +215,9 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
           </button>
         </form>
       </div>
-      
+
       {/* Locate Me Button */}
-      <button 
+      <button
         onClick={handleLocateMe}
         disabled={loading}
         className="absolute bottom-4 right-4 z-[1000] bg-white rounded-full p-3 shadow-lg hover:bg-zinc-50 border border-zinc-200 text-brand-primary transition-colors disabled:opacity-50"
@@ -198,10 +226,10 @@ export default function MapPicker({ onLocationSelect, defaultCenter = [12.9716, 
         <LocateFixed className="w-5 h-5" />
       </button>
 
-      <MapContainer 
-        center={position} 
-        zoom={15} 
-        scrollWheelZoom={true} 
+      <MapContainer
+        center={position}
+        zoom={15}
+        scrollWheelZoom={true}
         style={{ height: '100%', width: '100%', zIndex: 1 }}
       >
         <TileLayer
