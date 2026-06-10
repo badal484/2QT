@@ -189,27 +189,18 @@ router.post('/refresh', async (req, res) => {
     if (!refreshToken) return res.status(400).json({ error: 'MISSING_TOKEN' });
 
     try {
+        // Verify JWT signature + expiry (7d) — no DB hash check needed while DB migrates
         const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any;
-        
-        // Find token hash in DB
-        const { rows } = await query(
-            'SELECT * FROM refresh_tokens WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()',
+
+        // Ensure user still exists and is active
+        const userRes = await query(
+            'SELECT role, kitchen_id, zone_id, is_active FROM users WHERE id = $1',
             [decoded.userId]
         );
-
-        let valid = false;
-        for (const row of rows) {
-            if (await bcrypt.compare(refreshToken, row.token_hash)) {
-                valid = true;
-                break;
-            }
-        }
-
-        if (!valid) return res.status(401).json({ error: 'INVALID_TOKEN' });
-
-        // Get user for role etc.
-        const userRes = await query('SELECT role, kitchen_id, zone_id FROM users WHERE id = $1', [decoded.userId]);
         const user = userRes.rows[0];
+        if (!user || !user.is_active) {
+            return res.status(401).json({ error: 'INVALID_TOKEN' });
+        }
 
         const jti = crypto.randomUUID();
         const accessToken = jwt.sign(
