@@ -12,7 +12,7 @@ export const deductStockForOrder = async (orderId: string) => {
         for (const item of items) {
             // 2. Get ingredients for each menu item
             const { rows: recipe } = await client.query(`
-                SELECT ri.ingredient_id, ri.quantity as amount, i.name, i.current_stock, i.reorder_threshold
+                SELECT ri.ingredient_id, ri.quantity_grams as amount, i.name, i.current_stock_grams, i.reorder_threshold_grams
                 FROM recipe_ingredients ri
                 JOIN recipes r ON ri.recipe_id = r.id
                 JOIN ingredients i ON ri.ingredient_id = i.id
@@ -21,23 +21,23 @@ export const deductStockForOrder = async (orderId: string) => {
 
             for (const ing of recipe) {
                 const totalDeduction = ing.amount * item.quantity;
-                
+
                 // 3. Update stock
                 const { rows: updated } = await client.query(`
-                    UPDATE ingredients 
-                    SET current_stock = current_stock - $1,
+                    UPDATE ingredients
+                    SET current_stock_grams = current_stock_grams - $1,
                         updated_at = NOW()
                     WHERE id = $2
-                    RETURNING current_stock, reorder_threshold, name
+                    RETURNING current_stock_grams, reorder_threshold_grams, name
                 `, [totalDeduction, ing.ingredient_id]);
 
                 const status = updated[0];
-                
+
                 // 4. Alert if low stock
-                if (status.current_stock <= status.reorder_threshold) {
+                if (status.current_stock_grams <= status.reorder_threshold_grams) {
                     await notificationsQueue.add('low_stock_alert', {
                         ingredientName: status.name,
-                        currentStock: status.current_stock
+                        currentStock: status.current_stock_grams
                     });
                 }
             }
