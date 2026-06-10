@@ -84,16 +84,21 @@ export function ZonesTab() {
   };
 
   const save = async (id: string) => {
+    // Compute centroid from polygon so kitchen_lat/lng always reflects real location
+    const pts: { lat: number; lng: number }[] = form.polygon_points || [];
+    const centroidLat = pts.length > 0 ? pts.reduce((s, p) => s + p.lat, 0) / pts.length : undefined;
+    const centroidLng = pts.length > 0 ? pts.reduce((s, p) => s + p.lng, 0) / pts.length : undefined;
     await api.patch(`/admin/zones/${id}`, {
       ...form,
       radius_km: 0,
       delivery_fee_base_paise: parseInt(form.delivery_fee_base_paise),
       max_orders_per_hour: parseInt(form.max_orders_per_hour),
       realistic_delivery_minutes: parseInt(form.realistic_delivery_minutes),
+      ...(centroidLat != null && { kitchen_lat: centroidLat, kitchen_lng: centroidLng }),
     });
     setEditing(null);
     load();
-    toast.success("Zone updated");
+    toast.success("Zone updated — kitchen coordinates synced");
   };
 
   const executeDeleteZone = async (id: string) => {
@@ -247,6 +252,8 @@ export function ZonesTab() {
                     { label: "Max Orders/hr", value: zone.max_orders_per_hour },
                     { label: "Est. Delivery", value: `${zone.realistic_delivery_minutes} min` },
                     { label: "Surge", value: zone.surge_enabled ? "On" : "Off" },
+                    { label: "Kitchen Lat", value: zone.kitchen_lat ? Number(zone.kitchen_lat).toFixed(4) : "⚠️ not set" },
+                    { label: "Kitchen Lng", value: zone.kitchen_lng ? Number(zone.kitchen_lng).toFixed(4) : "⚠️ not set" },
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">{label}</div>
