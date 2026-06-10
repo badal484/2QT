@@ -35,6 +35,7 @@ interface MenuItem {
   available: boolean;
   photo_url?: string;
   is_veg?: boolean;
+  zone_id?: string;
 }
 
 function getDishImage(name: string, category: string, photo_url?: string) {
@@ -142,6 +143,18 @@ export default function MenuPage() {
           setServiceable(true);
           setZoneId(check.zone.id);
           setCurrentZoneName(check.zone.name);
+
+          // Clear cart if the user switched to a new zone
+          try {
+            const savedCart = localStorage.getItem("2qt_cart");
+            if (savedCart) {
+              const parsedCart = JSON.parse(savedCart);
+              if (parsedCart.length > 0 && parsedCart[0].zone_id && parsedCart[0].zone_id !== check.zone.id) {
+                clearCart();
+                toast.error("Your cart was cleared because you switched delivery zones.");
+              }
+            }
+          } catch {}
 
           // Serve cached menu instantly, then refresh in background
           const cacheKey = `2qt_menu_${check.zone.id}`;
