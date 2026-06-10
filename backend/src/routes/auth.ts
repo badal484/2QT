@@ -32,16 +32,16 @@ router.post('/send-otp', async (req, res) => {
         return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
     }
 
-    // Rate limit: 20 per 10 minutes
+    // Rate limit: 100 per 10 minutes (generous during testing)
     let attempts = 0;
     try {
         attempts = await redis.incr(keys.otpAttempts(normalizedPhone));
         if (attempts === 1) await redis.expire(keys.otpAttempts(normalizedPhone), 600);
+        console.log('[SEND_OTP] Rate limit count:', attempts);
     } catch (redisErr: any) {
         console.error('[SEND_OTP] Redis error on rate-limit check:', redisErr.message);
-        // Redis down — allow the request through so OTP still works
     }
-    if (attempts > 20) {
+    if (attempts > 100) {
         return res.status(429).json({ error: 'TOO_MANY_OTP', message: 'Too many OTP requests, please try again in 10 minutes.' });
     }
 
