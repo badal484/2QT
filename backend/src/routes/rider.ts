@@ -90,12 +90,12 @@ router.post('/offline', authenticate, requireRole('rider', 'rider_captain', 'sup
 
 router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(`
-        SELECT o.*, 
-               u.name as customer_name, 
-               u.phone as customer_phone, 
+        SELECT o.*,
+               u.name as customer_name,
+               u.phone as customer_phone,
                a.address_text as delivery_address_text,
-               a.lat as customer_lat,
-               a.lng as customer_lng,
+               COALESCE(o.delivery_location_lat, a.lat) as customer_lat,
+               COALESCE(o.delivery_location_lng, a.lng) as customer_lng,
                k.name as kitchen_name,
                k.address as kitchen_address,
                k.lat as kitchen_lat,

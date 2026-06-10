@@ -225,6 +225,26 @@ export default function LiveTrackingMap({
     );
   }
 
+  // Sanity check: if kitchen and delivery address are >500 km apart the
+  // coordinates are stale placeholder data — show a neutral fallback rather
+  // than an absurd cross-country route.
+  const coordDistance = haversineMeters(kitchenLat, kitchenLng!, customerLat, customerLng!);
+  if (coordDistance > 500_000) {
+    const currentRiderLatFallback = liveRiderLat ?? initialRiderLat;
+    const currentRiderLngFallback = liveRiderLng ?? initialRiderLng;
+    const riderPosStr = currentRiderLatFallback
+      ? `Rider at ${currentRiderLatFallback.toFixed(4)}, ${currentRiderLngFallback?.toFixed(4)}`
+      : 'Rider location updating…';
+    return (
+      <div className="w-full h-full bg-zinc-50 rounded-2xl flex flex-col items-center justify-center gap-2 px-6 text-center border border-zinc-200">
+        <span className="text-2xl">📍</span>
+        <p className="text-sm font-bold text-zinc-700">Rider is on the way</p>
+        <p className="text-xs text-zinc-400">{riderPosStr}</p>
+        <p className="text-[10px] text-zinc-300 mt-1">Map will show once address is updated</p>
+      </div>
+    );
+  }
+
   const currentRiderLat = liveRiderLat ?? initialRiderLat;
   const currentRiderLng = liveRiderLng ?? initialRiderLng;
   const hasRider = !!(currentRiderLat && currentRiderLng);
