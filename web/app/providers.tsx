@@ -80,6 +80,7 @@ interface CartItem {
   price_paise: number;
   quantity: number;
   category: string;
+  zone_id?: string;
 }
 
 interface CartContextType {
@@ -114,6 +115,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addItem = (item: Omit<CartItem, "quantity">) => {
     haptics.tap();
     setItems(prev => {
+      if (prev.length > 0 && prev[0].zone_id && item.zone_id && prev[0].zone_id !== item.zone_id) {
+        toast.error("Cart cleared because you added an item from a different delivery zone!");
+        return [{ ...item, quantity: 1 }];
+      }
       const existing = prev.find(i => i.id === item.id);
       if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, { ...item, quantity: 1 }];
