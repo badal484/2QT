@@ -186,19 +186,26 @@ router.post('/verify-otp', async (req, res) => {
 
 router.post('/refresh', async (req, res) => {
     const { refreshToken } = req.body;
-    if (!refreshToken) return res.status(400).json({ error: 'MISSING_TOKEN' });
+    if (!refreshToken) {
+        console.log('[REFRESH] No token in body');
+        return res.status(400).json({ error: 'MISSING_TOKEN' });
+    }
 
     try {
-        // Verify JWT signature + expiry (7d) — no DB hash check needed while DB migrates
         const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any;
+        console.log(`[REFRESH] JWT valid, userId=${decoded.userId}`);
 
-        // Ensure user still exists and is active
         const userRes = await query(
             'SELECT role, kitchen_id, zone_id, is_active FROM users WHERE id = $1',
             [decoded.userId]
         );
         const user = userRes.rows[0];
-        if (!user || !user.is_active) {
+        if (!user) {
+            console.log(`[REFRESH] User ${decoded.userId} not found in DB`);
+            return res.status(401).json({ error: 'INVALID_TOKEN' });
+        }
+        if (!user.is_active) {
+            console.log(`[REFRESH] User ${decoded.userId} is deactivated`);
             return res.status(401).json({ error: 'INVALID_TOKEN' });
         }
 
@@ -208,9 +215,10 @@ router.post('/refresh', async (req, res) => {
             JWT_SECRET,
             { expiresIn: '2h' }
         );
-
+        console.log(`[REFRESH] Success for userId=${decoded.userId}`);
         res.json({ accessToken });
-    } catch (err) {
+    } catch (err: any) {
+        console.log(`[REFRESH] Failed: ${err.message}`);
         res.status(401).json({ error: 'INVALID_TOKEN' });
     }
 });
