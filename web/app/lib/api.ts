@@ -9,7 +9,8 @@ const API_BASE_URL = getApiUrl();
 let isRefreshing = false;
 let refreshQueue: Array<(token: string) => void> = [];
 
-async function refreshAccessToken(): Promise<string | null> {
+// 'NETWORK_ERROR' = transient failure (don't log user out), null = genuinely expired (do log out)
+async function refreshAccessToken(): Promise<string | null | 'NETWORK_ERROR'> {
   const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('2qt_refresh_token') : null;
   if (!refreshToken) return null;
 
@@ -23,21 +24,28 @@ async function refreshAccessToken(): Promise<string | null> {
       body: JSON.stringify({ refreshToken }),
       signal: controller.signal
     });
-    
+
     clearTimeout(timeoutId);
 
-    if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      // Refresh token genuinely invalid/expired — clear everything
       localStorage.removeItem('2qt_token');
       localStorage.removeItem('2qt_refresh_token');
       localStorage.removeItem('2qt_user');
       return null;
     }
 
+    if (!res.ok) {
+      // 5xx or network error — transient, keep auth state
+      return 'NETWORK_ERROR';
+    }
+
     const data = await res.json();
     localStorage.setItem('2qt_token', data.accessToken);
     return data.accessToken;
   } catch {
-    return null;
+    // Timeout or connection drop — don't log user out
+    return 'NETWORK_ERROR';
   }
 }
 
@@ -74,10 +82,7 @@ class ApiClient {
     // Auto-refresh on 401
     if (response.status === 401 && retry) {
       if (isRefreshing) {
-        // Wait for the ongoing refresh to complete
-        await new Promise<string>((resolve) => {
-          refreshQueue.push(resolve);
-        });
+        await new Promise<string>((resolve) => { refreshQueue.push(resolve); });
         return this.request(endpoint, options, false);
       }
 
@@ -85,20 +90,26 @@ class ApiClient {
       const newToken = await refreshAccessToken();
       isRefreshing = false;
 
+      if (newToken === 'NETWORK_ERROR') {
+        // Backend is unreachable — don't log out, surface as a connection error
+        refreshQueue.forEach((cb) => cb(''));
+        refreshQueue = [];
+        throw new Error('Connection error. Please check your internet and try again.');
+      }
+
       if (newToken) {
         refreshQueue.forEach((cb) => cb(newToken));
         refreshQueue = [];
         return this.request(endpoint, options, false);
-      } else {
-        // Clear queue and reject waiting requests
-        refreshQueue.forEach((cb) => cb(''));
-        refreshQueue = [];
       }
-      
+
+      // null = genuinely expired refresh token
+      refreshQueue.forEach((cb) => cb(''));
+      refreshQueue = [];
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
-      throw new Error('Session expired');
+      throw new Error('Session expired. Please log in again.');
     }
 
     // Handle empty responses
