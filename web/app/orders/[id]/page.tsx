@@ -99,9 +99,29 @@ export default function OrderTrackingPage() {
       .then(d => { if (d.order) setOrder(d.order); })
       .finally(() => setLoading(false));
 
+    // Fallback poll every 15s to refresh rider position from Redis in case socket misses events
+    const pollInterval = setInterval(async () => {
+      try {
+        const d = await api.get(`/orders/${id}`);
+        if (d.order) {
+          setOrder(prev => {
+            if (!prev) return d.order;
+            return { ...d.order, items: prev.items }; // keep items from first load
+          });
+          if (d.order.rider_lat && d.order.rider_lng) {
+            setLiveRiderLocation({ lat: Number(d.order.rider_lat), lng: Number(d.order.rider_lng) });
+          }
+        }
+      } catch { /* silent */ }
+    }, 15000);
+
+    const joinRoom = () => socket.emit("join_order", id);
+
     socket.connect();
-    socket.emit("join_order", id);
-    
+    // Re-join room on every (re)connect so we never miss events after Render cold start
+    socket.on("connect", joinRoom);
+    if (socket.connected) joinRoom();
+
     socket.on("order_status_update", ({ orderId, status }: { orderId: string; status: Order["status"] }) => {
       if (orderId === id) setOrder(prev => prev ? { ...prev, status } : null);
     });
@@ -111,6 +131,8 @@ export default function OrderTrackingPage() {
     });
 
     return () => {
+      clearInterval(pollInterval);
+      socket.off("connect", joinRoom);
       socket.off("order_status_update");
       socket.off("rider_location");
       socket.disconnect();
