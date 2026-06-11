@@ -7,9 +7,10 @@ import {
   Phone, Download, Package, Lock, Star, Loader2, XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { socket } from "../../lib/socket";
 import { api } from "../../lib/api";
+import { useAuth } from "../../providers";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 
@@ -112,6 +113,8 @@ function HorizontalStepper({ current }: { current: number }) {
 
 export default function OrderTrackingPage() {
   const { id } = useParams();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth()!;
   const [order, setOrder]                     = useState<Order | null>(null);
   const [loading, setLoading]                 = useState(true);
   const [liveRider, setLiveRider]             = useState<{ lat: number; lng: number } | null>(null);
@@ -121,6 +124,12 @@ export default function OrderTrackingPage() {
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace(`/login?redirect=/orders/${id}`);
+    }
+  }, [authLoading, user, id, router]);
 
   useEffect(() => {
     api.get(`/orders/${id}`)
@@ -144,16 +153,21 @@ export default function OrderTrackingPage() {
     socket.on("connect", joinRoom);
     if (socket.connected) joinRoom();
 
-    socket.on("order_status_update", ({ orderId, status }: { orderId: string; status: Order["status"] }) => {
+    const orderStatusHandler = ({ orderId, status }: { orderId: string; status: Order["status"] }) => {
       if (orderId === id) setOrder(prev => prev ? { ...prev, status } : null);
-    });
-    socket.on("rider_location", (loc: { lat: number; lng: number }) => setLiveRider(loc));
+    };
+    const riderLocationHandler = (loc: { lat: number | string; lng: number | string }) => {
+      setLiveRider({ lat: Number(loc.lat), lng: Number(loc.lng) });
+    };
+
+    socket.on("order_status_update", orderStatusHandler);
+    socket.on("rider_location", riderLocationHandler);
 
     return () => {
       clearInterval(pollInterval);
       socket.off("connect", joinRoom);
-      socket.off("order_status_update");
-      socket.off("rider_location");
+      socket.off("order_status_update", orderStatusHandler);
+      socket.off("rider_location", riderLocationHandler);
       socket.disconnect();
     };
   }, [id]);
