@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Smartphone, Shield } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +22,8 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [serverReady, setServerReady] = useState(false);
   const [devOtp, setDevOtp] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { login } = useAuth()!;
 
   // Pre-warm Render backend — poll /health until it responds, then unlock the form
@@ -51,8 +53,27 @@ function LoginForm() {
     return () => clearInterval(id);
   }, [serverReady]);
 
-  const handleSendOtp = async (e: { preventDefault(): void }) => {
-    e.preventDefault();
+  const startCooldown = (seconds = 30) => {
+    setResendCooldown(seconds);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const sendOtpRequest = async () => {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setError("Enter a valid phone number (at least 10 digits)");
+      return false;
+    }
     setLoading(true);
     setError("");
     setLoadingMsg("");
@@ -63,15 +84,16 @@ function LoginForm() {
     }, 8000);
 
     try {
-      const data = await api.sendOtp(phone);
+      const data = await api.sendOtp(digits);
       if (data?.devOtp) {
-        setOtp(data.devOtp);   // auto-fill so user can just tap Verify
+        setOtp(data.devOtp);
         setDevOtp(data.devOtp);
       }
-      setStep("otp");
+      return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
       setError(msg === 'SERVER_TIMEOUT' ? "Server took too long. Tap Continue to try again." : msg);
+      return false;
     } finally {
       clearTimeout(hintTimer);
       setLoading(false);
@@ -79,9 +101,24 @@ function LoginForm() {
     }
   };
 
+  const handleSendOtp = async (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    const ok = await sendOtpRequest();
+    if (ok) {
+      setStep("otp");
+      startCooldown(30);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || loading) return;
+    const ok = await sendOtpRequest();
+    if (ok) startCooldown(30);
+  };
+
   const redirectUser = (userRole: string) => {
     const redirectUrl = searchParams.get("redirect");
-    if (redirectUrl) {
+    if (redirectUrl && redirectUrl.startsWith("/")) {
       router.push(redirectUrl);
     } else if (userRole === "super_admin") {
       router.push("/admin");
@@ -102,7 +139,7 @@ function LoginForm() {
       const data = await api.verifyOtp(phone, otp, undefined);
       login(data.user);
       
-      if (!data.user.name || data.user.name === "2QT User" || data.user.name === "2QT User") {
+      if (!data.user.name || data.user.name === "2QT User" || data.user.name === "2QT_User") {
         setStep("onboarding");
       } else {
         redirectUser(data.user.role);
@@ -242,7 +279,7 @@ function LoginForm() {
                       type="tel"
                       placeholder="Phone number"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                       className="w-full bg-black/40 border border-white/[0.1] rounded-xl pl-12 pr-4 py-4 text-base text-white placeholder-zinc-600 focus:outline-none focus:border-brand-primary/50 focus:bg-black/60 transition-all font-mono tracking-wide"
                       required
                       autoFocus
@@ -334,6 +371,15 @@ function LoginForm() {
                     ) : (
                       "Verify Code"
                     )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={resendCooldown > 0 || loading}
+                    className="w-full text-sm font-semibold text-zinc-500 hover:text-white transition-colors py-2 disabled:opacity-40"
+                  >
+                    {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"}
                   </button>
 
                   <button

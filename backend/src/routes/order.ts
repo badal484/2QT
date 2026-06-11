@@ -38,8 +38,24 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
                 r.phone as rider_phone,
                 a.address_text as delivery_address_text,
                 a.label as delivery_address_label,
-                COALESCE(o.delivery_location_lat, a.lat) as customer_lat,
-                COALESCE(o.delivery_location_lng, a.lng) as customer_lng,
+                CASE
+                  WHEN o.delivery_location_lat IS NOT NULL
+                       AND (k.lat IS NULL OR ABS(o.delivery_location_lat::numeric - k.lat::numeric) > 0.00001)
+                  THEN o.delivery_location_lat
+                  WHEN a.lat IS NOT NULL
+                       AND (k.lat IS NULL OR ABS(a.lat::numeric - k.lat::numeric) > 0.00001)
+                  THEN a.lat
+                  ELSE NULL
+                END as customer_lat,
+                CASE
+                  WHEN o.delivery_location_lng IS NOT NULL
+                       AND (k.lng IS NULL OR ABS(o.delivery_location_lng::numeric - k.lng::numeric) > 0.00001)
+                  THEN o.delivery_location_lng
+                  WHEN a.lng IS NOT NULL
+                       AND (k.lng IS NULL OR ABS(a.lng::numeric - k.lng::numeric) > 0.00001)
+                  THEN a.lng
+                  ELSE NULL
+                END as customer_lng,
                 k.lat as kitchen_lat,
                 k.lng as kitchen_lng,
                 k.name as kitchen_name
