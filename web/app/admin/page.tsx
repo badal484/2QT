@@ -1707,7 +1707,7 @@ export default function AdminPage() {
               <Package className="w-5 h-5 text-white" />
             </div>
             <div className="text-lg font-black tracking-tight text-white leading-none">
-              Aether<span className="text-brand-primary">.</span>
+              2QT<span className="text-brand-primary">.</span>
             </div>
           </div>
         </div>
