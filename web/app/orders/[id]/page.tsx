@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, MapPin, Bike, ShoppingBag, ChefHat, CheckCircle2,
@@ -123,6 +123,8 @@ export default function OrderTrackingPage() {
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [invoiceLoading, setInvoiceLoading]   = useState(false);
+  const prevStatusRef = useRef<string | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -176,6 +178,27 @@ export default function OrderTrackingPage() {
 
   const handleEtaChange = useCallback((e: string | null) => setEta(e), []);
 
+  const downloadInvoice = useCallback(async () => {
+    setInvoiceLoading(true);
+    try {
+      const data = await api.get(`/orders/${id}/invoice`);
+      if (data.invoiceUrl) window.open(data.invoiceUrl, "_blank");
+    } catch { toast.error("Could not generate invoice"); }
+    finally { setInvoiceLoading(false); }
+  }, [id]);
+
+  // Auto-nudge when order transitions to delivered
+  useEffect(() => {
+    if (!order) return;
+    if (prevStatusRef.current && prevStatusRef.current !== "delivered" && order.status === "delivered") {
+      toast.success("Order delivered! Your invoice is ready.", {
+        action: { label: "Download", onClick: downloadInvoice },
+        duration: 8000,
+      });
+    }
+    prevStatusRef.current = order.status;
+  }, [order?.status, downloadInvoice]);
+
   if (loading) return (
     <div className="min-h-screen bg-white flex items-center justify-center">
       <Loader2 className="w-7 h-7 animate-spin text-brand-primary" />
@@ -216,17 +239,20 @@ export default function OrderTrackingPage() {
             <p className="text-xs font-bold text-zinc-700">#{order.display_id}</p>
           </div>
 
-          <button
-            onClick={async () => {
-              try {
-                const data = await api.get(`/orders/${order.id}/invoice`);
-                if (data.invoiceUrl) window.open(data.invoiceUrl, "_blank");
-              } catch { toast.error("Could not generate invoice"); }
-            }}
-            className="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center"
-          >
-            <Download className="w-4 h-4 text-zinc-700" />
-          </button>
+          {["delivered", "cancelled"].includes(order.status) ? (
+            <button
+              onClick={downloadInvoice}
+              disabled={invoiceLoading}
+              className="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center disabled:opacity-50"
+              title="Download Invoice"
+            >
+              {invoiceLoading
+                ? <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />
+                : <Download className="w-4 h-4 text-zinc-700" />}
+            </button>
+          ) : (
+            <div className="w-9 h-9" />
+          )}
         </div>
 
         {/* Map or status illustration */}
@@ -466,6 +492,26 @@ export default function OrderTrackingPage() {
         </div>
 
         <div className="h-2 bg-zinc-50 mt-4" />
+
+        {/* Invoice ready card */}
+        {order.status === "delivered" && (
+          <div className="mx-5 mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-green-900">Invoice Ready</p>
+              <p className="text-xs text-green-600 mt-0.5">Download your order receipt</p>
+            </div>
+            <button
+              onClick={downloadInvoice}
+              disabled={invoiceLoading}
+              className="flex items-center gap-2 bg-green-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-600 active:scale-95 transition-all disabled:opacity-50 shadow-md shadow-green-500/20"
+            >
+              {invoiceLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Download className="w-3.5 h-3.5" />}
+              Download
+            </button>
+          </div>
+        )}
 
         {/* Feedback */}
         {order.status === "delivered" && (
