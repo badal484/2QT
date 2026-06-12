@@ -20,6 +20,22 @@ interface MapPickerProps {
   defaultCenter?: [number, number];
 }
 
+function MapEvents({ setPosition, reverseGeocode, setMapInstance }: any) {
+  useMapEvents({
+    click(e) {
+      setPosition([e.latlng.lat, e.latlng.lng]);
+      reverseGeocode(e.latlng.lat, e.latlng.lng);
+    },
+  });
+
+  const map = useMap();
+  useEffect(() => {
+    setMapInstance(map);
+  }, [map, setMapInstance]);
+
+  return null;
+}
+
 export default function MapPicker({ onLocationSelect, defaultCenter }: MapPickerProps) {
   const [position, setPosition] = useState<[number, number] | null>(defaultCenter ?? null);
   const [gpsLoading, setGpsLoading] = useState(!defaultCenter);
@@ -28,7 +44,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
   const [searchQuery, setSearchQuery] = useState("");
   const markerRef = useRef<L.Marker>(null);
 
-  const reverseGeocode = async (lat: number, lng: number) => {
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     setLoading(true);
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&email=admin@2qt.com`, {
@@ -41,7 +57,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
       if (data && data.address) {
         const { road, suburb, neighbourhood, city_district, city } = data.address;
 
-        let areaParts = [];
+        const areaParts = [];
         if (suburb || neighbourhood) areaParts.push(suburb || neighbourhood);
         if (city_district || city) areaParts.push(city_district || city);
 
@@ -60,7 +76,8 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
     } finally {
       setLoading(false);
     }
-  };
+  }, [onLocationSelect]);
+
 
   // On mount: if a center was provided use it; otherwise ask the browser for GPS.
   // Falls back to a generic subcontinent center if GPS is denied or unavailable.
@@ -99,24 +116,9 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
         }
       },
     }),
-    []
+    [reverseGeocode]
   );
 
-  const MapEvents = () => {
-    useMapEvents({
-      click(e) {
-        setPosition([e.latlng.lat, e.latlng.lng]);
-        reverseGeocode(e.latlng.lat, e.latlng.lng);
-      },
-    });
-
-    const map = useMap();
-    useEffect(() => {
-      setMapInstance(map);
-    }, [map]);
-
-    return null;
-  };
 
   const handleLocateMe = () => {
     if (!navigator.geolocation) {
@@ -236,7 +238,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <MapEvents />
+        <MapEvents setPosition={setPosition} reverseGeocode={reverseGeocode} setMapInstance={setMapInstance} />
         <Marker
           draggable={true}
           eventHandlers={eventHandlers}

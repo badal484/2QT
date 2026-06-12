@@ -27,21 +27,21 @@ export default function PushNotifier() {
     const [isSupported, setIsSupported] = useState(false);
 
     useEffect(() => {
+        const registerServiceWorker = async () => {
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js');
+                const subscription = await registration.pushManager.getSubscription();
+                if (subscription) setIsSubscribed(true);
+            } catch (error) {
+                console.error('Service Worker registration failed:', error);
+            }
+        };
+
         if ('serviceWorker' in navigator && 'PushManager' in window) {
             setIsSupported(true);
             registerServiceWorker();
         }
     }, []);
-
-    const registerServiceWorker = async () => {
-        try {
-            const registration = await navigator.serviceWorker.register('/sw.js');
-            const subscription = await registration.pushManager.getSubscription();
-            if (subscription) setIsSubscribed(true);
-        } catch (error) {
-            console.error('Service Worker registration failed:', error);
-        }
-    };
 
     const subscribeToPush = async () => {
         if (!user) {
