@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShoppingBag, MapPin, Star, Heart, Clock, ChevronRight, Utensils, Smartphone, Download } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "./providers";
+import { InstallModal } from "../components/InstallModal";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 export default function HomePage() {
   const { user } = useAuth()!;
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -207,26 +209,7 @@ export default function HomePage() {
 
             <div className="flex flex-col sm:flex-row gap-4">
               <button 
-                onClick={async () => {
-                  if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                      setDeferredPrompt(null);
-                    }
-                  } else {
-                    const ua = navigator.userAgent.toLowerCase();
-                    const isIOS = /iphone|ipad|ipod/.test(ua);
-                    const isAndroid = /android/.test(ua);
-                    if (isIOS) {
-                      toast.success("Tap the Share icon [↑] and 'Add to Home Screen' to install!");
-                    } else if (isAndroid) {
-                      toast.success("Tap the 3-dot menu and select 'Add to Home screen' or 'Install app'!");
-                    } else {
-                      toast.success("Click the install icon in your browser's address bar to install!");
-                    }
-                  }
-                }}
+                onClick={() => setIsInstallModalOpen(true)}
                 className="group flex items-center justify-center gap-3 bg-brand-primary text-white px-8 py-4 rounded-2xl text-[15px] font-bold hover:bg-brand-primary-dark transition-all shadow-[0_10px_30px_rgba(255,107,53,0.3)]"
               >
                 <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
@@ -300,6 +283,22 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      <InstallModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        canNativeInstall={!!deferredPrompt}
+        onNativeInstall={async () => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+              setDeferredPrompt(null);
+              setIsInstallModalOpen(false);
+            }
+          }
+        }}
+      />
     </div>
   );
 }
