@@ -21,31 +21,31 @@ interface MapPolygonPickerProps {
   defaultCenter?: [number, number];
 }
 
+function MapEvents({ polygonPoints, onChange, setMapInstance, positions }: any) {
+  useMapEvents({
+    click(e) {
+      onChange([...polygonPoints, { lat: e.latlng.lat, lng: e.latlng.lng }]);
+    },
+  });
+  
+  const map = useMap();
+  useEffect(() => {
+    setMapInstance(map);
+    if (positions.length > 0) {
+      const bounds = L.latLngBounds(positions);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [map, positions.length, setMapInstance]);
+  
+  return null;
+}
+
 export default function MapPolygonPicker({ polygonPoints = [], onChange, defaultCenter = [12.9716, 77.5946] }: MapPolygonPickerProps) {
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
   const positions = polygonPoints.map(p => [p.lat, p.lng] as [number, number]);
-
-  const MapEvents = () => {
-    useMapEvents({
-      click(e) {
-        onChange([...polygonPoints, { lat: e.latlng.lat, lng: e.latlng.lng }]);
-      },
-    });
-    
-    const map = useMap();
-    useEffect(() => {
-      setMapInstance(map);
-      if (positions.length > 0 && !mapInstance) {
-        const bounds = L.latLngBounds(positions);
-        map.fitBounds(bounds, { padding: [50, 50] });
-      }
-    }, [map]);
-    
-    return null;
-  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,7 +165,7 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
           attribution='&copy; OpenStreetMap'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
-        <MapEvents />
+        <MapEvents polygonPoints={polygonPoints} onChange={onChange} setMapInstance={setMapInstance} positions={positions} />
         {positions.length > 0 && (
           <Polygon 
             positions={positions} 
