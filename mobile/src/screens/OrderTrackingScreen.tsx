@@ -69,9 +69,9 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
       const lng = parseFloat(o.rider_lng);
       setRiderLocation({ lat, lng });
       if (Platform.OS === 'android') {
-        animatedRiderLocation.timing({ latitude: lat, longitude: lng, duration: 1000, useNativeDriver: false }).start();
+        (animatedRiderLocation as any).timing({ latitude: lat, longitude: lng, duration: 1000, useNativeDriver: false }).start();
       } else {
-        animatedRiderLocation.spring({ latitude: lat, longitude: lng, useNativeDriver: false }).start();
+        (animatedRiderLocation as any).spring({ latitude: lat, longitude: lng, useNativeDriver: false }).start();
       }
     }
   }, [o?.rider_lat, o?.rider_lng]);
@@ -100,9 +100,9 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
       socket.on('rider_location', (data) => {
         setRiderLocation({ lat: data.lat, lng: data.lng });
         if (Platform.OS === 'android') {
-            animatedRiderLocation.timing({ latitude: data.lat, longitude: data.lng, duration: 1000, useNativeDriver: false }).start();
+            (animatedRiderLocation as any).timing({ latitude: data.lat, longitude: data.lng, duration: 1000, useNativeDriver: false }).start();
         } else {
-            animatedRiderLocation.spring({ latitude: data.lat, longitude: data.lng, useNativeDriver: false }).start();
+            (animatedRiderLocation as any).spring({ latitude: data.lat, longitude: data.lng, useNativeDriver: false }).start();
         }
       });
     }
@@ -154,15 +154,17 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
                   <Home size={24} color="#1A1A2E" />
                 </View>
               </Marker>
-              <Polyline
-                coordinates={[
-                  { latitude: riderLocation.lat, longitude: riderLocation.lng },
-                  { latitude: parseFloat(o.lat), longitude: parseFloat(o.lng) }
-                ]}
-                strokeColor="#FF6B35"
-                strokeWidth={4}
-                lineDashPattern={[10, 10]}
-              />
+              {riderLocation && (
+                <Polyline
+                  coordinates={[
+                    { latitude: riderLocation.lat, longitude: riderLocation.lng },
+                    { latitude: parseFloat(o.lat), longitude: parseFloat(o.lng) }
+                  ]}
+                  strokeColor="#1A1A2E"
+                  strokeWidth={3}
+                  lineDashPattern={[5, 5]}
+                />
+              )}
             </>
           )}
         </MapView>

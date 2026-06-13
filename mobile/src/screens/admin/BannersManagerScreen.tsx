@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Plus, Trash2, Image as ImageIcon } from 'lucide-react-native';
 import { api } from '../../api/client';
-import * as ImagePicker from 'expo-image-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 const BannersManagerScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
@@ -46,32 +46,31 @@ const BannersManagerScreen = ({ navigation }: any) => {
   });
 
   const pickAndUploadImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
       quality: 0.8,
     });
 
-    if (!result.canceled) {
-      setIsUploading(true);
-      const uri = result.assets[0].uri;
-      const fileType = uri.substring(uri.lastIndexOf('.') + 1);
-      const formData = new FormData();
-      formData.append('image', {
-        uri: uri,
-        name: `banner_${Date.now()}.${fileType}`,
-        type: `image/${fileType}`
-      } as any);
+    if (result.didCancel || !result.assets || result.assets.length === 0) return;
 
-      try {
-        const response = await api.post('/menu/upload', formData); // Reusing upload endpoint
-        setNewBanner({ ...newBanner, image_url: response.url });
-      } catch (err: any) {
-        Alert.alert('Upload Failed', err.message);
-      } finally {
-        setIsUploading(false);
-      }
+    setIsUploading(true);
+    const asset = result.assets[0];
+    const uri = asset.uri!;
+    const fileType = asset.type || 'image/jpeg';
+    const formData = new FormData();
+    formData.append('image', {
+      uri: uri,
+      name: asset.fileName || `banner_${Date.now()}.jpg`,
+      type: fileType
+    } as any);
+
+    try {
+      const response = await api.post('/menu/upload', formData);
+      setNewBanner({ ...newBanner, image_url: response.url });
+    } catch (err: any) {
+      Alert.alert('Upload Failed', err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 

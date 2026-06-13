@@ -1,6 +1,6 @@
 import { ArrowLeft, Home, Briefcase, MapPin, Trash2, Plus, ArrowRight, Navigation } from 'lucide-react-native';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, StyleSheet, Dimensions, Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import MapView, { Region } from 'react-native-maps';
 import { api } from '../api/client';
