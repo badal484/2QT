@@ -1,4 +1,4 @@
-import { ArrowLeft, MapPin, CreditCard, ArrowRight, Sparkles, Clock, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, MapPin, CreditCard, ArrowRight, Sparkles, Clock, ShieldCheck, Heart } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, StyleSheet } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -517,8 +517,16 @@ const styles = StyleSheet.create({
   metaItem: { flex: 1 },
   metaLabel: { color: '#9ca3af', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 },
   metaValueRow: { flexDirection: 'row', alignItems: 'center' },
-  metaValue: { color: '#1A1A2E', fontWeight: '900', fontSize: 12, marginLeft: 4 },
-  metaValueSmall: { color: '#1A1A2E', fontWeight: '700', fontSize: 12 },
+  metaValue: { fontSize: 13, fontWeight: 'bold', color: '#1A1A2E', marginLeft: 6 },
+  sectionCard: { backgroundColor: '#fff', borderRadius: 24, padding: 24, marginBottom: 16 },
+  sectionHeader: { fontSize: 16, fontWeight: '900', color: '#1A1A2E', marginBottom: 12 },
+  instructionsInput: { backgroundColor: '#f9fafb', borderRadius: 16, padding: 16, minHeight: 80, textAlignVertical: 'top', color: '#1A1A2E', fontWeight: '500' },
+  tipSub: { fontSize: 12, color: '#9ca3af', marginBottom: 16 },
+  tipOptionsRow: { flexDirection: 'row', gap: 12 },
+  tipChip: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },
+  tipChipActive: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' },
+  tipChipText: { color: '#1A1A2E', fontWeight: 'bold', fontSize: 14 },
+  tipChipTextActive: { color: '#fff' },
   billCard: { backgroundColor: '#1A1A2E', padding: 32, borderRadius: 40, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.3, shadowRadius: 30, elevation: 10 },
   billHeader: { color: 'rgba(255,255,255,0.4)', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10, marginBottom: 24 },
   billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },

@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
   premiumPrice: { fontSize: 15, fontWeight: '900', color: '#1A1A2E', marginBottom: 4 },
   premiumDesc: { fontSize: 11, color: '#9CA3AF', fontWeight: '500', lineHeight: 14 },
 
-  soldOutOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
   soldOutText: { color: '#fff', fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 },
 
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },

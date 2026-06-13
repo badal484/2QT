@@ -1,7 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { AlertTriangle, RefreshCcw } from 'lucide-react-native';
-import RNRestart from 'react-native-restart'; // We'll just prompt a manual reload if this isn't installed
 
 interface Props {
   children?: ReactNode;
@@ -27,12 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReload = () => {
-    try {
-      // If react-native-restart is installed, use it. Otherwise just clear state.
-      this.setState({ hasError: false, error: null });
-    } catch (e) {
-      console.warn("Could not reload", e);
-    }
+    this.setState({ hasError: false, error: null });
   }
 
   public render() {

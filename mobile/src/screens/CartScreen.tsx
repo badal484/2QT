@@ -1,4 +1,4 @@
-import { ArrowLeft, ChefHat, Wallet, Calendar, Clock, Sparkles, Star } from 'lucide-react-native';
+import { ArrowLeft, ChefHat, Wallet, Calendar, Clock, Sparkles, Star, Ticket } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';

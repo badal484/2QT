@@ -13,7 +13,11 @@ export const reduxStorage: Storage = {
     return Promise.resolve(value);
   },
   removeItem: (key) => {
-    storage.delete(key);
+    if (typeof storage.delete === 'function') {
+      storage.delete(key);
+    } else {
+      (storage as any).removeItem?.(key);
+    }
     return Promise.resolve();
   },
 };
