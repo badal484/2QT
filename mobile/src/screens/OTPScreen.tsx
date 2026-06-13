@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, NativeModules } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, NativeModules, Platform } from 'react-native';
+import RNOtpVerify from 'react-native-otp-verify';
 import { useDispatch } from 'react-redux';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { setAuth } from '../store/slices/authSlice';
 import { connectSocket } from '../socket/client';
 
-const { RoleModule } = NativeModules;
-const BUILD_ROLE = RoleModule?.BUILD_ROLE;
-
 const OTPScreen = ({ route, navigation }: any) => {
-  const { phone, referralCode } = route.params;
+  const { phone, referralCode, devOtp, devRole } = route.params;
   const [otp, setOtp] = useState('');
   const [timer, setTimer] = useState(30);
   const dispatch = useDispatch();
@@ -20,11 +18,40 @@ const OTPScreen = ({ route, navigation }: any) => {
     const interval = setInterval(() => {
       setTimer((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    if (devOtp) {
+      setOtp(devOtp);
+      setTimeout(() => verifyMutation.mutate(devOtp), 500);
+    }
+    
+    if (Platform.OS === 'android') {
+      RNOtpVerify.getOtp()
+        .then(() => RNOtpVerify.addListener(otpHandler))
+        .catch((e) => console.log('OTP Verify error', e));
+    }
+    
+    return () => {
+      clearInterval(interval);
+      if (Platform.OS === 'android') {
+        RNOtpVerify.removeListener();
+      }
+    };
+  }, [devOtp]);
+
+  const otpHandler = (message: string) => {
+    if (message && message !== 'Timeout Error') {
+      const match = /(\d{6})/.exec(message);
+      if (match && match[1]) {
+        const code = match[1];
+        setOtp(code);
+        verifyMutation.mutate(code);
+        RNOtpVerify.removeListener();
+      }
+    }
+  };
 
   const verifyMutation = useMutation({
-    mutationFn: (code: string) => api.post('/auth/verify-otp', { phone, otp: code, referralCode, appRole: BUILD_ROLE }),
+    mutationFn: (code: string) => api.post('/auth/verify-otp', { phone, otp: code, referralCode, appRole: devRole }),
     onSuccess: (data) => {
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
       connectSocket(data.accessToken);

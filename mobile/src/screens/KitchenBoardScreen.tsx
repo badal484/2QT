@@ -46,6 +46,21 @@ const KitchenBoardScreen = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] }),
   });
 
+  const { data: orders, isLoading } = useQuery({
+    queryKey: ['kitchen-orders'],
+    queryFn: () => api.get('/kitchen/orders'),
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/claim`, {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] })
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ orderId, status }: { orderId: string, status: string }) => api.patch(`/kitchen/orders/${orderId}/status`, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] })
+  });
+
   if (isLoading) return (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color="#FF6B35" />

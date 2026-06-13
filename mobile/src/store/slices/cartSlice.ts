@@ -69,7 +69,7 @@ const initialState: CartState = {
 export const syncCartWithCloud = createAsyncThunk(
   'cart/syncWithCloud',
   async (items: CartItem[]) => {
-    const response = await api.post('/customer/cart/sync', { items });
+    const response = await api.post('/customers/cart/sync', { items });
     return response;
   }
 );
@@ -77,7 +77,7 @@ export const syncCartWithCloud = createAsyncThunk(
 export const fetchCloudCart = createAsyncThunk(
   'cart/fetchFromCloud',
   async () => {
-    const response = await api.get('/customer/cart');
+    const response = await api.get('/customers/cart');
     return response.items; // Array of CartItem
   }
 );
@@ -123,7 +123,45 @@ const cartSlice = createSlice({
         getStorage().remove('cart.useWallet');
         getStorage().remove('cart.useLoyalty');
       },
-      // ... Other reducers ...
+      setZone: (state, action: PayloadAction<string | null>) => {
+        if (state.zoneId && action.payload && state.zoneId !== action.payload) {
+          // Zone changed, clear cart!
+          state.items = [];
+          state.promoCode = null;
+          getStorage().remove('cart.items');
+          getStorage().remove('cart.promoCode');
+        }
+        state.zoneId = action.payload;
+        if (action.payload) getStorage().set('cart.zoneId', action.payload);
+        else getStorage().remove('cart.zoneId');
+      },
+      setAddress: (state, action: PayloadAction<string | null>) => {
+        state.addressId = action.payload;
+        if (action.payload) getStorage().set('cart.addressId', action.payload);
+        else getStorage().remove('cart.addressId');
+      },
+      setPromoCode: (state, action: PayloadAction<string | null>) => {
+        state.promoCode = action.payload;
+        if (action.payload) getStorage().set('cart.promoCode', action.payload);
+        else getStorage().remove('cart.promoCode');
+      },
+      toggleWallet: (state) => {
+        state.useWallet = !state.useWallet;
+        getStorage().set('cart.useWallet', state.useWallet);
+      },
+      toggleLoyalty: (state) => {
+        state.useLoyalty = !state.useLoyalty;
+        getStorage().set('cart.useLoyalty', state.useLoyalty);
+      },
+      setInstructions: (state, action: PayloadAction<string>) => {
+        state.instructions = action.payload;
+        getStorage().set('cart.instructions', action.payload);
+      },
+      setScheduledAt: (state, action: PayloadAction<string | null>) => {
+        state.scheduledAt = action.payload;
+        if (action.payload) getStorage().set('cart.scheduledAt', action.payload);
+        else getStorage().remove('cart.scheduledAt');
+      },
   },
   extraReducers: (builder) => {
     builder

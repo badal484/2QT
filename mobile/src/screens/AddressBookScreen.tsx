@@ -1,10 +1,14 @@
-import { ArrowLeft, Home, Briefcase, MapPin, Trash2, Plus, ArrowRight } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
+import { ArrowLeft, Home, Briefcase, MapPin, Trash2, Plus, ArrowRight, Navigation } from 'lucide-react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, StyleSheet, Dimensions } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import MapView, { Region } from 'react-native-maps';
 import { api } from '../api/client';
 import { useDispatch } from 'react-redux';
 import { setAddress, setZone } from '../store/slices/cartSlice';
+import { useLocation } from '../hooks/useLocation';
+
+const { width, height } = Dimensions.get('window');
 
 const AddressBookScreen = ({ navigation, route }: any) => {
   const dispatch = useDispatch();
@@ -15,6 +19,52 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [serviceable, setServiceable] = useState<boolean | null>(null);
+  const [mapRegion, setMapRegion] = useState<Region>({
+    latitude: 20.5937,
+    longitude: 78.9629,
+    latitudeDelta: 15.0,
+    longitudeDelta: 15.0,
+  });
+  const mapRef = useRef<MapView>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const { location, loadingLocation, fetchLocation } = useLocation();
+
+  useEffect(() => {
+    if (showAdd) {
+      fetchLocation();
+    }
+  }, [showAdd]);
+
+  useEffect(() => {
+    if (location && showAdd) {
+      const newRegion = {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      };
+      setMapRegion(newRegion);
+      mapRef.current?.animateToRegion(newRegion, 1000);
+      setNewAddress(location.addressText);
+    }
+  }, [location]);
+
+  // Reverse geocode on pan complete
+  const onRegionChangeComplete = async (region: Region) => {
+    setMapRegion(region);
+    setIsDragging(false);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${region.latitude}&lon=${region.longitude}&format=json`, {
+        headers: { 'User-Agent': 'VeltoFoodApp/1.0' }
+      });
+      const data = await response.json();
+      if (data && data.display_name) {
+        setNewAddress(data.display_name);
+      }
+    } catch (e) {
+      console.log('Reverse geocode failed', e);
+    }
+  };
 
 
   const { data: addresses, isLoading } = useQuery({
@@ -47,11 +97,14 @@ const AddressBookScreen = ({ navigation, route }: any) => {
       setServiceable(res.serviceable);
       if (res.serviceable && res.zone) {
         setSelectedZoneId(res.zone.id);
+        return res.zone.id;
       } else {
         setSelectedZoneId(null);
+        return null;
       }
     } catch (err) {
       console.error('Serviceability check failed:', err);
+      return null;
     } finally {
       setIsChecking(false);
     }
@@ -72,14 +125,105 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft size={24} color="#1A1A2E" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Address Book</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      {!showAdd && (
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <ArrowLeft size={24} color="#1A1A2E" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Address Book</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      )}
 
+      {showAdd ? (
+        <View style={styles.mapFullscreenContainer}>
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            initialRegion={mapRegion}
+            onRegionChange={() => setIsDragging(true)}
+            onRegionChangeComplete={onRegionChangeComplete}
+            showsUserLocation={true}
+          />
+          <View style={styles.mapCenterMarker}>
+            <MapPin size={40} color="#FF6B35" />
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.mapBackButton}
+            onPress={() => {
+              setShowAdd(false);
+              setServiceable(null);
+            }}
+          >
+            <ArrowLeft size={24} color="#1A1A2E" />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.locateMeButton}
+            onPress={() => fetchLocation()}
+          >
+            {loadingLocation ? <ActivityIndicator size="small" color="#FF6B35" /> : <Navigation size={24} color="#FF6B35" />}
+          </TouchableOpacity>
+
+          <View style={styles.mapBottomCard}>
+            <Text style={styles.formSectionLabel}>Label</Text>
+            <View style={styles.labelPickerRow}>
+                {['Home', 'Work', 'Other'].map(l => (
+                    <TouchableOpacity 
+                        key={l}
+                        onPress={() => setNewLabel(l)}
+                        style={[styles.labelChip, newLabel === l ? styles.labelChipActive : styles.labelChipInactive]}
+                    >
+                        <Text style={[styles.labelChipText, newLabel === l ? styles.labelChipTextActive : styles.labelChipTextInactive]}>{l}</Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            <TextInput 
+                placeholder="Flat / House No. / Building / Area"
+                placeholderTextColor="#A0A0A0"
+                value={newAddress}
+                onChangeText={setNewAddress}
+                style={styles.addressInputMap}
+                multiline
+                numberOfLines={2}
+            />
+
+            <TouchableOpacity 
+                style={[styles.saveBtn, (!newAddress || isDragging) ? styles.saveBtnDisabled : styles.saveBtnEnabled]}
+                disabled={!newAddress || isDragging || addMutation.isPending || isChecking}
+                onPress={async () => {
+                  if (newAddress.trim().length < 5) {
+                    Alert.alert('Invalid Address', 'Please provide a more detailed address.');
+                    return;
+                  }
+                  const currentZoneId = await checkServiceability(mapRegion.latitude, mapRegion.longitude);
+                  if (currentZoneId) {
+                    addMutation.mutate({ 
+                        label: newLabel, 
+                        addressText: newAddress.trim(), 
+                        zoneId: currentZoneId, 
+                        lat: mapRegion.latitude,
+                        lng: mapRegion.longitude 
+                    });
+                  }
+                }}
+            >
+                {addMutation.isPending || isChecking ? (
+                    <ActivityIndicator color="white" />
+                ) : (
+                    <Text style={styles.saveBtnText}>
+                        Save Address
+                    </Text>
+                )}
+            </TouchableOpacity>
+            {serviceable === false && (
+                <Text style={styles.errorText}>Oops! We don't serve this location yet.</Text>
+            )}
+          </View>
+        </View>
+      ) : (
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {addresses?.addresses?.map((addr: any) => (
           <TouchableOpacity 
@@ -115,104 +259,8 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           </TouchableOpacity>
         ))}
 
-        {!showAdd ? (
-          <TouchableOpacity 
-            style={styles.addBtn}
-            onPress={() => setShowAdd(true)}
-          >
-            <Plus size={20} color="#FF6B35" style={{ marginRight: 8 }} />
-            <Text style={styles.addBtnText}>Add New Address</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.addForm}>
-            <Text style={styles.formSectionLabel}>Label</Text>
-            <View style={styles.labelPickerRow}>
-                {['Home', 'Work', 'Other'].map(l => (
-                    <TouchableOpacity 
-                        key={l}
-                        onPress={() => setNewLabel(l)}
-                        style={[styles.labelChip, newLabel === l ? styles.labelChipActive : styles.labelChipInactive]}
-                    >
-                        <Text style={[styles.labelChipText, newLabel === l ? styles.labelChipTextActive : styles.labelChipTextInactive]}>{l}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            <Text style={styles.formSectionLabel}>Select Service Area</Text>
-            <View style={styles.zonePickerRow}>
-                {zones.map((z: any) => (
-                    <TouchableOpacity 
-                        key={z.id}
-                        onPress={() => setSelectedZoneId(z.id)}
-                        style={[styles.zoneChip, selectedZoneId === z.id ? styles.zoneChipActive : styles.zoneChipInactive]}
-                    >
-                        <Text style={[styles.zoneChipText, selectedZoneId === z.id ? styles.zoneChipTextActive : styles.zoneChipTextInactive]}>{z.name}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            <TextInput 
-                placeholder="Flat / House No. / Building / Area"
-                placeholderTextColor="#A0A0A0"
-                value={newAddress}
-                onChangeText={setNewAddress}
-                style={styles.addressInput}
-                multiline
-                numberOfLines={3}
-            />
-            <View style={styles.formActionRow}>
-                <TouchableOpacity 
-                    style={[styles.saveBtn, (!selectedZoneId || !newAddress || serviceable === false) ? styles.saveBtnDisabled : styles.saveBtnEnabled]}
-                    disabled={!selectedZoneId || !newAddress || addMutation.isPending || serviceable === false}
-                    onPress={() => {
-                        // Mock coordinates based on common Bangalore areas for pilot
-                        let lat = 12.9667, lng = 77.7111; // Default: Kundanahalli
-                        if (newAddress.toLowerCase().includes('brookefield')) {
-                            lat = 12.9654; lng = 77.7185;
-                        } else if (newAddress.toLowerCase().includes('indiranagar')) {
-                            lat = 12.9719; lng = 77.6412; // Far away (Not serviceable)
-                        }
-
-                        if (serviceable === null) {
-                            checkServiceability(lat, lng);
-                        } else {
-                            addMutation.mutate({ 
-                                label: newLabel, 
-                                addressText: newAddress, 
-                                zoneId: selectedZoneId, 
-                                lat,
-                                lng 
-                            });
-                        }
-                    }}
-                >
-                    {addMutation.isPending || isChecking ? (
-                        <ActivityIndicator color="white" />
-                    ) : (
-                        <Text style={styles.saveBtnText}>
-                            {serviceable === null ? 'Check Serviceability' : 'Save Address'}
-                        </Text>
-                    )}
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    style={styles.cancelBtn}
-                    onPress={() => {
-                        setShowAdd(false);
-                        setServiceable(null);
-                    }}
-                >
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-            </View>
-            {serviceable === false && (
-                <Text style={styles.errorText}>Oops! We don't serve this location yet.</Text>
-            )}
-            {serviceable === true && (
-                <Text style={styles.successText}>Great! We deliver to your area.</Text>
-            )}
-          </View>
-        )}
       </ScrollView>
+      )}
     </View>
   );
 };
@@ -474,6 +522,85 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 16,
     textAlign: 'center',
+  },
+  mapFullscreenContainer: {
+    flex: 1,
+  },
+  map: {
+    flex: 1,
+  },
+  mapCenterMarker: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -80, // Offset for the top half of map view minus bottom card height approx
+    marginLeft: -20,
+    zIndex: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  mapBackButton: {
+    position: 'absolute',
+    top: 64,
+    left: 24,
+    width: 48,
+    height: 48,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 10,
+  },
+  locateMeButton: {
+    position: 'absolute',
+    top: 64,
+    right: 24,
+    width: 48,
+    height: 48,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 10,
+  },
+  mapBottomCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    paddingBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  addressInputMap: {
+    backgroundColor: '#f9fafb',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 24,
+    fontWeight: '700',
+    color: '#1A1A2E',
+    textAlignVertical: 'top',
   },
 });
 

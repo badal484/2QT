@@ -18,11 +18,12 @@ import {
   Landmark
 } from 'lucide-react-native';
 import RiderStatsCard from '../components/RiderStatsCard';
+import Geolocation from '@react-native-community/geolocation';
 
 const RiderHomeScreen = ({ navigation }: any) => {
   const { user } = useSelector((state: RootState) => state.auth);
   const [isOnline, setIsOnline] = useState(user?.is_online || false);
-  const [currentLocation, setCurrentLocation] = useState({ latitude: 12.9716, longitude: 77.5946 });
+  const [currentLocation, setCurrentLocation] = useState({ latitude: 0, longitude: 0 });
   const [sessionTime, setSessionTime] = useState('00h 00m');
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
@@ -114,7 +115,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
             timestamp: new Date().toISOString()
           });
           
-          if (process.env.NODE_ENV === 'development') {
+          if (__DEV__) {
             console.log(`--- SYSTEMATIC LOCATION SYNC: ${currentLocation.latitude}, ${currentLocation.longitude} ---`);
           }
         } catch (err) {
@@ -131,7 +132,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     let timer: any;
     if (isOnline && user?.online_since) {
       const updateTimer = () => {
-        const start = new Date(user.online_since).getTime();
+        const start = new Date(user.online_since as string).getTime();
         const now = new Date().getTime();
         const diff = Math.max(0, now - start);
         const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -145,6 +146,35 @@ const RiderHomeScreen = ({ navigation }: any) => {
     }
     return () => clearInterval(timer);
   }, [isOnline, user?.online_since]);
+
+  useEffect(() => {
+    let watchId: number;
+    if (isOnline) {
+      Geolocation.getCurrentPosition(
+        pos => setCurrentLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        err => console.log('Location err', err),
+        { enableHighAccuracy: true }
+      );
+      watchId = Geolocation.watchPosition(
+        pos => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setCurrentLocation({ latitude: lat, longitude: lng });
+          
+          // Emit to backend socket so Admin and Customer can track
+          const socket = getSocket();
+          if (socket) {
+             socket.emit('update_location', { lat, lng });
+          }
+        },
+        error => console.log('WatchPosition Error', error),
+        { enableHighAccuracy: true, distanceFilter: 10, interval: 5000, fastestInterval: 2000 }
+      );
+    }
+    return () => {
+      if (watchId !== undefined) Geolocation.clearWatch(watchId);
+    };
+  }, [isOnline]);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to go off duty?', [
@@ -163,9 +193,10 @@ const RiderHomeScreen = ({ navigation }: any) => {
           provider={PROVIDER_GOOGLE}
           style={styles.map}
           region={{
-            ...currentLocation,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
+            latitude: currentLocation.latitude || 20.5937,
+            longitude: currentLocation.longitude || 78.9629,
+            latitudeDelta: currentLocation.latitude ? 0.01 : 15.0,
+            longitudeDelta: currentLocation.longitude ? 0.01 : 15.0,
           }}
           customMapStyle={mapStyle}
         >
@@ -178,8 +209,8 @@ const RiderHomeScreen = ({ navigation }: any) => {
             </View>
           </Marker>
           
-          {activeOrder && (
-             <Marker coordinate={{ latitude: 12.9725, longitude: 77.5960 }}>
+          {activeOrder && activeOrder.kitchen_lat && activeOrder.kitchen_lng && (
+             <Marker coordinate={{ latitude: parseFloat(activeOrder.kitchen_lat), longitude: parseFloat(activeOrder.kitchen_lng) }}>
                 <View style={styles.kitchenMarker}>
                     <ChefHat size={20} color="white" />
                 </View>

@@ -3,7 +3,7 @@ import multer from 'multer';
 import { query } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole } from '../middleware/auth';
-import { emitToRiders } from '../socket';
+import { emitToAll } from '../socket';
 
 const router = Router();
 const upload = multer({ dest: 'uploads/' });
@@ -64,6 +64,31 @@ router.get('/', async (req, res) => {
 
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json({ ...response, fromCache: false });
+});
+
+router.post('/validate-cart', async (req, res) => {
+    const { items } = req.body;
+    if (!items || !items.length) return res.json({ validItems: [], removedCount: 0, priceChanges: [] });
+
+    const validItems = [];
+    const priceChanges = [];
+    let removedCount = 0;
+
+    for (const item of items) {
+        const { rows } = await query('SELECT price_paise, available, is_veg FROM menu_items WHERE id = $1', [item.menuItemId]);
+        if (rows.length === 0 || !rows[0].available) {
+            removedCount++;
+            continue;
+        }
+        
+        if (rows[0].price_paise !== item.pricePaise) {
+            priceChanges.push({ menuItemId: item.menuItemId, oldPrice: item.pricePaise, newPrice: rows[0].price_paise });
+            item.pricePaise = rows[0].price_paise;
+        }
+        validItems.push(item);
+    }
+
+    res.json({ validItems, removedCount, priceChanges });
 });
 
 router.get('/search', async (req, res) => {
@@ -137,7 +162,7 @@ router.patch('/items/:id/toggle', authenticate, requireRole('chef', 'super_admin
 
     // Clear cache for the zone and notify riders/kitchen of menu change
     await redis.del(keys.menu(rows[0].zone_id));
-    emitToRiders('menu_updated', { zoneId: rows[0].zone_id }, rows[0].zone_id);
+    emitToAll('menu_updated', { zoneId: rows[0].zone_id });
 
     res.json({ item: rows[0] });
 });

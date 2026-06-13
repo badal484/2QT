@@ -1,15 +1,27 @@
 import { ArrowLeft, CreditCard, Plus, History } from 'lucide-react-native';
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Modal, TextInput } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import RazorpayCheckout from 'react-native-razorpay';
+import ReactNativeHapticFeedback from "react-native-haptic-feedback";
+import Animated, { FadeInDown, Layout, FadeIn } from 'react-native-reanimated';
 
 import { getSocket } from '../socket/client';
+
+const hapticOptions = {
+  enableVibrateFallback: true,
+  ignoreAndroidSystemSettings: false,
+};
 
 const WalletScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const socket = getSocket();
+  const [isModalVisible, setModalVisible] = React.useState(false);
+  const [rechargeAmount, setRechargeAmount] = React.useState('');
+
+  const triggerHaptic = () => ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
+  const triggerHapticHeavy = () => ReactNativeHapticFeedback.trigger("impactHeavy", hapticOptions);
 
   const { data: wallet, isLoading } = useQuery({
     queryKey: ['wallet'],
@@ -19,6 +31,7 @@ const WalletScreen = ({ navigation }: any) => {
   React.useEffect(() => {
     if (socket) {
       socket.on('wallet_updated', () => {
+        triggerHapticHeavy();
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
       });
     }
@@ -53,6 +66,7 @@ const WalletScreen = ({ navigation }: any) => {
                 type: 'wallet',
                 amountPaise: amount * 100
             });
+            triggerHapticHeavy();
             Alert.alert('Success', 'Wallet recharged successfully!');
             queryClient.invalidateQueries({ queryKey: ['wallet'] });
         } catch (error: any) {
@@ -71,8 +85,8 @@ const WalletScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       {/* Header Card */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+        <TouchableOpacity onPress={() => { triggerHaptic(); navigation.goBack(); }} style={styles.backButton}>
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
         
@@ -82,22 +96,7 @@ const WalletScreen = ({ navigation }: any) => {
         <View style={styles.actionRow}>
           <TouchableOpacity 
             style={styles.addMoneyBtn}
-            onPress={() => {
-                Alert.prompt(
-                    'Add Money',
-                    'Enter amount to add (Min ₹100)',
-                    [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Add', onPress: (val) => {
-                            const amt = parseInt(val || '0');
-                            if (amt >= 100) rechargeMutation.mutate(amt);
-                            else Alert.alert('Error', 'Minimum ₹100 required');
-                        }}
-                    ],
-                    'plain-text',
-                    '500'
-                );
-            }}
+            onPress={() => { triggerHaptic(); setModalVisible(true); }}
             disabled={rechargeMutation.isPending}
           >
             {rechargeMutation.isPending ? <ActivityIndicator color="#FF6B35" /> : (
@@ -108,24 +107,31 @@ const WalletScreen = ({ navigation }: any) => {
             )}
           </TouchableOpacity>
         </View>
-      </View>
+        <View style={styles.glassDecoration} />
+        <View style={styles.glassDecoration2} />
+      </Animated.View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.transactionHeaderRow}>
+        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.transactionHeaderRow}>
           <History size={20} color="#1A1A2E" style={{ marginRight: 12 }} />
           <Text style={styles.transactionTitle}>Transactions</Text>
-        </View>
+        </Animated.View>
         
         {wallet?.transactions?.length === 0 ? (
-          <View style={styles.emptyContainer}>
+          <Animated.View entering={FadeIn.delay(300)} style={styles.emptyContainer}>
             <View style={styles.emptyIconWrapper}>
               <CreditCard size={24} color="#9CA3AF" />
             </View>
             <Text style={styles.emptyText}>No transactions yet.</Text>
-          </View>
+          </Animated.View>
         ) : (
-          wallet?.transactions?.map((tx: any) => (
-            <View key={tx.id} style={styles.txRow}>
+          wallet?.transactions?.map((tx: any, index: number) => (
+            <Animated.View 
+              key={tx.id} 
+              entering={FadeInDown.delay(index * 50 + 200).duration(400)}
+              layout={Layout.springify()}
+              style={styles.txRow}
+            >
               <View style={styles.txInfo}>
                 <Text style={styles.txDesc}>{tx.description}</Text>
                 <Text style={styles.txDate}>{new Date(tx.created_at).toLocaleDateString()}</Text>
@@ -136,148 +142,87 @@ const WalletScreen = ({ navigation }: any) => {
                 </Text>
                 <Text style={styles.txBalanceAfter}>Balance: ₹{tx.balanceAfterPaise / 100}</Text>
               </View>
-            </View>
+            </Animated.View>
           ))
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <Modal visible={isModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Money</Text>
+            <Text style={styles.modalSub}>Enter amount to add (Min ₹100)</Text>
+            <TextInput
+              style={styles.modalInput}
+              keyboardType="numeric"
+              placeholder="500"
+              value={rechargeAmount}
+              onChangeText={setRechargeAmount}
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { triggerHaptic(); setModalVisible(false); }}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.modalAddBtn} 
+                onPress={() => {
+                  triggerHapticHeavy();
+                  const amt = parseInt(rechargeAmount || '0');
+                  if (amt >= 100) {
+                    setModalVisible(false);
+                    rechargeMutation.mutate(amt);
+                    setRechargeAmount('');
+                  } else {
+                    Alert.alert('Error', 'Minimum ₹100 required');
+                  }
+                }}
+              >
+                <Text style={styles.modalAddText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    paddingTop: 80,
-    paddingHorizontal: 32,
-    paddingBottom: 48,
-    backgroundColor: '#FF6B35',
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  backButton: {
-    marginBottom: 24,
-    alignSelf: 'flex-start',
-  },
-  headerLabel: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 4,
-    marginBottom: 8,
-  },
-  balanceValue: {
-    color: '#fff',
-    fontSize: 48,
-    fontWeight: '900',
-    letterSpacing: -1,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    marginTop: 40,
-  },
-  addMoneyBtn: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  addMoneyText: {
-    color: '#FF6B35',
-    fontWeight: '900',
-    fontSize: 16,
-    textTransform: 'uppercase',
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 32,
-    paddingTop: 32,
-  },
-  transactionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  transactionTitle: {
-    color: '#1A1A2E',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 48,
-  },
-  emptyIconWrapper: {
-    width: 64,
-    height: 64,
-    backgroundColor: '#f9fafb',
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyText: {
-    color: '#9ca3af',
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  txRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f9fafb',
-  },
-  txInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  txDesc: {
-    color: '#1A1A2E',
-    fontWeight: '700',
-    fontSize: 17,
-  },
-  txDate: {
-    color: '#9ca3af',
-    fontSize: 10,
-    marginTop: 4,
-    textTransform: 'uppercase',
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  txAmount: {
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  txBalanceAfter: {
-    color: '#9ca3af',
-    fontSize: 10,
-    marginTop: 4,
-    fontWeight: '700',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  loadingContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  header: { paddingTop: 80, paddingHorizontal: 32, paddingBottom: 48, backgroundColor: '#1A1A2E', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 8, overflow: 'hidden' },
+  glassDecoration: { position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255, 107, 53, 0.15)' },
+  glassDecoration2: { position: 'absolute', bottom: -20, left: -60, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
+  backButton: { marginBottom: 24, alignSelf: 'flex-start' },
+  headerLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 4, marginBottom: 8 },
+  balanceValue: { color: '#fff', fontSize: 48, fontWeight: '900', letterSpacing: -1 },
+  actionRow: { flexDirection: 'row', marginTop: 40 },
+  addMoneyBtn: { backgroundColor: '#fff', paddingHorizontal: 32, paddingVertical: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 2 },
+  addMoneyText: { color: '#1A1A2E', fontWeight: '900', fontSize: 14, textTransform: 'uppercase' },
+  scrollView: { flex: 1, paddingHorizontal: 32, paddingTop: 32 },
+  transactionHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  transactionTitle: { color: '#1A1A2E', fontSize: 20, fontWeight: '900' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 48 },
+  emptyIconWrapper: { width: 64, height: 64, backgroundColor: '#f9fafb', borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyText: { color: '#9ca3af', fontWeight: '700', textAlign: 'center' },
+  txRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#f9fafb' },
+  txInfo: { flex: 1, marginRight: 16 },
+  txDesc: { color: '#1A1A2E', fontWeight: '700', fontSize: 17 },
+  txDate: { color: '#9ca3af', fontSize: 10, marginTop: 4, textTransform: 'uppercase', fontWeight: '900', letterSpacing: 1 },
+  txAmount: { fontSize: 18, fontWeight: '900' },
+  txBalanceAfter: { color: '#9ca3af', fontSize: 10, marginTop: 4, fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#fff', width: '80%', borderRadius: 24, padding: 24 },
+  modalTitle: { fontSize: 20, fontWeight: '900', color: '#1A1A2E' },
+  modalSub: { fontSize: 12, color: '#9CA3AF', marginTop: 4, marginBottom: 24 },
+  modalInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 16, fontSize: 24, fontWeight: '900', color: '#1A1A2E', marginBottom: 24, textAlign: 'center' },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
+  modalCancelBtn: { flex: 1, padding: 16, alignItems: 'center', marginRight: 8, backgroundColor: '#F3F4F6', borderRadius: 12 },
+  modalCancelText: { color: '#9CA3AF', fontWeight: '900' },
+  modalAddBtn: { flex: 1, padding: 16, alignItems: 'center', marginLeft: 8, backgroundColor: '#FF6B35', borderRadius: 12 },
+  modalAddText: { color: '#fff', fontWeight: '900' },
 });
 
 export default WalletScreen;

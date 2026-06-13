@@ -89,3 +89,7 @@ export const emitToRiders = (event: string, data: any, zoneId?: string) => {
         }
     }
 };
+
+export const emitToAll = (event: string, data: any) => {
+    if (io) io.emit(event, data);
+};

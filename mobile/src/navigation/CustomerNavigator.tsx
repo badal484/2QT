@@ -2,6 +2,8 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { UtensilsCrossed, PackageSearch, UserRound } from 'lucide-react-native';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -25,6 +27,8 @@ import HelpScreen from '../screens/HelpScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import RenewSubscriptionScreen from '../screens/RenewSubscriptionScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
+import ScheduleOrderScreen from '../screens/ScheduleOrderScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -98,8 +102,15 @@ const TabNavigator = () => (
 );
 
 const CustomerNavigator = () => {
+  const user = useSelector((state: RootState) => state.auth.user);
+  const isNewUser = !user?.name || user?.name === '2QT User' || user?.name === '2QT_User';
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ headerShown: false }}
+      initialRouteName={isNewUser ? 'Onboarding' : 'MainTabs'}
+    >
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="MainTabs" component={TabNavigator} />
       <Stack.Screen name="AddressBook" component={AddressBookScreen} />
       <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
@@ -109,10 +120,9 @@ const CustomerNavigator = () => {
       <Stack.Screen name="OrderConfirmed" component={OrderConfirmedScreen} />
       <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
       <Stack.Screen name="RateOrder" component={RateOrderScreen} />
+      <Stack.Screen name="ScheduleOrder" component={ScheduleOrderScreen} />
     </Stack.Navigator>
   );
 };
-
-export default CustomerNavigator;
 
 export default CustomerNavigator;

@@ -9,11 +9,17 @@ const BUILD_ROLE = RoleModule?.BUILD_ROLE || 'customer';
 const LoginScreen = ({ navigation }: any) => {
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [devRole, setDevRole] = useState(RoleModule?.BUILD_ROLE || 'customer');
 
   const mutation = useMutation({
     mutationFn: (phoneNumber: string) => api.post('/auth/send-otp', { phone: phoneNumber }),
     onSuccess: (data) => {
-      navigation.navigate('OTP', { phone: data.phone, referralCode: referralCode.trim().toUpperCase() });
+      navigation.navigate('OTP', { 
+        phone: data.phone, 
+        referralCode: referralCode.trim().toUpperCase(),
+        devOtp: data.devOtp,
+        devRole: devRole
+      });
     },
     onError: (error: any) => {
       Alert.alert('Error', 'Could not send OTP. Check your connection.');
@@ -27,7 +33,7 @@ const LoginScreen = ({ navigation }: any) => {
   };
 
   const getAppBranding = () => {
-    switch (BUILD_ROLE) {
+    switch (devRole) {
       case 'rider': return { name: '2QT CAPTAIN', color: '#1A1A2E', sub: 'Rider Portal' };
       case 'kitchen': return { name: '2QT PARTNER', color: '#10B981', sub: 'Kitchen Command' };
       case 'admin': return { name: '2QT ADMIN', color: '#EF4444', sub: 'Operations Deck' };
@@ -94,6 +100,19 @@ const LoginScreen = ({ navigation }: any) => {
         )}
         
         <Text style={styles.secureText}>Secured by 2QT Shield</Text>
+
+        {__DEV__ && !RoleModule?.BUILD_ROLE && (
+          <View style={styles.devRoleContainer}>
+            <Text style={styles.devRoleLabel}>DEV ROLE SWITCHER</Text>
+            <View style={styles.devRoleRow}>
+              {['customer', 'rider', 'kitchen', 'admin'].map(r => (
+                <TouchableOpacity key={r} onPress={() => setDevRole(r)} style={[styles.devRoleBtn, devRole === r && styles.devRoleBtnActive]}>
+                  <Text style={[styles.devRoleBtnText, devRole === r && styles.devRoleBtnTextActive]}>{r}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -218,6 +237,43 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 2,
+  },
+  devRoleContainer: {
+    marginTop: 40,
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  devRoleLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#9CA3AF',
+    marginBottom: 12,
+  },
+  devRoleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  devRoleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  devRoleBtnActive: {
+    backgroundColor: '#1A1A2E',
+  },
+  devRoleBtnText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#9CA3AF',
+  },
+  devRoleBtnTextActive: {
+    color: '#fff',
   },
 });
 

@@ -1,14 +1,20 @@
 import { ArrowLeft, ChefHat, Search, SearchX, Utensils } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, Image, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import Animated, { FadeIn, BounceIn } from 'react-native-reanimated';
+import { NetworkImage } from '../components/NetworkImage';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { addItem, setQuantity } from '../store/slices/cartSlice';
+import { createMMKV } from 'react-native-mmkv';
+
+const storage = createMMKV();
 
 const SearchScreen = ({ navigation }: any) => {
   const [query, setQuery] = useState('');
+  const [vegOnly, setVegOnly] = useState(false);
   const { zoneId } = useSelector((state: RootState) => state.cart);
   const { user } = useSelector((state: RootState) => state.auth);
   const cartItems = useSelector((state: RootState) => state.cart.items);
@@ -19,6 +25,28 @@ const SearchScreen = ({ navigation }: any) => {
     queryFn: () => api.get(`/menu/search?q=${query}&zoneId=${zoneId || user?.zoneId}`),
     enabled: query.length > 2 && !!(zoneId || user?.zoneId),
   });
+
+  const filteredResults = searchResults?.results?.filter((item: any) => vegOnly ? item.is_veg : true) || [];
+
+  const [recentSearches, setRecentSearches] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    const stored = storage.getString('recent_searches');
+    if (stored) {
+      try {
+        setRecentSearches(JSON.parse(stored));
+      } catch (e) {}
+    }
+  }, []);
+
+  const saveSearch = (term: string) => {
+    if (!term || term.trim().length < 3) return;
+    const termClean = term.trim().toLowerCase();
+    const current = recentSearches.filter(s => s.toLowerCase() !== termClean);
+    const updated = [termClean, ...current].slice(0, 5);
+    setRecentSearches(updated);
+    storage.set('recent_searches', JSON.stringify(updated));
+  };
 
   return (
     <View style={styles.container}>
@@ -35,8 +63,10 @@ const SearchScreen = ({ navigation }: any) => {
               placeholder="Search dishes..."
               value={query}
               onChangeText={setQuery}
+              onSubmitEditing={(e) => saveSearch(e.nativeEvent.text)}
               style={styles.searchInput}
               placeholderTextColor="#9ca3af"
+              returnKeyType="search"
             />
             {query.length > 0 && (
               <TouchableOpacity onPress={() => setQuery('')}>
@@ -44,6 +74,18 @@ const SearchScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             )}
           </View>
+        </View>
+
+        <View style={styles.filterRow}>
+            <TouchableOpacity 
+                style={[styles.filterChip, vegOnly ? styles.filterChipActive : null]}
+                onPress={() => setVegOnly(!vegOnly)}
+            >
+                <View style={styles.vegIndicator}>
+                    <View style={styles.vegDot} />
+                </View>
+                <Text style={[styles.filterChipText, vegOnly ? styles.filterChipTextActive : null]}>Pure Veg</Text>
+            </TouchableOpacity>
         </View>
       </View>
 
@@ -53,35 +95,58 @@ const SearchScreen = ({ navigation }: any) => {
             <ActivityIndicator color="#FF6B35" />
           </View>
         ) : query.length < 3 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconWrapper}>
-              <Utensils size={48} color="#FF6B35" />
-            </View>
-            <Text style={styles.emptyTitle}>Hungry?</Text>
-            <Text style={styles.emptySub}>Type at least 3 characters to find your favorite dishes.</Text>
-          </View>
-        ) : searchResults?.results?.length === 0 ? (
-          <View style={styles.emptyState}>
+          <Animated.View entering={BounceIn} style={styles.emptyState}>
+            {recentSearches.length > 0 ? (
+                <View style={{ width: '100%', alignItems: 'flex-start' }}>
+                    <Text style={[styles.sectionLabel, { marginBottom: 16 }]}>Recent Searches</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                        {recentSearches.map(rs => (
+                            <TouchableOpacity 
+                                key={rs}
+                                style={styles.recentSearchChip}
+                                onPress={() => setQuery(rs)}
+                            >
+                                <Search size={12} color="#6B7280" style={{ marginRight: 6 }} />
+                                <Text style={styles.recentSearchText}>{rs}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            ) : (
+                <>
+                    <View style={styles.emptyIconWrapper}>
+                    <Utensils size={48} color="#FF6B35" />
+                    </View>
+                    <Text style={styles.emptyTitle}>Hungry?</Text>
+                    <Text style={styles.emptySub}>Type at least 3 characters to find your favorite dishes.</Text>
+                </>
+            )}
+          </Animated.View>
+        ) : filteredResults.length === 0 ? (
+          <Animated.View entering={BounceIn} style={styles.emptyState}>
             <View style={[styles.emptyIconWrapper, { backgroundColor: '#f9fafb' }]}>
               <SearchX size={48} color="#9CA3AF" />
             </View>
             <Text style={styles.emptyTitle}>No results found</Text>
             <Text style={styles.emptySub}>We couldn't find anything matching "{query}". Try something else?</Text>
-          </View>
+          </Animated.View>
         ) : (
           <View style={styles.resultsContainer}>
-            {searchResults?.results?.map((item: any) => {
+            {filteredResults.map((item: any) => {
               const cartItem = cartItems.find(ci => ci.menuItemId === item.id);
               return (
                 <TouchableOpacity 
                   key={item.id}
                   activeOpacity={0.9}
-                  onPress={() => navigation.navigate('ItemDetail', { item })}
+                  onPress={() => {
+                    saveSearch(query);
+                    navigation.navigate('ItemDetail', { item });
+                  }}
                   style={styles.itemCard}
                 >
                   <View style={styles.itemImageWrapper}>
                     {item.photo_url ? (
-                      <Image source={{ uri: item.photo_url }} style={styles.itemImage} />
+                      <NetworkImage uri={item.photo_url} style={styles.itemImage} fallbackText={item.name[0]} />
                     ) : (
                       <View style={styles.itemPlaceholder}>
                         <ChefHat size={32} color="#FF6B35" />
@@ -179,6 +244,32 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginLeft: 8,
     fontSize: 16,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    marginTop: 16,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#fff',
+  },
+  filterChipActive: {
+    borderColor: '#22C55E',
+    backgroundColor: '#F0FDF4',
+  },
+  filterChipText: {
+    color: '#6b7280',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  filterChipTextActive: {
+    color: '#166534',
   },
   scrollView: {
     flex: 1,
@@ -309,6 +400,34 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 14,
     marginHorizontal: 4,
+  },
+  quantityText: {
+    fontWeight: '900',
+    color: '#1A1A2E',
+    fontSize: 14,
+    marginHorizontal: 12,
+  },
+  sectionLabel: {
+    color: '#1A1A2E',
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    fontSize: 12,
+  },
+  recentSearchChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 12,
+    marginBottom: 12,
+  },
+  recentSearchText: {
+    color: '#4B5563',
+    fontWeight: '700',
+    fontSize: 14,
   },
   addButton: {
     backgroundColor: '#fff',

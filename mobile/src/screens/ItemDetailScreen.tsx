@@ -1,6 +1,6 @@
 import { ArrowLeft, ChefHat, Flame, ShoppingBag } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, Dimensions, StatusBar, StyleSheet } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, Dimensions, StatusBar, StyleSheet, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { addItem } from '../store/slices/cartSlice';
@@ -15,17 +15,35 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   );
   const [quantity, setLocalQuantity] = useState(cartItem?.quantity || 1);
 
+  const cartItems = useSelector((state: RootState) => state.cart.items);
+
   const handleAddToCart = () => {
-    dispatch(addItem({ 
-      menuItemId: item.id, 
-      name: item.name, 
-      pricePaise: item.price_paise, 
-      quantity: quantity,
-      photoUrl: item.photo_url,
-      isVeg: item.is_veg,
-      kitchenId: item.kitchen_id
-    }));
-    navigation.goBack();
+    if (cartItems.length > 0 && cartItems[0].kitchenId !== item.kitchen_id) {
+      Alert.alert(
+        'Clear Cart?',
+        'Your cart contains items from a different kitchen. Would you like to clear your cart and add this item instead?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Clear & Add', 
+            style: 'destructive',
+            onPress: () => {
+              dispatch(addItem({ 
+                menuItemId: item.id, name: item.name, pricePaise: item.price_paise, 
+                quantity: quantity, photoUrl: item.photo_url, isVeg: item.is_veg, kitchenId: item.kitchen_id
+              }));
+              navigation.goBack();
+            }
+          }
+        ]
+      );
+    } else {
+      dispatch(addItem({ 
+        menuItemId: item.id, name: item.name, pricePaise: item.price_paise, 
+        quantity: quantity, photoUrl: item.photo_url, isVeg: item.is_veg, kitchenId: item.kitchen_id
+      }));
+      navigation.goBack();
+    }
   };
 
   return (

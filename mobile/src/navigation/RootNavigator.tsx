@@ -74,27 +74,36 @@ const RootNavigator = () => {
     prefixes: ['2qt://', 'https://2qt.app'],
     config: {
       screens: {
-        Customer: {
+        MainTabs: {
           screens: {
-            Home: 'home',
-            OrderTracking: 'track/:orderId',
-            OrderHistory: 'history',
-            Profile: 'profile'
+            MenuTab: {
+              screens: {
+                Home: 'home',
+              }
+            },
+            OrdersTab: {
+              screens: {
+                OrderHistory: 'history',
+                OrderTracking: 'track/:orderId',
+              }
+            },
+            ProfileTab: {
+              screens: {
+                Profile: 'profile'
+              }
+            }
           }
         },
-        Rider: {
-          screens: {
-            Home: 'rider/home',
-            AssignedOrder: 'mission/:orderId',
-            Payouts: 'rider/payouts'
-          }
-        }
+        RiderOnboarding: 'rider/onboarding',
+        RiderHome: 'rider/home',
+        AssignedOrder: 'mission/:orderId',
+        Payouts: 'rider/payouts'
       }
     }
   };
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer linking={linking as any}>
       {!user ? (
         <AuthNavigator />
       ) : (activeRole === 'customer' || activeRole === 'buyer') ? (

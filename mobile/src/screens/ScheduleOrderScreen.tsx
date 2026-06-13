@@ -1,13 +1,38 @@
 import { ArrowLeft } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { useDispatch } from 'react-redux';
+import { setScheduledAt } from '../store/slices/cartSlice';
 
 const ScheduleOrderScreen = ({ navigation }: any) => {
-  const [selectedDay, setSelectedDay] = useState('Today');
+  const dispatch = useDispatch();
+  const [selectedDay, setSelectedDay] = useState('Tomorrow');
   const [selectedTime, setSelectedTime] = useState('12:30 PM');
 
-  const days = ['Today', 'Tomorrow', 'Wednesday', 'Thursday', 'Friday'];
+  const days = ['Tomorrow', 'Wednesday', 'Thursday', 'Friday'];
   const times = ['12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '7:00 PM', '7:30 PM', '8:00 PM'];
+
+  const handleSave = () => {
+    // Basic date parsing logic for simulation
+    const date = new Date();
+    if (selectedDay === 'Tomorrow') {
+        date.setDate(date.getDate() + 1);
+    } else {
+        // Just arbitrarily add a few days for other selections to simulate picking
+        date.setDate(date.getDate() + 2);
+    }
+    
+    // Parse Time: "12:30 PM"
+    const [timeStr, period] = selectedTime.split(' ');
+    const [h, m] = timeStr.split(':');
+    let hour = parseInt(h);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    date.setHours(hour, parseInt(m), 0, 0);
+
+    dispatch(setScheduledAt(date.toISOString()));
+    navigation.goBack();
+  };
 
   return (
     <View style={styles.container}>
@@ -47,7 +72,7 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
       </ScrollView>
 
       <TouchableOpacity 
-        onPress={() => navigation.goBack()}
+        onPress={handleSave}
         style={styles.setBtn}
       >
         <Text style={styles.setBtnText}>SET SCHEDULE</Text>

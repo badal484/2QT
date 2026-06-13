@@ -5,9 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
 import { api } from '../api/client';
 import { setAddress, setZone } from '../store/slices/cartSlice';
+import { useLocation } from '../hooks/useLocation';
 
 const AddressScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
+  const { location, loadingLocation, fetchLocation } = useLocation();
 
   const { data: addresses, isLoading } = useQuery({
     queryKey: ['addresses'],
@@ -42,6 +44,25 @@ const AddressScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        
+        <TouchableOpacity 
+          style={styles.currentLocationBtn}
+          onPress={fetchLocation}
+          disabled={loadingLocation}
+        >
+          {loadingLocation ? (
+            <ActivityIndicator size="small" color="#FF6B35" />
+          ) : (
+            <MapPin size={24} color="#FF6B35" />
+          )}
+          <View style={{ marginLeft: 16, flex: 1 }}>
+            <Text style={styles.currentLocationTitle}>Use Current Location</Text>
+            <Text style={styles.currentLocationSubtitle} numberOfLines={1}>
+              {location ? location.addressText : 'Using GPS'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
         <Text style={styles.sectionLabel}>Saved Locations</Text>
 
         {addresses?.addresses?.map((addr: any) => (
@@ -145,6 +166,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginBottom: 24,
     marginLeft: 8,
+  },
+  currentLocationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 53, 0.05)',
+    padding: 24,
+    borderRadius: 32,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.2)',
+  },
+  currentLocationTitle: {
+    color: '#FF6B35',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  currentLocationSubtitle: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginTop: 4,
+    fontWeight: '500',
   },
   addressCard: {
     flexDirection: 'row',

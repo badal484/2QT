@@ -2,8 +2,9 @@
 import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
-import { emitToUser, emitToKitchen, emitToRiders, emitToAdmin, emitToOrder } from '../socket';
+import { emitToUser, emitToKitchen, emitToRiders, emitToAdmin, emitToOrder, emitToAll } from '../socket';
 import { notificationsQueue } from '../jobs/queues';
+import { redis, keys } from '../redis';
 
 async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> {
     if (req.user!.kitchenId) return req.user!.kitchenId;
@@ -16,6 +17,59 @@ async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> 
 }
 
 const router = Router();
+
+router.get('/menu', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+
+    const { rows: zoneRows } = await query('SELECT zone_id FROM kitchen_zones WHERE kitchen_id = $1', [kitchenId]);
+    if (zoneRows.length === 0) return res.status(400).json({ error: 'KITCHEN_NOT_IN_ZONE' });
+    const zoneId = zoneRows[0].zone_id;
+
+    const { rows } = await query('SELECT id, name, description, price_paise, category, station, available, is_veg FROM menu_items WHERE zone_id = $1 ORDER BY name', [zoneId]);
+    
+    const { rows: kitchenInfo } = await query('SELECT is_paused, pause_reason FROM kitchens WHERE id = $1', [kitchenId]);
+
+    res.json({ 
+        menu: rows,
+        kitchenPaused: kitchenInfo[0]?.is_paused || false,
+        pauseReason: kitchenInfo[0]?.pause_reason || null
+    });
+});
+
+router.patch('/status', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+
+    const { paused, reason } = req.body;
+    await query('UPDATE kitchens SET is_paused = $1, pause_reason = $2 WHERE id = $3', [paused, reason, kitchenId]);
+    
+    // Clear cache for the zone
+    const { rows: zoneRows } = await query('SELECT zone_id FROM kitchen_zones WHERE kitchen_id = $1', [kitchenId]);
+    if (zoneRows.length > 0) {
+        await redis.del(keys.menu(zoneRows[0].zone_id));
+        emitToAll('menu_updated', { zoneId: zoneRows[0].zone_id });
+    }
+
+    res.json({ success: true, isPaused: paused });
+});
+
+router.patch('/menu/:itemId/availability', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { itemId } = req.params;
+    const { available } = req.body;
+    
+    const { rows } = await query(
+        'UPDATE menu_items SET available = $1 WHERE id = $2 RETURNING zone_id',
+        [available, itemId]
+    );
+
+    if (rows.length === 0) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    await redis.del(keys.menu(rows[0].zone_id));
+    emitToAll('menu_updated', { zoneId: rows[0].zone_id });
+
+    res.json({ success: true });
+});
 
 router.get('/orders', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
     let rows: any[] = [];
