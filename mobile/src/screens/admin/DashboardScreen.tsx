@@ -19,7 +19,9 @@ import {
   Heart,
   Box,
   LayoutDashboard,
-  IndianRupee
+  IndianRupee,
+  Ticket,
+  Image as ImageIcon
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -251,6 +253,18 @@ const DashboardScreen = ({ navigation }: any) => {
             icon={Zap} 
             onPress={() => navigation.navigate('Broadcast')} 
           />
+          <NavItem 
+            title="Marketing Banners" 
+            sub="Manage home screen promotions" 
+            icon={ImageIcon} 
+            onPress={() => navigation.navigate('BannersManager')} 
+          />
+          <NavItem 
+            title="Promo Codes" 
+            sub="Create and manage discount codes" 
+            icon={Ticket} 
+            onPress={() => navigation.navigate('PromoCodesManager')} 
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -313,7 +327,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 24,
     flexDirection: 'row',
-    justifyContent: 'between',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   statusIndicator: {

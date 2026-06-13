@@ -14,12 +14,17 @@ interface AuthState {
   user: null | {
     id: string;
     name: string;
+    email?: string | null;
     phone: string;
+    photo_url?: string | null;
     role: string;
     termsAcceptedAt: string | null;
     kitchenId: string | null;
     zoneId: string | null;
     onboarding_complete: boolean;
+    is_online?: boolean;
+    online_since?: string | null;
+    is_verified?: boolean;
   };
   accessToken: null | string;
   refreshToken: null | string;
@@ -44,17 +49,21 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setAuth: (state, action: PayloadAction<{ user: any; accessToken: string; refreshToken: string }>) => {
+    setAuth: (state, action: PayloadAction<{ user: any; accessToken: string | null; refreshToken: string | null }>) => {
       state.user = action.payload.user;
       state.accessToken = action.payload.accessToken;
       state.refreshToken = action.payload.refreshToken;
       getStorage().set('auth.user', JSON.stringify(action.payload.user));
-      getStorage().set('auth.accessToken', action.payload.accessToken);
-      getStorage().set('auth.refreshToken', action.payload.refreshToken);
+      if (action.payload.accessToken) getStorage().set('auth.accessToken', action.payload.accessToken);
+      else getStorage().remove('auth.accessToken');
+      
+      if (action.payload.refreshToken) getStorage().set('auth.refreshToken', action.payload.refreshToken);
+      else getStorage().remove('auth.refreshToken');
     },
-    setAccessToken: (state, action: PayloadAction<string>) => {
+    setAccessToken: (state, action: PayloadAction<string | null>) => {
       state.accessToken = action.payload;
-      getStorage().set('auth.accessToken', action.payload);
+      if (action.payload) getStorage().set('auth.accessToken', action.payload);
+      else getStorage().remove('auth.accessToken');
     },
     updateUser: (state, action: PayloadAction<Partial<AuthState['user']>>) => {
       if (state.user) {

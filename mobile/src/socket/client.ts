@@ -1,9 +1,9 @@
 import { io, Socket } from 'socket.io-client';
 import { Platform } from 'react-native';
 
-const SOCKET_URL = Platform.OS === 'android' 
-  ? 'http://192.168.0.143:3000' 
-  : 'http://localhost:3000';
+import { ENV } from '../config/env';
+
+const SOCKET_URL = ENV.SOCKET_URL;
 
 
 

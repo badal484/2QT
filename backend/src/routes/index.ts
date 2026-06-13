@@ -15,6 +15,7 @@ import webhookRoutes from './webhooks';
 import bannersRoutes from './banners';
 import notificationsRoutes from './notifications';
 import serviceRequestsRoutes from './service-requests';
+import promocodesRoutes from './promocodes';
 // ... other routes
 
 const router = Router();
@@ -36,6 +37,7 @@ router.use('/webhooks', webhookRoutes);
 router.use('/banners', bannersRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/service-requests', serviceRequestsRoutes);
+router.use('/promocodes', promocodesRoutes);
 // ...
 
 export default router;

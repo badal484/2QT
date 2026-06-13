@@ -13,7 +13,8 @@ export const calculatePricing = async ({
     walletAmountPaise = 0,
     useLoyalty = false,
     isSubscriptionOrder = false,
-    customerId
+    customerId,
+    riderTipPaise = 0
 }: {
     cartItems: CartItem[];
     addressId: string;
@@ -22,6 +23,7 @@ export const calculatePricing = async ({
     useLoyalty?: boolean;
     isSubscriptionOrder?: boolean;
     customerId: string;
+    riderTipPaise?: number;
 }) => {
     // 1. Fetch item prices
     const itemIds = cartItems.map(i => i.menuItemId);
@@ -111,7 +113,7 @@ export const calculatePricing = async ({
     const cgstPaise = Math.round(gstPaise / 2);
     const sgstPaise = gstPaise - cgstPaise;
 
-    const totalAmountPaise = taxableAmount + deliveryFeePaise + surgePaise + gstPaise;
+    const totalAmountPaise = taxableAmount + deliveryFeePaise + surgePaise + gstPaise + riderTipPaise;
 
     // 7. Wallet
     const { rows: wallet } = await query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [customerId]);
@@ -132,6 +134,7 @@ export const calculatePricing = async ({
         sgstPaise,
         totalAmountPaise,
         gatewayAmountPaise,
-        promoCodeId
+        promoCodeId,
+        riderTipPaise
     };
 };

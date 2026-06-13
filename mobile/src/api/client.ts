@@ -2,11 +2,10 @@ import { Platform } from 'react-native';
 // Removed top-level store import to break circular dependency
 import { setAccessToken, logout } from '../store/slices/authSlice';
 
-const BASE_URL = Platform.OS === 'android' 
-  ? 'http://192.168.0.143:3000/api/v1' 
-  : 'http://localhost:3000/api/v1';
+import { ENV } from '../config/env';
 
-export const APP_VERSION = '1.0.0';
+const BASE_URL = ENV.API_URL;
+export const APP_VERSION = ENV.APP_VERSION;
 
 
 interface RequestOptions {
@@ -52,40 +51,6 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
   console.log(`--- API REQUEST: [${fetchOptions.method}] ${BASE_URL}${path}`);
   
   const fetchWithTimeout = async (url: string, opts: any, timeout = 10000) => {
-    // Offline Mock Intercepts
-    if (url.includes('/auth/send-otp')) {
-      console.log('--- [OFFLINE MOCK] /auth/send-otp ---');
-      const body = JSON.parse(opts.body || '{}');
-      return { ok: true, status: 200, json: async () => ({ sent: true, phone: body.phone }), headers: { get: () => 'application/json' } };
-    }
-    if (url.includes('/auth/verify-otp')) {
-      console.log('--- [OFFLINE MOCK] /auth/verify-otp ---');
-      const body = JSON.parse(opts.body || '{}');
-      const phone = body.phone || "";
-      let role = "customer";
-      if (phone.includes("0000000000")) role = "super_admin";
-      else if (phone.includes("1111111111")) role = "chef";
-      else if (phone.includes("2222222222")) role = "rider";
-      
-      return { 
-        ok: true, 
-        status: 200, 
-        json: async () => ({ 
-          accessToken: "mock_token", 
-          refreshToken: "mock_refresh", 
-          user: { id: "mock_id", name: "Mock User", phone, role, is_verified: true, onboarding_complete: true } 
-        }),
-        headers: { get: () => 'application/json' }
-      };
-    }
-    if (url.includes('/auth/onboarding/complete')) {
-      console.log('--- [OFFLINE MOCK] /auth/onboarding/complete ---');
-      return { ok: true, status: 200, json: async () => ({ success: true }), headers: { get: () => 'application/json' } };
-    }
-    if (url.includes('/app/version')) {
-      return { ok: true, status: 200, json: async () => ({ forceUpdate: false, maintenanceMode: false }), headers: { get: () => 'application/json' } };
-    }
-
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
@@ -100,7 +65,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
 
   // SYSTEMATIC INTEGRATION: Exponential Backoff Retry Engine
   const MAX_RETRIES = 3;
-  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+  const delay = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
   
   let response;
   let lastError;
@@ -124,6 +89,10 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
     }
   }
 
+
+  if (!response) {
+    throw new Error('NETWORK_ERROR: No response received');
+  }
 
   if (response.status === 401 && state.auth.refreshToken) {
     // Attempt token refresh
@@ -171,7 +140,8 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
 
 export const api = {
   get: (path: string) => request(path),
-  post: (path: string, body: any) => request(path, { method: 'POST', body }),
-  patch: (path: string, body: any) => request(path, { method: 'PATCH', body }),
+  post: (path: string, body?: any) => request(path, { method: 'POST', body }),
+  put: (path: string, body?: any) => request(path, { method: 'PUT', body }),
+  patch: (path: string, body?: any) => request(path, { method: 'PATCH', body }),
   delete: (path: string) => request(path, { method: 'DELETE' }),
 };

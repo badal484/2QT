@@ -7,7 +7,6 @@ import RiderOnboardingScreen from '../screens/RiderOnboardingScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PayoutsScreen from '../screens/PayoutsScreen';
 import EarningsScreen from '../screens/EarningsScreen';
-import RiderStatusScreen from '../screens/RiderStatusScreen';
 import RiderHistoryScreen from '../screens/RiderHistoryScreen';
 import VerificationPendingScreen from '../screens/VerificationPendingScreen';
 import { useSelector } from 'react-redux';

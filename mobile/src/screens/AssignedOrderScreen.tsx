@@ -84,8 +84,13 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
 
   const openDirections = () => {
     const isGoingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus);
-    const lat = isGoingToKitchen ? (order.kitchen_lat || '12.9725') : (order.lat || '12.9716');
-    const lng = isGoingToKitchen ? (order.kitchen_lng || '77.5960') : (order.lng || '77.5946');
+    const lat = isGoingToKitchen ? (order.kitchen_lat || order.lat) : (order.lat);
+    const lng = isGoingToKitchen ? (order.kitchen_lng || order.lng) : (order.lng);
+    
+    if (!lat || !lng) {
+      Alert.alert('Location Error', 'Target location is missing');
+      return;
+    }
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     Linking.openURL(url);
   };

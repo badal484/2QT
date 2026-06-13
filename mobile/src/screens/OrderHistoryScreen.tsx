@@ -1,16 +1,26 @@
 import { Package, RotateCcw, ArrowRight } from 'lucide-react-native';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image, StyleSheet, Alert, Linking } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useDispatch } from 'react-redux';
 import { addItem } from '../store/slices/cartSlice';
 
 const OrderHistoryScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
+  const queryClient = useQueryClient();
   const { data: ordersData, isLoading } = useQuery({
     queryKey: ['order-history'],
     queryFn: () => api.get('/orders/mine'),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/orders/${id}/cancel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order-history'] });
+      Alert.alert('Cancelled', 'Order cancelled successfully.');
+    },
+    onError: () => Alert.alert('Error', 'Could not cancel the order.')
   });
 
   const orders = ordersData?.orders || [];
@@ -91,13 +101,28 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                 </View>
                 
                 {!['delivered', 'cancelled'].includes(order.status) ? (
-                  <TouchableOpacity 
-                    style={styles.trackBtn}
-                    onPress={() => navigation.navigate('OrderTracking', { orderId: order.id })}
-                  >
-                    <Text style={styles.trackBtnText}>Track Now</Text>
-                    <ArrowRight size={14} color="white" style={{ marginLeft: 8 }} />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row' }}>
+                      {['pending_payment', 'confirmed'].includes(order.status) && (
+                          <TouchableOpacity 
+                            style={[styles.trackBtn, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#EF4444', marginRight: 8 }]}
+                            onPress={() => {
+                                Alert.alert('Cancel Order', 'Are you sure?', [
+                                    { text: 'No', style: 'cancel' },
+                                    { text: 'Yes', style: 'destructive', onPress: () => cancelMutation.mutate(order.id) }
+                                ]);
+                            }}
+                          >
+                            <Text style={[styles.trackBtnText, { color: '#EF4444' }]}>Cancel</Text>
+                          </TouchableOpacity>
+                      )}
+                      <TouchableOpacity 
+                        style={styles.trackBtn}
+                        onPress={() => navigation.navigate('OrderTracking', { orderId: order.id })}
+                      >
+                        <Text style={styles.trackBtnText}>Track Now</Text>
+                        <ArrowRight size={14} color="white" style={{ marginLeft: 8 }} />
+                      </TouchableOpacity>
+                  </View>
                 ) : (
                   <View style={{ flexDirection: 'row' }}>
                     {order.invoice_url && (
