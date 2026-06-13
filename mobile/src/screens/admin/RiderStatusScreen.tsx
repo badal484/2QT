@@ -12,8 +12,7 @@ import {
   Circle,
   Search,
   X,
-  Zap,
-  Marker
+  Zap
 } from 'lucide-react-native';
 import MapView, { Marker as MapMarker } from 'react-native-maps';
 
@@ -149,10 +148,10 @@ const RiderStatusScreen = ({ navigation }: any) => {
            <MapView
              style={styles.map}
              initialRegion={{
-               latitude: trackingRider?.location?.lat || 12.9716,
-               longitude: trackingRider?.location?.lng || 77.5946,
-               latitudeDelta: 0.01,
-               longitudeDelta: 0.01,
+               latitude: trackingRider?.location?.lat || 20.5937,
+               longitude: trackingRider?.location?.lng || 78.9629,
+               latitudeDelta: trackingRider ? 0.01 : 15.0,
+               longitudeDelta: trackingRider ? 0.01 : 15.0,
              }}
            >
              {trackingRider?.location && (

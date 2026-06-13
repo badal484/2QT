@@ -14,7 +14,7 @@ const RateOrderScreen = ({ route, navigation }: any) => {
     mutationFn: (data: any) => api.post(`/orders/${orderId}/feedback`, data),
     onSuccess: () => {
       Alert.alert('Thank You!', 'Your feedback helps us improve.');
-      navigation.navigate('Home');
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     },
   });
 
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '900',
     fontSize: 18,
-    tracking: 2,
+    letterSpacing: 2,
     textTransform: 'uppercase',
   },
 });

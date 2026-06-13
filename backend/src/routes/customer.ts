@@ -3,6 +3,7 @@ import { query } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { TWO_QT } from '../config/constants';
 import { emitToAdmin } from '../socket';
+import { redis, keys } from '../redis';
 
 const router = Router();
 
@@ -10,6 +11,19 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const { rows } = await query('SELECT * FROM users WHERE id = $1', [userId]);
     res.json({ user: rows[0] });
+});
+
+router.get('/cart', authenticate, async (req: AuthRequest, res) => {
+    const userId = req.user!.userId;
+    const cartStr = await redis.get(keys.customerCart(userId));
+    res.json({ items: cartStr ? JSON.parse(cartStr) : [] });
+});
+
+router.post('/cart/sync', authenticate, async (req: AuthRequest, res) => {
+    const userId = req.user!.userId;
+    const { items } = req.body;
+    await redis.set(keys.customerCart(userId), JSON.stringify(items || []));
+    res.json({ success: true });
 });
 
 router.patch('/profile', authenticate, async (req: AuthRequest, res) => {

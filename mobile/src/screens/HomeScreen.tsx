@@ -1,15 +1,41 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Dimensions, StyleSheet } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, StyleSheet, TextInput, Switch, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setAddress, setZone } from '../store/slices/cartSlice';
-import { MapPin, User, Search, PackageOpen, ChefHat, ArrowRight, ChevronDown, Sparkles } from 'lucide-react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { MapPin, User, Search, PackageOpen, ChefHat, ArrowRight, ChevronDown, Sparkles, Navigation } from 'lucide-react-native';
+import ReactNativeHapticFeedback from "react-native-haptic-feedback";
+import Animated, { FadeInDown, FadeIn, Layout, BounceIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
+import { useLocation } from '../hooks/useLocation';
+import { NetworkImage } from '../components/NetworkImage';
 
 const { width } = Dimensions.get('window');
+
+const hapticOptions = {
+  enableVibrateFallback: true,
+  ignoreAndroidSystemSettings: false,
+};
+
+const SkeletonItem = () => {
+  const opacity = useSharedValue(0.3);
+  React.useEffect(() => {
+    opacity.value = withRepeat(withTiming(0.7, { duration: 800 }), -1, true);
+  }, []);
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <Animated.View style={[styles.skeletonCard, style]}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.skeletonInfo}>
+        <View style={styles.skeletonTextRow} />
+        <View style={styles.skeletonTextShort} />
+      </View>
+    </Animated.View>
+  );
+};
 
 const HomeScreen = ({ navigation }: any) => {
   const { user } = useSelector((state: RootState) => state.auth);
@@ -18,6 +44,10 @@ const HomeScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const socket = getSocket();
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isVegOnly, setIsVegOnly] = useState(false);
+  const [unserviceableLocation, setUnserviceableLocation] = useState(false);
+  const { location, loadingLocation, fetchLocation } = useLocation();
 
   React.useEffect(() => {
     if (socket && zoneId) {
@@ -36,6 +66,11 @@ const HomeScreen = ({ navigation }: any) => {
     queryKey: ['my-subscriptions'],
     queryFn: () => api.get('/customers/subscriptions/my'),
     enabled: !!user,
+  });
+
+  const { data: bannersData } = useQuery({
+    queryKey: ['banners'],
+    queryFn: () => api.get('/banners'),
   });
 
   const activeSub = subsData?.subscriptions?.[0];
@@ -60,250 +95,276 @@ const HomeScreen = ({ navigation }: any) => {
       if (defaultAddr) {
         dispatch(setAddress(defaultAddr.id));
         dispatch(setZone(defaultAddr.zone_id));
+        setUnserviceableLocation(false);
       }
+    } else if (!addressId && !loadingLocation && !location) {
+      fetchLocation();
     }
-  }, [addresses, addressId]);
+  }, [addresses, addressId, location, loadingLocation]);
+
+  React.useEffect(() => {
+    if (!addressId && location && !zoneId) {
+      const checkZone = async () => {
+        try {
+          const res = await api.get(`/menu/zones/check?lat=${location.latitude}&lng=${location.longitude}`);
+          if (res.serviceable && res.zone) {
+            dispatch(setZone(res.zone.id));
+            setUnserviceableLocation(false);
+          } else {
+            setUnserviceableLocation(true);
+          }
+        } catch (e) {
+          console.log('Zone check failed', e);
+        }
+      };
+      checkZone();
+    }
+  }, [location, addressId, zoneId]);
+
+  const handleAddToCart = (item: any) => {
+    if (cartItems.length > 0 && cartItems[0].kitchenId !== item.kitchen_id) {
+      Alert.alert(
+        'Clear Cart?',
+        'Your cart contains items from a different kitchen. Would you like to clear your cart and add this item instead?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Clear & Add', 
+            style: 'destructive',
+            onPress: () => {
+              triggerHaptic();
+              // The Redux slice clears the cart if kitchenId is different, but we should make sure it actually dispatches.
+              dispatch(addItem({ 
+                menuItemId: item.id, name: item.name, pricePaise: item.price_paise, 
+                quantity: 1, photoUrl: item.photo_url, isVeg: item.is_veg, kitchenId: item.kitchen_id
+              }));
+            }
+          }
+        ]
+      );
+    } else {
+      triggerHaptic();
+      dispatch(addItem({ 
+        menuItemId: item.id, name: item.name, pricePaise: item.price_paise, 
+        quantity: 1, photoUrl: item.photo_url, isVeg: item.is_veg, kitchenId: item.kitchen_id
+      }));
+    }
+  };
 
   const categories = ['All', ...new Set((menuData?.items || []).map((item: any) => item.category))];
 
-  const filteredItems = selectedCategory === 'All' 
-    ? menuData?.items 
-    : menuData?.items.filter((item: any) => item.category === selectedCategory);
+  const filteredItems = useMemo(() => {
+    if (!menuData?.items) return [];
+    return menuData.items.filter((item: any) => {
+      if (selectedCategory !== 'All' && item.category !== selectedCategory) return false;
+      if (isVegOnly && !item.is_veg) return false;
+      if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    });
+  }, [menuData?.items, selectedCategory, isVegOnly, searchQuery]);
 
   const cartTotal = cartItems.reduce((acc, item) => acc + item.quantity * item.pricePaise, 0);
 
-  if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
-      <Text style={styles.loadingText}>Preparing Menu</Text>
-    </View>
-  );
+  const triggerHaptic = () => ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
 
   return (
     <View style={styles.container}>
-      {/* Premium Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.addressBar}
-          onPress={() => navigation.navigate('Address')}
-        >
-          <View style={styles.addressIconWrapper}>
-            <MapPin size={20} color="#FF6B35" />
-          </View>
-          <View style={styles.addressTextColumn}>
-            <Text style={styles.addressLabel}>Deliver to</Text>
+      {/* VIBRANT GREEN HEADER (SWISH STYLE) */}
+      <View style={styles.vibrantHeader}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            style={styles.addressSection}
+            onPress={() => {
+              triggerHaptic();
+              navigation.navigate('Address');
+            }}
+          >
+            <View style={styles.etaRow}>
+              <Text style={styles.etaText}>15 Minutes</Text>
+            </View>
             <View style={styles.addressValueRow}>
               <Text style={styles.addressValue} numberOfLines={1}>
-                {selectedAddress ? `${selectedAddress.label} - ${selectedAddress.address_text}` : 'Select Location'}
+                {selectedAddress 
+                  ? `${selectedAddress.label} - ${selectedAddress.address_text}`
+                  : location 
+                    ? location.addressText 
+                    : loadingLocation 
+                      ? 'Locating...' 
+                      : 'Select Location'}
               </Text>
-              <ChevronDown size={14} color="#1A1A2E" style={{ marginLeft: 4, marginTop: 2 }} />
+              <ChevronDown size={16} color="#fff" style={{ marginLeft: 4 }} />
             </View>
+          </TouchableOpacity>
+          
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.proButton} onPress={() => navigation.navigate('Subscription')}>
+              <Sparkles size={16} color="#FF6B35" />
+              <Text style={styles.proButtonText}>Get</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.profileButton}
+              onPress={() => {
+                triggerHaptic();
+                navigation.navigate('ProfileTab');
+              }}
+            >
+              {user?.photo_url ? (
+                <NetworkImage uri={user.photo_url} style={styles.profileImage} fallbackText={user?.name ? user.name.charAt(0).toUpperCase() : '?'} />
+              ) : (
+                <User size={20} color="#1A1A2E" />
+              )}
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.profileButton}
-          onPress={() => navigation.navigate('ProfileTab')}
-        >
-          {user?.photo_url ? (
-            <Image source={{ uri: user.photo_url }} style={styles.profileImage} />
-          ) : (
-            <Text style={styles.profileInitial}>
-              {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
-            </Text>
-          )}
-        </TouchableOpacity>
+        </View>
+
+        {/* INTEGRATED SEARCH BAR */}
+        <View style={styles.searchBarContainer}>
+          <Search size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
+          <TextInput
+            placeholder='Search "Rajma Rice"'
+            placeholderTextColor="#9CA3AF"
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <View style={styles.vegToggleContainer}>
+            <View style={styles.vegIconBox}>
+              <View style={styles.vegIconDot} />
+            </View>
+            <Switch
+              value={isVegOnly}
+              onValueChange={(val) => {
+                triggerHaptic();
+                setIsVegOnly(val);
+              }}
+              trackColor={{ false: '#e5e7eb', true: '#FF6B35' }}
+              thumbColor="#fff"
+              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+            />
+          </View>
+        </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-        {/* Search Bar Placeholder */}
-        <TouchableOpacity 
-          style={styles.searchPlaceholder}
-          onPress={() => navigation.navigate('Search')}
-        >
-          <Search size={20} color="#9CA3AF" style={{ marginRight: 12 }} />
-          <Text style={styles.searchPlaceholderText}>Search for "Dal Tadka" or "Paneer"...</Text>
-        </TouchableOpacity>
-
-        {/* Kitchen Status Banner */}
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView} contentContainerStyle={{ paddingBottom: 160 }}>
+        
+        {/* KITCHEN PAUSED BANNER */}
         {menuData?.kitchenPaused && (
-          <View style={styles.kitchenPausedBanner}>
+          <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.kitchenPausedBanner}>
             <ChefHat size={20} color="#fff" style={{ marginRight: 12 }} />
             <View style={{ flex: 1 }}>
               <Text style={styles.pausedTitle}>Kitchen is currently paused</Text>
               <Text style={styles.pausedReason}>{menuData.pauseReason || 'Taking a short break to catch up on orders.'}</Text>
             </View>
-          </View>
+          </Animated.View>
         )}
 
-        {/* Membership Card / Promo */}
-        {!menuData?.kitchenPaused && (
-          activeSub ? (
-            <TouchableOpacity 
-              activeOpacity={0.9}
-              style={styles.membershipCard}
-              onPress={() => navigation.navigate('Subscription')}
-            >
-              <View style={{ flex: 1 }}>
-                <View style={styles.proBadgeRow}>
-                  <Sparkles size={14} color="#FF6B35" />
-                  <Text style={styles.proBadgeText}>2QT Pro Member</Text>
+        {/* MASSIVE PROMO BANNER */}
+        {!menuData?.kitchenPaused && !isLoading && bannersData?.banners?.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.promoBannerContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} pagingEnabled snapToInterval={width - 32} decelerationRate="fast">
+              {bannersData.banners.map((banner: any, idx: number) => (
+                <View key={banner.id || idx} style={{ width: width - 32, paddingRight: idx === bannersData.banners.length - 1 ? 0 : 16 }}>
+                  {banner.image_url ? (
+                    <View style={[styles.promoImageMock, { padding: 0, overflow: 'hidden' }]}>
+                      <NetworkImage uri={banner.image_url} style={{ width: '100%', height: '100%' }} />
+                    </View>
+                  ) : (
+                    <ImageBackgroundMock 
+                      text={banner.title || "SPECIAL OFFER"} 
+                      sub={banner.subtitle || "Order Now"} 
+                      code={banner.tag_text || "OFFER"} 
+                    />
+                  )}
                 </View>
-                <Text style={styles.planName}>{activeSub.plan_id?.replace('sub_', '').toUpperCase() || 'ACTIVE PLAN'}</Text>
-                <Text style={styles.planStatus}>{activeSub.remaining_meals} meals left • {activeSub.current_day_credits} credit today</Text>
-              </View>
-              <View style={styles.membershipArrow}>
-                <ArrowRight size={24} color="white" />
-              </View>
-            </TouchableOpacity>
-          ) : !menuData?.items?.length ? null : (
-            <View style={styles.promoBanner}>
-              <View style={styles.promoContent}>
-                <Text style={styles.promoTag}>Limited Offer</Text>
-                <Text style={styles.promoTitle}>Get 50% OFF on{"\n"}your first order!</Text>
-                <TouchableOpacity style={styles.promoButton} onPress={() => navigation.navigate('Subscription')}>
-                  <Text style={styles.promoButtonText}>Claim Now</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.promoDecoration} />
-            </View>
-          )
+              ))}
+            </ScrollView>
+          </Animated.View>
         )}
 
-        {/* Categories Chips */}
-        <View>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesScroll}
-          >
-            {categories.map((cat: any) => (
-              <TouchableOpacity 
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
-                style={[styles.categoryChip, { backgroundColor: selectedCategory === cat ? '#1A1A2E' : '#fff', borderColor: selectedCategory === cat ? '#1A1A2E' : '#f3f4f6' }]}
-              >
-                <Text style={[styles.categoryChipText, { color: selectedCategory === cat ? '#fff' : '#9ca3af' }]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Items List */}
-        <View style={styles.itemsContainer}>
-          {(!filteredItems || filteredItems.length === 0) ? (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconWrapper}>
-                <PackageOpen size={48} color="#FF6B35" />
+        {/* CIRCULAR CATEGORY GRID */}
+        {!isLoading && categories.length > 1 && (
+          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.categoryGridContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryGridScroll}>
+              <View style={styles.categoryRow}>
+                {categories.slice(0, Math.ceil(categories.length/2)).map((cat: any) => (
+                  <CategoryCircle key={cat} name={cat} isSelected={selectedCategory === cat} onPress={() => { triggerHaptic(); setSelectedCategory(cat); }} />
+                ))}
               </View>
-              <Text style={styles.emptyStateTitle}>
-                {!(zoneId || user?.zoneId) ? 'Where are we sending food?' : 'Chef is busy preparing more!'}
-              </Text>
-              <Text style={styles.emptyStateSub}>
-                {!(zoneId || user?.zoneId) 
-                  ? 'Set your location to see the curated menu for your area.' 
-                  : 'Try another category or come back in a few minutes.'}
-              </Text>
-              {!(zoneId || user?.zoneId) && (
-                <TouchableOpacity 
-                  style={styles.selectAddressButton}
-                  onPress={() => navigation.navigate('Address')}
-                >
-                  <Text style={styles.selectAddressButtonText}>Select Address</Text>
-                </TouchableOpacity>
-              )}
+              <View style={styles.categoryRow}>
+                {categories.slice(Math.ceil(categories.length/2)).map((cat: any) => (
+                  <CategoryCircle key={`bottom-${cat}`} name={cat} isSelected={selectedCategory === cat} onPress={() => { triggerHaptic(); setSelectedCategory(cat); }} />
+                ))}
+              </View>
+            </ScrollView>
+          </Animated.View>
+        )}
+
+        {/* ITEMS LIST (PREMIUM CARDS) */}
+        <View style={styles.itemsContainer}>
+          {unserviceableLocation ? (
+            <View style={styles.emptyState}>
+              <MapPin size={48} color="#FF6B35" />
+              <Text style={styles.emptyStateTitle}>Out of Delivery Zone</Text>
+              <Text style={styles.emptyStateSub}>We don't deliver to your current location yet. Please select a different address.</Text>
+            </View>
+          ) : isLoading ? (
+            <View style={styles.skeletonGrid}>
+              <SkeletonItem />
+              <SkeletonItem />
+              <SkeletonItem />
+              <SkeletonItem />
+            </View>
+          ) : (!filteredItems || filteredItems.length === 0) ? (
+            <View style={styles.emptyState}>
+              <PackageOpen size={48} color="#FF6B35" />
+              <Text style={styles.emptyStateTitle}>Nothing found</Text>
+              <Text style={styles.emptyStateSub}>Try changing your search or filters.</Text>
             </View>
           ) : (
-            <>
-              <Text style={styles.sectionHeader}>
-                {selectedCategory === 'All' ? 'Signature Menu' : selectedCategory}
-              </Text>
-              {filteredItems.map((item: any) => {
+            <View style={styles.premiumItemsGrid}>
+              {filteredItems.map((item: any, index: number) => {
                 const cartItem = cartItems.find(ci => ci.menuItemId === item.id);
                 return (
-                  <TouchableOpacity 
-                    key={item.id}
-                    activeOpacity={item.available ? 0.9 : 1}
-                    onPress={() => item.available && navigation.navigate('ItemDetail', { item })}
-                    style={[styles.itemCard, !item.available && { opacity: 0.6 }]}
-                  >
-                    <View style={styles.itemImageWrapper}>
-                      {item.photo_url ? (
-                        <Image source={{ uri: item.photo_url }} style={styles.itemImage} />
-                      ) : (
-                        <View style={styles.itemImagePlaceholder}>
-                          <ChefHat size={32} color="#FF6B35" opacity={0.5} />
-                        </View>
-                      )}
-                      {!item.available && (
-                        <View style={styles.soldOutOverlay}>
-                          <Text style={styles.soldOutText}>Sold Out</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.itemDetails}>
-                      <View>
-                        <View style={styles.itemNameRow}>
-                          <View style={[styles.vegIndicator, { borderColor: item.is_veg ? '#22C55E' : '#EF4444' }]}>
-                            <View style={[styles.vegDot, { backgroundColor: item.is_veg ? '#22C55E' : '#EF4444' }]} />
-                          </View>
-                          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                        </View>
-                        <Text style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
-                      </View>
-                      
-                      <View style={styles.itemFooter}>
-                        <View>
-                          <Text style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
-                        </View>
-                        
-                        {cartItem ? (
-                          <View style={styles.quantityControl}>
-                            <TouchableOpacity onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity - 1 }))}>
-                              <Text style={styles.quantityButtonText}>−</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.quantityValue}>{cartItem.quantity}</Text>
-                            <TouchableOpacity onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity + 1 }))}>
-                              <Text style={styles.quantityButtonText}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
-                          <TouchableOpacity 
-                            style={[styles.addButton, (!item.available || menuData?.kitchenPaused) && styles.addButtonDisabled]}
-                            disabled={!item.available || menuData?.kitchenPaused}
-                            onPress={() => dispatch(addItem({ 
-                              menuItemId: item.id, 
-                              name: item.name, 
-                              pricePaise: item.price_paise, 
-                              quantity: 1,
-                              photoUrl: item.photo_url,
-                              isVeg: item.is_veg,
-                              kitchenId: item.kitchen_id
-                            }))}
-                          >
-                            <Text style={[styles.addButtonText, (!item.available || menuData?.kitchenPaused) && styles.addButtonTextDisabled]}>
-                              {menuData?.kitchenPaused ? 'Paused' : item.available ? 'Add' : 'Out'}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  </TouchableOpacity>
+                  <PremiumItemCard 
+                    key={item.id} 
+                    item={item} 
+                    cartItem={cartItem} 
+                    kitchenPaused={menuData?.kitchenPaused}
+                    onPress={() => {
+                      if (item.available) {
+                        triggerHaptic();
+                        navigation.navigate('ItemDetail', { item });
+                      }
+                    }}
+                    onAdd={() => handleAddToCart(item)}
+                    onUpdate={(qty: number) => {
+                      triggerHaptic();
+                      dispatch(setQuantity({ menuItemId: item.id, quantity: qty }));
+                    }}
+                  />
                 );
               })}
-            </>
+            </View>
           )}
         </View>
       </ScrollView>
 
-      {/* View Cart Button (Floating) */}
-      {cartItems.length > 0 && (
-        <View style={styles.floatingCartContainer}>
-          <TouchableOpacity 
-            style={styles.floatingCartButton}
-            onPress={() => navigation.navigate('Cart')}
-          >
+      {/* FLOATING CATEGORY PILL */}
+      <View style={styles.floatingMenuPillContainer}>
+        <TouchableOpacity style={styles.floatingMenuPill} onPress={() => {
+          triggerHaptic();
+          // Scroll to top or show category modal logic
+          setSelectedCategory('All');
+        }}>
+          <ChefHat size={16} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={styles.floatingMenuPillText}>Menu</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* STICKY BOTTOM OFFERS / CART SUMMARY */}
+      {cartItems.length > 0 ? (
+        <Animated.View entering={BounceIn.duration(600)} style={styles.floatingCartContainer}>
+          <TouchableOpacity style={styles.floatingCartButton} onPress={() => { triggerHaptic(); navigation.navigate('Cart'); }}>
             <View>
               <Text style={styles.cartCountText}>{cartItems.length} Item{cartItems.length > 1 ? 's' : ''}</Text>
               <Text style={styles.cartTotalText}>₹{cartTotal / 100}</Text>
@@ -313,512 +374,245 @@ const HomeScreen = ({ navigation }: any) => {
               <ArrowRight size={16} color="white" />
             </View>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
+      ) : (
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.stickyOfferBanner}>
+          <View style={styles.offerIconCircle}><Text style={{fontSize: 16}}>%</Text></View>
+          <View>
+            <Text style={styles.stickyOfferTitle}>Exciting Offers Available</Text>
+            <Text style={styles.stickyOfferSub}>APPLY PROMO CODE IN CART</Text>
+          </View>
+        </Animated.View>
       )}
     </View>
   );
 };
 
+// Sub-components
+
+const CategoryCircle = ({ name, isSelected, onPress }: any) => (
+  <TouchableOpacity style={styles.categoryCircleItem} onPress={onPress}>
+    <View style={[styles.categoryCircleImage, isSelected && styles.categoryCircleImageActive]}>
+      {/* Fallback to text for category since we don't have category images */}
+      <Text style={styles.categoryCircleInit}>{name.charAt(0).toUpperCase()}</Text>
+    </View>
+    <Text style={[styles.categoryCircleText, isSelected && styles.categoryCircleTextActive]} numberOfLines={2}>
+      {name}
+    </Text>
+  </TouchableOpacity>
+);
+
+const PremiumItemCard = ({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaused }: any) => (
+  <Animated.View layout={Layout.springify()} style={styles.premiumCard}>
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.premiumImageWrapper}>
+        {item.photo_url ? (
+          <NetworkImage uri={item.photo_url} style={styles.premiumImage} />
+        ) : (
+          <View style={styles.premiumImagePlaceholder}>
+            <Text style={styles.premiumImagePlaceholderText}>V</Text>
+          </View>
+        )}
+        
+        {/* Bestseller Tag */}
+        {(item.is_bestseller || item.id === '1' || item.id === '2') && (
+          <View style={styles.bestsellerTag}>
+            <Text style={styles.bestsellerTagText}>★ Bestseller</Text>
+          </View>
+        )}
+
+        {(!item.available || kitchenPaused) && (
+          <View style={styles.soldOutOverlay}>
+            <Text style={styles.soldOutText}>Sold Out</Text>
+          </View>
+        )}
+
+        {/* Floating Add Button overlapping image */}
+        <View style={styles.floatingAddContainer}>
+          {cartItem ? (
+            <View style={styles.floatingQuantityControl}>
+              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity - 1)} style={styles.floatingQtyBtn}>
+                <Text style={styles.floatingQtyText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.floatingQtyValue}>{cartItem.quantity}</Text>
+              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity + 1)} style={styles.floatingQtyBtn}>
+                <Text style={styles.floatingQtyText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ alignItems: 'center' }}>
+              <View style={styles.customiseTag}>
+                <Text style={styles.customiseTagText}>Customise</Text>
+              </View>
+              <TouchableOpacity 
+                style={[styles.floatingAddButton, (!item.available || kitchenPaused) && styles.floatingAddButtonDisabled]}
+                disabled={!item.available || kitchenPaused}
+                onPress={onAdd}
+              >
+                <Text style={styles.floatingAddButtonText}>Add</Text>
+                <View style={styles.floatingAddPlus}><Text style={styles.floatingAddPlusText}>+</Text></View>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+      
+      <View style={styles.premiumInfo}>
+        <View style={styles.premiumTagsRow}>
+          <View style={[styles.vegIndicatorSmall, { borderColor: item.is_veg ? '#22C55E' : '#EF4444' }]}>
+            <View style={[styles.vegDotSmall, { backgroundColor: item.is_veg ? '#22C55E' : '#EF4444' }]} />
+          </View>
+          <View style={styles.servesTag}>
+            <Text style={styles.servesTagText}>Serves 1</Text>
+          </View>
+        </View>
+        <Text style={styles.premiumName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.premiumPrice}>₹{item.price_paise / 100}</Text>
+        <Text style={styles.premiumDesc} numberOfLines={2}>{item.description}</Text>
+      </View>
+    </TouchableOpacity>
+  </Animated.View>
+);
+
+const ImageBackgroundMock = ({ text, sub, code }: any) => (
+  <View style={styles.promoImageMock}>
+    <Text style={styles.promoImageMockTitle}>{text}</Text>
+    <Text style={styles.promoImageMockSub}>{sub}</Text>
+    <View style={styles.promoCodePill}><Text style={styles.promoCodeText}>{code}</Text></View>
+  </View>
+);
+
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#9ca3af',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontSize: 10,
-  },
-  header: {
+  container: { flex: 1, backgroundColor: '#f9fafb' },
+  vibrantHeader: {
+    backgroundColor: '#FF6B35', // Brand Orange
     paddingTop: 64,
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  addressBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 16,
-  },
-  addressIconWrapper: {
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  addressTextColumn: {
-    flex: 1,
-  },
-  addressLabel: {
-    color: '#9ca3af',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  addressValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addressValue: {
-    color: '#1A1A2E',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  profileButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: '#1A1A2E',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-    overflow: 'hidden',
-  },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  profileInitial: {
-    color: '#fff',
-    fontWeight: '900',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  searchPlaceholder: {
-    marginHorizontal: 24,
-    marginTop: 8,
-    marginBottom: 24,
-    backgroundColor: '#f9fafb',
-    height: 56,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  searchPlaceholderText: {
-    color: '#9ca3af',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  membershipCard: {
-    marginHorizontal: 24,
-    marginBottom: 32,
-    padding: 24,
-    backgroundColor: '#1A1A2E',
-    borderRadius: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  proBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  proBadgeText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 9,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginLeft: 8,
-  },
-  planName: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  planStatus: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  membershipArrow: {
-    width: 48,
-    height: 48,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  promoBanner: {
-    marginHorizontal: 24,
-    marginBottom: 32,
-    height: 160,
-    backgroundColor: '#FF6B35',
-    borderRadius: 32,
-    overflow: 'hidden',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 6,
-  },
-  promoContent: {
-    padding: 24,
-    justifyContent: 'center',
-    flex: 1,
-  },
-  promoTag: {
-    color: 'rgba(255,255,255,0.8)',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontSize: 10,
-  },
-  promoTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '900',
-    marginTop: 4,
-  },
-  promoButton: {
-    backgroundColor: '#fff',
-    alignSelf: 'flex-start',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginTop: 12,
-  },
-  promoButtonText: {
-    color: '#FF6B35',
-    fontWeight: '900',
-    fontSize: 12,
-    textTransform: 'uppercase',
-  },
-  promoDecoration: {
-    position: 'absolute',
-    right: -16,
-    bottom: -16,
-    width: 128,
-    height: 128,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 64,
-  },
-  categoriesScroll: {
-    paddingHorizontal: 24,
     paddingBottom: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
-  categoryChip: {
-    marginRight: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  headerTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
+  addressSection: { flex: 1, marginRight: 16 },
+  etaRow: { flexDirection: 'row', alignItems: 'center' },
+  etaText: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  addressValueRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  addressValue: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
+  proButton: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', marginRight: 12 },
+  proButtonText: { color: '#FF6B35', fontWeight: '900', fontSize: 12, marginLeft: 4 },
+  profileButton: { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  profileImage: { width: '100%', height: '100%' },
+  
+  searchBarContainer: {
+    backgroundColor: '#fff',
     borderRadius: 16,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  categoryChipText: {
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    fontSize: 10,
-  },
-  kitchenPausedBanner: {
-    backgroundColor: '#1A1A2E',
-    marginHorizontal: 24,
-    marginBottom: 24,
-    padding: 20,
-    borderRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    height: 52,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  pausedTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  pausedReason: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  itemsContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 128,
-  },
-  sectionHeader: {
-    color: '#1A1A2E',
-    fontSize: 18,
-    fontWeight: '900',
-    marginBottom: 24,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  itemCard: {
-    flexDirection: 'row',
-    marginBottom: 24,
-    backgroundColor: '#fff',
-    borderRadius: 28,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  itemImageWrapper: {
-    width: 112,
-    height: 112,
-    backgroundColor: '#f9fafb',
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  itemImage: {
-    width: '100%',
-    height: '100%',
-  },
-  itemImagePlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
-  },
-  itemDetails: {
-    flex: 1,
-    marginLeft: 20,
-    justifyContent: 'space-between',
-  },
-  itemNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  vegIndicator: {
-    width: 14,
-    height: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  vegDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  itemName: {
-    color: '#1A1A2E',
-    fontSize: 17,
-    fontWeight: '900',
-    flex: 1,
-    letterSpacing: -0.5,
-  },
-  itemDesc: {
-    color: '#9ca3af',
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 18,
-  },
-  itemFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  itemPrice: {
-    color: '#FF6B35',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1A1A2E',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  quantityButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '900',
-    paddingHorizontal: 12,
-  },
-  quantityValue: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 15,
-  },
-  addButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#FF6B35',
-    paddingHorizontal: 28,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  addButtonDisabled: {
-    borderColor: '#E5E7EB',
-  },
-  addButtonText: {
-    color: '#FF6B35',
-    fontWeight: '900',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  addButtonTextDisabled: {
-    color: '#9CA3AF',
-  },
-  soldOutOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  soldOutText: {
-    backgroundColor: '#1A1A2E',
-    color: '#fff',
-    fontSize: 8,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    letterSpacing: 1,
-  },
-  emptyState: {
-    paddingVertical: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyIconWrapper: {
-    width: 96,
-    height: 96,
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  emptyStateTitle: {
-    color: '#1A1A2E',
-    fontSize: 20,
-    fontWeight: '900',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  emptyStateSub: {
-    color: '#9ca3af',
-    textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 32,
-    fontWeight: '500',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  selectAddressButton: {
-    marginTop: 32,
-    backgroundColor: '#FF6B35',
-    paddingHorizontal: 40,
-    paddingVertical: 20,
-    borderRadius: 20,
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowRadius: 15,
     elevation: 5,
   },
-  selectAddressButtonText: {
-    color: '#fff',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontSize: 12,
-  },
-  floatingCartContainer: {
-    position: 'absolute',
-    bottom: 40,
-    left: 24,
-    right: 24,
-  },
-  floatingCartButton: {
-    height: 72,
-    backgroundColor: '#1A1A2E',
-    borderRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  cartCountText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  cartTotalText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  viewCartAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FF6B35',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  viewCartText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    marginRight: 8,
-  },
+  searchInput: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A2E' },
+  vegToggleContainer: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: '#f3f4f6', paddingLeft: 12, marginLeft: 8 },
+  vegIconBox: { width: 14, height: 14, borderWidth: 1, borderColor: '#22C55E', alignItems: 'center', justifyContent: 'center', marginRight: 2 },
+  vegIconDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
+  
+  scrollView: { flex: 1 },
+  
+  kitchenPausedBanner: { backgroundColor: '#1A1A2E', marginHorizontal: 16, marginTop: 24, padding: 20, borderRadius: 24, flexDirection: 'row', alignItems: 'center' },
+  pausedTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  pausedReason: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '500', marginTop: 2 },
+  
+  promoBannerContainer: { marginHorizontal: 16, marginTop: 24 },
+  promoImageMock: { height: 160, backgroundColor: '#1A1A2E', borderRadius: 24, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  promoImageMockTitle: { color: '#fff', fontSize: 28, fontWeight: '900', textAlign: 'center', letterSpacing: -1 },
+  promoImageMockSub: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '900', letterSpacing: 2, marginTop: 4 },
+  promoCodePill: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginTop: 16 },
+  promoCodeText: { color: '#1A1A2E', fontWeight: '900', fontSize: 12 },
+
+  secondaryBannerContainer: { marginHorizontal: 16, marginTop: 16 },
+  secondaryBanner: { backgroundColor: '#FEF3C7', padding: 16, borderRadius: 16, alignItems: 'center' },
+  secondaryBannerTitle: { color: '#B45309', fontSize: 16, fontWeight: '900' },
+  secondaryBannerSub: { color: '#D97706', fontSize: 12, fontWeight: '600', marginTop: 2 },
+
+  categoryGridContainer: { marginTop: 24 },
+  categoryGridScroll: { paddingHorizontal: 16 },
+  categoryRow: { flexDirection: 'row', marginBottom: 16 },
+  categoryCircleItem: { alignItems: 'center', width: 80, marginRight: 16 },
+  categoryCircleImage: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, alignItems: 'center', justifyContent: 'center' },
+  categoryCircleImageActive: { borderWidth: 2, borderColor: '#FF6B35' },
+  categoryCircleInit: { fontSize: 24, fontWeight: '900', color: '#FF6B35' },
+  categoryCircleText: { marginTop: 8, fontSize: 11, fontWeight: '600', color: '#4B5563', textAlign: 'center' },
+  categoryCircleTextActive: { color: '#FF6B35', fontWeight: '900' },
+
+  itemsContainer: { paddingHorizontal: 16, marginTop: 8 },
+  premiumItemsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  premiumCard: { width: (width - 48) / 2, backgroundColor: '#fff', borderRadius: 24, padding: 12, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  premiumImageWrapper: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: '#f3f4f6', overflow: 'visible', position: 'relative' },
+  premiumImage: { width: '100%', height: '100%', borderRadius: 16 },
+  premiumImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(34, 197, 94, 0.05)', borderRadius: 16 },
+  premiumImagePlaceholderText: { color: '#FF6B35', fontWeight: '900', fontSize: 24 },
+  bestsellerTag: { position: 'absolute', top: -4, left: -4, backgroundColor: '#fff', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2, zIndex: 10 },
+  bestsellerTagText: { color: '#FF6B35', fontSize: 9, fontWeight: '900', textTransform: 'uppercase' },
+  
+  floatingAddContainer: { position: 'absolute', bottom: -12, right: -4, zIndex: 20, alignItems: 'center' },
+  customiseTag: { backgroundColor: '#fff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginBottom: -6, zIndex: 21, borderWidth: 1, borderColor: '#FF6B35' },
+  customiseTagText: { color: '#FF6B35', fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
+  floatingAddButton: { backgroundColor: '#FF6B35', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  floatingAddButtonDisabled: { backgroundColor: '#9CA3AF', shadowOpacity: 0 },
+  floatingAddButtonText: { color: '#fff', fontWeight: '900', fontSize: 13, marginRight: 4 },
+  floatingAddPlus: { opacity: 0.8 },
+  floatingAddPlusText: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  floatingQuantityControl: { backgroundColor: '#FF6B35', flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  floatingQtyBtn: { padding: 6 },
+  floatingQtyText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  floatingQtyValue: { color: '#fff', fontSize: 14, fontWeight: '900', paddingHorizontal: 8 },
+  
+  premiumInfo: { marginTop: 20 },
+  premiumTagsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  vegIndicatorSmall: { width: 12, height: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 6, borderRadius: 2 },
+  vegDotSmall: { width: 4, height: 4, borderRadius: 2 },
+  servesTag: { backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  servesTagText: { color: '#B45309', fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
+  premiumName: { fontSize: 14, fontWeight: '800', color: '#1A1A2E', lineHeight: 18, marginBottom: 4 },
+  premiumPrice: { fontSize: 15, fontWeight: '900', color: '#1A1A2E', marginBottom: 4 },
+  premiumDesc: { fontSize: 11, color: '#9CA3AF', fontWeight: '500', lineHeight: 14 },
+
+  soldOutOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  soldOutText: { color: '#fff', fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 },
+
+  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  skeletonCard: { width: (width - 48) / 2, backgroundColor: '#fff', borderRadius: 24, padding: 12, marginBottom: 16 },
+  skeletonImage: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: '#E5E7EB' },
+  skeletonInfo: { marginTop: 16 },
+  skeletonTextRow: { width: '80%', height: 14, backgroundColor: '#E5E7EB', borderRadius: 4, marginBottom: 8 },
+  skeletonTextShort: { width: '40%', height: 14, backgroundColor: '#E5E7EB', borderRadius: 4 },
+  
+  emptyState: { alignItems: 'center', paddingVertical: 64 },
+  emptyStateTitle: { color: '#1A1A2E', fontSize: 18, fontWeight: '900', marginTop: 16 },
+  emptyStateSub: { color: '#9CA3AF', fontSize: 13, marginTop: 4 },
+
+  floatingMenuPillContainer: { position: 'absolute', bottom: 90, left: 0, right: 0, alignItems: 'center', pointerEvents: 'box-none' },
+  floatingMenuPill: { backgroundColor: '#1A1A2E', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
+  floatingMenuPillText: { color: '#fff', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 },
+
+  stickyOfferBanner: { position: 'absolute', bottom: 16, left: 16, right: 16, backgroundColor: '#FFF3E0', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
+  offerIconCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  stickyOfferTitle: { color: '#E65100', fontSize: 14, fontWeight: '900' },
+  stickyOfferSub: { color: '#EF6C00', fontSize: 10, fontWeight: '900', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
+
+  floatingCartContainer: { position: 'absolute', bottom: 16, left: 16, right: 16 },
+  floatingCartButton: { backgroundColor: '#FF6B35', borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 15, elevation: 8 },
+  cartCountText: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
+  cartTotalText: { color: '#fff', fontSize: 18, fontWeight: '900', marginTop: 2 },
+  viewCartAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
+  viewCartText: { color: '#fff', fontWeight: '900', fontSize: 13, marginRight: 8 },
 });
 
 export default HomeScreen;

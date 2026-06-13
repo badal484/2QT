@@ -14,6 +14,8 @@ import AddEditMenuItemScreen from '../screens/admin/AddEditMenuItemScreen';
 import UserManagementScreen from '../screens/admin/UserManagementScreen';
 import TicketDetailScreen from '../screens/admin/TicketDetailScreen';
 import StockScreen from '../screens/StockScreen';
+import BannersManagerScreen from '../screens/admin/BannersManagerScreen';
+import PromoCodesManagerScreen from '../screens/admin/PromoCodesManagerScreen';
 
 import { LayoutDashboard, ShoppingBag, Truck, IndianRupee, Headphones } from 'lucide-react-native';
 
@@ -79,6 +81,8 @@ const AdminNavigator = () => {
       <Stack.Screen name="UserManagement" component={UserManagementScreen} />
       <Stack.Screen name="TicketDetail" component={TicketDetailScreen} />
       <Stack.Screen name="Stock" component={StockScreen} />
+      <Stack.Screen name="BannersManager" component={BannersManagerScreen} />
+      <Stack.Screen name="PromoCodesManager" component={PromoCodesManagerScreen} />
     </Stack.Navigator>
   );
 };

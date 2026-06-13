@@ -1,7 +1,9 @@
 import { api } from '../api/client';
 
-const IMAGEKIT_URL_ENDPOINT = 'https://ik.imagekit.io/oellcbqek';
-const IMAGEKIT_PUBLIC_KEY = 'public_PStmG2ipavrJoxTXsWmjsYk5T+Y=';
+import { ENV } from '../config/env';
+
+const IMAGEKIT_URL_ENDPOINT = ENV.IMAGEKIT_URL_ENDPOINT;
+const IMAGEKIT_PUBLIC_KEY = ENV.IMAGEKIT_PUBLIC_KEY;
 
 export interface ImageKitUploadResult {
     url: string;

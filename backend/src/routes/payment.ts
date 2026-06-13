@@ -20,7 +20,7 @@ const razorpay = new Razorpay({
 
 router.post('/create-order', authenticate, paymentLimiter, async (req: AuthRequest, res) => {
     const customerId = req.user!.userId;
-    const { items, addressId, promoCode, useWallet, useLoyalty, isSubscriptionOrder, paymentMethod = 'online', dryRun, instructions, scheduledAt } = req.body;
+    const { items, addressId, promoCode, useWallet, useLoyalty, isSubscriptionOrder, paymentMethod = 'online', dryRun, instructions, scheduledAt, riderTipPaise } = req.body;
 
     try {
         const pricing = await calculatePricing({
@@ -30,7 +30,8 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             walletAmountPaise: useWallet ? 99999999 : 0,
             useLoyalty,
             isSubscriptionOrder,
-            customerId
+            customerId,
+            riderTipPaise
         });
 
         const { rows: wallet } = await query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [customerId]);
