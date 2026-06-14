@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   emptySub: { color: '#9ca3af', textAlign: 'center', marginTop: 16, fontWeight: '500', fontSize: 15, lineHeight: 24 },
   exploreButton: { marginTop: 40, backgroundColor: '#FF6B35', paddingHorizontal: 48, paddingVertical: 20, borderRadius: 24, shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 8 },
   exploreButtonText: { color: '#fff', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 12 },
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
+  loadingOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
   loadingOverlayText: { color: '#1A1A2E', fontSize: 16, fontWeight: '900', marginTop: 16 }
 });
 

@@ -169,8 +169,8 @@ const HomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* VIBRANT GREEN HEADER (SWISH STYLE) */}
-      <View style={styles.vibrantHeader}>
+      {/* MINIMALIST PREMIUM HEADER */}
+      <View style={styles.minimalHeader}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity 
             style={styles.addressSection}
@@ -180,7 +180,11 @@ const HomeScreen = ({ navigation }: any) => {
             }}
           >
             <View style={styles.etaRow}>
-              <Text style={styles.etaText}>15 Minutes</Text>
+              <View style={styles.etaBadge}>
+                <Navigation size={10} color="#FF6B35" style={{ marginRight: 4 }} />
+                <Text style={styles.etaText}>15 MINS</Text>
+              </View>
+              <Text style={styles.deliveringToText}>DELIVERING TO</Text>
             </View>
             <View style={styles.addressValueRow}>
               <Text style={styles.addressValue} numberOfLines={1}>
@@ -192,14 +196,14 @@ const HomeScreen = ({ navigation }: any) => {
                       ? 'Locating...' 
                       : 'Select Location'}
               </Text>
-              <ChevronDown size={16} color="#fff" style={{ marginLeft: 4 }} />
+              <ChevronDown size={18} color="#1A1A2E" style={{ marginLeft: 4 }} />
             </View>
           </TouchableOpacity>
           
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.proButton} onPress={() => navigation.navigate('Subscription')}>
               <Sparkles size={16} color="#FF6B35" />
-              <Text style={styles.proButtonText}>Get</Text>
+              <Text style={styles.proButtonText}>Pro</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.profileButton}
@@ -221,7 +225,7 @@ const HomeScreen = ({ navigation }: any) => {
         <View style={styles.searchBarContainer}>
           <Search size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
           <TextInput
-            placeholder='Search "Rajma Rice"'
+            placeholder='Search for dishes, restaurants...'
             placeholderTextColor="#9CA3AF"
             style={styles.searchInput}
             value={searchQuery}
@@ -237,7 +241,7 @@ const HomeScreen = ({ navigation }: any) => {
                 triggerHaptic();
                 setIsVegOnly(val);
               }}
-              trackColor={{ false: '#e5e7eb', true: '#FF6B35' }}
+              trackColor={{ false: '#E5E7EB', true: '#22C55E' }}
               thumbColor="#fff"
               style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
@@ -281,20 +285,13 @@ const HomeScreen = ({ navigation }: any) => {
           </Animated.View>
         )}
 
-        {/* CIRCULAR CATEGORY GRID */}
+        {/* PILL CATEGORY GRID */}
         {!isLoading && categories.length > 1 && (
           <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.categoryGridContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryGridScroll}>
-              <View style={styles.categoryRow}>
-                {categories.slice(0, Math.ceil(categories.length/2)).map((cat: any) => (
-                  <CategoryCircle key={cat} name={cat} isSelected={selectedCategory === cat} onPress={() => { triggerHaptic(); setSelectedCategory(cat); }} />
+                {categories.map((cat: any) => (
+                  <CategoryPill key={cat} name={cat} isSelected={selectedCategory === cat} onPress={() => { triggerHaptic(); setSelectedCategory(cat); }} />
                 ))}
-              </View>
-              <View style={styles.categoryRow}>
-                {categories.slice(Math.ceil(categories.length/2)).map((cat: any) => (
-                  <CategoryCircle key={`bottom-${cat}`} name={cat} isSelected={selectedCategory === cat} onPress={() => { triggerHaptic(); setSelectedCategory(cat); }} />
-                ))}
-              </View>
             </ScrollView>
           </Animated.View>
         )}
@@ -356,7 +353,7 @@ const HomeScreen = ({ navigation }: any) => {
           // Scroll to top or show category modal logic
           setSelectedCategory('All');
         }}>
-          <ChefHat size={16} color="#fff" style={{ marginRight: 6 }} />
+          <ChefHat size={16} color="#1A1A2E" style={{ marginRight: 6 }} />
           <Text style={styles.floatingMenuPillText}>Menu</Text>
         </TouchableOpacity>
       </View>
@@ -390,13 +387,9 @@ const HomeScreen = ({ navigation }: any) => {
 
 // Sub-components
 
-const CategoryCircle = ({ name, isSelected, onPress }: any) => (
-  <TouchableOpacity style={styles.categoryCircleItem} onPress={onPress}>
-    <View style={[styles.categoryCircleImage, isSelected && styles.categoryCircleImageActive]}>
-      {/* Fallback to text for category since we don't have category images */}
-      <Text style={styles.categoryCircleInit}>{name.charAt(0).toUpperCase()}</Text>
-    </View>
-    <Text style={[styles.categoryCircleText, isSelected && styles.categoryCircleTextActive]} numberOfLines={2}>
+const CategoryPill = ({ name, isSelected, onPress }: any) => (
+  <TouchableOpacity style={[styles.categoryPillItem, isSelected && styles.categoryPillItemActive]} onPress={onPress}>
+    <Text style={[styles.categoryPillText, isSelected && styles.categoryPillTextActive]}>
       {name}
     </Text>
   </TouchableOpacity>
@@ -484,50 +477,49 @@ const ImageBackgroundMock = ({ text, sub, code }: any) => (
 
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  vibrantHeader: {
-    backgroundColor: '#FF6B35', // Brand Orange
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  minimalHeader: {
+    backgroundColor: '#FFFFFF',
     paddingTop: 64,
     paddingHorizontal: 16,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   headerTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
   addressSection: { flex: 1, marginRight: 16 },
-  etaRow: { flexDirection: 'row', alignItems: 'center' },
-  etaText: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  addressValueRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  addressValue: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' },
+  etaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  etaBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF7ED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 8 },
+  etaText: { color: '#FF6B35', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  deliveringToText: { color: '#9CA3AF', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  addressValueRow: { flexDirection: 'row', alignItems: 'center' },
+  addressValue: { color: '#1A1A2E', fontSize: 15, fontWeight: '800' },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
-  proButton: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', marginRight: 12 },
+  proButton: { backgroundColor: '#FFF7ED', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', marginRight: 12 },
   proButtonText: { color: '#FF6B35', fontWeight: '900', fontSize: 12, marginLeft: 4 },
-  profileButton: { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  profileButton: { width: 40, height: 40, backgroundColor: '#F3F4F6', borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   profileImage: { width: '100%', height: '100%' },
   
   searchBarContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FAFB',
     borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     height: 52,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   searchInput: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A2E' },
-  vegToggleContainer: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: '#f3f4f6', paddingLeft: 12, marginLeft: 8 },
+  vegToggleContainer: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: '#E5E7EB', paddingLeft: 12, marginLeft: 8 },
   vegIconBox: { width: 14, height: 14, borderWidth: 1, borderColor: '#22C55E', alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   vegIconDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
   
   scrollView: { flex: 1 },
   
-  kitchenPausedBanner: { backgroundColor: '#1A1A2E', marginHorizontal: 16, marginTop: 24, padding: 20, borderRadius: 24, flexDirection: 'row', alignItems: 'center' },
-  pausedTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  pausedReason: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '500', marginTop: 2 },
+  kitchenPausedBanner: { backgroundColor: '#FEE2E2', marginHorizontal: 16, marginTop: 24, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#FECACA' },
+  pausedTitle: { color: '#991B1B', fontSize: 15, fontWeight: '800' },
+  pausedReason: { color: '#B91C1C', fontSize: 12, fontWeight: '500', marginTop: 2 },
   
   promoBannerContainer: { marginHorizontal: 16, marginTop: 24 },
   promoImageMock: { height: 160, backgroundColor: '#1A1A2E', borderRadius: 24, alignItems: 'center', justifyContent: 'center', padding: 20 },
@@ -536,83 +528,75 @@ const styles = StyleSheet.create({
   promoCodePill: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginTop: 16 },
   promoCodeText: { color: '#1A1A2E', fontWeight: '900', fontSize: 12 },
 
-  secondaryBannerContainer: { marginHorizontal: 16, marginTop: 16 },
-  secondaryBanner: { backgroundColor: '#FEF3C7', padding: 16, borderRadius: 16, alignItems: 'center' },
-  secondaryBannerTitle: { color: '#B45309', fontSize: 16, fontWeight: '900' },
-  secondaryBannerSub: { color: '#D97706', fontSize: 12, fontWeight: '600', marginTop: 2 },
-
   categoryGridContainer: { marginTop: 24 },
-  categoryGridScroll: { paddingHorizontal: 16 },
-  categoryRow: { flexDirection: 'row', marginBottom: 16 },
-  categoryCircleItem: { alignItems: 'center', width: 80, marginRight: 16 },
-  categoryCircleImage: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, alignItems: 'center', justifyContent: 'center' },
-  categoryCircleImageActive: { borderWidth: 2, borderColor: '#FF6B35' },
-  categoryCircleInit: { fontSize: 24, fontWeight: '900', color: '#FF6B35' },
-  categoryCircleText: { marginTop: 8, fontSize: 11, fontWeight: '600', color: '#4B5563', textAlign: 'center' },
-  categoryCircleTextActive: { color: '#FF6B35', fontWeight: '900' },
+  categoryGridScroll: { paddingHorizontal: 16, gap: 8 },
+  categoryPillItem: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, marginRight: 8, height: 40, justifyContent: 'center' },
+  categoryPillItemActive: { backgroundColor: '#1A1A2E', borderColor: '#1A1A2E' },
+  categoryPillText: { fontSize: 13, fontWeight: '700', color: '#4B5563' },
+  categoryPillTextActive: { color: '#FFFFFF' },
 
-  itemsContainer: { paddingHorizontal: 16, marginTop: 8 },
+  itemsContainer: { paddingHorizontal: 16, marginTop: 24 },
   premiumItemsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  premiumCard: { width: (width - 48) / 2, backgroundColor: '#fff', borderRadius: 24, padding: 12, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
-  premiumImageWrapper: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: '#f3f4f6', overflow: 'visible', position: 'relative' },
-  premiumImage: { width: '100%', height: '100%', borderRadius: 16 },
-  premiumImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(34, 197, 94, 0.05)', borderRadius: 16 },
-  premiumImagePlaceholderText: { color: '#FF6B35', fontWeight: '900', fontSize: 24 },
-  bestsellerTag: { position: 'absolute', top: -4, left: -4, backgroundColor: '#fff', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2, zIndex: 10 },
-  bestsellerTagText: { color: '#FF6B35', fontSize: 9, fontWeight: '900', textTransform: 'uppercase' },
+  premiumCard: { width: (width - 48) / 2, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6' },
+  premiumImageWrapper: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: '#F9FAFB', overflow: 'visible', position: 'relative' },
+  premiumImage: { width: '100%', height: '100%', borderRadius: 12 },
+  premiumImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderRadius: 12 },
+  premiumImagePlaceholderText: { color: '#D1D5DB', fontWeight: '900', fontSize: 24 },
+  bestsellerTag: { position: 'absolute', top: -4, left: -4, backgroundColor: '#FF6B35', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6, zIndex: 10 },
+  bestsellerTagText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', textTransform: 'uppercase' },
   
-  floatingAddContainer: { position: 'absolute', bottom: -12, right: -4, zIndex: 20, alignItems: 'center' },
-  customiseTag: { backgroundColor: '#fff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginBottom: -6, zIndex: 21, borderWidth: 1, borderColor: '#FF6B35' },
-  customiseTagText: { color: '#FF6B35', fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
-  floatingAddButton: { backgroundColor: '#FF6B35', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  floatingAddButtonDisabled: { backgroundColor: '#9CA3AF', shadowOpacity: 0 },
-  floatingAddButtonText: { color: '#fff', fontWeight: '900', fontSize: 13, marginRight: 4 },
-  floatingAddPlus: { opacity: 0.8 },
-  floatingAddPlusText: { color: '#fff', fontWeight: '900', fontSize: 14 },
-  floatingQuantityControl: { backgroundColor: '#FF6B35', flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  floatingAddContainer: { position: 'absolute', bottom: -12, alignSelf: 'center', zIndex: 20 },
+  customiseTag: { backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginBottom: -6, zIndex: 21, borderWidth: 1, borderColor: '#E5E7EB', alignSelf: 'center' },
+  customiseTagText: { color: '#6B7280', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' },
+  floatingAddButton: { backgroundColor: '#FFFFFF', paddingHorizontal: 24, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  floatingAddButtonDisabled: { backgroundColor: '#F3F4F6', opacity: 0.8 },
+  floatingAddButtonText: { color: '#FF6B35', fontWeight: '900', fontSize: 13, marginRight: 4 },
+  floatingAddPlus: { opacity: 1 },
+  floatingAddPlusText: { color: '#FF6B35', fontWeight: '900', fontSize: 14 },
+  floatingQuantityControl: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#FF6B35', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   floatingQtyBtn: { padding: 6 },
-  floatingQtyText: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  floatingQtyValue: { color: '#fff', fontSize: 14, fontWeight: '900', paddingHorizontal: 8 },
+  floatingQtyText: { color: '#FF6B35', fontSize: 16, fontWeight: '900' },
+  floatingQtyValue: { color: '#FF6B35', fontSize: 14, fontWeight: '900', paddingHorizontal: 8 },
   
   premiumInfo: { marginTop: 20 },
   premiumTagsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   vegIndicatorSmall: { width: 12, height: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 6, borderRadius: 2 },
   vegDotSmall: { width: 4, height: 4, borderRadius: 2 },
-  servesTag: { backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  servesTagText: { color: '#B45309', fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
+  servesTag: { backgroundColor: '#F3F4F6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  servesTagText: { color: '#6B7280', fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
   premiumName: { fontSize: 14, fontWeight: '800', color: '#1A1A2E', lineHeight: 18, marginBottom: 4 },
   premiumPrice: { fontSize: 15, fontWeight: '900', color: '#1A1A2E', marginBottom: 4 },
   premiumDesc: { fontSize: 11, color: '#9CA3AF', fontWeight: '500', lineHeight: 14 },
 
-  soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
-  soldOutText: { color: '#fff', fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 },
+  soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  soldOutText: { color: '#1A1A2E', fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 },
 
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  skeletonCard: { width: (width - 48) / 2, backgroundColor: '#fff', borderRadius: 24, padding: 12, marginBottom: 16 },
-  skeletonImage: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: '#E5E7EB' },
+  skeletonCard: { width: (width - 48) / 2, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6' },
+  skeletonImage: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: '#F3F4F6' },
   skeletonInfo: { marginTop: 16 },
-  skeletonTextRow: { width: '80%', height: 14, backgroundColor: '#E5E7EB', borderRadius: 4, marginBottom: 8 },
-  skeletonTextShort: { width: '40%', height: 14, backgroundColor: '#E5E7EB', borderRadius: 4 },
+  skeletonTextRow: { width: '80%', height: 14, backgroundColor: '#F3F4F6', borderRadius: 4, marginBottom: 8 },
+  skeletonTextShort: { width: '40%', height: 14, backgroundColor: '#F3F4F6', borderRadius: 4 },
   
   emptyState: { alignItems: 'center', paddingVertical: 64 },
   emptyStateTitle: { color: '#1A1A2E', fontSize: 18, fontWeight: '900', marginTop: 16 },
   emptyStateSub: { color: '#9CA3AF', fontSize: 13, marginTop: 4 },
 
   floatingMenuPillContainer: { position: 'absolute', bottom: 90, left: 0, right: 0, alignItems: 'center', pointerEvents: 'box-none' },
-  floatingMenuPill: { backgroundColor: '#1A1A2E', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
-  floatingMenuPillText: { color: '#fff', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 },
+  floatingMenuPill: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 8, borderWidth: 1, borderColor: '#E5E7EB' },
+  floatingMenuPillText: { color: '#1A1A2E', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 },
 
-  stickyOfferBanner: { position: 'absolute', bottom: 16, left: 16, right: 16, backgroundColor: '#FFF3E0', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
+  stickyOfferBanner: { position: 'absolute', bottom: 16, left: 16, right: 16, backgroundColor: '#1A1A2E', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 8 },
   offerIconCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  stickyOfferTitle: { color: '#E65100', fontSize: 14, fontWeight: '900' },
-  stickyOfferSub: { color: '#EF6C00', fontSize: 10, fontWeight: '900', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
+  stickyOfferTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  stickyOfferSub: { color: '#9CA3AF', fontSize: 10, fontWeight: '800', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
 
   floatingCartContainer: { position: 'absolute', bottom: 16, left: 16, right: 16 },
-  floatingCartButton: { backgroundColor: '#FF6B35', borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 15, elevation: 8 },
-  cartCountText: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
-  cartTotalText: { color: '#fff', fontSize: 18, fontWeight: '900', marginTop: 2 },
-  viewCartAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
-  viewCartText: { color: '#fff', fontWeight: '900', fontSize: 13, marginRight: 8 },
+  floatingCartButton: { backgroundColor: '#1A1A2E', borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
+  cartCountText: { color: '#9CA3AF', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  cartTotalText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginTop: 2 },
+  viewCartAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
+  viewCartText: { color: '#FFFFFF', fontWeight: '900', fontSize: 13, marginRight: 8 },
 });
 
 export default HomeScreen;
