@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -22,6 +22,7 @@ const MarketingTab = dynamic(() => import("./MarketingTab").then(m => ({ default
 const MenuTab = dynamic(() => import("./MenuTab").then(m => ({ default: m.MenuTab })), { ssr: false });
 const ZonesTab = dynamic(() => import("./ZonesTab").then(m => ({ default: m.ZonesTab })), { ssr: false });
 const KitchensTab = dynamic(() => import("./KitchensTab").then(m => ({ default: m.KitchensTab })), { ssr: false });
+const PromoCodesTab = dynamic(() => import("./PromoCodesTab").then(m => ({ default: m.PromoCodesTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1637,6 +1638,7 @@ const TABS = [
   { name: "Broadcast", icon: Send, component: BroadcastTab },
   { name: "Systems", icon: Cpu, component: SystemsTab },
   { name: "Marketing", icon: Zap, component: MarketingTab },
+  { name: "Promo Codes", icon: Ticket, component: PromoCodesTab },
   { name: "Zones", icon: MapPin, component: ZonesTab },
   { name: "Kitchens", icon: Store, component: KitchensTab },
   { name: "Settings", icon: Settings, component: SettingsTab },
@@ -1716,7 +1718,7 @@ export default function AdminPage() {
           {[
             { section: "Main", items: ["Overview", "Analytics", "Orders", "Scheduled", "Fleet", "Customers", "Support"] },
             { section: "Operations", items: ["Menu", "Inventory", "Zones", "Kitchens", "Finance", "Applications"] },
-            { section: "System", items: ["Broadcast", "Marketing", "Systems", "Settings"] },
+            { section: "System", items: ["Broadcast", "Marketing", "Promo Codes", "Systems", "Settings"] },
           ].map(group => (
             <div key={group.section}>
               <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-3 mb-2">{group.section}</div>
