@@ -11,6 +11,7 @@ import ReactNativeHapticFeedback from "react-native-haptic-feedback";
 import Animated, { FadeInDown, FadeIn, Layout, BounceIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { useLocation } from '../hooks/useLocation';
 import { NetworkImage } from '../components/NetworkImage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +49,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [unserviceableLocation, setUnserviceableLocation] = useState(false);
   const { location, loadingLocation, fetchLocation } = useLocation();
+  const insets = useSafeAreaInsets();
 
   React.useEffect(() => {
     if (socket && zoneId) {
@@ -170,7 +172,7 @@ const HomeScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       {/* MINIMALIST PREMIUM HEADER */}
-      <View style={styles.minimalHeader}>
+      <View style={[styles.minimalHeader, { paddingTop: Math.max(insets.top + 16, 60) }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity 
             style={styles.addressSection}
@@ -419,35 +421,6 @@ const PremiumItemCard = ({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaus
             <Text style={styles.soldOutText}>Sold Out</Text>
           </View>
         )}
-
-        {/* Floating Add Button overlapping image */}
-        <View style={styles.floatingAddContainer}>
-          {cartItem ? (
-            <View style={styles.floatingQuantityControl}>
-              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity - 1)} style={styles.floatingQtyBtn}>
-                <Text style={styles.floatingQtyText}>−</Text>
-              </TouchableOpacity>
-              <Text style={styles.floatingQtyValue}>{cartItem.quantity}</Text>
-              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity + 1)} style={styles.floatingQtyBtn}>
-                <Text style={styles.floatingQtyText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={{ alignItems: 'center' }}>
-              <View style={styles.customiseTag}>
-                <Text style={styles.customiseTagText}>Customise</Text>
-              </View>
-              <TouchableOpacity 
-                style={[styles.floatingAddButton, (!item.available || kitchenPaused) && styles.floatingAddButtonDisabled]}
-                disabled={!item.available || kitchenPaused}
-                onPress={onAdd}
-              >
-                <Text style={styles.floatingAddButtonText}>Add</Text>
-                <View style={styles.floatingAddPlus}><Text style={styles.floatingAddPlusText}>+</Text></View>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
       </View>
       
       <View style={styles.premiumInfo}>
@@ -461,7 +434,29 @@ const PremiumItemCard = ({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaus
         </View>
         <Text style={styles.premiumName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.premiumPrice}>₹{item.price_paise / 100}</Text>
-        <Text style={styles.premiumDesc} numberOfLines={2}>{item.description}</Text>
+        
+        {/* ADD BUTTON MOVED BELOW TEXT FOR CLEANER UI */}
+        <View style={{ marginTop: 12 }}>
+          {cartItem ? (
+            <View style={styles.floatingQuantityControl}>
+              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity - 1)} style={styles.floatingQtyBtn}>
+                <Text style={styles.floatingQtyText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.floatingQtyValue}>{cartItem.quantity}</Text>
+              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity + 1)} style={styles.floatingQtyBtn}>
+                <Text style={styles.floatingQtyText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.floatingAddButton, (!item.available || kitchenPaused) && styles.floatingAddButtonDisabled]}
+              disabled={!item.available || kitchenPaused}
+              onPress={onAdd}
+            >
+              <Text style={styles.floatingAddButtonText}>ADD</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   </Animated.View>
@@ -480,7 +475,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   minimalHeader: {
     backgroundColor: '#FFFFFF',
-    paddingTop: 64,
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
@@ -535,27 +529,22 @@ const styles = StyleSheet.create({
   categoryPillText: { fontSize: 13, fontWeight: '700', color: '#4B5563' },
   categoryPillTextActive: { color: '#FFFFFF' },
 
-  itemsContainer: { paddingHorizontal: 16, marginTop: 24 },
+  itemsContainer: { paddingHorizontal: 16, marginTop: 24, paddingBottom: 40 },
   premiumItemsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  premiumCard: { width: (width - 48) / 2, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6' },
-  premiumImageWrapper: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: '#F9FAFB', overflow: 'visible', position: 'relative' },
+  premiumCard: { width: (width - 48) / 2, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6' },
+  premiumImageWrapper: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: '#F9FAFB', overflow: 'hidden', position: 'relative' },
   premiumImage: { width: '100%', height: '100%', borderRadius: 12 },
   premiumImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderRadius: 12 },
   premiumImagePlaceholderText: { color: '#D1D5DB', fontWeight: '900', fontSize: 24 },
-  bestsellerTag: { position: 'absolute', top: -4, left: -4, backgroundColor: '#FF6B35', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6, zIndex: 10 },
-  bestsellerTagText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', textTransform: 'uppercase' },
+  bestsellerTag: { position: 'absolute', top: 0, left: 0, backgroundColor: '#FF6B35', paddingHorizontal: 6, paddingVertical: 4, borderBottomRightRadius: 8, zIndex: 10 },
+  bestsellerTagText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
   
-  floatingAddContainer: { position: 'absolute', bottom: -12, alignSelf: 'center', zIndex: 20 },
-  customiseTag: { backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginBottom: -6, zIndex: 21, borderWidth: 1, borderColor: '#E5E7EB', alignSelf: 'center' },
-  customiseTagText: { color: '#6B7280', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' },
-  floatingAddButton: { backgroundColor: '#FFFFFF', paddingHorizontal: 24, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  floatingAddButtonDisabled: { backgroundColor: '#F3F4F6', opacity: 0.8 },
-  floatingAddButtonText: { color: '#FF6B35', fontWeight: '900', fontSize: 13, marginRight: 4 },
-  floatingAddPlus: { opacity: 1 },
-  floatingAddPlusText: { color: '#FF6B35', fontWeight: '900', fontSize: 14 },
-  floatingQuantityControl: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#FF6B35', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  floatingQtyBtn: { padding: 6 },
-  floatingQtyText: { color: '#FF6B35', fontSize: 16, fontWeight: '900' },
+  floatingAddButton: { backgroundColor: '#FFF7ED', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFEDD5' },
+  floatingAddButtonDisabled: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
+  floatingAddButtonText: { color: '#FF6B35', fontWeight: '900', fontSize: 13 },
+  floatingQuantityControl: { backgroundColor: '#FFF7ED', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#FFEDD5' },
+  floatingQtyBtn: { padding: 4 },
+  floatingQtyText: { color: '#FF6B35', fontSize: 18, fontWeight: '900' },
   floatingQtyValue: { color: '#FF6B35', fontSize: 14, fontWeight: '900', paddingHorizontal: 8 },
   
   premiumInfo: { marginTop: 20 },
@@ -582,21 +571,21 @@ const styles = StyleSheet.create({
   emptyStateTitle: { color: '#1A1A2E', fontSize: 18, fontWeight: '900', marginTop: 16 },
   emptyStateSub: { color: '#9CA3AF', fontSize: 13, marginTop: 4 },
 
-  floatingMenuPillContainer: { position: 'absolute', bottom: 90, left: 0, right: 0, alignItems: 'center', pointerEvents: 'box-none' },
+  floatingMenuPillContainer: { position: 'absolute', bottom: 100, left: 0, right: 0, alignItems: 'center', pointerEvents: 'box-none' },
   floatingMenuPill: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 8, borderWidth: 1, borderColor: '#E5E7EB' },
   floatingMenuPillText: { color: '#1A1A2E', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 },
 
-  stickyOfferBanner: { position: 'absolute', bottom: 16, left: 16, right: 16, backgroundColor: '#1A1A2E', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 8 },
-  offerIconCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  stickyOfferTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-  stickyOfferSub: { color: '#9CA3AF', fontSize: 10, fontWeight: '800', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
+  stickyOfferBanner: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#1A1A2E', padding: 20, paddingBottom: 36, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 12 },
+  offerIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255, 107, 53, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  stickyOfferTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  stickyOfferSub: { color: '#9CA3AF', fontSize: 11, fontWeight: '700', marginTop: 2, letterSpacing: 0.5 },
 
-  floatingCartContainer: { position: 'absolute', bottom: 16, left: 16, right: 16 },
-  floatingCartButton: { backgroundColor: '#1A1A2E', borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
-  cartCountText: { color: '#9CA3AF', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  cartTotalText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginTop: 2 },
-  viewCartAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
-  viewCartText: { color: '#FFFFFF', fontWeight: '900', fontSize: 13, marginRight: 8 },
+  floatingCartContainer: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  floatingCartButton: { backgroundColor: '#1A1A2E', padding: 20, paddingBottom: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 12 },
+  cartCountText: { color: '#9CA3AF', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  cartTotalText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginTop: 2 },
+  viewCartAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B35', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+  viewCartText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14, marginRight: 8 },
 });
 
 export default HomeScreen;
