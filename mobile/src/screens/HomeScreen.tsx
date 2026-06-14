@@ -539,10 +539,10 @@ const styles = StyleSheet.create({
   bestsellerTag: { position: 'absolute', top: 0, left: 0, backgroundColor: '#FF6B35', paddingHorizontal: 6, paddingVertical: 4, borderBottomRightRadius: 8, zIndex: 10 },
   bestsellerTagText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
   
-  floatingAddButton: { backgroundColor: '#FFF7ED', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFEDD5' },
+  floatingAddButton: { alignSelf: 'center', width: 90, backgroundColor: '#FFF7ED', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFEDD5' },
   floatingAddButtonDisabled: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
   floatingAddButtonText: { color: '#FF6B35', fontWeight: '900', fontSize: 13 },
-  floatingQuantityControl: { backgroundColor: '#FFF7ED', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#FFEDD5' },
+  floatingQuantityControl: { alignSelf: 'center', width: 90, backgroundColor: '#FFF7ED', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#FFEDD5' },
   floatingQtyBtn: { padding: 4 },
   floatingQtyText: { color: '#FF6B35', fontSize: 18, fontWeight: '900' },
   floatingQtyValue: { color: '#FF6B35', fontSize: 14, fontWeight: '900', paddingHorizontal: 8 },
