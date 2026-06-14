@@ -78,14 +78,14 @@ export function MarketingTab() {
     setConfirmDialog({ isOpen: true, id });
   };
 
-  if (loading) return <div className="p-8 text-center text-black/40 font-medium animate-pulse">Loading Banners...</div>;
+  if (loading) return <div className="p-8 text-center text-zinc-500 font-medium animate-pulse">Loading Banners...</div>;
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-brand-dark mb-2">Promotional Banners</h2>
-          <p className="text-black/60 font-medium">Manage the auto-playing marketing carousel on the customer menu page.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Promotional Banners</h2>
+          <p className="text-zinc-400 font-medium">Manage the auto-playing marketing carousel on the customer menu page.</p>
         </div>
         <button 
           onClick={() => setIsCreating(true)}
@@ -96,39 +96,39 @@ export function MarketingTab() {
       </div>
 
       {isCreating && (
-        <div className="bg-white border border-black/5 rounded-3xl p-6 shadow-sm mb-8 space-y-4">
+        <div className="bg-[#11111a] border border-white/[0.05] rounded-3xl p-6 shadow-sm mb-8 space-y-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold">Create New Banner</h3>
-            <button onClick={() => setIsCreating(false)} className="text-black/40 hover:text-black"><X className="w-5 h-5"/></button>
+            <h3 className="text-lg font-bold text-white">Create New Banner</h3>
+            <button onClick={() => setIsCreating(false)} className="text-zinc-500 hover:text-white"><X className="w-5 h-5"/></button>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Title</label>
-              <input value={newBanner.title} onChange={e=>setNewBanner({...newBanner, title: e.target.value})} className="w-full bg-black/[0.02] border border-black/5 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="Gourmet Meals" />
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Title</label>
+              <input value={newBanner.title} onChange={e=>setNewBanner({...newBanner, title: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="Gourmet Meals" />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Subtitle</label>
-              <input value={newBanner.subtitle} onChange={e=>setNewBanner({...newBanner, subtitle: e.target.value})} className="w-full bg-black/[0.02] border border-black/5 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="Crafted for you" />
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Subtitle</label>
+              <input value={newBanner.subtitle} onChange={e=>setNewBanner({...newBanner, subtitle: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="Crafted for you" />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Tag Pill Text</label>
-              <input value={newBanner.tag_text} onChange={e=>setNewBanner({...newBanner, tag_text: e.target.value})} className="w-full bg-black/[0.02] border border-black/5 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="30 MIN" />
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Tag Pill Text</label>
+              <input value={newBanner.tag_text} onChange={e=>setNewBanner({...newBanner, tag_text: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="30 MIN" />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Image URL</label>
-              <input value={newBanner.image_url} onChange={e=>setNewBanner({...newBanner, image_url: e.target.value})} className="w-full bg-black/[0.02] border border-black/5 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="https://..." />
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Image URL</label>
+              <input value={newBanner.image_url} onChange={e=>setNewBanner({...newBanner, image_url: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="https://..." />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Action Type</label>
-              <select value={newBanner.action_type} onChange={e=>setNewBanner({...newBanner, action_type: e.target.value})} className="w-full bg-black/[0.02] border border-black/5 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary">
-                <option value="NONE">No Action</option>
-                <option value="APPLY_COUPON">Apply Coupon</option>
-                <option value="FILTER_CATEGORY">Filter Category</option>
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Action Type</label>
+              <select value={newBanner.action_type} onChange={e=>setNewBanner({...newBanner, action_type: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary">
+                <option value="NONE" className="text-black">No Action</option>
+                <option value="APPLY_COUPON" className="text-black">Apply Coupon</option>
+                <option value="FILTER_CATEGORY" className="text-black">Filter Category</option>
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Action Payload</label>
-              <input value={newBanner.action_payload} onChange={e=>setNewBanner({...newBanner, action_payload: e.target.value})} className="w-full bg-black/[0.02] border border-black/5 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="e.g. FIRST50 or Pizza" />
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Action Payload</label>
+              <input value={newBanner.action_payload} onChange={e=>setNewBanner({...newBanner, action_payload: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="e.g. FIRST50 or Pizza" />
             </div>
           </div>
           <div className="pt-4 flex justify-end">
@@ -139,7 +139,7 @@ export function MarketingTab() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {banners.map(banner => (
-          <div key={banner.id} className={`bg-white border ${banner.is_active ? 'border-brand-primary/30 shadow-lg' : 'border-black/5 opacity-60'} rounded-3xl overflow-hidden transition-all group`}>
+          <div key={banner.id} className={`bg-[#11111a] border ${banner.is_active ? 'border-brand-primary/30 shadow-lg' : 'border-white/[0.05] opacity-60'} rounded-3xl overflow-hidden transition-all group`}>
             <div className="relative h-32 bg-black">
                <Image src={banner.image_url} alt={banner.title} fill className="object-cover opacity-60" />
                <div className="absolute top-4 left-4 inline-flex items-center gap-1 bg-brand-primary text-[10px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow">
@@ -155,11 +155,11 @@ export function MarketingTab() {
                </div>
             </div>
             <div className="p-5">
-               <h3 className="font-bold text-lg leading-tight mb-1">{banner.title}</h3>
-               <p className="text-sm text-black/50 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
-               <div className="flex items-center justify-between border-t border-black/5 pt-4">
-                 <div className="text-xs font-bold uppercase text-black/40">Order: {banner.display_order}</div>
-                 <div className="text-xs font-bold bg-black/5 px-2 py-1 rounded text-black/60">
+               <h3 className="font-bold text-lg leading-tight text-white mb-1">{banner.title}</h3>
+               <p className="text-sm text-zinc-400 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
+               <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                 <div className="text-xs font-bold uppercase text-zinc-500">Order: {banner.display_order}</div>
+                 <div className="text-xs font-bold bg-white/5 px-2 py-1 rounded text-zinc-400">
                    {banner.action_type} {banner.action_payload && `(${banner.action_payload})`}
                  </div>
                </div>
@@ -167,7 +167,7 @@ export function MarketingTab() {
           </div>
         ))}
         {banners.length === 0 && (
-          <div className="col-span-full py-20 text-center text-black/40 font-medium">No banners found. Create one above.</div>
+          <div className="col-span-full py-20 text-center text-zinc-500 font-medium">No banners found. Create one above.</div>
         )}
       </div>
 
