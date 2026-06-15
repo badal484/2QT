@@ -6,7 +6,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import Animated, { FadeInDown, Layout, SlideInDown, BounceIn } from 'react-native-reanimated';
+import Animated, { FadeInDown, Layout, SlideInDown, BounceIn, useSharedValue, withRepeat, withTiming, useAnimatedStyle, Easing } from 'react-native-reanimated';
+
+const calculateBearing = (startLat: number, startLng: number, destLat: number, destLng: number) => {
+  const toRad = (val: number) => (val * Math.PI) / 180;
+  const toDeg = (val: number) => (val * 180) / Math.PI;
+  const startLatRad = toRad(startLat);
+  const startLngRad = toRad(startLng);
+  const destLatRad = toRad(destLat);
+  const destLngRad = toRad(destLng);
+  const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
+  const x = Math.cos(startLatRad) * Math.sin(destLatRad) - Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+};
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -62,11 +74,33 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
     longitudeDelta: 0.01,
   }));
   const [status, setStatus] = useState(o?.status || 'confirmed');
+  const [heading, setHeading] = useState(0);
+
+  // Pulse animation for destination marker
+  const pulseScale = useSharedValue(1);
+  const pulseOpacity = useSharedValue(0.6);
+
+  useEffect(() => {
+    pulseScale.value = withRepeat(withTiming(2.5, { duration: 1500, easing: Easing.out(Easing.ease) }), -1, false);
+    pulseOpacity.value = withRepeat(withTiming(0, { duration: 1500, easing: Easing.out(Easing.ease) }), -1, false);
+  }, []);
+
+  const pulseAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: pulseScale.value }],
+      opacity: pulseOpacity.value,
+    };
+  });
 
   useEffect(() => {
     if (o?.rider_lat && o?.rider_lng) {
       const lat = parseFloat(o.rider_lat);
       const lng = parseFloat(o.rider_lng);
+      
+      if (riderLocation) {
+        setHeading(calculateBearing(riderLocation.lat, riderLocation.lng, lat, lng));
+      }
+      
       setRiderLocation({ lat, lng });
       if (Platform.OS === 'android') {
         (animatedRiderLocation as any).timing({ latitude: lat, longitude: lng, duration: 1000, useNativeDriver: false }).start();
@@ -98,7 +132,13 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
       });
 
       socket.on('rider_location', (data) => {
-        setRiderLocation({ lat: data.lat, lng: data.lng });
+        setRiderLocation((prev) => {
+            if (prev) {
+                setHeading(calculateBearing(prev.lat, prev.lng, data.lat, data.lng));
+            }
+            return { lat: data.lat, lng: data.lng };
+        });
+        
         if (Platform.OS === 'android') {
             (animatedRiderLocation as any).timing({ latitude: data.lat, longitude: data.lng, duration: 1000, useNativeDriver: false }).start();
         } else {
@@ -138,9 +178,10 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
             <Marker.Animated 
               coordinate={animatedRiderLocation as any}
               title="Rider"
+              anchor={{ x: 0.5, y: 0.5 }}
             >
-              <View style={styles.riderMarker}>
-                <Navigation size={20} color="#FFFFFF" style={{ transform: [{ rotate: '45deg' }] }} />
+              <View style={[styles.riderMarker, { transform: [{ rotate: `${heading - 45}deg` }] }]}>
+                <Navigation size={20} color="#FFFFFF" />
               </View>
             </Marker.Animated>
           )}
@@ -149,9 +190,13 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
               <Marker 
                 coordinate={{ latitude: parseFloat(o.customer_lat), longitude: parseFloat(o.customer_lng) }}
                 title="Delivery Location"
+                anchor={{ x: 0.5, y: 0.5 }}
               >
-                <View style={styles.homeMarker}>
-                  <MapPin size={24} color="#FFFFFF" />
+                <View style={styles.homeMarkerContainer}>
+                  <Animated.View style={[styles.pulseRing, pulseAnimatedStyle]} />
+                  <View style={styles.homeMarker}>
+                    <MapPin size={24} color="#FFFFFF" />
+                  </View>
                 </View>
               </Marker>
               {riderLocation && (
@@ -272,10 +317,12 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  mapContainer: { height: '55%', backgroundColor: '#F3F4F6' },
+  mapContainer: { height: '65%', backgroundColor: '#F3F4F6' },
   map: { ...StyleSheet.absoluteFillObject },
   
   riderMarker: { width: 44, height: 44, backgroundColor: '#1A1A2E', borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#FFFFFF', shadowColor: '#10B981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 10 },
+  homeMarkerContainer: { alignItems: 'center', justifyContent: 'center' },
+  pulseRing: { position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(16, 185, 129, 0.2)', borderWidth: 1, borderColor: '#10B981' },
   homeMarker: { width: 44, height: 44, backgroundColor: '#10B981', borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#FFFFFF', shadowColor: '#10B981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 10 },
   
   floatingHeader: { position: 'absolute', top: 60, left: 24 },

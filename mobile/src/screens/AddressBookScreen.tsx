@@ -13,7 +13,6 @@ const { width, height } = Dimensions.get('window');
 const AddressBookScreen = ({ navigation, route }: any) => {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
-  const [showAdd, setShowAdd] = useState(false);
   const [newLabel, setNewLabel] = useState('Home');
   const [newAddress, setNewAddress] = useState('');
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
@@ -30,13 +29,11 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const { location, loadingLocation, fetchLocation } = useLocation();
 
   useEffect(() => {
-    if (showAdd) {
-      fetchLocation();
-    }
-  }, [showAdd]);
+    fetchLocation();
+  }, []);
 
   useEffect(() => {
-    if (location && showAdd) {
+    if (location) {
       const newRegion = {
         latitude: location.latitude,
         longitude: location.longitude,
@@ -82,11 +79,11 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const addMutation = useMutation({
     mutationFn: (data: any) => api.post('/customers/addresses', data),
     onSuccess: () => {
-      setShowAdd(false);
       setNewAddress('');
       setServiceable(null);
       setSelectedZoneId(null);
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      navigation.goBack();
     },
   });
 
@@ -124,18 +121,6 @@ const AddressBookScreen = ({ navigation, route }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      {!showAdd && (
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft size={24} color="#1A1A2E" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Address Book</Text>
-          <View style={{ width: 40 }} />
-        </View>
-      )}
-
-      {showAdd ? (
         <View style={styles.mapFullscreenContainer}>
           <MapView
             ref={mapRef}
@@ -145,16 +130,14 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             onRegionChangeComplete={onRegionChangeComplete}
             showsUserLocation={true}
           />
-          <View style={styles.mapCenterMarker}>
-            <MapPin size={40} color="#FF6B35" />
+          <View style={styles.mapCenterMarker} pointerEvents="none">
+            <View style={styles.centerPinDot} />
+            <MapPin size={40} color="#10B981" />
           </View>
           
           <TouchableOpacity 
             style={styles.mapBackButton}
-            onPress={() => {
-              setShowAdd(false);
-              setServiceable(null);
-            }}
+            onPress={() => navigation.goBack()}
           >
             <ArrowLeft size={24} color="#1A1A2E" />
           </TouchableOpacity>
@@ -163,7 +146,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             style={styles.locateMeButton}
             onPress={() => fetchLocation()}
           >
-            {loadingLocation ? <ActivityIndicator size="small" color="#FF6B35" /> : <Navigation size={24} color="#FF6B35" />}
+            {loadingLocation ? <ActivityIndicator size="small" color="#10B981" /> : <Navigation size={24} color="#10B981" />}
           </TouchableOpacity>
 
           <View style={styles.mapBottomCard}>
@@ -223,44 +206,6 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             )}
           </View>
         </View>
-      ) : (
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {addresses?.addresses?.map((addr: any) => (
-          <TouchableOpacity 
-            key={addr.id} 
-            disabled={!route.params?.select}
-            onPress={() => {
-              dispatch(setAddress(addr.id));
-              dispatch(setZone(addr.zone_id));
-              navigation.goBack();
-            }}
-            activeOpacity={0.9}
-            style={styles.addressCard}
-          >
-            <View style={styles.addressIconWrapper}>
-              {addr.label === 'Home' ? <Home size={22} color="#1A1A2E" /> : addr.label === 'Work' ? <Briefcase size={22} color="#1A1A2E" /> : <MapPin size={22} color="#1A1A2E" />}
-            </View>
-            <View style={styles.addressInfo}>
-              <Text style={styles.addressLabelText}>{addr.label}</Text>
-              <Text style={styles.addressDetailText} numberOfLines={1}>{addr.address_text}</Text>
-            </View>
-            {!route.params?.select ? (
-              <TouchableOpacity 
-                onPress={() => deleteMutation.mutate(addr.id)}
-                style={styles.deleteButton}
-              >
-                <Trash2 size={16} color="#EF4444" />
-              </TouchableOpacity>
-            ) : (
-                <View style={styles.selectArrowWrapper}>
-                    <ArrowRight size={16} color="#FF6B35" />
-                </View>
-            )}
-          </TouchableOpacity>
-        ))}
-
-      </ScrollView>
-      )}
     </View>
   );
 };
@@ -403,12 +348,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   labelChipActive: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+    borderWidth: 1,
   },
   labelChipInactive: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#F3F4F6',
   },
   labelChipText: {
     fontWeight: '900',
@@ -480,17 +427,17 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   saveBtnEnabled: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: '#10B981',
   },
   saveBtnDisabled: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#F3F4F6',
   },
   saveBtnText: {
     color: '#fff',
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 2,
-    fontSize: 12,
+    fontSize: 14,
   },
   cancelBtn: {
     flex: 1,
@@ -536,10 +483,19 @@ const styles = StyleSheet.create({
     marginTop: -80, // Offset for the top half of map view minus bottom card height approx
     marginLeft: -20,
     zIndex: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    alignItems: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+  },
+  centerPinDot: {
+    width: 8,
+    height: 8,
+    backgroundColor: '#1A1A2E',
+    borderRadius: 4,
+    position: 'absolute',
+    bottom: -4,
   },
   mapBackButton: {
     position: 'absolute',
@@ -592,11 +548,11 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   addressInputMap: {
-    backgroundColor: '#f9fafb',
-    padding: 16,
+    backgroundColor: '#F9FAFB',
+    padding: 20,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#F3F4F6',
     marginBottom: 24,
     fontWeight: '700',
     color: '#1A1A2E',
