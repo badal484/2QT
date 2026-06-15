@@ -28,7 +28,7 @@ const AddressScreen = ({ navigation }: any) => {
 
   if (isLoading) return (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
+      <ActivityIndicator size="large" color="#10B981" />
     </View>
   );
 
@@ -51,9 +51,9 @@ const AddressScreen = ({ navigation }: any) => {
           disabled={loadingLocation}
         >
           {loadingLocation ? (
-            <ActivityIndicator size="small" color="#FF6B35" />
+            <ActivityIndicator size="small" color="#10B981" />
           ) : (
-            <MapPin size={24} color="#FF6B35" />
+            <MapPin size={24} color="#10B981" />
           )}
           <View style={{ marginLeft: 16, flex: 1 }}>
             <Text style={styles.currentLocationTitle}>Use Current Location</Text>
@@ -73,7 +73,7 @@ const AddressScreen = ({ navigation }: any) => {
             onPress={() => selectAddress(addr)}
           >
             <View style={styles.iconWrapper}>
-              {addr.label === 'Home' ? <Home size={24} color={addr.is_serviceable ? "#FF6B35" : "#9ca3af"} /> : addr.label === 'Work' ? <Briefcase size={24} color={addr.is_serviceable ? "#FF6B35" : "#9ca3af"} /> : <MapPin size={24} color={addr.is_serviceable ? "#FF6B35" : "#9ca3af"} />}
+              {addr.label === 'Home' ? <Home size={24} color={addr.is_serviceable ? "#10B981" : "#9ca3af"} /> : addr.label === 'Work' ? <Briefcase size={24} color={addr.is_serviceable ? "#10B981" : "#9ca3af"} /> : <MapPin size={24} color={addr.is_serviceable ? "#10B981" : "#9ca3af"} />}
             </View>
             <View style={styles.addressInfo}>
               <Text style={[styles.addressLabel, !addr.is_serviceable && styles.disabledText]}>{addr.label}</Text>
@@ -123,27 +123,22 @@ const styles = StyleSheet.create({
     paddingTop: 64,
     paddingHorizontal: 32,
     paddingBottom: 24,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: '#F3F4F6',
   },
   backButton: {
     width: 48,
     height: 48,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#F3F4F6',
   },
   headerTitle: {
     color: '#1A1A2E',
@@ -170,20 +165,21 @@ const styles = StyleSheet.create({
   currentLocationBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
+    backgroundColor: '#ECFDF5',
     padding: 24,
-    borderRadius: 32,
+    borderRadius: 24,
     marginBottom: 32,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
+    borderColor: '#D1FAE5',
   },
   currentLocationTitle: {
-    color: '#FF6B35',
-    fontSize: 18,
+    color: '#10B981',
+    fontSize: 16,
     fontWeight: '900',
+    letterSpacing: -0.5,
   },
   currentLocationSubtitle: {
-    color: '#6b7280',
+    color: '#059669',
     fontSize: 14,
     marginTop: 4,
     fontWeight: '500',
@@ -191,31 +187,26 @@ const styles = StyleSheet.create({
   addressCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#FFFFFF',
     padding: 24,
-    borderRadius: 32,
+    borderRadius: 24,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#F3F4F6',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
     elevation: 2,
   },
   iconWrapper: {
-    width: 56,
-    height: 56,
-    backgroundColor: '#fff',
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    marginRight: 16,
   },
   addressInfo: {
     flex: 1,
@@ -250,21 +241,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: '#e5e7eb',
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
     padding: 24,
-    borderRadius: 32,
+    borderRadius: 24,
     marginTop: 16,
   },
   addIcon: {
-    color: '#FF6B35',
+    color: '#10B981',
     fontSize: 24,
     fontWeight: '900',
     marginRight: 8,
   },
   addText: {
-    color: '#9ca3af',
-    fontSize: 18,
-    fontWeight: '700',
+    color: '#1A1A2E',
+    fontSize: 16,
+    fontWeight: '900',
   },
   footer: {
     padding: 32,
