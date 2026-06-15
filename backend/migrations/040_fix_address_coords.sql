@@ -11,8 +11,7 @@
 UPDATE addresses a
 SET
     lat        = z.kitchen_lat,
-    lng        = z.kitchen_lng,
-    updated_at = NOW()
+    lng        = z.kitchen_lng
 FROM zones z
 WHERE a.zone_id = z.id
   AND z.kitchen_lat IS NOT NULL
@@ -30,8 +29,7 @@ WHERE a.zone_id = z.id
 UPDATE addresses a
 SET
     lat        = (SELECT kitchen_lat FROM zones WHERE is_active = true AND kitchen_lat IS NOT NULL ORDER BY created_at LIMIT 1),
-    lng        = (SELECT kitchen_lng FROM zones WHERE is_active = true AND kitchen_lng IS NOT NULL ORDER BY created_at LIMIT 1),
-    updated_at = NOW()
+    lng        = (SELECT kitchen_lng FROM zones WHERE is_active = true AND kitchen_lng IS NOT NULL ORDER BY created_at LIMIT 1)
 WHERE zone_id IS NULL
   AND EXISTS (
     SELECT 1

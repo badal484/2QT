@@ -29,8 +29,7 @@ WHERE polygon_points IS NOT NULL
 UPDATE kitchens k
 SET
     lat  = z.kitchen_lat,
-    lng  = z.kitchen_lng,
-    updated_at = NOW()
+    lng  = z.kitchen_lng
 FROM kitchen_zones kz
 JOIN zones z ON z.id = kz.zone_id
 WHERE kz.kitchen_id = k.id;
@@ -40,7 +39,6 @@ WHERE kz.kitchen_id = k.id;
 UPDATE kitchens
 SET
     lat  = (SELECT kitchen_lat FROM zones ORDER BY created_at LIMIT 1),
-    lng  = (SELECT kitchen_lng FROM zones ORDER BY created_at LIMIT 1),
-    updated_at = NOW()
+    lng  = (SELECT kitchen_lng FROM zones ORDER BY created_at LIMIT 1)
 WHERE id NOT IN (SELECT kitchen_id FROM kitchen_zones)
   AND lat = 12.9667;

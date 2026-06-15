@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
-import { Timer, ChefHat, Bell, LogOut, Info, CheckCircle2 } from 'lucide-react-native';
+import { Timer, ChefHat, Bell, LogOut, Info, CheckCircle2, Check, X } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
 import { useEffect } from 'react';
 
@@ -116,7 +116,7 @@ const KitchenBoardScreen = () => {
                         style={[styles.inventoryChip, !item.available && styles.inventoryChipDisabled]}
                     >
                         <Text style={[styles.inventoryText, !item.available && styles.inventoryTextDisabled]}>
-                            {item.name} {item.available ? '✓' : '✗'}
+                            {item.name} {item.available ? <Check size={12} color="#22C55E"/> : <X size={12} color="#EF4444"/>}
                         </Text>
                     </TouchableOpacity>
                 ))}

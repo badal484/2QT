@@ -9,7 +9,8 @@ import {
   Star, 
   Gift,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Wallet
 } from 'lucide-react-native';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Image, StyleSheet } from 'react-native';
@@ -19,23 +20,37 @@ import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { disconnectSocket } from '../socket/client';
 import { api } from '../api/client';
+import ReactNativeHapticFeedback from "react-native-haptic-feedback";
+import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const MenuItem = ({ icon, title, onPress, subtitle }: any) => (
+const hapticOptions = {
+  enableVibrateFallback: true,
+  ignoreAndroidSystemSettings: false,
+};
+
+const MinimalListItem = ({ icon, title, value, onPress, subtitle, color = "#1A1A2E", hideBorder = false }: any) => (
   <TouchableOpacity 
     activeOpacity={0.7}
-    style={styles.menuItem}
-    onPress={onPress}
+    style={[styles.minimalListItem, hideBorder && { borderBottomWidth: 0 }]}
+    onPress={() => {
+      ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
+      onPress();
+    }}
   >
-    <View style={styles.menuItemLeft}>
-      <View style={styles.menuItemIconWrapper}>
+    <View style={styles.minimalListLeft}>
+      <View style={styles.minimalListIcon}>
         {icon}
       </View>
       <View>
-        <Text style={styles.menuItemTitle}>{title}</Text>
-        {subtitle && <Text style={styles.menuItemSub}>{subtitle}</Text>}
+        <Text style={[styles.minimalListTitle, { color }]}>{title}</Text>
+        {subtitle && <Text style={styles.minimalListSub}>{subtitle}</Text>}
       </View>
     </View>
-    <ChevronRight size={20} color="#D1D5DB" />
+    <View style={styles.minimalListRight}>
+      {value && <Text style={styles.minimalListValue}>{value}</Text>}
+      <ChevronRight size={18} color="#D1D5DB" />
+    </View>
   </TouchableOpacity>
 );
 
@@ -43,6 +58,7 @@ const ProfileScreen = ({ navigation }: any) => {
   const { user } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const isRider = user?.role === 'rider';
 
   const { data: wallet } = useQuery({
@@ -64,6 +80,7 @@ const ProfileScreen = ({ navigation }: any) => {
   });
 
   const handleLogout = () => {
+    ReactNativeHapticFeedback.trigger("impactHeavy", hapticOptions);
     Alert.alert('Logout', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       { 
@@ -79,125 +96,91 @@ const ProfileScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Premium Header Card */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerTitleCol}>
-            <Text style={styles.headerSubText}>{isRider ? 'Fleet Personnel' : 'Welcome back,'}</Text>
-            <Text style={styles.headerMainText}>{user?.name?.split(' ')[0] || (isRider ? 'Rider' : 'Gourmet')}</Text>
-            <View style={styles.phoneBadge}>
-              <View style={[styles.statusDot, { backgroundColor: isRider ? '#10B981' : '#FF6B35' }]} />
-              <Text style={styles.phoneText}>+{user?.phone}</Text>
-            </View>
-          </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        
+        {/* REFINED HEADER */}
+        <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { paddingTop: Math.max(insets.top + 16, 40) }]}>
           <TouchableOpacity 
             style={styles.profilePicWrapper}
-            onPress={() => navigation.navigate('EditProfile')}
+            onPress={() => {
+              ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
+              navigation.navigate('EditProfile');
+            }}
           >
             {user?.photo_url ? (
               <Image source={{ uri: user.photo_url }} style={styles.profilePic} />
             ) : (
-              <User size={32} color="white" opacity={0.3} />
+              <User size={32} color="#10B981" />
             )}
-            <View style={styles.editPicOverlay}>
-              <Text style={styles.editPicText}>Edit</Text>
+            <View style={styles.editPicBadge}>
+              <Text style={styles.editPicText}>EDIT</Text>
             </View>
           </TouchableOpacity>
-        </View>
+          <View style={styles.headerTextCol}>
+            <Text style={styles.headerName}>{user?.name || (isRider ? 'Rider' : 'Gourmet')}</Text>
+            <Text style={styles.phoneText}>+{user?.phone}</Text>
+          </View>
+        </Animated.View>
 
-        {/* Balance Cards */}
-        <View style={styles.balanceRow}>
+        {/* ACCOUNT SETTINGS GROUP */}
+        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.settingsGroup}>
           {isRider ? (
             <>
-              <View style={[styles.balanceCard, styles.whiteCard]}>
-                <View style={[styles.balanceIconWrapper, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                  <Package size={24} color="#10B981" />
-                </View>
-                <Text style={styles.balanceCardLabel}>Trips</Text>
-                <Text style={styles.balanceCardValue}>{riderStats?.totalDeliveries || 0}</Text>
-              </View>
-              <View style={[styles.balanceCard, styles.greenCard]}>
-                <View style={styles.balanceIconWrapperGlass}>
-                  <CreditCard size={16} color="white" />
-                </View>
-                <Text style={styles.balanceCardLabelWhite}>Earnings</Text>
-                <Text style={styles.balanceCardValueWhite}>₹{(riderStats?.totalEarnings || 0) / 100}</Text>
-              </View>
+              <MinimalListItem icon={<Wallet size={20} color="#10B981" />} title="Earnings" value={`₹${(riderStats?.totalEarnings || 0) / 100}`} onPress={() => navigation.navigate('RiderPayouts')} />
+              <MinimalListItem icon={<Package size={20} color="#6B7280" />} title="Total Trips" value={riderStats?.totalDeliveries || 0} onPress={() => navigation.navigate('TripHistory')} hideBorder={true} />
             </>
           ) : (
             <>
-              <TouchableOpacity 
-                activeOpacity={0.9}
-                style={[styles.balanceCard, styles.whiteCard]}
-                onPress={() => navigation.navigate('Wallet')}
-              >
-                <View style={[styles.balanceIconWrapper, { backgroundColor: '#f9fafb' }]}>
-                  <CreditCard size={24} color="#1A1A2E" />
-                </View>
-                <Text style={styles.balanceCardLabel}>Balance</Text>
-                <Text style={styles.balanceCardValue}>₹{wallet?.balancePaise / 100 || '0.00'}</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                activeOpacity={0.9}
-                style={[styles.balanceCard, styles.orangeCard]}
-                onPress={() => navigation.navigate('Loyalty')}
-              >
-                <View style={styles.balanceIconWrapperGlass}>
-                  <Star size={16} color="white" />
-                </View>
-                <Text style={styles.balanceCardLabelWhite}>Loyalty</Text>
-                <Text style={styles.balanceCardValueWhite}>{loyalty?.points || 0}</Text>
-              </TouchableOpacity>
+              <MinimalListItem icon={<Wallet size={20} color="#10B981" />} title="Wallet Balance" value={`₹${wallet?.balancePaise / 100 || '0.00'}`} onPress={() => navigation.navigate('Wallet')} />
+              <MinimalListItem icon={<Star size={20} color="#F59E0B" />} title="Loyalty Points" value={loyalty?.points || 0} onPress={() => navigation.navigate('Loyalty')} hideBorder={true} />
             </>
           )}
-        </View>
-      </View>
+        </Animated.View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* REFERRAL CARD (MINIMAL) */}
         {!isRider && (
-          <TouchableOpacity 
-            activeOpacity={0.9}
-            style={styles.referralCard}
-            onPress={() => navigation.navigate('Referral')}
-          >
-            <View style={styles.referralTextCol}>
-              <Text style={styles.referralTitle}>Earn Rewards</Text>
-              <Text style={styles.referralSub}>Get ₹50 for every friend who joins the 2QT community.</Text>
-            </View>
-            <View style={styles.referralIconWrapper}>
-              <Gift size={32} color="#FF6B35" />
-            </View>
-          </TouchableOpacity>
+          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.referralWrapper}>
+            <TouchableOpacity 
+              activeOpacity={0.9}
+              style={styles.referralCard}
+              onPress={() => {
+                ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
+                navigation.navigate('Referral');
+              }}
+            >
+              <View style={styles.referralIconWrapper}>
+                <Gift size={20} color="#10B981" />
+              </View>
+              <View style={styles.referralTextCol}>
+                <Text style={styles.referralTitle}>Invite & Earn ₹50</Text>
+              </View>
+              <ChevronRight size={18} color="#10B981" />
+            </TouchableOpacity>
+          </Animated.View>
         )}
 
-        <Text style={styles.sectionLabel}>
-            {isRider ? 'Fleet Management' : 'Personal Settings'}
-        </Text>
-        
-        {isRider ? (
-          <>
-            <MenuItem icon={<Package size={22} color="#1A1A2E" />} title="Trip History" subtitle="Your Deliveries" onPress={() => navigation.navigate('TripHistory')} />
-            <MenuItem icon={<CreditCard size={22} color="#1A1A2E" />} title="Payouts" subtitle="Weekly Settlements" onPress={() => navigation.navigate('RiderPayouts')} />
-            <MenuItem icon={<ShieldCheck size={22} color="#1A1A2E" />} title="Fleet Documents" subtitle="Compliance Status" onPress={() => navigation.navigate('Documents')} />
-          </>
-        ) : (
-          <>
-            <MenuItem icon={<Package size={22} color="#1A1A2E" />} title="Order History" subtitle="Your Past Cravings" onPress={() => navigation.navigate('OrdersTab')} />
-            <MenuItem icon={<MapPin size={22} color="#1A1A2E" />} title="Saved Addresses" subtitle="Home, Office & More" onPress={() => navigation.navigate('AddressBook')} />
-            <MenuItem icon={<Calendar size={22} color="#1A1A2E" />} title="Meal Plans" subtitle="Active Subscriptions" onPress={() => navigation.navigate('MyPlans')} />
-          </>
-        )}
-        
-        <MenuItem icon={<MessageCircle size={22} color="#1A1A2E" />} title="Support" subtitle="Help & FAQs" onPress={() => navigation.navigate('Support')} />
-        
-        <TouchableOpacity 
-          style={styles.logoutBtn}
-          onPress={handleLogout}
-        >
-          <LogOut size={22} color="#EF4444" />
-          <Text style={styles.logoutBtnText}>Sign Out</Text>
-        </TouchableOpacity>
+        {/* ACTIVITY GROUP */}
+        <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.settingsGroup}>
+          <Text style={styles.groupLabel}>{isRider ? 'FLEET MANAGEMENT' : 'ACTIVITY'}</Text>
+          {isRider ? (
+            <>
+              <MinimalListItem icon={<ShieldCheck size={20} color="#1A1A2E" />} title="Documents" onPress={() => navigation.navigate('Documents')} hideBorder={true} />
+            </>
+          ) : (
+            <>
+              <MinimalListItem icon={<Package size={20} color="#1A1A2E" />} title="Your Orders" onPress={() => navigation.navigate('OrdersTab')} />
+              <MinimalListItem icon={<MapPin size={20} color="#1A1A2E" />} title="Saved Addresses" onPress={() => navigation.navigate('AddressBook')} />
+              <MinimalListItem icon={<Calendar size={20} color="#1A1A2E" />} title="Meal Subscriptions" onPress={() => navigation.navigate('MyPlans')} hideBorder={true} />
+            </>
+          )}
+        </Animated.View>
+
+        {/* HELP & SUPPORT GROUP */}
+        <Animated.View entering={FadeInDown.delay(400).duration(400)} style={[styles.settingsGroup, { marginBottom: 40 }]}>
+          <Text style={styles.groupLabel}>SUPPORT</Text>
+          <MinimalListItem icon={<MessageCircle size={20} color="#1A1A2E" />} title="Help Center" onPress={() => navigation.navigate('Support')} />
+          <MinimalListItem icon={<LogOut size={20} color="#EF4444" />} title="Sign Out" color="#EF4444" onPress={handleLogout} hideBorder={true} />
+        </Animated.View>
 
         {/* Dev Role Switcher */}
         {__DEV__ && (
@@ -227,6 +210,7 @@ const ProfileScreen = ({ navigation }: any) => {
         <View style={styles.footer}>
           <Text style={styles.footerText}>2QT v1.0.0 Stable</Text>
         </View>
+
       </ScrollView>
     </View>
   );
@@ -235,340 +219,206 @@ const ProfileScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F3F4F6', // iOS-style very light grey background
   },
   header: {
-    paddingTop: 80,
-    paddingHorizontal: 32,
-    paddingBottom: 40,
-    backgroundColor: '#1A1A2E',
-    borderBottomLeftRadius: 48,
-    borderBottomRightRadius: 48,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
-    elevation: 10,
-  },
-  headerTop: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitleCol: {
-    flex: 1,
-    marginRight: 16,
-  },
-  headerSubText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  headerMainText: {
-    color: '#fff',
-    fontSize: 40,
-    fontWeight: '900',
-    marginTop: 8,
-  },
-  phoneBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  phoneText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontWeight: '900',
-    fontSize: 10,
-    letterSpacing: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
   },
   profilePicWrapper: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 28,
+    width: 88,
+    height: 88,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
+    marginBottom: 16,
   },
   profilePic: {
     width: '100%',
     height: '100%',
+    borderRadius: 44,
   },
-  editPicOverlay: {
+  editPicBadge: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    bottom: -4,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
     paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
   },
   editPicText: {
-    fontSize: 8,
+    fontSize: 9,
     color: '#fff',
     fontWeight: '900',
-    textAlign: 'center',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  balanceRow: {
-    flexDirection: 'row',
-    marginTop: 40,
-    justifyContent: 'space-between',
-  },
-  balanceCard: {
-    width: '48%',
-    padding: 24,
-    borderRadius: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  whiteCard: {
-    backgroundColor: '#fff',
-  },
-  greenCard: {
-    backgroundColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOpacity: 0.3,
-  },
-  orangeCard: {
-    backgroundColor: '#FF6B35',
-    shadowColor: '#FF6B35',
-    shadowOpacity: 0.3,
-  },
-  balanceIconWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  headerTextCol: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
   },
-  balanceIconWrapperGlass: {
-    width: 32,
-    height: 32,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  balanceCardLabel: {
-    color: '#9ca3af',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  balanceCardValue: {
+  headerName: {
     color: '#1A1A2E',
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  phoneText: {
+    color: '#6B7280',
+    fontWeight: '600',
+    fontSize: 14,
     marginTop: 4,
   },
-  balanceCardLabelWhite: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
-    fontWeight: '900',
+
+  settingsGroup: {
+    marginHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 24,
+  },
+  groupLabel: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 2,
+    letterSpacing: 1,
+    marginBottom: 8,
+    marginTop: 8,
+    marginLeft: 4,
   },
-  balanceCardValueWhite: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '900',
-    marginTop: 4,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 40,
-  },
-  referralCard: {
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
-    padding: 24,
-    borderRadius: 32,
-    marginBottom: 32,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.1)',
+  minimalListItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+  },
+  minimalListLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  minimalListRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  minimalListIcon: {
+    width: 32,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  minimalListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A2E',
+  },
+  minimalListSub: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  minimalListValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginRight: 8,
+  },
+
+  referralWrapper: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  referralCard: {
+    backgroundColor: '#ECFDF5',
+    padding: 16,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  referralIconWrapper: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
   },
   referralTextCol: {
     flex: 1,
-    marginRight: 16,
   },
   referralTitle: {
-    color: '#FF6B35',
-    fontWeight: '900',
-    fontSize: 20,
+    color: '#10B981',
+    fontWeight: '800',
+    fontSize: 15,
   },
-  referralSub: {
-    color: '#6b7280',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
-    lineHeight: 20,
-  },
-  referralIconWrapper: {
-    width: 64,
-    height: 64,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  sectionLabel: {
-    color: '#9ca3af',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginBottom: 24,
-    marginLeft: 8,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 24,
-    backgroundColor: '#fff',
-    borderRadius: 32,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#f9fafb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuItemIconWrapper: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#f9fafb',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  menuItemTitle: {
-    color: '#1A1A2E',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  menuItemSub: {
-    color: '#9ca3af',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    marginTop: 4,
-    letterSpacing: 1,
-  },
-  logoutBtn: {
-    backgroundColor: '#FEF2F2',
-    padding: 24,
-    borderRadius: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-    marginTop: 16,
-  },
-  logoutBtnText: {
-    color: '#EF4444',
-    fontWeight: '900',
-    marginLeft: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontSize: 12,
-  },
+
   devCard: {
-    marginTop: 48,
-    backgroundColor: '#f9fafb',
-    padding: 32,
-    borderRadius: 40,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
+    marginHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    borderRadius: 20,
+    marginBottom: 24,
   },
   devHeader: {
     color: '#1A1A2E',
-    fontWeight: '900',
-    marginBottom: 24,
+    fontWeight: '800',
+    marginBottom: 16,
     textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontSize: 10,
+    letterSpacing: 1,
+    fontSize: 11,
   },
   devBtnRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   devBtn: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: 10,
     marginRight: 8,
     marginBottom: 8,
   },
   devBtnActive: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#10B981',
   },
   devBtnInactive: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    backgroundColor: '#F3F4F6',
   },
   devBtnText: {
     fontWeight: '700',
-    fontSize: 9,
+    fontSize: 10,
     textTransform: 'uppercase',
   },
   devBtnTextActive: {
-    color: '#fff',
+    color: '#FFFFFF',
   },
   devBtnTextInactive: {
-    color: '#9ca3af',
+    color: '#6B7280',
   },
   footer: {
     alignItems: 'center',
     marginBottom: 40,
-    marginTop: 32,
   },
   footerText: {
-    color: '#d1d5db',
-    fontSize: 10,
-    fontWeight: '900',
+    color: '#D1D5DB',
+    fontSize: 11,
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 3,
+    letterSpacing: 2,
   },
 });
 

@@ -1,4 +1,4 @@
-import { ArrowLeft, ChefHat, Search, SearchX, Utensils } from 'lucide-react-native';
+import { ArrowLeft, ChefHat, Search, SearchX, Utensils, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import Animated, { FadeIn, BounceIn } from 'react-native-reanimated';
@@ -70,7 +70,7 @@ const SearchScreen = ({ navigation }: any) => {
             />
             {query.length > 0 && (
               <TouchableOpacity onPress={() => setQuery('')}>
-                <Text style={styles.clearIcon}>✕</Text>
+                <X size={16} color="#9CA3AF" />
               </TouchableOpacity>
             )}
           </View>

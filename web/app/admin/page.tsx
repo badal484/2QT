@@ -23,6 +23,7 @@ const MenuTab = dynamic(() => import("./MenuTab").then(m => ({ default: m.MenuTa
 const ZonesTab = dynamic(() => import("./ZonesTab").then(m => ({ default: m.ZonesTab })), { ssr: false });
 const KitchensTab = dynamic(() => import("./KitchensTab").then(m => ({ default: m.KitchensTab })), { ssr: false });
 const PromoCodesTab = dynamic(() => import("./PromoCodesTab").then(m => ({ default: m.PromoCodesTab })), { ssr: false });
+const KitchenHealthTab = dynamic(() => import("./KitchenHealthTab").then(m => ({ default: m.KitchenHealthTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {

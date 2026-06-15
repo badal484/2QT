@@ -21,7 +21,12 @@ END $$;
 
 -- 3. loyalty_transactions: add type column, give description a default so inserts without it work
 ALTER TABLE loyalty_transactions ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'earn';
-ALTER TABLE loyalty_transactions ALTER COLUMN description SET DEFAULT '';
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='loyalty_transactions' AND column_name='description') THEN
+        ALTER TABLE loyalty_transactions ALTER COLUMN description SET DEFAULT '';
+    END IF;
+END $$;
 
 -- 4. users: add fraud-detection columns
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ip TEXT;
