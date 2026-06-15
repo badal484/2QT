@@ -8,7 +8,7 @@ import { setAuth } from '../store/slices/authSlice';
 import { connectSocket } from '../socket/client';
 
 const OTPScreen = ({ route, navigation }: any) => {
-  const { phone, referralCode, devOtp, devRole } = route.params;
+  const { phone, referralCode, devOtp, devRole, lat, lng } = route.params;
   const [otp, setOtp] = useState('');
   const [timer, setTimer] = useState(30);
   const dispatch = useDispatch();
@@ -51,7 +51,7 @@ const OTPScreen = ({ route, navigation }: any) => {
   };
 
   const verifyMutation = useMutation({
-    mutationFn: (code: string) => api.post('/auth/verify-otp', { phone, otp: code, referralCode, appRole: devRole }),
+    mutationFn: (code: string) => api.post('/auth/verify-otp', { phone, otp: code, referralCode, appRole: devRole, lat, lng }),
     onSuccess: (data) => {
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
       connectSocket(data.accessToken);

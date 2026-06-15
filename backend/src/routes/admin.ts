@@ -746,6 +746,42 @@ router.delete('/zones/:id', authenticate, requireRole('super_admin', 'admin'), a
 
 // ─── Kitchen Management ───────────────────────────────────────────────────────
 
+router.get('/zones/:id/metrics', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { rows } = await query('SELECT * FROM kitchen_metrics WHERE zone_id = $1', [req.params.id]);
+    if (rows.length === 0) return res.json({ metrics: null });
+    res.json({ metrics: rows[0] });
+});
+
+router.put('/zones/:id/metrics', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    const { 
+        fssai_status, fssai_valid_till, 
+        staff_temp_value, staff_temp_time, 
+        sanitization_percent, sanitization_freq, 
+        pure_veg_status, pure_veg_audited 
+    } = req.body;
+
+    const { rows } = await query(`
+        INSERT INTO kitchen_metrics (zone_id, fssai_status, fssai_valid_till, staff_temp_value, staff_temp_time, sanitization_percent, sanitization_freq, pure_veg_status, pure_veg_audited, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+        ON CONFLICT (zone_id) DO UPDATE SET
+            fssai_status = EXCLUDED.fssai_status,
+            fssai_valid_till = EXCLUDED.fssai_valid_till,
+            staff_temp_value = EXCLUDED.staff_temp_value,
+            staff_temp_time = EXCLUDED.staff_temp_time,
+            sanitization_percent = EXCLUDED.sanitization_percent,
+            sanitization_freq = EXCLUDED.sanitization_freq,
+            pure_veg_status = EXCLUDED.pure_veg_status,
+            pure_veg_audited = EXCLUDED.pure_veg_audited,
+            updated_at = NOW()
+        RETURNING *
+    `, [id, fssai_status, fssai_valid_till, staff_temp_value, staff_temp_time, sanitization_percent, sanitization_freq, pure_veg_status, pure_veg_audited]);
+
+    res.json({ metrics: rows[0] });
+});
+
+// ─── Kitchens Table Management ────────────────────────────────────────────────
+
 router.get('/kitchens', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(`
         SELECT k.*, 

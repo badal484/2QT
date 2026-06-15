@@ -14,6 +14,15 @@ router.get('/zones', async (req, res) => {
     res.json({ zones: rows });
 });
 
+router.get('/kitchen-metrics', async (req, res) => {
+    const { zoneId } = req.query;
+    if (!zoneId) return res.status(400).json({ error: 'MISSING_ZONE' });
+
+    const { rows } = await query('SELECT * FROM kitchen_metrics WHERE zone_id = $1', [zoneId]);
+    if (rows.length === 0) return res.json({ metrics: null });
+    res.json({ metrics: rows[0] });
+});
+
 router.get('/', async (req, res) => {
     const { zoneId } = req.query;
     if (!zoneId) return res.status(400).json({ error: 'MISSING_ZONE' });

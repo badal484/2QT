@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Check } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ const Checkbox = ({ value, label, onToggle }: any) => (
     style={styles.checkboxRow}
   >
     <View style={[styles.checkbox, value ? styles.checkboxActive : styles.checkboxInactive]}>
-      {value && <Text style={styles.checkMark}>✓</Text>}
+      {value && <Check size={16} color="#22C55E" />}
     </View>
     <Text style={styles.checkboxLabel}>{label}</Text>
   </TouchableOpacity>

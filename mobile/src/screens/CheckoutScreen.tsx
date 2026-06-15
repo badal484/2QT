@@ -1,4 +1,4 @@
-import { ArrowLeft, MapPin, CreditCard, ArrowRight, Sparkles, Clock, ShieldCheck, Heart } from 'lucide-react-native';
+import { ArrowLeft, MapPin, CreditCard, ArrowRight, Sparkles, Clock, ShieldCheck, Heart, Banknote } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, StyleSheet } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,7 +31,7 @@ const PulseLoader = () => {
 
   return (
     <Animated.View style={[styles.pulseCircle, animatedStyle]}>
-      <ShieldCheck size={48} color="#FF6B35" />
+      <ShieldCheck size={48} color="#10B981" />
     </Animated.View>
   );
 };
@@ -165,7 +165,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           contact: user?.phone || '',
           name: user?.name || 'Customer'
         },
-        theme: { color: '#FF6B35' }
+        theme: { color: '#10B981' }
       };
 
       if (RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
@@ -219,7 +219,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.addressCard}>
             <View style={styles.addressHeader}>
               <View style={styles.addressIconWrapper}>
-                <MapPin size={24} color="#FF6B35" />
+                <MapPin size={24} color="#10B981" />
               </View>
               <View style={styles.addressLabelCol}>
                 <Text style={styles.addressSubLabel}>Delivering to</Text>
@@ -238,7 +238,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
                 <View style={styles.metaItem}>
                   <Text style={styles.metaLabel}>Schedule</Text>
                   <View style={styles.metaValueRow}>
-                    <Clock size={12} color="#FF6B35" />
+                    <Clock size={12} color="#10B981" />
                     <Text style={styles.metaValue}>
                       {new Date(route.params.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
@@ -264,7 +264,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           {/* Tip the Rider */}
           <Animated.View entering={FadeInDown.delay(180).duration(400)} style={styles.sectionCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-              <Heart size={20} color="#FF6B35" style={{ marginRight: 8 }} />
+              <Heart size={20} color="#10B981" style={{ marginRight: 8 }} />
               <Text style={styles.sectionHeader}>Tip your delivery partner</Text>
             </View>
             <Text style={styles.tipSub}>Your entire tip goes directly to the rider.</Text>
@@ -336,7 +336,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
             {p.isSubscriptionOrder && (
               <Animated.View entering={FadeInDown} style={styles.subOrderBadge}>
                 <View style={styles.subOrderBadgeLeft}>
-                    <Sparkles size={14} color="#FF6B35" />
+                    <Sparkles size={14} color="#10B981" />
                     <Text style={styles.subOrderText}>Pro Meal Credit</Text>
                 </View>
                 <Text style={styles.subOrderValue}>-₹{p.subtotalPaise / 100}</Text>
@@ -367,7 +367,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
                   <Text style={styles.toggleSub}>Bal: ₹{pricing?.availableWallet / 100 || 0}</Text>
                 </View>
               </View>
-              <View style={[styles.switchTrack, { backgroundColor: useWallet ? '#FF6B35' : '#e5e7eb' }]}>
+              <View style={[styles.switchTrack, { backgroundColor: useWallet ? '#10B981' : '#e5e7eb' }]}>
                 <View style={[styles.switchThumb, { alignSelf: useWallet ? 'flex-end' : 'flex-start' }]} />
               </View>
             </TouchableOpacity>
@@ -383,14 +383,14 @@ const CheckoutScreen = ({ navigation, route }: any) => {
             >
               <View style={styles.toggleCardLeft}>
                 <View style={styles.toggleIconWrapper}>
-                  <Sparkles size={24} color={useLoyalty ? "#FF6B35" : "#1A1A2E"} />
+                  <Sparkles size={24} color={useLoyalty ? "#10B981" : "#1A1A2E"} />
                 </View>
                 <View>
                   <Text style={styles.toggleTitle}>2QT Points</Text>
                   <Text style={styles.toggleSub}>Bal: {loyaltyData?.points || 0} pts</Text>
                 </View>
               </View>
-              <View style={[styles.switchTrack, { backgroundColor: useLoyalty ? '#FF6B35' : '#e5e7eb' }]}>
+              <View style={[styles.switchTrack, { backgroundColor: useLoyalty ? '#10B981' : '#e5e7eb' }]}>
                 <View style={[styles.switchThumb, { alignSelf: useLoyalty ? 'flex-end' : 'flex-start' }]} />
               </View>
             </TouchableOpacity>
@@ -434,11 +434,11 @@ const CheckoutScreen = ({ navigation, route }: any) => {
             >
               <View style={styles.paymentMethodLeft}>
                 <View style={styles.paymentMethodIconWrapper}>
-                  <CreditCard size={20} color={paymentMethod === 'online' ? '#FF6B35' : '#1A1A2E'} />
+                  <CreditCard size={20} color={paymentMethod === 'online' ? '#10B981' : '#1A1A2E'} />
                 </View>
-                <Text style={[styles.paymentMethodText, paymentMethod === 'online' ? styles.paymentMethodTextActive : styles.paymentMethodTextInactive]}>Pay Online / UPI</Text>
+                <Text style={[styles.paymentMethodText, paymentMethod === 'online' ? styles.paymentMethodTextActive : styles.paymentMethodTextInactive]}>Pay Online (UPI/Cards)</Text>
               </View>
-              <View style={[styles.radioOuter, { borderColor: paymentMethod === 'online' ? '#FF6B35' : '#d1d5db' }]}>
+              <View style={[styles.radioOuter, { borderColor: paymentMethod === 'online' ? '#10B981' : '#d1d5db' }]}>
                 {paymentMethod === 'online' && <Animated.View entering={FadeIn} style={styles.radioInner} />}
               </View>
             </TouchableOpacity>
@@ -449,12 +449,10 @@ const CheckoutScreen = ({ navigation, route }: any) => {
               style={[styles.paymentMethodBtn, paymentMethod === 'cod' ? styles.paymentMethodBtnActive : styles.paymentMethodBtnInactive, { marginBottom: 120 }]}
             >
               <View style={styles.paymentMethodLeft}>
-                <View style={styles.paymentMethodIconWrapper}>
-                  <Text style={styles.codEmoji}>💵</Text>
-                </View>
+                  <Banknote size={24} color="#10B981" />
                 <Text style={[styles.paymentMethodText, paymentMethod === 'cod' ? styles.paymentMethodTextActive : styles.paymentMethodTextInactive]}>Cash on Delivery</Text>
               </View>
-              <View style={[styles.radioOuter, { borderColor: paymentMethod === 'cod' ? '#FF6B35' : '#d1d5db' }]}>
+              <View style={[styles.radioOuter, { borderColor: paymentMethod === 'cod' ? '#10B981' : '#d1d5db' }]}>
                 {paymentMethod === 'cod' && <Animated.View entering={FadeIn} style={styles.radioInner} />}
               </View>
             </TouchableOpacity>
@@ -499,87 +497,87 @@ const CheckoutScreen = ({ navigation, route }: any) => {
 };
 
 const styles = StyleSheet.create({
-  pulseCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255, 107, 53, 0.1)', alignItems: 'center', justifyContent: 'center' },
-  container: { flex: 1, backgroundColor: '#fff' },
+  pulseCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(16, 185, 129, 0.1)', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 24, paddingTop: 64, paddingBottom: 32 },
-  backButton: { marginBottom: 32, alignSelf: 'flex-start', width: 48, height: 48, backgroundColor: '#f9fafb', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  screenTitle: { color: '#1A1A2E', fontSize: 40, fontWeight: '900', marginBottom: 8 },
-  screenSubTitle: { color: '#9ca3af', fontWeight: '900', marginBottom: 40, textTransform: 'uppercase', letterSpacing: 2, fontSize: 12 },
-  addressCard: { backgroundColor: '#f9fafb', padding: 24, borderRadius: 32, marginBottom: 24, borderWidth: 1, borderColor: '#f3f4f6' },
+  backButton: { marginBottom: 32, alignSelf: 'flex-start', width: 48, height: 48, backgroundColor: '#FFFFFF', borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
+  screenTitle: { color: '#1A1A2E', fontSize: 32, fontWeight: '900', marginBottom: 8, letterSpacing: -0.5 },
+  screenSubTitle: { color: '#9ca3af', fontWeight: '900', marginBottom: 40, textTransform: 'uppercase', letterSpacing: 1.5, fontSize: 11 },
+  addressCard: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
   addressHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  addressIconWrapper: { width: 40, height: 40, backgroundColor: 'rgba(255, 107, 53, 0.1)', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  addressIconWrapper: { width: 40, height: 40, backgroundColor: '#ECFDF5', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   addressLabelCol: { flex: 1 },
   addressSubLabel: { color: '#9ca3af', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 },
   addressLabel: { color: '#1A1A2E', fontWeight: '900', fontSize: 15 },
   addressText: { color: '#6b7280', fontWeight: '500', fontSize: 14, lineHeight: 20 },
-  metaInfoRow: { backgroundColor: '#f9fafb', padding: 24, borderRadius: 32, marginBottom: 24, borderWidth: 1, borderColor: '#f3f4f6', flexDirection: 'row' },
+  metaInfoRow: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6', flexDirection: 'row', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
   metaItem: { flex: 1 },
   metaLabel: { color: '#9ca3af', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 },
   metaValueRow: { flexDirection: 'row', alignItems: 'center' },
   metaValue: { fontSize: 13, fontWeight: 'bold', color: '#1A1A2E', marginLeft: 6 },
-  sectionCard: { backgroundColor: '#fff', borderRadius: 24, padding: 24, marginBottom: 16 },
+  sectionCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
   sectionHeader: { fontSize: 16, fontWeight: '900', color: '#1A1A2E', marginBottom: 12 },
-  instructionsInput: { backgroundColor: '#f9fafb', borderRadius: 16, padding: 16, minHeight: 80, textAlignVertical: 'top', color: '#1A1A2E', fontWeight: '500' },
+  instructionsInput: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, minHeight: 80, textAlignVertical: 'top', color: '#1A1A2E', fontWeight: '500' },
   tipSub: { fontSize: 12, color: '#9ca3af', marginBottom: 16 },
   tipOptionsRow: { flexDirection: 'row', gap: 12 },
-  tipChip: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },
-  tipChipActive: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' },
+  tipChip: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6', backgroundColor: '#FFFFFF' },
+  tipChipActive: { backgroundColor: '#10B981', borderColor: '#10B981' },
   tipChipText: { color: '#1A1A2E', fontWeight: 'bold', fontSize: 14 },
   tipChipTextActive: { color: '#fff' },
-  billCard: { backgroundColor: '#1A1A2E', padding: 32, borderRadius: 40, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.3, shadowRadius: 30, elevation: 10 },
-  billHeader: { color: 'rgba(255,255,255,0.4)', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10, marginBottom: 24 },
+  billCard: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
+  billHeader: { color: '#9CA3AF', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10, marginBottom: 24 },
   billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  billLabel: { color: 'rgba(255,255,255,0.8)', fontWeight: '700' },
-  billValue: { color: '#fff', fontWeight: '900' },
-  discountText: { color: '#4ADE80', fontWeight: '700' },
-  discountValue: { color: '#4ADE80', fontWeight: '900' },
-  loyaltyText: { color: '#FF6B35', fontWeight: '700' },
-  loyaltyValue: { color: '#FF6B35', fontWeight: '900' },
-  subOrderBadge: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, backgroundColor: 'rgba(255, 107, 53, 0.2)', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255, 107, 53, 0.1)' },
+  billLabel: { color: '#6B7280', fontWeight: '700' },
+  billValue: { color: '#1A1A2E', fontWeight: '900' },
+  discountText: { color: '#10B981', fontWeight: '700' },
+  discountValue: { color: '#10B981', fontWeight: '900' },
+  loyaltyText: { color: '#10B981', fontWeight: '700' },
+  loyaltyValue: { color: '#10B981', fontWeight: '900' },
+  subOrderBadge: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, backgroundColor: '#ECFDF5', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#D1FAE5' },
   subOrderBadgeLeft: { flexDirection: 'row', alignItems: 'center' },
-  subOrderText: { color: '#FB923C', fontWeight: '700', marginLeft: 8 },
-  subOrderValue: { color: '#FB923C', fontWeight: '900' },
-  billDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 24 },
-  billTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  billTotalLabel: { color: '#fff', fontSize: 20, fontWeight: '900' },
-  billTotalValue: { color: '#FF6B35', fontSize: 32, fontWeight: '900' },
-  toggleCard: { padding: 24, borderRadius: 32, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderWidth: 1 },
-  toggleCardActive: { backgroundColor: 'rgba(255, 107, 53, 0.05)', borderColor: '#FF6B35' },
-  toggleCardInactive: { backgroundColor: '#fff', borderColor: '#f3f4f6' },
+  subOrderText: { color: '#10B981', fontWeight: '700', marginLeft: 8 },
+  subOrderValue: { color: '#10B981', fontWeight: '900' },
+  billDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 16, borderStyle: 'dashed' },
+  billTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
+  billTotalLabel: { color: '#1A1A2E', fontSize: 16, fontWeight: '900' },
+  billTotalValue: { color: '#1A1A2E', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  toggleCard: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
+  toggleCardActive: { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
+  toggleCardInactive: { backgroundColor: '#FFFFFF', borderColor: '#F3F4F6' },
   toggleCardLeft: { flexDirection: 'row', alignItems: 'center' },
-  toggleIconWrapper: { width: 48, height: 48, backgroundColor: '#fff', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  toggleIconWrapper: { width: 48, height: 48, backgroundColor: '#F9FAFB', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   toggleTitle: { color: '#1A1A2E', fontWeight: '900' },
   toggleSub: { color: '#9ca3af', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginTop: 4 },
   switchTrack: { width: 56, height: 28, borderRadius: 14, paddingHorizontal: 4, justifyContent: 'center' },
   switchThumb: { width: 20, height: 20, backgroundColor: '#fff', borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
-  promoCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f3f4f6', padding: 10, borderRadius: 32, flexDirection: 'row', alignItems: 'center', marginBottom: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  promoCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', padding: 6, borderRadius: 24, flexDirection: 'row', alignItems: 'center', marginBottom: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
   promoInputWrapper: { flex: 1, paddingHorizontal: 20 },
   promoInput: { fontWeight: '900', color: '#1A1A2E', fontSize: 12, textTransform: 'uppercase', letterSpacing: 2 },
-  promoApplyBtn: { backgroundColor: '#1A1A2E', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 24 },
-  promoApplyText: { color: '#fff', fontWeight: '900', fontSize: 12, textTransform: 'uppercase', letterSpacing: 2 },
-  sectionTitle: { color: '#9ca3af', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10, marginBottom: 24, marginLeft: 8 },
-  paymentMethodBtn: { padding: 24, borderRadius: 32, marginBottom: 16, borderWidth: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  paymentMethodBtnActive: { backgroundColor: 'rgba(255, 107, 53, 0.05)', borderColor: '#FF6B35' },
-  paymentMethodBtnInactive: { backgroundColor: '#fff', borderColor: '#f3f4f6' },
+  promoApplyBtn: { backgroundColor: '#1A1A2E', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 20 },
+  promoApplyText: { color: '#fff', fontWeight: '900', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  sectionTitle: { color: '#9ca3af', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10, marginBottom: 20, marginLeft: 8 },
+  paymentMethodBtn: { padding: 20, borderRadius: 24, marginBottom: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
+  paymentMethodBtnActive: { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
+  paymentMethodBtnInactive: { backgroundColor: '#FFFFFF', borderColor: '#F3F4F6' },
   paymentMethodLeft: { flexDirection: 'row', alignItems: 'center' },
-  paymentMethodIconWrapper: { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  paymentMethodIconWrapper: { width: 48, height: 48, backgroundColor: '#F9FAFB', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   codEmoji: { fontSize: 20 },
-  paymentMethodText: { fontWeight: '900' },
-  paymentMethodTextActive: { color: '#FF6B35' },
+  paymentMethodText: { fontWeight: '900', fontSize: 15 },
+  paymentMethodTextActive: { color: '#10B981' },
   paymentMethodTextInactive: { color: '#1A1A2E' },
-  radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  radioInner: { width: 10, height: 10, backgroundColor: '#FF6B35', borderRadius: 5 },
+  radioOuter: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  radioInner: { width: 12, height: 12, backgroundColor: '#10B981', borderRadius: 6 },
   footer: { position: 'absolute', bottom: 40, left: 24, right: 24 },
-  payButton: { height: 80, backgroundColor: '#FF6B35', borderRadius: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 8 },
-  payButtonSub: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 },
-  payButtonMain: { color: '#fff', fontSize: 24, fontWeight: '900' },
-  payArrowWrapper: { width: 48, height: 48, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  loadingContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  payButton: { height: 72, backgroundColor: '#10B981', borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, shadowColor: '#10B981', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 8 },
+  payButtonSub: { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 },
+  payButtonMain: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  payArrowWrapper: { width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  loadingContainer: { flex: 1, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 16, color: '#9ca3af', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10 },
-  verifyingContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  verifyingContainer: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.95)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, zIndex: 1000 },
   verifyingTitle: { marginTop: 32, color: '#1A1A2E', fontSize: 24, fontWeight: '900', textAlign: 'center' },
-  verifyingSub: { marginTop: 8, color: '#9ca3af', fontWeight: '500', textAlign: 'center', lineHeight: 20 },
+  verifyingSub: { marginTop: 8, color: '#9ca3af', fontWeight: '600', textAlign: 'center', lineHeight: 22 },
 });
 
 export default CheckoutScreen;

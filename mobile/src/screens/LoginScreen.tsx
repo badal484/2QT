@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, NativeModules, StyleSheet } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { useLocation } from '../hooks/useLocation';
 
 const { RoleModule } = NativeModules;
 const BUILD_ROLE = RoleModule?.BUILD_ROLE || 'customer';
@@ -10,6 +11,11 @@ const LoginScreen = ({ navigation }: any) => {
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [devRole, setDevRole] = useState(RoleModule?.BUILD_ROLE || 'customer');
+  const { location, fetchLocation } = useLocation();
+
+  React.useEffect(() => {
+    fetchLocation();
+  }, [fetchLocation]);
 
   const mutation = useMutation({
     mutationFn: (phoneNumber: string) => api.post('/auth/send-otp', { phone: phoneNumber }),
@@ -18,7 +24,9 @@ const LoginScreen = ({ navigation }: any) => {
         phone: data.phone, 
         referralCode: referralCode.trim().toUpperCase(),
         devOtp: data.devOtp,
-        devRole: devRole
+        devRole: devRole,
+        lat: location?.latitude,
+        lng: location?.longitude
       });
     },
     onError: (error: any) => {

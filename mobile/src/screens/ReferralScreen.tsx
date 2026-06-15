@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Share2, Copy, Gift } from 'lucide-react-native';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Share, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -31,7 +31,7 @@ const ReferralScreen = ({ navigation }: any) => {
       {/* Header Image/Icon */}
       <View style={styles.heroSection}>
         <View style={styles.giftWrapper}>
-          <Text style={styles.giftEmoji}>🎁</Text>
+          <Gift size={48} color="#FF6B35" />
         </View>
         <Text style={styles.heroTitle}>Invite & Earn</Text>
         <TouchableOpacity 

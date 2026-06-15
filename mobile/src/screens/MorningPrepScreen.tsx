@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { Check } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 
@@ -41,7 +42,7 @@ const MorningPrepScreen = () => {
               <Text style={styles.taskCategory}>{task.category}</Text>
             </View>
             <View style={[styles.checkbox, task.completed ? styles.checkboxChecked : styles.checkboxUnchecked]}>
-              {task.completed && <Text style={styles.checkMark}>✓</Text>}
+              {task.completed && <Check size={16} color="#22C55E" style={{ marginLeft: 8 }} />}
             </View>
           </TouchableOpacity>
         ))}

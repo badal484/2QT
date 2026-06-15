@@ -108,7 +108,7 @@ router.post('/send-otp', async (req, res) => {
 
 router.post('/verify-otp', async (req, res) => {
     try {
-        const { phone, otp, referralCode, name, appRole } = req.body;
+        const { phone, otp, referralCode, name, appRole, lat, lng } = req.body;
         let normalizedPhone = phone.replace(/\D/g, '');
         if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
         
@@ -131,6 +131,57 @@ router.post('/verify-otp', async (req, res) => {
     let roleUpdate = '';
     let insertRole = 'customer';
     let insertVerified = false;
+
+    let detectedZoneId = null;
+    let detectedKitchenId = null;
+    let zoneInsertKeys = '';
+    let zoneInsertVals = '';
+    let zoneUpdateKeys = '';
+
+    if (lat && lng && appRole !== 'rider' && appRole !== 'chef' && appRole !== 'admin') {
+        const { rows: zones } = await query(`
+            SELECT id, radius_km, polygon_points,
+            (6371 * acos(cos(radians($1)) * cos(radians(kitchen_lat)) * cos(radians(kitchen_lng) - radians($2)) + sin(radians($1)) * sin(radians(kitchen_lat)))) AS distance
+            FROM zones WHERE is_active = true ORDER BY distance ASC
+        `, [lat, lng]);
+
+        const isPointInPolygon = (point: {lat: number, lng: number}, polygon: {lat: number, lng: number}[]) => {
+            let x = point.lng, y = point.lat, inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                let xi = polygon[i].lng, yi = polygon[i].lat, xj = polygon[j].lng, yj = polygon[j].lat;
+                let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        };
+
+        for (const zone of zones) {
+            let isMatch = false;
+            if (zone.polygon_points && Array.isArray(zone.polygon_points) && zone.polygon_points.length > 2) {
+                isMatch = isPointInPolygon({ lat, lng }, zone.polygon_points);
+            } else {
+                isMatch = zone.distance <= zone.radius_km;
+            }
+            
+            if (isMatch) {
+                detectedZoneId = zone.id;
+                const { rows: kInfo } = await query(`SELECT k.id FROM kitchens k JOIN kitchen_zones kz ON k.id = kz.kitchen_id WHERE kz.zone_id = $1 LIMIT 1`, [zone.id]);
+                if (kInfo.length > 0) detectedKitchenId = kInfo[0].id;
+                break;
+            }
+        }
+    }
+
+    if (detectedZoneId) {
+        zoneInsertKeys = ', zone_id';
+        zoneInsertVals = `, '${detectedZoneId}'`;
+        zoneUpdateKeys += `, zone_id = COALESCE(users.zone_id, '${detectedZoneId}')`;
+    }
+    if (detectedKitchenId) {
+        zoneInsertKeys += ', kitchen_id';
+        zoneInsertVals += `, '${detectedKitchenId}'`;
+        zoneUpdateKeys += `, kitchen_id = COALESCE(users.kitchen_id, '${detectedKitchenId}')`;
+    }
 
     if (appRole === 'rider') {
         insertRole = 'rider';
@@ -158,8 +209,10 @@ router.post('/verify-otp', async (req, res) => {
         }
     }
 
+    roleUpdate += zoneUpdateKeys;
+
     const { rows } = await query(
-        `INSERT INTO users (phone, name, role, is_verified) VALUES ($1, $2, $3, $4) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified`,
+        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified`,
         [normalizedPhone, name || '2QT User', insertRole, insertVerified]
     );
 

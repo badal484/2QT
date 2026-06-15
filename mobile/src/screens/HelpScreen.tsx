@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, MessageCircle, Phone } from 'lucide-react-native';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Linking, StyleSheet } from 'react-native';
 
@@ -35,7 +35,7 @@ const HelpScreen = ({ navigation }: any) => {
           onPress={() => Linking.openURL('whatsapp://send?phone=919999999999')}
           style={styles.whatsappBtn}
         >
-          <Text style={styles.contactIcon}>💬</Text>
+          <MessageCircle size={24} color="#fff" style={styles.contactIcon} />
           <View>
             <Text style={styles.contactTitle}>Chat on WhatsApp</Text>
             <Text style={styles.contactSub}>Average response: 2 mins</Text>
@@ -46,7 +46,7 @@ const HelpScreen = ({ navigation }: any) => {
           onPress={() => Linking.openURL('tel:919999999999')}
           style={styles.callBtn}
         >
-          <Text style={styles.contactIcon}>📞</Text>
+          <Phone size={24} color="#fff" style={styles.contactIcon} />
           <View>
             <Text style={styles.contactTitle}>Call Support</Text>
             <Text style={styles.contactSub}>Available 8 AM - 11 PM</Text>

@@ -14,7 +14,7 @@ const RateOrderScreen = ({ route, navigation }: any) => {
     mutationFn: (data: any) => api.post(`/orders/${orderId}/feedback`, data),
     onSuccess: () => {
       Alert.alert('Thank You!', 'Your feedback helps us improve.');
-      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     },
   });
 

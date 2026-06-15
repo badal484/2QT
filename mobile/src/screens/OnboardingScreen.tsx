@@ -15,7 +15,7 @@ const OnboardingScreen = ({ navigation }: any) => {
     onSuccess: (data) => {
       dispatch(updateUser(data.customer));
       // Replace removes Onboarding from the stack so they can't go back
-      navigation.replace('MainTabs');
+      navigation.replace('Home');
     },
     onError: (err: any) => {
       Alert.alert('Setup Failed', err.message || 'Could not update profile.');

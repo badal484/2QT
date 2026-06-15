@@ -48,7 +48,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
 
       <TouchableOpacity 
         style={styles.homeBtn}
-        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] })}
+        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] })}
       >
         <Text style={styles.homeBtnText}>Back to Menu</Text>
       </TouchableOpacity>

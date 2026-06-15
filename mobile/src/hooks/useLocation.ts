@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import axios from 'axios';
@@ -13,6 +13,7 @@ export const useLocation = () => {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   const requestPermissions = async () => {
     if (Platform.OS === 'android') {
@@ -67,14 +68,40 @@ export const useLocation = () => {
     }
   };
 
-  const fetchLocation = async () => {
+  const fetchLocation = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setLoadingLocation(true);
     setLocationError(null);
 
+    const fallbackToIp = async () => {
+      try {
+        const ipRes = await axios.get('https://freeipapi.com/api/json');
+        if (ipRes.data && ipRes.data.cityName) {
+          const { latitude, longitude, cityName, regionName } = ipRes.data;
+          setLocation({
+            latitude,
+            longitude,
+            addressText: `${cityName}, ${regionName}`
+          });
+          setLoadingLocation(false);
+          isFetchingRef.current = false;
+          return true;
+        }
+      } catch (e) {
+        console.log('IP fallback failed', e);
+      }
+      return false;
+    };
+
     const hasPermission = await requestPermissions();
     if (!hasPermission) {
-      setLocationError('Location permission denied');
-      setLoadingLocation(false);
+      const ipSuccess = await fallbackToIp();
+      if (!ipSuccess) {
+        setLocationError('Location permission denied');
+        setLoadingLocation(false);
+        isFetchingRef.current = false;
+      }
       return;
     }
 
@@ -84,15 +111,20 @@ export const useLocation = () => {
         const addressText = await reverseGeocode(latitude, longitude);
         setLocation({ latitude, longitude, addressText });
         setLoadingLocation(false);
+        isFetchingRef.current = false;
       },
-      (error) => {
-        setLocationError(error.message);
-        setLoadingLocation(false);
-        Alert.alert('Location Error', 'Could not fetch your location. Please check your GPS settings.');
+      async (error) => {
+        const ipSuccess = await fallbackToIp();
+        if (!ipSuccess) {
+          setLocationError(error.message);
+          setLoadingLocation(false);
+          isFetchingRef.current = false;
+          Alert.alert('Location Error', 'Could not fetch your location. Please check your GPS settings.');
+        }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
-  };
+  }, []);
 
   return { location, loadingLocation, locationError, fetchLocation };
 };
