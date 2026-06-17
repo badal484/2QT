@@ -696,9 +696,11 @@ function FleetTab() {
             <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-32 bg-white/[0.04] backdrop-blur-xl rounded-[24px] animate-pulse" />)}</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {onlineRiders.map(r => (
+              {onlineRiders.map(r => {
+                const onDelivery = !!r.current_order_id;
+                return (
                 <div key={r.id} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[24px] p-6 shadow-2xl shadow-black/40 hover:shadow-2xl hover:shadow-black/60 transition-all relative overflow-hidden">
-                  {r.status === "on_delivery" && (
+                  {onDelivery && (
                     <div className="absolute top-0 left-0 w-full h-1 bg-swish-green" />
                   )}
                   <div className="flex items-center justify-between mb-4">
@@ -708,25 +710,19 @@ function FleetTab() {
                       </div>
                       <div>
                         <h3 className="font-bold text-white">{r.name}</h3>
-                        <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1">
-                          <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> 4.9 • 10 del.
-                        </div>
+                        <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{r.phone}</div>
                       </div>
                     </div>
-                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${r.status === "on_delivery" ? 'bg-swish-green/10 text-swish-green' : 'bg-blue-500/10 text-blue-500'}`}>
-                      {r.status?.replace("_", " ") ?? "Idle"}
+                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${onDelivery ? 'bg-swish-green/10 text-swish-green' : 'bg-blue-500/10 text-blue-500'}`}>
+                      {onDelivery ? "On Delivery" : "Idle"}
                     </span>
                   </div>
-                  
-                  {r.status === "on_delivery" ? (
+
+                  {onDelivery ? (
                     <div className="bg-white/[0.02] backdrop-blur-lg rounded-xl p-4 border border-white/10">
-                      <div className="flex items-center justify-between mb-2">
-                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Current Order</span>
-                         <span className="font-black text-sm text-white">#R-992</span>
-                      </div>
                       <div className="flex items-center justify-between">
-                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Est. Arrival</span>
-                         <span className="font-bold text-swish-green text-sm flex items-center gap-1"><Clock className="w-3 h-3" /> 12 mins</span>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Current Order</span>
+                         <span className="font-black text-sm text-white">{r.active_order_display_id || r.current_order_id?.slice(0, 8)}</span>
                       </div>
                     </div>
                   ) : (
@@ -735,7 +731,8 @@ function FleetTab() {
                     </div>
                   )}
                 </div>
-              ))}
+              );
+              })}
               {onlineRiders.length === 0 && !loading && (
                 <div className="col-span-full py-12 text-center border border-white/10 border-dashed rounded-[24px]">
                   <p className="text-zinc-500 text-sm font-bold">No active riders</p>
@@ -816,7 +813,7 @@ function InventoryTab() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map(item => (
-            <div key={item.id} className={`bg-white/[0.03] backdrop-blur-2xl border rounded-[32px] p-8 shadow-2xl shadow-black/40 ${item.current_stock <= item.reorder_threshold ? "border-red-100 bg-red-50/10" : "border-white/10"}`}>
+            <div key={item.id} className={`bg-white/[0.03] backdrop-blur-2xl border rounded-[32px] p-8 shadow-2xl shadow-black/40 ${Number(item.current_stock) <= Number(item.reorder_threshold) ? "border-red-100 bg-red-50/10" : "border-white/10"}`}>
               <div className="mb-6">
                 <h3 className="text-xl font-black italic tracking-tighter mb-1 text-white">{item.name}</h3>
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{item.unit}</p>
