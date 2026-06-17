@@ -21,10 +21,13 @@ function LoginForm() {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
   const [serverReady, setServerReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [devOtp, setDevOtp] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { login } = useAuth()!;
+
+  useEffect(() => { setMounted(true); }, []);
 
   // Pre-warm Render backend — poll /health until it responds, then unlock the form
   useEffect(() => {
@@ -293,7 +296,7 @@ function LoginForm() {
                   </motion.p>
                 )}
 
-                {!serverReady && (
+                {mounted && !serverReady && (
                   <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-zinc-400 text-center">
                     Connecting to server...
                   </motion.p>
@@ -307,12 +310,10 @@ function LoginForm() {
 
                 <button
                   type="submit"
-                  disabled={loading || !serverReady}
+                  disabled={loading || (mounted && !serverReady)}
                   className="w-full bg-brand-primary text-white py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 hover:bg-orange-500 transition-all disabled:opacity-50 active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                 >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : !serverReady ? (
+                  {loading || (mounted && !serverReady) ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     "Continue"

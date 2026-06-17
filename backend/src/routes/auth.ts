@@ -187,6 +187,18 @@ router.post('/verify-otp', async (req, res) => {
         insertRole = 'rider';
         roleUpdate = `, role = 'rider'`;
     }
+    if (appRole === 'chef') {
+        // Kitchen app: only pre-authorized accounts (role='chef' set by admin) can log in.
+        // Never auto-promote an arbitrary phone number to chef.
+        const { rows: chefRows } = await query(
+            `SELECT id FROM users WHERE phone = $1 AND role = 'chef'`,
+            [normalizedPhone]
+        );
+        if (chefRows.length === 0) {
+            return res.status(403).json({ error: 'NOT_KITCHEN_STAFF', message: 'This number is not registered as kitchen staff. Contact your manager.' });
+        }
+        // Leave insertRole / roleUpdate at their defaults — don't change the existing role.
+    }
 
     if (process.env.NODE_ENV === 'development') {
         if (normalizedPhone === '910000000000') {
@@ -212,7 +224,7 @@ router.post('/verify-otp', async (req, res) => {
     roleUpdate += zoneUpdateKeys;
 
     const { rows } = await query(
-        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified`,
+        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete`,
         [normalizedPhone, name || '2QT User', insertRole, insertVerified]
     );
 
@@ -282,7 +294,9 @@ router.post('/verify-otp', async (req, res) => {
             role: user.role,
             kitchenId: user.kitchen_id ?? null,
             zoneId: user.zone_id ?? null,
-            termsAccepted: !!user.terms_accepted_at
+            termsAccepted: !!user.terms_accepted_at,
+            onboarding_complete: user.onboarding_complete,
+            is_verified: user.is_verified
         },
         accessToken,
         refreshToken
@@ -395,10 +409,22 @@ router.post('/kitchen-pin', async (req, res) => {
         const accessToken = jwt.sign(
             { userId: user.id, role: 'chef', kitchenId: kitchen.id, zoneId: null, jti },
             JWT_SECRET,
+            { expiresIn: '2h' }
+        );
+
+        const refreshToken = jwt.sign(
+            { userId: user.id, jti },
+            JWT_REFRESH_SECRET,
             { expiresIn: '30d' }
         );
 
-        res.json({ accessToken, kitchen: { id: kitchen.id, name: kitchen.name } });
+        const tokenHash = await bcrypt.hash(refreshToken, 10);
+        await query(
+            'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + interval \'30 days\')',
+            [user.id, tokenHash]
+        );
+
+        res.json({ accessToken, refreshToken, kitchen: { id: kitchen.id, name: kitchen.name } });
     } catch (err: any) {
         console.error('KITCHEN_PIN_ERROR:', err);
         res.status(500).json({ error: 'SERVER_ERROR' });

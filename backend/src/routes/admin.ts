@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z, ZodSchema } from 'zod';
+import bcrypt from 'bcrypt';
 import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
@@ -40,6 +41,7 @@ const KitchenSchema = z.object({
     lat: z.number().optional().default(12.9716),
     lng: z.number().optional().default(77.5946),
     is_paused: z.boolean().optional(),
+    pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits').optional(),
 });
 
 const ZoneSchema = z.object({
@@ -784,26 +786,45 @@ router.put('/zones/:id/metrics', authenticate, requireRole('super_admin', 'admin
 
 router.get('/kitchens', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(`
-        SELECT k.*, 
+        SELECT k.*,
                COALESCE(json_agg(json_build_object('id', z.id, 'name', z.name)) FILTER (WHERE z.id IS NOT NULL), '[]') as zones
-        FROM kitchens k 
+        FROM kitchens k
         LEFT JOIN kitchen_zones kz ON k.id = kz.kitchen_id
         LEFT JOIN zones z ON kz.zone_id = z.id
         GROUP BY k.id
         ORDER BY k.created_at DESC
     `);
-    res.json({ kitchens: rows });
+    res.json({ kitchens: rows.map(({ pin_hash, ...k }) => ({ ...k, has_pin: !!pin_hash })) });
 });
 
+// Kitchen PIN login (auth.ts /auth/kitchen-pin) bcrypt-compares an entered PIN against
+// every kitchen's pin_hash and logs into whichever one matches first — two kitchens
+// sharing a PIN makes that lookup ambiguous, so PINs must be unique across kitchens.
+async function assertPinAvailable(pin: string, excludeKitchenId?: string) {
+    const { rows: others } = await query(
+        'SELECT pin_hash FROM kitchens WHERE pin_hash IS NOT NULL' + (excludeKitchenId ? ' AND id != $1' : ''),
+        excludeKitchenId ? [excludeKitchenId] : []
+    );
+    for (const other of others) {
+        if (await bcrypt.compare(pin, other.pin_hash)) {
+            const err: any = new Error('PIN_ALREADY_IN_USE');
+            err.status = 409;
+            throw err;
+        }
+    }
+}
+
 router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), validate(KitchenSchema), async (req: AuthRequest, res) => {
-    const { name, zone_ids, address, fssai_license, gstin, lat = 12.9716, lng = 77.5946 } = req.body;
+    const { name, zone_ids, address, fssai_license, gstin, lat = 12.9716, lng = 77.5946, pin } = req.body;
+    if (pin) await assertPinAvailable(pin);
+    const pinHash = pin ? await bcrypt.hash(pin, 10) : null;
 
     const kitchenId = await withTransaction(async (client) => {
         const { rows } = await client.query(`
-            INSERT INTO kitchens (name, address, fssai_license, gstin, lat, lng)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO kitchens (name, address, fssai_license, gstin, lat, lng, pin_hash)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
-        `, [name, address, fssai_license, gstin, lat, lng]);
+        `, [name, address, fssai_license, gstin, lat, lng, pinHash]);
         const id = rows[0].id;
         if (zone_ids && Array.isArray(zone_ids)) {
             for (const zId of zone_ids) {
@@ -826,12 +847,15 @@ router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), vali
         GROUP BY k.id
     `, [kitchenId]);
 
-    res.status(201).json({ kitchen: updated[0] });
+    const { pin_hash, ...kitchenOut } = updated[0];
+    res.status(201).json({ kitchen: { ...kitchenOut, has_pin: !!pin_hash } });
 });
 
 router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), validate(KitchenSchema.partial()), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { name, zone_ids, address, fssai_license, gstin, is_paused, lat, lng } = req.body;
+    const { name, zone_ids, address, fssai_license, gstin, is_paused, lat, lng, pin } = req.body;
+    if (pin) await assertPinAvailable(pin, id as string);
+    const pinHash = pin ? await bcrypt.hash(pin, 10) : null;
 
     await withTransaction(async (client) => {
         const { rows } = await client.query(`
@@ -842,10 +866,11 @@ router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'),
                 gstin = COALESCE($4, gstin),
                 is_paused = COALESCE($5, is_paused),
                 lat = COALESCE($7, lat),
-                lng = COALESCE($8, lng)
+                lng = COALESCE($8, lng),
+                pin_hash = COALESCE($9, pin_hash)
             WHERE id = $6
             RETURNING id
-        `, [name, address, fssai_license, gstin, is_paused, id, lat, lng]);
+        `, [name, address, fssai_license, gstin, is_paused, id, lat, lng, pinHash]);
 
         if (rows.length === 0) {
             const err: any = new Error('NOT_FOUND');
@@ -874,7 +899,8 @@ router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'),
         GROUP BY k.id
     `, [id]);
 
-    res.json({ kitchen: updated[0] });
+    const { pin_hash, ...kitchenOut } = updated[0];
+    res.json({ kitchen: { ...kitchenOut, has_pin: !!pin_hash } });
 });
 
 router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
@@ -895,7 +921,11 @@ router.get('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'admi
 
 router.post('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { phone, name } = req.body;
+    const { phone: rawPhone, name } = req.body;
+    // Normalize to 91XXXXXXXXXX format (same as OTP flow)
+    let phone = (rawPhone || '').replace(/\D/g, '');
+    if (phone.length === 10) phone = '91' + phone;
+    if (!phone || phone.length !== 12) return res.status(400).json({ error: 'INVALID_PHONE', message: 'Enter a valid 10-digit mobile number.' });
     try {
         const { rows: existing } = await query('SELECT id FROM users WHERE phone = $1', [phone]);
         if (existing.length > 0) {

@@ -1,33 +1,70 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  ActivityIndicator, StatusBar, StyleSheet, Alert,
+} from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../store';
+import { useDispatch } from 'react-redux';
 import { logout } from '../store/slices/authSlice';
-import { Timer, ChefHat, Bell, LogOut, Info, CheckCircle2, Check, X } from 'lucide-react-native';
+import { ChefHat, LogOut, ClipboardCheck, Zap, Clock } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
-import { useEffect } from 'react';
 
-const KitchenBoardScreen = () => {
+const G = {
+  bg: '#070707',
+  card: '#111111',
+  cardHi: '#161616',
+  border: 'rgba(255,255,255,0.07)',
+  green: '#00D084',
+  greenBg: 'rgba(0,208,132,0.08)',
+  greenBorder: 'rgba(0,208,132,0.18)',
+  amber: '#F59E0B',
+  amberBg: 'rgba(245,158,11,0.08)',
+  amberBorder: 'rgba(245,158,11,0.18)',
+  red: '#EF4444',
+  redBg: 'rgba(239,68,68,0.08)',
+  redBorder: 'rgba(239,68,68,0.18)',
+  white: '#FFFFFF',
+  dim: 'rgba(255,255,255,0.45)',
+  muted: 'rgba(255,255,255,0.18)',
+  faint: 'rgba(255,255,255,0.05)',
+};
+
+function elapsed(dateStr: string): string {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return `${diff}s`;
+  const m = Math.floor(diff / 60);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function LiveClock() {
+  const [t, setT] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setT(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <Text style={styles.clock}>
+      {t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+    </Text>
+  );
+}
+
+const KitchenBoardScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
 
   useEffect(() => {
     const socket = getSocket();
-    if (socket) {
-      socket.on('new_order', () => {
-        queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
-      });
-      socket.on('order_updated', () => {
-        queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
-      });
-      return () => {
-        socket.off('new_order');
-        socket.off('order_updated');
-      };
-    }
+    if (!socket) return;
+    socket.on('new_order', () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }));
+    socket.on('order_updated', () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }));
+    return () => {
+      socket.off('new_order');
+      socket.off('order_updated');
+    };
   }, [queryClient]);
 
   const { data: menuData } = useQuery({
@@ -36,12 +73,12 @@ const KitchenBoardScreen = () => {
   });
 
   const pauseMutation = useMutation({
-    mutationFn: (paused: boolean) => api.patch('/kitchen/status', { paused, reason: 'Chef decided to take a break.' }),
+    mutationFn: (paused: boolean) => api.patch('/kitchen/status', { paused, reason: 'Chef paused.' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] }),
   });
 
   const toggleItemMutation = useMutation({
-    mutationFn: ({ itemId, available }: { itemId: string; available: boolean }) => 
+    mutationFn: ({ itemId, available }: { itemId: string; available: boolean }) =>
       api.patch(`/kitchen/menu/${itemId}/availability`, { available }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] }),
   });
@@ -49,593 +86,382 @@ const KitchenBoardScreen = () => {
   const { data: orders, isLoading } = useQuery({
     queryKey: ['kitchen-orders'],
     queryFn: () => api.get('/kitchen/orders'),
+    refetchInterval: 30000,
   });
 
   const claimMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/claim`, {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
+    onError: () => Alert.alert('Error', 'Could not accept this order. It may have been claimed already.'),
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ orderId, status }: { orderId: string, status: string }) => api.patch(`/kitchen/orders/${orderId}/status`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] })
+    mutationFn: ({ orderId, status }: { orderId: string; status: string }) =>
+      api.patch(`/kitchen/orders/${orderId}/status`, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
+    onError: () => Alert.alert('Error', 'Could not update order status.'),
   });
 
-  if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
-      <Text style={styles.loadingText}>Synchronizing Command</Text>
-    </View>
-  );
-
-  const incomingOrders = orders?.orders?.filter((o: any) => o.status === 'confirmed') || [];
-  const activeOrders = orders?.orders?.filter((o: any) => o.status === 'preparing' || o.status === 'at_kitchen' || o.status === 'ready_for_pickup') || [];
+  const paused = menuData?.kitchenPaused;
+  const incoming = orders?.orders?.filter((o: any) => o.status === 'confirmed') || [];
+  const cooking = orders?.orders?.filter((o: any) =>
+    ['preparing', 'at_kitchen'].includes(o.status)
+  ) || [];
+  const ready = orders?.orders?.filter((o: any) => o.status === 'ready_for_pickup') || [];
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      
-      <ScrollView style={styles.scrollView}>
-        {/* Header Section */}
-        <SafeAreaView edges={['top', 'left', 'right']}>
-          <View style={styles.header}>
-            <View>
-              <View style={styles.statusRow}>
-                <View style={[styles.statusDot, { backgroundColor: menuData?.kitchenPaused ? '#EF4444' : '#00D084' }]} />
-                <Text style={styles.statusText}>{menuData?.kitchenPaused ? 'Operations Paused' : 'Operations Live'}</Text>
-              </View>
-              <Text style={styles.headerTitle}>Kitchen Command</Text>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor={G.bg} />
+
+      <SafeAreaView edges={['top']} style={styles.safeTop}>
+        <View style={styles.header}>
+          <View>
+            <View style={styles.liveRow}>
+              <View style={[styles.liveDot, { backgroundColor: paused ? G.red : G.green, shadowColor: paused ? G.red : G.green }]} />
+              <Text style={styles.liveLabel}>{paused ? 'PAUSED' : 'LIVE'}</Text>
             </View>
-            <View style={{ flexDirection: 'row' }}>
-                <TouchableOpacity 
-                    activeOpacity={0.7}
-                    style={[styles.commandButton, { backgroundColor: menuData?.kitchenPaused ? '#00D084' : '#EF4444', marginRight: 12 }]}
-                    onPress={() => pauseMutation.mutate(!menuData?.kitchenPaused)}
-                >
-                    <Text style={styles.commandButtonText}>{menuData?.kitchenPaused ? 'RESUME' : 'PAUSE'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    activeOpacity={0.7}
-                    style={styles.logoutButton}
-                    onPress={() => dispatch(logout())}
-                >
-                    <LogOut size={20} color="rgba(255,255,255,0.4)" />
-                </TouchableOpacity>
+            <LiveClock />
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[styles.pill, {
+                backgroundColor: paused ? G.greenBg : G.redBg,
+                borderColor: paused ? G.greenBorder : G.redBorder,
+              }]}
+              onPress={() => pauseMutation.mutate(!paused)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.pillText, { color: paused ? G.green : G.red }]}>
+                {paused ? 'RESUME' : 'PAUSE'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('ShiftHandover')}>
+              <ClipboardCheck size={20} color={G.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => dispatch(logout())}>
+              <LogOut size={20} color={G.muted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      {isLoading ? (
+        <View style={styles.loader}>
+          <ActivityIndicator color={G.green} size="large" />
+          <Text style={styles.loaderText}>SYNCING KITCHEN</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+          {/* Stats */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={[styles.statNum, incoming.length > 0 && { color: G.white }]}>{incoming.length}</Text>
+              <Text style={styles.statLabel}>INCOMING</Text>
+            </View>
+            <View style={[styles.statCard, styles.statMiddle]}>
+              <Text style={[styles.statNum, cooking.length > 0 && { color: G.amber }]}>{cooking.length}</Text>
+              <Text style={styles.statLabel}>COOKING</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={[styles.statNum, ready.length > 0 && { color: G.green }]}>{ready.length}</Text>
+              <Text style={styles.statLabel}>READY</Text>
             </View>
           </View>
-        </SafeAreaView>
 
-        {/* Quick Inventory Management */}
-        <View style={styles.inventorySection}>
-            <Text style={styles.sectionLabel}>Quick Inventory</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inventoryScroll}>
-                {menuData?.items?.map((item: any) => (
-                    <TouchableOpacity 
-                        key={item.id}
-                        onPress={() => toggleItemMutation.mutate({ itemId: item.id, available: !item.available })}
-                        style={[styles.inventoryChip, !item.available && styles.inventoryChipDisabled]}
-                    >
-                        <Text style={[styles.inventoryText, !item.available && styles.inventoryTextDisabled]}>
-                            {item.name} {item.available ? <Check size={12} color="#22C55E"/> : <X size={12} color="#EF4444"/>}
-                        </Text>
-                    </TouchableOpacity>
+          {/* 86 Items */}
+          {menuData?.items?.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>86 ITEMS</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
+                {menuData.items.map((item: any) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.chip, !item.available && styles.chipOff]}
+                    onPress={() => toggleItemMutation.mutate({ itemId: item.id, available: !item.available })}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.chipDot, { backgroundColor: item.available ? G.green : G.red }]} />
+                    <Text style={[styles.chipText, !item.available && { color: G.red }]}>{item.name}</Text>
+                  </TouchableOpacity>
                 ))}
-            </ScrollView>
-        </View>
-
-        {/* Incoming Orders Horizontal Strip */}
-        <View style={styles.incomingSection}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionHeaderLeft}>
-              <Text style={styles.sectionLabel}>Incoming</Text>
-              {incomingOrders.length > 0 && (
-                <View style={styles.countBadge}>
-                  <Text style={styles.countText}>{incomingOrders.length}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-          
-          <ScrollView 
-            horizontal 
-            style={styles.horizontalScroll}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScrollContent}
-          >
-            {incomingOrders.map((order: any) => (
-              <TouchableOpacity 
-                key={order.id} 
-                activeOpacity={0.9}
-                onPress={() => claimMutation.mutate(order.id)}
-                style={styles.incomingCard}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={styles.idBadge}>
-                    <Text style={styles.idText}>{order.display_id}</Text>
-                  </View>
-                  <Text style={styles.timeLabel}>Just In</Text>
-                </View>
-                
-                <View style={styles.itemsPreview}>
-                  {order.items?.map((item: any, idx: number) => (
-                    <Text key={idx} style={styles.previewItemText} numberOfLines={1}>• {item.quantity}x {item.name}</Text>
-                  ))}
-                </View>
-
-                <View style={styles.acceptButton}>
-                  <ChefHat size={14} color="white" style={{ marginRight: 8 }} />
-                  <Text style={styles.acceptButtonText}>Accept & Start</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-            
-            {incomingOrders.length === 0 && (
-              <View style={styles.emptyIncoming}>
-                <Bell size={20} color="white" />
-                <Text style={styles.emptyIncomingText}>Awaiting Orders</Text>
-              </View>
-            )}
-          </ScrollView>
-        </View>
-
-        {/* Active Orders Section */}
-        <View style={styles.activeSection}>
-          <Text style={styles.sectionLabelLarge}>In Preparation</Text>
-          
-          {activeOrders.map((order: any) => (
-            <View key={order.id} style={styles.activeCard}>
-              <View style={styles.activeCardHeader}>
-                <View>
-                  <Text style={styles.activeId}>{order.display_id}</Text>
-                  <View style={styles.statusRowSmall}>
-                    <View style={[styles.statusTag, { backgroundColor: order.status === 'preparing' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(0, 208, 132, 0.1)' }]}>
-                      <Text style={[styles.statusTagText, { color: order.status === 'preparing' ? '#F59E0B' : '#00D084' }]}>
-                        ● {order.status.replace(/_/g, ' ')}
-                      </Text>
-                    </View>
-                    {order.is_scheduled && (
-                      <View style={styles.scheduledTag}>
-                        <Timer size={10} color="#3B82F6" style={{ marginRight: 4 }} />
-                        <Text style={styles.scheduledText}>
-                          Sched: {new Date(order.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                <Text style={styles.orderTimeText}>{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-              </View>
-              
-                <View style={styles.fullItemsList}>
-                  {order.items?.map((item: any, idx: number) => (
-                    <View key={idx} style={styles.fullItemRow}>
-                      <Text style={styles.fullItemText}>{item.quantity}x {item.name}</Text>
-                      <CheckCircle2 size={16} color="rgba(255,255,255,0.1)" />
-                    </View>
-                  ))}
-                </View>
-
-                {order.special_instructions && (
-                  <View style={styles.instructionBox}>
-                    <Info size={16} color="#EF4444" style={{ marginRight: 12, marginTop: 2 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.instructionHeader}>Customer Note</Text>
-                      <Text style={styles.instructionText}>{order.special_instructions}</Text>
-                    </View>
-                  </View>
-                )}
-
-              {order.status === 'preparing' ? (
-                <TouchableOpacity 
-                  activeOpacity={0.8}
-                  style={styles.completeButton}
-                  onPress={() => updateStatusMutation.mutate({ orderId: order.id, status: 'ready_for_pickup' })}
-                >
-                  <Text style={styles.completeButtonText}>Complete & Ready</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.waitingState}>
-                  <Text style={styles.waitingText}>Waiting for Rider</Text>
-                </View>
-              )}
-            </View>
-          ))}
-
-          {activeOrders.length === 0 && (
-            <View style={styles.emptyActive}>
-              <ChefHat size={60} color="white" strokeWidth={1} />
-              <Text style={styles.emptyActiveText}>The Floor is Clear</Text>
+              </ScrollView>
             </View>
           )}
-        </View>
-      </ScrollView>
+
+          {/* Incoming Orders */}
+          <View style={styles.section}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionLabel}>NEW ORDERS</Text>
+              {incoming.length > 0 && (
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>{incoming.length}</Text>
+                </View>
+              )}
+            </View>
+
+            {incoming.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Zap size={22} color={G.muted} strokeWidth={1.5} />
+                <Text style={styles.emptyText}>Awaiting orders</Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>
+                {incoming.map((order: any) => (
+                  <View key={order.id} style={styles.newCard}>
+                    <View style={styles.newCardTop}>
+                      <Text style={styles.newCardId}>{order.display_id}</Text>
+                      <View style={styles.ageChip}>
+                        <Clock size={9} color={G.amber} />
+                        <Text style={styles.ageText}>{elapsed(order.created_at)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.newCardItems}>
+                      {order.items?.map((item: any, i: number) => (
+                        <View key={i} style={styles.newItemRow}>
+                          <Text style={styles.newItemQty}>{item.quantity}×</Text>
+                          <Text style={styles.newItemName} numberOfLines={1}>{item.name}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    {order.special_instructions ? (
+                      <View style={styles.newNoteBox}>
+                        <Text style={styles.newNoteText} numberOfLines={2}>{order.special_instructions}</Text>
+                      </View>
+                    ) : null}
+
+                    <TouchableOpacity
+                      style={styles.acceptBtn}
+                      onPress={() => claimMutation.mutate(order.id)}
+                      activeOpacity={0.8}
+                    >
+                      <ChefHat size={15} color="#000" strokeWidth={2.5} />
+                      <Text style={styles.acceptBtnText}>ACCEPT</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
+          {/* Cooking */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>IN KITCHEN</Text>
+
+            {[...cooking, ...ready].length === 0 ? (
+              <View style={styles.emptyCard}>
+                <ChefHat size={22} color={G.muted} strokeWidth={1.5} />
+                <Text style={styles.emptyText}>Kitchen floor clear</Text>
+              </View>
+            ) : (
+              [...cooking, ...ready].map((order: any) => {
+                const isReady = order.status === 'ready_for_pickup';
+                return (
+                  <View key={order.id} style={[styles.activeCard, isReady && styles.activeCardReady]}>
+                    {/* Top row */}
+                    <View style={styles.activeTop}>
+                      <View>
+                        <Text style={styles.activeId}>{order.display_id}</Text>
+                        <View style={[styles.statusPill, {
+                          backgroundColor: isReady ? G.greenBg : G.amberBg,
+                          borderColor: isReady ? G.greenBorder : G.amberBorder,
+                        }]}>
+                          <View style={[styles.statusDot, { backgroundColor: isReady ? G.green : G.amber }]} />
+                          <Text style={[styles.statusPillText, { color: isReady ? G.green : G.amber }]}>
+                            {isReady ? 'READY FOR PICKUP' : 'COOKING'}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.ageChipDark}>
+                        <Clock size={10} color={G.muted} />
+                        <Text style={styles.ageTextDark}>{elapsed(order.created_at)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    {/* Items */}
+                    <View style={styles.itemsList}>
+                      {order.items?.map((item: any, i: number) => (
+                        <View key={i} style={styles.activeItemRow}>
+                          <Text style={styles.activeItemQty}>{item.quantity}</Text>
+                          <Text style={styles.activeItemName}>{item.name}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    {/* Note */}
+                    {order.special_instructions && (
+                      <View style={styles.alertBox}>
+                        <Text style={styles.alertLabel}>NOTE</Text>
+                        <Text style={styles.alertText}>{order.special_instructions}</Text>
+                      </View>
+                    )}
+
+                    {/* CTA */}
+                    {isReady ? (
+                      <View style={styles.waitingBar}>
+                        <Text style={styles.waitingText}>WAITING FOR RIDER PICKUP</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.readyBtn}
+                        onPress={() => updateStatusMutation.mutate({ orderId: order.id, status: 'ready_for_pickup' })}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.readyBtnText}>MARK READY</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 24,
-    color: 'rgba(255,255,255,0.2)',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 5,
-    fontSize: 10,
-  },
-  scrollView: {
-    flex: 1,
-  },
+  root: { flex: 1, backgroundColor: G.bg },
+  safeTop: { backgroundColor: G.bg },
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  loaderText: { color: G.muted, fontSize: 10, fontWeight: '900', letterSpacing: 4 },
+
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 32,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 20,
+    borderBottomWidth: 1, borderBottomColor: G.faint,
   },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+  liveRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  liveDot: {
+    width: 7, height: 7, borderRadius: 4, marginRight: 7,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 6, elevation: 4,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#00D084',
-    marginRight: 8,
-    shadowColor: '#00D084',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+  liveLabel: { color: G.muted, fontSize: 9, fontWeight: '900', letterSpacing: 3 },
+  clock: { color: G.white, fontSize: 36, fontWeight: '900', letterSpacing: -1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pill: {
+    paddingHorizontal: 16, height: 40, borderRadius: 12, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
   },
-  statusText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 8,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 3,
+  pillText: { fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  iconBtn: {
+    width: 44, height: 44, backgroundColor: G.faint, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: G.border,
   },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -1,
+
+  scroll: { flex: 1 },
+  scrollContent: { paddingTop: 8 },
+
+  statsRow: {
+    flexDirection: 'row', marginHorizontal: 20, marginBottom: 8,
+    backgroundColor: G.card, borderRadius: 20, borderWidth: 1, borderColor: G.border,
+    overflow: 'hidden',
   },
-  logoutButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#111',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  commandButton: {
-    paddingHorizontal: 20,
-    height: 48,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  commandButtonText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 10,
-    letterSpacing: 2,
-  },
-  inventorySection: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  inventoryScroll: {
-    paddingTop: 12,
-  },
-  inventoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  inventoryChipDisabled: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  inventoryText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  inventoryTextDisabled: {
-    color: '#EF4444',
-  },
-  incomingSection: {
-    paddingVertical: 16,
-  },
-  sectionHeaderRow: {
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sectionLabel: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 4,
-  },
+  statCard: { flex: 1, alignItems: 'center', paddingVertical: 20 },
+  statMiddle: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: G.border },
+  statNum: { color: G.muted, fontSize: 32, fontWeight: '900', letterSpacing: -1 },
+  statLabel: { color: G.muted, fontSize: 8, fontWeight: '900', letterSpacing: 3, marginTop: 2 },
+
+  section: { marginTop: 28, paddingHorizontal: 20 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  sectionLabel: { color: G.muted, fontSize: 9, fontWeight: '900', letterSpacing: 4, marginBottom: 14 },
   countBadge: {
-    backgroundColor: '#FF6B35',
-    marginLeft: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
+    marginLeft: 10, marginBottom: 14, backgroundColor: G.red, borderRadius: 10,
+    minWidth: 22, height: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
   },
-  countText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 12,
+  countBadgeText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+
+  chipScroll: { gap: 8 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: G.faint, borderRadius: 12, borderWidth: 1, borderColor: G.border,
   },
-  horizontalScroll: {
-    paddingLeft: 24,
+  chipOff: { backgroundColor: G.redBg, borderColor: G.redBorder },
+  chipDot: { width: 6, height: 6, borderRadius: 3 },
+  chipText: { color: G.dim, fontSize: 11, fontWeight: '700' },
+
+  emptyCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: G.faint, borderRadius: 18, borderWidth: 1, borderColor: G.border,
+    paddingHorizontal: 20, paddingVertical: 20,
   },
-  horizontalScrollContent: {
-    paddingRight: 40,
+  emptyText: { color: G.muted, fontSize: 13, fontWeight: '700' },
+
+  newCard: {
+    backgroundColor: G.card, borderRadius: 24, padding: 20, marginRight: 14,
+    borderWidth: 1, borderColor: G.border, width: 270,
   },
-  incomingCard: {
-    backgroundColor: '#151515',
-    borderRadius: 24,
-    padding: 20,
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    width: 280,
+  newCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  newCardId: { color: G.white, fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  ageChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: G.amberBg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: G.amberBorder,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  ageText: { color: G.amber, fontSize: 10, fontWeight: '900' },
+  newCardItems: { marginBottom: 14, minHeight: 70 },
+  newItemRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 6, gap: 8 },
+  newItemQty: { color: G.green, fontSize: 16, fontWeight: '900', width: 24 },
+  newItemName: { color: G.dim, fontSize: 14, fontWeight: '600', flex: 1 },
+  newNoteBox: {
+    backgroundColor: G.redBg, borderRadius: 10, borderWidth: 1, borderColor: G.redBorder,
+    padding: 10, marginBottom: 14,
   },
-  idBadge: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
+  newNoteText: { color: G.red, fontSize: 11, fontWeight: '600', lineHeight: 16 },
+  acceptBtn: {
+    backgroundColor: G.green, borderRadius: 14, height: 52,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  idText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 14,
+  acceptBtnText: { color: '#000', fontSize: 12, fontWeight: '900', letterSpacing: 2 },
+
+  activeCard: {
+    backgroundColor: G.card, borderRadius: 24, padding: 22,
+    marginBottom: 16, borderWidth: 1, borderColor: G.border,
+  },
+  activeCardReady: { borderColor: G.greenBorder },
+  activeTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  activeId: { color: G.white, fontSize: 28, fontWeight: '900', letterSpacing: -1, marginBottom: 8 },
+  statusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusPillText: { fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
+  ageChipDark: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  ageTextDark: { color: G.muted, fontSize: 11, fontWeight: '700' },
+  divider: { height: 1, backgroundColor: G.faint, marginVertical: 16 },
+  itemsList: { gap: 10, marginBottom: 16 },
+  activeItemRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
+  activeItemQty: {
+    color: G.white, fontSize: 22, fontWeight: '900', width: 28,
     letterSpacing: -0.5,
   },
-  timeLabel: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 9,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+  activeItemName: { color: G.dim, fontSize: 16, fontWeight: '600', flex: 1 },
+  alertBox: {
+    backgroundColor: G.redBg, borderRadius: 14, borderWidth: 1, borderColor: G.redBorder,
+    padding: 14, marginBottom: 16,
   },
-  itemsPreview: {
-    marginBottom: 16,
-    height: 80,
+  alertLabel: { color: G.red, fontSize: 8, fontWeight: '900', letterSpacing: 3, marginBottom: 4 },
+  alertText: { color: G.white, fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  readyBtn: {
+    backgroundColor: G.green, borderRadius: 16, height: 56,
+    alignItems: 'center', justifyContent: 'center',
   },
-  previewItemText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 2,
+  readyBtnText: { color: '#000', fontSize: 13, fontWeight: '900', letterSpacing: 2 },
+  waitingBar: {
+    height: 56, borderRadius: 16, borderWidth: 1, borderColor: G.border,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: G.faint,
   },
-  acceptButton: {
-    backgroundColor: '#FF6B35',
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  acceptButtonText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  emptyIncoming: {
-    paddingVertical: 40,
-    paddingHorizontal: 16,
-    opacity: 0.2,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  emptyIncomingText: {
-    color: '#fff',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontSize: 10,
-    marginLeft: 12,
-  },
-  activeSection: {
-    paddingHorizontal: 24,
-    paddingBottom: 80,
-  },
-  sectionLabelLarge: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 4,
-    marginBottom: 24,
-  },
-  activeCard: {
-    backgroundColor: '#0D0D0D',
-    borderRadius: 32,
-    padding: 24,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.5,
-    shadowRadius: 30,
-    elevation: 10,
-  },
-  activeCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 24,
-  },
-  activeId: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -1,
-    marginBottom: 4,
-  },
-  statusRowSmall: {
-    flexDirection: 'row',
-  },
-  statusTag: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  statusTagText: {
-    fontWeight: '900',
-    fontSize: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  scheduledTag: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  scheduledText: {
-    color: '#3B82F6',
-    fontWeight: '900',
-    fontSize: 8,
-    textTransform: 'uppercase',
-  },
-  orderTimeText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  fullItemsList: {
-    marginBottom: 24,
-  },
-  fullItemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  fullItemText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  instructionBox: {
-    marginBottom: 24,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-    flexDirection: 'row',
-  },
-  instructionHeader: {
-    color: '#EF4444',
-    fontSize: 8,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginBottom: 4,
-  },
-  instructionText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 12,
-    lineHeight: 20,
-  },
-  completeButton: {
-    backgroundColor: '#00D084',
-    height: 64,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#00D084',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 5,
-  },
-  completeButtonText: {
-    color: '#000',
-    fontWeight: '900',
-    fontSize: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  waitingState: {
-    height: 64,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  waitingText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontWeight: '900',
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  emptyActive: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    opacity: 0.1,
-  },
-  emptyActiveText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 8,
-    marginTop: 24,
-  },
+  waitingText: { color: G.muted, fontSize: 10, fontWeight: '900', letterSpacing: 3 },
 });
 
 export default KitchenBoardScreen;

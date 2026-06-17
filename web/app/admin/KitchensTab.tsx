@@ -280,7 +280,7 @@ export function KitchensTab() {
                   <form onSubmit={addStaff} className="flex gap-2">
                     <input type="text" placeholder="Chef Name" required value={staffForm.name} onChange={e=>setStaffForm({...staffForm, name: e.target.value})}
                       className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
-                    <input type="tel" placeholder="Phone Number" required value={staffForm.phone} onChange={e=>setStaffForm({...staffForm, phone: e.target.value})}
+                    <input type="tel" placeholder="10-digit mobile number" required value={staffForm.phone} onChange={e=>setStaffForm({...staffForm, phone: e.target.value})}
                       className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
                     <button type="submit" className="bg-brand-primary text-white px-4 py-2 rounded-xl text-xs font-bold">Add Chef</button>
                   </form>
