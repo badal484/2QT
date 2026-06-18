@@ -615,59 +615,70 @@ const CategoryPill = React.memo(({ name, isSelected, onPress }: any) => {
 
 const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaused }: any) => {
   const vegColor = item.is_veg ? '#22C55E' : colors.danger;
+  const unavailable = !item.available || kitchenPaused;
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.92} onPress={onPress}>
-      {/* Left: text */}
+    <TouchableOpacity style={styles.card} activeOpacity={0.93} onPress={onPress}>
+      {/* ── Left: text content ─────────────────────────────── */}
       <View style={styles.cardLeft}>
+        {/* Veg / non-veg indicator */}
         <View style={[styles.vegBadge, { borderColor: vegColor }]}>
           <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
         </View>
+
         <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.cardPrice}>₹{item.price_paise / 100}</Text>
-        <Text style={styles.cardDesc} numberOfLines={2}>
-          {item.description || 'Fresh and delicious.'}
-        </Text>
+        {item.description ? (
+          <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
+        ) : null}
       </View>
 
-      {/* Right: image + ADD/qty pinned to its bottom */}
+      {/* ── Right: image fills full card height, button floats over it ── */}
       <View style={styles.cardRight}>
-        <View style={styles.cardImageWrapper}>
-          {item.photo_url ? (
-            <NetworkImage uri={item.photo_url} style={styles.cardImage} />
-          ) : (
-            <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-              <ChefHat size={28} color={colors.inkFaint} />
-            </View>
-          )}
-          {(!item.available || kitchenPaused) && (
-            <View style={styles.soldOutOverlay}>
-              <Text style={styles.soldOutText}>Sold Out</Text>
-            </View>
-          )}
-        </View>
+        {/* Image fills the whole right column */}
+        {item.photo_url ? (
+          <NetworkImage uri={item.photo_url} style={styles.cardImage} />
+        ) : (
+          <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+            <ChefHat size={32} color={colors.inkFaint} />
+          </View>
+        )}
 
-        <View style={styles.cardQtyRow}>
-          {cartItem ? (
-            <View style={styles.qtyControl}>
-              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity - 1)} style={styles.qtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
-                <Text style={styles.qtyBtnText}>−</Text>
+        {/* Sold-out dim */}
+        {unavailable && (
+          <View style={styles.soldOutOverlay}>
+            <Text style={styles.soldOutText}>Sold Out</Text>
+          </View>
+        )}
+
+        {/* ADD / qty — floats over bottom of image */}
+        {!unavailable && (
+          <View style={styles.cardBtnFloat}>
+            {cartItem ? (
+              <View style={styles.qtyControl}>
+                <TouchableOpacity
+                  onPress={() => onUpdate(cartItem.quantity - 1)}
+                  style={styles.qtyBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                >
+                  <Text style={styles.qtyBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.qtyValue}>{cartItem.quantity}</Text>
+                <TouchableOpacity
+                  onPress={() => onUpdate(cartItem.quantity + 1)}
+                  style={styles.qtyBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                >
+                  <Text style={styles.qtyBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.addBtn} onPress={onAdd} activeOpacity={0.85}>
+                <Text style={styles.addBtnText}>ADD</Text>
               </TouchableOpacity>
-              <Text style={styles.qtyValue}>{cartItem.quantity}</Text>
-              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity + 1)} style={styles.qtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
-                <Text style={styles.qtyBtnText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.addBtn, (!item.available || kitchenPaused) && styles.addBtnDisabled]}
-              disabled={!item.available || kitchenPaused}
-              onPress={onAdd}
-            >
-              <Text style={styles.addBtnText}>ADD</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            )}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -722,46 +733,54 @@ const styles = StyleSheet.create({
   },
   profileImage: { width: '100%', height: '100%' },
 
-  // ── New card layout ─────────────────────────────────────────────────────
+  // ── Card layout ──────────────────────────────────────────────────────────
   card: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     marginBottom: 12,
+    minHeight: 140,
     overflow: 'hidden',
-    elevation: 3,
+    elevation: 4,
     shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
   },
-  cardLeft: { flex: 1, padding: 14, justifyContent: 'center' },
+  cardLeft: { flex: 1, padding: 16, justifyContent: 'center' },
   vegBadge: {
-    width: 16, height: 16, borderWidth: 1.5, borderRadius: 3,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 6,
+    width: 18, height: 18, borderWidth: 1.5, borderRadius: 4,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
-  vegDot: { width: 7, height: 7, borderRadius: 4 },
-  cardName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
-  cardPrice: { fontSize: 14, fontFamily: fontFamily.extrabold, color: colors.ink, marginBottom: 4 },
-  cardDesc: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.medium, lineHeight: 16 },
-  cardRight: { width: 126, justifyContent: 'flex-end' },
-  cardImageWrapper: { width: 126, height: 126, overflow: 'hidden' },
-  cardImage: { width: '100%', height: '100%' },
+  vegDot: { width: 8, height: 8, borderRadius: 4 },
+  cardName: { fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 22 },
+  cardPrice: { fontSize: 15, fontFamily: fontFamily.extrabold, color: colors.ink, marginBottom: 5 },
+  cardDesc: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.medium, lineHeight: 17 },
+
+  // Right column: image fills full height, button floats over bottom
+  cardRight: { width: 130, position: 'relative' },
+  cardImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   cardImagePlaceholder: { backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
-  cardQtyRow: { padding: 8, backgroundColor: colors.surface },
-  qtyControl: {
-    flexDirection: 'row', backgroundColor: colors.accent, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'space-between', height: 36,
+
+  // ADD / qty floats over image bottom
+  cardBtnFloat: {
+    position: 'absolute', bottom: 10, left: 8, right: 8,
   },
-  qtyBtn: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
-  qtyBtnText: { color: colors.white, fontSize: 20, fontFamily: fontFamily.bold },
-  qtyValue: { color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold },
+  qtyControl: {
+    flexDirection: 'row', backgroundColor: colors.accent, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'space-between', height: 38,
+    shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+  },
+  qtyBtn: { width: 36, height: 38, alignItems: 'center', justifyContent: 'center' },
+  qtyBtnText: { color: colors.white, fontSize: 22, fontFamily: fontFamily.bold },
+  qtyValue: { color: colors.white, fontSize: 15, fontFamily: fontFamily.extrabold },
   addBtn: {
-    backgroundColor: colors.accent, borderRadius: 10,
-    paddingVertical: 8, alignItems: 'center',
+    backgroundColor: colors.accent, borderRadius: 12,
+    paddingVertical: 9, alignItems: 'center',
+    shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
   },
   addBtnDisabled: { backgroundColor: colors.surfaceMuted },
-  addBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 13, letterSpacing: 0.5 },
+  addBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 13, letterSpacing: 0.8 },
 
   liveKitchenBanner: {
     flexDirection: 'row',
