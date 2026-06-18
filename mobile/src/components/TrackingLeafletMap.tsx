@@ -213,6 +213,7 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
 
   return (
     <WebView
+      key="tracking-map-v3"
       ref={webviewRef}
       originWhitelist={['*']}
       source={{ html, baseUrl: 'https://leafletjs.com/' }}
@@ -220,6 +221,7 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
       bounces={false}
       javaScriptEnabled={true}
       domStorageEnabled={true}
+      cacheEnabled={false}
       mixedContentMode="always"
       showsHorizontalScrollIndicator={false}
       showsVerticalScrollIndicator={false}
