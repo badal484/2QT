@@ -153,20 +153,25 @@ const CartScreen = ({ navigation }: any) => {
   const verifyOrder = (orderId: string) => {
     setIsVerifying(true);
     let attempts = 0;
+    let navigated = false;
     const id = setInterval(async () => {
+      if (navigated) return;
       attempts++;
       try {
         const res: any = await api.get(`/orders/${orderId}`);
         if (['confirmed', 'preparing'].includes(res.order?.status)) {
           clearInterval(id);
+          navigated = true;
           setIsVerifying(false);
           dispatch(clearCart());
           queryClient.invalidateQueries({ queryKey: ['order-history'] });
           navigation.navigate('OrderPlaced', { orderId, displayId: res.order?.display_id });
+          return;
         }
       } catch (_) {}
-      if (attempts >= 10) {
+      if (attempts >= 15) {
         clearInterval(id);
+        navigated = true;
         setIsVerifying(false);
         navigation.navigate('OrderHistory');
       }

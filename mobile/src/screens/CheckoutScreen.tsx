@@ -139,14 +139,16 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   const verifyOrder = async (orderId: string) => {
     setIsVerifying(true);
     let attempts = 0;
-    const maxAttempts = 10;
-    
+    let navigated = false;
+
     const interval = setInterval(async () => {
+      if (navigated) return;
       attempts++;
       try {
         const res: any = await api.get(`/orders/${orderId}`);
         if (res.order?.status === 'confirmed' || res.order?.status === 'preparing') {
           clearInterval(interval);
+          navigated = true;
           triggerHaptic('notificationSuccess');
           setIsVerifying(false);
           dispatch(clearCart());
@@ -154,13 +156,15 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           queryClient.invalidateQueries({ queryKey: ['loyalty'] });
           queryClient.invalidateQueries({ queryKey: ['order-history'] });
           navigation.navigate('OrderPlaced', { orderId, displayId: res.order?.display_id });
+          return;
         }
       } catch (e) {
         console.log('Verification polling error:', e);
       }
 
-      if (attempts >= maxAttempts) {
+      if (attempts >= 15) {
         clearInterval(interval);
+        navigated = true;
         setIsVerifying(false);
         Alert.alert('Payment Pending', 'Your payment is being processed. You can check the status in your orders history.');
         navigation.navigate('OrderHistory');
