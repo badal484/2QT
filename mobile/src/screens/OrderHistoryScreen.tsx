@@ -79,7 +79,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                 <TouchableOpacity 
                   activeOpacity={0.9}
                   style={styles.orderCard}
-                  onPress={() => ['delivered', 'cancelled'].includes(order.status) ? null : navigation.navigate('OrderTracking', { orderId: order.id })}
+                  onPress={() => ['delivered', 'cancelled'].includes(order.status) ? null : navigation.navigate('OrderConfirmed', { orderId: order.id })}
                 >
                   <View style={styles.orderCardHeader}>
                     <View>
@@ -141,7 +141,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                             style={styles.trackBtn}
                             onPress={() => {
                                 ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-                                navigation.navigate('OrderTracking', { orderId: order.id });
+                                navigation.navigate('OrderConfirmed', { orderId: order.id });
                             }}
                           >
                             <Text style={styles.trackBtnText}>Track Order</Text>
