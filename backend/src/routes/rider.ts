@@ -423,10 +423,20 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
             await client.query('UPDATE users SET current_order_id = $1 WHERE id = $2', [id, riderId]);
         });
 
-        // Notify customer
-        const { rows: orderRows } = await query('SELECT customer_id, status FROM orders WHERE id = $1', [id]);
+        // Notify customer — include rider info so buyer app updates immediately without waiting for next poll
+        const { rows: orderRows } = await query(
+            `SELECT o.customer_id, o.status, u.name as rider_name, u.phone as rider_phone
+             FROM orders o JOIN users u ON u.id = $2 WHERE o.id = $1`,
+            [id, riderId]
+        );
         if (orderRows[0]) {
-            emitToUser(orderRows[0].customer_id, 'order_status_update', { orderId: id, status: orderRows[0].status });
+            emitToUser(orderRows[0].customer_id, 'order_status_update', {
+                orderId: id,
+                status: orderRows[0].status,
+                riderAssigned: true,
+                riderName: orderRows[0].rider_name,
+                riderPhone: orderRows[0].rider_phone,
+            });
         }
 
         res.json({ success: true });
