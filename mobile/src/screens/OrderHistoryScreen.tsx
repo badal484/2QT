@@ -255,13 +255,13 @@ const styles = StyleSheet.create({
   itemQty: { color: '#10B981', fontWeight: '900', fontSize: 11 },
   itemName: { color: '#4B5563', fontWeight: '600', fontSize: 13, flex: 1 },
   
-  orderCardFooter: { flexDirection: 'column', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6', gap: 12 },
-  footerTotalRow: {},
-  footerBtnRow: { flexDirection: 'row', gap: 8 },
+  orderCardFooter: { flexDirection: 'column', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
+  footerTotalRow: { marginBottom: 12 },
+  footerBtnRow: { flexDirection: 'row' },
   footerLabel: { color: '#9CA3AF', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   footerValue: { color: '#1A1A2E', fontWeight: '900', fontSize: 18, marginTop: 2 },
 
-  cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: '#EF4444', paddingVertical: 12, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: '#EF4444', paddingVertical: 12, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   cancelBtnText: { color: '#EF4444', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
   trackBtn: { flex: 1, backgroundColor: '#10B981', paddingVertical: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   trackBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },

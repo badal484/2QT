@@ -1,5 +1,5 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
@@ -53,7 +53,17 @@ const CustomerNavigator = () => {
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       <Stack.Screen name="Address" component={AddressScreen} />
       <Stack.Screen name="AddressBook" component={AddressBookScreen} />
-      <Stack.Screen name="OrderConfirmed" component={OrderConfirmedScreen} />
+      <Stack.Screen
+        name="OrderConfirmed"
+        component={OrderConfirmedScreen}
+        options={{
+          ...TransitionPresets.SlideFromRightIOS,
+          transitionSpec: {
+            open:  { animation: 'timing', config: { duration: 280 } },
+            close: { animation: 'timing', config: { duration: 220 } },
+          },
+        }}
+      />
       <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
       <Stack.Screen name="RateOrder" component={RateOrderScreen} />
       <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
