@@ -247,9 +247,7 @@ const HomeScreen = ({ navigation }: any) => {
             >
               <MapPin size={12} color={unserviceableLocation || showNoLocation ? colors.danger : colors.primary} />
               <Text style={[styles.addressPillText, (unserviceableLocation || showNoLocation) && { color: colors.danger }]} numberOfLines={1}>
-                {addressId
-                  ? selectedAddress?.label || selectedAddress?.address_text?.split(',')[0] || 'Home'
-                  : (location?.addressText?.split(',')[0] || 'Set location')}
+                {location?.addressText?.split(',')[0] || selectedAddress?.address_text?.split(',')[0] || 'Set location'}
               </Text>
               <ChevronDown size={12} color={colors.inkMuted} />
             </TouchableOpacity>
