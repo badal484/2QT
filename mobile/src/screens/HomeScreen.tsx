@@ -6,7 +6,7 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone } from '../store/slices/cartSlice';
-import { MapPin, User, Search, PackageOpen, ChefHat, ArrowRight, ChevronDown, ShoppingBag } from 'lucide-react-native';
+import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
@@ -224,47 +224,42 @@ const HomeScreen = ({ navigation }: any) => {
     );
   }, [cartItems, menuData?.kitchenPaused, handleAddToCart, triggerHaptic, dispatch, navigation]);
 
+  const totalCartQty = cartItems.reduce((acc, i) => acc + i.quantity, 0);
+
   return (
     <View style={styles.container}>
       <View style={[styles.minimalHeader, { paddingTop: Math.max(insets.top + spacing.md, 50) }]}>
+        {/* ── Logo row ─────────────────────────────────────────── */}
         <View style={styles.headerTopRow}>
-          <TouchableOpacity
-            style={styles.addressSection}
-            onPress={() => {
-              triggerHaptic();
-              navigation.navigate('Address');
-            }}
-          >
-            <View style={styles.addressRow}>
-              <View style={styles.addressLabelRow}>
-                <Text style={[styles.locationTitle, (unserviceableLocation || showNoLocation) && styles.locationTitleUnserviceable]}>
-                  {unserviceableLocation || showNoLocation ? 'Unserviceable area' : 'Delivering to'}
-                </Text>
-                <ChevronDown size={14} color={unserviceableLocation || showNoLocation ? colors.danger : colors.ink} style={styles.chevron} />
-              </View>
-              <Text style={styles.addressValue} numberOfLines={1}>
-                {addressId ? selectedAddress?.label || selectedAddress?.address_text?.split(',')[0] || 'Home' : (location?.addressText || 'Tap to set location')}
-              </Text>
+          <View>
+            <Text style={styles.logoText}>2QT<Text style={styles.logoDot}>.</Text></Text>
+            <View style={styles.deliveryTagRow}>
+              <Text style={styles.deliveryTagIcon}>⚡</Text>
+              <Text style={styles.deliveryTagText}>15-MIN DELIVERY</Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
           <View style={styles.headerActions}>
+            {/* Address pill */}
             <TouchableOpacity
-              style={styles.profileButton}
-              onPress={() => {
-                triggerHaptic();
-                navigation.navigate('ProfileTab');
-              }}
+              style={styles.addressPill}
+              onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
             >
-              {user?.photo_url ? (
-                <NetworkImage
-                  uri={user.photo_url}
-                  style={styles.profileImage}
-                  fallbackText={user?.name ? user.name.charAt(0).toUpperCase() : '?'}
-                />
-              ) : (
-                <User size={20} color={colors.primary} />
-              )}
+              <MapPin size={12} color={unserviceableLocation || showNoLocation ? colors.danger : colors.primary} />
+              <Text style={[styles.addressPillText, (unserviceableLocation || showNoLocation) && { color: colors.danger }]} numberOfLines={1}>
+                {addressId
+                  ? selectedAddress?.label || selectedAddress?.address_text?.split(',')[0] || 'Home'
+                  : (location?.addressText?.split(',')[0] || 'Set location')}
+              </Text>
+              <ChevronDown size={12} color={colors.inkMuted} />
+            </TouchableOpacity>
+
+            {/* Cart badge */}
+            <TouchableOpacity
+              style={styles.cartBadgeBtn}
+              onPress={() => { triggerHaptic(); navigation.navigate('Cart'); }}
+            >
+              <Text style={styles.cartBadgeNum}>{totalCartQty || 0}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -591,20 +586,12 @@ const HomeScreen = ({ navigation }: any) => {
             }}
           >
             <View style={styles.cartLeftRow}>
-              <View style={styles.cartIconBadge}>
-                <ShoppingBag size={18} color={colors.white} />
-                <View style={styles.cartBadgeCount}>
-                  <Text style={styles.cartBadgeCountText}>{cartItems.length}</Text>
-                </View>
-              </View>
-              <View style={styles.cartTextCol}>
-                <Text style={styles.cartTotalText}>₹{cartTotal / 100}</Text>
-                <Text style={styles.cartSubText}>From {menuData?.kitchenName || '2QT Kitchen'}</Text>
-              </View>
+              <Text style={styles.cartItemCount}>{totalCartQty} {totalCartQty === 1 ? 'ITEM' : 'ITEMS'}</Text>
+              <Text style={styles.cartTotalText}>  ₹{cartTotal / 100}</Text>
             </View>
             <View style={styles.viewCartAction}>
               <Text style={styles.viewCartText}>View Cart</Text>
-              <ArrowRight size={16} color={colors.primary} />
+              <ShoppingBag size={16} color={colors.white} style={{ marginLeft: 6 }} />
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -622,72 +609,62 @@ const CategoryPill = React.memo(({ name, isSelected, onPress }: any) => {
 });
 
 const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaused }: any) => {
-  const isBestseller = item.is_bestseller || item.id === '1' || item.id === '2';
+  const vegColor = item.is_veg ? '#22C55E' : colors.danger;
 
   return (
-    <View style={styles.modernCard}>
-      <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.modernCardInner}>
-        <View style={styles.modernImageCol}>
-          <View style={styles.modernImageWrapper}>
-            {item.photo_url ? (
-              <NetworkImage uri={item.photo_url} style={styles.modernImage} />
-            ) : (
-              <View style={styles.modernImagePlaceholder}>
-                <ChefHat size={32} color={colors.inkFaint} />
-              </View>
-            )}
-
-            {(!item.available || kitchenPaused) && (
-              <View style={styles.soldOutOverlay}>
-                <Text style={styles.soldOutText}>Sold Out</Text>
-              </View>
-            )}
-          </View>
+    <TouchableOpacity style={styles.card} activeOpacity={0.92} onPress={onPress}>
+      {/* Left: text */}
+      <View style={styles.cardLeft}>
+        <View style={[styles.vegBadge, { borderColor: vegColor }]}>
+          <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
         </View>
+        <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.cardPrice}>₹{item.price_paise / 100}</Text>
+        <Text style={styles.cardDesc} numberOfLines={2}>
+          {item.description || 'Fresh and delicious.'}
+        </Text>
+      </View>
 
-        <View style={styles.modernInfo}>
-          <View style={styles.modernTagsRow}>
-            <View style={[styles.vegIndicatorModern, { borderColor: item.is_veg ? colors.primary : colors.danger }]}>
-              <View style={[styles.vegDotModern, { backgroundColor: item.is_veg ? colors.primary : colors.danger }]} />
+      {/* Right: image + ADD/qty pinned to its bottom */}
+      <View style={styles.cardRight}>
+        <View style={styles.cardImageWrapper}>
+          {item.photo_url ? (
+            <NetworkImage uri={item.photo_url} style={styles.cardImage} />
+          ) : (
+            <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+              <ChefHat size={28} color={colors.inkFaint} />
             </View>
-            {isBestseller && (
-              <View style={styles.bestsellerTagModern}>
-                <Text style={styles.bestsellerTagTextModern}>Bestseller</Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.modernName} numberOfLines={2}>
-            {item.name}
-          </Text>
-          <Text style={styles.modernPrice}>₹{item.price_paise / 100}</Text>
-          <Text style={styles.modernDesc} numberOfLines={2}>
-            {item.description || 'Fresh and delicious.'}
-          </Text>
+          )}
+          {(!item.available || kitchenPaused) && (
+            <View style={styles.soldOutOverlay}>
+              <Text style={styles.soldOutText}>Sold Out</Text>
+            </View>
+          )}
         </View>
 
-        <View style={styles.addBtnContainerRight}>
+        <View style={styles.cardQtyRow}>
           {cartItem ? (
-            <View style={styles.floatingQuantityControlModern}>
-              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity - 1)} style={styles.floatingQtyBtnModern}>
-                <Text style={styles.floatingQtyTextModern}>−</Text>
+            <View style={styles.qtyControl}>
+              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity - 1)} style={styles.qtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
+                <Text style={styles.qtyBtnText}>−</Text>
               </TouchableOpacity>
-              <Text style={styles.floatingQtyValueModern}>{cartItem.quantity}</Text>
-              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity + 1)} style={styles.floatingQtyBtnModern}>
-                <Text style={styles.floatingQtyTextModern}>+</Text>
+              <Text style={styles.qtyValue}>{cartItem.quantity}</Text>
+              <TouchableOpacity onPress={() => onUpdate(cartItem.quantity + 1)} style={styles.qtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                <Text style={styles.qtyBtnText}>+</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity
-              style={[styles.floatingAddButtonModern, (!item.available || kitchenPaused) && styles.floatingAddButtonDisabled]}
+              style={[styles.addBtn, (!item.available || kitchenPaused) && styles.addBtnDisabled]}
               disabled={!item.available || kitchenPaused}
               onPress={onAdd}
             >
-              <Text style={styles.floatingAddButtonTextModern}>ADD</Text>
+              <Text style={styles.addBtnText}>ADD</Text>
             </TouchableOpacity>
           )}
         </View>
-      </TouchableOpacity>
-    </View>
+      </View>
+    </TouchableOpacity>
   );
 });
 
@@ -701,25 +678,85 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+
+  // Logo
+  logoText: { fontSize: 28, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
+  logoDot: { color: colors.accent },
+  deliveryTagRow: { flexDirection: 'row', alignItems: 'center', marginTop: 1 },
+  deliveryTagIcon: { fontSize: 11, marginRight: 3 },
+  deliveryTagText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.accent, letterSpacing: 1.2, textTransform: 'uppercase' },
+
+  // Header right cluster
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  addressPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: colors.surfaceMuted, borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: colors.border, maxWidth: 140,
+  },
+  addressPillText: { fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted, flex: 1 },
+  cartBadgeBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: colors.ink,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cartBadgeNum: { color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold },
+
+  // Kept for compatibility (used in unserviceable state)
+  locationTitleUnserviceable: { color: colors.danger },
   addressSection: { flex: 1, marginRight: spacing.lg },
   addressRow: { justifyContent: 'center' },
   addressLabelRow: { flexDirection: 'row', alignItems: 'center' },
   chevron: { marginLeft: spacing.xs },
   locationTitle: { color: colors.ink, fontSize: 13, fontFamily: fontFamily.extrabold, letterSpacing: 0.3 },
   addressValue: { color: colors.inkMuted, fontSize: 13, fontFamily: fontFamily.semibold, marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center' },
   profileButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: colors.primaryTint,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.primaryTint,
+    width: 44, height: 44, backgroundColor: colors.primaryTint, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+    borderWidth: 1, borderColor: colors.primaryTint,
   },
   profileImage: { width: '100%', height: '100%' },
+
+  // ── New card layout ─────────────────────────────────────────────────────
+  card: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+  },
+  cardLeft: { flex: 1, padding: 14, justifyContent: 'center' },
+  vegBadge: {
+    width: 16, height: 16, borderWidth: 1.5, borderRadius: 3,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 6,
+  },
+  vegDot: { width: 7, height: 7, borderRadius: 4 },
+  cardName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
+  cardPrice: { fontSize: 14, fontFamily: fontFamily.extrabold, color: colors.ink, marginBottom: 4 },
+  cardDesc: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.medium, lineHeight: 16 },
+  cardRight: { width: 126, justifyContent: 'flex-end' },
+  cardImageWrapper: { width: 126, height: 126, overflow: 'hidden' },
+  cardImage: { width: '100%', height: '100%' },
+  cardImagePlaceholder: { backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
+  cardQtyRow: { padding: 8, backgroundColor: colors.surface },
+  qtyControl: {
+    flexDirection: 'row', backgroundColor: colors.accent, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'space-between', height: 36,
+  },
+  qtyBtn: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
+  qtyBtnText: { color: colors.white, fontSize: 20, fontFamily: fontFamily.bold },
+  qtyValue: { color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold },
+  addBtn: {
+    backgroundColor: colors.accent, borderRadius: 10,
+    paddingVertical: 8, alignItems: 'center',
+  },
+  addBtnDisabled: { backgroundColor: colors.surfaceMuted },
+  addBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 13, letterSpacing: 0.5 },
 
   liveKitchenBanner: {
     flexDirection: 'row',
@@ -895,34 +932,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cartLeftRow: { flexDirection: 'row', alignItems: 'center' },
-  cartIconBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  cartBadgeCount: {
-    backgroundColor: colors.white,
-    borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    marginLeft: 6,
-    minWidth: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cartBadgeCountText: {
-    color: colors.primary,
-    fontSize: 10,
-    fontFamily: fontFamily.extrabold,
-  },
-  cartTextCol: { marginLeft: spacing.md },
-  cartTotalText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.extrabold, letterSpacing: -0.3 },
-  cartSubText: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontFamily: fontFamily.bold, marginTop: 2, letterSpacing: 0.5 },
-  viewCartAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
-  viewCartText: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 13, marginRight: spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
+  cartItemCount: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: fontFamily.extrabold, letterSpacing: 1, textTransform: 'uppercase' },
+  cartTotalText: { color: colors.white, fontSize: 22, fontFamily: fontFamily.black, letterSpacing: -0.5 },
+  viewCartAction: { flexDirection: 'row', alignItems: 'center' },
+  viewCartText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.3 },
 
   bannersList: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.xl },
   bannerContainer: {
@@ -977,8 +990,6 @@ const styles = StyleSheet.create({
   reqBackBtnText: { color: colors.ink, fontSize: 14, fontFamily: fontFamily.extrabold },
 
   // ── Unserviceable / Coming Soon screen ──────────────────────────────────
-  locationTitleUnserviceable: { color: colors.danger },
-
   unserviceableWrap: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xxl,
