@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
-import { emitToUser, emitToAdmin } from '../socket';
+import { emitToUser, emitToAdmin, emitToKitchen } from '../socket';
 import { notificationsQueue } from '../jobs/queues';
 import { logSystemEvent } from '../utils/logger';
 import ImageKit from '@imagekit/nodejs';
@@ -352,9 +352,21 @@ router.post('/orders/:id/assign', authenticate, requireRole('super_admin', 'admi
 router.patch('/orders/:id/status', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { status } = req.body;
-    const validStatuses = ['confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered'];
+    const validStatuses = ['confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status)) return res.status(400).json({ error: 'INVALID_STATUS' });
-    await query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
+
+    if (status === 'cancelled') {
+        const { rows } = await query('SELECT customer_id, kitchen_id FROM orders WHERE id = $1', [id]);
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        await query("UPDATE orders SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = 'Admin cancelled' WHERE id = $1", [id]);
+        emitToUser(rows[0].customer_id, 'order_status_update', { orderId: id, status: 'cancelled' });
+        emitToKitchen(rows[0].kitchen_id, 'order_cancelled', { orderId: id });
+    } else {
+        await query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
+        const { rows } = await query('SELECT customer_id FROM orders WHERE id = $1', [id]);
+        if (rows[0]) emitToUser(rows[0].customer_id, 'order_status_update', { orderId: id, status });
+    }
+
     res.json({ success: true });
 });
 
