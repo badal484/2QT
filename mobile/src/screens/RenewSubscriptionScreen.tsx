@@ -38,10 +38,13 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
         };
 
         try {
-            await RazorpayCheckout.open(options);
+            const paymentData: any = await RazorpayCheckout.open(options);
             await api.post('/payments/verify-payment', {
-                razorpay_order_id: data.razorpayOrderId,
-                type: 'subscription'
+                razorpay_order_id: paymentData.razorpay_order_id,
+                razorpay_payment_id: paymentData.razorpay_payment_id,
+                razorpay_signature: paymentData.razorpay_signature,
+                type: 'subscription',
+                planId: selectedPlan,
             });
             Alert.alert('Success', 'Your membership has been renewed!');
             queryClient.invalidateQueries({ queryKey: ['my-subscriptions'] });

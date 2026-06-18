@@ -1,25 +1,41 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { useDispatch } from 'react-redux';
-import { updateUser } from '../store/slices/authSlice';
-import { api } from '../api/client';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 import { useMutation } from '@tanstack/react-query';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { ChefHat, ShieldCheck, Bike } from 'lucide-react-native';
+import { updateUser } from '../store/slices/authSlice';
+import { api } from '../api/client';
+import { Button, TextField } from '../components/ui';
+import { colors } from '../theme/colors';
+import { fontFamily } from '../theme/typography';
+import { radius, spacing } from '../theme/spacing';
+import { RootState } from '../store';
 
 const OnboardingScreen = ({ navigation }: any) => {
   const [name, setName] = useState('');
+  const [riderFocused, setRiderFocused] = useState(false);
   const dispatch = useDispatch();
+  const { user } = useSelector((state: RootState) => state.auth);
+  
+  const isRider = user?.role === 'rider' || user?.role === 'rider_captain';
 
   const updateMutation = useMutation({
-    mutationFn: (newName: string) => api.put('/customers/profile', { name: newName }),
-    onSuccess: (data) => {
-      dispatch(updateUser(data.customer));
-      // Replace removes Onboarding from the stack so they can't go back
-      navigation.replace('Home');
+    mutationFn: async (newName: string) => {
+      const res = await api.patch('/customers/profile', { name: newName });
+      await api.post('/auth/onboarding/complete', {});
+      return res;
+    },
+    onSuccess: (data: any) => {
+      dispatch(updateUser({ ...data.user, onboarding_complete: true }));
+      const role = data?.user?.role || user?.role || 'customer';
+      if (role === 'customer' || role === 'buyer') {
+        navigation.replace('Home');
+      }
     },
     onError: (err: any) => {
       Alert.alert('Setup Failed', err.message || 'Could not update profile.');
-    }
+    },
   });
 
   const handleSave = () => {
@@ -29,40 +45,104 @@ const OnboardingScreen = ({ navigation }: any) => {
 
   return (
     <KeyboardAvoidingView 
-      style={styles.container} 
+      style={[styles.container, isRider && styles.riderContainer]} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <Animated.View entering={FadeInDown.duration(600)} style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.logo}>2QT</Text>
+      <Animated.View entering={FadeInDown.duration(500)} style={styles.content}>
+        <View style={[
+          styles.logoMark, 
+          isRider && { backgroundColor: 'rgba(255, 107, 53, 0.15)', shadowColor: '#FF6B35' }
+        ]}>
+          {isRider ? (
+            <Bike color="#FF6B35" size={28} strokeWidth={2.25} />
+          ) : (
+            <ChefHat color={colors.white} size={28} strokeWidth={2.25} />
+          )}
         </View>
-        <Text style={styles.title}>Welcome aboard</Text>
-        <Text style={styles.subText}>Let's get your profile set up so we know who we're delivering to.</Text>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>FULL NAME</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. John Doe"
-            placeholderTextColor="#9CA3AF"
+        <Text style={[styles.title, isRider && styles.riderTitle]}>
+          {isRider ? 'Welcome, Captain' : 'Welcome aboard'}
+        </Text>
+        <Text style={[styles.subText, isRider && styles.riderSubText]}>
+          {isRider 
+            ? "Let's set up your Captain profile so we know exactly who is representing 2QT on the road."
+            : "Let's get your profile set up so we know exactly who we're cooking for."
+          }
+        </Text>
+
+        {isRider ? (
+          <View style={styles.riderFieldContainer}>
+            <Text style={styles.riderLabel}>Full Name</Text>
+            <View style={[styles.riderField, riderFocused && styles.riderFieldFocused]}>
+              <TextInput
+                style={styles.riderInput}
+                placeholder="e.g. Capt. Arjun Singh"
+                placeholderTextColor="#3A3B55"
+                value={name}
+                onChangeText={setName}
+                autoFocus
+                autoCapitalize="words"
+                onFocus={() => setRiderFocused(true)}
+                onBlur={() => setRiderFocused(false)}
+              />
+            </View>
+          </View>
+        ) : (
+          <TextField
+            label="Full Name"
+            placeholder="e.g. Ananya Rao"
             value={name}
             onChangeText={setName}
             autoFocus
             autoCapitalize="words"
+            containerStyle={styles.fieldSpacing}
           />
+        )}
+
+        <View style={isRider ? styles.riderTrustRow : styles.trustRow}>
+          <ShieldCheck 
+            color={isRider ? '#FF6B35' : colors.primary} 
+            size={16} 
+            strokeWidth={2.25} 
+          />
+          <Text style={isRider ? styles.riderTrustText : styles.trustText}>
+            {isRider
+              ? 'All active delivery missions are secured with 2QT accident coverage and navigation assistance.'
+              : 'Every meal is made fresh in our own kitchen — watch how, anytime.'
+            }
+          </Text>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.saveButton, !name.trim() && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={!name.trim() || updateMutation.isPending}
-        >
-          {updateMutation.isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveButtonText}>Complete Setup</Text>
-          )}
-        </TouchableOpacity>
+        {isRider ? (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={handleSave}
+            disabled={!name.trim() || updateMutation.isPending}
+            style={[
+              styles.riderSaveButton,
+              (!name.trim() || updateMutation.isPending) && styles.riderSaveButtonDisabled
+            ]}
+          >
+            {updateMutation.isPending ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={[
+                styles.riderSaveButtonText,
+                (!name.trim() || updateMutation.isPending) && styles.riderSaveButtonTextDisabled
+              ]}>
+                Register as Captain
+              </Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <Button
+            label="Complete Setup"
+            onPress={handleSave}
+            disabled={!name.trim()}
+            loading={updateMutation.isPending}
+            style={styles.saveButton}
+          />
+        )}
       </Animated.View>
     </KeyboardAvoidingView>
   );
@@ -71,92 +151,148 @@ const OnboardingScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
+  },
+  riderContainer: {
+    backgroundColor: '#0B0C10',
   },
   content: {
     flex: 1,
-    padding: 32,
+    padding: spacing.xxl,
     justifyContent: 'center',
   },
-  header: {
+  logoMark: {
     width: 64,
     height: 64,
-    backgroundColor: '#FF6B35',
-    borderRadius: 20,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 32,
-    shadowColor: '#FF6B35',
+    marginBottom: spacing.xxl,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 10,
-    transform: [{ rotate: '3deg' }],
-  },
-  logo: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: -1,
   },
   title: {
-    color: '#1A1A2E',
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -1,
+    color: colors.ink,
+    fontSize: 30,
+    fontFamily: fontFamily.black,
+    letterSpacing: -0.5,
+  },
+  riderTitle: {
+    color: '#FFFFFF',
   },
   subText: {
-    color: '#9ca3af',
-    marginTop: 8,
-    fontWeight: '500',
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 48,
+    color: colors.inkMuted,
+    marginTop: spacing.sm,
+    fontFamily: fontFamily.medium,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: spacing.xxl,
   },
-  inputContainer: {
-    marginBottom: 32,
+  riderSubText: {
+    color: '#94A3B8',
   },
-  label: {
-    color: '#9ca3af',
-    fontSize: 10,
-    fontWeight: '900',
+  fieldSpacing: {
+    marginBottom: spacing.lg,
+  },
+  riderFieldContainer: {
+    marginBottom: spacing.lg,
+  },
+  riderLabel: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: 11,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginBottom: 8,
+    color: '#94A3B8',
+    marginBottom: spacing.sm,
   },
-  input: {
-    backgroundColor: '#f9fafb',
+  riderField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#161726',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    minHeight: 56,
+  },
+  riderFieldFocused: {
+    borderColor: '#FF6B35',
+    backgroundColor: '#161726',
+  },
+  riderInput: {
+    flex: 1,
+    fontFamily: fontFamily.semibold,
+    fontSize: 16,
+    color: '#FFFFFF',
+    paddingVertical: spacing.md,
+  },
+  trustRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.primaryTint,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.xxl,
+  },
+  riderTrustRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.xxl,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 16,
-    padding: 20,
-    fontSize: 18,
-    color: '#1A1A2E',
-    fontWeight: '700',
+    borderColor: 'rgba(255, 107, 53, 0.15)',
+  },
+  trustText: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    color: colors.primaryDark,
+    fontFamily: fontFamily.semibold,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  riderTrustText: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    color: '#FF6B35',
+    fontFamily: fontFamily.semibold,
+    fontSize: 13,
+    lineHeight: 18,
   },
   saveButton: {
-    backgroundColor: '#1A1A2E',
+    marginTop: spacing.xs,
+  },
+  riderSaveButton: {
+    backgroundColor: '#FF6B35',
     height: 64,
-    borderRadius: 20,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    width: '100%',
+    shadowColor: '#FF6B35',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 8,
   },
-  saveButtonDisabled: {
-    backgroundColor: '#E5E7EB',
-    shadowOpacity: 0,
+  riderSaveButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     elevation: 0,
   },
-  saveButtonText: {
-    color: '#fff',
-    fontWeight: '900',
+  riderSaveButtonText: {
+    color: '#FFFFFF',
+    fontFamily: fontFamily.extrabold,
     fontSize: 16,
+    letterSpacing: 2,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+  },
+  riderSaveButtonTextDisabled: {
+    color: '#64748B',
   },
 });
 

@@ -1,5 +1,4 @@
 import { io, Socket } from 'socket.io-client';
-import { Platform } from 'react-native';
 
 import { ENV } from '../config/env';
 
@@ -16,6 +15,9 @@ export const connectSocket = (token: string) => {
     auth: { token },
     transports: ['websocket'],
     reconnection: true,
+    extraHeaders: {
+      'Bypass-Tunnel-Reminder': 'true'
+    }
   });
 
   socket.on('connect', () => {

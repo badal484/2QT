@@ -7,22 +7,33 @@ import { store, persistor } from './src/store/index';
 import RootNavigator from './src/navigation/RootNavigator';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { NetworkObserver } from './src/components/NetworkObserver';
+import { AppBootManager } from './src/components/AppBootManager';
+import SplashScreen from './src/screens/SplashScreen';
 
 console.log('--- 2QT SYSTEM INITIALIZING ---');
 console.log('STORE_STATUS:', !!store);
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,
+      retry: false,
+    },
+  },
+});
 
 const App = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <Provider store={store}>
-          <PersistGate loading={null} persistor={persistor}>
+          <PersistGate loading={<SplashScreen />} persistor={persistor}>
             <QueryClientProvider client={queryClient}>
               <ErrorBoundary>
                 <NetworkObserver />
-                <RootNavigator />
+                <AppBootManager>
+                  <RootNavigator />
+                </AppBootManager>
               </ErrorBoundary>
             </QueryClientProvider>
           </PersistGate>

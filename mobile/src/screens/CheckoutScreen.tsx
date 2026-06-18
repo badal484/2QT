@@ -1,18 +1,54 @@
-import { ArrowLeft, MapPin, CreditCard, ArrowRight, Sparkles, Clock, ShieldCheck, Heart, Banknote } from 'lucide-react-native';
+import { ArrowLeft, MapPin, CreditCard, Sparkles, Clock, ShieldCheck, Heart, Banknote, Ticket, ChevronRight } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, StyleSheet } from 'react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearCart, setPromoCode as setPromoCodeAction } from '../store/slices/cartSlice';
 import RazorpayCheckout from 'react-native-razorpay';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import Animated, { FadeInDown, FadeIn, Layout, BounceInUp, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, SlideInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring } from 'react-native-reanimated';
 
 const hapticOptions = {
   enableVibrateFallback: true,
   ignoreAndroidSystemSettings: false,
+};
+
+const triggerHaptic = (type = 'impactLight') => ReactNativeHapticFeedback.trigger(type as any, hapticOptions);
+
+// Premium Bouncing Button for the Pay Action
+const BouncingButton = ({ onPress, style, children, disabled = false }: any) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  return (
+    <Animated.View style={[style, animatedStyle]}>
+      <TouchableOpacity
+        activeOpacity={1}
+        disabled={disabled}
+        onPressIn={() => {
+          if (!disabled) {
+            scale.value = withSpring(0.95, { damping: 10, stiffness: 400 });
+            triggerHaptic('impactMedium');
+          }
+        }}
+        onPressOut={() => {
+          if (!disabled) {
+            scale.value = withSpring(1, { damping: 10, stiffness: 400 });
+          }
+        }}
+        onPress={() => {
+          if (!disabled) onPress();
+        }}
+        style={StyleSheet.absoluteFill}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
 };
 
 const PulseLoader = () => {
@@ -43,10 +79,6 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   const cart = useSelector((state: any) => state.cart);
   const { user } = useSelector((state: any) => state.auth);
 
-  const triggerHaptic = () => ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-  const triggerHapticHeavy = () => ReactNativeHapticFeedback.trigger("impactHeavy", hapticOptions);
-  const triggerHapticSuccess = () => ReactNativeHapticFeedback.trigger("notificationSuccess", hapticOptions);
-
   React.useEffect(() => {
     if (socket) {
       const handleUpdate = () => {
@@ -72,27 +104,30 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   const [riderTip, setRiderTip] = useState<number>(0);
   const [deliveryInstructions, setDeliveryInstructions] = useState(route.params?.instructions || '');
   
-  const { data: pricing, isLoading: loadingPricing } = useQuery({
+  const { data: addresses, isLoading: loadingAddresses } = useQuery({
+    queryKey: ['addresses'],
+    queryFn: () => api.get('/customers/addresses'),
+  });
+
+  const selectedAddress = addresses?.addresses?.find((a: any) => a.id === route.params?.addressId);
+  const isOutOfZone = !!selectedAddress && !selectedAddress.is_serviceable;
+
+  const { data: pricing, isPending: loadingPricing, isFetching } = useQuery({
     queryKey: ['pricing', cart.items, useWallet, useLoyalty, promoCode, riderTip],
-    queryFn: () => api.post('/payment/create-order', { 
-        items: cart.items, 
-        addressId: route.params?.addressId, 
+    queryFn: () => api.post('/payment/create-order', {
+        items: cart.items,
+        addressId: route.params?.addressId,
         useWallet,
         useLoyalty,
         promoCode,
         riderTipPaise: riderTip * 100,
         instructions: deliveryInstructions,
         scheduledAt: route.params?.scheduledAt,
-        dryRun: true 
+        dryRun: true
     }),
+    enabled: !loadingAddresses && !isOutOfZone,
+    placeholderData: keepPreviousData,
   });
-
-  const { data: addresses } = useQuery({
-    queryKey: ['addresses'],
-    queryFn: () => api.get('/customers/addresses'),
-  });
-
-  const selectedAddress = addresses?.addresses?.find((a: any) => a.id === route.params?.addressId);
 
   const { data: loyaltyData } = useQuery({
     queryKey: ['loyalty'],
@@ -112,7 +147,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         const res: any = await api.get(`/orders/${orderId}`);
         if (res.order?.status === 'confirmed' || res.order?.status === 'preparing') {
           clearInterval(interval);
-          triggerHapticSuccess();
+          triggerHaptic('notificationSuccess');
           setIsVerifying(false);
           dispatch(clearCart());
           queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -137,7 +172,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
     mutationFn: (data: any) => api.post('/payment/create-order', data),
     onSuccess: (res: any) => {
       if (res.status === 'confirmed') {
-        triggerHapticSuccess();
+        triggerHaptic('notificationSuccess');
         dispatch(clearCart());
         navigation.navigate('OrderConfirmed', { orderId: res.orderId });
         return;
@@ -171,7 +206,17 @@ const CheckoutScreen = ({ navigation, route }: any) => {
       if (RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
         RazorpayCheckout.open(options)
           .then((data: any) => {
-            verifyOrder(res.orderId);
+            // Instantly verify on backend to avoid waiting for webhooks
+            api.post('/payment/verify-payment', {
+              razorpay_order_id: data.razorpay_order_id,
+              razorpay_payment_id: data.razorpay_payment_id,
+              razorpay_signature: data.razorpay_signature,
+              type: 'order'
+            }).then(() => {
+              verifyOrder(res.orderId);
+            }).catch(() => {
+              verifyOrder(res.orderId); // fallback to polling
+            });
           })
           .catch((error: any) => {
             Alert.alert('Payment Failed', error.description || 'Transaction cancelled');
@@ -189,15 +234,50 @@ const CheckoutScreen = ({ navigation, route }: any) => {
     <View style={styles.verifyingContainer}>
       <PulseLoader />
       <Animated.Text entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Verifying Payment</Animated.Text>
-      <Animated.Text entering={FadeInDown.delay(300)} style={styles.verifyingSub}>We are confirming your order with our kitchen. Please don't close the app.</Animated.Text>
+      <Animated.Text entering={FadeInDown.delay(300)} style={styles.verifyingSub}>Confirming your order with our kitchen. Please wait...</Animated.Text>
     </View>
   );
 
-  if (loadingPricing) return (
+  if (loadingAddresses) return (
+    <View style={styles.verifyingContainer}>
+      <PulseLoader />
+      <Animated.Text entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Loading</Animated.Text>
+    </View>
+  );
+
+  if (isOutOfZone) return (
+    <View style={styles.outOfZoneContainer}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.outOfZoneBack}>
+        <ArrowLeft size={24} color="#1A1A2E" />
+      </TouchableOpacity>
+      <Animated.View entering={FadeInDown.duration(400)} style={styles.outOfZoneContent}>
+        <View style={styles.outOfZoneIconBox}>
+          <MapPin size={48} color="#EF4444" />
+        </View>
+        <Text style={styles.outOfZoneTitle}>Out of delivery zone</Text>
+        <Text style={styles.outOfZoneSub}>
+          <Text style={{ fontWeight: '800' }}>{selectedAddress?.label || 'Your address'}</Text>
+          {' '}is outside our current delivery area. Pick a different address to continue.
+        </Text>
+        <TouchableOpacity
+          style={styles.outOfZoneChangeBtn}
+          onPress={() => navigation.navigate('Address')}
+        >
+          <MapPin size={18} color="#FFFFFF" />
+          <Text style={styles.outOfZoneChangeBtnText}>Change Delivery Address</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.outOfZoneBackLink}>
+          <Text style={styles.outOfZoneBackLinkText}>Back to Cart</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+
+  if (loadingPricing && !pricing) return (
     <View style={styles.verifyingContainer}>
       <PulseLoader />
       <Animated.Text entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Calculating Total</Animated.Text>
-      <Animated.Text entering={FadeInDown.delay(300)} style={styles.verifyingSub}>Please wait while we apply your discounts and loyalty points...</Animated.Text>
+      <Animated.Text entering={FadeInDown.delay(300)} style={styles.verifyingSub}>Applying your discounts and loyalty points...</Animated.Text>
     </View>
   );
 
@@ -205,266 +285,270 @@ const CheckoutScreen = ({ navigation, route }: any) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-        <View style={styles.scrollContent}>
-          <Animated.View entering={FadeInDown.duration(400)}>
-            <TouchableOpacity onPress={() => { triggerHaptic(); navigation.goBack(); }} style={styles.backButton}>
-              <ArrowLeft size={24} color="#1A1A2E" />
-            </TouchableOpacity>
-            <Text style={styles.screenTitle}>Final Step</Text>
-            <Text style={styles.screenSubTitle}>Review and Pay</Text>
-          </Animated.View>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => { triggerHaptic('impactLight'); navigation.goBack(); }} style={styles.backButton}>
+          <ArrowLeft size={24} color="#1A1A2E" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Review & Pay</Text>
+        <View style={{ width: 48 }} />
+      </View>
 
-          {/* Delivery Address Summary */}
-          <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.addressCard}>
-            <View style={styles.addressHeader}>
-              <View style={styles.addressIconWrapper}>
-                <MapPin size={24} color="#10B981" />
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        
+        {/* Delivery Address Summary */}
+        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.premiumCard}>
+          <View style={styles.addressHeaderRow}>
+            <View style={styles.addressIconCircle}>
+              <MapPin size={22} color="#10B981" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionSubtitle}>Delivering To</Text>
+              <Text style={styles.addressLabel} numberOfLines={1}>{selectedAddress?.label || 'Selected Address'}</Text>
+            </View>
+            <TouchableOpacity style={styles.editBtn}>
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.addressText} numberOfLines={2}>
+            {selectedAddress?.address_text}, {selectedAddress?.landmark}
+          </Text>
+        </Animated.View>
+
+        {/* Schedule Info */}
+        {(route.params?.scheduledAt) && (
+          <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.premiumCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={[styles.addressIconCircle, { backgroundColor: '#FEF3C7' }]}>
+                <Clock size={22} color="#D97706" />
               </View>
-              <View style={styles.addressLabelCol}>
-                <Text style={styles.addressSubLabel}>Delivering to</Text>
-                <Text style={styles.addressLabel} numberOfLines={1}>{selectedAddress?.label || 'Selected Address'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionSubtitle}>Scheduled Delivery</Text>
+                <Text style={styles.addressLabel}>
+                  {new Date(route.params.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
               </View>
             </View>
-            <Text style={styles.addressText}>
-              {selectedAddress?.address_text}, {selectedAddress?.landmark}
-            </Text>
           </Animated.View>
+        )}
 
-          {/* Delivery & Notes Summary */}
-          {(route.params?.scheduledAt) && (
-            <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.metaInfoRow}>
-              {route.params?.scheduledAt && (
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Schedule</Text>
-                  <View style={styles.metaValueRow}>
-                    <Clock size={12} color="#10B981" />
-                    <Text style={styles.metaValue}>
-                      {new Date(route.params.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
-                </View>
-              )}
+        {/* Delivery Instructions */}
+        <Animated.View entering={FadeInDown.delay(160).duration(400)} style={styles.premiumCard}>
+          <Text style={styles.cardHeaderTitle}>Delivery Instructions</Text>
+          <TextInput 
+            placeholder="e.g. Leave at door, don't ring bell..."
+            placeholderTextColor="#9ca3af"
+            value={deliveryInstructions}
+            onChangeText={setDeliveryInstructions}
+            style={styles.premiumInput}
+            multiline
+          />
+        </Animated.View>
+
+        {/* Tip the Rider */}
+        <Animated.View entering={FadeInDown.delay(180).duration(400)} style={styles.premiumCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <Heart size={20} color="#FF6B35" style={{ marginRight: 8 }} />
+            <Text style={styles.cardHeaderTitle}>Tip your delivery partner</Text>
+          </View>
+          <Text style={styles.tipSub}>100% of your tip goes directly to your rider.</Text>
+          <View style={styles.tipOptionsRow}>
+            {[20, 50, 100].map((amt) => (
+              <TouchableOpacity 
+                key={amt}
+                style={[styles.tipChip, riderTip === amt && styles.tipChipActive]}
+                onPress={() => {
+                  triggerHaptic('impactLight');
+                  setRiderTip(riderTip === amt ? 0 : amt);
+                }}
+              >
+                <Text style={[styles.tipChipText, riderTip === amt && styles.tipChipTextActive]}>
+                  ₹{amt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Animated.View>
+
+        {/* Bill Details */}
+        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.billCard}>
+          <Text style={styles.cardHeaderTitle}>Bill Details</Text>
+          
+          <View style={styles.billRow}>
+            <Text style={styles.billLabel}>Item Total</Text>
+            <Text style={styles.billValue}>₹{p.subtotalPaise / 100}</Text>
+          </View>
+          
+          <View style={styles.billRow}>
+            <Text style={styles.billLabel}>Delivery Fee</Text>
+            <Text style={styles.billValue}>₹{p.deliveryFeePaise / 100}</Text>
+          </View>
+          
+          <View style={styles.billRow}>
+            <Text style={styles.billLabel}>Taxes & Charges</Text>
+            <Text style={styles.billValue}>₹{(p.cgstPaise + p.sgstPaise) / 100}</Text>
+          </View>
+
+          {riderTip > 0 && (
+            <Animated.View entering={FadeInDown} style={styles.billRow}>
+              <Text style={styles.billLabel}>Rider Tip</Text>
+              <Text style={styles.billValue}>₹{riderTip}</Text>
             </Animated.View>
           )}
 
-          {/* Delivery Instructions */}
-          <Animated.View entering={FadeInDown.delay(160).duration(400)} style={styles.sectionCard}>
-            <Text style={styles.sectionHeader}>Delivery Instructions</Text>
+          {p.discountPaise > 0 && (
+            <Animated.View entering={FadeInDown} style={styles.billRowHighlight}>
+              <Text style={styles.discountText}>Promo Discount</Text>
+              <Text style={styles.discountValue}>-₹{p.discountPaise / 100}</Text>
+            </Animated.View>
+          )}
+
+          {p.loyaltyDiscountPaise > 0 && (
+            <Animated.View entering={FadeInDown} style={styles.billRowHighlight}>
+              <Text style={styles.loyaltyText}>Points Applied</Text>
+              <Text style={styles.loyaltyValue}>-₹{p.loyaltyDiscountPaise / 100}</Text>
+            </Animated.View>
+          )}
+
+          {p.walletDeductionPaise > 0 && (
+            <Animated.View entering={FadeInDown} style={styles.billRowHighlight}>
+              <Text style={styles.discountText}>Wallet Used</Text>
+              <Text style={styles.discountValue}>-₹{p.walletDeductionPaise / 100}</Text>
+            </Animated.View>
+          )}
+
+          <View style={styles.billDividerDashed} />
+          
+          <View style={styles.billTotalRow}>
+            <Text style={styles.billTotalLabel}>Grand Total</Text>
+            <Text style={styles.billTotalValue}>₹{p.gatewayAmountPaise / 100}</Text>
+          </View>
+        </Animated.View>
+
+        {/* Payment Options Header */}
+        <Text style={styles.sectionHeaderTitle}>Offers & Payment</Text>
+
+        {/* Promo Code Ticket */}
+        <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.promoTicketCard}>
+          <View style={styles.promoTicketLeft}>
+            <Ticket size={24} color="#1A1A2E" />
             <TextInput 
-              placeholder="e.g. Leave at door, Don't ring bell..."
+              placeholder="Enter Promo Code" 
               placeholderTextColor="#9ca3af"
-              value={deliveryInstructions}
-              onChangeText={setDeliveryInstructions}
-              style={styles.instructionsInput}
-              multiline
+              value={promoCode}
+              onChangeText={setPromoCode}
+              style={styles.promoTicketInput}
             />
-          </Animated.View>
+          </View>
+          <TouchableOpacity 
+            style={styles.promoTicketBtn}
+            onPress={() => {
+              triggerHaptic('impactHeavy');
+              if (promoCode.toUpperCase() === '2QT50') {
+                dispatch(setPromoCodeAction(promoCode.toUpperCase()));
+                Alert.alert('Success', 'Promo code applied! You get 50% off.');
+              } else {
+                Alert.alert('Invalid Code', 'Try 2QT50 for a discount.');
+              }
+            }} 
+          >
+            <Text style={styles.promoTicketBtnText}>Apply</Text>
+          </TouchableOpacity>
+        </Animated.View>
 
-          {/* Tip the Rider */}
-          <Animated.View entering={FadeInDown.delay(180).duration(400)} style={styles.sectionCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-              <Heart size={20} color="#10B981" style={{ marginRight: 8 }} />
-              <Text style={styles.sectionHeader}>Tip your delivery partner</Text>
+        {/* Toggles */}
+        <Animated.View entering={FadeInDown.delay(350).duration(400)}>
+          <TouchableOpacity 
+            onPress={() => { triggerHaptic('impactMedium'); setUseWallet(!useWallet); }}
+            activeOpacity={0.8}
+            style={[styles.toggleCardPremium, useWallet && styles.toggleCardActive]}
+          >
+            <View style={styles.toggleCardLeft}>
+              <View style={[styles.toggleIconCircle, useWallet && { backgroundColor: '#10B981' }]}>
+                <CreditCard size={20} color={useWallet ? "#fff" : "#6B7280"} />
+              </View>
+              <View>
+                <Text style={styles.toggleTitle}>Pay from Wallet</Text>
+                <Text style={styles.toggleSub}>Available Balance: ₹{pricing?.availableWallet / 100 || 0}</Text>
+              </View>
             </View>
-            <Text style={styles.tipSub}>Your entire tip goes directly to the rider.</Text>
-            <View style={styles.tipOptionsRow}>
-              {[20, 50, 100].map((amt) => (
-                <TouchableOpacity 
-                  key={amt}
-                  style={[styles.tipChip, riderTip === amt && styles.tipChipActive]}
-                  onPress={() => {
-                    triggerHaptic();
-                    setRiderTip(riderTip === amt ? 0 : amt);
-                  }}
-                >
-                  <Text style={[styles.tipChipText, riderTip === amt && styles.tipChipTextActive]}>
-                    ₹{amt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={[styles.customCheckbox, useWallet && styles.customCheckboxActive]}>
+              {useWallet && <View style={styles.customCheckboxInner} />}
             </View>
-          </Animated.View>
+          </TouchableOpacity>
 
-          {/* Bill Details */}
-          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.billCard}>
-            <Text style={styles.billHeader}>Bill Details</Text>
-            
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Item Total</Text>
-              <Text style={styles.billValue}>₹{p.subtotalPaise / 100}</Text>
+          <TouchableOpacity 
+            onPress={() => { triggerHaptic('impactMedium'); setUseLoyalty(!useLoyalty); }}
+            activeOpacity={0.8}
+            disabled={!loyaltyData?.points}
+            style={[styles.toggleCardPremium, useLoyalty && styles.toggleCardActive, !loyaltyData?.points && { opacity: 0.6 }]}
+          >
+            <View style={styles.toggleCardLeft}>
+              <View style={[styles.toggleIconCircle, useLoyalty && { backgroundColor: '#FF6B35' }]}>
+                <Sparkles size={20} color={useLoyalty ? "#fff" : "#6B7280"} />
+              </View>
+              <View>
+                <Text style={styles.toggleTitle}>Redeem 2QT Points</Text>
+                <Text style={styles.toggleSub}>Balance: {loyaltyData?.points || 0} pts</Text>
+              </View>
             </View>
-            
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Delivery Fee</Text>
-              <Text style={styles.billValue}>₹{p.deliveryFeePaise / 100}</Text>
+            <View style={[styles.customCheckbox, useLoyalty && { borderColor: '#FF6B35' }]}>
+              {useLoyalty && <View style={[styles.customCheckboxInner, { backgroundColor: '#FF6B35' }]} />}
             </View>
-            
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Taxes & Charges</Text>
-              <Text style={styles.billValue}>₹{(p.cgstPaise + p.sgstPaise) / 100}</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Payment Methods */}
+        <Animated.View entering={FadeInDown.delay(400).duration(400)}>
+          
+          <TouchableOpacity 
+            activeOpacity={0.9}
+            onPress={() => { triggerHaptic('selection'); setPaymentMethod('online'); }}
+            style={[styles.paymentMethodPremium, paymentMethod === 'online' && styles.paymentMethodActive]}
+          >
+            <View style={styles.paymentMethodLeft}>
+              <View style={[styles.paymentMethodIconBox, paymentMethod === 'online' && { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                <CreditCard size={24} color={paymentMethod === 'online' ? '#10B981' : '#6B7280'} />
+              </View>
+              <View>
+                <Text style={[styles.paymentMethodTitle, paymentMethod === 'online' && styles.paymentMethodTitleActive]}>Pay Online</Text>
+                <Text style={styles.paymentMethodSub}>UPI, Cards, Netbanking</Text>
+              </View>
             </View>
-
-            {riderTip > 0 && (
-              <Animated.View entering={FadeInDown} style={styles.billRow}>
-                <Text style={styles.billLabel}>Rider Tip</Text>
-                <Text style={styles.billValue}>₹{riderTip}</Text>
-              </Animated.View>
-            )}
-
-            {p.discountPaise > 0 && (
-              <Animated.View entering={FadeInDown} style={styles.billRow}>
-                <Text style={styles.discountText}>Promo Discount</Text>
-                <Text style={styles.discountValue}>-₹{p.discountPaise / 100}</Text>
-              </Animated.View>
-            )}
-
-            {p.loyaltyDiscountPaise > 0 && (
-              <Animated.View entering={FadeInDown} style={styles.billRow}>
-                <Text style={styles.loyaltyText}>Points Applied</Text>
-                <Text style={styles.loyaltyValue}>-₹{p.loyaltyDiscountPaise / 100}</Text>
-              </Animated.View>
-            )}
-
-            {p.walletDeductionPaise > 0 && (
-              <Animated.View entering={FadeInDown} style={styles.billRow}>
-                <Text style={styles.discountText}>Wallet Used</Text>
-                <Text style={styles.discountValue}>-₹{p.walletDeductionPaise / 100}</Text>
-              </Animated.View>
-            )}
-
-            {p.isSubscriptionOrder && (
-              <Animated.View entering={FadeInDown} style={styles.subOrderBadge}>
-                <View style={styles.subOrderBadgeLeft}>
-                    <Sparkles size={14} color="#10B981" />
-                    <Text style={styles.subOrderText}>Pro Meal Credit</Text>
-                </View>
-                <Text style={styles.subOrderValue}>-₹{p.subtotalPaise / 100}</Text>
-              </Animated.View>
-            )}
-
-            <View style={styles.billDivider} />
-            
-            <View style={styles.billTotalRow}>
-              <Text style={styles.billTotalLabel}>Total</Text>
-              <Text style={styles.billTotalValue}>₹{p.gatewayAmountPaise / 100}</Text>
+            <View style={[styles.radioOuter, paymentMethod === 'online' && styles.radioOuterActive]}>
+              {paymentMethod === 'online' && <Animated.View entering={FadeIn} style={styles.radioInner} />}
             </View>
-          </Animated.View>
+          </TouchableOpacity>
 
-          {/* Wallet Toggle */}
-          <Animated.View entering={FadeInDown.delay(300).duration(400)}>
-            <TouchableOpacity 
-              onPress={() => { triggerHaptic(); setUseWallet(!useWallet); }}
-              activeOpacity={0.8}
-              style={[styles.toggleCard, useWallet ? styles.toggleCardActive : styles.toggleCardInactive]}
-            >
-              <View style={styles.toggleCardLeft}>
-                <View style={styles.toggleIconWrapper}>
-                  <CreditCard size={24} color="#1A1A2E" />
-                </View>
-                <View>
-                  <Text style={styles.toggleTitle}>2QT Wallet</Text>
-                  <Text style={styles.toggleSub}>Bal: ₹{pricing?.availableWallet / 100 || 0}</Text>
-                </View>
+          <TouchableOpacity 
+            activeOpacity={0.9}
+            onPress={() => { triggerHaptic('selection'); setPaymentMethod('cod'); }}
+            style={[styles.paymentMethodPremium, paymentMethod === 'cod' && styles.paymentMethodActive, { marginBottom: 40 }]}
+          >
+            <View style={styles.paymentMethodLeft}>
+              <View style={[styles.paymentMethodIconBox, paymentMethod === 'cod' && { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                <Banknote size={24} color={paymentMethod === 'cod' ? '#10B981' : '#6B7280'} />
               </View>
-              <View style={[styles.switchTrack, { backgroundColor: useWallet ? '#10B981' : '#e5e7eb' }]}>
-                <View style={[styles.switchThumb, { alignSelf: useWallet ? 'flex-end' : 'flex-start' }]} />
+              <View>
+                <Text style={[styles.paymentMethodTitle, paymentMethod === 'cod' && styles.paymentMethodTitleActive]}>Cash on Delivery</Text>
+                <Text style={styles.paymentMethodSub}>Pay when it arrives</Text>
               </View>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Loyalty Toggle */}
-          <Animated.View entering={FadeInDown.delay(350).duration(400)}>
-            <TouchableOpacity 
-              onPress={() => { triggerHaptic(); setUseLoyalty(!useLoyalty); }}
-              activeOpacity={0.8}
-              disabled={!loyaltyData?.points}
-              style={[styles.toggleCard, useLoyalty ? styles.toggleCardActive : styles.toggleCardInactive, !loyaltyData?.points && { opacity: 0.5 }]}
-            >
-              <View style={styles.toggleCardLeft}>
-                <View style={styles.toggleIconWrapper}>
-                  <Sparkles size={24} color={useLoyalty ? "#10B981" : "#1A1A2E"} />
-                </View>
-                <View>
-                  <Text style={styles.toggleTitle}>2QT Points</Text>
-                  <Text style={styles.toggleSub}>Bal: {loyaltyData?.points || 0} pts</Text>
-                </View>
-              </View>
-              <View style={[styles.switchTrack, { backgroundColor: useLoyalty ? '#10B981' : '#e5e7eb' }]}>
-                <View style={[styles.switchThumb, { alignSelf: useLoyalty ? 'flex-end' : 'flex-start' }]} />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Promo Code */}
-          <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.promoCard}>
-            <View style={styles.promoInputWrapper}>
-              <TextInput 
-                placeholder="PROMO CODE" 
-                placeholderTextColor="#A0A0A0"
-                value={promoCode}
-                onChangeText={setPromoCode}
-                style={styles.promoInput}
-              />
             </View>
-            <TouchableOpacity 
-              style={styles.promoApplyBtn}
-              onPress={() => {
-                triggerHapticHeavy();
-                if (promoCode.toUpperCase() === '2QT50') {
-                  dispatch(setPromoCodeAction(promoCode.toUpperCase()));
-                  Alert.alert('Success', 'Promo code applied! You get 50% off.');
-                } else {
-                  Alert.alert('Invalid Code', 'Try 2QT50 for a discount.');
-                }
-              }} 
-            >
-              <Text style={styles.promoApplyText}>Apply</Text>
-            </TouchableOpacity>
-          </Animated.View>
+            <View style={[styles.radioOuter, paymentMethod === 'cod' && styles.radioOuterActive]}>
+              {paymentMethod === 'cod' && <Animated.View entering={FadeIn} style={styles.radioInner} />}
+            </View>
+          </TouchableOpacity>
 
-          {/* Payment Method Selector */}
-          <Animated.View entering={FadeInDown.delay(450).duration(400)}>
-            <Text style={styles.sectionTitle}>Payment Method</Text>
-            
-            <TouchableOpacity 
-              activeOpacity={0.8}
-              onPress={() => { triggerHaptic(); setPaymentMethod('online'); }}
-              style={[styles.paymentMethodBtn, paymentMethod === 'online' ? styles.paymentMethodBtnActive : styles.paymentMethodBtnInactive]}
-            >
-              <View style={styles.paymentMethodLeft}>
-                <View style={styles.paymentMethodIconWrapper}>
-                  <CreditCard size={20} color={paymentMethod === 'online' ? '#10B981' : '#1A1A2E'} />
-                </View>
-                <Text style={[styles.paymentMethodText, paymentMethod === 'online' ? styles.paymentMethodTextActive : styles.paymentMethodTextInactive]}>Pay Online (UPI/Cards)</Text>
-              </View>
-              <View style={[styles.radioOuter, { borderColor: paymentMethod === 'online' ? '#10B981' : '#d1d5db' }]}>
-                {paymentMethod === 'online' && <Animated.View entering={FadeIn} style={styles.radioInner} />}
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              activeOpacity={0.8}
-              onPress={() => { triggerHaptic(); setPaymentMethod('cod'); }}
-              style={[styles.paymentMethodBtn, paymentMethod === 'cod' ? styles.paymentMethodBtnActive : styles.paymentMethodBtnInactive, { marginBottom: 120 }]}
-            >
-              <View style={styles.paymentMethodLeft}>
-                  <Banknote size={24} color="#10B981" />
-                <Text style={[styles.paymentMethodText, paymentMethod === 'cod' ? styles.paymentMethodTextActive : styles.paymentMethodTextInactive]}>Cash on Delivery</Text>
-              </View>
-              <View style={[styles.radioOuter, { borderColor: paymentMethod === 'cod' ? '#10B981' : '#d1d5db' }]}>
-                {paymentMethod === 'cod' && <Animated.View entering={FadeIn} style={styles.radioInner} />}
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
+        </Animated.View>
       </ScrollView>
 
-      {/* Final Action Button */}
-      <Animated.View entering={BounceInUp.duration(600).delay(500)} style={styles.footer}>
-        <TouchableOpacity 
+      {/* Sticky Full-Width Footer */}
+      <Animated.View entering={SlideInDown.duration(400).delay(200)} style={styles.stickyFooter}>
+        <BouncingButton 
+          style={styles.premiumPayBtn}
+          disabled={placeOrderMutation.isPending || isFetching}
           onPress={() => {
-            triggerHapticHeavy();
+            triggerHaptic('impactHeavy');
             placeOrderMutation.mutate({ 
               items: cart.items, 
               addressId: route.params?.addressId, 
@@ -476,21 +560,27 @@ const CheckoutScreen = ({ navigation, route }: any) => {
               instructions: route.params?.instructions
             });
           }}
-          disabled={placeOrderMutation.isPending}
-          style={styles.payButton}
         >
-          <View>
-            <Text style={styles.payButtonSub}>Secure Checkout</Text>
-            <Text style={styles.payButtonMain}>Pay ₹{p.gatewayAmountPaise / 100}</Text>
-          </View>
-          {placeOrderMutation.isPending ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <View style={styles.payArrowWrapper}>
-              <ArrowRight size={24} color="white" />
+          <View style={styles.premiumPayBtnContent}>
+            <View>
+              <Text style={styles.payBtnGrandTotal}>₹{p.gatewayAmountPaise / 100}</Text>
+              <Text style={styles.payBtnSubText}>TOTAL TO PAY</Text>
             </View>
-          )}
-        </TouchableOpacity>
+            
+            <View style={styles.payBtnActionRow}>
+              {placeOrderMutation.isPending || isFetching ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Text style={styles.payBtnActionText}>Place Order</Text>
+                  <View style={styles.payBtnIconWrapper}>
+                    <ChevronRight size={20} color="#10B981" />
+                  </View>
+                </>
+              )}
+            </View>
+          </View>
+        </BouncingButton>
       </Animated.View>
     </View>
   );
@@ -499,85 +589,168 @@ const CheckoutScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   pulseCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(16, 185, 129, 0.1)', alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1, backgroundColor: '#F9FAFB' },
+  header: {
+    paddingTop: 64,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    zIndex: 10,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  headerTitle: {
+    color: '#1A1A2E',
+    fontSize: 16,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 24, paddingTop: 64, paddingBottom: 32 },
-  backButton: { marginBottom: 32, alignSelf: 'flex-start', width: 48, height: 48, backgroundColor: '#FFFFFF', borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
-  screenTitle: { color: '#1A1A2E', fontSize: 32, fontWeight: '900', marginBottom: 8, letterSpacing: -0.5 },
-  screenSubTitle: { color: '#9ca3af', fontWeight: '900', marginBottom: 40, textTransform: 'uppercase', letterSpacing: 1.5, fontSize: 11 },
-  addressCard: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
-  addressHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  addressIconWrapper: { width: 40, height: 40, backgroundColor: '#ECFDF5', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  addressLabelCol: { flex: 1 },
-  addressSubLabel: { color: '#9ca3af', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 },
-  addressLabel: { color: '#1A1A2E', fontWeight: '900', fontSize: 15 },
-  addressText: { color: '#6b7280', fontWeight: '500', fontSize: 14, lineHeight: 20 },
-  metaInfoRow: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6', flexDirection: 'row', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
-  metaItem: { flex: 1 },
-  metaLabel: { color: '#9ca3af', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 },
-  metaValueRow: { flexDirection: 'row', alignItems: 'center' },
-  metaValue: { fontSize: 13, fontWeight: 'bold', color: '#1A1A2E', marginLeft: 6 },
-  sectionCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
-  sectionHeader: { fontSize: 16, fontWeight: '900', color: '#1A1A2E', marginBottom: 12 },
-  instructionsInput: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, minHeight: 80, textAlignVertical: 'top', color: '#1A1A2E', fontWeight: '500' },
-  tipSub: { fontSize: 12, color: '#9ca3af', marginBottom: 16 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 140 }, // Extra padding for sticky footer
+  
+  premiumCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  cardHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#1A1A2E',
+    marginBottom: 16,
+    letterSpacing: -0.5,
+  },
+  
+  addressHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  addressIconCircle: { width: 44, height: 44, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  sectionSubtitle: { color: '#9CA3AF', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 2 },
+  addressLabel: { color: '#1A1A2E', fontWeight: '900', fontSize: 17, letterSpacing: -0.5 },
+  addressText: { color: '#6B7280', fontSize: 14, lineHeight: 22, fontWeight: '500' },
+  editBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 10 },
+  editBtnText: { color: '#4B5563', fontSize: 12, fontWeight: '800' },
+  
+  premiumInput: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, minHeight: 80, textAlignVertical: 'top', color: '#1A1A2E', fontWeight: '600', fontSize: 14, borderWidth: 1, borderColor: '#F3F4F6' },
+  
+  tipSub: { fontSize: 13, color: '#6B7280', marginBottom: 16, fontWeight: '500' },
   tipOptionsRow: { flexDirection: 'row', gap: 12 },
-  tipChip: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6', backgroundColor: '#FFFFFF' },
-  tipChipActive: { backgroundColor: '#10B981', borderColor: '#10B981' },
-  tipChipText: { color: '#1A1A2E', fontWeight: 'bold', fontSize: 14 },
-  tipChipTextActive: { color: '#fff' },
-  billCard: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
-  billHeader: { color: '#9CA3AF', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10, marginBottom: 24 },
+  tipChip: { flex: 1, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', alignItems: 'center' },
+  tipChipActive: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' },
+  tipChipText: { color: '#4B5563', fontWeight: '800', fontSize: 16 },
+  tipChipTextActive: { color: '#FFFFFF' },
+
+  billCard: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, marginBottom: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 3 },
   billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  billLabel: { color: '#6B7280', fontWeight: '700' },
-  billValue: { color: '#1A1A2E', fontWeight: '900' },
-  discountText: { color: '#10B981', fontWeight: '700' },
-  discountValue: { color: '#10B981', fontWeight: '900' },
-  loyaltyText: { color: '#10B981', fontWeight: '700' },
-  loyaltyValue: { color: '#10B981', fontWeight: '900' },
-  subOrderBadge: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, backgroundColor: '#ECFDF5', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#D1FAE5' },
-  subOrderBadgeLeft: { flexDirection: 'row', alignItems: 'center' },
-  subOrderText: { color: '#10B981', fontWeight: '700', marginLeft: 8 },
-  subOrderValue: { color: '#10B981', fontWeight: '900' },
-  billDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 16, borderStyle: 'dashed' },
+  billLabel: { color: '#6B7280', fontWeight: '600', fontSize: 14 },
+  billValue: { color: '#1A1A2E', fontWeight: '800', fontSize: 15 },
+  billRowHighlight: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, backgroundColor: '#ECFDF5', padding: 12, borderRadius: 12, marginHorizontal: -12 },
+  discountText: { color: '#10B981', fontWeight: '800', fontSize: 14 },
+  discountValue: { color: '#10B981', fontWeight: '900', fontSize: 15 },
+  loyaltyText: { color: '#10B981', fontWeight: '800', fontSize: 14 },
+  loyaltyValue: { color: '#10B981', fontWeight: '900', fontSize: 15 },
+  billDividerDashed: { height: 1, borderRadius: 1, borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed', marginVertical: 16 },
   billTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
-  billTotalLabel: { color: '#1A1A2E', fontSize: 16, fontWeight: '900' },
-  billTotalValue: { color: '#1A1A2E', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
-  toggleCard: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
-  toggleCardActive: { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
-  toggleCardInactive: { backgroundColor: '#FFFFFF', borderColor: '#F3F4F6' },
+  billTotalLabel: { color: '#1A1A2E', fontSize: 18, fontWeight: '900' },
+  billTotalValue: { color: '#1A1A2E', fontSize: 24, fontWeight: '900', letterSpacing: -1 },
+
+  sectionHeaderTitle: { color: '#1A1A2E', fontSize: 20, fontWeight: '900', letterSpacing: -0.5, marginBottom: 16, marginTop: 8 },
+
+  promoTicketCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 8, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F3F4F6' },
+  promoTicketLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
+  promoTicketInput: { flex: 1, fontWeight: '900', color: '#1A1A2E', fontSize: 14, textTransform: 'uppercase', letterSpacing: 2, marginLeft: 12 },
+  promoTicketBtn: { backgroundColor: '#1A1A2E', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16, justifyContent: 'center' },
+  promoTicketBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+
+  toggleCardPremium: { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 },
+  toggleCardActive: { backgroundColor: '#F0FDF4', borderColor: '#10B981' },
   toggleCardLeft: { flexDirection: 'row', alignItems: 'center' },
-  toggleIconWrapper: { width: 48, height: 48, backgroundColor: '#F9FAFB', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  toggleTitle: { color: '#1A1A2E', fontWeight: '900' },
-  toggleSub: { color: '#9ca3af', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginTop: 4 },
-  switchTrack: { width: 56, height: 28, borderRadius: 14, paddingHorizontal: 4, justifyContent: 'center' },
-  switchThumb: { width: 20, height: 20, backgroundColor: '#fff', borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
-  promoCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', padding: 6, borderRadius: 24, flexDirection: 'row', alignItems: 'center', marginBottom: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
-  promoInputWrapper: { flex: 1, paddingHorizontal: 20 },
-  promoInput: { fontWeight: '900', color: '#1A1A2E', fontSize: 12, textTransform: 'uppercase', letterSpacing: 2 },
-  promoApplyBtn: { backgroundColor: '#1A1A2E', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 20 },
-  promoApplyText: { color: '#fff', fontWeight: '900', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
-  sectionTitle: { color: '#9ca3af', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10, marginBottom: 20, marginLeft: 8 },
-  paymentMethodBtn: { padding: 20, borderRadius: 24, marginBottom: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 2 },
-  paymentMethodBtnActive: { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
-  paymentMethodBtnInactive: { backgroundColor: '#FFFFFF', borderColor: '#F3F4F6' },
+  toggleIconCircle: { width: 40, height: 40, backgroundColor: '#F3F4F6', borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  toggleTitle: { color: '#1A1A2E', fontWeight: '800', fontSize: 15 },
+  toggleSub: { color: '#6B7280', fontSize: 12, fontWeight: '600', marginTop: 2 },
+  customCheckbox: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
+  customCheckboxActive: { borderColor: '#10B981' },
+  customCheckboxInner: { width: 12, height: 12, backgroundColor: '#10B981', borderRadius: 4 },
+
+  paymentMethodPremium: { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 20, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 2 },
+  paymentMethodActive: { borderColor: '#10B981', backgroundColor: '#FFFFFF' },
   paymentMethodLeft: { flexDirection: 'row', alignItems: 'center' },
-  paymentMethodIconWrapper: { width: 48, height: 48, backgroundColor: '#F9FAFB', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  codEmoji: { fontSize: 20 },
-  paymentMethodText: { fontWeight: '900', fontSize: 15 },
-  paymentMethodTextActive: { color: '#10B981' },
-  paymentMethodTextInactive: { color: '#1A1A2E' },
-  radioOuter: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  paymentMethodIconBox: { width: 48, height: 48, backgroundColor: '#F3F4F6', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  paymentMethodTitle: { fontWeight: '800', fontSize: 16, color: '#1A1A2E' },
+  paymentMethodTitleActive: { color: '#10B981' },
+  paymentMethodSub: { color: '#6B7280', fontSize: 13, fontWeight: '500', marginTop: 2 },
+  radioOuter: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
+  radioOuterActive: { borderColor: '#10B981' },
   radioInner: { width: 12, height: 12, backgroundColor: '#10B981', borderRadius: 6 },
-  footer: { position: 'absolute', bottom: 40, left: 24, right: 24 },
-  payButton: { height: 72, backgroundColor: '#10B981', borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, shadowColor: '#10B981', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 8 },
-  payButtonSub: { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 },
-  payButtonMain: { color: '#fff', fontSize: 20, fontWeight: '900' },
-  payArrowWrapper: { width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+
+  stickyFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  premiumPayBtn: {
+    height: 64,
+    backgroundColor: '#10B981',
+    borderRadius: 20,
+    width: '100%',
+  },
+  premiumPayBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    height: '100%',
+  },
+  payBtnGrandTotal: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  payBtnSubText: { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginTop: 2 },
+  payBtnActionRow: { flexDirection: 'row', alignItems: 'center' },
+  payBtnActionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', marginRight: 12 },
+  payBtnIconWrapper: { width: 36, height: 36, backgroundColor: '#FFFFFF', borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  
   loadingContainer: { flex: 1, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center' },
-  loadingText: { marginTop: 16, color: '#9ca3af', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 10 },
-  verifyingContainer: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.95)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, zIndex: 1000 },
-  verifyingTitle: { marginTop: 32, color: '#1A1A2E', fontSize: 24, fontWeight: '900', textAlign: 'center' },
-  verifyingSub: { marginTop: 8, color: '#9ca3af', fontWeight: '600', textAlign: 'center', lineHeight: 22 },
+  verifyingContainer: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.98)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, zIndex: 1000 },
+  verifyingTitle: { marginTop: 40, color: '#1A1A2E', fontSize: 24, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5 },
+  verifyingSub: { marginTop: 12, color: '#6B7280', fontSize: 16, fontWeight: '500', textAlign: 'center', lineHeight: 24 },
+
+  outOfZoneContainer: { flex: 1, backgroundColor: '#F9FAFB' },
+  outOfZoneBack: { position: 'absolute', top: 64, left: 24, zIndex: 10, width: 44, height: 44, backgroundColor: '#FFFFFF', borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F3F4F6' },
+  outOfZoneContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  outOfZoneIconBox: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginBottom: 32, borderWidth: 1, borderColor: '#FECACA' },
+  outOfZoneTitle: { color: '#1A1A2E', fontSize: 28, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5, marginBottom: 12 },
+  outOfZoneSub: { color: '#6B7280', fontSize: 15, fontWeight: '500', textAlign: 'center', lineHeight: 24, marginBottom: 40 },
+  outOfZoneChangeBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1A1A2E', paddingHorizontal: 28, paddingVertical: 18, borderRadius: 20, width: '100%', justifyContent: 'center', marginBottom: 16 },
+  outOfZoneChangeBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
+  outOfZoneBackLink: { paddingVertical: 12 },
+  outOfZoneBackLinkText: { color: '#9CA3AF', fontSize: 14, fontWeight: '700' },
 });
 
 export default CheckoutScreen;

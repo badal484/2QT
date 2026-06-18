@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Linking, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking, ActivityIndicator, Alert, StyleSheet, StatusBar } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,7 +12,9 @@ import {
   CreditCard, 
   ChevronRight,
   Info,
-  ExternalLink
+  ExternalLink,
+  ShieldAlert,
+  Clock
 } from 'lucide-react-native';
 
 import { getSocket } from '../socket/client';
@@ -95,54 +97,110 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     Linking.openURL(url);
   };
 
+  // Render high-tech order progress steps indicator
+  const renderStepper = () => {
+    const steps = [
+      { key: 'preparing', label: 'PREP' },
+      { key: 'ready_for_pickup', label: 'PICKUP' },
+      { key: 'out_for_delivery', label: 'TRANSIT' },
+      { key: 'delivered', label: 'DONE' }
+    ];
+
+    const currentIdx = steps.findIndex(s => s.key === currentStatus);
+    
+    return (
+      <View style={styles.stepperContainer}>
+        {steps.map((step, idx) => {
+          const isActive = idx <= currentIdx;
+          const isCurrent = idx === currentIdx;
+          return (
+            <React.Fragment key={step.key}>
+              <View style={styles.stepDotContainer}>
+                <View style={[
+                  styles.stepDot,
+                  isActive && styles.stepDotActive,
+                  isCurrent && styles.stepDotCurrent
+                ]} />
+                <Text style={[
+                  styles.stepLabel,
+                  isActive && styles.stepLabelActive
+                ]}>
+                  {step.label}
+                </Text>
+              </View>
+              {idx < steps.length - 1 && (
+                <View style={[
+                  styles.stepLine,
+                  idx < currentIdx && styles.stepLineActive
+                ]} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
       {/* Premium Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          activeOpacity={0.7}
-          onPress={() => navigation.goBack()} 
-          style={styles.backButton}
-        >
-          <ArrowLeft size={24} color="white" />
-        </TouchableOpacity>
-        
-        <View style={styles.headerContent}>
-          <View>
-            <View style={styles.headerLabelRow}>
-                <View style={styles.headerDot} />
-                <Text style={styles.headerLabelText}>Mission Control</Text>
-            </View>
-            <Text style={styles.headerOrderId}>{order.display_id}</Text>
-          </View>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            activeOpacity={0.7}
+            onPress={() => navigation.goBack()} 
+            style={styles.backButton}
+          >
+            <ArrowLeft size={20} color="white" />
+          </TouchableOpacity>
           <View style={styles.statusBadge}>
             <Text style={styles.statusBadgeText}>{currentStatus.replace(/_/g, ' ')}</Text>
           </View>
         </View>
+        
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerLabelText}>Active Mission</Text>
+            <Text style={styles.headerOrderId}>{order.display_id}</Text>
+          </View>
+        </View>
+        
+        {renderStepper()}
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Customer Detail Card */}
+        {/* Destination Card */}
         <View style={styles.detailCard}>
           <View style={styles.detailHeader}>
             <View style={styles.destIconWrapper}>
-              <MapPin size={28} color="#FF6B35" />
+              <MapPin size={24} color="#FF6B35" />
             </View>
             <View style={styles.destLabelCol}>
-              <Text style={styles.destSubLabel}>Delivery Destination</Text>
-              <Text style={styles.destTitle}>{order.customer_name || 'Premium Customer'}</Text>
+              <Text style={styles.destSubLabel}>
+                {['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus) 
+                  ? 'Pickup Location' 
+                  : 'Customer Destination'}
+              </Text>
+              <Text style={styles.destTitle} numberOfLines={1}>
+                {['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus)
+                  ? (order.kitchen_name || 'Kitchen Hub')
+                  : (order.customer_name || 'Premium Customer')}
+              </Text>
             </View>
             <TouchableOpacity 
               onPress={() => Linking.openURL(`tel:${order.customer_phone || '919999999999'}`)}
               style={styles.phoneBtn}
             >
-              <Phone size={20} color="#1A1A2E" />
+              <Phone size={18} color="#FF6B35" />
             </TouchableOpacity>
           </View>
           
           <View style={styles.addressBox}>
              <Text style={styles.addressText}>
-                {order.customer_address_text || order.address_text || 'Delivery address not provided'}
+                {['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus)
+                  ? (order.kitchen_address || 'Kitchen Address Not Specified')
+                  : (order.customer_address_text || order.address_text || 'Delivery Address Not Provided')}
              </Text>
           </View>
 
@@ -151,16 +209,16 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
             style={styles.navBtn}
             onPress={openDirections}
           >
-            <Navigation size={20} color="white" style={{ marginRight: 12 }} />
-            <Text style={styles.navBtnText}>Open Navigation</Text>
-            <ExternalLink size={14} color="white" style={{ marginLeft: 8, opacity: 0.5 }} />
+            <Navigation size={18} color="white" style={{ marginRight: 8 }} />
+            <Text style={styles.navBtnText}>Launch HUD Navigation</Text>
+            <ExternalLink size={12} color="white" style={{ marginLeft: 8, opacity: 0.5 }} />
           </TouchableOpacity>
 
           {order.special_instructions && (
             <View style={styles.instructionCard}>
-              <Info size={18} color="#FF6B35" style={{ marginRight: 16, marginTop: 2 }} />
+              <Info size={16} color="#FF6B35" style={{ marginRight: 12, marginTop: 2 }} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.instructionLabel}>Customer Note</Text>
+                <Text style={styles.instructionLabel}>Customer Dispatch Note</Text>
                 <Text style={styles.instructionText}>{order.special_instructions}</Text>
               </View>
             </View>
@@ -170,8 +228,8 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
         {/* Order Contents */}
         <View style={styles.contentsCard}>
           <View style={styles.contentsHeader}>
-            <Package size={20} color="#9CA3AF" style={{ marginRight: 12 }} />
-            <Text style={styles.contentsHeaderText}>Package Contents</Text>
+            <Package size={18} color="#9CA3AF" style={{ marginRight: 8 }} />
+            <Text style={styles.contentsHeaderText}>Cargo Inventory</Text>
           </View>
           
           {order.items?.map((item: any, idx: number) => (
@@ -181,7 +239,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.itemNameText}>{item.menu_item_name}</Text>
-                <Text style={styles.itemSubText}>PREPARED BY KITCHEN</Text>
+                <Text style={styles.itemSubText}>SEALED CONTAINER</Text>
               </View>
               <View style={styles.itemStatusDot} />
             </View>
@@ -190,35 +248,32 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           <View style={styles.paymentSummaryRow}>
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <CreditCard size={14} color="#9CA3AF" style={{ marginRight: 8 }} />
-                <Text style={styles.paymentLabel}>Payment</Text>
+                <CreditCard size={12} color="#94A3B8" style={{ marginRight: 6 }} />
+                <Text style={styles.paymentLabel}>Method</Text>
               </View>
               <Text style={styles.paymentValue}>{order.payment_method || 'PREPAID'}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.paymentLabel}>Collect Cash</Text>
+              <Text style={styles.paymentLabel}>Collect Amount</Text>
               <Text style={styles.cashValue}>₹{order.payment_method?.toLowerCase() === 'cod' ? order.total_amount_paise / 100 : '0.00'}</Text>
             </View>
           </View>
         </View>
 
-        {/* Safety & Help */}
-        <View style={styles.helpRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Info size={14} color="#D1D5DB" />
-            <Text style={styles.helpText}>Contact 2QT Support for assistance</Text>
-          </View>
-          <TouchableOpacity 
-            onPress={() => {
-              Alert.alert('Release Mission', 'Are you sure you want to drop this delivery? It will be returned to the pool for another rider.', [
-                { text: 'Back', style: 'cancel' },
-                { text: 'Release Delivery', style: 'destructive', onPress: () => unclaimMutation.mutate() }
-              ]);
-            }}
-          >
-            <Text style={styles.cancelLinkText}>Report Issue / Cancel</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Release Order */}
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          style={styles.releaseBtn}
+          onPress={() => {
+            Alert.alert('Release Mission', 'Are you sure you want to drop this delivery? It will be returned to the pool for another rider.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Release Delivery', style: 'destructive', onPress: () => unclaimMutation.mutate() }
+            ]);
+          }}
+        >
+          <ShieldAlert size={16} color="#EF4444" style={{ marginRight: 8 }} />
+          <Text style={styles.releaseBtnText}>Release Mission / Decline</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Action Footer */}
@@ -248,208 +303,240 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#0B0C10',
   },
   header: {
     paddingTop: 64,
-    paddingHorizontal: 32,
-    paddingBottom: 48,
-    backgroundColor: '#1A1A2E',
-    borderBottomLeftRadius: 56,
-    borderBottomRightRadius: 56,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
-    elevation: 10,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
+    backgroundColor: '#0D0E15',
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  backButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 32,
-  },
-  headerContent: {
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  headerLabelRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 20,
   },
-  headerDot: {
-    width: 8,
-    height: 8,
-    backgroundColor: '#FF6B35',
-    borderRadius: 4,
-    marginRight: 8,
+  backButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#161726',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  headerContent: {
+    marginBottom: 20,
   },
   headerLabelText: {
-    color: 'rgba(255,255,255,0.4)',
+    color: '#94A3B8',
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 3,
+    letterSpacing: 2,
+    marginBottom: 4,
   },
   headerOrderId: {
-    color: '#fff',
-    fontSize: 40,
+    color: '#FFFFFF',
+    fontSize: 32,
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: -1,
   },
   statusBadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   statusBadgeText: {
-    color: '#000',
+    color: '#FF6B35',
     fontWeight: '900',
-    fontSize: 10,
+    fontSize: 9,
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  // Stepper Visual UI
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  stepDotContainer: {
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  stepDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#2C2D42',
+    borderWidth: 2,
+    borderColor: '#0D0E15',
+  },
+  stepDotActive: {
+    backgroundColor: '#FF6B35',
+  },
+  stepDotCurrent: {
+    borderColor: '#FFFFFF',
+    backgroundColor: '#FF6B35',
+    transform: [{ scale: 1.25 }],
+  },
+  stepLabel: {
+    color: '#64748B',
+    fontSize: 8,
+    fontWeight: '900',
+    marginTop: 6,
+    letterSpacing: 0.5,
+  },
+  stepLabelActive: {
+    color: '#FFFFFF',
+  },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#2C2D42',
+    marginHorizontal: -4,
+    marginTop: -14, // align with dot vertical center
+  },
+  stepLineActive: {
+    backgroundColor: '#FF6B35',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 40,
+    paddingTop: 24,
     paddingBottom: 160,
   },
   detailCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161726',
     borderWidth: 1,
-    borderColor: '#f3f4f6',
-    borderRadius: 40,
-    padding: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-    marginBottom: 32,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 28,
+    padding: 24,
+    marginBottom: 24,
   },
   detailHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   destIconWrapper: {
-    width: 56,
-    height: 56,
+    width: 48,
+    height: 48,
     backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 20,
+    marginRight: 16,
   },
   destLabelCol: {
     flex: 1,
   },
   destSubLabel: {
-    color: '#9ca3af',
-    fontSize: 10,
+    color: '#94A3B8',
+    fontSize: 9,
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
   },
   destTitle: {
-    color: '#1A1A2E',
-    fontSize: 20,
+    color: '#FFFFFF',
+    fontSize: 18,
     fontWeight: '900',
-    marginTop: 4,
+    marginTop: 2,
   },
   phoneBtn: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#f9fafb',
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: 'rgba(255, 107, 53, 0.15)',
   },
   addressBox: {
-    backgroundColor: '#f9fafb',
-    padding: 24,
-    borderRadius: 24,
-    marginBottom: 32,
+    backgroundColor: '#0D0E15',
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: 'rgba(255, 255, 255, 0.04)',
   },
   addressText: {
-    color: '#4B5563',
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 24,
+    color: '#E2E8F0',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 22,
   },
   navBtn: {
     width: '100%',
-    height: 72,
-    backgroundColor: '#1A1A2E',
-    borderRadius: 24,
+    height: 60,
+    backgroundColor: '#FF6B35',
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 8,
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
   navBtnText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 12,
     textTransform: 'uppercase',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
   },
   instructionCard: {
-    marginTop: 32,
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
-    padding: 24,
-    borderRadius: 24,
+    marginTop: 20,
+    backgroundColor: 'rgba(255, 107, 53, 0.06)',
+    padding: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: 'rgba(255, 107, 53, 0.12)',
     flexDirection: 'row',
   },
   instructionLabel: {
     color: '#FF6B35',
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
     marginBottom: 4,
   },
   instructionText: {
-    color: '#1A1A2E',
-    fontWeight: '700',
+    color: '#FFFFFF',
+    fontWeight: '600',
     fontSize: 12,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   contentsCard: {
-    backgroundColor: 'rgba(249, 250, 251, 0.3)',
-    borderRadius: 40,
-    padding: 32,
+    backgroundColor: '#161726',
+    borderRadius: 28,
+    padding: 24,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
-    marginBottom: 32,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 24,
   },
   contentsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   contentsHeaderText: {
-    color: '#9ca3af',
+    color: '#94A3B8',
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -458,134 +545,128 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 24,
+    marginBottom: 12,
+    backgroundColor: '#0D0E15',
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#f9fafb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
   },
   itemQtyWrapper: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#1A1A2E',
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 20,
+    marginRight: 16,
   },
   itemQtyText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 14,
+    fontSize: 12,
   },
   itemNameText: {
-    color: '#1A1A2E',
+    color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 11,
     textTransform: 'uppercase',
   },
   itemSubText: {
-    color: '#9ca3af',
-    fontSize: 9,
-    fontWeight: '700',
+    color: '#64748B',
+    fontSize: 8,
+    fontWeight: '900',
     marginTop: 2,
+    letterSpacing: 0.5,
   },
   itemStatusDot: {
-    width: 8,
-    height: 8,
+    width: 6,
+    height: 6,
     backgroundColor: '#22C55E',
-    borderRadius: 4,
+    borderRadius: 3,
   },
   paymentSummaryRow: {
-    marginTop: 24,
-    paddingTop: 32,
+    marginTop: 16,
+    paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   paymentLabel: {
-    color: '#9ca3af',
-    fontSize: 9,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  paymentValue: {
-    color: '#1A1A2E',
-    fontWeight: '900',
-    fontSize: 14,
-    marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  cashValue: {
-    color: '#1A1A2E',
-    fontWeight: '900',
-    fontSize: 24,
-    marginTop: 4,
-  },
-  helpRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-  },
-  helpText: {
-    color: '#d1d5db',
+    color: '#94A3B8',
+    fontSize: 8,
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
-    fontSize: 9,
-    marginLeft: 8,
   },
-  cancelLinkText: {
+  paymentValue: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 13,
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  cashValue: {
+    color: '#22C55E',
+    fontWeight: '900',
+    fontSize: 22,
+    marginTop: 2,
+  },
+  releaseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.15)',
+    borderRadius: 20,
+    height: 56,
+    marginBottom: 16,
+  },
+  releaseBtnText: {
     color: '#EF4444',
     fontWeight: '900',
-    fontSize: 9,
+    fontSize: 11,
     textTransform: 'uppercase',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
   },
   footer: {
     position: 'absolute',
-    bottom: 48,
+    bottom: 40,
     left: 24,
     right: 24,
   },
   actionBtn: {
-    height: 96,
-    borderRadius: 32,
+    height: 80,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: '#FF6B35',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
-    elevation: 10,
+    elevation: 8,
   },
   actionBtnEnabled: {
     backgroundColor: '#FF6B35',
   },
   actionBtnDisabled: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   actionBtnContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   actionBtnText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 4,
+    letterSpacing: 3,
   },
 });
 

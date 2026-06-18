@@ -1,4 +1,4 @@
-import { ArrowLeft, ChefHat, Wallet, Calendar, Clock, Sparkles, Star, Ticket, Trash2, ShoppingCart, ArrowRight } from 'lucide-react-native';
+import { ArrowLeft, ChefHat, Wallet, Calendar, Clock, Sparkles, Star, Ticket, Trash2, ShoppingCart, ArrowRight, MapPin } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, Alert, StyleSheet, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -19,6 +19,14 @@ const hapticOptions = {
 const CartScreen = ({ navigation }: any) => {
   const { items, addressId, instructions, scheduledAt } = useSelector((state: RootState) => state.cart);
   const { user } = useSelector((state: RootState) => state.auth);
+
+  const { data: addressesData } = useQuery({
+    queryKey: ['addresses'],
+    queryFn: () => api.get('/customers/addresses'),
+    enabled: !!addressId && !!user,
+  });
+  const selectedAddress = addressesData?.addresses?.find((a: any) => a.id === addressId);
+  const isOutOfZone = !!addressId && !!selectedAddress && !selectedAddress.is_serviceable;
   const [promoCode, setPromoCode] = useState('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const dispatch = useDispatch();
@@ -148,6 +156,19 @@ const CartScreen = ({ navigation }: any) => {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View style={styles.scrollContent}>
+          {/* Out-of-zone warning banner */}
+          {isOutOfZone && (
+            <Animated.View entering={FadeInDown.duration(300)} style={styles.outOfZoneBanner}>
+              <MapPin size={16} color="#EF4444" />
+              <Text style={styles.outOfZoneText}>
+                We don't deliver to <Text style={{ fontWeight: '900' }}>{selectedAddress?.label || 'this address'}</Text> yet.
+              </Text>
+              <TouchableOpacity onPress={() => { triggerHaptic(); navigation.navigate('Address'); }} style={styles.outOfZoneBtn}>
+                <Text style={styles.outOfZoneBtnText}>Change →</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
           {/* Active Subscription Badge */}
           {activeSub && (
             <Animated.View entering={FadeInDown.duration(400)} style={styles.proCard}>
@@ -368,9 +389,9 @@ const CartScreen = ({ navigation }: any) => {
           <Text style={styles.footerTotalValue}>₹{finalTotal / 100}</Text>
         </View>
         
-        <TouchableOpacity 
-          style={styles.checkoutButton}
-          disabled={isCheckingOut}
+        <TouchableOpacity
+          style={[styles.checkoutButton, isOutOfZone && styles.checkoutButtonDisabled]}
+          disabled={isCheckingOut || isOutOfZone}
           onPress={async () => {
             triggerHapticHeavy();
             if (!addressId) {
@@ -507,7 +528,12 @@ const styles = StyleSheet.create({
   footerTotalSection: { flex: 1 },
   footerTotalLabel: { color: '#9CA3AF', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   footerTotalValue: { color: '#1A1A2E', fontSize: 22, fontWeight: '900', marginTop: 2, letterSpacing: -0.5 },
+  outOfZoneBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', borderRadius: 16, padding: 14, marginBottom: 24, borderWidth: 1, borderColor: '#FECACA', gap: 8 },
+  outOfZoneText: { flex: 1, color: '#DC2626', fontSize: 13, fontWeight: '600' },
+  outOfZoneBtn: { backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  outOfZoneBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   checkoutButton: { backgroundColor: '#10B981', paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center' },
+  checkoutButtonDisabled: { backgroundColor: '#D1D5DB' },
   checkoutMainText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginRight: 8 },
   checkoutArrowWrapper: { width: 28, height: 28, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   
@@ -518,7 +544,7 @@ const styles = StyleSheet.create({
   exploreButton: { marginTop: 40, backgroundColor: '#1A1A2E', paddingHorizontal: 48, paddingVertical: 20, borderRadius: 24 },
   exploreButtonText: { color: '#FFFFFF', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, fontSize: 14 },
   
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
+  loadingOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
   loadingOverlayText: { color: '#1A1A2E', fontSize: 18, fontWeight: '900', marginTop: 16 }
 });
 

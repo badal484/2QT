@@ -8,6 +8,41 @@ import { emitToAll } from '../socket';
 const router = Router();
 const upload = multer({ dest: 'uploads/' });
 
+// Geocoding proxy — mobile calls our backend, backend calls Nominatim
+// This avoids emulator/device direct-internet issues with Nominatim
+router.get('/geocode/search', async (req, res) => {
+    const { q } = req.query;
+    if (!q || typeof q !== 'string' || q.trim().length < 2) {
+        return res.status(400).json({ error: 'MISSING_QUERY' });
+    }
+    try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=in`;
+        const response = await fetch(url, { headers: { 'User-Agent': '2QTFoodApp/1.0' } });
+        const data = await response.json() as any[];
+        res.set('Cache-Control', 'public, max-age=60');
+        res.json(data);
+    } catch (err) {
+        console.error('[Geocode] Search failed:', err);
+        res.status(502).json({ error: 'GEOCODE_UNAVAILABLE' });
+    }
+});
+
+router.get('/geocode/reverse', async (req, res) => {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+    if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'INVALID_COORDS' });
+    try {
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+        const response = await fetch(url, { headers: { 'User-Agent': '2QTFoodApp/1.0' } });
+        const data = await response.json();
+        res.set('Cache-Control', 'public, max-age=300');
+        res.json(data);
+    } catch (err) {
+        console.error('[Geocode] Reverse failed:', err);
+        res.status(502).json({ error: 'GEOCODE_UNAVAILABLE' });
+    }
+});
+
 router.get('/zones', async (req, res) => {
     const { rows } = await query('SELECT id, name, radius_km, kitchen_lat, kitchen_lng FROM zones WHERE is_active = true ORDER BY name');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
@@ -49,20 +84,22 @@ router.get('/', async (req, res) => {
     );
 
     const { rows: zoneInfo } = await query(
-        'SELECT opening_time, closing_time, surge_enabled, surge_fee_paise FROM zones WHERE id = $1',
+        'SELECT name, opening_time, closing_time, surge_enabled, surge_fee_paise FROM zones WHERE id = $1',
         [zoneId]
     );
 
     const { rows: kitchenInfo } = await query(
-        `SELECT k.is_paused, k.pause_reason 
-         FROM kitchens k 
-         JOIN kitchen_zones kz ON k.id = kz.kitchen_id 
+        `SELECT k.name, k.is_paused, k.pause_reason
+         FROM kitchens k
+         JOIN kitchen_zones kz ON k.id = kz.kitchen_id
          WHERE kz.zone_id = $1 LIMIT 1`,
         [zoneId]
     );
 
     const response = {
         items,
+        zoneName: zoneInfo[0]?.name || null,
+        kitchenName: kitchenInfo[0]?.name || null,
         kitchenPaused: kitchenInfo[0]?.is_paused || false,
         pauseReason: kitchenInfo[0]?.pause_reason || null,
         openingTime: zoneInfo[0]?.opening_time,

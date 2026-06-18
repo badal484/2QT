@@ -19,6 +19,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const login = (userData: any) => {
+    setUser(userData);
+    try { localStorage.setItem("2qt_user", JSON.stringify(userData)); } catch {}
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("2qt_user");
+    localStorage.removeItem("2qt_token");
+    localStorage.removeItem("2qt_refresh_token");
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -46,18 +58,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timer = setTimeout(() => setLoading(false), 300);
     return () => clearTimeout(timer);
   }, []);
-
-  const login = (userData: any) => {
-    setUser(userData);
-    try { localStorage.setItem("2qt_user", JSON.stringify(userData)); } catch {}
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("2qt_user");
-    localStorage.removeItem("2qt_token");
-    localStorage.removeItem("2qt_refresh_token");
-  };
 
   useEffect(() => {
     if (user && ['rider', 'rider_captain'].includes(user.role)) {

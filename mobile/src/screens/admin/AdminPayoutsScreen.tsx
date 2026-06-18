@@ -61,6 +61,12 @@ const AdminPayoutsScreen = ({ navigation }: any) => {
                     <Phone size={12} color="#9CA3AF" style={{ marginRight: 8 }} />
                     <Text style={styles.riderPhone}>+{payout.rider_phone}</Text>
                   </View>
+                  {payout.upi_id && (
+                    <View style={[styles.phoneRow, { marginTop: 4 }]}>
+                      <IndianRupee size={12} color="#10B981" style={{ marginRight: 8 }} />
+                      <Text style={[styles.riderPhone, { color: '#10B981' }]}>{payout.upi_id}</Text>
+                    </View>
+                  )}
                 </View>
                 <View style={styles.amountCol}>
                    <Text style={styles.amountValue}>₹{payout.net_amount_paise / 100}</Text>
@@ -83,7 +89,7 @@ const AdminPayoutsScreen = ({ navigation }: any) => {
               <TouchableOpacity 
                 activeOpacity={0.8}
                 onPress={() => {
-                  Alert.alert('Approve Payout', `Confirm settlement of ₹${payout.net_amount_paise / 100} to ${payout.rider_name}?`, [
+                  Alert.alert('Approve Payout', `Confirm settlement of ₹${payout.net_amount_paise / 100} to ${payout.rider_name} (${payout.upi_id || 'No UPI ID'})?`, [
                     { text: 'Cancel', style: 'cancel' },
                     { text: 'Confirm', onPress: () => approveMutation.mutate(payout.id) }
                   ]);

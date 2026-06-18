@@ -115,7 +115,8 @@ export default function RiderPage() {
   const { user, logout, loading: authLoading } = useAuth()!;
   const router = useRouter();
 
-  const [orders,          setOrders]          = useState<Order[]>([]);
+  const [activeOrder,    setActiveOrder]     = useState<Order | null>(null);
+  const [poolOrders,      setPoolOrders]      = useState<Order[]>([]);
   const [loading,         setLoading]         = useState(true);
   const [isOnline,        setIsOnline]        = useState(false);
   const [incomingOrder,   setIncomingOrder]   = useState<Order | null>(null);
@@ -144,37 +145,37 @@ export default function RiderPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) router.replace("/login");
-    else if (user.role !== "rider" && user.role !== "super_admin") router.replace("/menu");
+    else if (user.role !== "rider" && user.role !== "rider_captain" && user.role !== "super_admin") router.replace("/menu");
   }, [user, authLoading, router]);
 
   // ── Fetch orders ────────────────────────────────────────────────────────────
   const fetchOrders = useCallback(async () => {
     try {
-      // active returns { order: singular }, pool returns { orders: array }
       const [poolRes, activeRes] = await Promise.all([
         api.get("/riders/orders/pool").catch((e: any) => { console.error("[POOL]", e.message); return { orders: [] }; }),
         api.get("/riders/orders/active").catch((e: any) => { console.error("[ACTIVE]", e.message); return { order: null }; }),
       ]);
-      const all: Order[] = [];
-      if (activeRes.order) all.push(activeRes.order);
-      // Don't show pool orders while rider is already out_for_delivery (RIDER_BUSY scenario)
-      const isDelivering = activeRes.order?.status === "out_for_delivery";
-      if (!isDelivering && poolRes.orders?.length > 0) {
-        const ids = new Set(all.map((o: any) => o.id));
-        all.push(...poolRes.orders.filter((o: any) => !ids.has(o.id)));
-      }
-      setOrders(all);
+      
+      const active = activeRes.order || null;
+      setActiveOrder(active);
 
-      // Layer 3: crash / app-reload recovery — if an active delivery exists the
-      // rider must be online. Force the flag so the UI never shows "You're offline"
-      // while a delivery is in progress.
+      // If rider is delivering or has active claimed order, don't show pool orders
+      if (active) {
+        setPoolOrders([]);
+      } else {
+        setPoolOrders(poolRes.orders || []);
+      }
+
+      // Layer 3: crash / app-reload recovery
+      const isDelivering = active?.status === "out_for_delivery";
       if (isDelivering) {
         setIsOnline(true);
         if (typeof window !== "undefined") localStorage.setItem("rider_is_online", "true");
       }
     } catch (e: any) {
       console.error("[fetchOrders]", e.message);
-      setOrders([]);
+      setActiveOrder(null);
+      setPoolOrders([]);
     }
     finally { setLoading(false); }
   }, []);
@@ -192,7 +193,7 @@ export default function RiderPage() {
   }, []);
 
   useEffect(() => {
-    if (user && (user.role === "rider" || user.role === "super_admin")) {
+    if (user && (user.role === "rider" || user.role === "rider_captain" || user.role === "super_admin")) {
       fetchOrders();
       fetchEarnings();
     }
@@ -202,7 +203,7 @@ export default function RiderPage() {
 
   // ── Tab-specific data ───────────────────────────────────────────────────────
   useEffect(() => {
-    if (!user || (user.role !== "rider" && user.role !== "super_admin")) return;
+    if (!user || (user.role !== "rider" && user.role !== "rider_captain" && user.role !== "super_admin")) return;
     if (activeTab === "earnings") fetchEarnings();
     else if (activeTab === "history") {
       setHistoryLoading(true);
@@ -215,7 +216,7 @@ export default function RiderPage() {
 
   // ── Socket: new order notifications + 30s fallback poll ────────────────────
   useEffect(() => {
-    if (!user || (user.role !== "rider" && user.role !== "super_admin")) return;
+    if (!user || (user.role !== "rider" && user.role !== "rider_captain" && user.role !== "super_admin")) return;
 
     socket.connect();
 
@@ -295,15 +296,16 @@ export default function RiderPage() {
   // ── Actions ─────────────────────────────────────────────────────────────────
   const updateStatus = async (orderId: string, status: "out_for_delivery" | "delivered") => {
     try {
-      if (status === "out_for_delivery") await api.post(`/riders/orders/${orderId}/claim`);
       await api.patch(`/riders/orders/${orderId}/status`, { status });
       if (status === "delivered") {
-        const order = orders.find(o => o.id === orderId);
-        setOrders(prev => prev.filter(o => o.id !== orderId));
-        setEarningsFlash({ amount: order?.total_amount_paise ?? 5000 });
+        setEarningsFlash({ amount: activeOrder?.total_amount_paise ?? 5000 });
+        setActiveOrder(null);
         fetchEarnings();
+        fetchOrders();
       } else {
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+        if (activeOrder) {
+          setActiveOrder({ ...activeOrder, status });
+        }
         toast.success("Order picked up! Head to customer.");
       }
     } catch (err: any) {
@@ -316,18 +318,18 @@ export default function RiderPage() {
     if (!verifyOtpFor || otpInput.length !== 6) { toast.error("Enter the 6-digit OTP"); return; }
     try {
       await api.post("/riders/verify-otp", { orderId: verifyOtpFor, otp: otpInput });
-      const order = orders.find(o => o.id === verifyOtpFor);
-      setOrders(prev => prev.filter(o => o.id !== verifyOtpFor));
       setVerifyOtpFor(null); setOtpInput("");
-      setEarningsFlash({ amount: order?.total_amount_paise ?? 5000 });
+      setEarningsFlash({ amount: activeOrder?.total_amount_paise ?? 5000 });
+      setActiveOrder(null);
       fetchEarnings();
+      fetchOrders();
     } catch (err: any) { toast.error(err.message || "Invalid OTP"); }
   };
 
   const toggleOnline = async () => {
     const next = !isOnline;
     // Layer 1: hard-block going offline while actively delivering
-    if (!next && orders.some(o => o.status === 'out_for_delivery')) {
+    if (!next && activeOrder?.status === 'out_for_delivery') {
       toast.error("Complete your current delivery before going offline.");
       return;
     }
@@ -343,12 +345,26 @@ export default function RiderPage() {
     }
   };
 
-  const acceptIncoming = () => {
+  const claimOrder = async (orderId: string) => {
+    try {
+      await api.post(`/riders/orders/${orderId}/claim`);
+      toast.success("Mission claimed successfully!");
+      fetchOrders();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to claim mission");
+    }
+  };
+
+  const acceptIncoming = async () => {
     if (!incomingOrder) return;
     if (countdownRef.current) clearInterval(countdownRef.current);
-    setOrders(prev => [incomingOrder, ...prev]);
+    try {
+      await api.post(`/riders/orders/${incomingOrder.id}/claim`);
+      toast.success("Mission accepted! Head to the kitchen.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to accept mission");
+    }
     setIncomingOrder(null);
-    toast.success("Order accepted! Head to the kitchen.");
     fetchOrders();
   };
 
@@ -359,20 +375,18 @@ export default function RiderPage() {
   };
 
   // ── Map destination ─────────────────────────────────────────────────────────
-  const activeDelivery = orders.find(o => o.status === 'out_for_delivery');
-  const activePickup   = orders.find(o => o.status === 'ready_for_pickup' || (o.status as any) === 'ready');
-  const mapDestination = activeDelivery
-    ? { lat: activeDelivery.customer_lat, lng: activeDelivery.customer_lng, type: 'customer' as const }
-    : activePickup
-    ? { lat: activePickup.kitchen_lat,    lng: activePickup.kitchen_lng,    type: 'kitchen' as const }
+  const mapDestination = activeOrder
+    ? activeOrder.status === 'out_for_delivery'
+      ? { lat: activeOrder.customer_lat, lng: activeOrder.customer_lng, type: 'customer' as const }
+      : { lat: activeOrder.kitchen_lat,    lng: activeOrder.kitchen_lng,    type: 'kitchen' as const }
     : undefined;
 
   const mapLat = riderLoc?.lat ?? 12.9716;
   const mapLng = riderLoc?.lng ?? 77.5946;
 
   // ── Zone demand proxy ───────────────────────────────────────────────────────
-  const demandLevel = orders.length >= 3 ? { label: 'High Demand', color: 'text-orange-400' }
-    : orders.length >= 1 ? { label: 'Active Zone', color: 'text-amber-400' }
+  const demandLevel = poolOrders.length >= 3 ? { label: 'High Demand', color: 'text-orange-400' }
+    : poolOrders.length >= 1 ? { label: 'Active Zone', color: 'text-amber-400' }
     : { label: 'Quiet Now', color: 'text-zinc-400' };
 
   if (authLoading) return (
@@ -441,8 +455,8 @@ export default function RiderPage() {
 
           {/* Online toggle + logout */}
           <div className="flex items-center gap-2">
-            {(() => {
-              const lockedOffline = isOnline && orders.some(o => o.status === 'out_for_delivery');
+              {(() => {
+              const lockedOffline = isOnline && activeOrder?.status === 'out_for_delivery';
               return (
                 <button
                   onClick={toggleOnline}
@@ -504,7 +518,7 @@ export default function RiderPage() {
             )}
 
             {/* ONLINE + WAITING ─ Situational awareness card */}
-            {isOnline && !loading && orders.length === 0 && (
+            {isOnline && !loading && !activeOrder && poolOrders.length === 0 && (
               <div className="px-4 pb-2">
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}
@@ -555,18 +569,33 @@ export default function RiderPage() {
               </div>
             )}
 
-            {/* ONLINE + HAS ORDERS */}
-            {isOnline && !loading && orders.length > 0 && (
+            {/* ONLINE + HAS ACTIVE ORDER */}
+            {isOnline && !loading && activeOrder && (
               <div className="px-4 space-y-3 pb-2">
+                <OrderCard
+                  order={activeOrder}
+                  index={0}
+                  isVerifying={verifyOtpFor === activeOrder.id}
+                  swipeErrorKey={swipeErrorMap[activeOrder.id] ?? 0}
+                  onUpdate={(id, status) => {
+                    if (status === "delivered") setVerifyOtpFor(id);
+                    else updateStatus(id, status);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* ONLINE + HAS AVAILABLE POOL ORDERS */}
+            {isOnline && !loading && !activeOrder && poolOrders.length > 0 && (
+              <div className="px-4 space-y-4 pb-2">
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 px-1">Available Missions</h3>
                 <AnimatePresence mode="popLayout">
-                  {orders.map((order, i) => (
-                    <OrderCard key={order.id} order={order} index={i}
-                      isVerifying={verifyOtpFor === order.id}
-                      swipeErrorKey={swipeErrorMap[order.id] ?? 0}
-                      onUpdate={(id, status) => {
-                        if (status === "delivered") setVerifyOtpFor(id);
-                        else updateStatus(id, status);
-                      }}
+                  {poolOrders.map((order, i) => (
+                    <PoolOrderCard
+                      key={order.id}
+                      order={order}
+                      index={i}
+                      onClaim={claimOrder}
                     />
                   ))}
                 </AnimatePresence>
@@ -801,9 +830,9 @@ export default function RiderPage() {
               <Icon className="w-5 h-5" />
               <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
               {/* Badge for pending orders */}
-              {key === "deliveries" && orders.length > 0 && activeTab !== "deliveries" && (
+              {key === "deliveries" && (activeOrder || poolOrders.length > 0) && activeTab !== "deliveries" && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-brand-primary rounded-full text-[9px] font-black text-white flex items-center justify-center">
-                  {orders.length}
+                  {activeOrder ? 1 : poolOrders.length}
                 </span>
               )}
             </button>
@@ -956,3 +985,64 @@ function SwipeButton({ text, onComplete, isVerifying, color = "orange", resetKey
     </div>
   );
 }
+
+// ─── Pool Order Card ─────────────────────────────────────────────────────────
+
+function PoolOrderCard({ order, onClaim, index }: {
+  order: Order;
+  onClaim: (id: string) => void;
+  index: number;
+}) {
+  return (
+    <motion.div layout
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 30 }}
+      className="bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-[28px] p-5 shadow-2xl shadow-black/50"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-amber-400/20 text-amber-400 bg-amber-400/10">
+          Available Mission
+        </span>
+        <span className="text-xs font-bold text-zinc-500">#{order.display_id}</span>
+      </div>
+
+      <div className="space-y-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+            <ChefHat className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 leading-none mb-0.5">Pickup</p>
+            <p className="text-sm font-bold text-white truncate">{order.kitchen_name || "Kitchen"}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0">
+            <Home className="w-4 h-4 text-green-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 leading-none mb-0.5">Deliver To</p>
+            <p className="text-sm font-bold text-white truncate">{order.delivery_address_text || "Customer location"}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-white/[0.06] pt-4">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 leading-none mb-0.5">Estimated Pay</p>
+          <p className="text-lg font-black text-green-400">₹{(order.total_amount_paise / 100).toFixed(0)}</p>
+        </div>
+        <button
+          onClick={() => onClaim(order.id)}
+          className="bg-brand-primary hover:bg-orange-500 text-white font-black text-xs uppercase tracking-widest px-5 py-3 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-brand-primary/20 cursor-pointer"
+        >
+          Claim Mission <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+

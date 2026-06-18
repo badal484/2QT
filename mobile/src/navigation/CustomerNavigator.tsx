@@ -36,9 +36,10 @@ const CustomerNavigator = () => {
   const isNewUser = !user?.name || user?.name === '2QT User' || user?.name === '2QT_User';
 
   return (
-    <Stack.Navigator 
+    <Stack.Navigator
       screenOptions={{ headerShown: false }}
       initialRouteName={isNewUser ? 'Onboarding' : 'Home'}
+      detachInactiveScreens={false}
     >
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />

@@ -505,7 +505,7 @@ function AddressesTab() {
       .catch(() => {});
   }, [pinLat, pinLng]);
 
-  const useMyLocation = () => {
+  const detectMyLocation = () => {
     if (!navigator.geolocation) { toast.error("GPS not supported on this device"); return; }
     setGpsLoading(true);
     navigator.geolocation.getCurrentPosition(
@@ -569,7 +569,7 @@ function AddressesTab() {
           </div>
         ))}
 
-        <button onClick={() => { setShowForm(true); useMyLocation(); }}
+        <button onClick={() => { setShowForm(true); detectMyLocation(); }}
           className="h-full min-h-[120px] border-2 border-dashed border-zinc-300 rounded-3xl flex flex-col items-center justify-center gap-2 group hover:border-brand-primary hover:bg-brand-primary/5 transition-all bg-zinc-50">
           <div className="w-10 h-10 rounded-full bg-zinc-200 flex items-center justify-center group-hover:bg-brand-primary group-hover:text-white transition-all text-zinc-500">
             <Plus className="w-5 h-5" />
@@ -595,7 +595,7 @@ function AddressesTab() {
               </div>
 
               {/* GPS button */}
-              <button onClick={useMyLocation} disabled={gpsLoading}
+              <button onClick={detectMyLocation} disabled={gpsLoading}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-brand-primary/10 text-brand-primary font-bold text-sm hover:bg-brand-primary/20 transition-colors disabled:opacity-50">
                 {gpsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
                 {gpsLoading ? "Detecting location…" : "Use My Current Location"}
