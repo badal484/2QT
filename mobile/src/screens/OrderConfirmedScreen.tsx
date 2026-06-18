@@ -1,90 +1,78 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, Alert, Dimensions,
+  ActivityIndicator, Alert, Linking,
 } from 'react-native';
-import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
-  FadeInDown, SlideInDown,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
 import {
-  ArrowLeft, ShoppingBag, MapPin, Package,
-  ChefHat, Bike, CircleCheck, Navigation, MessageCircle,
+  ArrowLeft, MapPin, Package, ChefHat, Bike,
+  CircleCheck, ShoppingBag, MessageCircle, Phone, UserCircle, Check,
 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSelector } from 'react-redux';
 import { api } from '../api/client';
+import { getSocket } from '../socket/client';
+import { RootState } from '../store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TrackingLeafletMap } from '../components/TrackingLeafletMap';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
-const { height: SCREEN_H } = Dimensions.get('window');
-const HERO_H = Math.round(SCREEN_H * 0.44);
+const HAPTIC = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
+const triggerHaptic = () => ReactNativeHapticFeedback.trigger('impactLight', HAPTIC);
+const triggerSuccess = () => ReactNativeHapticFeedback.trigger('notificationSuccess', HAPTIC);
 
-// ── Progress step ─────────────────────────────────────────────────────────────
-const STEPS = [
-  { key: 'confirmed',         label: 'Confirmed',  Icon: ShoppingBag },
-  { key: 'preparing',         label: 'Preparing',  Icon: ChefHat     },
-  { key: 'ready_for_pickup',  label: 'Pickup',     Icon: Package     },
-  { key: 'out_for_delivery',  label: 'On the Way', Icon: Bike        },
-  { key: 'delivered',         label: 'Delivered',  Icon: CircleCheck },
-];
-
-const STATUS_ORDER = ['confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered'];
-
-const stepIndex = (status: string) => {
-  const i = STATUS_ORDER.indexOf(status);
-  return i === -1 ? 0 : i;
+const calculateBearing = (sLat: number, sLng: number, dLat: number, dLng: number) => {
+  const r = (v: number) => (v * Math.PI) / 180;
+  const d = (v: number) => (v * 180) / Math.PI;
+  const y = Math.sin(r(dLng) - r(sLng)) * Math.cos(r(dLat));
+  const x = Math.cos(r(sLat)) * Math.sin(r(dLat)) - Math.sin(r(sLat)) * Math.cos(r(dLat)) * Math.cos(r(dLng) - r(sLng));
+  return (d(Math.atan2(y, x)) + 360) % 360;
 };
 
+// ── Progress tracker ──────────────────────────────────────────────────────────
+const STEPS = [
+  { key: 'confirmed',        label: 'Confirmed', Icon: ShoppingBag },
+  { key: 'preparing',        label: 'Preparing', Icon: ChefHat     },
+  { key: 'ready_for_pickup', label: 'Ready',     Icon: Package     },
+  { key: 'out_for_delivery', label: 'On the Way',Icon: Bike        },
+  { key: 'delivered',        label: 'Delivered', Icon: CircleCheck },
+];
+const STATUS_ORDER = ['confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered'];
+const stepIndex = (s: string) => { const i = STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
+
 const ProgressTracker = ({ status }: { status: string }) => {
-  const current = stepIndex(status);
+  const cur = stepIndex(status);
   return (
-    <View style={track.row}>
+    <View style={tr.row}>
       {STEPS.map(({ key, label, Icon }, i) => {
-        const done = i < current;
-        const active = i === current;
+        const done = i < cur, active = i === cur;
         return (
           <React.Fragment key={key}>
-            <View style={track.step}>
-              <View style={[
-                track.circle,
-                done && track.circleDone,
-                active && track.circleActive,
-              ]}>
-                <Icon
-                  size={14}
-                  color={done ? colors.white : active ? colors.white : colors.inkFaint}
-                  strokeWidth={2.5}
-                />
+            <View style={tr.step}>
+              <View style={[tr.circle, done && tr.done, active && tr.active]}>
+                <Icon size={13} color={done || active ? '#fff' : colors.inkFaint} strokeWidth={2.5} />
               </View>
-              <Text style={[track.label, (done || active) && track.labelActive]}>
-                {label}
-              </Text>
+              <Text style={[tr.label, (done || active) && tr.labelOn]}>{label}</Text>
             </View>
-            {i < STEPS.length - 1 && (
-              <View style={[track.line, done && track.lineDone]} />
-            )}
+            {i < STEPS.length - 1 && <View style={[tr.line, done && tr.lineDone]} />}
           </React.Fragment>
         );
       })}
     </View>
   );
 };
-
-const track = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
-  step: { alignItems: 'center', width: 52 },
-  circle: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  circleDone: { backgroundColor: colors.primary },
-  circleActive: { backgroundColor: colors.ink },
-  label: { fontSize: 9, fontFamily: fontFamily.semibold, color: colors.inkFaint, marginTop: 5, textAlign: 'center' },
-  labelActive: { color: colors.ink },
-  line: { flex: 1, height: 2, backgroundColor: '#E5E7EB', marginBottom: 18, borderRadius: 1 },
-  lineDone: { backgroundColor: colors.primary },
+const tr = StyleSheet.create({
+  row:     { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  step:    { alignItems: 'center', width: 52 },
+  circle:  { width: 30, height: 30, borderRadius: 15, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  done:    { backgroundColor: colors.primary },
+  active:  { backgroundColor: colors.ink },
+  label:   { fontSize: 9, fontFamily: fontFamily.semibold, color: colors.inkFaint, marginTop: 5, textAlign: 'center' },
+  labelOn: { color: colors.ink },
+  line:    { flex: 1, height: 2, backgroundColor: '#E5E7EB', marginBottom: 16, borderRadius: 1 },
+  lineDone:{ backgroundColor: colors.primary },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -92,27 +80,47 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
   const { orderId } = route.params;
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const socket = getSocket();
+  const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
 
-  // Animated bag icon entrance
-  const scale = useSharedValue(0.3);
-  const opacity = useSharedValue(0);
-  useEffect(() => {
-    scale.value = withSpring(1, { stiffness: 260, damping: 18 });
-    opacity.value = withTiming(1, { duration: 400 });
-  }, []);
-  const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  // Fetch order details
   const { data: orderData, isLoading } = useQuery({
     queryKey: ['order-confirmed', orderId],
     queryFn: () => api.get(`/orders/${orderId}`),
-    refetchInterval: 8000,
+    refetchInterval: 6000,
   });
   const o = orderData?.order;
   const items: any[] = o?.items || [];
+
+  // Live rider location
+  const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [heading, setHeading] = useState(0);
+  const [status, setStatus] = useState('confirmed');
+
+  useEffect(() => {
+    if (o?.status) setStatus(o.status);
+    if (o?.rider_lat && o?.rider_lng) {
+      setRiderLocation({ lat: parseFloat(o.rider_lat), lng: parseFloat(o.rider_lng) });
+    }
+  }, [o?.status, o?.rider_lat, o?.rider_lng]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.emit('join_order', orderId);
+    socket.on('order_status_update', (data: any) => {
+      if (data.orderId === orderId) {
+        setStatus(data.status);
+        triggerSuccess();
+        queryClient.invalidateQueries({ queryKey: ['order-confirmed', orderId] });
+      }
+    });
+    socket.on('rider_location', (data: any) => {
+      setRiderLocation(prev => {
+        if (prev) setHeading(calculateBearing(prev.lat, prev.lng, data.lat, data.lng));
+        return { lat: data.lat, lng: data.lng };
+      });
+    });
+    return () => { socket.off('order_status_update'); socket.off('rider_location'); };
+  }, [socket, orderId]);
 
   const cancelMutation = useMutation({
     mutationFn: () => api.post(`/orders/${orderId}/cancel`),
@@ -131,83 +139,134 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
     ]);
   };
 
-  const status = o?.status || 'confirmed';
   const canCancel = !!o && ['pending_payment', 'confirmed'].includes(status);
 
-  const subtotal    = o ? o.subtotal_paise / 100 : 0;
-  const delivery    = o ? (o.delivery_fee_paise + (o.surge_paise || 0)) / 100 : 0;
-  const tax         = o ? ((o.cgst_paise || 0) + (o.sgst_paise || 0)) / 100 : 0;
-  const discount    = o ? (o.discount_paise || 0) / 100 : 0;
-  const loyalty     = o ? (o.loyalty_discount_paise || 0) / 100 : 0;
-  const wallet      = o ? (o.wallet_deduction_paise || 0) / 100 : 0;
-  const total       = o ? o.total_amount_paise / 100 : 0;
+  const customerLocation = o?.customer_lat && o?.customer_lng
+    ? { lat: parseFloat(o.customer_lat), lng: parseFloat(o.customer_lng) } : null;
+  const kitchenLocation = o?.kitchen_lat && o?.kitchen_lng
+    ? { lat: parseFloat(o.kitchen_lat), lng: parseFloat(o.kitchen_lng) } : null;
+
+  const subtotal = o ? o.subtotal_paise / 100 : 0;
+  const delivery = o ? (o.delivery_fee_paise + (o.surge_paise || 0)) / 100 : 0;
+  const tax      = o ? ((o.cgst_paise || 0) + (o.sgst_paise || 0)) / 100 : 0;
+  const discount = o ? (o.discount_paise || 0) / 100 : 0;
+  const loyalty  = o ? (o.loyalty_discount_paise || 0) / 100 : 0;
+  const wallet   = o ? (o.wallet_deduction_paise || 0) / 100 : 0;
+  const total    = o ? o.total_amount_paise / 100 : 0;
+
+  const estTime = status === 'delivered' ? 'Delivered'
+    : status === 'out_for_delivery' ? '10 mins'
+    : status === 'ready_for_pickup' ? '15 mins' : '25 mins';
 
   return (
     <View style={styles.root}>
 
-      {/* ── Hero ── */}
-      <View style={[styles.hero, { paddingTop: insets.top + 8 }]}>
-        {/* Header row */}
-        <View style={styles.heroHeader}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}
-          >
-            <ArrowLeft size={20} color={colors.ink} />
-          </TouchableOpacity>
-          {o?.display_id && (
-            <View style={styles.orderIdBadge}>
-              <Text style={styles.orderIdText}>#{o.display_id}</Text>
-            </View>
-          )}
-          <View style={{ width: 40 }} />
-        </View>
-
-        {/* Animated icon */}
-        <View style={styles.heroIconWrap}>
-          <Animated.View style={[styles.heroIconBox, iconStyle]}>
-            <ShoppingBag size={52} color={colors.primary} strokeWidth={1.8} />
-          </Animated.View>
-        </View>
+      {/* ── Live Map ── */}
+      <View style={styles.mapContainer}>
+        <TrackingLeafletMap
+          riderLocation={riderLocation}
+          customerLocation={customerLocation}
+          kitchenLocation={kitchenLocation}
+          riderHeading={heading}
+          initialLat={customerLocation?.lat ?? globalLocation?.latitude ?? 20.5937}
+          initialLng={customerLocation?.lng ?? globalLocation?.longitude ?? 78.9629}
+          initialZoom={customerLocation ? 15 : globalLocation ? 14 : 5}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Floating back button */}
+        <TouchableOpacity
+          style={[styles.backBtn, { top: insets.top + 12 }]}
+          onPress={() => { triggerHaptic(); navigation.goBack(); }}
+          activeOpacity={0.85}
+        >
+          <ArrowLeft size={20} color={colors.ink} />
+        </TouchableOpacity>
+        {/* Order ID badge */}
+        {o?.display_id && (
+          <View style={[styles.orderIdBadge, { top: insets.top + 16 }]}>
+            <Text style={styles.orderIdText}>#{o.display_id}</Text>
+          </View>
+        )}
       </View>
 
-      {/* ── Sheet ── */}
-      <Animated.View entering={SlideInDown.duration(380)} style={styles.sheet}>
+      {/* ── Bottom sheet ── */}
+      <Animated.View entering={SlideInDown.duration(500).springify().damping(22)} style={styles.sheet}>
         <View style={styles.sheetHandle} />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
 
-          {/* Title */}
-          <Text style={styles.title}>Order Confirmed!</Text>
-          <Text style={styles.subtitle}>We have received your order</Text>
-
-          {/* Progress tracker */}
-          <View style={styles.trackerWrap}>
-            <ProgressTracker status={status} />
+          {/* ETA row */}
+          <View style={styles.etaRow}>
+            <View>
+              <Text style={styles.etaLabel}>ESTIMATED ARRIVAL</Text>
+              <Text style={styles.etaValue}>{estTime}</Text>
+            </View>
+            <View style={styles.onTimeBadge}>
+              <Text style={styles.onTimeText}>ON TIME</Text>
+            </View>
           </View>
 
-          {/* Live Track button */}
-          <TouchableOpacity
-            style={styles.trackBtn}
-            activeOpacity={0.88}
-            onPress={() => navigation.navigate('OrderTracking', { orderId })}
-          >
-            <Navigation size={16} color={colors.white} />
-            <Text style={styles.trackBtnText}>Live Track Order</Text>
-          </TouchableOpacity>
+          {/* Progress tracker */}
+          <ProgressTracker status={status} />
+
+          {/* Delivery OTP */}
+          {status === 'out_for_delivery' && o?.delivery_otp && (
+            <Animated.View entering={FadeInDown} style={styles.otpCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.otpLabel}>YOUR DELIVERY CODE</Text>
+                <Text style={styles.otpCode}>{o.delivery_otp}</Text>
+                <Text style={styles.otpHint}>Share this with your delivery partner</Text>
+              </View>
+              <Text style={{ fontSize: 28 }}>🔐</Text>
+            </Animated.View>
+          )}
+
+          {/* Rider card */}
+          {status === 'delivered' && o?.invoice_url ? (
+            <Animated.View entering={FadeInDown} style={[styles.riderCard, styles.riderCardGreen]}>
+              <View style={[styles.riderAvatar, { backgroundColor: colors.primary }]}>
+                <Check size={22} color="#fff" strokeWidth={3} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.riderMeta, { color: colors.primary }]}>FINANCIAL RECORD</Text>
+                <Text style={styles.riderName}>Invoice is Ready</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.riderAction, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                onPress={() => Linking.openURL(o.invoice_url)}
+              >
+                <Text style={{ color: '#fff', fontFamily: fontFamily.extrabold, fontSize: 10 }}>VIEW</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ) : (
+            <Animated.View entering={FadeInDown} style={styles.riderCard}>
+              <View style={styles.riderAvatar}>
+                <UserCircle size={26} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.riderMeta}>DELIVERY PARTNER</Text>
+                <Text style={styles.riderName}>{o?.rider_name || 'Assigning...'}</Text>
+              </View>
+              {o?.rider_phone && (
+                <TouchableOpacity
+                  style={styles.riderAction}
+                  onPress={() => { triggerHaptic(); Linking.openURL(`tel:${o.rider_phone}`); }}
+                >
+                  <Phone size={17} color={colors.ink} />
+                </TouchableOpacity>
+              )}
+            </Animated.View>
+          )}
 
           {/* Delivery address */}
           {o && (
-            <Animated.View entering={FadeInDown.delay(80)} style={styles.section}>
+            <Animated.View entering={FadeInDown.delay(60)} style={styles.section}>
               <View style={styles.addressCard}>
                 <View style={styles.addressIconBox}>
-                  <MapPin size={16} color={ACCENT} />
+                  <MapPin size={15} color={colors.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.addressCardLabel}>DELIVERY ADDRESS</Text>
-                  <Text style={styles.addressCardText}>
-                    {o.delivery_address_text || o.address_text || '—'}
-                  </Text>
+                  <Text style={styles.addressLabel}>DELIVERY ADDRESS</Text>
+                  <Text style={styles.addressText}>{o.delivery_address_text || o.address_text || '—'}</Text>
                   {(o.delivery_address_label || o.label) && (
                     <View style={styles.labelPill}>
                       <Text style={styles.labelPillText}>
@@ -220,19 +279,15 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
             </Animated.View>
           )}
 
-          {/* Items ordered */}
+          {/* Items */}
           {items.length > 0 && (
-            <Animated.View entering={FadeInDown.delay(120)} style={styles.section}>
+            <Animated.View entering={FadeInDown.delay(90)} style={styles.section}>
               <Text style={styles.sectionTitle}>Items Ordered</Text>
               {items.map((item: any, i: number) => (
                 <View key={i} style={styles.itemRow}>
-                  <View style={styles.itemQtyBadge}>
-                    <Text style={styles.itemQtyText}>{item.quantity}×</Text>
-                  </View>
+                  <Text style={styles.itemQty}>{item.quantity}×</Text>
                   <Text style={styles.itemName} numberOfLines={1}>{item.menu_item_name || item.name}</Text>
-                  <Text style={styles.itemPrice}>
-                    ₹{((item.price_paise * item.quantity) / 100).toFixed(0)}
-                  </Text>
+                  <Text style={styles.itemPrice}>₹{((item.price_paise * item.quantity) / 100).toFixed(0)}</Text>
                 </View>
               ))}
             </Animated.View>
@@ -240,41 +295,13 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
 
           {/* Bill */}
           {o && (
-            <Animated.View entering={FadeInDown.delay(150)} style={[styles.section, styles.billSection]}>
-              <View style={styles.billRow}>
-                <Text style={styles.billLabel}>Subtotal</Text>
-                <Text style={styles.billValue}>₹{subtotal.toFixed(0)}</Text>
-              </View>
-              {delivery > 0 && (
-                <View style={styles.billRow}>
-                  <Text style={styles.billLabel}>Delivery & Surge</Text>
-                  <Text style={styles.billValue}>₹{delivery.toFixed(0)}</Text>
-                </View>
-              )}
-              {tax > 0 && (
-                <View style={styles.billRow}>
-                  <Text style={styles.billLabel}>Taxes (GST)</Text>
-                  <Text style={styles.billValue}>₹{tax.toFixed(2)}</Text>
-                </View>
-              )}
-              {discount > 0 && (
-                <View style={styles.billRow}>
-                  <Text style={[styles.billLabel, { color: colors.success }]}>Promo Discount</Text>
-                  <Text style={[styles.billValue, { color: colors.success }]}>−₹{discount.toFixed(0)}</Text>
-                </View>
-              )}
-              {loyalty > 0 && (
-                <View style={styles.billRow}>
-                  <Text style={[styles.billLabel, { color: colors.success }]}>Loyalty Points</Text>
-                  <Text style={[styles.billValue, { color: colors.success }]}>−₹{loyalty.toFixed(0)}</Text>
-                </View>
-              )}
-              {wallet > 0 && (
-                <View style={styles.billRow}>
-                  <Text style={[styles.billLabel, { color: colors.primary }]}>Wallet</Text>
-                  <Text style={[styles.billValue, { color: colors.primary }]}>−₹{wallet.toFixed(2)}</Text>
-                </View>
-              )}
+            <Animated.View entering={FadeInDown.delay(120)} style={styles.section}>
+              <View style={styles.billRow}><Text style={styles.billLabel}>Subtotal</Text><Text style={styles.billValue}>₹{subtotal.toFixed(0)}</Text></View>
+              {delivery > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Delivery & Surge</Text><Text style={styles.billValue}>₹{delivery.toFixed(0)}</Text></View>}
+              {tax > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Taxes (GST)</Text><Text style={styles.billValue}>₹{tax.toFixed(2)}</Text></View>}
+              {discount > 0 && <View style={styles.billRow}><Text style={[styles.billLabel, { color: colors.success }]}>Promo Discount</Text><Text style={[styles.billValue, { color: colors.success }]}>−₹{discount.toFixed(0)}</Text></View>}
+              {loyalty > 0 && <View style={styles.billRow}><Text style={[styles.billLabel, { color: colors.success }]}>Loyalty Points</Text><Text style={[styles.billValue, { color: colors.success }]}>−₹{loyalty.toFixed(0)}</Text></View>}
+              {wallet > 0 && <View style={styles.billRow}><Text style={[styles.billLabel, { color: colors.primary }]}>Wallet</Text><Text style={[styles.billValue, { color: colors.primary }]}>−₹{wallet.toFixed(2)}</Text></View>}
               <View style={styles.billDivider} />
               <View style={styles.billRow}>
                 <Text style={styles.totalLabel}>Total</Text>
@@ -283,12 +310,12 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
             </Animated.View>
           )}
 
-          {/* Cancel order */}
+          {/* Cancel */}
           {canCancel && (
-            <Animated.View entering={FadeInDown.delay(180)} style={styles.cancelCard}>
+            <Animated.View entering={FadeInDown.delay(140)} style={styles.cancelCard}>
               <View>
-                <Text style={styles.cancelCardTitle}>Cancel Order</Text>
-                <Text style={styles.cancelCardSub}>Refund to wallet</Text>
+                <Text style={styles.cancelTitle}>Cancel Order</Text>
+                <Text style={styles.cancelSub}>Refund to wallet</Text>
               </View>
               <TouchableOpacity
                 style={[styles.cancelBtn, cancelMutation.isPending && { opacity: 0.6 }]}
@@ -297,14 +324,14 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                 activeOpacity={0.85}
               >
                 {cancelMutation.isPending
-                  ? <ActivityIndicator size="small" color={colors.white} />
+                  ? <ActivityIndicator size="small" color="#fff" />
                   : <Text style={styles.cancelBtnText}>Cancel</Text>}
               </TouchableOpacity>
             </Animated.View>
           )}
 
           {/* Help */}
-          <Animated.View entering={FadeInDown.delay(200)} style={styles.helpCard}>
+          <Animated.View entering={FadeInDown.delay(160)} style={styles.helpCard}>
             <View>
               <Text style={styles.helpTitle}>Need help?</Text>
               <Text style={styles.helpSub}>Support available 24/7</Text>
@@ -328,9 +355,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
             <Text style={styles.homeBtnText}>Back to Home</Text>
           </TouchableOpacity>
 
-          {isLoading && !o && (
-            <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
-          )}
+          {isLoading && !o && <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />}
         </ScrollView>
       </Animated.View>
     </View>
@@ -339,153 +364,108 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
 
 export default OrderConfirmedScreen;
 
-const ACCENT = colors.accent;
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.primaryTint },
+  root: { flex: 1, backgroundColor: '#f0ede9' },
 
-  // Hero
-  hero: {
-    height: HERO_H,
-    backgroundColor: '#EAF1FF',
-    paddingHorizontal: 20,
-  },
-  heroHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 8,
-  },
+  // Map
+  mapContainer: { height: '48%', backgroundColor: '#f0ede9' },
+
+  // Floating overlays on map
   backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', left: 20,
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+  orderIdBadge: {
+    position: 'absolute', alignSelf: 'center', left: 0, right: 0, marginHorizontal: 80,
+    backgroundColor: '#fff', borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 9, alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  orderIdBadge: {
-    backgroundColor: '#FFFFFF', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
   orderIdText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink },
-  heroIconWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  heroIconBox: {
-    width: 120, height: 120, borderRadius: 36,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary, shadowOpacity: 0.18, shadowRadius: 30, shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
 
   // Sheet
   sheet: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -28,
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20, shadowOffset: { width: 0, height: -4 },
-    elevation: 10,
+    flex: 1, backgroundColor: '#fff',
+    borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    marginTop: -32,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20, shadowOffset: { width: 0, height: -6 },
+    elevation: 12,
   },
-  sheetHandle: {
-    width: 44, height: 4, borderRadius: 2,
-    backgroundColor: '#E5E7EB',
-    alignSelf: 'center', marginTop: 12, marginBottom: 4,
-  },
+  sheetHandle: { width: 44, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginTop: 12, marginBottom: 2 },
   sheetScroll: { paddingHorizontal: 20, paddingBottom: 48 },
 
-  title: { fontSize: 28, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5, marginTop: 16 },
-  subtitle: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 4, marginBottom: 20 },
+  // ETA
+  etaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 16 },
+  etaLabel: { fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.inkFaint, letterSpacing: 1.5 },
+  etaValue: { fontSize: 34, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -1, marginTop: 2 },
+  onTimeBadge: { backgroundColor: '#ECFDF5', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  onTimeText: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 10, letterSpacing: 1 },
 
-  // Tracker
-  trackerWrap: { marginBottom: 16 },
-
-  // Live track button
-  trackBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 14, paddingVertical: 14,
-    marginBottom: 20,
+  // OTP
+  otpCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4', borderRadius: 16, padding: 16, marginVertical: 12,
+    borderWidth: 1.5, borderColor: '#BBF7D0',
   },
-  trackBtnText: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.white },
+  otpLabel: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#059669', letterSpacing: 1.5, marginBottom: 4 },
+  otpCode: { fontSize: 34, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: 8 },
+  otpHint: { fontSize: 11, fontFamily: fontFamily.regular, color: colors.inkMuted, marginTop: 4 },
+
+  // Rider
+  riderCard: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 20, padding: 18, marginVertical: 12,
+    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: '#fff',
+  },
+  riderCardGreen: { backgroundColor: '#F0FDF4', borderColor: '#D1FAE5' },
+  riderAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  riderMeta: { fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.inkFaint, letterSpacing: 1 },
+  riderName: { fontSize: 17, fontFamily: fontFamily.extrabold, color: colors.ink, marginTop: 2 },
+  riderAction: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
 
   // Sections
-  section: {
-    borderTopWidth: 1, borderTopColor: '#F3F4F6',
-    paddingTop: 16, marginBottom: 4,
-  },
+  section: { borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 16, marginBottom: 4 },
   sectionTitle: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 12 },
 
-  // Address card
-  addressCard: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: colors.background, borderRadius: 14, padding: 14, gap: 12,
-  },
-  addressIconBox: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: colors.accentTint,
-    alignItems: 'center', justifyContent: 'center', marginTop: 2,
-  },
-  addressCardLabel: {
-    fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.inkFaint,
-    letterSpacing: 1, marginBottom: 4,
-  },
-  addressCardText: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, lineHeight: 20 },
-  labelPill: {
-    alignSelf: 'flex-start', marginTop: 6,
-    backgroundColor: '#E5E7EB', borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 2,
-  },
+  // Address
+  addressCard: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: colors.background, borderRadius: 14, padding: 14, gap: 12 },
+  addressIconBox: { width: 32, height: 32, borderRadius: 9, backgroundColor: colors.accentTint, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  addressLabel: { fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.inkFaint, letterSpacing: 1, marginBottom: 4 },
+  addressText: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, lineHeight: 20 },
+  labelPill: { alignSelf: 'flex-start', marginTop: 6, backgroundColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   labelPillText: { fontSize: 10, fontFamily: fontFamily.bold, color: colors.inkMuted },
 
   // Items
-  itemRow: {
-    flexDirection: 'row', alignItems: 'center', marginBottom: 10,
-  },
-  itemQtyBadge: {
-    width: 32, alignItems: 'flex-start',
-  },
-  itemQtyText: { fontSize: 13, fontFamily: fontFamily.bold, color: ACCENT },
+  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  itemQty: { width: 30, fontSize: 13, fontFamily: fontFamily.bold, color: colors.accent },
   itemName: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
   itemPrice: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink },
 
   // Bill
-  billSection: { paddingTop: 16 },
   billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   billLabel: { fontSize: 14, fontFamily: fontFamily.regular, color: colors.inkMuted },
   billValue: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
-  billDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 10 },
+  billDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 8 },
   totalLabel: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink },
   totalValue: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
 
   // Cancel
-  cancelCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.dangerTint, borderRadius: 16,
-    padding: 16, marginTop: 16,
-  },
-  cancelCardTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.danger },
-  cancelCardSub: { fontSize: 12, fontFamily: fontFamily.regular, color: colors.danger + 'AA', marginTop: 2 },
-  cancelBtn: {
-    backgroundColor: colors.danger, borderRadius: 12,
-    paddingHorizontal: 20, paddingVertical: 10,
-    minWidth: 80, alignItems: 'center',
-  },
-  cancelBtnText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.white },
+  cancelCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.dangerTint, borderRadius: 16, padding: 16, marginTop: 16 },
+  cancelTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.danger },
+  cancelSub: { fontSize: 12, fontFamily: fontFamily.regular, color: colors.danger + 'AA', marginTop: 2 },
+  cancelBtn: { backgroundColor: colors.danger, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10, minWidth: 80, alignItems: 'center' },
+  cancelBtnText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#fff' },
 
   // Help
-  helpCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderRadius: 16, padding: 16, marginTop: 12,
-    borderWidth: 1, borderColor: '#F3F4F6',
-  },
+  helpCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1, borderColor: '#F3F4F6' },
   helpTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
   helpSub: { fontSize: 12, fontFamily: fontFamily.regular, color: colors.inkMuted, marginTop: 2 },
-  helpBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.surfaceMuted, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 10,
-  },
+  helpBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surfaceMuted, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
   helpBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.ink },
 
   // Home
