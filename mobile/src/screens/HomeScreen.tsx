@@ -266,13 +266,6 @@ const HomeScreen = ({ navigation }: any) => {
               )}
             </TouchableOpacity>
 
-            {/* Cart badge */}
-            <TouchableOpacity
-              style={styles.cartBadgeBtn}
-              onPress={() => { triggerHaptic(); navigation.navigate('Cart'); }}
-            >
-              <Text style={styles.cartBadgeNum}>{totalCartQty || 0}</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
