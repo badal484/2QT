@@ -54,6 +54,22 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     return () => { socket.off('order_status_update'); };
   }, [order.id, queryClient]);
 
+  // Continuous GPS broadcast so the buyer map shows live rider position
+  useEffect(() => {
+    const socket = getSocket();
+    const watchId = Geolocation.watchPosition(
+      pos => {
+        socket?.emit('update_location', {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      () => {},
+      { enableHighAccuracy: true, distanceFilter: 10, interval: 5000 },
+    );
+    return () => Geolocation.clearWatch(watchId);
+  }, []);
+
   const updateStatusMutation = useMutation({
     mutationFn: (status: string) => api.patch(`/riders/orders/${order.id}/status`, { status }),
     onSuccess: (data: any) => {

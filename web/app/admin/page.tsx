@@ -301,7 +301,7 @@ function OrdersTab() {
     
     setCancelling(id);
     try {
-      await api.post(`/orders/${id}/cancel`, { reason: "Admin cancelled" });
+      await api.patch(`/admin/orders/${id}/status`, { status: 'cancelled' });
       toast.success("Order cancelled");
       load();
     } finally {
