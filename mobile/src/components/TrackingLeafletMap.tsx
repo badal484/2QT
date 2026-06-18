@@ -29,15 +29,9 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
   };
 
   const handleLoadEnd = () => {
-    if (riderLocation) {
-      inject(`window.updateRider && window.updateRider(${riderLocation.lat},${riderLocation.lng},${riderHeading});`);
-    }
-    if (customerLocation) {
-      inject(`window.updateHome && window.updateHome(${customerLocation.lat},${customerLocation.lng});`);
-    }
-    if (kitchenLocation) {
-      inject(`window.updateKitchen && window.updateKitchen(${kitchenLocation.lat},${kitchenLocation.lng});`);
-    }
+    if (riderLocation) inject(`window.updateRider && window.updateRider(${riderLocation.lat},${riderLocation.lng},${riderHeading});`);
+    if (customerLocation) inject(`window.updateHome && window.updateHome(${customerLocation.lat},${customerLocation.lng});`);
+    if (kitchenLocation) inject(`window.updateKitchen && window.updateKitchen(${kitchenLocation.lat},${kitchenLocation.lng});`);
     inject(`window.fitAll && window.fitAll();`);
   };
 
@@ -56,12 +50,8 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
     inject(`window.updateKitchen && window.updateKitchen(${kitchenLocation.lat},${kitchenLocation.lng}); window.fitAll && window.fitAll();`);
   }, [kitchenLocation?.lat, kitchenLocation?.lng]);
 
-  const initKitchen = kitchenLocation
-    ? `window.updateKitchen(${kitchenLocation.lat},${kitchenLocation.lng});`
-    : '';
-  const initHome = customerLocation
-    ? `window.updateHome(${customerLocation.lat},${customerLocation.lng});`
-    : '';
+  const initKitchen = kitchenLocation ? `window.updateKitchen(${kitchenLocation.lat},${kitchenLocation.lng});` : '';
+  const initHome    = customerLocation ? `window.updateHome(${customerLocation.lat},${customerLocation.lng});` : '';
 
   const html = `<!DOCTYPE html>
 <html>
@@ -70,10 +60,11 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body,html,#map{width:100%;height:100%;margin:0;padding:0;background:#f0ede9;}
+    *{box-sizing:border-box;}
+    body,html,#map{width:100%;height:100%;margin:0;padding:0;background:#0D1117;}
     .leaflet-control-attribution,.leaflet-control-zoom{display:none!important;}
-    @keyframes pulse{0%{transform:scale(0.5);opacity:0.9;}100%{transform:scale(2.2);opacity:0;}}
-    .pulse{position:absolute;width:70px;height:70px;top:-13px;left:-13px;border-radius:50%;border:2px solid rgba(16,185,129,0.5);animation:pulse 2s ease-out infinite;}
+    @keyframes pulse{0%{transform:scale(0.5);opacity:0.8;}100%{transform:scale(2.5);opacity:0;}}
+    .pulse-ring{position:absolute;width:70px;height:70px;top:-13px;left:-13px;border-radius:50%;border:2px solid rgba(16,185,129,0.6);animation:pulse 2s ease-out infinite;}
     .hw{position:relative;display:flex;align-items:center;justify-content:center;}
   </style>
 </head>
@@ -81,79 +72,122 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
   <div id="map"></div>
   <script>
     var map = L.map('map',{zoomControl:false,attributionControl:false}).setView([${initialLat},${initialLng}],${initialZoom});
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',{maxZoom:19,subdomains:'abcd'}).addTo(map);
 
-    var riderM = null, homeM = null, kitchenM = null, routeLine = null;
+    // Dark map tiles (CartoDB Dark Matter)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+      maxZoom:19, subdomains:'abcd'
+    }).addTo(map);
 
+    var riderM=null, homeM=null, kitchenM=null, routeLine=null;
+    var lastRouteFetch=0;
+
+    // ── Icons ──────────────────────────────────────────────────────────────
     function riderIcon(hdg) {
       return L.divIcon({
-        html: '<div style="transform:rotate('+hdg+'deg);width:44px;height:44px;"><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#070F0C" stroke="#10B981" stroke-width="3"/><path d="M22 10 L30 32 L22 26 L14 32 Z" fill="#10B981"/></svg></div>',
-        className:'', iconSize:[44,44], iconAnchor:[22,22]
+        html: '<div style="transform:rotate('+hdg+'deg);width:46px;height:46px;">'
+          +'<svg width="46" height="46" viewBox="0 0 46 46">'
+          +'<circle cx="23" cy="23" r="21" fill="#0D1117" stroke="#10B981" stroke-width="2.5"/>'
+          +'<path d="M23 11 L31 33 L23 27 L15 33 Z" fill="#10B981"/>'
+          +'</svg></div>',
+        className:'', iconSize:[46,46], iconAnchor:[23,23]
       });
     }
 
     function homeIcon() {
       return L.divIcon({
-        html: '<div class="hw"><div class="pulse"></div><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#10B981" stroke="white" stroke-width="3"/><path d="M22 12 L13 20 L15 20 L15 32 L20 32 L20 26 L24 26 L24 32 L29 32 L29 20 L31 20 Z" fill="white"/></svg></div>',
-        className:'', iconSize:[44,44], iconAnchor:[22,40]
+        html: '<div class="hw">'
+          +'<div class="pulse-ring"></div>'
+          +'<svg width="46" height="46" viewBox="0 0 46 46">'
+          +'<circle cx="23" cy="23" r="21" fill="#10B981" stroke="white" stroke-width="2.5"/>'
+          +'<path d="M23 13 L14 21 L16 21 L16 33 L21 33 L21 27 L25 27 L25 33 L30 33 L30 21 L32 21 Z" fill="white"/>'
+          +'</svg></div>',
+        className:'', iconSize:[46,46], iconAnchor:[23,43]
       });
     }
 
     function kitchenIcon() {
       return L.divIcon({
-        html: '<div style="width:40px;height:40px;background:#1A1F1C;border:2px solid #F97316;border-radius:10px;display:flex;align-items:center;justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M18 2v6c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V2" stroke="#F97316" stroke-width="2" stroke-linecap="round"/><path d="M12 2v8M2 22h20M6 12v10M18 12v10M12 12v10" stroke="#F97316" stroke-width="2" stroke-linecap="round"/></svg></div>',
-        className:'', iconSize:[40,40], iconAnchor:[20,40]
+        html: '<div style="width:42px;height:42px;background:#1A1F1C;border:2px solid #F97316;border-radius:11px;display:flex;align-items:center;justify-content:center;">'
+          +'<svg width="22" height="22" viewBox="0 0 24 24" fill="none">'
+          +'<path d="M18 2v6c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V2" stroke="#F97316" stroke-width="2" stroke-linecap="round"/>'
+          +'<path d="M12 2v8M2 22h20M6 12v10M18 12v10M12 12v10" stroke="#F97316" stroke-width="2" stroke-linecap="round"/>'
+          +'</svg></div>',
+        className:'', iconSize:[42,42], iconAnchor:[21,42]
       });
     }
 
-    function refreshRoute() {
-      if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-      if (kitchenM && homeM) {
-        // Static route: kitchen → customer (the full delivery path)
-        routeLine = L.polyline(
-          [kitchenM.getLatLng(), homeM.getLatLng()],
-          {color:'#10B981', weight:4, opacity:0.5, dashArray:'12,8'}
-        ).addTo(map);
-      } else if (riderM && homeM) {
-        // Fallback when kitchen not yet known
-        routeLine = L.polyline(
-          [riderM.getLatLng(), homeM.getLatLng()],
-          {color:'#10B981', weight:4, opacity:0.5, dashArray:'12,8'}
-        ).addTo(map);
+    // ── OSRM road routing ──────────────────────────────────────────────────
+    function drawRoute(coords) {
+      if (routeLine) { map.removeLayer(routeLine); routeLine=null; }
+      if (!coords || coords.length < 2) return;
+      routeLine = L.polyline(coords, {
+        color:'#10B981', weight:5, opacity:0.85,
+        lineJoin:'round', lineCap:'round'
+      }).addTo(map);
+    }
+
+    async function fetchOSRMRoute(fromLat, fromLng, toLat, toLng) {
+      var now = Date.now();
+      if (now - lastRouteFetch < 8000) return; // throttle: max 1 call per 8s
+      lastRouteFetch = now;
+      try {
+        var url = 'https://router.project-osrm.org/route/v1/driving/'
+          + fromLng+','+fromLat+';'+toLng+','+toLat
+          + '?overview=full&geometries=geojson';
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (data.routes && data.routes[0]) {
+          var coords = data.routes[0].geometry.coordinates.map(function(c){return[c[1],c[0]];});
+          drawRoute(coords);
+        }
+      } catch(e) {
+        // Fallback to straight line if OSRM fails
+        if (riderM && homeM) drawRoute([riderM.getLatLng(), homeM.getLatLng()]);
+        else if (kitchenM && homeM) drawRoute([kitchenM.getLatLng(), homeM.getLatLng()]);
       }
     }
 
+    function refreshRoute() {
+      var from = riderM ? riderM.getLatLng() : (kitchenM ? kitchenM.getLatLng() : null);
+      var to   = homeM ? homeM.getLatLng() : null;
+      if (from && to) {
+        fetchOSRMRoute(from.lat, from.lng, to.lat, to.lng);
+      }
+    }
+
+    // ── Fit bounds ──────────────────────────────────────────────────────────
     window.fitAll = function() {
       var pts = [];
       if (kitchenM) pts.push(kitchenM.getLatLng());
       if (homeM)    pts.push(homeM.getLatLng());
       if (riderM)   pts.push(riderM.getLatLng());
       if (pts.length >= 2) {
-        map.fitBounds(L.latLngBounds(pts), {padding:[48,48], maxZoom:16, animate:true, duration:0.8});
+        map.fitBounds(L.latLngBounds(pts), {padding:[56,56], maxZoom:16, animate:true, duration:0.8});
       } else if (pts.length === 1) {
         map.setView(pts[0], 15, {animate:true});
       }
     };
 
+    // ── Marker update functions ─────────────────────────────────────────────
     window.updateRider = function(lat, lng, hdg) {
       if (!riderM) { riderM = L.marker([lat,lng],{icon:riderIcon(hdg),zIndexOffset:2000}).addTo(map); }
-      else { riderM.setLatLng([lat,lng]); riderM.setIcon(riderIcon(hdg)); }
+      else         { riderM.setLatLng([lat,lng]); riderM.setIcon(riderIcon(hdg)); }
       refreshRoute();
     };
 
     window.updateHome = function(lat, lng) {
       if (!homeM) { homeM = L.marker([lat,lng],{icon:homeIcon(),zIndexOffset:1000}).addTo(map); }
-      else { homeM.setLatLng([lat,lng]); }
+      else        { homeM.setLatLng([lat,lng]); }
       refreshRoute();
     };
 
     window.updateKitchen = function(lat, lng) {
       if (!kitchenM) { kitchenM = L.marker([lat,lng],{icon:kitchenIcon(),zIndexOffset:900}).addTo(map); }
-      else { kitchenM.setLatLng([lat,lng]); }
+      else           { kitchenM.setLatLng([lat,lng]); }
       refreshRoute();
     };
 
-    // Render static markers immediately
+    // Init static markers
     ${initKitchen}
     ${initHome}
     window.fitAll();
@@ -174,7 +208,7 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
       showsHorizontalScrollIndicator={false}
       showsVerticalScrollIndicator={false}
       onLoadEnd={handleLoadEnd}
-      style={[{ flex: 1, backgroundColor: '#f0ede9' }, style]}
+      style={[{ flex: 1, backgroundColor: '#0D1117' }, style]}
     />
   );
 };
