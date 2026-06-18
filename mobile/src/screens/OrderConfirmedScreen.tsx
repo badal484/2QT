@@ -107,10 +107,15 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
     if (o?.rider_name && !prevRiderNameRef.current) {
       triggerSuccess();
       setRiderJustAssigned(true);
-      setTimeout(() => setRiderJustAssigned(false), 3000);
     }
     prevRiderNameRef.current = o?.rider_name || null;
   }, [o?.status, o?.rider_lat, o?.rider_lng, o?.rider_name]);
+
+  useEffect(() => {
+    if (!riderJustAssigned) return;
+    const t = setTimeout(() => setRiderJustAssigned(false), 3000);
+    return () => clearTimeout(t);
+  }, [riderJustAssigned]);
 
   useEffect(() => {
     if (!socket) return;
