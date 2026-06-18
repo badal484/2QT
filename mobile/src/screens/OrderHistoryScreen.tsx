@@ -123,16 +123,17 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                   )}
 
                   <View style={styles.orderCardFooter}>
-                    <View>
+                    {/* Total row */}
+                    <View style={styles.footerTotalRow}>
                       <Text style={styles.footerLabel}>Total Paid</Text>
                       <Text style={styles.footerValue}>₹{(order.total_amount_paise / 100).toFixed(2)}</Text>
                     </View>
-                    
+
                     {!['delivered', 'cancelled'].includes(order.status) ? (
-                      <View style={{ flexDirection: 'row' }}>
+                      <View style={styles.footerBtnRow}>
                           {['pending_payment', 'confirmed'].includes(order.status) && (
-                              <TouchableOpacity 
-                                style={[styles.trackBtn, { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EF4444', marginRight: 8 }]}
+                              <TouchableOpacity
+                                style={styles.cancelBtn}
                                 onPress={() => {
                                     Alert.alert('Cancel Order', 'Are you sure you want to cancel?', [
                                         { text: 'No', style: 'cancel' },
@@ -140,10 +141,10 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                                     ]);
                                 }}
                               >
-                                <Text style={[styles.trackBtnText, { color: '#EF4444' }]}>Cancel</Text>
+                                <Text style={styles.cancelBtnText}>Cancel</Text>
                               </TouchableOpacity>
                           )}
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={styles.trackBtn}
                             onPress={() => {
                                 ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
@@ -254,13 +255,17 @@ const styles = StyleSheet.create({
   itemQty: { color: '#10B981', fontWeight: '900', fontSize: 11 },
   itemName: { color: '#4B5563', fontWeight: '600', fontSize: 13, flex: 1 },
   
-  orderCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
+  orderCardFooter: { flexDirection: 'column', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6', gap: 12 },
+  footerTotalRow: {},
+  footerBtnRow: { flexDirection: 'row', gap: 8 },
   footerLabel: { color: '#9CA3AF', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   footerValue: { color: '#1A1A2E', fontWeight: '900', fontSize: 18, marginTop: 2 },
-  
-  trackBtn: { backgroundColor: '#10B981', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center' },
+
+  cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: '#EF4444', paddingVertical: 12, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { color: '#EF4444', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
+  trackBtn: { flex: 1, backgroundColor: '#10B981', paddingVertical: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   trackBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
-  reorderBtn: { backgroundColor: '#F3F4F6', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center' },
+  reorderBtn: { flex: 1, backgroundColor: '#F3F4F6', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   reorderBtnText: { color: '#1A1A2E', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
 });
 
