@@ -84,12 +84,28 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
     // ── Icons ──────────────────────────────────────────────────────────────
     function riderIcon(hdg) {
       return L.divIcon({
-        html: '<div style="transform:rotate('+hdg+'deg);width:46px;height:46px;">'
-          +'<svg width="46" height="46" viewBox="0 0 46 46">'
-          +'<circle cx="23" cy="23" r="21" fill="#0D1117" stroke="#10B981" stroke-width="2.5"/>'
-          +'<path d="M23 11 L31 33 L23 27 L15 33 Z" fill="#10B981"/>'
+        html: '<div style="transform:rotate('+hdg+'deg);width:52px;height:52px;">'
+          +'<svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">'
+          // Outer circle background
+          +'<circle cx="26" cy="26" r="24" fill="#0D1117" stroke="#10B981" stroke-width="2.5"/>'
+          // Rear wheel (bottom)
+          +'<ellipse cx="26" cy="40" rx="5" ry="3.5" fill="#10B981" opacity="0.9"/>'
+          // Body frame (elongated diamond)
+          +'<path d="M26 15 L30 26 L26 37 L22 26 Z" fill="#10B981" opacity="0.85"/>'
+          // Front fork (small wedge above body)
+          +'<path d="M24 15 L26 11 L28 15 Z" fill="#10B981"/>'
+          // Handlebar stem (vertical)
+          +'<rect x="25" y="11" width="2" height="5" rx="1" fill="#10B981"/>'
+          // Handlebars (horizontal bar — T-shape)
+          +'<rect x="14" y="13" width="24" height="3" rx="1.5" fill="#10B981"/>'
+          // Left grip (round end)
+          +'<circle cx="14" cy="14.5" r="3.5" fill="#10B981"/>'
+          // Right grip (round end)
+          +'<circle cx="38" cy="14.5" r="3.5" fill="#10B981"/>'
+          // Rider dot (seat)
+          +'<circle cx="26" cy="26" r="2.5" fill="#0D1117"/>'
           +'</svg></div>',
-        className:'', iconSize:[46,46], iconAnchor:[23,23]
+        className:'', iconSize:[52,52], iconAnchor:[26,26]
       });
     }
 
