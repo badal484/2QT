@@ -3,7 +3,6 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   ActivityIndicator, Alert, Linking,
 } from 'react-native';
-import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
 import {
   ArrowLeft, MapPin, Package, ChefHat, Bike,
   CircleCheck, ShoppingBag, MessageCircle, Phone, UserCircle, Check,
@@ -204,7 +203,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
       </View>
 
       {/* ── Bottom sheet ── */}
-      <Animated.View entering={SlideInDown.duration(380)} style={styles.sheet}>
+      <View style={styles.sheet}>
         <View style={styles.sheetHandle} />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
 
@@ -224,19 +223,19 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
 
           {/* Delivery OTP */}
           {status === 'out_for_delivery' && o?.delivery_otp && (
-            <Animated.View entering={FadeInDown} style={styles.otpCard}>
+            <View style={styles.otpCard}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.otpLabel}>YOUR DELIVERY CODE</Text>
                 <Text style={styles.otpCode}>{o.delivery_otp}</Text>
                 <Text style={styles.otpHint}>Share this with your delivery partner</Text>
               </View>
               <Text style={{ fontSize: 28 }}>🔐</Text>
-            </Animated.View>
+            </View>
           )}
 
           {/* Rider card */}
           {status === 'delivered' && o?.invoice_url ? (
-            <Animated.View entering={FadeInDown} style={[styles.riderCard, styles.riderCardGreen]}>
+            <View style={[styles.riderCard, styles.riderCardGreen]}>
               <View style={[styles.riderAvatar, { backgroundColor: colors.primary }]}>
                 <Check size={22} color="#fff" strokeWidth={3} />
               </View>
@@ -250,10 +249,9 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               >
                 <Text style={{ color: '#fff', fontFamily: fontFamily.extrabold, fontSize: 10 }}>VIEW</Text>
               </TouchableOpacity>
-            </Animated.View>
+            </View>
           ) : (
-            <Animated.View
-              entering={FadeInDown}
+            <View
               style={[
                 styles.riderCard,
                 o?.rider_name && styles.riderCardAssigned,
@@ -277,12 +275,12 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                   <Phone size={17} color="#fff" />
                 </TouchableOpacity>
               )}
-            </Animated.View>
+            </View>
           )}
 
           {/* Delivery address */}
           {o && (
-            <Animated.View entering={FadeInDown.delay(60)} style={styles.section}>
+            <View style={styles.section}>
               <View style={styles.addressCard}>
                 <View style={styles.addressIconBox}>
                   <MapPin size={15} color={colors.accent} />
@@ -299,12 +297,12 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                   )}
                 </View>
               </View>
-            </Animated.View>
+            </View>
           )}
 
           {/* Items */}
           {items.length > 0 && (
-            <Animated.View entering={FadeInDown.delay(90)} style={styles.section}>
+            <View style={styles.section}>
               <Text style={styles.sectionTitle}>Items Ordered</Text>
               {items.map((item: any, i: number) => (
                 <View key={i} style={styles.itemRow}>
@@ -313,12 +311,12 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                   <Text style={styles.itemPrice}>₹{((item.price_paise * item.quantity) / 100).toFixed(0)}</Text>
                 </View>
               ))}
-            </Animated.View>
+            </View>
           )}
 
           {/* Bill */}
           {o && (
-            <Animated.View entering={FadeInDown.delay(120)} style={styles.section}>
+            <View style={styles.section}>
               <View style={styles.billRow}><Text style={styles.billLabel}>Subtotal</Text><Text style={styles.billValue}>₹{subtotal.toFixed(0)}</Text></View>
               {delivery > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Delivery & Surge</Text><Text style={styles.billValue}>₹{delivery.toFixed(0)}</Text></View>}
               {tax > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Taxes (GST)</Text><Text style={styles.billValue}>₹{tax.toFixed(2)}</Text></View>}
@@ -330,12 +328,12 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                 <Text style={styles.totalLabel}>Total</Text>
                 <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
               </View>
-            </Animated.View>
+            </View>
           )}
 
           {/* Cancel */}
           {canCancel && (
-            <Animated.View entering={FadeInDown.delay(140)} style={styles.cancelCard}>
+            <View style={styles.cancelCard}>
               <View>
                 <Text style={styles.cancelTitle}>Cancel Order</Text>
                 <Text style={styles.cancelSub}>Refund to wallet</Text>
@@ -350,11 +348,11 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                   ? <ActivityIndicator size="small" color="#fff" />
                   : <Text style={styles.cancelBtnText}>Cancel</Text>}
               </TouchableOpacity>
-            </Animated.View>
+            </View>
           )}
 
           {/* Help */}
-          <Animated.View entering={FadeInDown.delay(160)} style={styles.helpCard}>
+          <View style={styles.helpCard}>
             <View>
               <Text style={styles.helpTitle}>Need help?</Text>
               <Text style={styles.helpSub}>Support available 24/7</Text>
@@ -367,7 +365,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               <MessageCircle size={14} color={colors.ink} />
               <Text style={styles.helpBtnText}>Contact Us</Text>
             </TouchableOpacity>
-          </Animated.View>
+          </View>
 
           {/* Back to home */}
           <TouchableOpacity
@@ -380,7 +378,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
 
           {isLoading && !o && <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />}
         </ScrollView>
-      </Animated.View>
+      </View>
     </View>
   );
 };
