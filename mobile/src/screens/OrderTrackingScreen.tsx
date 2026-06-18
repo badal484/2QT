@@ -55,6 +55,7 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
   const { data: orderData } = useQuery({
     queryKey: ['order-track', orderId],
     queryFn: () => api.get(`/orders/${orderId}`),
+    refetchInterval: 6000, // poll so rider name + OTP update without needing socket
   });
 
   const o = orderData?.order;
@@ -121,6 +122,11 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
       ? { lat: parseFloat(o.customer_lat), lng: parseFloat(o.customer_lng) }
       : null;
 
+  const kitchenLocation =
+    o?.kitchen_lat && o?.kitchen_lng
+      ? { lat: parseFloat(o.kitchen_lat), lng: parseFloat(o.kitchen_lng) }
+      : null;
+
   return (
     <View style={styles.container}>
       {/* Map */}
@@ -128,6 +134,7 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
         <TrackingLeafletMap
           riderLocation={riderLocation}
           customerLocation={customerLocation}
+          kitchenLocation={kitchenLocation}
           riderHeading={heading}
           initialLat={customerLocation?.lat ?? globalLocation?.latitude ?? 20.5937}
           initialLng={customerLocation?.lng ?? globalLocation?.longitude ?? 78.9629}
@@ -172,6 +179,20 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
           <View style={[styles.progressLine, ['out_for_delivery', 'delivered'].includes(status) && { backgroundColor: '#10B981' }]} />
           <StatusStep title="Delivery" isActive={status === 'out_for_delivery'} isDone={status === 'delivered'} />
         </Animated.View>
+
+        {/* Delivery OTP — shown to customer when rider is on the way */}
+        {status === 'out_for_delivery' && o?.delivery_otp && (
+          <Animated.View entering={FadeInDown} layout={LinearTransition.springify()} style={styles.otpCard}>
+            <View style={styles.otpCardLeft}>
+              <Text style={styles.otpCardLabel}>YOUR DELIVERY CODE</Text>
+              <Text style={styles.otpCardOtp}>{o.delivery_otp}</Text>
+              <Text style={styles.otpCardHint}>Share this with your delivery partner</Text>
+            </View>
+            <View style={styles.otpShield}>
+              <Text style={{ fontSize: 28 }}>🔐</Text>
+            </View>
+          </Animated.View>
+        )}
 
         {status === 'delivered' && o?.invoice_url ? (
           <Animated.View entering={FadeInDown} layout={LinearTransition.springify()} style={[styles.riderCard, { backgroundColor: '#F0FDF4', borderColor: '#D1FAE5' }]}>
@@ -267,6 +288,16 @@ const styles = StyleSheet.create({
 
   cancelBtn: { marginTop: 24, paddingVertical: 16, borderRadius: 20, alignItems: 'center' },
   cancelBtnText: { color: '#EF4444', fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5 },
+  otpCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4', borderRadius: 16, padding: 18, marginBottom: 12,
+    borderWidth: 1.5, borderColor: '#BBF7D0',
+  },
+  otpCardLeft: { flex: 1 },
+  otpCardLabel: { fontSize: 9, fontWeight: '800', color: '#059669', letterSpacing: 1.5, marginBottom: 4 },
+  otpCardOtp: { fontSize: 36, fontWeight: '900', color: '#1A1F1C', letterSpacing: 8 },
+  otpCardHint: { fontSize: 11, color: '#6B7570', marginTop: 4 },
+  otpShield: { paddingLeft: 12 },
 });
 
 export default OrderTrackingScreen;
