@@ -42,8 +42,12 @@ const getGpsCoords = (): Promise<{ latitude: number; longitude: number } | null>
   new Promise((resolve) => {
     Geolocation.getCurrentPosition(
       (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 },
+      () => Geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 },
+      ),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
     );
   });
 
@@ -97,34 +101,51 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
 
   const runServiceabilityCheck = useCallback(
     async (coords: { latitude: number; longitude: number }, addressText?: string) => {
-      try {
-        const res = await api.get(
-          `/menu/zones/check?lat=${coords.latitude}&lng=${coords.longitude}`,
-        );
-        if (res.serviceable && res.zone?.id) {
-          dispatch(
-            setServiceable({
-              zoneId: res.zone.id,
-              zoneName: res.zone.name || null,
-              location: {
+      // Render free tier cold-starts in 30-60s — retry up to 3x with 40s timeout each
+      const MAX_ATTEMPTS = 3;
+      const ATTEMPT_TIMEOUT = 40000;
+      let lastErr: any;
+
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          console.log(`[AppBoot] Zone check attempt ${attempt}/${MAX_ATTEMPTS}`);
+          const res = await api.get(
+            `/menu/zones/check?lat=${coords.latitude}&lng=${coords.longitude}`,
+            { timeout: ATTEMPT_TIMEOUT },
+          );
+          if (res.serviceable && res.zone?.id) {
+            dispatch(
+              setServiceable({
+                zoneId: res.zone.id,
+                zoneName: res.zone.name || null,
+                location: {
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                  addressText: addressText || 'Current Location',
+                },
+              }),
+            );
+          } else {
+            dispatch(
+              setUnserviceable({
                 latitude: coords.latitude,
                 longitude: coords.longitude,
                 addressText: addressText || 'Current Location',
-              },
-            }),
-          );
-        } else {
-          dispatch(
-            setUnserviceable({
-              latitude: coords.latitude,
-              longitude: coords.longitude,
-              addressText: addressText || 'Current Location',
-            }),
-          );
+              }),
+            );
+          }
+          return; // success — exit retry loop
+        } catch (err) {
+          lastErr = err;
+          console.warn(`[AppBoot] Zone check attempt ${attempt} failed:`, err);
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise<void>(r => setTimeout(r, 2000)); // 2s gap between retries
+          }
         }
-      } catch {
-        dispatch(setNetworkError());
       }
+
+      console.warn('[AppBoot] All zone check attempts failed:', lastErr);
+      dispatch(setNetworkError());
     },
     [dispatch],
   );

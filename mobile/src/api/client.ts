@@ -10,6 +10,7 @@ export const APP_VERSION = ENV.APP_VERSION;
 interface RequestOptions {
   method?: string;
   body?: any;
+  timeout?: number;
 }
 
 const request = async (path: string, options: RequestOptions = {}): Promise<any> => {
@@ -50,7 +51,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
 
   console.log(`--- API REQUEST: [${fetchOptions.method}] ${BASE_URL}${path}`);
   
-  const fetchWithTimeout = async (url: string, opts: any, timeout = 6000) => {
+  const fetchWithTimeout = async (url: string, opts: any, timeout = options.timeout ?? 10000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
@@ -137,7 +138,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
 };
 
 export const api = {
-  get: (path: string) => request(path),
+  get: (path: string, opts?: { timeout?: number }) => request(path, { timeout: opts?.timeout }),
   post: (path: string, body?: any) => request(path, { method: 'POST', body }),
   put: (path: string, body?: any) => request(path, { method: 'PUT', body }),
   patch: (path: string, body?: any) => request(path, { method: 'PATCH', body }),
