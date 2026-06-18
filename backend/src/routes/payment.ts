@@ -20,7 +20,7 @@ const razorpay = new Razorpay({
 
 router.post('/create-order', authenticate, paymentLimiter, async (req: AuthRequest, res) => {
     const customerId = req.user!.userId;
-    const { items, addressId, promoCode, useWallet, useLoyalty, isSubscriptionOrder, paymentMethod = 'online', dryRun, instructions, scheduledAt, riderTipPaise } = req.body;
+    const { items, addressId, promoCode, useWallet, useLoyalty, isSubscriptionOrder, paymentMethod = 'online', dryRun, instructions, scheduledAt, riderTipPaise, deliveryContactName, deliveryContactPhone } = req.body;
 
     try {
         const pricing = await calculatePricing({
@@ -94,7 +94,9 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             isSubscriptionOrder,
             paymentMethod,
             instructions,
-            scheduledAt
+            scheduledAt,
+            deliveryContactName: deliveryContactName?.trim() || null,
+            deliveryContactPhone: deliveryContactPhone?.trim() || null,
         });
 
         // 1.5 Deduct loyalty points immediately if used (Wallet is deducted at finalization, but points are simpler to lock here or we can just pass it to pending)

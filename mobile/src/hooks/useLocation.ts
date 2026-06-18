@@ -64,7 +64,7 @@ export const useLocation = () => {
     return 'Current Location';
   };
 
-  const fetchLocation = useCallback(async () => {
+  const fetchLocation = useCallback(async (silent = false) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
     setLoadingLocation(true);
@@ -79,25 +79,33 @@ export const useLocation = () => {
       return;
     }
 
+    const onSuccess = async (position: any) => {
+      const { latitude, longitude } = position.coords;
+      const addressText = await reverseGeocode(latitude, longitude);
+      setLocation({ latitude, longitude, addressText });
+      setLoadingLocation(false);
+      isFetchingRef.current = false;
+    };
+
+    const onError = (error: any) => {
+      console.warn('[useLocation] GPS failed:', error.message);
+      setLocationError(error.message);
+      setLoadingLocation(false);
+      isFetchingRef.current = false;
+      if (!silent) {
+        Alert.alert('Location Error', 'Could not get GPS. Try again or select an address.');
+      }
+    };
+
+    // Try fast network-based location first; retry with GPS if it fails
     Geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        const addressText = await reverseGeocode(latitude, longitude);
-        setLocation({ latitude, longitude, addressText });
-        setLoadingLocation(false);
-        isFetchingRef.current = false;
+      onSuccess,
+      () => {
+        Geolocation.getCurrentPosition(onSuccess, onError, {
+          enableHighAccuracy: true, timeout: 20000, maximumAge: 60000,
+        });
       },
-      (error) => {
-        console.warn('[useLocation] GPS failed:', error.message);
-        setLocationError(error.message);
-        setLoadingLocation(false);
-        isFetchingRef.current = false;
-        Alert.alert(
-          'Location Error',
-          'Could not get your GPS location. Try tapping again or pick an address manually.',
-        );
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
     );
   }, []);
 

@@ -30,8 +30,9 @@ export async function createPendingOrder(data: any) {
                 cgst_paise, sgst_paise, total_amount_paise, gateway_amount_paise,
                 payment_method, payment_status, promo_code_id,
                 is_subscription_order, special_instructions,
-                delivery_location_lat, delivery_location_lng
-            ) VALUES ('ORD-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT) FROM 1 FOR 6)), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20)
+                delivery_location_lat, delivery_location_lng,
+                delivery_contact_name, delivery_contact_phone
+            ) VALUES ('ORD-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT) FROM 1 FOR 6)), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22)
             RETURNING id, display_id
         `, [
             data.customerId, data.kitchenId, data.zoneId, data.addressId,
@@ -45,6 +46,8 @@ export async function createPendingOrder(data: any) {
             data.isSubscriptionOrder || false,
             data.instructions || null,
             deliveryLat, deliveryLng,
+            data.deliveryContactName || null,
+            data.deliveryContactPhone || null,
         ]);
 
         const newOrder = orderRows[0];

@@ -238,7 +238,7 @@ router.post('/:id/feedback', authenticate, async (req: AuthRequest, res) => {
 router.get('/:id/tracking', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { rows } = await query(`
-        SELECT o.status, o.rider_id, o.display_id, 
+        SELECT o.status, o.rider_id, o.display_id, o.delivery_otp,
                k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
                a.address_text as delivery_address, a.lat as delivery_lat, a.lng as delivery_lng
         FROM orders o
@@ -259,6 +259,8 @@ router.get('/:id/tracking', authenticate, async (req: AuthRequest, res) => {
     res.json({
         status: order.status,
         displayId: order.display_id,
+        // Only expose OTP when rider is actually on the way
+        deliveryOtp: order.status === 'out_for_delivery' ? order.delivery_otp : null,
         kitchen: {
             name: order.kitchen_name,
             address: order.kitchen_address,
