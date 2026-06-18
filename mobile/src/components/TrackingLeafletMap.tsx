@@ -123,12 +123,17 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
 
     function kitchenIcon() {
       return L.divIcon({
-        html: '<div style="width:42px;height:42px;background:#1A1F1C;border:2px solid #F97316;border-radius:11px;display:flex;align-items:center;justify-content:center;">'
-          +'<svg width="22" height="22" viewBox="0 0 24 24" fill="none">'
-          +'<path d="M18 2v6c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V2" stroke="#F97316" stroke-width="2" stroke-linecap="round"/>'
-          +'<path d="M12 2v8M2 22h20M6 12v10M18 12v10M12 12v10" stroke="#F97316" stroke-width="2" stroke-linecap="round"/>'
-          +'</svg></div>',
-        className:'', iconSize:[42,42], iconAnchor:[21,42]
+        html: '<svg width="44" height="56" viewBox="0 0 44 56" fill="none" xmlns="http://www.w3.org/2000/svg">'
+          +'<path d="M22 0C9.85 0 0 9.85 0 22C0 38.5 22 56 22 56C22 56 44 38.5 44 22C44 9.85 34.15 0 22 0Z" fill="#F97316"/>'
+          +'<circle cx="22" cy="22" r="14" fill="#C2410C"/>'
+          +'<path d="M15 17C14.5 15.5 15.5 14 15 12.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>'
+          +'<path d="M22 16C21.5 14.5 22.5 13 22 11.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>'
+          +'<path d="M29 17C28.5 15.5 29.5 14 29 12.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>'
+          +'<line x1="10" y1="22" x2="34" y2="22" stroke="white" stroke-width="2.2" stroke-linecap="round"/>'
+          +'<path d="M11 22C11 30.5 33 30.5 33 22" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"/>'
+          +'<line x1="16" y1="32" x2="28" y2="32" stroke="white" stroke-width="2" stroke-linecap="round"/>'
+          +'</svg>',
+        className:'', iconSize:[44,56], iconAnchor:[22,56]
       });
     }
 
