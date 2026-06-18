@@ -100,6 +100,8 @@ router.post('/offline', authenticate, requireRole('rider', 'rider_captain', 'sup
 });
 
 router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+
     const { rows } = await query(`
         SELECT o.*,
                u.name as customer_name,
@@ -133,11 +135,16 @@ router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain',
         LEFT JOIN kitchens k ON o.kitchen_id = k.id
         WHERE o.rider_id = $1 AND o.status NOT IN ('delivered', 'cancelled')
         LIMIT 1
-    `, [req.user!.userId]);
-    
+    `, [riderId]);
+
     if (rows[0]) {
         const { rows: items } = await query('SELECT * FROM order_items WHERE order_id = $1', [rows[0].id]);
         rows[0].items = items;
+        // Keep current_order_id in sync
+        await query('UPDATE users SET current_order_id = $1 WHERE id = $2 AND (current_order_id IS DISTINCT FROM $1)', [rows[0].id, riderId]);
+    } else {
+        // Auto-recover: no active order found — clear any stale current_order_id
+        await query('UPDATE users SET current_order_id = NULL WHERE id = $1 AND current_order_id IS NOT NULL', [riderId]);
     }
 
     res.json({ order: rows[0] || null });
@@ -362,7 +369,7 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
         JOIN users u ON o.customer_id = u.id
         LEFT JOIN addresses a ON o.address_id = a.id
         LEFT JOIN kitchens k ON o.kitchen_id = k.id
-        WHERE o.status IN ('ready_for_pickup', 'confirmed', 'preparing') AND o.rider_id IS NULL
+        WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL
         ORDER BY o.created_at ASC
     `);
     
@@ -406,9 +413,8 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
             if (process.env.NODE_ENV !== 'development' && !rider[0]?.is_verified) throw new Error('RIDER_NOT_VERIFIED');
             if (rider[0]?.current_order_id) throw new Error('RIDER_BUSY');
 
-            // Accept ready_for_pickup, confirmed, and preparing orders
             const { rowCount } = await client.query(
-                'UPDATE orders SET rider_id = $1 WHERE id = $2 AND rider_id IS NULL AND status IN (\'ready_for_pickup\', \'confirmed\', \'preparing\')',
+                "UPDATE orders SET rider_id = $1 WHERE id = $2 AND rider_id IS NULL AND status = 'ready_for_pickup'",
                 [riderId, id]
             );
             if (rowCount === 0) throw new Error('ORDER_UNAVAILABLE');
