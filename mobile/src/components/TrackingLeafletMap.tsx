@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 interface TrackingLeafletMapProps {
   riderLocation?: { lat: number; lng: number } | null;
   customerLocation?: { lat: number; lng: number } | null;
+  kitchenLocation?: { lat: number; lng: number } | null;
   riderHeading?: number;
   initialLat?: number;
   initialLng?: number;
@@ -14,6 +15,7 @@ interface TrackingLeafletMapProps {
 export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
   riderLocation,
   customerLocation,
+  kitchenLocation,
   riderHeading = 0,
   initialLat = 20.5937,
   initialLng = 78.9629,
@@ -21,40 +23,44 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
   style,
 }) => {
   const webviewRef = useRef<WebView>(null);
-  const riderRef = useRef(riderLocation);
-  const headingRef = useRef(riderHeading);
-
-  useEffect(() => { riderRef.current = riderLocation; }, [riderLocation]);
-  useEffect(() => { headingRef.current = riderHeading; }, [riderHeading]);
 
   const inject = (js: string) => {
     webviewRef.current?.injectJavaScript(`(function(){${js}})(); true;`);
   };
 
-  // After WebView loads, apply any rider location that arrived while it was loading
   const handleLoadEnd = () => {
-    if (riderRef.current) {
-      const { lat, lng } = riderRef.current;
-      inject(`window.updateRider && window.updateRider(${lat}, ${lng}, ${headingRef.current});`);
+    if (riderLocation) {
+      inject(`window.updateRider && window.updateRider(${riderLocation.lat},${riderLocation.lng},${riderHeading});`);
     }
+    if (customerLocation) {
+      inject(`window.updateHome && window.updateHome(${customerLocation.lat},${customerLocation.lng});`);
+    }
+    if (kitchenLocation) {
+      inject(`window.updateKitchen && window.updateKitchen(${kitchenLocation.lat},${kitchenLocation.lng});`);
+    }
+    inject(`window.fitAll && window.fitAll();`);
   };
 
-  // Dynamic rider updates via injection
   useEffect(() => {
     if (!riderLocation) return;
-    inject(`window.updateRider && window.updateRider(${riderLocation.lat}, ${riderLocation.lng}, ${riderHeading});`);
+    inject(`window.updateRider && window.updateRider(${riderLocation.lat},${riderLocation.lng},${riderHeading}); window.fitAll && window.fitAll();`);
   }, [riderLocation, riderHeading]);
 
-  // Customer location is baked into HTML (see initScript below) for instant rendering.
-  // If it changes after mount (shouldn't normally happen), inject it.
   useEffect(() => {
     if (!customerLocation) return;
-    inject(`window.updateHome && window.updateHome(${customerLocation.lat}, ${customerLocation.lng});`);
+    inject(`window.updateHome && window.updateHome(${customerLocation.lat},${customerLocation.lng}); window.fitAll && window.fitAll();`);
   }, [customerLocation?.lat, customerLocation?.lng]);
 
-  // Embed customer pin directly into HTML so it shows without any injection delay
-  const initScript = customerLocation
-    ? `window.updateHome(${customerLocation.lat}, ${customerLocation.lng});`
+  useEffect(() => {
+    if (!kitchenLocation) return;
+    inject(`window.updateKitchen && window.updateKitchen(${kitchenLocation.lat},${kitchenLocation.lng}); window.fitAll && window.fitAll();`);
+  }, [kitchenLocation?.lat, kitchenLocation?.lng]);
+
+  const initKitchen = kitchenLocation
+    ? `window.updateKitchen(${kitchenLocation.lat},${kitchenLocation.lng});`
+    : '';
+  const initHome = customerLocation
+    ? `window.updateHome(${customerLocation.lat},${customerLocation.lng});`
     : '';
 
   const html = `<!DOCTYPE html>
@@ -67,55 +73,90 @@ export const TrackingLeafletMap: React.FC<TrackingLeafletMapProps> = ({
     body,html,#map{width:100%;height:100%;margin:0;padding:0;background:#f0ede9;}
     .leaflet-control-attribution,.leaflet-control-zoom{display:none!important;}
     @keyframes pulse{0%{transform:scale(0.5);opacity:0.9;}100%{transform:scale(2.2);opacity:0;}}
-    .pulse{position:absolute;width:70px;height:70px;top:-13px;left:-13px;border-radius:50%;border:2px solid rgba(27,94,70,0.45);animation:pulse 2s ease-out infinite;}
+    .pulse{position:absolute;width:70px;height:70px;top:-13px;left:-13px;border-radius:50%;border:2px solid rgba(16,185,129,0.5);animation:pulse 2s ease-out infinite;}
     .hw{position:relative;display:flex;align-items:center;justify-content:center;}
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
-    var map=L.map('map',{zoomControl:false,attributionControl:false}).setView([${initialLat},${initialLng}],${initialZoom});
+    var map = L.map('map',{zoomControl:false,attributionControl:false}).setView([${initialLat},${initialLng}],${initialZoom});
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',{maxZoom:19,subdomains:'abcd'}).addTo(map);
 
-    var riderM=null,homeM=null,routeLine=null;
+    var riderM = null, homeM = null, kitchenM = null, routeLine = null;
 
-    function riderIcon(hdg){
+    function riderIcon(hdg) {
       return L.divIcon({
-        html:'<div style="transform:rotate('+hdg+'deg);width:44px;height:44px;"><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#1A1F1C" stroke="white" stroke-width="3"/><path d="M22 10 L30 32 L22 26 L14 32 Z" fill="white"/></svg></div>',
-        className:'',iconSize:[44,44],iconAnchor:[22,22]
+        html: '<div style="transform:rotate('+hdg+'deg);width:44px;height:44px;"><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#070F0C" stroke="#10B981" stroke-width="3"/><path d="M22 10 L30 32 L22 26 L14 32 Z" fill="#10B981"/></svg></div>',
+        className:'', iconSize:[44,44], iconAnchor:[22,22]
       });
     }
 
-    function homeIcon(){
+    function homeIcon() {
       return L.divIcon({
-        html:'<div class="hw"><div class="pulse"></div><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#1B5E46" stroke="white" stroke-width="3"/><path d="M22 11C16.5 11 12 15.5 12 21C12 29 22 37 22 37C22 37 32 29 32 21C32 15.5 27.5 11 22 11ZM22 25C19.8 25 18 23.2 18 21C18 18.8 19.8 17 22 17C24.2 17 26 18.8 26 21C26 23.2 24.2 25 22 25Z" fill="white"/></svg></div>',
-        className:'',iconSize:[44,44],iconAnchor:[22,22]
+        html: '<div class="hw"><div class="pulse"></div><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="#10B981" stroke="white" stroke-width="3"/><path d="M22 12 L13 20 L15 20 L15 32 L20 32 L20 26 L24 26 L24 32 L29 32 L29 20 L31 20 Z" fill="white"/></svg></div>',
+        className:'', iconSize:[44,44], iconAnchor:[22,40]
       });
     }
 
-    function refreshRoute(){
-      if(routeLine){map.removeLayer(routeLine);routeLine=null;}
-      if(riderM&&homeM){
-        routeLine=L.polyline([riderM.getLatLng(),homeM.getLatLng()],{color:'#1B5E46',weight:4,opacity:0.7,dashArray:'10,8'}).addTo(map);
+    function kitchenIcon() {
+      return L.divIcon({
+        html: '<div style="width:40px;height:40px;background:#1A1F1C;border:2px solid #F97316;border-radius:10px;display:flex;align-items:center;justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M18 2v6c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V2" stroke="#F97316" stroke-width="2" stroke-linecap="round"/><path d="M12 2v8M2 22h20M6 12v10M18 12v10M12 12v10" stroke="#F97316" stroke-width="2" stroke-linecap="round"/></svg></div>',
+        className:'', iconSize:[40,40], iconAnchor:[20,40]
+      });
+    }
+
+    function refreshRoute() {
+      if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+      if (kitchenM && homeM) {
+        // Static route: kitchen → customer (the full delivery path)
+        routeLine = L.polyline(
+          [kitchenM.getLatLng(), homeM.getLatLng()],
+          {color:'#10B981', weight:4, opacity:0.5, dashArray:'12,8'}
+        ).addTo(map);
+      } else if (riderM && homeM) {
+        // Fallback when kitchen not yet known
+        routeLine = L.polyline(
+          [riderM.getLatLng(), homeM.getLatLng()],
+          {color:'#10B981', weight:4, opacity:0.5, dashArray:'12,8'}
+        ).addTo(map);
       }
     }
 
-    window.updateRider=function(lat,lng,hdg){
-      if(!riderM){riderM=L.marker([lat,lng],{icon:riderIcon(hdg),zIndexOffset:1000}).addTo(map);}
-      else{riderM.setLatLng([lat,lng]);riderM.setIcon(riderIcon(hdg));}
-      map.panTo([lat,lng],{animate:true,duration:1.0});
+    window.fitAll = function() {
+      var pts = [];
+      if (kitchenM) pts.push(kitchenM.getLatLng());
+      if (homeM)    pts.push(homeM.getLatLng());
+      if (riderM)   pts.push(riderM.getLatLng());
+      if (pts.length >= 2) {
+        map.fitBounds(L.latLngBounds(pts), {padding:[48,48], maxZoom:16, animate:true, duration:0.8});
+      } else if (pts.length === 1) {
+        map.setView(pts[0], 15, {animate:true});
+      }
+    };
+
+    window.updateRider = function(lat, lng, hdg) {
+      if (!riderM) { riderM = L.marker([lat,lng],{icon:riderIcon(hdg),zIndexOffset:2000}).addTo(map); }
+      else { riderM.setLatLng([lat,lng]); riderM.setIcon(riderIcon(hdg)); }
       refreshRoute();
     };
 
-    window.updateHome=function(lat,lng){
-      if(!homeM){homeM=L.marker([lat,lng],{icon:homeIcon()}).addTo(map);}
-      else{homeM.setLatLng([lat,lng]);}
-      if(!riderM){map.setView([lat,lng],15);}
+    window.updateHome = function(lat, lng) {
+      if (!homeM) { homeM = L.marker([lat,lng],{icon:homeIcon(),zIndexOffset:1000}).addTo(map); }
+      else { homeM.setLatLng([lat,lng]); }
       refreshRoute();
     };
 
-    // Render initial customer pin without any injection delay
-    ${initScript}
+    window.updateKitchen = function(lat, lng) {
+      if (!kitchenM) { kitchenM = L.marker([lat,lng],{icon:kitchenIcon(),zIndexOffset:900}).addTo(map); }
+      else { kitchenM.setLatLng([lat,lng]); }
+      refreshRoute();
+    };
+
+    // Render static markers immediately
+    ${initKitchen}
+    ${initHome}
+    window.fitAll();
   </script>
 </body>
 </html>`;
