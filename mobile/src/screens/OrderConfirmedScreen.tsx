@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import {
   ArrowLeft, MapPin, Package, ChefHat, Bike,
-  CircleCheck, ShoppingBag, MessageCircle, Phone, UserCircle, Check,
+  CircleCheck, ShoppingBag, MessageCircle, Phone, UserCircle, Check, ShieldCheck,
 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
@@ -229,7 +229,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                 <Text style={styles.otpCode}>{o.delivery_otp}</Text>
                 <Text style={styles.otpHint}>Share this with your delivery partner</Text>
               </View>
-              <Text style={{ fontSize: 28 }}>🔐</Text>
+              <ShieldCheck size={28} color={colors.primary} />
             </View>
           )}
 
