@@ -120,12 +120,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const destinationName = goingToKitchen ? (order.kitchen_name || 'Kitchen') : (order.customer_name || 'Customer');
   const kitchenAddressText = (() => {
     const a = order.kitchen_address;
-    if (!a || !a.includes(' ')) {
-      // Garbage/missing text — show coordinates instead
-      return order.kitchen_lat && order.kitchen_lng
-        ? `${parseFloat(order.kitchen_lat).toFixed(5)}, ${parseFloat(order.kitchen_lng).toFixed(5)}`
-        : 'Kitchen address';
-    }
+    if (!a || !a.includes(' ')) return order.kitchen_name || 'Kitchen';
     return a;
   })();
   const destinationAddress = goingToKitchen
