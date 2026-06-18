@@ -164,7 +164,9 @@ export const initCrons = () => {
             await withTransaction(async (client) => {
                 // Calculate previous week's earnings (Mon-Sun)
                 const { rows: earnings } = await client.query(`
-                    SELECT COALESCE(SUM(total_paise), 0) as total,
+                    SELECT COALESCE(SUM(deliveries_count), 0) as deliveries_count,
+                           COALESCE(SUM(base_earnings_paise), 0) as base,
+                           COALESCE(SUM(bonus_earnings_paise + COALESCE(rain_bonus_paise, 0) + COALESCE(guarantee_topup_paise, 0)), 0) as bonus,
                            COALESCE(SUM(cash_collected_paise), 0) as cash
                     FROM rider_daily_earnings 
                     WHERE rider_id = $1 
@@ -172,18 +174,20 @@ export const initCrons = () => {
                     AND date < CURRENT_DATE
                 `, [rider.id]);
 
-                const gross = parseInt(earnings[0].total);
-                const cash = parseInt(earnings[0].cash);
-                const net = Math.max(0, gross - cash);
+                const base = parseInt(earnings[0].base);
+                const bonus = parseInt(earnings[0].bonus);
+                const deductions = parseInt(earnings[0].cash);
+                const deliveries = parseInt(earnings[0].deliveries_count);
+                const net = Math.max(0, base + bonus - deductions);
 
                 if (net > 0) {
                     await client.query(`
                         INSERT INTO weekly_payouts (
                             rider_id, week_start, week_end, 
-                            gross_earnings_paise, cash_collected_paise, net_amount_paise, 
-                            status
-                        ) VALUES ($1, CURRENT_DATE - INTERVAL '7 days', CURRENT_DATE - INTERVAL '1 day', $2, $3, $4, 'pending')
-                    `, [rider.id, gross, cash, net]);
+                            base_amount_paise, bonus_amount_paise, deductions_paise, total_deliveries,
+                            net_amount_paise, status
+                        ) VALUES ($1, CURRENT_DATE - INTERVAL '7 days', CURRENT_DATE - INTERVAL '1 day', $2, $3, $4, $5, $6, 'pending')
+                    `, [rider.id, base, bonus, deductions, deliveries, net]);
                 }
             });
         }

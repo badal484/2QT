@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video from 'react-native-video';
 import { useSelector } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
-import api from '../api/client';
+import { api } from '../api/client';
 import { RootState } from '../store';
 
 const { width, height } = Dimensions.get('window');
@@ -46,7 +46,7 @@ const LiveKitchenScreen = ({ navigation }: any) => {
       pure_veg_audited: 'Audited'
   };
 
-  const [activeStoryVideo, setActiveStoryVideo] = useState<string | null>(null);
+  const [activeStoryVideo, setActiveStoryVideo] = useState<any>(null);
 
   const pulseAnim = useSharedValue(0.2);
   useEffect(() => {
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
 
   // Full Screen Story Viewer
   storyViewerContainer: { flex: 1, backgroundColor: '#000000' },
-  storyViewerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'transparent' },
+  storyViewerOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'transparent' },
   storyProgressBar: { marginHorizontal: 16, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, overflow: 'hidden' },
   storyProgressFill: { width: '70%', height: '100%', backgroundColor: '#FFFFFF' },
   storyCloseButton: { position: 'absolute', top: 50, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },

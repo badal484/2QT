@@ -3,7 +3,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 import RiderHomeScreen from '../screens/RiderHomeScreen';
 import AssignedOrderScreen from '../screens/AssignedOrderScreen';
 import DeliveryOTPScreen from '../screens/DeliveryOTPScreen';
-import RiderOnboardingScreen from '../screens/RiderOnboardingScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PayoutsScreen from '../screens/PayoutsScreen';
 import EarningsScreen from '../screens/EarningsScreen';
@@ -20,12 +19,9 @@ const RiderNavigator = () => {
   const isVerified = user?.is_verified ?? false;
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} detachInactiveScreens={false}>
       {!onboardingComplete ? (
-        <>
-          <Stack.Screen name="RiderOnboarding" component={RiderOnboardingScreen} />
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        </>
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       ) : !isVerified ? (
         <Stack.Screen name="VerificationPending" component={VerificationPendingScreen} />
       ) : (

@@ -38,7 +38,7 @@ const KitchenLoginScreen = () => {
           zoneId: null
         },
         accessToken: response.accessToken,
-        refreshToken: response.accessToken
+        refreshToken: response.refreshToken
       }));
     } catch (err: any) {
       Alert.alert('Access Denied', err?.response?.data?.error || 'Invalid PIN code');

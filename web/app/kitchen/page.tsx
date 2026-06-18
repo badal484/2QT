@@ -81,41 +81,7 @@ export default function KitchenPage() {
   const fetchOrders = useCallback(async () => {
     try {
       const data = await api.get("/kitchen/orders");
-      // Add a mock order if empty for demo purposes
-      if (!data.orders || data.orders.length === 0) {
-        const savedMock = typeof window !== 'undefined' ? localStorage.getItem("mock_kitchen_orders") : null;
-        if (savedMock) {
-          setOrders(JSON.parse(savedMock));
-        } else {
-          const initialMock: Order[] = [
-            {
-              id: "mock-k1",
-              display_id: "K-104",
-              status: "confirmed",
-              customer_name: "Arjun Reddy",
-              items: [
-                { name: "Premium Butter Naan", quantity: 3, price_paise: 13500, station: "Tandoor" },
-                { name: "Paneer Butter Masala", quantity: 1, price_paise: 28000, station: "Curry" }
-              ],
-              created_at: new Date(Date.now() - 4 * 60000).toISOString() // 4 mins ago
-            },
-            {
-              id: "mock-k2",
-              display_id: "K-105",
-              status: "preparing",
-              customer_name: "Priya Sharma",
-              items: [
-                { name: "Mediterranean Quinoa Bowl", quantity: 1, price_paise: 25000, station: "Salad" }
-              ],
-              created_at: new Date(Date.now() - 12 * 60000).toISOString() // 12 mins ago
-            }
-          ];
-          setOrders(initialMock);
-          if (typeof window !== 'undefined') localStorage.setItem("mock_kitchen_orders", JSON.stringify(initialMock));
-        }
-      } else {
-        setOrders(data.orders);
-      }
+      setOrders(data.orders || []);
       setError(null);
     } catch (err: any) {
       setError("Could not reach kitchen server.");
@@ -155,20 +121,10 @@ export default function KitchenPage() {
     setUpdatingId(orderId);
     try {
       await api.patch(`/kitchen/orders/${orderId}/status`, { status });
-      setOrders(prev => {
-        const next = prev.map(o => (o.id === orderId ? { ...o, status: status as Order["status"] } : o));
-        if (typeof window !== 'undefined') localStorage.setItem("mock_kitchen_orders", JSON.stringify(next));
-        return next;
-      });
+      setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, status: status as Order["status"] } : o)));
       toast.success(`Order updated`);
     } catch (err) {
-      // Offline fallback
-      setOrders(prev => {
-        const next = prev.map(o => (o.id === orderId ? { ...o, status: status as Order["status"] } : o));
-        if (typeof window !== 'undefined') localStorage.setItem("mock_kitchen_orders", JSON.stringify(next));
-        return next;
-      });
-      toast.success(`Order updated (Offline Mode)`);
+      toast.error(`Failed to update order`);
     } finally {
       setUpdatingId(null);
     }

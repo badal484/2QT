@@ -286,6 +286,12 @@ router.post('/verify-otp', async (req, res) => {
         [user.id, tokenHash]
     );
 
+    let kitchenName: string | null = null;
+    if (user.kitchen_id) {
+        const { rows: kRows } = await query('SELECT name FROM kitchens WHERE id = $1', [user.kitchen_id]);
+        if (kRows[0]) kitchenName = kRows[0].name;
+    }
+
     res.json({
         user: {
             id: user.id,
@@ -293,6 +299,7 @@ router.post('/verify-otp', async (req, res) => {
             phone: user.phone,
             role: user.role,
             kitchenId: user.kitchen_id ?? null,
+            kitchenName: kitchenName,
             zoneId: user.zone_id ?? null,
             termsAccepted: !!user.terms_accepted_at,
             onboarding_complete: user.onboarding_complete,

@@ -176,7 +176,11 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'super_admi
 router.get('/inventory', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
-    const { rows } = await query('SELECT * FROM ingredients WHERE kitchen_id = $1 ORDER BY name', [kitchenId]);
+    const { rows } = await query(
+        `SELECT id, kitchen_id, name, unit, current_stock_grams AS current_stock, reorder_threshold_grams AS reorder_threshold, last_restocked_at, created_at
+         FROM ingredients WHERE kitchen_id = $1 ORDER BY name`,
+        [kitchenId]
+    );
     res.json({ inventory: rows });
 });
 
@@ -232,6 +236,18 @@ router.post('/prep-list/:id/toggle', authenticate, requireRole('chef', 'super_ad
     const { id } = req.params;
     await query('UPDATE prep_tasks SET completed = NOT completed, completed_at = CASE WHEN NOT completed THEN NOW() ELSE NULL END WHERE id = $1', [id]);
     res.json({ success: true });
+});
+
+router.post('/prep-list', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { title, category } = req.body;
+    if (!title) return res.status(400).json({ error: 'TITLE_REQUIRED' });
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+    const { rows } = await query(
+        'INSERT INTO prep_tasks (kitchen_id, title, category) VALUES ($1, $2, $3) RETURNING *',
+        [kitchenId, title, category || 'General']
+    );
+    res.json({ task: rows[0] });
 });
 
 router.get('/feedback', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {

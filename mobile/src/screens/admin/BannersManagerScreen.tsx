@@ -4,7 +4,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Plus, Trash2, Image as ImageIcon } from 'lucide-react-native';
 import { api } from '../../api/client';
+import { ENV } from '../../config/env';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { store } from '../../store';
 
 const BannersManagerScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
@@ -65,8 +67,15 @@ const BannersManagerScreen = ({ navigation }: any) => {
     } as any);
 
     try {
-      const response = await api.post('/menu/upload', formData);
-      setNewBanner({ ...newBanner, image_url: response.url });
+      const token = store.getState().auth.accessToken;
+      const response = await fetch(`${ENV.API_URL}/upload/image`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.message || json.error || 'Upload failed');
+      setNewBanner({ ...newBanner, image_url: json.url });
     } catch (err: any) {
       Alert.alert('Upload Failed', err.message);
     } finally {

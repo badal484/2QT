@@ -5,17 +5,19 @@ import { reduxStorage } from './storage';
 import authReducer from './slices/authSlice';
 import cartReducer from './slices/cartSlice';
 import ordersReducer from './slices/ordersSlice';
+import appReducer from './slices/appSlice';
 
 const persistConfig = {
   key: 'root',
   storage: reduxStorage,
-  whitelist: ['auth', 'cart'], // Only persist auth and cart
+  whitelist: ['auth', 'cart'], // Never persist app state — zone must always be freshly detected on launch
 };
 
 const rootReducer = combineReducers({
   auth: authReducer,
   cart: cartReducer,
   orders: ordersReducer,
+  app: appReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

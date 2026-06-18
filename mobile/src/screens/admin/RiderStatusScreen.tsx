@@ -14,7 +14,7 @@ import {
   X,
   Zap
 } from 'lucide-react-native';
-import MapView, { Marker as MapMarker } from 'react-native-maps';
+import MapView, { Marker as MapMarker, UrlTile } from 'react-native-maps';
 
 const RiderStatusScreen = ({ navigation }: any) => {
   const [trackingRider, setTrackingRider] = useState<any>(null);
@@ -147,6 +147,7 @@ const RiderStatusScreen = ({ navigation }: any) => {
 
            <MapView
              style={styles.map}
+             mapType="none"
              initialRegion={{
                latitude: trackingRider?.location?.lat || 20.5937,
                longitude: trackingRider?.location?.lng || 78.9629,
@@ -154,6 +155,11 @@ const RiderStatusScreen = ({ navigation }: any) => {
                longitudeDelta: trackingRider ? 0.01 : 15.0,
              }}
            >
+             <UrlTile
+               urlTemplate="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+               maximumZ={19}
+               zIndex={100}
+             />
              {trackingRider?.location && (
                <MapMarker
                  coordinate={{

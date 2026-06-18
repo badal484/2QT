@@ -48,7 +48,9 @@ const MinimalListItem = ({ icon, title, value, onPress, subtitle, color = "#1A1A
       </View>
     </View>
     <View style={styles.minimalListRight}>
-      {value && <Text style={styles.minimalListValue}>{value}</Text>}
+      {value !== undefined && value !== null && value !== '' && (
+        <Text style={styles.minimalListValue}>{value}</Text>
+      )}
       <ChevronRight size={18} color="#D1D5DB" />
     </View>
   </TouchableOpacity>

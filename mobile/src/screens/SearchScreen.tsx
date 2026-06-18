@@ -8,9 +8,7 @@ import { api } from '../api/client';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { addItem, setQuantity } from '../store/slices/cartSlice';
-import { createMMKV } from 'react-native-mmkv';
-
-const storage = createMMKV();
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SearchScreen = ({ navigation }: any) => {
   const [query, setQuery] = useState('');
@@ -31,21 +29,26 @@ const SearchScreen = ({ navigation }: any) => {
   const [recentSearches, setRecentSearches] = React.useState<string[]>([]);
 
   React.useEffect(() => {
-    const stored = storage.getString('recent_searches');
-    if (stored) {
+    const loadSearches = async () => {
       try {
-        setRecentSearches(JSON.parse(stored));
+        const stored = await AsyncStorage.getItem('recent_searches');
+        if (stored) {
+          setRecentSearches(JSON.parse(stored));
+        }
       } catch (e) {}
-    }
+    };
+    loadSearches();
   }, []);
 
-  const saveSearch = (term: string) => {
+  const saveSearch = async (term: string) => {
     if (!term || term.trim().length < 3) return;
     const termClean = term.trim().toLowerCase();
     const current = recentSearches.filter(s => s.toLowerCase() !== termClean);
     const updated = [termClean, ...current].slice(0, 5);
     setRecentSearches(updated);
-    storage.set('recent_searches', JSON.stringify(updated));
+    try {
+      await AsyncStorage.setItem('recent_searches', JSON.stringify(updated));
+    } catch(e) {}
   };
 
   return (

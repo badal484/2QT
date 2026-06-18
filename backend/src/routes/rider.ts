@@ -201,25 +201,56 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         return res.json({ success: true });
     }
 
-    const { rows: orders } = await query('SELECT * FROM orders WHERE id = $1 AND rider_id = $2', [orderId, riderId]);
+    const { rows: orders } = await query(`
+        SELECT o.*, 
+               k.lat as kitchen_lat, k.lng as kitchen_lng, 
+               a.lat as address_lat, a.lng as address_lng
+        FROM orders o
+        JOIN kitchens k ON o.kitchen_id = k.id
+        LEFT JOIN addresses a ON o.address_id = a.id
+        WHERE o.id = $1 AND o.rider_id = $2
+    `, [orderId, riderId]);
     const order = orders[0];
 
     if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+    if (order.status === 'delivered') {
+        return res.status(400).json({ error: 'ALREADY_DELIVERED', message: 'Order has already been delivered.' });
+    }
     const isDevTestOtp = process.env.NODE_ENV === 'development' && otp === DEV_TEST_DELIVERY_OTP;
     if (order.delivery_otp !== otp && !isDevTestOtp) return res.status(400).json({ error: 'INVALID_OTP' });
 
     console.log("[VERIFY-OTP] Starting transaction...");
     await withTransaction(async (client) => {
         console.log("[VERIFY-OTP] Transaction started. Updating orders...");
-        await client.query('UPDATE orders SET status = \'delivered\', delivered_at = NOW() WHERE id = $1', [orderId]);
+        const updateRes = await client.query('UPDATE orders SET status = \'delivered\', delivered_at = NOW() WHERE id = $1 AND status = \'out_for_delivery\'', [orderId]);
+        if (updateRes.rowCount === 0) {
+            throw new Error('ALREADY_DELIVERED');
+        }
         await client.query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
         
         const isCOD = order.payment_method === 'cod';
         const cashToRecord = isCOD ? order.total_amount_paise : 0;
 
         // Systematic Financial Split
+        const kLat = parseFloat(order.kitchen_lat);
+        const kLng = parseFloat(order.kitchen_lng);
+        const cLat = parseFloat(order.delivery_location_lat || order.address_lat);
+        const cLng = parseFloat(order.delivery_location_lng || order.address_lng);
+
+        let distanceKm = 0;
+        if (!isNaN(kLat) && !isNaN(kLng) && !isNaN(cLat) && !isNaN(cLng)) {
+            const R = 6371;
+            const dLat = (cLat - kLat) * (Math.PI / 180);
+            const dLng = (cLng - kLng) * (Math.PI / 180);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(kLat * (Math.PI / 180)) * Math.cos(cLat * (Math.PI / 180)) *
+                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            distanceKm = R * c;
+        }
+
         const basePay = TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
-        const distanceBonus = 1000; // Rs. 10 (Systematic calculation would go here)
+        const distanceBonus = distanceKm > 2 ? Math.floor((distanceKm - 2) * 500) : 0; // Rs. 5 per extra km
         const platformFee = Math.floor(basePay * 0.1); // 10% 2QT Commission
         const netEarnings = basePay + distanceBonus - platformFee;
 
@@ -243,7 +274,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     });
 
     // Notify Rider of net earnings update
-    emitToUser(riderId, 'earnings_updated', { earningsPaise: TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE + 1000 - Math.floor(TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE * 0.1) });
+    emitToUser(riderId, 'earnings_updated', { earningsPaise: TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE });
 
     emitToUser(order.customer_id, 'order_status_update', { orderId, status: 'delivered' });
     emitToOrder(orderId, 'order_status_update', { orderId, status: 'delivered' });
@@ -369,8 +400,8 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
 
     try {
         await withTransaction(async (client) => {
-            // 1. Check if rider is verified and already busy
-            const { rows: rider } = await client.query('SELECT current_order_id, is_verified FROM users WHERE id = $1', [riderId]);
+            // 1. Check if rider is verified and already busy (with FOR UPDATE lock to prevent claim race conditions)
+            const { rows: rider } = await client.query('SELECT current_order_id, is_verified FROM users WHERE id = $1 FOR UPDATE', [riderId]);
             // In dev, skip verification check
             if (process.env.NODE_ENV !== 'development' && !rider[0]?.is_verified) throw new Error('RIDER_NOT_VERIFIED');
             if (rider[0]?.current_order_id) throw new Error('RIDER_BUSY');
@@ -406,7 +437,7 @@ router.post('/orders/:id/unclaim', authenticate, requireRole('rider', 'rider_cap
         await withTransaction(async (client) => {
             // 1. Verify rider actually owns this order
             const { rowCount } = await client.query(
-                'UPDATE orders SET rider_id = NULL WHERE id = $1 AND rider_id = $2 AND status IN (\'ready_for_pickup\', \'confirmed\', \'at_kitchen\')',
+                'UPDATE orders SET rider_id = NULL WHERE id = $1 AND rider_id = $2 AND status IN (\'ready_for_pickup\', \'confirmed\', \'preparing\', \'at_kitchen\', \'ready\')',
                 [id, riderId]
             );
             
@@ -432,31 +463,47 @@ router.get('/', authenticate, requireRole('rider', 'rider_captain', 'super_admin
 
 router.post('/payouts/request', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
-    const { amountPaise } = req.body;
+    const { amountPaise, upiId } = req.body;
 
     if (!amountPaise || amountPaise < 10000) { // Min Rs. 100
         return res.status(400).json({ error: 'INVALID_AMOUNT' });
     }
 
-    // Check balance
-    const { rows: earningsRes } = await query('SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]);
-    const { rows: paidRes } = await query('SELECT COALESCE(SUM(net_amount_paise), 0) as paid FROM weekly_payouts WHERE rider_id = $1 AND status = \'paid\'', [riderId]);
-    const { rows: pendingRes } = await query('SELECT COALESCE(SUM(net_amount_paise), 0) as pending FROM weekly_payouts WHERE rider_id = $1 AND status = \'pending\'', [riderId]);
-    
-    const available = parseInt(earningsRes[0].total) - parseInt(paidRes[0].paid) - parseInt(pendingRes[0].pending);
+    try {
+        await withTransaction(async (client) => {
+            // Lock the rider user row to prevent race conditions (double withdrawal requests)
+            await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [riderId]);
 
-    if (amountPaise > available) {
-        return res.status(400).json({ error: 'INSUFFICIENT_BALANCE' });
+            // Check balance using the transaction client
+            const { rows: earningsRes } = await client.query('SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]);
+            const { rows: paidRes } = await client.query('SELECT COALESCE(SUM(net_amount_paise), 0) as paid FROM weekly_payouts WHERE rider_id = $1 AND status = \'paid\'', [riderId]);
+            const { rows: pendingRes } = await client.query('SELECT COALESCE(SUM(net_amount_paise), 0) as pending FROM weekly_payouts WHERE rider_id = $1 AND status = \'pending\'', [riderId]);
+            
+            const available = parseInt(earningsRes[0].total) - parseInt(paidRes[0].paid) - parseInt(pendingRes[0].pending);
+
+            if (amountPaise > available) {
+                throw new Error('INSUFFICIENT_BALANCE');
+            }
+
+            await client.query(`
+                INSERT INTO weekly_payouts (rider_id, week_start, week_end, net_amount_paise, status, upi_id)
+                VALUES ($1, CURRENT_DATE, CURRENT_DATE, $2, 'pending', $3)
+            `, [riderId, amountPaise, upiId || null]);
+        });
+
+        emitToUser(riderId, 'earnings_updated', { pendingAmountPaise: amountPaise });
+        res.json({ success: true });
+    } catch (err: any) {
+        let errorType = 'SERVER_ERROR';
+        let errorMessage = err.message;
+        if (err.message === 'INSUFFICIENT_BALANCE') {
+            errorType = 'INSUFFICIENT_BALANCE';
+        } else if (err.code === '23505') {
+            errorType = 'ALREADY_REQUESTED_TODAY';
+            errorMessage = 'You can only request one instant settlement per day.';
+        }
+        res.status(400).json({ error: errorType, message: errorMessage });
     }
-
-    await query(`
-        INSERT INTO weekly_payouts (rider_id, week_start, week_end, gross_earnings_paise, net_amount_paise, status)
-        VALUES ($1, CURRENT_DATE, CURRENT_DATE, $2, $2, 'pending')
-    `, [riderId, amountPaise]);
-
-    emitToUser(riderId, 'earnings_updated', { pendingAmountPaise: amountPaise });
-    
-    res.json({ success: true });
 });
 
 export default router;

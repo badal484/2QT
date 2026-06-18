@@ -26,9 +26,14 @@ const CreateBatchScreen = ({ navigation }: any) => {
       Alert.alert('Validation', 'Please enter an item name');
       return;
     }
+    const qty = parseInt(targetQuantity, 10);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      Alert.alert('Validation', 'Please enter a valid target quantity');
+      return;
+    }
     createMutation.mutate({
       item_name: itemName,
-      target_quantity: parseInt(targetQuantity, 10),
+      target_quantity: qty,
     });
   };
 

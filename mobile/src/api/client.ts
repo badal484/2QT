@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 // Removed top-level store import to break circular dependency
 import { setAccessToken, logout } from '../store/slices/authSlice';
 
@@ -33,6 +32,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
   const headers: any = {
     'Content-Type': 'application/json',
     'X-App-Version': APP_VERSION,
+    'Bypass-Tunnel-Reminder': 'true',
   };
 
   if (token) {
@@ -50,7 +50,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
 
   console.log(`--- API REQUEST: [${fetchOptions.method}] ${BASE_URL}${path}`);
   
-  const fetchWithTimeout = async (url: string, opts: any, timeout = 10000) => {
+  const fetchWithTimeout = async (url: string, opts: any, timeout = 6000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
@@ -64,11 +64,10 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
   };
 
   // SYSTEMATIC INTEGRATION: Exponential Backoff Retry Engine
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 1;
   const delay = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
-  
+
   let response;
-  let lastError;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -77,11 +76,10 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
         console.log(`--- SYSTEMATIC RETRY [Attempt ${attempt}]: Waiting ${waitTime}ms for ${path}`);
         await delay(waitTime);
       }
-      
+
       response = await fetchWithTimeout(`${BASE_URL}${path}`, fetchOptions);
       break; // Success!
     } catch (err) {
-      lastError = err;
       if (attempt === MAX_RETRIES) {
         console.warn('--- SYSTEMATIC NETWORK FAILURE: Max retries reached ---', err);
         throw err;
@@ -132,7 +130,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
   }
 
   if (!response.ok) {
-    throw new Error(data.error || 'UNKNOWN_ERROR');
+    throw new Error(data.message || data.error || 'UNKNOWN_ERROR');
   }
 
   return data;

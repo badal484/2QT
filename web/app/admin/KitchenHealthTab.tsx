@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ShieldCheck, Thermometer, Droplets, Utensils, RefreshCw, Save } from "lucide-react";
 
@@ -12,7 +12,7 @@ export function KitchenHealthTab() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get("/admin/zones").then(data => {
+    api.get("/admin/zones").then((data: any) => {
       setZones(data.zones || []);
       if (data.zones?.length > 0) setSelectedZone(data.zones[0].id);
     });
@@ -21,7 +21,7 @@ export function KitchenHealthTab() {
   useEffect(() => {
     if (!selectedZone) return;
     setLoading(true);
-    api.get(`/admin/zones/${selectedZone}/metrics`).then(data => {
+    api.get(`/admin/zones/${selectedZone}/metrics`).then((data: any) => {
       setMetrics(data.metrics || {
         fssai_status: 'FSSAI Certified',
         fssai_valid_till: 'Valid \'27',

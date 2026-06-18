@@ -6,8 +6,9 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/slices/authSlice';
+import { RootState } from '../store';
 import { ChefHat, LogOut, ClipboardCheck, Zap, Clock } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
 
@@ -55,6 +56,7 @@ function LiveClock() {
 const KitchenBoardScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
     const socket = getSocket();
@@ -121,6 +123,9 @@ const KitchenBoardScreen = ({ navigation }: any) => {
               <Text style={styles.liveLabel}>{paused ? 'PAUSED' : 'LIVE'}</Text>
             </View>
             <LiveClock />
+            {user?.kitchenName ? (
+              <Text style={styles.kitchenName}>{user.kitchenName}</Text>
+            ) : null}
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
@@ -345,6 +350,7 @@ const styles = StyleSheet.create({
   },
   liveLabel: { color: G.muted, fontSize: 9, fontWeight: '900', letterSpacing: 3 },
   clock: { color: G.white, fontSize: 36, fontWeight: '900', letterSpacing: -1 },
+  kitchenName: { color: G.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginTop: 3, textTransform: 'uppercase' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pill: {
     paddingHorizontal: 16, height: 40, borderRadius: 12, borderWidth: 1,

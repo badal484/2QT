@@ -72,7 +72,7 @@ const MainAdminStack = () => (
 
 const AdminNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} detachInactiveScreens={false}>
       <Stack.Screen name="MainAdmin" component={MainAdminStack} />
       <Stack.Screen name="Broadcast" component={BroadcastScreen} />
       <Stack.Screen name="MenuManager" component={MenuManagerScreen} />

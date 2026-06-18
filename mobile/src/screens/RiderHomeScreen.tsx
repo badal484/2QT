@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Switch, StatusBar, ActivityIndicator, Alert, ScrollView, StyleSheet } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { LeafletMap } from '../components/LeafletMap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -148,29 +148,32 @@ const RiderHomeScreen = ({ navigation }: any) => {
   }, [isOnline, user?.online_since]);
 
   useEffect(() => {
-    let watchId: number;
-    if (isOnline) {
-      Geolocation.getCurrentPosition(
-        pos => setCurrentLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        err => console.log('Location err', err),
-        { enableHighAccuracy: true }
-      );
-      watchId = Geolocation.watchPosition(
-        pos => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setCurrentLocation({ latitude: lat, longitude: lng });
-          
-          // Emit to backend socket so Admin and Customer can track
+    // 1. Initial Position Lookup on Mount
+    Geolocation.getCurrentPosition(
+      pos => setCurrentLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      err => console.log('Initial location lookup err', err),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+
+    // 2. Active Continuous Watching
+    const watchId = Geolocation.watchPosition(
+      pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setCurrentLocation({ latitude: lat, longitude: lng });
+        
+        // Emit location via socket only if online
+        if (isOnline) {
           const socket = getSocket();
           if (socket) {
              socket.emit('update_location', { lat, lng });
           }
-        },
-        error => console.log('WatchPosition Error', error),
-        { enableHighAccuracy: true, distanceFilter: 10, interval: 5000, fastestInterval: 2000 }
-      );
-    }
+        }
+      },
+      error => console.log('Continuous WatchPosition Error', error),
+      { enableHighAccuracy: true, distanceFilter: 10, interval: 5000, fastestInterval: 2000 }
+    );
+
     return () => {
       if (watchId !== undefined) Geolocation.clearWatch(watchId);
     };
@@ -185,38 +188,45 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Map Layer */}
       <View style={styles.mapContainer}>
-        <MapView
-          provider={PROVIDER_GOOGLE}
+        <LeafletMap
+          latitude={currentLocation.latitude || 20.5937}
+          longitude={currentLocation.longitude || 78.9629}
+          zoom={15}
+          markers={[
+            ...(currentLocation.latitude && currentLocation.longitude ? [{
+              id: 'rider',
+              lat: currentLocation.latitude,
+              lng: currentLocation.longitude,
+              iconUrl: 'https://cdn-icons-png.flaticon.com/512/3198/3198336.png',
+            }] : []),
+            ...(activeOrder ? (() => {
+              const isOut = activeOrder.status === 'out_for_delivery';
+              const targetLat = isOut 
+                ? parseFloat(activeOrder.customer_lat || activeOrder.lat || '0') 
+                : parseFloat(activeOrder.kitchen_lat || '0');
+              const targetLng = isOut 
+                ? parseFloat(activeOrder.customer_lng || activeOrder.lng || '0') 
+                : parseFloat(activeOrder.kitchen_lng || '0');
+              
+              if (targetLat && targetLng) {
+                return [{
+                  id: 'destination',
+                  lat: targetLat,
+                  lng: targetLng,
+                  iconUrl: isOut
+                    ? 'https://cdn-icons-png.flaticon.com/512/619/619034.png' // Customer House
+                    : 'https://cdn-icons-png.flaticon.com/512/3448/3448609.png', // Kitchen Store
+                }];
+              }
+              return [];
+            })() : []),
+          ]}
           style={styles.map}
-          region={{
-            latitude: currentLocation.latitude || 20.5937,
-            longitude: currentLocation.longitude || 78.9629,
-            latitudeDelta: currentLocation.latitude ? 0.01 : 15.0,
-            longitudeDelta: currentLocation.longitude ? 0.01 : 15.0,
-          }}
-          customMapStyle={mapStyle}
-        >
-          <Marker coordinate={currentLocation}>
-            <View style={styles.riderMarkerContainer}>
-              <View style={styles.riderMarkerCircle}>
-                <Bike size={24} color="white" strokeWidth={2.5} />
-              </View>
-              <View style={styles.riderMarkerDot} />
-            </View>
-          </Marker>
-          
-          {activeOrder && activeOrder.kitchen_lat && activeOrder.kitchen_lng && (
-             <Marker coordinate={{ latitude: parseFloat(activeOrder.kitchen_lat), longitude: parseFloat(activeOrder.kitchen_lng) }}>
-                <View style={styles.kitchenMarker}>
-                    <ChefHat size={20} color="white" />
-                </View>
-             </Marker>
-          )}
-        </MapView>
+        />
         
         {/* Floating Header */}
         <View style={styles.floatingHeader}>
@@ -227,15 +237,15 @@ const RiderHomeScreen = ({ navigation }: any) => {
                 style={styles.logoutBtn}
                 onPress={handleLogout}
               >
-                <LogOut size={22} color="#1A1A2E" />
+                <LogOut size={22} color="#FF6B35" />
               </TouchableOpacity>
 
               <View style={styles.statusCard}>
                 <View style={styles.statusInfoRow}>
-                  <View style={[styles.statusIndicator, { backgroundColor: isOnline ? '#22C55E' : '#D1D5DB' }]} />
+                  <View style={[styles.statusIndicator, { backgroundColor: isOnline ? '#22C55E' : '#64748B' }]} />
                   <View>
                     <Text style={styles.statusLabel}>Status</Text>
-                    <Text style={[styles.statusValue, { color: isOnline ? '#1A1A2E' : '#9CA3AF' }]}>
+                    <Text style={[styles.statusValue, { color: isOnline ? '#22C55E' : '#64748B' }]}>
                       {isOnline ? 'ON DUTY' : 'OFF DUTY'}
                     </Text>
                   </View>
@@ -243,7 +253,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
                 <Switch 
                   value={isOnline}
                   onValueChange={(val) => toggleOnlineMutation.mutate(val)}
-                  trackColor={{ false: '#F3F4F6', true: '#FF6B35' }}
+                  trackColor={{ false: '#2C2D42', true: '#FF6B35' }}
                   thumbColor="white"
                 />
               </View>
@@ -253,7 +263,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
                 style={styles.payoutBtn}
                 onPress={() => navigation.navigate('Payouts')}
               >
-                <Landmark size={22} color="#1A1A2E" />
+                <Landmark size={22} color="#FFFFFF" />
                 {activeOrder && <View style={styles.activeOrderDot} />}
               </TouchableOpacity>
             </View>
@@ -301,7 +311,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
         ) : (
           <View style={styles.poolSection}>
              {isOnline && pool.length > 0 && (
-               <View style={styles.missionsPool}>
+                <View style={styles.missionsPool}>
                   <View style={styles.poolHeaderRow}>
                     <Text style={styles.poolHeaderTitle}>Available Missions</Text>
                     <View style={styles.poolBadge}>
@@ -325,41 +335,72 @@ const RiderHomeScreen = ({ navigation }: any) => {
                         <Text style={styles.poolCardAddress} numberOfLines={1}>{mission.delivery_address || 'Central Kitchen'}</Text>
                       </View>
                       <View style={styles.poolCardArrow}>
-                        <ChevronRight size={20} color="#1A1A2E" />
+                        <ChevronRight size={20} color="#FFFFFF" />
                       </View>
                     </TouchableOpacity>
                   ))}
-               </View>
+                </View>
              )}
 
-             <View style={styles.statsRow}>
+              {/* Daily Target Progress Meter */}
+              {isOnline && (
+                <View style={styles.targetContainer}>
+                  <View style={styles.targetHeader}>
+                    <Text style={styles.targetTitle}>Daily Mission Target</Text>
+                    <Text style={styles.targetRatio}>
+                      {earnings?.deliveriesCount || 0} / 10 Completed
+                    </Text>
+                  </View>
+                  <View style={styles.progressBarTrack}>
+                    <View 
+                      style={[
+                        styles.progressBarFill, 
+                        { width: `${Math.min(100, ((earnings?.deliveriesCount || 0) / 10) * 100)}%` }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.targetSubtext}>
+                    Complete 10 deliveries to secure the ₹500 daily streak bonus.
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <RiderStatsCard 
-                      label="Earnings" 
-                      value={`₹${(earnings?.totalPaise || 0) / 100}`} 
-                      icon={Trophy} 
-                      backgroundColor="#FF6B35" 
-                  />
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Earnings')}>
+                    <RiderStatsCard 
+                        label="Earnings" 
+                        value={`₹${(earnings?.totalPaise || 0) / 100}`} 
+                        icon={Trophy} 
+                        backgroundColor="rgba(34, 197, 94, 0.15)" 
+                        iconColor="#22C55E"
+                    />
+                  </TouchableOpacity>
                 </View>
                 <View style={styles.statItem}>
-                  <RiderStatsCard 
-                      label="Deposits" 
-                      value={`₹${(earnings?.cashCollectedPaise || 0) / 100}`} 
-                      icon={Landmark} 
-                      backgroundColor="#1A1A2E" 
-                  />
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Payouts')}>
+                    <RiderStatsCard 
+                        label="Deposits" 
+                        value={`₹${(earnings?.cashCollectedPaise || 0) / 100}`} 
+                        icon={Landmark} 
+                        backgroundColor="rgba(255, 107, 53, 0.15)" 
+                        iconColor="#FF6B35"
+                    />
+                  </TouchableOpacity>
                 </View>
                 <View style={styles.statItem}>
-                  <RiderStatsCard 
-                      label="Jobs" 
-                      value={earnings?.deliveriesCount || 0} 
-                      icon={Bike} 
-                      backgroundColor="#f3f4f6" 
-                      iconColor="#1A1A2E"
-                  />
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('RiderHistory')}>
+                    <RiderStatsCard 
+                        label="Jobs" 
+                        value={earnings?.deliveriesCount || 0} 
+                        icon={Bike} 
+                        backgroundColor="rgba(255, 255, 255, 0.08)" 
+                        iconColor="#FFFFFF"
+                    />
+                  </TouchableOpacity>
                 </View>
-             </View>
-          </View>
+              </View>
+           </View>
         )}
 
         {!activeOrder && (
@@ -375,21 +416,24 @@ const RiderHomeScreen = ({ navigation }: any) => {
 };
 
 const mapStyle = [
-  { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
-  { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-  { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
-  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
-  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
-  { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
-  { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
-  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e9e9e9" }] }
+  { "elementType": "geometry", "stylers": [{ "color": "#1C1D24" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#8A8D9F" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#1C1D24" }] },
+  { "featureType": "administrative", "elementType": "geometry.stroke", "stylers": [{ "color": "#2D303F" }] },
+  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#4A4D5E" }] },
+  { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#282A36" }] },
+  { "featureType": "road", "elementType": "geometry.stroke", "stylers": [{ "color": "#1C1D24" }] },
+  { "featureType": "road", "elementType": "labels.text.fill", "stylers": [{ "color": "#9AA0B9" }] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#3D4155" }] },
+  { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [{ "color": "#1C1D24" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0B0C10" }] }
 ];
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#0B0C10',
   },
   mapContainer: {
     height: '60%',
@@ -404,39 +448,39 @@ const styles = StyleSheet.create({
   riderMarkerCircle: {
     width: 48,
     height: 48,
-    backgroundColor: '#1A1A2E',
+    backgroundColor: '#FF6B35',
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: '#fff',
-    shadowColor: '#000',
+    borderColor: '#FFFFFF',
+    shadowColor: '#FF6B35',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.5,
     shadowRadius: 15,
     elevation: 10,
   },
   riderMarkerDot: {
     width: 16,
     height: 16,
-    backgroundColor: '#1A1A2E',
+    backgroundColor: '#FF6B35',
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#FFFFFF',
     marginTop: -4,
   },
   kitchenMarker: {
     width: 40,
     height: 40,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#10B981',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
-    shadowColor: '#000',
+    borderColor: '#FFFFFF',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
   },
@@ -459,22 +503,22 @@ const styles = StyleSheet.create({
   logoutBtn: {
     width: 56,
     height: 56,
-    backgroundColor: '#fff',
+    backgroundColor: '#161726',
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 15,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   statusCard: {
     flex: 1,
     marginHorizontal: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#161726',
     borderRadius: 32,
     padding: 16,
     flexDirection: 'row',
@@ -482,11 +526,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 15,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   statusInfoRow: {
     flexDirection: 'row',
@@ -499,7 +543,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   statusLabel: {
-    color: '#9ca3af',
+    color: '#94A3B8',
     fontSize: 9,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -512,17 +556,17 @@ const styles = StyleSheet.create({
   payoutBtn: {
     width: 56,
     height: 56,
-    backgroundColor: '#fff',
+    backgroundColor: '#161726',
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 15,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   activeOrderDot: {
     position: 'absolute',
@@ -533,21 +577,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#161726',
   },
   controlPanel: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#0B0C10',
     marginTop: -64,
     borderTopLeftRadius: 48,
     borderTopRightRadius: 48,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -20 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 30,
     elevation: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f9fafb',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
   },
   controlPanelContent: {
     padding: 32,
@@ -555,7 +599,7 @@ const styles = StyleSheet.create({
   dragHandle: {
     width: 48,
     height: 6,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 3,
     alignSelf: 'center',
     marginBottom: 32,
@@ -564,10 +608,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A2E',
     padding: 28,
     borderRadius: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
+    borderWidth: 1.5,
+    borderColor: '#FF6B35',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
-    shadowRadius: 30,
+    shadowRadius: 20,
     elevation: 10,
     marginBottom: 32,
   },
@@ -583,10 +629,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   missionActiveDot: {
-    width: 6,
-    height: 6,
+    width: 8,
+    height: 8,
     backgroundColor: '#22C55E',
-    borderRadius: 3,
+    borderRadius: 4,
     marginRight: 8,
   },
   missionLabelText: {
@@ -664,14 +710,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   poolHeaderTitle: {
-    color: '#1A1A2E',
+    color: '#FFFFFF',
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 2,
     fontSize: 11,
   },
   poolBadge: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -682,15 +728,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   poolCard: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#161726',
     padding: 24,
     borderRadius: 32,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderLeftWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderLeftColor: '#FF6B35',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   poolCardInfo: {
     flex: 1,
@@ -701,7 +754,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   poolCardId: {
-    color: '#1A1A2E',
+    color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 18,
   },
@@ -713,29 +766,29 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   poolCardStatus: {
-    color: '#9ca3af',
+    color: '#94A3B8',
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 2,
   },
   poolCardAddress: {
-    color: '#6b7280',
+    color: '#CCCCCC',
     fontSize: 12,
     fontWeight: '500',
   },
   poolCardArrow: {
     width: 48,
     height: 48,
-    backgroundColor: '#fff',
+    backgroundColor: '#FF6B35',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   statsRow: {
     flexDirection: 'row',
@@ -746,15 +799,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   sessionCard: {
-    backgroundColor: 'rgba(249, 250, 251, 0.5)',
+    backgroundColor: '#161726',
     padding: 24,
     borderRadius: 32,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   sessionLabel: {
-    color: '#9ca3af',
+    color: '#94A3B8',
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -763,9 +821,58 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sessionValue: {
-    color: '#1A1A2E',
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '900',
+  },
+  targetContainer: {
+    backgroundColor: '#161726',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 32,
+    padding: 24,
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  targetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  targetTitle: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    fontSize: 11,
+  },
+  targetRatio: {
+    color: '#22C55E',
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  progressBarTrack: {
+    height: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#22C55E',
+    borderRadius: 5,
+  },
+  targetSubtext: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '500',
+    lineHeight: 14,
   },
 });
 
