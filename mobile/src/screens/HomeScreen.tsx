@@ -6,7 +6,7 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone } from '../store/slices/cartSlice';
-import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag } from 'lucide-react-native';
+import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
@@ -252,6 +252,18 @@ const HomeScreen = ({ navigation }: any) => {
                   : (location?.addressText?.split(',')[0] || 'Set location')}
               </Text>
               <ChevronDown size={12} color={colors.inkMuted} />
+            </TouchableOpacity>
+
+            {/* Profile */}
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => { triggerHaptic(); navigation.navigate('ProfileTab'); }}
+            >
+              {user?.photo_url ? (
+                <NetworkImage uri={user.photo_url} style={styles.profileImage} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
+              ) : (
+                <User size={18} color={colors.primary} />
+              )}
             </TouchableOpacity>
 
             {/* Cart badge */}
