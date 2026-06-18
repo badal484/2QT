@@ -162,7 +162,7 @@ const CartScreen = ({ navigation }: any) => {
           setIsVerifying(false);
           dispatch(clearCart());
           queryClient.invalidateQueries({ queryKey: ['order-history'] });
-          navigation.navigate('OrderConfirmed', { orderId });
+          navigation.navigate('OrderPlaced', { orderId, displayId: res.order?.display_id });
         }
       } catch (_) {}
       if (attempts >= 10) {
@@ -178,7 +178,7 @@ const CartScreen = ({ navigation }: any) => {
     onSuccess: (res: any) => {
       if (res.status === 'confirmed') {
         dispatch(clearCart());
-        navigation.navigate('OrderConfirmed', { orderId: res.orderId });
+        navigation.navigate('OrderPlaced', { orderId: res.orderId, displayId: res.displayId });
         return;
       }
       if (__DEV__ && !res.keyId) {

@@ -10,6 +10,7 @@ import CartScreen from '../screens/CartScreen';
 import AddressScreen from '../screens/AddressScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import OrderConfirmedScreen from '../screens/OrderConfirmedScreen';
+import OrderPlacedScreen from '../screens/OrderPlacedScreen';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 import RateOrderScreen from '../screens/RateOrderScreen';
 import OrderHistoryScreen from '../screens/OrderHistoryScreen';
@@ -53,6 +54,7 @@ const CustomerNavigator = () => {
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       <Stack.Screen name="Address" component={AddressScreen} />
       <Stack.Screen name="AddressBook" component={AddressBookScreen} />
+      <Stack.Screen name="OrderPlaced" component={OrderPlacedScreen} />
       <Stack.Screen
         name="OrderConfirmed"
         component={OrderConfirmedScreen}
