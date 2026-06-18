@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   ActivityIndicator, Alert, Linking,
@@ -95,13 +95,22 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
   const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [heading, setHeading] = useState(0);
   const [status, setStatus] = useState('confirmed');
+  const [riderJustAssigned, setRiderJustAssigned] = useState(false);
+  const prevRiderNameRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (o?.status) setStatus(o.status);
     if (o?.rider_lat && o?.rider_lng) {
       setRiderLocation({ lat: parseFloat(o.rider_lat), lng: parseFloat(o.rider_lng) });
     }
-  }, [o?.status, o?.rider_lat, o?.rider_lng]);
+    // Detect when a rider first gets assigned
+    if (o?.rider_name && !prevRiderNameRef.current) {
+      triggerSuccess();
+      setRiderJustAssigned(true);
+      setTimeout(() => setRiderJustAssigned(false), 3000);
+    }
+    prevRiderNameRef.current = o?.rider_name || null;
+  }, [o?.status, o?.rider_lat, o?.rider_lng, o?.rider_name]);
 
   useEffect(() => {
     if (!socket) return;
@@ -238,20 +247,29 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               </TouchableOpacity>
             </Animated.View>
           ) : (
-            <Animated.View entering={FadeInDown} style={styles.riderCard}>
-              <View style={styles.riderAvatar}>
-                <UserCircle size={26} color={colors.primary} />
+            <Animated.View
+              entering={FadeInDown}
+              style={[
+                styles.riderCard,
+                o?.rider_name && styles.riderCardAssigned,
+                riderJustAssigned && styles.riderCardPulse,
+              ]}
+            >
+              <View style={[styles.riderAvatar, o?.rider_name && { backgroundColor: '#E8F5E9' }]}>
+                <UserCircle size={26} color={o?.rider_name ? colors.primary : colors.inkFaint} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.riderMeta}>DELIVERY PARTNER</Text>
-                <Text style={styles.riderName}>{o?.rider_name || 'Assigning...'}</Text>
+                <Text style={styles.riderMeta}>{o?.rider_name ? 'DELIVERY PARTNER' : 'FINDING PARTNER'}</Text>
+                <Text style={[styles.riderName, !o?.rider_name && { color: colors.inkMuted, fontSize: 15 }]}>
+                  {o?.rider_name || 'Assigning...'}
+                </Text>
               </View>
               {o?.rider_phone && (
                 <TouchableOpacity
-                  style={styles.riderAction}
+                  style={[styles.riderAction, styles.riderCallBtn]}
                   onPress={() => { triggerHaptic(); Linking.openURL(`tel:${o.rider_phone}`); }}
                 >
-                  <Phone size={17} color={colors.ink} />
+                  <Phone size={17} color="#fff" />
                 </TouchableOpacity>
               )}
             </Animated.View>
@@ -422,7 +440,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
     backgroundColor: '#fff',
   },
-  riderCardGreen: { backgroundColor: '#F0FDF4', borderColor: '#D1FAE5' },
+  riderCardGreen:    { backgroundColor: '#F0FDF4', borderColor: '#D1FAE5' },
+  riderCardAssigned: { borderColor: colors.primary, borderWidth: 1.5 },
+  riderCardPulse:    { backgroundColor: '#F0FDF4', borderColor: colors.primary, borderWidth: 2 },
+  riderCallBtn:      { backgroundColor: colors.primary, borderColor: colors.primary },
   riderAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   riderMeta: { fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.inkFaint, letterSpacing: 1 },
   riderName: { fontSize: 17, fontFamily: fontFamily.extrabold, color: colors.ink, marginTop: 2 },
