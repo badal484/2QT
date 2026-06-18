@@ -1,7 +1,8 @@
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
-import { redisPub, redisSub } from '../redis';
+import { redisPub, redisSub, redis, keys } from '../redis';
+import { query } from '../db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -53,6 +54,45 @@ export const initSocket = (server: any) => {
         socket.on('join_order', (orderId) => {
             socket.join(`order:${orderId}`);
         });
+
+        // Rider location heartbeat via socket (avoids extra HTTP round-trip every 8s)
+        if (user.role === 'rider' || user.role === 'rider_captain') {
+            socket.on('update_location', async (data: { lat: number; lng: number }) => {
+                try {
+                    const riderId = user.userId;
+                    const zoneId = user.zoneId;
+
+                    // Store in Redis (60s TTL — if rider disappears, location expires)
+                    await redis.set(
+                        keys.riderLocation(riderId),
+                        JSON.stringify({ lat: data.lat, lng: data.lng, updatedAt: new Date() }),
+                        { EX: 60 }
+                    );
+
+                    // Zone capacity heartbeat
+                    if (zoneId) {
+                        const capacityKey = keys.activeRidersInZone(zoneId);
+                        const now = Date.now();
+                        await redis.zAdd(capacityKey, { score: now, value: riderId });
+                        await redis.zRemRangeByScore(capacityKey, '-inf', now - 60000);
+                    }
+
+                    // Forward location to any customer watching this rider's active order
+                    const { rows } = await query(
+                        'SELECT current_order_id FROM users WHERE id = $1',
+                        [riderId]
+                    );
+                    if (rows[0]?.current_order_id) {
+                        io.to(`order:${rows[0].current_order_id}`).emit('rider_location', {
+                            lat: data.lat,
+                            lng: data.lng,
+                        });
+                    }
+                } catch (_) {
+                    // Non-critical — location update failure should never crash socket
+                }
+            });
+        }
 
         socket.on('disconnect', () => {
             console.log(`Socket disconnected: ${socket.id}`);

@@ -1,43 +1,59 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Switch, StatusBar, ActivityIndicator, Alert, ScrollView, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, TouchableOpacity, StatusBar, Alert,
+  StyleSheet, Animated, Easing,
+} from 'react-native';
 import { LeafletMap } from '../components/LeafletMap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { logout, updateUser } from '../store/slices/authSlice';
 import { getSocket } from '../socket/client';
-import { 
-  Bike, 
-  LogOut, 
-  Trophy, 
-  ChevronRight, 
-  Clock, 
-  ChefHat,
-  Landmark
-} from 'lucide-react-native';
-import RiderStatsCard from '../components/RiderStatsCard';
+import { LogOut, ChevronRight, Check, X, Wallet, History } from 'lucide-react-native';
 import Geolocation from '@react-native-community/geolocation';
+
+const G = {
+  bg: '#070F0C',
+  surface: '#0F1F18',
+  card: '#152318',
+  primary: '#1B5E46',
+  accent: '#10B981',
+  accentDim: 'rgba(16,185,129,0.15)',
+  orange: '#F97316',
+  orangeDim: 'rgba(249,115,22,0.15)',
+  danger: '#EF4444',
+  white: '#FFFFFF',
+  muted: '#6B9E85',
+  border: 'rgba(16,185,129,0.15)',
+};
 
 const RiderHomeScreen = ({ navigation }: any) => {
   const { user } = useSelector((state: RootState) => state.auth);
+  const insets = useSafeAreaInsets();
   const [isOnline, setIsOnline] = useState(user?.is_online || false);
-  const [currentLocation, setCurrentLocation] = useState({ latitude: 0, longitude: 0 });
-  const [sessionTime, setSessionTime] = useState('00h 00m');
+  const [currentLocation, setCurrentLocation] = useState({ latitude: 23.7, longitude: 85.1 });
+  const [pendingOrder, setPendingOrder] = useState<any>(null);
+  const [countdown, setCountdown] = useState(15);
+  const [skippedIds, setSkippedIds] = useState<string[]>([]);
+  const countdownRef = useRef<any>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(300)).current;
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
 
+  // ── Queries ──────────────────────────────────────────────────────────────
   const { data: earnings } = useQuery({
     queryKey: ['rider-earnings'],
     queryFn: () => api.get('/riders/earnings/today'),
-    enabled: isOnline,
   });
 
-  const { data: activeOrderData } = useQuery({
+  const { data: activeOrderData, isFetched: activeOrderFetched } = useQuery({
     queryKey: ['rider-active-order'],
     queryFn: () => api.get('/riders/orders/active'),
     enabled: isOnline,
+    refetchInterval: isOnline ? 8000 : false,
   });
 
   const { data: poolData } = useQuery({
@@ -48,832 +64,429 @@ const RiderHomeScreen = ({ navigation }: any) => {
   });
 
   const activeOrder = activeOrderData?.order;
-  const pool = poolData?.orders || [];
+  const pool: any[] = (poolData?.orders || []).filter((o: any) => !skippedIds.includes(o.id));
 
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const toggleOnlineMutation = useMutation({
-    mutationFn: (online: boolean) => {
-      return api.post(online ? '/riders/online' : '/riders/offline', {});
-    },
-    onSuccess: (_, variables) => {
-      setIsOnline(variables);
-      dispatch(updateUser({ 
-          is_online: variables, 
-          online_since: variables ? new Date().toISOString() : null 
-      }));
+    mutationFn: (online: boolean) => api.post(online ? '/riders/online' : '/riders/offline', {}),
+    onSuccess: (_, val) => {
+      setIsOnline(val);
+      dispatch(updateUser({ is_online: val, online_since: val ? new Date().toISOString() : null }));
       queryClient.invalidateQueries({ queryKey: ['me'] });
-    }
+    },
   });
 
-  const claimMissionMutation = useMutation({
+  const claimMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/riders/orders/${orderId}/claim`, {}),
     onSuccess: () => {
+      clearTimer();
+      setPendingOrder(null);
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
     },
     onError: (err: any) => {
-      Alert.alert('Claim Failed', err.message || 'This mission is no longer available.');
-    }
+      setPendingOrder(null);
+      if (err.message === 'RIDER_BUSY') {
+        queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+      } else {
+        Alert.alert('Order Taken', 'This order was claimed by another rider.');
+      }
+    },
   });
 
-  // Socket Integration
+  // ── Incoming order notification slide ─────────────────────────────────────
+  const showNotification = (order: any) => {
+    setPendingOrder(order);
+    setCountdown(15);
+    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 80 }).start();
+    startTimer(order.id);
+  };
+
+  const hideNotification = () => {
+    Animated.timing(slideAnim, { toValue: 400, useNativeDriver: true, duration: 250, easing: Easing.in(Easing.quad) }).start(() => {
+      setPendingOrder(null);
+    });
+    clearTimer();
+  };
+
+  const startTimer = (orderId: string) => {
+    clearTimer();
+    let count = 15;
+    countdownRef.current = setInterval(() => {
+      count -= 1;
+      setCountdown(count);
+      if (count <= 0) {
+        clearTimer();
+        setSkippedIds(prev => [...prev, orderId]);
+        hideNotification();
+      }
+    }, 1000);
+  };
+
+  const clearTimer = () => {
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+  };
+
+  // Show notification only after active order query has resolved (avoids RIDER_BUSY on startup)
+  useEffect(() => {
+    if (activeOrderFetched && !activeOrder && !pendingOrder && pool.length > 0) {
+      showNotification(pool[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poolData, activeOrder]);
+
+  // ── Pulsing dot animation ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isOnline || activeOrder) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.4, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isOnline, activeOrder, pulseAnim]);
+
+  // ── Socket ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const socket = getSocket();
-    if (socket && isOnline) {
-      socket.on('new_order_assigned', (data: any) => {
-        Alert.alert('New Mission!', `Order #${data.display_id} assigned to you.`, [
-          { text: 'View Details', onPress: () => queryClient.invalidateQueries({ queryKey: ['rider-active-order'] }) }
-        ]);
-      });
-
-      socket.on('order_status_update', () => {
-        queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-      });
-
-      socket.on('new_available_mission', () => {
-        queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
-      });
-
-      return () => {
-        socket.off('new_order_assigned');
-        socket.off('order_status_update');
-        socket.off('new_available_mission');
-      };
-    }
+    if (!socket || !isOnline) return;
+    socket.on('new_order_assigned', () => {
+      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+    });
+    socket.on('order_status_update', () => {
+      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+    });
+    socket.on('new_available_mission', () => {
+      queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
+    });
+    return () => {
+      socket.off('new_order_assigned');
+      socket.off('order_status_update');
+      socket.off('new_available_mission');
+    };
   }, [isOnline, queryClient]);
 
-  // Systematic Location Heartbeat
+  // ── GPS location heartbeat ─────────────────────────────────────────────────
   useEffect(() => {
-    let interval: any;
-    if (isOnline) {
-      interval = setInterval(async () => {
-        try {
-          // In a real device, we would use Geolocation.getCurrentPosition here
-          // For now, we systematically sync the state to the backend
-          await api.post('/riders/location', { 
-            lat: currentLocation.latitude, 
-            lng: currentLocation.longitude,
-            timestamp: new Date().toISOString()
-          });
-          
-          if (__DEV__) {
-            console.log(`--- SYSTEMATIC LOCATION SYNC: ${currentLocation.latitude}, ${currentLocation.longitude} ---`);
-          }
-        } catch (err) {
-          console.error('--- SYSTEMATIC SYNC FAILURE ---', err);
-          // If sync fails repeatedly, the Captain should be alerted
-        }
-      }, 20000); // 20-second precision for Bengaluru traffic
-    }
-    return () => clearInterval(interval);
-  }, [isOnline, currentLocation]);
-
-  // Session Timer
-  useEffect(() => {
-    let timer: any;
-    if (isOnline && user?.online_since) {
-      const updateTimer = () => {
-        const start = new Date(user.online_since as string).getTime();
-        const now = new Date().getTime();
-        const diff = Math.max(0, now - start);
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        setSessionTime(`${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`);
-      };
-      updateTimer();
-      timer = setInterval(updateTimer, 60000);
-    } else {
-      setSessionTime('00h 00m');
-    }
-    return () => clearInterval(timer);
-  }, [isOnline, user?.online_since]);
-
-  useEffect(() => {
-    // 1. Initial Position Lookup on Mount
-    Geolocation.getCurrentPosition(
-      pos => setCurrentLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      err => console.log('Initial location lookup err', err),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
-
-    // 2. Active Continuous Watching
     const watchId = Geolocation.watchPosition(
       pos => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCurrentLocation({ latitude: lat, longitude: lng });
-        
-        // Emit location via socket only if online
+        const { latitude, longitude } = pos.coords;
+        setCurrentLocation({ latitude, longitude });
         if (isOnline) {
           const socket = getSocket();
-          if (socket) {
-             socket.emit('update_location', { lat, lng });
-          }
+          socket?.emit('update_location', { lat: latitude, lng: longitude });
         }
       },
-      error => console.log('Continuous WatchPosition Error', error),
-      { enableHighAccuracy: true, distanceFilter: 10, interval: 5000, fastestInterval: 2000 }
+      () => {},
+      { enableHighAccuracy: false, distanceFilter: 20, interval: 8000 },
     );
-
-    return () => {
-      if (watchId !== undefined) Geolocation.clearWatch(watchId);
-    };
+    return () => Geolocation.clearWatch(watchId);
   }, [isOnline]);
 
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
+  useEffect(() => () => clearTimer(), []);
+
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to go off duty?', [
+    Alert.alert('Sign Out', 'Go off duty and sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: () => dispatch(logout()) }
+      { text: 'Sign Out', style: 'destructive', onPress: () => dispatch(logout()) },
     ]);
   };
 
+  const todayEarnings = ((earnings?.totalPaise || 0) / 100).toFixed(0);
+  const ordersToday = earnings?.deliveriesCount || 0;
+  const isGoingToKitchen = activeOrder && ['confirmed', 'preparing', 'ready_for_pickup'].includes(activeOrder.status);
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      
-      {/* Map Layer */}
-      <View style={styles.mapContainer}>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+      {/* Full screen map */}
+      <View style={StyleSheet.absoluteFill}>
         <LeafletMap
-          latitude={currentLocation.latitude || 20.5937}
-          longitude={currentLocation.longitude || 78.9629}
+          latitude={currentLocation.latitude}
+          longitude={currentLocation.longitude}
           zoom={15}
           markers={[
-            ...(currentLocation.latitude && currentLocation.longitude ? [{
-              id: 'rider',
-              lat: currentLocation.latitude,
-              lng: currentLocation.longitude,
-              iconUrl: 'https://cdn-icons-png.flaticon.com/512/3198/3198336.png',
+            { id: 'rider', lat: currentLocation.latitude, lng: currentLocation.longitude,
+              iconUrl: 'https://cdn-icons-png.flaticon.com/512/3198/3198336.png' },
+            ...(activeOrder && isGoingToKitchen && activeOrder.kitchen_lat ? [{
+              id: 'dest', lat: parseFloat(activeOrder.kitchen_lat), lng: parseFloat(activeOrder.kitchen_lng),
+              iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448609.png',
             }] : []),
-            ...(activeOrder ? (() => {
-              const isOut = activeOrder.status === 'out_for_delivery';
-              const targetLat = isOut 
-                ? parseFloat(activeOrder.customer_lat || activeOrder.lat || '0') 
-                : parseFloat(activeOrder.kitchen_lat || '0');
-              const targetLng = isOut 
-                ? parseFloat(activeOrder.customer_lng || activeOrder.lng || '0') 
-                : parseFloat(activeOrder.kitchen_lng || '0');
-              
-              if (targetLat && targetLng) {
-                return [{
-                  id: 'destination',
-                  lat: targetLat,
-                  lng: targetLng,
-                  iconUrl: isOut
-                    ? 'https://cdn-icons-png.flaticon.com/512/619/619034.png' // Customer House
-                    : 'https://cdn-icons-png.flaticon.com/512/3448/3448609.png', // Kitchen Store
-                }];
-              }
-              return [];
-            })() : []),
+            ...(activeOrder && !isGoingToKitchen && activeOrder.customer_lat ? [{
+              id: 'dest', lat: parseFloat(activeOrder.customer_lat), lng: parseFloat(activeOrder.customer_lng),
+              iconUrl: 'https://cdn-icons-png.flaticon.com/512/619/619034.png',
+            }] : []),
           ]}
-          style={styles.map}
+          style={{ flex: 1 }}
         />
-        
-        {/* Floating Header */}
-        <View style={styles.floatingHeader}>
-          <SafeAreaView edges={['top']} style={styles.safeArea}>
-            <View style={styles.headerRow}>
-              <TouchableOpacity 
-                activeOpacity={0.8}
-                style={styles.logoutBtn}
-                onPress={handleLogout}
-              >
-                <LogOut size={22} color="#FF6B35" />
-              </TouchableOpacity>
-
-              <View style={styles.statusCard}>
-                <View style={styles.statusInfoRow}>
-                  <View style={[styles.statusIndicator, { backgroundColor: isOnline ? '#22C55E' : '#64748B' }]} />
-                  <View>
-                    <Text style={styles.statusLabel}>Status</Text>
-                    <Text style={[styles.statusValue, { color: isOnline ? '#22C55E' : '#64748B' }]}>
-                      {isOnline ? 'ON DUTY' : 'OFF DUTY'}
-                    </Text>
-                  </View>
-                </View>
-                <Switch 
-                  value={isOnline}
-                  onValueChange={(val) => toggleOnlineMutation.mutate(val)}
-                  trackColor={{ false: '#2C2D42', true: '#FF6B35' }}
-                  thumbColor="white"
-                />
-              </View>
-
-              <TouchableOpacity 
-                activeOpacity={0.8}
-                style={styles.payoutBtn}
-                onPress={() => navigation.navigate('Payouts')}
-              >
-                <Landmark size={22} color="#FFFFFF" />
-                {activeOrder && <View style={styles.activeOrderDot} />}
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </View>
       </View>
 
-      {/* Control Panel */}
-      <ScrollView style={styles.controlPanel} contentContainerStyle={styles.controlPanelContent}>
-        <View style={styles.dragHandle} />
+      {/* ── Top header ─────────────────────────────────────────────────────── */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+        {/* Rider info pill */}
+        <View style={styles.riderPill}>
+          <View style={[styles.onlineDot, { backgroundColor: isOnline ? G.accent : '#64748B' }]} />
+          <Text style={styles.riderPillName}>{user?.name || 'Rider'}</Text>
+        </View>
 
-        {activeOrder ? (
-          <TouchableOpacity 
-            activeOpacity={0.95}
-            style={styles.activeMissionCard}
-            onPress={() => navigation.navigate('AssignedOrder', { order: activeOrder })}
+        {/* Earnings pill */}
+        <TouchableOpacity style={styles.earningsPill} onPress={() => navigation.navigate('Earnings')} activeOpacity={0.8}>
+          <Wallet size={14} color={G.orange} />
+          <Text style={styles.earningsPillText}>₹{todayEarnings}</Text>
+          <Text style={styles.earningsPillSub}>{ordersToday} orders</Text>
+        </TouchableOpacity>
+
+        {/* Online toggle */}
+        <TouchableOpacity
+          style={[styles.onlineToggle, isOnline ? styles.onlineToggleOn : styles.onlineToggleOff]}
+          onPress={() => toggleOnlineMutation.mutate(!isOnline)}
+          disabled={toggleOnlineMutation.isPending}
+          activeOpacity={0.9}
+        >
+          <Text style={[styles.onlineToggleText, { color: isOnline ? G.accent : '#64748B' }]}>
+            {isOnline ? 'ON DUTY' : 'GO ONLINE'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Logout */}
+      <TouchableOpacity style={[styles.logoutBtn, { top: insets.top + 12 + 52 }]} onPress={handleLogout} activeOpacity={0.8}>
+        <LogOut size={18} color={G.muted} />
+      </TouchableOpacity>
+
+      {/* History */}
+      <TouchableOpacity style={[styles.historyBtn, { top: insets.top + 12 + 52 }]} onPress={() => navigation.navigate('RiderHistory')} activeOpacity={0.8}>
+        <History size={18} color={G.muted} />
+      </TouchableOpacity>
+
+      {/* ── Waiting pulse (online, no order) ───────────────────────────────── */}
+      {isOnline && !activeOrder && !pendingOrder && (
+        <View style={styles.waitingWrapper}>
+          <Animated.View style={[styles.pulseDot, { transform: [{ scale: pulseAnim }] }]} />
+          <View style={styles.waitingCard}>
+            <Text style={styles.waitingTitle}>Waiting for orders…</Text>
+            <Text style={styles.waitingSubtitle}>You'll be notified when one is nearby</Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── Offline state ──────────────────────────────────────────────────── */}
+      {!isOnline && (
+        <View style={styles.offlineCard}>
+          <Text style={styles.offlineTitle}>You're offline</Text>
+          <Text style={styles.offlineSub}>Go online to start accepting deliveries</Text>
+          <TouchableOpacity
+            style={styles.goOnlineBtn}
+            onPress={() => toggleOnlineMutation.mutate(true)}
+            activeOpacity={0.9}
           >
-            <View style={styles.missionHeaderRow}>
-              <View>
-                <View style={styles.missionLabelRow}>
-                    <View style={styles.missionActiveDot} />
-                    <Text style={styles.missionLabelText}>Mission Assigned</Text>
-                </View>
-                <Text style={styles.missionIdText}>{activeOrder.display_id}</Text>
-              </View>
-              <View style={styles.missionStatusBadge}>
-                <Text style={styles.missionStatusText}>{activeOrder.status.replace(/_/g, ' ')}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.missionNextStopCard}>
-              <View style={styles.missionNextStopInfo}>
-                <Text style={styles.nextStopLabel}>Next Stop</Text>
-                <Text style={styles.nextStopValue} numberOfLines={1}>
-                  {activeOrder.status === 'confirmed' || activeOrder.status === 'at_kitchen' || activeOrder.status === 'ready_for_pickup' 
-                    ? (activeOrder.kitchen_name || 'Kitchen Hub') 
-                    : (activeOrder.customer_name || 'Customer')}
-                </Text>
-              </View>
-              <View style={styles.missionNextStopArrow}>
-                <ChevronRight size={24} color="white" strokeWidth={3} />
-              </View>
-            </View>
+            <Text style={styles.goOnlineBtnText}>Go Online</Text>
           </TouchableOpacity>
-        ) : (
-          <View style={styles.poolSection}>
-             {isOnline && pool.length > 0 && (
-                <View style={styles.missionsPool}>
-                  <View style={styles.poolHeaderRow}>
-                    <Text style={styles.poolHeaderTitle}>Available Missions</Text>
-                    <View style={styles.poolBadge}>
-                      <Text style={styles.poolBadgeText}>{pool.length} ACTIVE</Text>
-                    </View>
-                  </View>
-                  
-                  {pool.map((mission: any) => (
-                    <TouchableOpacity 
-                      key={mission.id}
-                      activeOpacity={0.9}
-                      style={styles.poolCard}
-                      onPress={() => claimMissionMutation.mutate(mission.id)}
-                    >
-                      <View style={styles.poolCardInfo}>
-                        <View style={styles.poolCardTitleRow}>
-                          <Text style={styles.poolCardId}>{mission.display_id}</Text>
-                          <View style={styles.poolCardDot} />
-                          <Text style={styles.poolCardStatus}>{mission.status.replace(/_/g, ' ')}</Text>
-                        </View>
-                        <Text style={styles.poolCardAddress} numberOfLines={1}>{mission.delivery_address || 'Central Kitchen'}</Text>
-                      </View>
-                      <View style={styles.poolCardArrow}>
-                        <ChevronRight size={20} color="#FFFFFF" />
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-             )}
+        </View>
+      )}
 
-              {/* Daily Target Progress Meter */}
-              {isOnline && (
-                <View style={styles.targetContainer}>
-                  <View style={styles.targetHeader}>
-                    <Text style={styles.targetTitle}>Daily Mission Target</Text>
-                    <Text style={styles.targetRatio}>
-                      {earnings?.deliveriesCount || 0} / 10 Completed
-                    </Text>
-                  </View>
-                  <View style={styles.progressBarTrack}>
-                    <View 
-                      style={[
-                        styles.progressBarFill, 
-                        { width: `${Math.min(100, ((earnings?.deliveriesCount || 0) / 10) * 100)}%` }
-                      ]} 
-                    />
-                  </View>
-                  <Text style={styles.targetSubtext}>
-                    Complete 10 deliveries to secure the ₹500 daily streak bonus.
-                  </Text>
-                </View>
-              )}
-
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Earnings')}>
-                    <RiderStatsCard 
-                        label="Earnings" 
-                        value={`₹${(earnings?.totalPaise || 0) / 100}`} 
-                        icon={Trophy} 
-                        backgroundColor="rgba(34, 197, 94, 0.15)" 
-                        iconColor="#22C55E"
-                    />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.statItem}>
-                  <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Payouts')}>
-                    <RiderStatsCard 
-                        label="Deposits" 
-                        value={`₹${(earnings?.cashCollectedPaise || 0) / 100}`} 
-                        icon={Landmark} 
-                        backgroundColor="rgba(255, 107, 53, 0.15)" 
-                        iconColor="#FF6B35"
-                    />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.statItem}>
-                  <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('RiderHistory')}>
-                    <RiderStatsCard 
-                        label="Jobs" 
-                        value={earnings?.deliveriesCount || 0} 
-                        icon={Bike} 
-                        backgroundColor="rgba(255, 255, 255, 0.08)" 
-                        iconColor="#FFFFFF"
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-           </View>
-        )}
-
-        {!activeOrder && (
-            <View style={styles.sessionCard}>
-                <Clock size={24} color="#9CA3AF" />
-                <Text style={styles.sessionLabel}>Current Session</Text>
-                <Text style={styles.sessionValue}>{sessionTime}</Text>
+      {/* ── Active order pill ──────────────────────────────────────────────── */}
+      {activeOrder && !pendingOrder && (
+        <TouchableOpacity
+          style={[styles.activeOrderPill, { bottom: insets.bottom + 24 }]}
+          onPress={() => navigation.navigate('AssignedOrder', { order: activeOrder })}
+          activeOpacity={0.9}
+        >
+          <View style={styles.activeOrderLeft}>
+            <View style={styles.activeOrderDot} />
+            <View>
+              <Text style={styles.activeOrderLabel}>ACTIVE ORDER</Text>
+              <Text style={styles.activeOrderId}>{activeOrder.display_id}</Text>
             </View>
-        )}
-      </ScrollView>
+          </View>
+          <View style={styles.activeOrderRight}>
+            <Text style={styles.activeOrderNext} numberOfLines={1}>
+              {isGoingToKitchen ? `→ ${activeOrder.kitchen_name || 'Kitchen'}` : `→ ${activeOrder.customer_name || 'Customer'}`}
+            </Text>
+            <ChevronRight size={20} color={G.accent} />
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* ── Incoming order notification card ──────────────────────────────── */}
+      {pendingOrder && (
+        <Animated.View
+          style={[styles.notifCard, { bottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] }]}
+        >
+          {/* Header */}
+          <View style={styles.notifHeader}>
+            <View style={styles.notifHeaderLeft}>
+              <View style={styles.notifDot} />
+              <Text style={styles.notifLabel}>NEW ORDER</Text>
+            </View>
+            <View style={styles.countdownCircle}>
+              <Text style={[styles.countdownText, { color: countdown <= 5 ? G.danger : G.accent }]}>{countdown}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.notifOrderId}>{pendingOrder.display_id}</Text>
+
+          {/* Details row */}
+          <View style={styles.notifDetailsRow}>
+            <View style={styles.notifDetail}>
+              <Text style={styles.notifDetailLabel}>DELIVER TO</Text>
+              <Text style={styles.notifDetailValue} numberOfLines={1}>{pendingOrder.delivery_address_text || 'Nearby'}</Text>
+            </View>
+            <View style={[styles.notifDetail, { alignItems: 'flex-end' }]}>
+              <Text style={styles.notifDetailLabel}>EARNINGS</Text>
+              <Text style={[styles.notifDetailValue, { color: G.orange }]}>
+                ₹{pendingOrder.delivery_fee_paise ? Math.round(pendingOrder.delivery_fee_paise / 100) : '—'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Buttons */}
+          <View style={styles.notifBtns}>
+            <TouchableOpacity
+              style={styles.skipBtn}
+              onPress={() => {
+                setSkippedIds(prev => [...prev, pendingOrder.id]);
+                hideNotification();
+              }}
+              activeOpacity={0.8}
+            >
+              <X size={18} color='#EF4444' />
+              <Text style={styles.skipBtnText}>Skip</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.acceptBtn, claimMutation.isPending && { opacity: 0.7 }]}
+              onPress={() => claimMutation.mutate(pendingOrder.id)}
+              disabled={claimMutation.isPending}
+              activeOpacity={0.9}
+            >
+              <Check size={18} color={G.white} />
+              <Text style={styles.acceptBtnText}>Accept</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 };
 
-const mapStyle = [
-  { "elementType": "geometry", "stylers": [{ "color": "#1C1D24" }] },
-  { "elementType": "labels.text.fill", "stylers": [{ "color": "#8A8D9F" }] },
-  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#1C1D24" }] },
-  { "featureType": "administrative", "elementType": "geometry.stroke", "stylers": [{ "color": "#2D303F" }] },
-  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#4A4D5E" }] },
-  { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
-  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#282A36" }] },
-  { "featureType": "road", "elementType": "geometry.stroke", "stylers": [{ "color": "#1C1D24" }] },
-  { "featureType": "road", "elementType": "labels.text.fill", "stylers": [{ "color": "#9AA0B9" }] },
-  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#3D4155" }] },
-  { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [{ "color": "#1C1D24" }] },
-  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0B0C10" }] }
-];
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0B0C10',
+  root: { flex: 1, backgroundColor: G.bg },
+
+  topBar: {
+    position: 'absolute', top: 0, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 50,
   },
-  mapContainer: {
-    height: '60%',
+  riderPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: G.surface, borderRadius: 24, paddingHorizontal: 14, paddingVertical: 10,
+    borderWidth: 1, borderColor: G.border,
   },
-  map: {
-    width: '100%',
-    height: '100%',
+  onlineDot: { width: 8, height: 8, borderRadius: 4 },
+  riderPillName: { color: G.white, fontSize: 13, fontWeight: '700' },
+  earningsPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: G.surface, borderRadius: 24, paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: G.border,
   },
-  riderMarkerContainer: {
-    alignItems: 'center',
-  },
-  riderMarkerCircle: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#FF6B35',
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#FFFFFF',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  riderMarkerDot: {
-    width: 16,
-    height: 16,
-    backgroundColor: '#FF6B35',
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    marginTop: -4,
-  },
-  kitchenMarker: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  floatingHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-  },
-  safeArea: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  logoutBtn: {
-    width: 56,
-    height: 56,
-    backgroundColor: '#161726',
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  statusCard: {
-    flex: 1,
-    marginHorizontal: 16,
-    backgroundColor: '#161726',
-    borderRadius: 32,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  statusInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  statusLabel: {
-    color: '#94A3B8',
-    fontSize: 9,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  statusValue: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  payoutBtn: {
-    width: 56,
-    height: 56,
-    backgroundColor: '#161726',
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  activeOrderDot: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 12,
-    height: 12,
-    backgroundColor: '#EF4444',
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#161726',
-  },
-  controlPanel: {
-    flex: 1,
-    backgroundColor: '#0B0C10',
-    marginTop: -64,
-    borderTopLeftRadius: 48,
-    borderTopRightRadius: 48,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -20 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 20,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  controlPanelContent: {
-    padding: 32,
-  },
-  dragHandle: {
-    width: 48,
-    height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 3,
-    alignSelf: 'center',
-    marginBottom: 32,
-  },
-  activeMissionCard: {
-    backgroundColor: '#1A1A2E',
-    padding: 28,
-    borderRadius: 40,
+  earningsPillText: { color: G.orange, fontSize: 13, fontWeight: '800' },
+  earningsPillSub: { color: G.muted, fontSize: 10, fontWeight: '600' },
+  onlineToggle: {
+    flex: 1, borderRadius: 24, paddingVertical: 10, alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#FF6B35',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-    marginBottom: 32,
   },
-  missionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 24,
+  onlineToggleOn: { backgroundColor: G.accentDim, borderColor: G.accent },
+  onlineToggleOff: { backgroundColor: G.surface, borderColor: 'rgba(100,116,139,0.3)' },
+  onlineToggleText: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+
+  logoutBtn: {
+    position: 'absolute', left: 16, width: 38, height: 38, borderRadius: 19,
+    backgroundColor: G.surface, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: G.border, zIndex: 50,
   },
-  missionLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+  historyBtn: {
+    position: 'absolute', right: 16, width: 38, height: 38, borderRadius: 19,
+    backgroundColor: G.surface, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: G.border, zIndex: 50,
   },
-  missionActiveDot: {
-    width: 8,
-    height: 8,
-    backgroundColor: '#22C55E',
-    borderRadius: 4,
-    marginRight: 8,
+
+  // Waiting
+  waitingWrapper: { position: 'absolute', bottom: 120, alignSelf: 'center', alignItems: 'center', zIndex: 40 },
+  pulseDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: G.accent, marginBottom: 12,
+    shadowColor: G.accent, shadowOpacity: 0.6, shadowRadius: 10, elevation: 6 },
+  waitingCard: {
+    backgroundColor: G.surface, borderRadius: 20, paddingHorizontal: 24, paddingVertical: 14,
+    alignItems: 'center', borderWidth: 1, borderColor: G.border,
   },
-  missionLabelText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 9,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 3,
+  waitingTitle: { color: G.white, fontSize: 14, fontWeight: '700' },
+  waitingSubtitle: { color: G.muted, fontSize: 11, marginTop: 3 },
+
+  // Offline
+  offlineCard: {
+    position: 'absolute', bottom: 48, left: 24, right: 24, zIndex: 40,
+    backgroundColor: G.surface, borderRadius: 24, padding: 28,
+    alignItems: 'center', borderWidth: 1, borderColor: G.border,
   },
-  missionIdText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+  offlineTitle: { color: G.white, fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  offlineSub: { color: G.muted, fontSize: 13, marginBottom: 20, textAlign: 'center' },
+  goOnlineBtn: {
+    backgroundColor: G.accent, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 40,
   },
-  missionStatusBadge: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
+  goOnlineBtnText: { color: G.white, fontSize: 15, fontWeight: '800' },
+
+  // Active order pill
+  activeOrderPill: {
+    position: 'absolute', left: 16, right: 16, zIndex: 40,
+    backgroundColor: G.surface, borderRadius: 20, padding: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1.5, borderColor: G.accent,
+    shadowColor: G.accent, shadowOpacity: 0.2, shadowRadius: 12, elevation: 8,
   },
-  missionStatusText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 10,
-    textTransform: 'uppercase',
+  activeOrderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  activeOrderDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: G.accent },
+  activeOrderLabel: { color: G.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+  activeOrderId: { color: G.white, fontSize: 17, fontWeight: '900', marginTop: 1 },
+  activeOrderRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  activeOrderNext: { color: G.accent, fontSize: 12, fontWeight: '700', maxWidth: 140 },
+
+  // Incoming order notification
+  notifCard: {
+    position: 'absolute', left: 16, right: 16, zIndex: 50,
+    backgroundColor: G.surface, borderRadius: 24, padding: 20,
+    borderWidth: 1.5, borderColor: G.accent,
+    shadowColor: G.accent, shadowOpacity: 0.25, shadowRadius: 20, elevation: 12,
   },
-  missionNextStopCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 16,
-    borderRadius: 24,
+  notifHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  notifHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  notifDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: G.accent },
+  notifLabel: { color: G.accent, fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  countdownCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 2, borderColor: G.accent,
+    alignItems: 'center', justifyContent: 'center',
   },
-  missionNextStopInfo: {
-    flex: 1,
+  countdownText: { fontSize: 13, fontWeight: '900' },
+  notifOrderId: { color: G.white, fontSize: 26, fontWeight: '900', marginBottom: 12 },
+  notifDetailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  notifDetail: { flex: 1 },
+  notifDetailLabel: { color: G.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.5, marginBottom: 3 },
+  notifDetailValue: { color: G.white, fontSize: 13, fontWeight: '700' },
+  notifBtns: { flexDirection: 'row', gap: 12 },
+  skipBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 14, borderRadius: 14,
+    backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)',
   },
-  nextStopLabel: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 8,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
+  skipBtnText: { color: '#EF4444', fontSize: 14, fontWeight: '800' },
+  acceptBtn: {
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 14, borderRadius: 14, backgroundColor: G.accent,
+    shadowColor: G.accent, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
   },
-  nextStopValue: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  missionNextStopArrow: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#FF6B35',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  poolSection: {
-    marginBottom: 40,
-  },
-  missionsPool: {
-    marginBottom: 32,
-  },
-  poolHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 8,
-  },
-  poolHeaderTitle: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontSize: 11,
-  },
-  poolBadge: {
-    backgroundColor: 'rgba(255, 107, 53, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  poolBadgeText: {
-    color: '#FF6B35',
-    fontWeight: '900',
-    fontSize: 10,
-  },
-  poolCard: {
-    backgroundColor: '#161726',
-    padding: 24,
-    borderRadius: 32,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderLeftWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderLeftColor: '#FF6B35',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  poolCardInfo: {
-    flex: 1,
-  },
-  poolCardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  poolCardId: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 18,
-  },
-  poolCardDot: {
-    width: 6,
-    height: 6,
-    backgroundColor: '#10B981',
-    borderRadius: 3,
-    marginHorizontal: 12,
-  },
-  poolCardStatus: {
-    color: '#94A3B8',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  poolCardAddress: {
-    color: '#CCCCCC',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  poolCardArrow: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#FF6B35',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    marginHorizontal: -4,
-  },
-  statItem: {
-    flex: 1,
-    paddingHorizontal: 4,
-  },
-  sessionCard: {
-    backgroundColor: '#161726',
-    padding: 24,
-    borderRadius: 32,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  sessionLabel: {
-    color: '#94A3B8',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  sessionValue: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  targetContainer: {
-    backgroundColor: '#161726',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 32,
-    padding: 24,
-    marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  targetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  targetTitle: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    fontSize: 11,
-  },
-  targetRatio: {
-    color: '#22C55E',
-    fontWeight: '900',
-    fontSize: 12,
-  },
-  progressBarTrack: {
-    height: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 5,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#22C55E',
-    borderRadius: 5,
-  },
-  targetSubtext: {
-    color: '#94A3B8',
-    fontSize: 10,
-    fontWeight: '500',
-    lineHeight: 14,
-  },
+  acceptBtnText: { color: G.white, fontSize: 15, fontWeight: '800' },
 });
 
 export default RiderHomeScreen;
