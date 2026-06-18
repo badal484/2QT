@@ -1,4 +1,4 @@
-import { Package, RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react-native';
+import { Package, RotateCcw, ArrowLeft, Bike } from 'lucide-react-native';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Platform } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -6,10 +6,23 @@ import { api } from '../api/client';
 import { useDispatch } from 'react-redux';
 import { addItem } from '../store/slices/cartSlice';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
+
+const STATUS_META: Record<string, { bg: string; text: string; label: string }> = {
+  pending_payment:  { bg: '#FFF7ED', text: '#C2410C', label: 'Pending Payment' },
+  confirmed:        { bg: '#EFF6FF', text: '#1D4ED8', label: 'Confirmed' },
+  preparing:        { bg: '#FFFBEB', text: '#B45309', label: 'Preparing' },
+  ready_for_pickup: { bg: '#FFF7ED', text: '#EA580C', label: 'Ready for Pickup' },
+  out_for_delivery: { bg: '#ECFEFF', text: '#0E7490', label: 'On the Way' },
+  delivered:        { bg: '#F0FDF4', text: '#15803D', label: 'Delivered' },
+  cancelled:        { bg: '#FEF2F2', text: '#DC2626', label: 'Cancelled' },
+};
+
+const getStatusMeta = (s: string) =>
+  STATUS_META[s] ?? { bg: '#F3F4F6', text: '#374151', label: s.replace(/_/g, ' ') };
 
 const OrderHistoryScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
@@ -75,7 +88,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
           </View>
         ) : (
           orders.map((order: any, index: number) => (
-            <Animated.View key={order.id} entering={FadeInDown.delay(index * 100)} layout={Layout.springify()}>
+            <Animated.View key={order.id} entering={FadeInDown.delay(index * 80)}>
                 <TouchableOpacity 
                   activeOpacity={0.9}
                   style={styles.orderCard}
@@ -88,17 +101,10 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                         {new Date(order.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </Text>
                     </View>
-                    <View style={[styles.statusBadge, { 
-                      backgroundColor: order.status === 'delivered' ? '#ECFDF5' : 
-                                       order.status === 'cancelled' ? '#FEF2F2' : 
-                                       '#F3F4F6'
-                    }]}>
-                      <Text style={[styles.statusBadgeText, { 
-                        color: order.status === 'delivered' ? '#10B981' : 
-                               order.status === 'cancelled' ? '#EF4444' : 
-                               '#1A1A2E'
-                      }]}>
-                        {order.status.replace(/_/g, ' ')}
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusMeta(order.status).bg }]}>
+                      <View style={[styles.statusDot, { backgroundColor: getStatusMeta(order.status).text }]} />
+                      <Text style={[styles.statusBadgeText, { color: getStatusMeta(order.status).text }]}>
+                        {getStatusMeta(order.status).label}
                       </Text>
                     </View>
                   </View>
@@ -119,7 +125,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                   <View style={styles.orderCardFooter}>
                     <View>
                       <Text style={styles.footerLabel}>Total Paid</Text>
-                      <Text style={styles.footerValue}>₹{order.total_amount_paise / 100}</Text>
+                      <Text style={styles.footerValue}>₹{(order.total_amount_paise / 100).toFixed(2)}</Text>
                     </View>
                     
                     {!['delivered', 'cancelled'].includes(order.status) ? (
@@ -144,8 +150,8 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                                 navigation.navigate('OrderConfirmed', { orderId: order.id });
                             }}
                           >
+                            <Bike size={14} color="white" style={{ marginRight: 6 }} />
                             <Text style={styles.trackBtnText}>Track Order</Text>
-                            <ArrowRight size={14} color="white" style={{ marginLeft: 6 }} />
                           </TouchableOpacity>
                       </View>
                     ) : (
@@ -238,8 +244,9 @@ const styles = StyleSheet.create({
   orderCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   orderIdText: { color: '#1A1A2E', fontSize: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
   orderDateText: { color: '#9CA3AF', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginTop: 4 },
-  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  statusBadgeText: { fontWeight: '900', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, gap: 5 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusBadgeText: { fontWeight: '800', fontSize: 10, letterSpacing: 0.2 },
   
   itemsListContainer: { marginBottom: 20, backgroundColor: '#F9FAFB', padding: 12, borderRadius: 16 },
   itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },

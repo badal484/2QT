@@ -204,7 +204,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
       </View>
 
       {/* ── Bottom sheet ── */}
-      <Animated.View entering={SlideInDown.duration(500).springify().damping(22)} style={styles.sheet}>
+      <Animated.View entering={SlideInDown.duration(380)} style={styles.sheet}>
         <View style={styles.sheetHandle} />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
 
