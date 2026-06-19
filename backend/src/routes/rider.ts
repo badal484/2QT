@@ -522,4 +522,49 @@ router.post('/payouts/request', authenticate, requireRole('rider', 'rider_captai
     }
 });
 
+// ─── Confirm Door Payment (UPI at door or Cash) ───────────────────────────────
+// Called just before OTP. Records how the customer paid at the door.
+// UPI → payment_status='paid', cod_cash_collected=TRUE (no cash with rider)
+// Cash → keep payment_status='cod_pending' (finance collects cash from rider later)
+router.post('/confirm-door-payment', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { orderId, method } = req.body as { orderId: string; method: 'upi' | 'cash' };
+    if (!orderId || !method || !['upi', 'cash'].includes(method)) {
+        return res.status(400).json({ error: 'orderId and method (upi|cash) required' });
+    }
+    const riderId = req.user!.userId;
+
+    try {
+        const { rows } = await query(
+            `SELECT id, payment_method, status FROM orders WHERE id = $1 AND rider_id = $2`,
+            [orderId, riderId]
+        );
+        if (!rows.length) return res.status(404).json({ error: 'Order not found' });
+        const order = rows[0];
+
+        if (order.payment_method !== 'cod') {
+            return res.status(400).json({ error: 'Order is not a COD order' });
+        }
+        if (order.status !== 'out_for_delivery') {
+            return res.status(400).json({ error: 'Order is not out for delivery' });
+        }
+
+        if (method === 'upi') {
+            await query(
+                `UPDATE orders
+                 SET payment_status = 'paid',
+                     cod_cash_collected = TRUE,
+                     cod_collected_at = NOW()
+                 WHERE id = $1`,
+                [orderId]
+            );
+        }
+        // For 'cash': no update needed — already cod_pending from order placement
+
+        res.json({ success: true, method });
+    } catch (err) {
+        console.error('[rider/confirm-door-payment]', err);
+        res.status(500).json({ error: 'Failed to confirm payment' });
+    }
+});
+
 export default router;

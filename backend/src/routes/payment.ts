@@ -109,13 +109,19 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
         }
 
         // 2. Handle COD
+        // finalizeOrder confirms the order and deducts inventory/wallet, but sets payment_status='paid'.
+        // We immediately override to 'cod_pending' because cash hasn't been collected yet.
         if (paymentMethod === 'cod') {
-            const codResult = await finalizeOrder(`COD_${dbOrder.id.slice(0, 8)}`, 'cod', dbOrder.id);
-            return res.json({ 
-                success: true, 
-                orderId: dbOrder.id, 
+            await finalizeOrder(`COD_${dbOrder.id.slice(0, 8)}`, 'cod', dbOrder.id);
+            await query(
+                `UPDATE orders SET payment_status = 'cod_pending' WHERE id = $1`,
+                [dbOrder.id]
+            );
+            return res.json({
+                success: true,
+                orderId: dbOrder.id,
                 displayId: dbOrder.display_id,
-                status: 'confirmed' 
+                status: 'confirmed'
             });
         }
 

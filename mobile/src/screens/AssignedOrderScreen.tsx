@@ -96,7 +96,18 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
 
   const handleAction = () => {
     if (canPickup) { updateStatusMutation.mutate('out_for_delivery'); return; }
-    if (isOutForDelivery) { navigation.navigate('DeliveryOTP', { orderId: order.id }); }
+    if (isOutForDelivery) {
+      // COD orders: collect payment at door first, then OTP
+      if (order.payment_method === 'cod') {
+        navigation.navigate('DoorPayment', {
+          orderId: order.id,
+          totalAmountPaise: order.total_amount_paise,
+          displayId: order.display_id,
+        });
+      } else {
+        navigation.navigate('DeliveryOTP', { orderId: order.id });
+      }
+    }
   };
 
   const openMaps = () => {

@@ -108,6 +108,29 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
 
             const finalizedOrder = updatedRows[0];
 
+            // 3.5 Calculate and store commission for partner kitchens
+            const { rows: kitchenRows } = await client.query(
+                'SELECT is_partner, commission_rate FROM kitchens WHERE id = $1',
+                [order.kitchen_id]
+            );
+            const kitchen = kitchenRows[0];
+            if (kitchen?.is_partner && parseFloat(kitchen.commission_rate) > 0) {
+                const subtotalPaise = order.subtotal_paise || 0;
+                const deliveryFeePaise = order.delivery_fee_paise || 0;
+                const commissionRate = parseFloat(kitchen.commission_rate);
+                const commissionPaise = Math.round(subtotalPaise * commissionRate);
+                const kitchenPayoutPaise = subtotalPaise - commissionPaise;
+                const platformDeliveryPaise = Math.round(deliveryFeePaise * 0.25);
+                await client.query(`
+                    UPDATE orders SET
+                        commission_rate = $1,
+                        commission_paise = $2,
+                        kitchen_payout_paise = $3,
+                        platform_delivery_paise = $4
+                    WHERE id = $5
+                `, [commissionRate, commissionPaise, kitchenPayoutPaise, platformDeliveryPaise, order.id]);
+            }
+
             // 4. Update Inventory & Item stats
             const { rows: items } = await client.query('SELECT menu_item_id, quantity FROM order_items WHERE order_id = $1', [order.id]);
             for (const item of items) {
