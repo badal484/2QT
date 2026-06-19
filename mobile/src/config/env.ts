@@ -8,5 +8,8 @@ export const ENV = {
   IMAGEKIT_URL_ENDPOINT: 'https://ik.imagekit.io/oellcbqek',
   IMAGEKIT_PUBLIC_KEY: 'public_PStmG2ipavrJoxTXsWmjsYk5T+Y=',
 
+  // Business UPI ID shown to customers at the door for UPI payment
+  BUSINESS_UPI_ID: 'badal90603@oksbi',
+
   APP_VERSION: '1.0.0'
 };

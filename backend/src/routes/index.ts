@@ -16,6 +16,7 @@ import bannersRoutes from './banners';
 import notificationsRoutes from './notifications';
 import serviceRequestsRoutes from './service-requests';
 import promocodesRoutes from './promocodes';
+import financeRoutes from './finance';
 // ... other routes
 
 const router = Router();
@@ -38,6 +39,7 @@ router.use('/banners', bannersRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/service-requests', serviceRequestsRoutes);
 router.use('/promocodes', promocodesRoutes);
+router.use('/finance', financeRoutes);
 // ...
 
 export default router;

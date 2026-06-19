@@ -995,4 +995,53 @@ router.post('/jobs/clear-failed', authenticate, requireRole('super_admin', 'admi
     res.json({ success: true });
 });
 
+// ─── Team Management ──────────────────────────────────────────────────────────
+
+router.get('/team/users', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT id, name, phone, email, role, is_active, is_verified, created_at
+            FROM users
+            WHERE role IN ('finance', 'super_admin', 'admin')
+            ORDER BY created_at DESC
+        `);
+        res.json({ users: rows });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch team users' });
+    }
+});
+
+router.post('/team/users', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
+    const { phone, name, role } = req.body as { phone: string; name: string; role: string };
+    if (!phone || !name || !role) return res.status(400).json({ error: 'phone, name, role required' });
+    if (!['finance', 'admin'].includes(role)) return res.status(400).json({ error: 'role must be finance or admin' });
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) return res.status(400).json({ error: 'Invalid phone number' });
+
+    try {
+        const { rows } = await query(`
+            INSERT INTO users (phone, name, role, is_active, is_verified, onboarding_complete)
+            VALUES ($1, $2, $3, true, true, true)
+            ON CONFLICT (phone) DO UPDATE
+                SET name = EXCLUDED.name, role = EXCLUDED.role, is_active = true, is_verified = true
+            RETURNING id, name, phone, role, created_at
+        `, [cleanPhone, name.trim(), role]);
+        res.json({ success: true, user: rows[0] });
+    } catch (err: any) {
+        console.error('[admin/team/users POST]', err);
+        res.status(500).json({ error: 'Failed to create user' });
+    }
+});
+
+router.patch('/team/users/:id/deactivate', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    try {
+        await query('UPDATE users SET is_active = false WHERE id = $1 AND role NOT IN (\'super_admin\')', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to deactivate user' });
+    }
+});
+
 export default router;

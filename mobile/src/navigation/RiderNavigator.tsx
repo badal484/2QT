@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import RiderHomeScreen from '../screens/RiderHomeScreen';
 import AssignedOrderScreen from '../screens/AssignedOrderScreen';
 import DeliveryOTPScreen from '../screens/DeliveryOTPScreen';
+import DoorPaymentScreen from '../screens/DoorPaymentScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PayoutsScreen from '../screens/PayoutsScreen';
 import EarningsScreen from '../screens/EarningsScreen';
@@ -28,6 +29,7 @@ const RiderNavigator = () => {
         <>
           <Stack.Screen name="RiderHome" component={RiderHomeScreen} />
           <Stack.Screen name="AssignedOrder" component={AssignedOrderScreen} />
+          <Stack.Screen name="DoorPayment" component={DoorPaymentScreen} />
           <Stack.Screen name="DeliveryOTP" component={DeliveryOTPScreen} />
           <Stack.Screen name="Payouts" component={PayoutsScreen} />
           <Stack.Screen name="Earnings" component={EarningsScreen} />
