@@ -25,6 +25,7 @@ const KitchensTab = dynamic(() => import("./KitchensTab").then(m => ({ default: 
 const PromoCodesTab = dynamic(() => import("./PromoCodesTab").then(m => ({ default: m.PromoCodesTab })), { ssr: false });
 const KitchenHealthTab = dynamic(() => import("./KitchenHealthTab").then(m => ({ default: m.KitchenHealthTab })), { ssr: false });
 const TeamTab = dynamic(() => import("./TeamTab").then(m => ({ default: m.TeamTab })), { ssr: false });
+const CampaignsTab = dynamic(() => import("./CampaignsTab").then(m => ({ default: m.CampaignsTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1636,6 +1637,7 @@ const TABS = [
   { name: "Analytics", icon: BarChart3, component: AnalyticsTab },
   { name: "Broadcast", icon: Send, component: BroadcastTab },
   { name: "Systems", icon: Cpu, component: SystemsTab },
+  { name: "Campaigns", icon: Zap, component: CampaignsTab },
   { name: "Marketing", icon: Zap, component: MarketingTab },
   { name: "Promo Codes", icon: Ticket, component: PromoCodesTab },
   { name: "Zones", icon: MapPin, component: ZonesTab },

@@ -43,6 +43,8 @@ export const keys = {
     orderByCf: (cfOrderId: string) => `2qt:order_by_cf:${cfOrderId}`,
     activeRidersInZone: (zoneId: string) => `2qt:active_riders:${zoneId}`,
     customerCart: (customerId: string) => `2qt:cart:${customerId}`,
+    activePromos: () => '2qt:offers:promos',
+    activeCampaigns: () => '2qt:offers:campaigns',
 };
 
 export default redis;

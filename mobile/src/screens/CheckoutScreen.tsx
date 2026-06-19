@@ -1,6 +1,6 @@
 import { ArrowLeft, MapPin, CreditCard, Sparkles, Clock, ShieldCheck, Heart, Banknote, Ticket, ChevronRight } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, StyleSheet, AppState } from 'react-native';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
@@ -78,6 +78,21 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   const dispatch = useDispatch();
   const cart = useSelector((state: any) => state.cart);
   const { user } = useSelector((state: any) => state.auth);
+  const appState = useRef(AppState.currentState);
+
+  // Refetch offers + pricing when app comes back to foreground
+  // so any offer the admin just disabled stops showing immediately
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        queryClient.invalidateQueries({ queryKey: ['pricing'] });
+        queryClient.invalidateQueries({ queryKey: ['active-promos'] });
+        queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      }
+      appState.current = nextState;
+    });
+    return () => sub.remove();
+  }, [queryClient]);
 
   React.useEffect(() => {
     if (socket) {
