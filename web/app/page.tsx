@@ -269,7 +269,7 @@ export default function HomePage() {
               <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 mb-6">Contact</h4>
               <ul className="space-y-4 text-sm font-semibold text-brand-dark">
                 <li><Link href="#" className="hover:text-brand-primary transition-colors">Help Center</Link></li>
-                <li><Link href="#" className="hover:text-brand-primary transition-colors">Partner with us</Link></li>
+                <li><Link href="/partner" className="hover:text-brand-primary transition-colors">Partner with us</Link></li>
                 <li><Link href="/become-a-rider/apply" className="hover:text-brand-primary transition-colors">Become a Rider</Link></li>
                 <li><Link href="mailto:hello@2qthello.com" className="text-brand-primary">hello@2qthello.com</Link></li>
               </ul>
@@ -279,7 +279,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-black/5 text-xs font-medium text-black/40 flex justify-between">
           <span>© 2026 2QT Culinary. All rights reserved.</span>
           <div className="flex gap-6">
-            <Link href="/login" className="hover:text-brand-dark transition-colors">Partner Portal</Link>
+            <Link href="/finance" className="hover:text-brand-dark transition-colors">Partner Portal</Link>
           </div>
         </div>
       </footer>
