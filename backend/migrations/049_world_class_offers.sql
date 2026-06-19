@@ -1,5 +1,10 @@
 -- Migration 049: World-Class Offers & Loyalty System
--- Adds: campaigns, streaks, milestones, tiers, 2QT Plus, enhanced promos
+-- Adds: campaigns, streaks, milestones, tiers, 2QT Plus, enhanced promos, refund fixes
+
+-- 0. Add partially_refunded to payment_status enum (for bug 7 fix)
+DO $$ BEGIN
+  ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'partially_refunded';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 1. Enhanced promo_codes
 ALTER TABLE promo_codes

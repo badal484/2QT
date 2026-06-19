@@ -356,11 +356,68 @@ router.patch('/orders/:id/status', authenticate, requireRole('super_admin', 'adm
     if (!validStatuses.includes(status)) return res.status(400).json({ error: 'INVALID_STATUS' });
 
     if (status === 'cancelled') {
-        const { rows } = await query('SELECT customer_id, kitchen_id FROM orders WHERE id = $1', [id]);
+        const { rows } = await query('SELECT * FROM orders WHERE id = $1', [id]);
         if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
-        await query("UPDATE orders SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = 'Admin cancelled' WHERE id = $1", [id]);
-        emitToUser(rows[0].customer_id, 'order_status_update', { orderId: id, status: 'cancelled' });
-        emitToKitchen(rows[0].kitchen_id, 'order_cancelled', { orderId: id });
+        const order = rows[0];
+
+        // Bug 2 fix: admin cancel must refund paid orders + reverse loyalty + promo + subscription
+        let newWalletBalance: number | null = null;
+        await withTransaction(async (client) => {
+            await client.query(
+                "UPDATE orders SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = 'Admin cancelled' WHERE id = $1",
+                [id]
+            );
+
+            if (order.payment_status === 'paid') {
+                await client.query(`
+                    INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, $2)
+                    ON CONFLICT (customer_id) DO UPDATE SET balance_paise = customer_wallet.balance_paise + $2
+                `, [order.customer_id, order.total_amount_paise]);
+                await client.query(`
+                    INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
+                    SELECT $1, $2, 'credit', 'Refund — admin cancelled order #' || $3, balance_paise
+                    FROM customer_wallet WHERE customer_id = $1
+                `, [order.customer_id, order.total_amount_paise, order.display_id]);
+                await client.query("UPDATE orders SET payment_status = 'refunded' WHERE id = $1", [id]);
+                const { rows: wb } = await client.query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [order.customer_id]);
+                newWalletBalance = wb[0]?.balance_paise ?? order.total_amount_paise;
+            }
+
+            // Reverse loyalty points
+            const { rows: earnedPts } = await client.query(
+                "SELECT points FROM loyalty_transactions WHERE order_id = $1 AND type = 'earn' LIMIT 1", [id]
+            );
+            if (earnedPts.length > 0 && earnedPts[0].points > 0) {
+                await client.query(
+                    "INSERT INTO loyalty_transactions (customer_id, points, type, order_id) VALUES ($1, $2, 'redeem', $3)",
+                    [order.customer_id, earnedPts[0].points, id]
+                );
+            }
+
+            // Reverse promo usage
+            if (order.promo_code_id) {
+                await client.query(
+                    'UPDATE promo_codes SET times_used = GREATEST(0, times_used - 1) WHERE id = $1',
+                    [order.promo_code_id]
+                );
+                await redis.del(keys.activePromos());
+            }
+
+            // Restore subscription credit
+            if (order.is_subscription_order) {
+                await client.query(`
+                    UPDATE subscriptions SET remaining_meals = remaining_meals + 1,
+                    current_day_credits = current_day_credits + 1
+                    WHERE customer_id = $1 AND status = 'active'
+                `, [order.customer_id]);
+            }
+        });
+
+        emitToUser(order.customer_id, 'order_status_update', { orderId: id, status: 'cancelled' });
+        if (newWalletBalance !== null) {
+            emitToUser(order.customer_id, 'wallet_updated', { balancePaise: newWalletBalance });
+        }
+        emitToKitchen(order.kitchen_id, 'order_cancelled', { orderId: id });
     } else {
         await query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
         const { rows } = await query('SELECT customer_id FROM orders WHERE id = $1', [id]);
@@ -379,48 +436,69 @@ router.post('/riders/:id/verify', authenticate, requireRole('super_admin', 'admi
 
 router.post('/orders/:id/refund', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { reason, amountPaise } = req.body; // Partial or full
+    const { reason, amountPaise } = req.body;
     const adminId = req.user!.userId;
 
     try {
+        let newWalletBalance = 0;
+
         await withTransaction(async (client) => {
-            // 1. Get order details
-            const { rows: orders } = await client.query('SELECT customer_id, total_amount_paise, display_id FROM orders WHERE id = $1', [id]);
+            const { rows: orders } = await client.query(
+                'SELECT customer_id, total_amount_paise, display_id, payment_status FROM orders WHERE id = $1',
+                [id]
+            );
             if (orders.length === 0) throw new Error('ORDER_NOT_FOUND');
             const order = orders[0];
-            const refundAmount = amountPaise || order.total_amount_paise;
 
-            // 2. Credit Wallet
+            // Bug 1 fix: double-refund protection
+            if (order.payment_status === 'refunded') throw new Error('ALREADY_REFUNDED');
+
+            const refundAmount = amountPaise || order.total_amount_paise;
+            const isPartial = refundAmount < order.total_amount_paise;
+
+            // Credit wallet
             await client.query(`
-                INSERT INTO customer_wallet (customer_id, balance_paise)
-                VALUES ($1, $2)
+                INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, $2)
                 ON CONFLICT (customer_id) DO UPDATE SET balance_paise = customer_wallet.balance_paise + $2
             `, [order.customer_id, refundAmount]);
 
-            // 3. Log Transaction
+            // Log transaction
             await client.query(`
                 INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
                 SELECT $1, $2, 'credit', 'Admin Refund: ' || $3, balance_paise
                 FROM customer_wallet WHERE customer_id = $1
             `, [order.customer_id, refundAmount, reason || 'Service Issue']);
 
-            // 4. Update Order
-            await client.query("UPDATE orders SET payment_status = 'refunded', cancellation_reason = $1 WHERE id = $2", [reason, id]);
+            // Bug 7 fix: partial refund gets distinct status
+            const newStatus = isPartial ? 'partially_refunded' : 'refunded';
+            await client.query(
+                "UPDATE orders SET payment_status = $1, cancellation_reason = $2 WHERE id = $3",
+                [newStatus, reason, id]
+            );
 
-            // 5. SYSTEMATIC INTEGRATION: Audit Logging
-            logSystemEvent('ADMIN_REFUND', `Admin ${adminId} refunded ₹${refundAmount/100} for Order #${order.display_id}`, 'info', { orderId: id, adminId, reason });
-            
-            // 6. Notify User
-            emitToUser(order.customer_id, 'wallet_updated', { balancePaise: refundAmount });
+            logSystemEvent('ADMIN_REFUND', `Admin ${adminId} refunded ₹${refundAmount/100} for Order #${order.display_id} (${isPartial ? 'partial' : 'full'})`, 'info', { orderId: id, adminId, reason });
+
+            // Bug 3 fix: emit actual new balance, not refund amount
+            const { rows: wb } = await client.query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [order.customer_id]);
+            newWalletBalance = wb[0]?.balance_paise ?? refundAmount;
+
+            const { rows: userRows } = await client.query('SELECT phone FROM users WHERE id = $1', [order.customer_id]);
             await notificationsQueue.add('broadcast_message', {
-                phone: (await query('SELECT phone FROM users WHERE id = $1', [order.customer_id])).rows[0]?.phone,
-                message: `2QT: A refund of ₹${refundAmount/100} has been credited to your wallet for Order #${order.display_id}. We apologize for the inconvenience!`
+                phone: userRows[0]?.phone,
+                message: `2QT: A refund of ₹${refundAmount/100} has been credited to your wallet for Order #${order.display_id}. Sorry for the inconvenience!`
             });
         });
 
-        res.json({ success: true, message: 'Refund processed systematically.' });
+        emitToUser(
+            (await query('SELECT customer_id FROM orders WHERE id = $1', [id])).rows[0]?.customer_id,
+            'wallet_updated',
+            { balancePaise: newWalletBalance }
+        );
+
+        res.json({ success: true, message: 'Refund processed.' });
     } catch (err: any) {
-        res.status(400).json({ error: 'REFUND_FAILED', message: err.message });
+        const status = err.message === 'ALREADY_REFUNDED' ? 409 : 400;
+        res.status(status).json({ error: 'REFUND_FAILED', message: err.message });
     }
 });
 
