@@ -1,6 +1,6 @@
 import { ArrowLeft, Star, Crown, Pizza } from 'lucide-react-native';
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, AppState } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
@@ -8,6 +8,18 @@ import { getSocket } from '../socket/client';
 const LoyaltyScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const socket = getSocket();
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        queryClient.invalidateQueries({ queryKey: ['loyalty'] });
+        queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      }
+      appState.current = nextState;
+    });
+    return () => sub.remove();
+  }, [queryClient]);
 
   const { data: loyalty, isLoading } = useQuery({
     queryKey: ['loyalty'],
