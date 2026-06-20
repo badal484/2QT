@@ -299,7 +299,7 @@ export const initCrons = () => {
                    rde.total_paise AS earned_today
             FROM users u
             JOIN rider_daily_earnings rde ON rde.rider_id = u.id AND rde.date = CURRENT_DATE
-            WHERE u.role IN ('rider', 'rider_captain')
+            WHERE u.role = 'rider'
               AND u.is_active = TRUE
               AND rde.total_paise > 0
         `);
@@ -377,8 +377,8 @@ export const initCrons = () => {
         console.log('[CRON] Daily rider payouts done');
     });
 
-    // Update scheduled marketing campaigns status every minute
-    cron.schedule('* * * * *', async () => {
+    // Update scheduled marketing campaigns status every 5 minutes (not every minute)
+    cron.schedule('*/5 * * * *', async () => {
         const { rowCount } = await query(`
             UPDATE marketing_campaigns
             SET status = 'completed'
@@ -387,6 +387,19 @@ export const initCrons = () => {
         if (rowCount && rowCount > 0) {
             console.log(`[CRON] Updated ${rowCount} marketing campaigns to completed`);
         }
+    });
+
+    // Keep Render free-tier warm — ping own health endpoint every 10 minutes
+    cron.schedule('*/10 * * * *', async () => {
+        const selfUrl = process.env.BACKEND_SELF_URL || `http://localhost:${process.env.PORT || 8000}/api/v1/health`;
+        try {
+            const { default: https } = await import('https');
+            const { default: http } = await import('http');
+            const client = selfUrl.startsWith('https') ? https : http;
+            client.get(selfUrl, (res) => {
+                res.resume();
+            }).on('error', () => {});
+        } catch {}
     });
 
     console.log('Crons initialized.');
