@@ -96,8 +96,12 @@ const DoorPaymentScreen = ({ route, navigation }: any) => {
   });
 
   const handleUPI = async () => {
-    await confirmMutation.mutateAsync('upi');
-    setUpiConfirmed(true);
+    try {
+      await confirmMutation.mutateAsync('upi');
+      setUpiConfirmed(true);
+    } catch {
+      // onError Alert already handled by the mutation
+    }
   };
 
   const handleCash = () => {
@@ -105,7 +109,7 @@ const DoorPaymentScreen = ({ route, navigation }: any) => {
     navigation.replace('DeliveryOTP', { orderId, isCashCod: true, amountPaise: totalAmountPaise, displayId });
   };
 
-  const proceedToOTP = () => navigation.replace('DeliveryOTP', { orderId });
+  const proceedToOTP = () => navigation.replace('DeliveryOTP', { orderId, displayId });
 
   const copyUpiId = () => {
     Clipboard.setString(businessUpiId);

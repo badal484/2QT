@@ -123,7 +123,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
     socket.on('order_status_update', (data: any) => {
       if (data.orderId === orderId) {
         setStatus(data.status);
-        if (!data.riderAssigned) triggerSuccess();
+        if (data.status) triggerSuccess();
         queryClient.invalidateQueries({ queryKey: ['order-confirmed', orderId] });
       }
     });

@@ -105,7 +105,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           displayId: order.display_id,
         });
       } else {
-        navigation.navigate('DeliveryOTP', { orderId: order.id });
+        navigation.navigate('DeliveryOTP', { orderId: order.id, isCashCod: false, displayId: order.display_id });
       }
     }
   };
@@ -264,18 +264,20 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* ── Release ──────────────────────────────────────────────────────── */}
-        <TouchableOpacity
-          style={styles.releaseBtn}
-          onPress={() => Alert.alert('Release Order', 'Return this order to the pool?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Release', style: 'destructive', onPress: () => unclaimMutation.mutate() },
-          ])}
-          activeOpacity={0.8}
-        >
-          <AlertTriangle size={15} color={G.danger} />
-          <Text style={styles.releaseBtnText}>Release Order</Text>
-        </TouchableOpacity>
+        {/* ── Release — hidden once rider is on the way (backend rejects unclaim) ── */}
+        {!isOutForDelivery && (
+          <TouchableOpacity
+            style={styles.releaseBtn}
+            onPress={() => Alert.alert('Release Order', 'Return this order to the pool?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Release', style: 'destructive', onPress: () => unclaimMutation.mutate() },
+            ])}
+            activeOpacity={0.8}
+          >
+            <AlertTriangle size={15} color={G.danger} />
+            <Text style={styles.releaseBtnText}>Release Order</Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
 
