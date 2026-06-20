@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Wallet, Bike, Utensils, Receipt,
-  BarChart3, Store, LogOut, IndianRupee, Menu, X
+  BarChart3, LogOut, IndianRupee, Menu, X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -18,8 +18,6 @@ const RiderPayoutsTab = dynamic(() => import("./RiderPayoutsTab").then(m => ({ d
 const KitchenPayoutsTab = dynamic(() => import("./KitchenPayoutsTab").then(m => ({ default: m.KitchenPayoutsTab })), { ssr: false });
 const TransactionsTab = dynamic(() => import("./TransactionsTab").then(m => ({ default: m.TransactionsTab })), { ssr: false });
 const ProductsTab = dynamic(() => import("./ProductsTab").then(m => ({ default: m.ProductsTab })), { ssr: false });
-const PartnersTab = dynamic(() => import("./PartnersTab").then(m => ({ default: m.PartnersTab })), { ssr: false });
-
 const TABS = [
   { name: "Overview", icon: LayoutDashboard, component: OverviewTab, section: "Main" },
   { name: "COD Cash", icon: Wallet, component: CODTab, section: "Main" },
@@ -27,10 +25,9 @@ const TABS = [
   { name: "Kitchen Payouts", icon: Utensils, component: KitchenPayoutsTab, section: "Payouts" },
   { name: "Transactions", icon: Receipt, component: TransactionsTab, section: "Reports" },
   { name: "Products", icon: BarChart3, component: ProductsTab, section: "Reports" },
-  { name: "Partners", icon: Store, component: PartnersTab, section: "Partners" },
 ];
 
-const SECTIONS = ["Main", "Payouts", "Reports", "Partners"];
+const SECTIONS = ["Main", "Payouts", "Reports"];
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 // Uses the same phone+OTP system as the rest of the app.

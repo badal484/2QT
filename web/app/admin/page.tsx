@@ -27,6 +27,7 @@ const KitchenHealthTab = dynamic(() => import("./KitchenHealthTab").then(m => ({
 const TeamTab = dynamic(() => import("./TeamTab").then(m => ({ default: m.TeamTab })), { ssr: false });
 const CampaignsTab = dynamic(() => import("./CampaignsTab").then(m => ({ default: m.CampaignsTab })), { ssr: false });
 const ComplaintsTab = dynamic(() => import("./ComplaintsTab").then(m => ({ default: m.ComplaintsTab })), { ssr: false });
+const PartnersTab = dynamic(() => import("./PartnersTab").then(m => ({ default: m.PartnersTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1644,6 +1645,7 @@ const TABS = [
   { name: "Promo Codes", icon: Ticket, component: PromoCodesTab },
   { name: "Zones", icon: MapPin, component: ZonesTab },
   { name: "Kitchens", icon: Store, component: KitchensTab },
+  { name: "Partners", icon: Store, component: PartnersTab },
   { name: "Team", icon: Users, component: TeamTab },
   { name: "Settings", icon: Settings, component: SettingsTab },
 ];
@@ -1721,7 +1723,7 @@ export default function AdminPage() {
         <div className="flex-1 px-3 overflow-y-auto pb-4 space-y-6">
           {[
             { section: "Main", items: ["Overview", "Analytics", "Orders", "Scheduled", "Fleet", "Customers", "Support"] },
-            { section: "Operations", items: ["Menu", "Inventory", "Zones", "Kitchens", "Finance", "Applications"] },
+            { section: "Operations", items: ["Menu", "Inventory", "Zones", "Kitchens", "Partners", "Finance", "Applications"] },
             { section: "System", items: ["Broadcast", "Marketing", "Promo Codes", "Systems", "Settings"] },
           ].map(group => (
             <div key={group.section}>
