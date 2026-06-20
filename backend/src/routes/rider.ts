@@ -437,7 +437,7 @@ router.post('/orders/:id/unclaim', authenticate, requireRole('rider', 'rider_cap
         await withTransaction(async (client) => {
             // 1. Verify rider actually owns this order
             const { rowCount } = await client.query(
-                'UPDATE orders SET rider_id = NULL WHERE id = $1 AND rider_id = $2 AND status IN (\'ready_for_pickup\', \'confirmed\', \'preparing\', \'at_kitchen\', \'ready\')',
+                "UPDATE orders SET rider_id = NULL WHERE id = $1 AND rider_id = $2 AND status IN ('ready_for_pickup', 'confirmed', 'preparing')",
                 [id, riderId]
             );
             
