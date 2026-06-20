@@ -51,8 +51,7 @@ function relativeTime(iso: string) {
 const PREF_ITEMS = [
   { key: 'order_updates', label: 'Order Updates', desc: 'Confirmed, preparing, delivered' },
   { key: 'promotions', label: 'Promotions & Offers', desc: 'Deals, coupons and campaigns' },
-  { key: 'wallet', label: 'Wallet Activity', desc: 'Credits, debits and cashback' },
-  { key: 'loyalty', label: 'Loyalty Rewards', desc: 'Points earned and redeemed' },
+  { key: 'payouts', label: 'Payout Alerts', desc: 'Rider and kitchen payout notifications' },
 ];
 
 const PreferencesTab = () => {
@@ -109,10 +108,10 @@ const PreferencesTab = () => {
           <Text style={styles.prefDesc}>Receive alerts even when app is closed</Text>
         </View>
         <Switch
-          value={p['push'] !== false}
+          value={p['push_enabled'] !== false}
           onValueChange={(val) => {
             haptic();
-            patchMutation.mutate({ push: val });
+            patchMutation.mutate({ push_enabled: val });
           }}
           trackColor={{ false: colors.border, true: colors.primary }}
           thumbColor={colors.white}
