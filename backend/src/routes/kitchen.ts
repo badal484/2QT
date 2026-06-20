@@ -272,12 +272,10 @@ router.post('/shift-handover', authenticate, requireRole('chef', 'super_admin'),
     res.json({ success: true });
 });
 
-export default router;
-
 // ─── Partner Kitchen Earnings (for partner_kitchen role web portal) ────────────
 
 router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_admin'), async (req: AuthRequest, res) => {
-    const kitchenId = (req as any).user.kitchen_id;
+    const kitchenId = req.user!.kitchenId;
     if (!kitchenId) return res.status(400).json({ error: 'No kitchen linked to this account' });
 
     try {
@@ -304,7 +302,7 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
                           status, paid_at, upi_reference
                    FROM kitchen_payouts WHERE kitchen_id=$1 ORDER BY created_at DESC LIMIT 12`, [kitchenId]),
             query(`SELECT o.display_id, o.total_amount_paise, o.kitchen_payout_paise, o.commission_paise,
-                          o.status, o.payment_type, o.updated_at
+                          o.status, o.payment_method, o.updated_at
                    FROM orders o WHERE o.kitchen_id=$1 AND o.status='delivered'
                    ORDER BY o.updated_at DESC LIMIT 20`, [kitchenId]),
         ]);
@@ -323,3 +321,5 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
         res.status(500).json({ error: 'Failed to fetch earnings' });
     }
 });
+
+export default router;

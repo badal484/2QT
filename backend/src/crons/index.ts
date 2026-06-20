@@ -143,8 +143,8 @@ export const initCrons = () => {
         console.log('[CRON] Checking for orders with no rider...');
         const { rows: stuckOrders } = await query(`
             SELECT id, display_id FROM orders 
-            WHERE status = 'confirmed' 
-            AND rider_id IS NULL 
+            WHERE status = 'ready_for_pickup'
+            AND rider_id IS NULL
             AND created_at < NOW() - INTERVAL '10 minutes'
         `);
 
