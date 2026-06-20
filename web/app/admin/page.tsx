@@ -1666,7 +1666,7 @@ export default function AdminPage() {
       return;
     } 
     
-    if (user.role !== "super_admin") {
+    if (!["super_admin", "admin"].includes(user.role)) {
       router.push("/menu");
       return;
     }
