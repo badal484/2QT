@@ -1,167 +1,250 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, StatusBar, StyleSheet, TextInput } from 'react-native';
+import {
+  View, Text, TouchableOpacity, ScrollView, ActivityIndicator,
+  Alert, StatusBar, StyleSheet, TextInput,
+} from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, Landmark, History, Clock, ArrowUpRight, ShieldCheck, AlertCircle } from 'lucide-react-native';
+import {
+  ArrowLeft, Zap, CheckCircle, Clock, ArrowUpRight,
+  ShieldCheck, AlertCircle, Pencil,
+} from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const G = {
+  bg: '#07080A', surface: '#10141A', card: '#161C25',
+  accent: '#10B981', accentDim: 'rgba(16,185,129,0.12)',
+  orange: '#F97316', orangeDim: 'rgba(249,115,22,0.12)',
+  amber: '#F59E0B', amberDim: 'rgba(245,158,11,0.12)',
+  white: '#FFFFFF', muted: '#6B7A8D', border: 'rgba(255,255,255,0.07)',
+};
 
 const PayoutsScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
-  const [upiId, setUpiId] = useState('');
+  const [upiInput, setUpiInput] = useState('');
+  const [editingUpi, setEditingUpi] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['rider-payouts-history'],
     queryFn: () => api.get('/riders/payouts'),
   });
 
-  const withdrawMutation = useMutation({
-    mutationFn: () => api.post('/riders/payouts/request', { amountPaise: data?.pendingAmountPaise, upiId }),
+  const saveUpiMutation = useMutation({
+    mutationFn: () => api.patch('/riders/upi', { upiId: upiInput.trim() }),
     onSuccess: () => {
-      setUpiId('');
+      setEditingUpi(false);
+      setUpiInput('');
       queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
-      Alert.alert('Request Sent', 'Your instant settlement request was submitted to the treasury desk.');
+      Alert.alert('UPI Saved!', 'Your earnings will be automatically transferred to this UPI every night at 11:45 PM.');
     },
-    onError: (err: any) => {
-      Alert.alert('Settlement Failed', err.response?.data?.message || err.message || 'Unable to request settlement.');
-    }
+    onError: (err: any) => Alert.alert('Error', err.message || 'Could not save UPI'),
   });
 
-  if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
-    </View>
-  );
+  const requestMutation = useMutation({
+    mutationFn: () => api.post('/riders/payouts/request', {
+      amountPaise: data?.pendingAmountPaise,
+      upiId: data?.storedUpiId || upiInput.trim(),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
+      Alert.alert('Request Sent', 'Finance will process your settlement.');
+    },
+    onError: (err: any) => Alert.alert('Failed', err.response?.data?.message || err.message || 'Try again'),
+  });
 
-  const pendingAmount = data?.pendingAmountPaise || 0;
-  const pendingRupees = (pendingAmount / 100).toFixed(2);
-  const canWithdraw = pendingAmount >= 10000; // ₹100 minimum threshold
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: G.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={G.accent} />
+      </View>
+    );
+  }
+
+  const pendingPaise  = data?.pendingAmountPaise || 0;
+  const storedUpi     = data?.storedUpiId as string | null;
+  const todayPaise    = data?.todayEarningsPaise || 0;
+  const todayOrders   = data?.todayDeliveries || 0;
+  const canRequest    = pendingPaise >= 10000;
+  const autoPayActive = !!storedUpi;
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <SafeAreaView style={styles.content} edges={['top']}>
-        {/* Premium Header */}
+    <View style={{ flex: 1, backgroundColor: G.bg }}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            activeOpacity={0.7}
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <ArrowLeft size={20} color="#FFFFFF" />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+            <ArrowLeft size={20} color={G.white} />
           </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.terminalLabel}>ACCOUNT // SETTLEMENTS</Text>
-            <Text style={styles.headerTitle}>Squad Settlements</Text>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={styles.headerSup}>EARNINGS</Text>
+            <Text style={styles.headerTitle}>Payouts</Text>
           </View>
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView 
-          style={styles.scrollView} 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {/* Balance Card */}
-          <View style={styles.balanceCard}>
-            <View style={styles.balanceHeader}>
-              <View style={styles.balanceIconWrapper}>
-                <Landmark size={20} color="#FF6B35" />
-              </View>
-              <View>
-                <Text style={styles.balanceLabel}>AVAILABLE CLEARANCE</Text>
-                <Text style={styles.balanceSubLabel}>Transferable Ledger Balance</Text>
-              </View>
-            </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 48, gap: 16 }}>
 
-            <View style={styles.amountContainer}>
-              <Text style={styles.currencySymbol}>₹</Text>
-              <Text style={styles.balanceAmount}>{pendingRupees}</Text>
+          {/* Today's earnings snapshot */}
+          <View style={[styles.card, { flexDirection: 'row', gap: 12 }]}>
+            <View style={[styles.stat, { flex: 1 }]}>
+              <Text style={styles.statLabel}>TODAY'S EARNINGS</Text>
+              <Text style={styles.statValue}>₹{(todayPaise / 100).toFixed(0)}</Text>
             </View>
+            <View style={[styles.divider]} />
+            <View style={[styles.stat, { flex: 1 }]}>
+              <Text style={styles.statLabel}>DELIVERIES</Text>
+              <Text style={styles.statValue}>{todayOrders}</Text>
+            </View>
+          </View>
 
-            <View style={styles.nextPayoutBox}>
-              <Clock size={14} color="#94A3B8" style={{ marginRight: 8 }} />
-              <Text style={styles.nextPayoutText}>
-                AUTO-SETTLEMENT ON FRIDAYS AT 10:00 AM
+          {/* Pending balance */}
+          <View style={[styles.card, { borderColor: autoPayActive ? 'rgba(16,185,129,0.25)' : G.border }]}>
+            <Text style={styles.balLabel}>TOTAL PENDING</Text>
+            <Text style={styles.balAmount}>₹{(pendingPaise / 100).toFixed(0)}</Text>
+
+            <View style={[styles.scheduleRow, autoPayActive && { borderColor: 'rgba(16,185,129,0.2)', backgroundColor: G.accentDim }]}>
+              {autoPayActive
+                ? <CheckCircle size={14} color={G.accent} />
+                : <Clock size={14} color={G.muted} />
+              }
+              <Text style={[styles.scheduleText, autoPayActive && { color: G.accent }]}>
+                {autoPayActive ? 'AUTO-PAY ACTIVE · Every night 11:45 PM' : 'Set UPI below to enable daily auto-pay'}
               </Text>
             </View>
           </View>
 
-          {/* Conditional Instant Withdrawal Actions */}
-          {canWithdraw ? (
-            <View style={styles.upiInputContainer}>
-              <Text style={styles.upiLabel}>UPI ID FOR SETTLEMENT</Text>
-              <TextInput 
-                style={styles.upiInput}
-                placeholder="e.g. rider@ybl"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={upiId}
-                onChangeText={setUpiId}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity 
-                activeOpacity={0.9}
-                onPress={() => {
-                  if (!upiId) return Alert.alert('Missing Info', 'Please enter your UPI ID');
-                  Alert.alert(
-                    'Confirm Instant Settlement', 
-                    `Withdraw ₹${pendingRupees} immediately to ${upiId}?`, 
-                    [
-                      { text: 'Decline', style: 'cancel' },
-                      { text: 'Authorize Payout', onPress: () => withdrawMutation.mutate() }
-                    ]
-                  );
-                }}
-                style={styles.withdrawBtnActive}
-              >
-                <ArrowUpRight size={18} color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.withdrawBtnTextActive}>Instant Bank Withdrawal</Text>
-              </TouchableOpacity>
+          {/* Auto-pay UPI setup */}
+          <View style={[styles.card, { borderColor: autoPayActive ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[styles.iconWrap, { backgroundColor: autoPayActive ? G.accentDim : G.amberDim }]}>
+                  <Zap size={16} color={autoPayActive ? G.accent : G.amber} />
+                </View>
+                <Text style={styles.sectionTitle}>
+                  {autoPayActive ? 'Daily Auto-Pay' : 'Enable Daily Auto-Pay'}
+                </Text>
+              </View>
+              {autoPayActive && !editingUpi && (
+                <TouchableOpacity onPress={() => { setEditingUpi(true); setUpiInput(storedUpi || ''); }} activeOpacity={0.7}>
+                  <Pencil size={16} color={G.muted} />
+                </TouchableOpacity>
+              )}
             </View>
-          ) : (
-            <View style={styles.withdrawBtnInactive}>
-              <AlertCircle size={16} color="#475569" style={{ marginRight: 8 }} />
-              <Text style={styles.withdrawBtnTextInactive}>
-                Withdraw Locked (Min threshold ₹100)
-              </Text>
-            </View>
+
+            {autoPayActive && !editingUpi ? (
+              <>
+                <View style={styles.upiDisplay}>
+                  <CheckCircle size={16} color={G.accent} />
+                  <Text style={styles.upiDisplayText}>{storedUpi}</Text>
+                </View>
+                <Text style={styles.upiHint}>Your today's earnings will be transferred here at 11:45 PM every night</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.upiHint}>
+                  {editingUpi ? 'Enter new UPI ID to update:' : 'Enter your UPI ID once — we transfer earnings automatically every night:'}
+                </Text>
+                <TextInput
+                  style={styles.upiInput}
+                  placeholder="yourname@upi"
+                  placeholderTextColor={G.muted}
+                  value={upiInput}
+                  onChangeText={setUpiInput}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  {editingUpi && (
+                    <TouchableOpacity onPress={() => setEditingUpi(false)} style={[styles.saveBtn, { flex: 1, backgroundColor: G.surface }]} activeOpacity={0.8}>
+                      <Text style={[styles.saveBtnText, { color: G.muted }]}>Cancel</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!upiInput.trim()) return Alert.alert('Required', 'Enter your UPI ID');
+                      saveUpiMutation.mutate();
+                    }}
+                    style={[styles.saveBtn, { flex: 2, backgroundColor: G.accent, opacity: saveUpiMutation.isPending ? 0.6 : 1 }]}
+                    disabled={saveUpiMutation.isPending}
+                    activeOpacity={0.88}
+                  >
+                    {saveUpiMutation.isPending
+                      ? <ActivityIndicator size="small" color={G.bg} />
+                      : <Text style={styles.saveBtnText}>Save & Activate Auto-Pay</Text>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Manual request (secondary) */}
+          {canRequest && (
+            <TouchableOpacity
+              onPress={() => {
+                const upi = storedUpi || upiInput.trim();
+                if (!upi) return Alert.alert('UPI Required', 'Set your UPI above first');
+                Alert.alert(
+                  'Request Manual Payout',
+                  `Request ₹${(pendingPaise / 100).toFixed(0)} to ${upi}?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Request', onPress: () => requestMutation.mutate() },
+                  ]
+                );
+              }}
+              style={[styles.manualBtn, requestMutation.isPending && { opacity: 0.6 }]}
+              disabled={requestMutation.isPending}
+              activeOpacity={0.85}
+            >
+              <ArrowUpRight size={16} color={G.white} />
+              <Text style={styles.manualBtnText}>Request Manual Payout</Text>
+            </TouchableOpacity>
           )}
 
-          {/* History Header */}
-          <View style={styles.historyHeaderRow}>
-            <History size={16} color="#FF6B35" style={{ marginRight: 8 }} />
-            <Text style={styles.historySectionTitle}>LEDGER TRANSFERS</Text>
+          {/* History */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <ShieldCheck size={14} color={G.orange} />
+            <Text style={[styles.sectionTitle, { color: G.orange }]}>PAYOUT HISTORY</Text>
           </View>
-          
-          {/* History List */}
-          {data?.payouts?.length === 0 ? (
-            <View style={styles.emptyHistory}>
-              <Landmark size={36} color="#475569" />
-              <Text style={styles.emptyText}>No historical settlements recorded.</Text>
+
+          {(!data?.payouts || data.payouts.length === 0) ? (
+            <View style={styles.emptyCard}>
+              <AlertCircle size={32} color={G.muted} />
+              <Text style={styles.emptyText}>No payouts recorded yet</Text>
             </View>
           ) : (
-            data?.payouts?.map((payout: any) => {
-              const isPaid = payout.status === 'paid';
+            data.payouts.map((p: any) => {
+              const isPaid = p.status === 'paid';
+              const isAuto = p.payout_mode === 'auto';
               return (
-                <View key={payout.id} style={styles.payoutCard}>
-                  <View style={styles.payoutLeft}>
-                    <View style={[styles.payoutIconContainer, isPaid ? styles.iconPaid : styles.iconPending]}>
-                      <ShieldCheck size={18} color={isPaid ? '#22C55E' : '#FF6B35'} />
-                    </View>
-                    <View style={styles.payoutDetails}>
-                      <Text style={styles.payoutDate}>
-                        {new Date(payout.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </Text>
-                      <Text style={styles.payoutRef}>TXN-REF-{payout.id.slice(0, 8).toUpperCase()}</Text>
+                <View key={p.id} style={styles.payoutRow}>
+                  <View style={[styles.payoutIcon, { backgroundColor: isPaid ? G.accentDim : G.orangeDim }]}>
+                    <ShieldCheck size={16} color={isPaid ? G.accent : G.orange} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.payoutDate}>
+                      {new Date(p.week_start || p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                      <View style={[styles.badge, isPaid ? styles.badgePaid : styles.badgePending]}>
+                        <Text style={[styles.badgeText, { color: isPaid ? G.accent : G.orange }]}>
+                          {p.status.toUpperCase()}
+                        </Text>
+                      </View>
+                      {isAuto && (
+                        <View style={[styles.badge, { backgroundColor: 'rgba(139,92,246,0.12)' }]}>
+                          <Text style={[styles.badgeText, { color: '#A78BFA' }]}>AUTO</Text>
+                        </View>
+                      )}
+                      {p.utr_number && (
+                        <Text style={styles.utrText}>UTR: {p.utr_number}</Text>
+                      )}
                     </View>
                   </View>
-                  <View style={styles.payoutRight}>
-                    <Text style={styles.payoutAmount}>₹{payout.net_amount_paise / 100}</Text>
-                    <View style={[styles.statusBadge, isPaid ? styles.badgePaid : styles.badgePending]}>
-                      <Text style={[styles.statusBadgeText, isPaid ? styles.textPaid : styles.textPending]}>
-                        {payout.status.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
+                  <Text style={styles.payoutAmt}>₹{(p.net_amount_paise / 100).toFixed(0)}</Text>
                 </View>
               );
             })
@@ -173,309 +256,81 @@ const PayoutsScreen = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0B0C10',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#0B0C10',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    flex: 1,
-  },
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-    backgroundColor: '#0D0E15',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1.5,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16,
+    borderBottomWidth: 1, borderBottomColor: G.border,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#161726',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+  backBtn: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: G.surface,
+    alignItems: 'center', justifyContent: 'center',
   },
-  headerTitleContainer: {
-    alignItems: 'center',
+  headerSup: { color: G.orange, fontSize: 8, fontWeight: '900', letterSpacing: 2 },
+  headerTitle: { color: G.white, fontSize: 18, fontWeight: '900', marginTop: 1 },
+
+  card: {
+    backgroundColor: G.surface, borderRadius: 20, padding: 20,
+    borderWidth: 1, borderColor: G.border,
   },
-  terminalLabel: {
-    color: '#FF6B35',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 2,
+  stat: { alignItems: 'center' },
+  statLabel: { color: G.muted, fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
+  statValue: { color: G.white, fontSize: 28, fontWeight: '900', marginTop: 6, letterSpacing: -1 },
+  divider: { width: 1, backgroundColor: G.border },
+
+  balLabel: { color: G.muted, fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
+  balAmount: { color: G.white, fontSize: 44, fontWeight: '900', letterSpacing: -2, marginTop: 6, marginBottom: 16 },
+  scheduleRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: G.card, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: G.border,
   },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 2,
+  scheduleText: { color: G.muted, fontSize: 10, fontWeight: '700', flex: 1 },
+
+  iconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { color: G.white, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
+  upiDisplay: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: G.accentDim, borderRadius: 12, padding: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: 'rgba(16,185,129,0.2)',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 24,
-    paddingBottom: 40,
-  },
-  balanceCard: {
-    backgroundColor: '#161726',
-    padding: 24,
-    borderRadius: 28,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  balanceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  balanceIconWrapper: {
-    width: 44,
-    height: 44,
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.15)',
-  },
-  balanceLabel: {
-    color: '#FF6B35',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-  },
-  balanceSubLabel: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  amountContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 20,
-  },
-  currencySymbol: {
-    color: '#94A3B8',
-    fontSize: 28,
-    fontWeight: '900',
-    marginRight: 4,
-  },
-  balanceAmount: {
-    color: '#FFFFFF',
-    fontSize: 44,
-    fontWeight: '900',
-    letterSpacing: -1,
-  },
-  nextPayoutBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0D0E15',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
-  },
-  nextPayoutText: {
-    color: '#94A3B8',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1,
-    flex: 1,
-  },
-  upiInputContainer: {
-    backgroundColor: '#1A1A2E',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    marginBottom: 24,
-  },
-  upiLabel: {
-    color: '#FF6B35',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
-    marginBottom: 12,
-  },
+  upiDisplayText: { color: G.accent, fontWeight: '800', fontSize: 14, fontFamily: 'monospace' },
+  upiHint: { color: G.muted, fontSize: 12, lineHeight: 18, marginBottom: 14 },
   upiInput: {
-    backgroundColor: '#161726',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 20,
+    backgroundColor: G.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
+    color: G.white, fontSize: 15, fontWeight: '700',
+    borderWidth: 1, borderColor: G.border, marginBottom: 14,
   },
-  withdrawBtnActive: {
-    backgroundColor: '#FF6B35',
-    height: 60,
-    borderRadius: 20,
-    marginBottom: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 15,
-    elevation: 4,
+  saveBtn: {
+    borderRadius: 14, paddingVertical: 15, alignItems: 'center', justifyContent: 'center',
   },
-  withdrawBtnTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    fontSize: 13,
+  saveBtnText: { color: G.bg, fontWeight: '900', fontSize: 13 },
+
+  manualBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: G.surface, borderRadius: 14, paddingVertical: 14,
+    borderWidth: 1, borderColor: G.border,
   },
-  withdrawBtnInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    height: 60,
-    borderRadius: 20,
-    marginBottom: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  manualBtnText: { color: G.white, fontWeight: '700', fontSize: 13 },
+
+  emptyCard: {
+    backgroundColor: G.surface, borderRadius: 20, paddingVertical: 48,
+    alignItems: 'center', gap: 10, borderWidth: 1, borderColor: G.border,
   },
-  withdrawBtnTextInactive: {
-    color: '#475569',
-    fontWeight: '800',
-    fontSize: 12,
+  emptyText: { color: G.muted, fontWeight: '700', fontSize: 13 },
+
+  payoutRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: G.surface, borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: G.border,
   },
-  historyHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 4,
-  },
-  historySectionTitle: {
-    color: '#FF6B35',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  emptyHistory: {
-    paddingVertical: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#161726',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  emptyText: {
-    color: '#64748B',
-    fontWeight: '700',
-    fontSize: 13,
-    marginTop: 12,
-  },
-  payoutCard: {
-    backgroundColor: '#161726',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-  },
-  payoutLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  payoutIconContainer: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  iconPaid: {
-    backgroundColor: 'rgba(34, 197, 94, 0.08)',
-  },
-  iconPending: {
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-  },
-  payoutDetails: {
-    justifyContent: 'center',
-  },
-  payoutDate: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  payoutRef: {
-    color: '#64748B',
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  payoutRight: {
-    alignItems: 'flex-end',
-  },
-  payoutAmount: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 18,
-    letterSpacing: -0.5,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginTop: 4,
-  },
-  badgePaid: {
-    backgroundColor: 'rgba(34, 197, 94, 0.08)',
-  },
-  badgePending: {
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-  },
-  statusBadgeText: {
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  textPaid: {
-    color: '#22C55E',
-  },
-  textPending: {
-    color: '#FF6B35',
-  },
+  payoutIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  payoutDate: { color: G.white, fontWeight: '800', fontSize: 14 },
+  badge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  badgePaid: { backgroundColor: G.accentDim },
+  badgePending: { backgroundColor: G.orangeDim },
+  badgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  utrText: { color: G.muted, fontSize: 9, fontWeight: '700', fontFamily: 'monospace', alignSelf: 'center' },
+  payoutAmt: { color: G.white, fontWeight: '900', fontSize: 18, letterSpacing: -0.5 },
 });
 
 export default PayoutsScreen;
