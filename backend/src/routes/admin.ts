@@ -73,7 +73,7 @@ router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), asyn
     try {
         const { rows: activeOrders } = await query('SELECT count(*) FROM orders WHERE status NOT IN (\'delivered\', \'cancelled\')');
         const { rows: revenue } = await query('SELECT sum(total_amount_paise) FROM orders WHERE payment_status = \'paid\' AND created_at >= CURRENT_DATE');
-        const { rows: ridersOnline } = await query('SELECT count(*) FROM users WHERE role = \'rider\' AND is_online = true');
+        const { rows: ridersOnline } = await query("SELECT count(*) FROM users WHERE role IN ('rider', 'rider_captain') AND is_online = true");
         const { rows: lowStock } = await query('SELECT count(*) FROM ingredients WHERE current_stock_grams <= reorder_threshold_grams');
 
         res.json({
@@ -325,10 +325,10 @@ router.post('/rider-applications/:id/:action', authenticate, requireRole('super_
 
 router.get('/riders', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows: riders } = await query(`
-        SELECT u.id, u.name, u.phone, u.is_online, u.current_order_id, o.display_id as active_order_display_id
+        SELECT u.id, u.name, u.phone, u.is_online, u.is_verified, u.current_order_id, o.display_id as active_order_display_id
         FROM users u
         LEFT JOIN orders o ON u.current_order_id = o.id
-        WHERE u.role = 'rider'
+        WHERE u.role IN ('rider', 'rider_captain')
     `);
 
     const locations = await Promise.all(
@@ -430,6 +430,10 @@ router.patch('/orders/:id/status', authenticate, requireRole('super_admin', 'adm
 router.post('/riders/:id/verify', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const id = req.params.id as string;
     await query('UPDATE users SET is_verified = true, is_active = true WHERE id = $1', [id]);
+    const { rows } = await query('SELECT phone, name FROM users WHERE id = $1', [id]);
+    if (rows[0]?.phone) {
+        await notificationsQueue.add('rider_verified', { phone: rows[0].phone, name: rows[0].name });
+    }
     emitToUser(id, 'user_updated', { is_verified: true, is_active: true });
     res.json({ success: true });
 });
@@ -1122,8 +1126,6 @@ router.patch('/team/users/:id/deactivate', authenticate, requireRole('super_admi
     }
 });
 
-export default router;
-
 // ─── Partner Applications (admin reviews who joins the platform) ──────────────
 
 router.get('/partners/applications', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
@@ -1268,3 +1270,5 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
         res.status(500).json({ error: 'Failed to update kitchen' });
     }
 });
+
+export default router;
