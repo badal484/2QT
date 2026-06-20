@@ -37,7 +37,18 @@ router.get('/mine', authenticate, async (req: AuthRequest, res) => {
 
 router.get('/active', authenticate, async (req: AuthRequest, res) => {
     const { rows } = await query(
-        'SELECT * FROM orders WHERE customer_id = $1 AND status NOT IN (\'delivered\', \'cancelled\')',
+        `SELECT o.*, a.address_text as delivery_address_text,
+                COALESCE(
+                    (SELECT json_agg(json_build_object(
+                        'menu_item_name', oi.menu_item_name,
+                        'quantity', oi.quantity,
+                        'price_paise', oi.price_paise,
+                        'menu_item_id', oi.menu_item_id
+                    )) FROM order_items oi WHERE oi.order_id = o.id), '[]'::json
+                ) as items
+         FROM orders o
+         LEFT JOIN addresses a ON o.address_id = a.id
+         WHERE o.customer_id = $1 AND o.status NOT IN ('delivered', 'cancelled')`,
         [req.user!.userId]
     );
     res.json({ activeOrders: rows });
