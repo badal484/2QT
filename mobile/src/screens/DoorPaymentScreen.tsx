@@ -101,8 +101,8 @@ const DoorPaymentScreen = ({ route, navigation }: any) => {
   };
 
   const handleCash = () => {
-    // Cash — no API call needed (already cod_pending). Go straight to OTP.
-    navigation.replace('DeliveryOTP', { orderId });
+    // Cash — no API call needed (already cod_pending). Go to OTP, pass cash flag.
+    navigation.replace('DeliveryOTP', { orderId, isCashCod: true, amountPaise: totalAmountPaise, displayId });
   };
 
   const proceedToOTP = () => navigation.replace('DeliveryOTP', { orderId });

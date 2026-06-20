@@ -110,13 +110,16 @@ router.get('/cod/pending', financeAccess, financeRole, async (req: AuthRequest, 
     const { rows } = await query(`
       SELECT
         o.id, o.display_id, o.total_amount_paise, o.created_at, o.updated_at,
+        o.cash_submit_requested_at,
         u.id AS rider_id, u.name AS rider_name, u.phone AS rider_phone
       FROM orders o
       JOIN users u ON o.rider_id = u.id
       WHERE o.payment_method = 'cod'
         AND o.status = 'delivered'
         AND o.cod_cash_collected = FALSE
-      ORDER BY o.updated_at DESC
+      ORDER BY
+        o.cash_submit_requested_at DESC NULLS LAST,
+        o.updated_at DESC
     `);
     res.json({ orders: rows });
   } catch (err) {

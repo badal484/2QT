@@ -567,4 +567,43 @@ router.post('/confirm-door-payment', authenticate, requireRole('rider', 'rider_c
     }
 });
 
+// POST /riders/submit-cash-to-finance
+// Rider physically hands cash to finance person at kitchen and taps this button.
+// Creates a real-time signal in the finance COD dashboard.
+router.post('/submit-cash-to-finance', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { orderId } = req.body;
+    const riderId = req.user!.userId;
+
+    if (!orderId) return res.status(400).json({ error: 'orderId required' });
+
+    try {
+        const { rows } = await query(
+            `SELECT id, payment_method, status, cod_cash_collected, total_amount_paise, display_id
+             FROM orders WHERE id = $1 AND rider_id = $2`,
+            [orderId, riderId]
+        );
+        if (!rows.length) return res.status(404).json({ error: 'Order not found' });
+        const order = rows[0];
+
+        if (order.payment_method !== 'cod') return res.status(400).json({ error: 'Not a COD order' });
+        if (order.status !== 'delivered') return res.status(400).json({ error: 'Order not yet delivered' });
+        if (order.cod_cash_collected) return res.status(409).json({ error: 'Cash already confirmed by finance' });
+
+        await query(
+            'UPDATE orders SET cash_submit_requested_at = NOW() WHERE id = $1',
+            [orderId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Finance has been notified. Hand over the cash and wait for confirmation.',
+            amountPaise: order.total_amount_paise,
+            displayId: order.display_id,
+        });
+    } catch (err) {
+        console.error('[rider/submit-cash-to-finance]', err);
+        res.status(500).json({ error: 'Failed to submit' });
+    }
+});
+
 export default router;

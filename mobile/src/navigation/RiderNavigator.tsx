@@ -4,6 +4,7 @@ import RiderHomeScreen from '../screens/RiderHomeScreen';
 import AssignedOrderScreen from '../screens/AssignedOrderScreen';
 import DeliveryOTPScreen from '../screens/DeliveryOTPScreen';
 import DoorPaymentScreen from '../screens/DoorPaymentScreen';
+import CashSubmitScreen from '../screens/CashSubmitScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PayoutsScreen from '../screens/PayoutsScreen';
 import EarningsScreen from '../screens/EarningsScreen';
@@ -31,6 +32,7 @@ const RiderNavigator = () => {
           <Stack.Screen name="AssignedOrder" component={AssignedOrderScreen} />
           <Stack.Screen name="DoorPayment" component={DoorPaymentScreen} />
           <Stack.Screen name="DeliveryOTP" component={DeliveryOTPScreen} />
+          <Stack.Screen name="CashSubmit" component={CashSubmitScreen} />
           <Stack.Screen name="Payouts" component={PayoutsScreen} />
           <Stack.Screen name="Earnings" component={EarningsScreen} />
           <Stack.Screen name="RiderHistory" component={RiderHistoryScreen} />
