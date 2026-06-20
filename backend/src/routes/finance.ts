@@ -369,7 +369,7 @@ router.post('/kitchen-payouts/generate', financeAccess, financeRole, async (req:
 
 router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const { upiReference, notes } = req.body as { upiReference?: string; notes?: string };
+  const { upiReference, bankReference, notes } = req.body as { upiReference?: string; bankReference?: string; notes?: string };
   try {
     const { rows: kpRows } = await query(`
       SELECT kp.*, k.name AS kitchen_name, k.upi_id, k.contact_phone,
@@ -411,9 +411,9 @@ router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async 
       UPDATE kitchen_payouts
       SET status = 'paid', paid_at = NOW(), approved_by = $2,
           razorpay_payout_id = $3, utr_number = $4,
-          payout_mode = $5, notes = $6, updated_at = NOW()
+          payout_mode = $5, notes = $6, bank_reference = $7, updated_at = NOW()
       WHERE id = $1 RETURNING *
-    `, [id, req.user!.userId, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual', notes || null]);
+    `, [id, req.user!.userId, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual', notes || null, bankReference || null]);
 
     res.json({ success: true, payout: rows[0], autoTransferred: autoMode });
   } catch (err) {
@@ -545,7 +545,7 @@ router.get('/products/revenue', financeAccess, financeRole, async (req: AuthRequ
 
     if (startDate) { conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') >= $${p++}`); params.push(startDate); }
     if (endDate) { conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') <= $${p++}`); params.push(endDate); }
-    if (kitchenId) { conditions.push(`oi.kitchen_id = $${p++}`); params.push(kitchenId); }
+    if (kitchenId) { conditions.push(`mi.kitchen_id = $${p++}`); params.push(kitchenId); }
 
     const { rows } = await query(`
       SELECT
@@ -553,8 +553,8 @@ router.get('/products/revenue', financeAccess, financeRole, async (req: AuthRequ
         k.name AS kitchen_name,
         COUNT(oi.id) AS units_sold,
         COALESCE(SUM(oi.quantity), 0) AS total_quantity,
-        COALESCE(SUM(oi.unit_price_paise * oi.quantity), 0) AS total_revenue_paise,
-        AVG(oi.unit_price_paise) AS avg_price_paise
+        COALESCE(SUM(oi.price_paise * oi.quantity), 0) AS total_revenue_paise,
+        AVG(oi.price_paise) AS avg_price_paise
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       JOIN menu_items mi ON oi.menu_item_id = mi.id

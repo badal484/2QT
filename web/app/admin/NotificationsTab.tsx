@@ -172,7 +172,7 @@ function BroadcastPanel() {
     if (!title.trim() || !message.trim()) return toast.error("Title and message required");
     setSending(true);
     try {
-      await api.post("/admin/marketing/broadcast", {
+      await api.post("/admin/broadcast", {
         segment,
         zoneId: segment === "zone" ? zoneId : undefined,
         title,
