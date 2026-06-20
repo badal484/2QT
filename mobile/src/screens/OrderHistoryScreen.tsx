@@ -1,6 +1,6 @@
 import { Package, RotateCcw, ArrowLeft, Bike, AlertTriangle, Download, FileText } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable, TextInput } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ENV } from '../config/env';
@@ -27,12 +27,25 @@ const getStatusMeta = (s: string) =>
 
 const BACKEND_URL = ENV.API_URL.replace('/api/v1', '');
 
+const COMPLAINT_TYPES = [
+  { key: 'wrong_item',     label: 'Wrong item delivered' },
+  { key: 'missing_item',   label: 'Item was missing' },
+  { key: 'quality_issue',  label: 'Quality was bad' },
+  { key: 'late_delivery',  label: 'Very late delivery' },
+  { key: 'rude_rider',     label: 'Rude delivery rider' },
+  { key: 'other',          label: 'Other issue' },
+];
+
 const OrderHistoryScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState<Set<string>>(new Set());
+  const [complaintOrderId, setComplaintOrderId] = useState<string | null>(null);
+  const [complaintType, setComplaintType] = useState('wrong_item');
+  const [complaintDesc, setComplaintDesc] = useState('');
+  const [complaintLoading, setComplaintLoading] = useState(false);
 
   const openInvoice = async (orderId: string) => {
     setInvoiceLoading(prev => new Set(prev).add(orderId));
@@ -46,6 +59,29 @@ const OrderHistoryScreen = ({ navigation }: any) => {
       Alert.alert('Error', 'Could not generate invoice. Please try again.');
     } finally {
       setInvoiceLoading(prev => { const s = new Set(prev); s.delete(orderId); return s; });
+    }
+  };
+
+  const submitComplaint = async () => {
+    if (!complaintOrderId || !complaintDesc.trim()) {
+      Alert.alert('Missing info', 'Please describe your issue.');
+      return;
+    }
+    setComplaintLoading(true);
+    try {
+      await api.post('/complaints', {
+        order_id: complaintOrderId,
+        type: complaintType,
+        description: complaintDesc.trim(),
+      });
+      setComplaintOrderId(null);
+      setComplaintDesc('');
+      setComplaintType('wrong_item');
+      Alert.alert('Submitted', 'We have received your complaint and will respond within 2 hours.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Could not submit complaint. Please try again.');
+    } finally {
+      setComplaintLoading(false);
     }
   };
 
@@ -194,19 +230,31 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                   ) : (
                     <View style={{ flexDirection: 'row' }}>
                       {order.status === 'delivered' && (
-                        <TouchableOpacity
-                          style={[styles.reorderBtn, styles.invoiceBtn]}
-                          onPress={() => openInvoice(order.id)}
-                          disabled={invoiceLoading.has(order.id)}
-                        >
-                          {invoiceLoading.has(order.id)
-                            ? <ActivityIndicator size="small" color="#10B981" />
-                            : <>
-                                <Download size={13} color="#10B981" style={{ marginRight: 6 }} />
-                                <Text style={[styles.reorderBtnText, { color: '#10B981' }]}>Invoice</Text>
-                              </>
-                          }
-                        </TouchableOpacity>
+                        <>
+                          <TouchableOpacity
+                            style={[styles.reorderBtn, styles.invoiceBtn]}
+                            onPress={() => openInvoice(order.id)}
+                            disabled={invoiceLoading.has(order.id)}
+                          >
+                            {invoiceLoading.has(order.id)
+                              ? <ActivityIndicator size="small" color="#10B981" />
+                              : <>
+                                  <Download size={13} color="#10B981" style={{ marginRight: 6 }} />
+                                  <Text style={[styles.reorderBtnText, { color: '#10B981' }]}>Invoice</Text>
+                                </>
+                            }
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.reorderBtn, { backgroundColor: '#FEF2F2', marginLeft: 6 }]}
+                            onPress={() => {
+                              ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
+                              setComplaintOrderId(order.id);
+                            }}
+                          >
+                            <AlertTriangle size={13} color="#EF4444" style={{ marginRight: 6 }} />
+                            <Text style={[styles.reorderBtnText, { color: '#EF4444' }]}>Issue</Text>
+                          </TouchableOpacity>
+                        </>
                       )}
                       <TouchableOpacity
                         style={styles.reorderBtn}
@@ -260,6 +308,76 @@ const OrderHistoryScreen = ({ navigation }: any) => {
           ))
         )}
       </ScrollView>
+
+      {/* Complaint Modal */}
+      <Modal
+        visible={!!complaintOrderId}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setComplaintOrderId(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setComplaintOrderId(null)}>
+          <Pressable style={[styles.modalCard, { maxHeight: '80%' }]} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Report an Issue</Text>
+            <Text style={styles.modalSub}>We'll review this and respond within 2 hours.</Text>
+
+            <Text style={[styles.modalSub, { fontWeight: '700', color: '#1A1A2E', marginTop: 16, marginBottom: 8 }]}>What went wrong?</Text>
+            {COMPLAINT_TYPES.map(ct => (
+              <TouchableOpacity
+                key={ct.key}
+                onPress={() => setComplaintType(ct.key)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+                  paddingHorizontal: 14, borderRadius: 12, marginBottom: 6,
+                  backgroundColor: complaintType === ct.key ? '#FFF7ED' : '#F9FAFB',
+                  borderWidth: 1.5,
+                  borderColor: complaintType === ct.key ? '#FF6B35' : '#F3F4F6',
+                }}
+              >
+                <View style={{
+                  width: 16, height: 16, borderRadius: 8, borderWidth: 2,
+                  borderColor: complaintType === ct.key ? '#FF6B35' : '#D1D5DB',
+                  backgroundColor: complaintType === ct.key ? '#FF6B35' : 'transparent',
+                  marginRight: 10,
+                }} />
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#1A1A2E' }}>{ct.label}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <Text style={[styles.modalSub, { fontWeight: '700', color: '#1A1A2E', marginTop: 12, marginBottom: 6 }]}>Describe the issue</Text>
+            <TextInput
+              style={{
+                borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14,
+                paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F9FAFB',
+                fontSize: 13, color: '#1A1A2E', minHeight: 80, textAlignVertical: 'top',
+                marginBottom: 16,
+              }}
+              placeholder="e.g. I received biryani instead of pasta..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              value={complaintDesc}
+              onChangeText={setComplaintDesc}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalKeepBtn} onPress={() => setComplaintOrderId(null)} activeOpacity={0.8}>
+                <Text style={styles.modalKeepText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { backgroundColor: '#EF4444' }]}
+                onPress={submitComplaint}
+                disabled={complaintLoading}
+                activeOpacity={0.8}
+              >
+                {complaintLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.modalCancelText}>Submit</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Cancel Confirmation Modal */}
       <Modal

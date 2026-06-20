@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -26,6 +26,7 @@ const PromoCodesTab = dynamic(() => import("./PromoCodesTab").then(m => ({ defau
 const KitchenHealthTab = dynamic(() => import("./KitchenHealthTab").then(m => ({ default: m.KitchenHealthTab })), { ssr: false });
 const TeamTab = dynamic(() => import("./TeamTab").then(m => ({ default: m.TeamTab })), { ssr: false });
 const CampaignsTab = dynamic(() => import("./CampaignsTab").then(m => ({ default: m.CampaignsTab })), { ssr: false });
+const ComplaintsTab = dynamic(() => import("./ComplaintsTab").then(m => ({ default: m.ComplaintsTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1632,6 +1633,7 @@ const TABS = [
   { name: "Fleet", icon: Bike, component: FleetTab },
   { name: "Applications", icon: Info, component: RiderApplicationsTab },
   { name: "Customers", icon: Users, component: CustomersTab },
+  { name: "Complaints", icon: AlertTriangle, component: ComplaintsTab },
   { name: "Support", icon: LifeBuoy, component: SupportTab },
   { name: "Finance", icon: Wallet, component: PayoutsTab },
   { name: "Analytics", icon: BarChart3, component: AnalyticsTab },
