@@ -49,7 +49,7 @@ const WalletScreen = ({ navigation }: any) => {
             currency: 'INR',
             key: data.keyId,
             amount: data.amount,
-            name: '2QT Food Palace',
+            name: '2QT',
             order_id: data.razorpayOrderId,
             prefill: {
                 email: 'customer@example.com',

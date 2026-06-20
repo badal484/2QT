@@ -230,7 +230,7 @@ router.get('/rider-payouts/all-riders', financeAccess, financeRole, async (req: 
       FROM users u
       LEFT JOIN rider_daily_earnings rde ON rde.rider_id = u.id
         AND rde.date >= CURRENT_DATE - INTERVAL '7 days'
-      WHERE u.role IN ('rider', 'rider_captain') AND u.is_active = TRUE
+      WHERE u.role = 'rider' AND u.is_active = TRUE
       GROUP BY u.id, u.name, u.phone
       ORDER BY pending_paise DESC
     `);
@@ -480,7 +480,7 @@ router.get('/transactions', financeAccess, financeRole, async (req: AuthRequest,
           k.name AS kitchen_name,
           r.name AS rider_name
         FROM orders o
-        LEFT JOIN users c ON o.user_id = c.id
+        LEFT JOIN users c ON o.customer_id = c.id
         LEFT JOIN kitchens k ON o.kitchen_id = k.id
         LEFT JOIN users r ON o.rider_id = r.id
         ${where}
@@ -511,7 +511,7 @@ router.get('/transactions', financeAccess, financeRole, async (req: AuthRequest,
           k.name AS kitchen_name,
           r.name AS rider_name
         FROM orders o
-        LEFT JOIN users c ON o.user_id = c.id
+        LEFT JOIN users c ON o.customer_id = c.id
         LEFT JOIN kitchens k ON o.kitchen_id = k.id
         LEFT JOIN users r ON o.rider_id = r.id
         ${where}
