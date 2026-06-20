@@ -84,21 +84,27 @@ export function ZonesTab() {
   };
 
   const save = async (id: string) => {
-    // Compute centroid from polygon so kitchen_lat/lng always reflects real location
-    const pts: { lat: number; lng: number }[] = form.polygon_points || [];
-    const centroidLat = pts.length > 0 ? pts.reduce((s, p) => s + p.lat, 0) / pts.length : undefined;
-    const centroidLng = pts.length > 0 ? pts.reduce((s, p) => s + p.lng, 0) / pts.length : undefined;
-    await api.patch(`/admin/zones/${id}`, {
-      ...form,
-      radius_km: 0,
-      delivery_fee_base_paise: parseInt(form.delivery_fee_base_paise),
-      max_orders_per_hour: parseInt(form.max_orders_per_hour),
-      realistic_delivery_minutes: parseInt(form.realistic_delivery_minutes),
-      ...(centroidLat != null && { kitchen_lat: centroidLat, kitchen_lng: centroidLng }),
-    });
-    setEditing(null);
-    load();
-    toast.success("Zone updated — kitchen coordinates synced");
+    setSaving(true);
+    try {
+      const pts: { lat: number; lng: number }[] = form.polygon_points || [];
+      const centroidLat = pts.length > 0 ? pts.reduce((s, p) => s + Number(p.lat), 0) / pts.length : undefined;
+      const centroidLng = pts.length > 0 ? pts.reduce((s, p) => s + Number(p.lng), 0) / pts.length : undefined;
+      await api.patch(`/admin/zones/${id}`, {
+        ...form,
+        radius_km: 0,
+        delivery_fee_base_paise: parseInt(form.delivery_fee_base_paise || "0", 10),
+        max_orders_per_hour: parseInt(form.max_orders_per_hour || "0", 10),
+        realistic_delivery_minutes: parseInt(form.realistic_delivery_minutes || "0", 10),
+        ...(centroidLat != null && !isNaN(centroidLat) && { kitchen_lat: centroidLat, kitchen_lng: centroidLng }),
+      });
+      setEditing(null);
+      load();
+      toast.success("Zone saved!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save zone");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const executeDeleteZone = async (id: string) => {
@@ -219,8 +225,10 @@ export function ZonesTab() {
                   <div className="flex gap-2">
                     <button onClick={() => setEditing(null)}
                       className="px-3 py-2 rounded-xl bg-white/[0.05] text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10">Cancel</button>
-                    <button onClick={() => save(zone.id)}
-                      className="px-4 py-2 rounded-xl bg-brand-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-dark shadow-lg shadow-brand-primary/30">Save</button>
+                    <button onClick={() => save(zone.id)} disabled={saving}
+                      className="px-4 py-2 rounded-xl bg-brand-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-dark shadow-lg shadow-brand-primary/30 disabled:opacity-60">
+                      {saving ? "Saving…" : "Save"}
+                    </button>
                   </div>
                 )}
               </div>
