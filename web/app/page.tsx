@@ -279,7 +279,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-black/5 text-xs font-medium text-black/40 flex justify-between">
           <span>© 2026 2QT Culinary. All rights reserved.</span>
           <div className="flex gap-6">
-            <Link href="/finance" className="hover:text-brand-dark transition-colors">Partner Portal</Link>
+            <Link href="/kitchen-portal" className="hover:text-brand-dark transition-colors">Kitchen Portal</Link>
+            <Link href="/finance" className="hover:text-brand-dark transition-colors">Finance Portal</Link>
           </div>
         </div>
       </footer>

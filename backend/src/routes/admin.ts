@@ -1123,3 +1123,76 @@ router.patch('/team/users/:id/deactivate', authenticate, requireRole('super_admi
 });
 
 export default router;
+
+// ─── Partner Applications (admin reviews who joins the platform) ──────────────
+
+router.get('/partners/applications', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT id, restaurant_name, owner_name, phone, email, address, city,
+                   cuisine_type, fssai_number, expected_daily_orders, upi_id,
+                   status, rejection_reason, notes, created_at
+            FROM kitchen_applications
+            ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'reviewing' THEN 1 ELSE 2 END, created_at DESC
+        `);
+        res.json({ applications: rows });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch applications' });
+    }
+});
+
+router.patch('/partners/applications/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { status, rejectionReason, notes } = req.body;
+    try {
+        const { rows } = await query(`
+            UPDATE kitchen_applications
+            SET status = COALESCE($1, status),
+                rejection_reason = COALESCE($2, rejection_reason),
+                notes = COALESCE($3, notes),
+                updated_at = NOW()
+            WHERE id = $4
+            RETURNING *
+        `, [status ?? null, rejectionReason ?? null, notes ?? null, id]);
+        res.json({ success: true, application: rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to update application' });
+    }
+});
+
+router.get('/partners/kitchens', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT k.id, k.name AS kitchen_name, k.commission_rate, k.upi_id, k.is_partner,
+                   k.partner_status, k.partner_notes, k.contact_phone, k.contact_email,
+                   COALESCE((SELECT SUM(o.kitchen_payout_paise)
+                        FROM orders o WHERE o.kitchen_id = k.id AND o.status = 'delivered'), 0) AS lifetime_payout_paise
+            FROM kitchens k
+            WHERE k.is_partner = TRUE
+            ORDER BY k.name
+        `);
+        res.json({ kitchens: rows });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch partner kitchens' });
+    }
+});
+
+router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { commissionRate, upiId, isPartner, partnerStatus, partnerNotes } = req.body;
+    try {
+        const { rows } = await query(`
+            UPDATE kitchens SET
+                commission_rate = COALESCE($1, commission_rate),
+                upi_id = COALESCE($2, upi_id),
+                is_partner = COALESCE($3, is_partner),
+                partner_status = COALESCE($4, partner_status),
+                partner_notes = COALESCE($5, partner_notes),
+                partner_approved_at = CASE WHEN $3 = TRUE AND NOT is_partner THEN NOW() ELSE partner_approved_at END
+            WHERE id = $6 RETURNING id, name, commission_rate, is_partner, partner_status
+        `, [commissionRate ?? null, upiId ?? null, isPartner ?? null, partnerStatus ?? null, partnerNotes ?? null, id]);
+        res.json({ success: true, kitchen: rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to update kitchen' });
+    }
+});

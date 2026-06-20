@@ -279,3 +279,53 @@ router.post('/shift-handover', authenticate, requireRole('chef', 'super_admin'),
 });
 
 export default router;
+
+// ─── Partner Kitchen Earnings (for partner_kitchen role web portal) ────────────
+
+router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = (req as any).user.kitchen_id;
+    if (!kitchenId) return res.status(400).json({ error: 'No kitchen linked to this account' });
+
+    try {
+        const now = new Date();
+        const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        const [kitchen, todayRows, weekRows, monthRows, allRows, payoutRows, recentOrders] = await Promise.all([
+            query('SELECT id, name, commission_rate, upi_id, partner_status FROM kitchens WHERE id = $1', [kitchenId]),
+            query(`SELECT COALESCE(SUM(kitchen_payout_paise),0) net, COALESCE(SUM(commission_paise),0) commission,
+                          COALESCE(SUM(total_amount_paise - delivery_fee_paise),0) gross, COUNT(*) orders
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered' AND updated_at >= $2`, [kitchenId, todayStart]),
+            query(`SELECT COALESCE(SUM(kitchen_payout_paise),0) net, COALESCE(SUM(commission_paise),0) commission,
+                          COALESCE(SUM(total_amount_paise - delivery_fee_paise),0) gross, COUNT(*) orders
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered' AND updated_at >= $2`, [kitchenId, weekStart]),
+            query(`SELECT COALESCE(SUM(kitchen_payout_paise),0) net, COALESCE(SUM(commission_paise),0) commission,
+                          COALESCE(SUM(total_amount_paise - delivery_fee_paise),0) gross, COUNT(*) orders
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered' AND updated_at >= $2`, [kitchenId, monthStart]),
+            query(`SELECT COALESCE(SUM(kitchen_payout_paise),0) net, COALESCE(SUM(commission_paise),0) commission,
+                          COALESCE(SUM(total_amount_paise - delivery_fee_paise),0) gross, COUNT(*) orders
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered'`, [kitchenId]),
+            query(`SELECT id, period_start, period_end, gross_sales_paise, commission_paise, net_payout_paise,
+                          status, paid_at, upi_reference
+                   FROM kitchen_payouts WHERE kitchen_id=$1 ORDER BY created_at DESC LIMIT 12`, [kitchenId]),
+            query(`SELECT o.display_id, o.total_amount_paise, o.kitchen_payout_paise, o.commission_paise,
+                          o.status, o.payment_type, o.updated_at
+                   FROM orders o WHERE o.kitchen_id=$1 AND o.status='delivered'
+                   ORDER BY o.updated_at DESC LIMIT 20`, [kitchenId]),
+        ]);
+
+        res.json({
+            kitchen: kitchen.rows[0],
+            today: todayRows.rows[0],
+            thisWeek: weekRows.rows[0],
+            thisMonth: monthRows.rows[0],
+            allTime: allRows.rows[0],
+            payouts: payoutRows.rows,
+            recentOrders: recentOrders.rows,
+        });
+    } catch (err) {
+        console.error('[kitchen/my-earnings]', err);
+        res.status(500).json({ error: 'Failed to fetch earnings' });
+    }
+});
