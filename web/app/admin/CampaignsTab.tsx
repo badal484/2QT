@@ -1,9 +1,8 @@
 "use client";
-import { useState } from "react";
-import { Zap, Clock, Gift, RotateCcw, Cake, TrendingUp, Star, ToggleLeft, ToggleRight, Edit3, X, Check, Loader2, Plus } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Zap, Clock, Gift, RotateCcw, Cake, TrendingUp, Star, ToggleLeft, ToggleRight, Edit3, X, Check, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const TYPE_META: Record<string, { label: string; color: string; icon: any; desc: string }> = {
   welcome:      { label: "Welcome",      color: "orange", icon: Gift,       desc: "First-time user discount" },
@@ -257,13 +256,19 @@ function CampaignCard({ campaign, onRefresh }: { campaign: Campaign; onRefresh: 
 }
 
 export function CampaignsTab() {
-  const qc = useQueryClient();
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["admin-campaigns"],
-    queryFn: () => api.get("/campaigns"),
-  });
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const campaigns: Campaign[] = data?.campaigns ?? [];
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await api.get("/campaigns");
+      setCampaigns(data?.campaigns ?? []);
+    } catch {}
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div className="space-y-6">
@@ -292,7 +297,7 @@ export function CampaignsTab() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {campaigns.map(c => (
-            <CampaignCard key={c.id} campaign={c} onRefresh={() => refetch()}/>
+            <CampaignCard key={c.id} campaign={c} onRefresh={load}/>
           ))}
         </div>
       )}

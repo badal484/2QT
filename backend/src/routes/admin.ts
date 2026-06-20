@@ -806,7 +806,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
         `, [name, radius_km, delivery_fee_base_paise, surge_fee_paise,
             opening_time, closing_time, max_orders_per_hour, is_active,
             realistic_delivery_minutes, surge_enabled,
-            polygon_points ? JSON.stringify(polygon_points) : null, id,
+            polygon_points ?? null, id,
             computedKitchenLat ?? null, computedKitchenLng ?? null]);
         if (rows.length === 0) return res.status(404).json({ error: 'ZONE_NOT_FOUND' });
 
@@ -1127,14 +1127,16 @@ export default router;
 // ─── Partner Applications (admin reviews who joins the platform) ──────────────
 
 router.get('/partners/applications', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { status: statusFilter } = req.query as { status?: string };
     try {
         const { rows } = await query(`
             SELECT id, restaurant_name, owner_name, phone, email, address, city,
                    cuisine_type, fssai_number, expected_daily_orders, upi_id,
-                   status, rejection_reason, notes, created_at
+                   status, rejection_reason, notes, kitchen_id, created_at
             FROM kitchen_applications
+            ${statusFilter ? 'WHERE status = $1' : ''}
             ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'reviewing' THEN 1 ELSE 2 END, created_at DESC
-        `);
+        `, statusFilter ? [statusFilter] : []);
         res.json({ applications: rows });
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch applications' });
@@ -1145,6 +1147,30 @@ router.patch('/partners/applications/:id', authenticate, requireRole('super_admi
     const { id } = req.params;
     const { status, rejectionReason, notes } = req.body;
     try {
+        // When approving: auto-create the kitchen record (idempotent)
+        let kitchenId: string | null = null;
+        if (status === 'approved') {
+            const { rows: appRows } = await query(
+                `SELECT * FROM kitchen_applications WHERE id = $1`, [id]
+            );
+            if (!appRows.length) return res.status(404).json({ error: 'Application not found' });
+            const app = appRows[0];
+
+            if (app.kitchen_id) {
+                kitchenId = app.kitchen_id; // already created
+            } else {
+                const { rows: kRows } = await query(`
+                    INSERT INTO kitchens (name, address, fssai_license, contact_phone, contact_email, upi_id,
+                                         commission_rate, is_partner, is_active, lat, lng)
+                    VALUES ($1, $2, $3, $4, $5, $6, 0.20, TRUE, FALSE, 0, 0)
+                    RETURNING id
+                `, [app.restaurant_name, app.address || '', app.fssai_number || null,
+                    app.phone || null, app.email || null, app.upi_id || null]);
+                kitchenId = kRows[0].id;
+                await query(`UPDATE kitchen_applications SET kitchen_id = $1 WHERE id = $2`, [kitchenId, id]);
+            }
+        }
+
         const { rows } = await query(`
             UPDATE kitchen_applications
             SET status = COALESCE($1, status),
@@ -1154,8 +1180,10 @@ router.patch('/partners/applications/:id', authenticate, requireRole('super_admi
             WHERE id = $4
             RETURNING *
         `, [status ?? null, rejectionReason ?? null, notes ?? null, id]);
-        res.json({ success: true, application: rows[0] });
+
+        res.json({ success: true, application: rows[0], kitchen_id: kitchenId });
     } catch (err) {
+        console.error('[admin/partners/applications/patch]', err);
         res.status(500).json({ error: 'Failed to update application' });
     }
 });
@@ -1163,13 +1191,20 @@ router.patch('/partners/applications/:id', authenticate, requireRole('super_admi
 router.get('/partners/kitchens', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
         const { rows } = await query(`
-            SELECT k.id, k.name AS kitchen_name, k.commission_rate, k.upi_id, k.is_partner,
+            SELECT k.id, k.name, k.commission_rate, k.upi_id, k.is_partner, k.is_active,
                    k.partner_status, k.partner_notes, k.contact_phone, k.contact_email,
+                   k.opening_time, k.closing_time, k.address,
+                   COALESCE(
+                     (SELECT json_build_object('id', z.id, 'name', z.name)
+                      FROM kitchen_zones kz JOIN zones z ON z.id = kz.zone_id
+                      WHERE kz.kitchen_id = k.id LIMIT 1),
+                     NULL
+                   ) AS zone,
                    COALESCE((SELECT SUM(o.kitchen_payout_paise)
                         FROM orders o WHERE o.kitchen_id = k.id AND o.status = 'delivered'), 0) AS lifetime_payout_paise
             FROM kitchens k
             WHERE k.is_partner = TRUE
-            ORDER BY k.name
+            ORDER BY k.is_active DESC, k.name
         `);
         res.json({ kitchens: rows });
     } catch (err) {
@@ -1179,20 +1214,57 @@ router.get('/partners/kitchens', authenticate, requireRole('super_admin', 'admin
 
 router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { commissionRate, upiId, isPartner, partnerStatus, partnerNotes } = req.body;
+    const { name, commissionRate, upiId, zoneId, openingTime, closingTime,
+            contactPhone, contactEmail, isActive, partnerNotes } = req.body;
     try {
+        await withTransaction(async (client) => {
+            await client.query(`
+                UPDATE kitchens SET
+                    name            = COALESCE($1, name),
+                    commission_rate = COALESCE($2, commission_rate),
+                    upi_id          = COALESCE($3, upi_id),
+                    opening_time    = COALESCE($4, opening_time),
+                    closing_time    = COALESCE($5, closing_time),
+                    contact_phone   = COALESCE($6, contact_phone),
+                    contact_email   = COALESCE($7, contact_email),
+                    is_active       = COALESCE($8, is_active),
+                    partner_notes   = COALESCE($9, partner_notes),
+                    updated_at      = NOW()
+                WHERE id = $10
+            `, [name ?? null, commissionRate ?? null, upiId ?? null,
+                openingTime ?? null, closingTime ?? null,
+                contactPhone ?? null, contactEmail ?? null,
+                isActive ?? null, partnerNotes ?? null, id]);
+
+            // Zone assignment — replace with single zone (same kitchen_zones table as regular kitchens)
+            if (zoneId) {
+                await client.query('DELETE FROM kitchen_zones WHERE kitchen_id = $1', [id]);
+                await client.query(
+                    'INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                    [id, zoneId]
+                );
+                // Sync kitchen lat/lng from zone centre
+                await client.query(`
+                    UPDATE kitchens k SET lat = z.kitchen_lat, lng = z.kitchen_lng, updated_at = NOW()
+                    FROM zones z WHERE z.id = $1 AND k.id = $2
+                `, [zoneId, id]);
+            }
+        });
+
         const { rows } = await query(`
-            UPDATE kitchens SET
-                commission_rate = COALESCE($1, commission_rate),
-                upi_id = COALESCE($2, upi_id),
-                is_partner = COALESCE($3, is_partner),
-                partner_status = COALESCE($4, partner_status),
-                partner_notes = COALESCE($5, partner_notes),
-                partner_approved_at = CASE WHEN $3 = TRUE AND NOT is_partner THEN NOW() ELSE partner_approved_at END
-            WHERE id = $6 RETURNING id, name, commission_rate, is_partner, partner_status
-        `, [commissionRate ?? null, upiId ?? null, isPartner ?? null, partnerStatus ?? null, partnerNotes ?? null, id]);
+            SELECT k.id, k.name, k.commission_rate, k.upi_id, k.is_active, k.is_partner,
+                   k.opening_time, k.closing_time, k.contact_phone, k.contact_email, k.address,
+                   COALESCE(
+                     (SELECT json_build_object('id', z.id, 'name', z.name)
+                      FROM kitchen_zones kz JOIN zones z ON z.id = kz.zone_id
+                      WHERE kz.kitchen_id = k.id LIMIT 1), NULL
+                   ) AS zone
+            FROM kitchens k WHERE k.id = $1
+        `, [id]);
+
         res.json({ success: true, kitchen: rows[0] });
     } catch (err) {
+        console.error('[admin/partners/kitchens/patch]', err);
         res.status(500).json({ error: 'Failed to update kitchen' });
     }
 });

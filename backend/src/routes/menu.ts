@@ -157,43 +157,47 @@ router.get('/zones/check', async (req, res) => {
     const lng = parseFloat(req.query.lng as string);
     if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'INVALID_LOCATION' });
 
-    const { rows } = await query(`
-        SELECT id, name, radius_km, polygon_points,
-        (6371 * acos(cos(radians($1)) * cos(radians(kitchen_lat)) * cos(radians(kitchen_lng) - radians($2)) + sin(radians($1)) * sin(radians(kitchen_lat)))) AS distance
-        FROM zones
-        WHERE is_active = true
-        ORDER BY distance ASC
-    `, [lat, lng]);
+    try {
+        // LEAST/GREATEST clamps acos input to [-1,1] — prevents NaN crash on floating-point edge cases
+        const { rows } = await query(`
+            SELECT id, name, radius_km, polygon_points,
+            (6371 * acos(LEAST(1, GREATEST(-1,
+                cos(radians($1)) * cos(radians(kitchen_lat)) * cos(radians(kitchen_lng) - radians($2))
+                + sin(radians($1)) * sin(radians(kitchen_lat))
+            )))) AS distance
+            FROM zones
+            WHERE is_active = true
+            ORDER BY distance ASC
+        `, [lat, lng]);
 
-    // Ray-Casting Algorithm for Point in Polygon
-    const isPointInPolygon = (point: {lat: number, lng: number}, polygon: {lat: number, lng: number}[]) => {
-        let x = point.lng, y = point.lat;
-        let inside = false;
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            let xi = polygon[i].lng, yi = polygon[i].lat;
-            let xj = polygon[j].lng, yj = polygon[j].lat;
-            
-            let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-            if (intersect) inside = !inside;
-        }
-        return inside;
-    };
+        const isPointInPolygon = (point: {lat: number, lng: number}, polygon: {lat: number, lng: number}[]) => {
+            let x = point.lng, y = point.lat, inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                const xi = polygon[i].lng, yi = polygon[i].lat;
+                const xj = polygon[j].lng, yj = polygon[j].lat;
+                if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi))
+                    inside = !inside;
+            }
+            return inside;
+        };
 
-    for (const zone of rows) {
-        if (zone.polygon_points && Array.isArray(zone.polygon_points) && zone.polygon_points.length > 2) {
-            // Check polygon
-            if (isPointInPolygon({ lat, lng }, zone.polygon_points)) {
-                return res.json({ serviceable: true, zone });
-            }
-        } else {
-            // Fallback to radius
-            if (zone.distance <= zone.radius_km) {
-                return res.json({ serviceable: true, zone });
+        for (const zone of rows) {
+            const pts = zone.polygon_points;
+            const hasPolygon = pts && Array.isArray(pts) && pts.length > 2;
+            if (hasPolygon) {
+                if (isPointInPolygon({ lat, lng }, pts))
+                    return res.json({ serviceable: true, zone });
+            } else {
+                if (zone.distance <= zone.radius_km)
+                    return res.json({ serviceable: true, zone });
             }
         }
+
+        res.json({ serviceable: false, zone: null });
+    } catch (err: any) {
+        console.error('[ZONES_CHECK_ERROR]', err.message);
+        res.status(500).json({ error: 'CHECK_FAILED', message: err.message });
     }
-
-    res.json({ serviceable: false, zone: null });
 });
 
 router.patch('/items/:id/toggle', authenticate, requireRole('chef', 'super_admin'), async (req, res) => {

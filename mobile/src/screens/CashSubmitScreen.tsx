@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   skipText: { color: G.muted, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' },
 
   overlayRoot: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(7,8,10,0.96)',
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 28, zIndex: 99,

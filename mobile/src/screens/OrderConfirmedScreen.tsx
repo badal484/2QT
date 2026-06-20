@@ -94,6 +94,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
   const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [heading, setHeading] = useState(0);
   const [status, setStatus] = useState('confirmed');
+  const [etaMins, setEtaMins] = useState<number | null>(null);
   const [riderJustAssigned, setRiderJustAssigned] = useState(false);
   const prevRiderNameRef = useRef<string | null>(null);
 
@@ -168,8 +169,9 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
   const total    = o ? o.total_amount_paise / 100 : 0;
 
   const estTime = status === 'delivered' ? 'Delivered'
-    : status === 'out_for_delivery' ? '10 mins'
-    : status === 'ready_for_pickup' ? '15 mins' : '25 mins';
+    : etaMins != null ? `${etaMins} min${etaMins === 1 ? '' : 's'}`
+    : status === 'out_for_delivery' ? '~10 mins'
+    : status === 'ready_for_pickup' ? '~15 mins' : '~25 mins';
 
   return (
     <View style={styles.root}>
@@ -184,6 +186,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
           initialLat={customerLocation?.lat ?? globalLocation?.latitude ?? 20.5937}
           initialLng={customerLocation?.lng ?? globalLocation?.longitude ?? 78.9629}
           initialZoom={customerLocation ? 15 : globalLocation ? 14 : 5}
+          onEtaUpdate={setEtaMins}
           style={StyleSheet.absoluteFill}
         />
         {/* Floating back button */}

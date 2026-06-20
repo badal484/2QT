@@ -1,138 +1,235 @@
-import { query } from '../db';
 import axios from 'axios';
+import { query } from '../db';
+import { redis } from '../redis';
+import { sendFCM } from './fcm.service';
+import { pushService } from './push.service'; // web-push VAPID for browser
 
-export type NotificationType = 
-    | 'order_confirmed' 
-    | 'order_preparing' 
-    | 'order_ready'
-    | 'order_out_for_delivery' 
-    | 'order_delivered' 
-    | 'order_cancelled'
-    | 'low_subscription_meals'
-    | 'rider_payout_sent'
-    | 'broadcast_message';
+export type NotifType =
+    | 'order_confirmed' | 'order_preparing' | 'order_ready'
+    | 'order_out_for_delivery' | 'order_delivered' | 'order_cancelled'
+    | 'rider_payout' | 'kitchen_payout' | 'low_subscription_meals'
+    | 'rider_verified' | 'cash_submitted' | 'broadcast_message'
+    | 'low_stock_alert' | 'rider_guarantee_payout' | 'renewal_reminder';
 
-export interface NotificationPayload {
-    phone: string;
-    displayId?: string;
-    riderName?: string;
-    otp?: string;
-    minutes?: number;
-    amount?: number;
-    upiId?: string;
-    count?: number;
-    message?: string;
-    imageUrl?: string;
+const PROMO_TYPES   = new Set(['broadcast_message', 'winback', 'birthday', 'flash_sale', 'renewal_reminder']);
+const PAYOUT_TYPES  = new Set(['rider_payout', 'kitchen_payout', 'rider_guarantee_payout']);
+const TEMPLATE_CACHE_TTL = 300; // 5 min
+
+// ─── Template cache ───────────────────────────────────────────────────────────
+
+async function loadTemplate(type: NotifType) {
+    const key = `notif_tmpl:${type}`;
+    const cached = await redis.get(key);
+    if (cached) return JSON.parse(cached);
+
+    const { rows } = await query(
+        'SELECT * FROM notification_templates WHERE type = $1 AND is_active = TRUE',
+        [type]
+    );
+    if (!rows.length) return null;
+
+    await redis.setEx(key, TEMPLATE_CACHE_TTL, JSON.stringify(rows[0]));
+    return rows[0];
 }
 
-export class NotificationService {
-    static async send(type: NotificationType, data: NotificationPayload) {
-        console.log(`[NOTIFICATION_SERVICE] Processing ${type} for ${data.phone}`);
+export async function bustTemplateCache(type: string) {
+    await redis.del(`notif_tmpl:${type}`);
+}
 
-        const message = this.getMessageTemplate(type, data);
-        if (!message) return;
+// ─── Variable interpolation ───────────────────────────────────────────────────
 
-        // 1. WhatsApp Logic (e.g., via Twilio or WATI)
-        await this.sendWhatsApp(data.phone, message, data.imageUrl);
+function interpolate(template: string, vars: Record<string, string>): string {
+    return template.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? '');
+}
 
-        // 2. Push Notification Logic (via FCM)
-        await this.sendPushNotification(data.phone, type, message, data.imageUrl);
+// ─── Main send ────────────────────────────────────────────────────────────────
+
+export interface SendOptions {
+    userId?: string;
+    phone?: string;
+    vars?: Record<string, string>;
+    dedupeKey?: string;     // e.g. orderId — prevents duplicate sends
+    overrideChannels?: ('push' | 'whatsapp' | 'sms')[];
+}
+
+export async function sendNotification(type: NotifType, options: SendOptions): Promise<void> {
+    const { userId, phone, vars = {}, dedupeKey, overrideChannels } = options;
+
+    // 1. Resolve user
+    let user: { id: string; phone: string; device_token: string | null; name: string } | null = null;
+    if (userId) {
+        const { rows } = await query('SELECT id, phone, device_token, name FROM users WHERE id = $1', [userId]);
+        user = rows[0] ?? null;
+    } else if (phone) {
+        const { rows } = await query('SELECT id, phone, device_token, name FROM users WHERE phone = $1', [phone]);
+        user = rows[0] ?? null;
+    }
+    if (!user) {
+        console.warn(`[NOTIF] User not found type=${type} userId=${userId} phone=${phone}`);
+        return;
     }
 
-    private static getMessageTemplate(type: NotificationType, data: NotificationPayload): string | null {
-        switch (type) {
-            case 'order_confirmed':
-                return `2QT: Your order #${data.displayId} is confirmed! Our chefs are starting to prep it. ETA: ${data.minutes} mins.`;
-            case 'order_preparing':
-                return `2QT: Chef is currently preparing your meal with fresh ingredients!`;
-            case 'order_ready':
-                return `2QT: Your order is ready and waiting for the rider!`;
-            case 'order_out_for_delivery':
-                return `2QT: Your rider ${data.riderName} is on the way! Your delivery OTP is ${data.otp}. Track in the app.`;
-            case 'order_delivered':
-                return `2QT: Delivered! Hope you enjoy your meal. Please rate us in the app.`;
-            case 'order_cancelled':
-                return `2QT: Your order #${data.displayId} has been cancelled. A refund of ₹${data.amount} has been added to your wallet.`;
-            case 'low_subscription_meals':
-                return `2QT: Heads up! You only have ${data.count} meals left in your plan. Renew soon to keep the hunger away!`;
-            case 'rider_payout_sent':
-                return `2QT: Your payout of ₹${data.amount} has been sent to your UPI ${data.upiId}. Great work!`;
-            case 'broadcast_message':
-                return data.message || null;
-            default:
-                return null;
-        }
+    // 2. Deduplicate within 60 s
+    if (dedupeKey) {
+        const dk = `notif:${user.id}:${type}:${dedupeKey}`;
+        if (await redis.get(dk)) return; // already sent
+        await redis.setEx(dk, 60, '1');
     }
 
-    private static async sendSMS(phone: string, message: string) {
-        if (!process.env.MSG91_AUTH_KEY || process.env.NODE_ENV === 'development') {
-            console.log(`[SMS_SIMULATOR] TO: ${phone} | MSG: ${message}`);
-            return;
-        }
+    // 3. Load template
+    const tmpl = await loadTemplate(type);
+    if (!tmpl) {
+        console.warn(`[NOTIF] No active template for type=${type}`);
+        return;
+    }
 
-        try {
-            await axios.post(
-                'https://control.msg91.com/api/v5/flow/',
-                {
-                    flow_id: process.env.MSG91_FLOW_ID,
-                    sender: process.env.MSG91_SENDER_ID,
-                    mobiles: phone,
-                    message: message
+    // 4. Check user preferences
+    const { rows: pRows } = await query(
+        'SELECT * FROM notification_preferences WHERE user_id = $1',
+        [user.id]
+    );
+    const prefs = pRows[0] ?? {
+        order_updates: true, promotions: true, payouts: true,
+        push_enabled: true, whatsapp_enabled: true,
+    };
+    if (PROMO_TYPES.has(type) && !prefs.promotions) return;
+    if (PAYOUT_TYPES.has(type) && !prefs.payouts) return;
+
+    // 5. Build content
+    const title   = interpolate(tmpl.title_template, vars);
+    const body    = interpolate(tmpl.body_template, vars);
+    const waText  = interpolate(tmpl.whatsapp_template || tmpl.body_template, vars);
+    const channels: string[] = overrideChannels ?? tmpl.channels ?? ['push', 'whatsapp'];
+
+    // 6. Dispatch channels in parallel (fire-and-forget individually)
+    const tasks: Promise<any>[] = [];
+
+    // FCM mobile push
+    if (channels.includes('push') && prefs.push_enabled && user.device_token) {
+        tasks.push(
+            sendFCM(user.device_token, title, body, { type, ...vars })
+                .then(result => {
+                    if (result === 'invalid_token') {
+                        return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
+                    }
+                })
+                .catch(err => console.error('[NOTIF_FCM_ERR]', err.message))
+        );
+    }
+
+    // Web-push (VAPID) — for browser customers
+    if (channels.includes('push') && prefs.push_enabled) {
+        tasks.push(
+            pushService.sendNotificationToUser(user.id, { title, body })
+                .catch(() => {}) // non-fatal
+        );
+    }
+
+    // WhatsApp
+    if (channels.includes('whatsapp') && prefs.whatsapp_enabled) {
+        tasks.push(sendWhatsApp(user.phone, waText).catch(() => {}));
+    }
+
+    // Store in notifications table (in-app bell)
+    tasks.push(
+        query(
+            `INSERT INTO notifications (user_id, type, title, body, data, channel, delivery_status)
+             VALUES ($1, $2, $3, $4, $5, $6, 'sent')`,
+            [user.id, type, title, body, JSON.stringify(vars), channels[0] ?? 'push']
+        ).catch(err => console.error('[NOTIF_DB_ERR]', err.message))
+    );
+
+    await Promise.allSettled(tasks);
+}
+
+// ─── Broadcast helper ─────────────────────────────────────────────────────────
+
+export async function broadcastNotification(
+    userIds: string[], title: string, body: string
+) {
+    const BATCH = 50;
+    for (let i = 0; i < userIds.length; i += BATCH) {
+        const batch = userIds.slice(i, i + BATCH);
+        await Promise.allSettled(
+            batch.map(uid =>
+                sendNotification('broadcast_message', {
+                    userId: uid,
+                    vars: { title, body },
+                })
+            )
+        );
+    }
+}
+
+// ─── WhatsApp via Interakt ────────────────────────────────────────────────────
+
+async function sendWhatsApp(rawPhone: string, message: string) {
+    if (!process.env.INTERAKT_API_KEY) {
+        console.log(`[WA_SIM] ${rawPhone} | ${message}`);
+        return;
+    }
+    try {
+        const digits    = rawPhone.replace(/\D/g, '');
+        const full      = digits.startsWith('91') ? digits : `91${digits.slice(-10)}`;
+        const countryCode = '91';
+        const number    = full.slice(2); // 10-digit
+
+        await axios.post(
+            'https://api.interakt.ai/v1/public/message/',
+            { countryCode, phoneNumber: number, type: 'Text', data: { message } },
+            {
+                headers: {
+                    Authorization: `Basic ${process.env.INTERAKT_API_KEY}`,
+                    'Content-Type': 'application/json',
                 },
-                {
-                    headers: {
-                        'authkey': process.env.MSG91_AUTH_KEY,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-        } catch (err: any) {
-            console.error('[SMS_ERROR] Fallback failed:', err?.response?.data || err.message);
-        }
+                timeout: 8000,
+            }
+        );
+    } catch (err: any) {
+        console.error('[WA_ERROR]', err?.response?.data || err.message);
+        await sendSMS(rawPhone, message);
     }
+}
 
-    private static async sendWhatsApp(phone: string, message: string, imageUrl?: string) {
-        if (!process.env.INTERAKT_API_KEY || process.env.NODE_ENV === 'development') {
-            console.log(`[WHATSAPP_SIMULATOR] TO: ${phone} | MSG: ${message}${imageUrl ? ` | IMAGE: ${imageUrl}` : ''}`);
-            return;
-        }
+// ─── SMS fallback via MSG91 ───────────────────────────────────────────────────
 
-        try {
-            const type = imageUrl ? 'Image' : 'Text';
-            const payload: any = {
-                countryCode: phone.substring(0, 2),
-                phoneNumber: phone.substring(2),
-                type: type,
-                message: message
-            };
-            if (imageUrl) payload.mediaUrl = imageUrl;
-
-            await axios.post(
-                'https://api.interakt.ai/v1/public/message/',
-                payload,
-                {
-                    headers: {
-                        'Authorization': `Basic ${process.env.INTERAKT_API_KEY}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-        } catch (err: any) {
-            console.error('[WHATSAPP_ERROR]', err?.response?.data || err.message);
-            console.log('[NOTIFICATION_SERVICE] Triggering SMS Fallback...');
-            await this.sendSMS(phone, message);
-        }
+async function sendSMS(phone: string, message: string) {
+    if (!process.env.MSG91_AUTH_KEY) {
+        console.log(`[SMS_SIM] ${phone} | ${message}`);
+        return;
     }
+    try {
+        await axios.post(
+            'https://control.msg91.com/api/v5/flow/',
+            { flow_id: process.env.MSG91_FLOW_ID, sender: process.env.MSG91_SENDER_ID, mobiles: phone, message },
+            { headers: { authkey: process.env.MSG91_AUTH_KEY }, timeout: 8000 }
+        );
+    } catch (err: any) {
+        console.error('[SMS_ERROR]', err?.response?.data || err.message);
+    }
+}
 
-    private static async sendPushNotification(phone: string, title: string, body: string, imageUrl?: string) {
-        try {
-            const { rows } = await query('SELECT fcm_token FROM users WHERE phone = $1', [phone]);
-            const token = rows[0]?.fcm_token;
-            if (!token) return;
+// ─── Legacy class wrapper — keeps old call sites working ─────────────────────
 
-            console.log(`[FCM_SIMULATOR] TO: ${token} | TITLE: ${title} | BODY: ${body}${imageUrl ? ` | IMAGE: ${imageUrl}` : ''}`);
-        } catch (err) {
-            console.error('[PUSH_ERROR]', err);
-        }
+export class NotificationService {
+    static async send(type: NotifType, data: any) {
+        const { userId, phone, displayId, riderName, otp, minutes, amount, upiId, count, message, title, body } = data;
+        await sendNotification(type, {
+            userId: userId || undefined,
+            phone: phone || undefined,
+            vars: {
+                displayId:  String(displayId  ?? ''),
+                riderName:  String(riderName  ?? ''),
+                otp:        String(otp         ?? ''),
+                minutes:    String(minutes     ?? ''),
+                amount:     String(amount      ?? ''),
+                upiId:      String(upiId       ?? ''),
+                count:      String(count       ?? ''),
+                message:    String(message     ?? ''),
+                title:      String(title       ?? ''),
+                body:       String(body        ?? ''),
+            },
+            dedupeKey: displayId || undefined,
+        });
     }
 }

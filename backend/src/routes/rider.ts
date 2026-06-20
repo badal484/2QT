@@ -177,23 +177,13 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
     emitToOrder(id, 'order_status_update', { orderId: id, status });
 
     // 2. Notification Queue
-    const { rows: userRows } = await query('SELECT name, phone FROM users WHERE id = $1', [order.customer_id]);
-    const { rows: riderRows } = await query('SELECT name FROM users WHERE id = $1', [riderId]);
-    const customerPhone = userRows[0]?.phone;
-    const riderName = riderRows[0]?.name;
-
-    if (customerPhone) {
-        if (status === 'out_for_delivery') {
-            await notificationsQueue.add('order_out_for_delivery', {
-                phone: customerPhone,
-                riderName: riderName,
-                otp: order.delivery_otp
-            });
-            await pushService.sendNotificationToUser(order.customer_id, {
-                title: "Out for Delivery! 🛵",
-                body: `${riderName} is on the way with your order! Please share OTP ${order.delivery_otp} on delivery.`
-            });
-        }
+    if (status === 'out_for_delivery') {
+        const { rows: riderRows } = await query('SELECT name FROM users WHERE id = $1', [riderId]);
+        await notificationsQueue.add('order_out_for_delivery', {
+            userId: order.customer_id,
+            riderName: riderRows[0]?.name ?? 'Your rider',
+            otp: String(order.delivery_otp ?? ''),
+        });
     }
 
     res.json({ success: true, status });
@@ -287,12 +277,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     emitToOrder(orderId, 'order_status_update', { orderId, status: 'delivered' });
     
     // 3. Queue delivery notification and invoice
-    const { rows: userRows } = await query('SELECT phone FROM users WHERE id = $1', [order.customer_id]);
-    const customerPhone = userRows[0]?.phone;
-    
-    if (customerPhone) {
-        await notificationsQueue.add('order_delivered', { phone: customerPhone });
-    }
+    await notificationsQueue.add('order_delivered', { userId: order.customer_id });
     await invoicesQueue.add('generate_invoice', { orderId });
 
     res.json({ success: true });
@@ -339,26 +324,25 @@ router.get('/earnings/today', authenticate, requireRole('rider', 'rider_captain'
 
 router.get('/payouts', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
-    
-    // 1. Get payout history
-    const { rows: payouts } = await query(
-        'SELECT * FROM weekly_payouts WHERE rider_id = $1 ORDER BY week_start DESC',
-        [riderId]
-    );
 
-    // 2. Calculate actual pending amount: Total Earnings - Total Paid
-    const { rows: earningsRes } = await query(
-        'SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1',
-        [riderId]
-    );
-    const { rows: paidRes } = await query(
-        'SELECT COALESCE(SUM(net_amount_paise), 0) as paid FROM weekly_payouts WHERE rider_id = $1 AND status = \'paid\'',
-        [riderId]
-    );
-    
-    const pendingAmountPaise = Math.max(0, parseInt(earningsRes[0].total) - parseInt(paidRes[0].paid));
+    const [payoutsRes, earningsRes, paidRes, profileRes, todayRes] = await Promise.all([
+        query('SELECT * FROM weekly_payouts WHERE rider_id = $1 ORDER BY week_start DESC', [riderId]),
+        query('SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]),
+        query(`SELECT COALESCE(SUM(net_amount_paise), 0) as paid FROM weekly_payouts WHERE rider_id = $1 AND status = 'paid'`, [riderId]),
+        query('SELECT upi_id FROM users WHERE id = $1', [riderId]),
+        query('SELECT deliveries_count, total_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE', [riderId]),
+    ]);
 
-    res.json({ payouts, pendingAmountPaise });
+    const pendingAmountPaise = Math.max(0, parseInt(earningsRes.rows[0].total) - parseInt(paidRes.rows[0].paid));
+    const today = todayRes.rows[0] || { deliveries_count: 0, total_paise: 0 };
+
+    res.json({
+        payouts: payoutsRes.rows,
+        pendingAmountPaise,
+        storedUpiId: profileRes.rows[0]?.upi_id || null,
+        todayDeliveries: parseInt(today.deliveries_count),
+        todayEarningsPaise: parseInt(today.total_paise),
+    });
 });
 
 router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
@@ -603,6 +587,23 @@ router.post('/submit-cash-to-finance', authenticate, requireRole('rider', 'rider
     } catch (err) {
         console.error('[rider/submit-cash-to-finance]', err);
         res.status(500).json({ error: 'Failed to submit' });
+    }
+});
+
+// Rider saves their UPI ID for daily auto-payout
+router.patch('/upi', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { upiId } = req.body as { upiId: string };
+    if (!upiId?.trim()) return res.status(400).json({ error: 'upiId required' });
+    const riderId = req.user!.userId;
+    try {
+        // Clear stored fund account so it gets recreated with new UPI
+        await query(
+            `UPDATE users SET upi_id = $1, razorpay_fund_account_id = NULL WHERE id = $2`,
+            [upiId.trim(), riderId]
+        );
+        res.json({ success: true, message: 'UPI saved — daily auto-payout enabled' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save UPI' });
     }
 });
 

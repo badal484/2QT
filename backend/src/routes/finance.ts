@@ -3,6 +3,7 @@ import { query } from '../db';
 import pool from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
+import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
 
 const router = Router();
 const financeAccess = authenticate, financeRole = requireRole('finance', 'super_admin');
@@ -243,16 +244,53 @@ router.post('/rider-payouts/:id/mark-paid', financeAccess, financeRole, async (r
   const { id } = req.params;
   const { paymentReference, notes } = req.body as { paymentReference?: string; notes?: string };
   try {
+    const { rows: payoutRows } = await query(`
+      SELECT wp.*, u.name AS rider_name, u.phone AS rider_phone,
+             u.upi_id, u.razorpay_contact_id, u.razorpay_fund_account_id
+      FROM weekly_payouts wp
+      JOIN users u ON wp.rider_id = u.id
+      WHERE wp.id = $1 AND wp.status = 'pending'
+    `, [id]);
+    if (!payoutRows.length) return res.status(404).json({ error: 'Payout not found or already paid' });
+    const payout = payoutRows[0];
+
+    let rzpPayoutId: string | null = paymentReference || null;
+    let utrNumber: string | null = null;
+    let autoMode = false;
+
+    // Auto-fire Razorpay if configured and rider has a UPI
+    if (isAutoPayConfigured() && payout.upi_id) {
+      try {
+        const fundAccountId = await ensureRiderFundAccount({
+          id: payout.rider_id, name: payout.rider_name,
+          phone: payout.rider_phone, upi_id: payout.upi_id,
+          razorpay_contact_id: payout.razorpay_contact_id,
+          razorpay_fund_account_id: payout.razorpay_fund_account_id,
+        });
+        const result = await firePayout(
+          fundAccountId, payout.net_amount_paise,
+          `2QT Rider Payout`, `2QT-R-${id.slice(0, 8)}`
+        );
+        rzpPayoutId = result.payoutId;
+        utrNumber = result.utr;
+        autoMode = true;
+      } catch (rzpErr: any) {
+        console.error('[finance/rider-payout/auto-pay]', rzpErr.message);
+        // Fall through — still mark paid manually
+      }
+    }
+
     const { rows } = await query(`
       UPDATE weekly_payouts
-      SET status = 'paid', paid_at = NOW(), approved_by = $2, payment_reference = $3, notes = $4, updated_at = NOW()
-      WHERE id = $1 AND status = 'pending'
-      RETURNING *
-    `, [id, req.user!.userId, paymentReference || null, notes || null]);
+      SET status = 'paid', paid_at = NOW(), approved_by = $2,
+          payment_reference = $3, notes = $4, razorpay_payout_id = $5,
+          utr_number = $6, payout_mode = $7, updated_at = NOW()
+      WHERE id = $1 RETURNING *
+    `, [id, req.user!.userId, rzpPayoutId, notes || null, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual']);
 
-    if (!rows.length) return res.status(404).json({ error: 'Payout not found or already paid' });
-    res.json({ success: true, payout: rows[0] });
+    res.json({ success: true, payout: rows[0], autoTransferred: autoMode });
   } catch (err) {
+    console.error('[finance/rider-payouts/mark-paid]', err);
     res.status(500).json({ error: 'Failed to mark paid' });
   }
 });
@@ -331,21 +369,55 @@ router.post('/kitchen-payouts/generate', financeAccess, financeRole, async (req:
 
 router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const { upiReference, bankReference, notes } = req.body as {
-    upiReference?: string; bankReference?: string; notes?: string;
-  };
+  const { upiReference, notes } = req.body as { upiReference?: string; notes?: string };
   try {
+    const { rows: kpRows } = await query(`
+      SELECT kp.*, k.name AS kitchen_name, k.upi_id, k.contact_phone,
+             k.razorpay_contact_id, k.razorpay_fund_account_id
+      FROM kitchen_payouts kp
+      JOIN kitchens k ON kp.kitchen_id = k.id
+      WHERE kp.id = $1 AND kp.status IN ('pending','processing')
+    `, [id]);
+    if (!kpRows.length) return res.status(404).json({ error: 'Payout not found or already paid' });
+    const kp = kpRows[0];
+
+    let rzpPayoutId: string | null = upiReference || null;
+    let utrNumber: string | null = null;
+    let autoMode = false;
+
+    // Auto-fire Razorpay if configured and kitchen has UPI
+    if (isAutoPayConfigured() && kp.upi_id) {
+      try {
+        const fundAccountId = await ensureKitchenFundAccount({
+          id: kp.kitchen_id, name: kp.kitchen_name,
+          upi_id: kp.upi_id, contact_phone: kp.contact_phone,
+          razorpay_contact_id: kp.razorpay_contact_id,
+          razorpay_fund_account_id: kp.razorpay_fund_account_id,
+        });
+        const result = await firePayout(
+          fundAccountId, kp.net_payout_paise,
+          `2QT Kitchen Payout`, `2QT-K-${id.slice(0, 8)}`
+        );
+        rzpPayoutId = result.payoutId;
+        utrNumber = result.utr;
+        autoMode = true;
+      } catch (rzpErr: any) {
+        console.error('[finance/kitchen-payout/auto-pay]', rzpErr.message);
+        // Fall through — still mark paid manually
+      }
+    }
+
     const { rows } = await query(`
       UPDATE kitchen_payouts
       SET status = 'paid', paid_at = NOW(), approved_by = $2,
-          upi_reference = $3, bank_reference = $4, notes = $5, updated_at = NOW()
-      WHERE id = $1 AND status IN ('pending','processing')
-      RETURNING *
-    `, [id, req.user!.userId, upiReference || null, bankReference || null, notes || null]);
+          razorpay_payout_id = $3, utr_number = $4,
+          payout_mode = $5, notes = $6, updated_at = NOW()
+      WHERE id = $1 RETURNING *
+    `, [id, req.user!.userId, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual', notes || null]);
 
-    if (!rows.length) return res.status(404).json({ error: 'Payout not found or already paid' });
-    res.json({ success: true, payout: rows[0] });
+    res.json({ success: true, payout: rows[0], autoTransferred: autoMode });
   } catch (err) {
+    console.error('[finance/kitchen-payouts/mark-paid]', err);
     res.status(500).json({ error: 'Failed to mark paid' });
   }
 });
