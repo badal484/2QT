@@ -19,7 +19,7 @@ export default function OfflinePage() {
                 Try Reconnecting
             </button>
             <p className="mt-8 text-sm text-zinc-400 font-medium">
-                2QT Food Palace
+                2QT
             </p>
         </div>
     );

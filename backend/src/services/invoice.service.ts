@@ -37,7 +37,7 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
     doc.pipe(stream);
 
     // Header
-    doc.fontSize(20).text('2QT FOOD PALACE', { align: 'center' });
+    doc.fontSize(20).text('2QT', { align: 'center' });
     doc.fontSize(10).text('Kundanahalli Central, Bengaluru', { align: 'center' });
     doc.moveDown();
 

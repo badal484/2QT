@@ -102,7 +102,7 @@ const LiveKitchenScreen = ({ navigation }: any) => {
 
                 {/* Footer inside video */}
                 <View style={styles.videoFooter}>
-                    <Text style={styles.kitchenName}>Velto Primary Kitchen</Text>
+                    <Text style={styles.kitchenName}>2QT Primary Kitchen</Text>
                     <Text style={styles.kitchenZone}>Zone A • Bangalore</Text>
                 </View>
             </View>

@@ -194,14 +194,14 @@ const CartScreen = ({ navigation }: any) => {
         return;
       }
       const options = {
-        description: 'VELTO Food Order',
+        description: '2QT Food Order',
         currency: 'INR',
         key: res.keyId,
         amount: res.amount,
-        name: 'VELTO Food Palace',
+        name: '2QT',
         order_id: res.razorpayOrderId,
         prefill: {
-          email: user?.email || 'customer@velto.app',
+          email: user?.email || 'customer@2qt.app',
           contact: user?.phone || '',
           name: user?.name || 'Customer',
         },
