@@ -32,6 +32,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
 
   const headers: any = {
     'Content-Type': 'application/json',
+    'Accept-Encoding': 'gzip, deflate',
     'X-App-Version': APP_VERSION,
     'Bypass-Tunnel-Reminder': 'true',
   };
@@ -49,7 +50,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
     fetchOptions.body = JSON.stringify(options.body);
   }
 
-  console.log(`--- API REQUEST: [${fetchOptions.method}] ${BASE_URL}${path}`);
+  if (__DEV__) console.log(`[API] ${fetchOptions.method} ${path}`);
   
   const fetchWithTimeout = async (url: string, opts: any, timeout = options.timeout ?? 10000) => {
     const controller = new AbortController();
@@ -74,17 +75,13 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
     try {
       if (attempt > 0) {
         const waitTime = Math.pow(2, attempt - 1) * 1000;
-        console.log(`--- SYSTEMATIC RETRY [Attempt ${attempt}]: Waiting ${waitTime}ms for ${path}`);
         await delay(waitTime);
       }
 
       response = await fetchWithTimeout(`${BASE_URL}${path}`, fetchOptions);
       break; // Success!
     } catch (err) {
-      if (attempt === MAX_RETRIES) {
-        console.warn('--- SYSTEMATIC NETWORK FAILURE: Max retries reached ---', err);
-        throw err;
-      }
+      if (attempt === MAX_RETRIES) throw err;
     }
   }
 
@@ -120,14 +117,11 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
   if (contentType && contentType.includes('application/json')) {
     try {
       data = await response.json();
-    } catch (e) {
-      console.error('--- API JSON PARSE ERROR:', e);
+    } catch {
       throw new Error('SERVER_ERROR: Invalid JSON response');
     }
   } else {
-    const text = await response.text();
-    console.error('--- API NON-JSON RESPONSE:', text.slice(0, 200));
-    throw new Error('SERVER_ERROR: Expected JSON but received HTML/Text. Check backend logs.');
+    throw new Error('SERVER_ERROR: Unexpected response format');
   }
 
   if (!response.ok) {
