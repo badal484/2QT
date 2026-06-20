@@ -86,11 +86,15 @@ const HomeScreen = ({ navigation }: any) => {
     queryKey: ['menu', effectiveZoneId],
     queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}`),
     enabled: !!effectiveZoneId,
+    staleTime: 3 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const { data: bannersData } = useQuery({
     queryKey: ['banners'],
     queryFn: () => api.get('/banners'),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
   const banners = bannersData?.banners || [];
 
@@ -98,6 +102,7 @@ const HomeScreen = ({ navigation }: any) => {
     queryKey: ['zones'],
     queryFn: () => api.get('/menu/zones'),
     staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
   const liveZones: any[] = zonesData?.zones || [];
 
@@ -105,6 +110,8 @@ const HomeScreen = ({ navigation }: any) => {
     queryKey: ['addresses'],
     queryFn: () => api.get('/customers/addresses'),
     enabled: !!user,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const selectedAddress = addresses?.addresses?.find((a: any) => a.id === addressId);

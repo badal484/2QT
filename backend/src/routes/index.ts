@@ -23,6 +23,8 @@ import complaintsRoutes from './complaints';
 
 const router = Router();
 
+router.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
+
 router.use('/admin', adminRoutes);
 router.use('/app', appRoutes);
 router.use('/auth', authRoutes);
