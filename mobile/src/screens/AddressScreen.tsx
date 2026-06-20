@@ -7,11 +7,11 @@ import {
   StyleSheet, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
+import Geolocation from '@react-native-community/geolocation';
 import { api } from '../api/client';
 import { setAddress, setZone } from '../store/slices/cartSlice';
 import { setServiceable, setUnserviceable } from '../store/slices/appSlice';
-import { RootState } from '../store';
 import { AddressSearchModal } from '../components/AddressSearchModal';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { colors } from '../theme/colors';
@@ -52,7 +52,6 @@ const AddressScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
 
   const [searchVisible, setSearchVisible] = useState(false);
   const [gpsChecking, setGpsChecking] = useState(false);
@@ -107,45 +106,63 @@ const AddressScreen = ({ navigation }: any) => {
     triggerHaptic('impactMedium');
   };
 
-  const handleUseCurrentLocation = async () => {
-    if (!globalLocation) return;
+  const checkAndOpenForm = async (lat: number, lng: number, addressText: string) => {
     setGpsChecking(true);
     try {
-      const res = await api.get(
-        `/menu/zones/check?lat=${globalLocation.latitude}&lng=${globalLocation.longitude}`,
-      );
+      const res = await api.get(`/menu/zones/check?lat=${lat}&lng=${lng}`);
       if (res.serviceable && res.zone?.id) {
-        openSaveForm({
-          lat: globalLocation.latitude,
-          lng: globalLocation.longitude,
-          addressText: globalLocation.addressText || 'Current Location',
-          zoneId: res.zone.id,
-          zoneName: res.zone.name || null,
-        });
+        openSaveForm({ lat, lng, addressText, zoneId: res.zone.id, zoneName: res.zone.name || null });
       } else {
-        dispatch(setUnserviceable(globalLocation));
-        Alert.alert('Out of zone', "We're not delivering to your current location yet.");
+        dispatch(setUnserviceable({ latitude: lat, longitude: lng, addressText }));
+        Alert.alert('Out of Delivery Zone', "We're not delivering to that location yet. Try a nearby area.");
       }
     } catch {
-      Alert.alert('Error', 'Could not check serviceability. Try again.');
+      Alert.alert('Error', 'Could not check serviceability. Please try again.');
     } finally {
       setGpsChecking(false);
     }
   };
 
-  const handleSearchSelect = async (result: any) => {
-    setSearchVisible(false);
-    const { lat, lng, label } = result;
-    try {
-      const res = await api.get(`/menu/zones/check?lat=${lat}&lng=${lng}`);
-      if (res.serviceable && res.zone?.id) {
-        openSaveForm({ lat, lng, addressText: label, zoneId: res.zone.id, zoneName: res.zone.name || null });
-      } else {
-        Alert.alert('Out of zone', "We're not delivering to that location yet.");
+  const handleUseCurrentLocation = () => {
+    triggerHaptic('impactMedium');
+    setGpsChecking(true);
+    Geolocation.requestAuthorization();
+    
+    const successCallback = async (pos: any) => {
+      const { latitude, longitude } = pos.coords;
+      try {
+        const geo = await api.get(`/menu/geocode/reverse?lat=${latitude}&lng=${longitude}`);
+        const a = geo?.address || {};
+        let addressText = geo?.display_name || 'Current Location';
+        if (addressText.endsWith(', India')) {
+          addressText = addressText.replace(', India', '');
+        }
+        await checkAndOpenForm(latitude, longitude, addressText);
+      } catch {
+        await checkAndOpenForm(latitude, longitude, 'Current Location');
       }
-    } catch {
-      Alert.alert('Error', 'Could not check serviceability.');
-    }
+    };
+
+    Geolocation.getCurrentPosition(
+      successCallback,
+      (err) => {
+        console.log('High accuracy GPS failed, falling back to low accuracy', err);
+        Geolocation.getCurrentPosition(
+          successCallback,
+          () => {
+            setGpsChecking(false);
+            Alert.alert('Location Error', 'Could not detect your location. Please check if your GPS is enabled and try again.');
+          },
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+    );
+  };
+
+  const handleSearchSelect = async (lat: number, lon: number, displayName: string) => {
+    setSearchVisible(false);
+    await checkAndOpenForm(lat, lon, displayName);
   };
 
   const handleSaveAndDeliver = async () => {
@@ -220,25 +237,23 @@ const AddressScreen = ({ navigation }: any) => {
               </TouchableOpacity>
 
               {/* Use current location */}
-              {globalLocation && (
-                <TouchableOpacity
-                  style={styles.gpsCard}
-                  onPress={handleUseCurrentLocation}
-                  disabled={gpsChecking}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.gpsIconBox}>
-                    {gpsChecking
-                      ? <ActivityIndicator size="small" color={colors.primary} />
-                      : <Navigation size={18} color={colors.primary} />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.gpsTitle}>Use current location</Text>
-                    <Text style={styles.gpsSub} numberOfLines={1}>{globalLocation.addressText}</Text>
-                  </View>
-                  <ChevronRight size={16} color={colors.inkMuted} />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.gpsCard}
+                onPress={handleUseCurrentLocation}
+                disabled={gpsChecking}
+                activeOpacity={0.8}
+              >
+                <View style={styles.gpsIconBox}>
+                  {gpsChecking
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Navigation size={18} color={colors.primary} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.gpsTitle}>Use current location</Text>
+                  <Text style={styles.gpsSub}>Detect my location automatically</Text>
+                </View>
+                <ChevronRight size={16} color={colors.inkMuted} />
+              </TouchableOpacity>
 
               {/* Saved addresses */}
               {isLoading ? (

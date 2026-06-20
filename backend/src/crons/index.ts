@@ -3,6 +3,10 @@ import { query, withTransaction } from '../db';
 import { notificationsQueue } from '../jobs/queues';
 import { TWO_QT } from '../config/constants';
 import { emitToKitchen, emitToAdmin, emitToRiders } from '../socket';
+import {
+    ensureKitchenFundAccount, ensureRiderFundAccount,
+    firePayout, isAutoPayConfigured,
+} from '../services/razorpay-payout.service';
 
 export const initCrons = () => {
     // Daily limit reset at midnight
@@ -191,6 +195,186 @@ export const initCrons = () => {
                 }
             });
         }
+    });
+
+    // ── Daily kitchen auto-payout at 11:00 PM ────────────────────────────────
+    cron.schedule('0 23 * * *', async () => {
+        console.log('[CRON] Running daily kitchen auto-payouts...');
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
+
+        const { rows: kitchens } = await query(`
+            SELECT k.id, k.name, k.upi_id, k.commission_rate,
+                   k.razorpay_contact_id, k.razorpay_fund_account_id,
+                   k.contact_phone, k.contact_email,
+                   COALESCE(k.min_daily_payout_paise, 5000) AS min_payout
+            FROM kitchens k
+            WHERE k.is_partner = TRUE AND k.is_active = TRUE
+              AND k.upi_id IS NOT NULL AND k.auto_payout_enabled = TRUE
+        `);
+
+        for (const kitchen of kitchens) {
+            try {
+                // Skip if payout already generated today
+                const { rows: existing } = await query(
+                    `SELECT id FROM kitchen_payouts WHERE kitchen_id = $1 AND period_start = $2`,
+                    [kitchen.id, today]
+                );
+                if (existing.length > 0) continue;
+
+                // Calculate today's delivered order earnings
+                const { rows: stats } = await query(`
+                    SELECT
+                        COUNT(*) AS orders_count,
+                        COALESCE(SUM(subtotal_paise), 0) AS gross_paise,
+                        COALESCE(SUM(kitchen_payout_paise), 0) AS net_paise,
+                        COALESCE(SUM(commission_paise), 0) AS commission_paise
+                    FROM orders
+                    WHERE kitchen_id = $1
+                      AND status = 'delivered'
+                      AND DATE(updated_at AT TIME ZONE 'Asia/Kolkata') = $2
+                `, [kitchen.id, today]);
+
+                const s = stats[0];
+                const netPaise = parseInt(s.net_paise);
+                const grossPaise = parseInt(s.gross_paise);
+                const commissionPaise = parseInt(s.commission_paise);
+                const ordersCount = parseInt(s.orders_count);
+
+                if (netPaise < parseInt(kitchen.min_payout)) {
+                    console.log(`[CRON] Kitchen ${kitchen.name}: ₹${netPaise / 100} below minimum — skipped`);
+                    continue;
+                }
+
+                // Create payout record as 'processing'
+                const { rows: pr } = await query(`
+                    INSERT INTO kitchen_payouts
+                      (kitchen_id, period_start, period_end, gross_sales_paise, commission_paise,
+                       net_payout_paise, orders_count, status, payout_mode)
+                    VALUES ($1, $2, $2, $3, $4, $5, $6, 'processing', 'auto')
+                    RETURNING id
+                `, [kitchen.id, today, grossPaise, commissionPaise, netPaise, ordersCount]);
+                const payoutRowId = pr[0].id;
+
+                if (isAutoPayConfigured()) {
+                    const fundAccountId = await ensureKitchenFundAccount(kitchen);
+                    const result = await firePayout(
+                        fundAccountId,
+                        netPaise,
+                        `2QT ${today}`,
+                        `2QT-K-${kitchen.id.slice(0, 8)}-${today}`
+                    );
+                    await query(`
+                        UPDATE kitchen_payouts
+                        SET status = 'paid', paid_at = NOW(),
+                            razorpay_payout_id = $1, utr_number = $2
+                        WHERE id = $3
+                    `, [result.payoutId, result.utr, payoutRowId]);
+                    console.log(`[CRON] Kitchen ${kitchen.name}: ₹${netPaise / 100} paid (${result.payoutId})`);
+                } else {
+                    // Razorpay not configured — leave pending for manual payment
+                    await query(`UPDATE kitchen_payouts SET status = 'pending' WHERE id = $1`, [payoutRowId]);
+                    console.log(`[CRON] Kitchen ${kitchen.name}: ₹${netPaise / 100} queued (no Razorpay account configured)`);
+                }
+            } catch (err: any) {
+                console.error(`[CRON_ERROR] Kitchen payout failed for ${kitchen.name}:`, err.message);
+                await query(`
+                    UPDATE kitchen_payouts SET status = 'failed', failure_reason = $1
+                    WHERE kitchen_id = $2 AND period_start = $3
+                `, [err.message, kitchen.id, today]).catch(() => {});
+                emitToAdmin('payout_failed', { type: 'kitchen', name: kitchen.name, error: err.message });
+            }
+        }
+        console.log('[CRON] Daily kitchen payouts done');
+    });
+
+    // ── Daily rider auto-payout at 11:45 PM (after 11:30 PM guarantee top-up) ─
+    cron.schedule('45 23 * * *', async () => {
+        console.log('[CRON] Running daily rider auto-payouts...');
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+        const { rows: riders } = await query(`
+            SELECT u.id, u.name, u.phone, u.upi_id,
+                   u.razorpay_contact_id, u.razorpay_fund_account_id,
+                   COALESCE(u.pending_deductions_paise, 0) AS pending_deductions,
+                   rde.total_paise AS earned_today
+            FROM users u
+            JOIN rider_daily_earnings rde ON rde.rider_id = u.id AND rde.date = CURRENT_DATE
+            WHERE u.role IN ('rider', 'rider_captain')
+              AND u.is_active = TRUE
+              AND rde.total_paise > 0
+        `);
+
+        for (const rider of riders) {
+            try {
+                // Skip if already paid today
+                const { rows: existing } = await query(
+                    `SELECT id FROM weekly_payouts WHERE rider_id = $1 AND week_start = $2`,
+                    [rider.id, today]
+                );
+                if (existing.length > 0) continue;
+
+                const earnedToday = parseInt(rider.earned_today);
+                const deductions = parseInt(rider.pending_deductions);
+                const complaintDeduction = Math.min(deductions, earnedToday);
+                const netPaise = Math.max(0, earnedToday - complaintDeduction);
+
+                if (netPaise <= 0) {
+                    console.log(`[CRON] Rider ${rider.name}: fully absorbed by deductions`);
+                    // Reduce pending deductions by what was absorbed
+                    await query(
+                        `UPDATE users SET pending_deductions_paise = pending_deductions_paise - $1 WHERE id = $2`,
+                        [complaintDeduction, rider.id]
+                    );
+                    continue;
+                }
+
+                // Create payout record
+                const mode = (isAutoPayConfigured() && rider.upi_id) ? 'auto' : 'manual';
+                const { rows: pr } = await query(`
+                    INSERT INTO weekly_payouts
+                      (rider_id, week_start, week_end, net_amount_paise,
+                       status, payout_mode, complaint_deduction_paise, upi_id)
+                    VALUES ($1, $2, $2, $3, 'processing', $4, $5, $6)
+                    RETURNING id
+                `, [rider.id, today, netPaise, mode, complaintDeduction, rider.upi_id || null]);
+                const payoutRowId = pr[0].id;
+
+                if (mode === 'auto') {
+                    const fundAccountId = await ensureRiderFundAccount(rider);
+                    const result = await firePayout(
+                        fundAccountId,
+                        netPaise,
+                        `2QT Earnings ${today}`,
+                        `2QT-R-${rider.id.slice(0, 8)}-${today}`
+                    );
+                    await query(`
+                        UPDATE weekly_payouts
+                        SET status = 'paid', paid_at = NOW(),
+                            razorpay_payout_id = $1, utr_number = $2
+                        WHERE id = $3
+                    `, [result.payoutId, result.utr, payoutRowId]);
+                    console.log(`[CRON] Rider ${rider.name}: ₹${netPaise / 100} paid (${result.payoutId})`);
+                } else {
+                    await query(`UPDATE weekly_payouts SET status = 'pending' WHERE id = $1`, [payoutRowId]);
+                    console.log(`[CRON] Rider ${rider.name}: ₹${netPaise / 100} pending (no UPI stored)`);
+                }
+
+                // Clear absorbed deductions
+                if (complaintDeduction > 0) {
+                    await query(
+                        `UPDATE users SET pending_deductions_paise = pending_deductions_paise - $1 WHERE id = $2`,
+                        [complaintDeduction, rider.id]
+                    );
+                }
+            } catch (err: any) {
+                console.error(`[CRON_ERROR] Rider payout failed for ${rider.name}:`, err.message);
+                await query(
+                    `UPDATE weekly_payouts SET status = 'failed' WHERE rider_id = $1 AND week_start = $2`,
+                    [rider.id, today]
+                ).catch(() => {});
+            }
+        }
+        console.log('[CRON] Daily rider payouts done');
     });
 
     // Update scheduled marketing campaigns status every minute

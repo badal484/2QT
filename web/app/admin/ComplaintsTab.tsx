@@ -1,6 +1,5 @@
 "use client";
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, CheckCircle, XCircle, Clock, Banknote, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -174,15 +173,21 @@ function ComplaintCard({ c, onAction }: { c: any; onAction: () => void }) {
 }
 
 export function ComplaintsTab() {
-  const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>("open");
+  const [complaints, setComplaints] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["admin-complaints", statusFilter],
-    queryFn: () => api.get(`/complaints/admin?status=${statusFilter}`),
-  });
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await api.get(`/complaints/admin?status=${statusFilter}`);
+      setComplaints(data?.complaints ?? []);
+    } catch {}
+    setIsLoading(false);
+  }, [statusFilter]);
 
-  const complaints = data?.complaints ?? [];
+  useEffect(() => { load(); }, [load]);
+
   const openCount = complaints.filter((c: any) => c.status === "open").length;
 
   return (
@@ -222,7 +227,7 @@ export function ComplaintsTab() {
       ) : (
         <div className="space-y-4">
           {complaints.map((c: any) => (
-            <ComplaintCard key={c.id} c={c} onAction={() => refetch()}/>
+            <ComplaintCard key={c.id} c={c} onAction={load}/>
           ))}
         </div>
       )}

@@ -51,27 +51,15 @@ const getGpsCoords = (): Promise<{ latitude: number; longitude: number } | null>
     );
   });
 
-// Covers both urban (road/suburb/city) and rural India (hamlet/village/county/state_district).
-// Falls back to display_name which Nominatim always populates.
 const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
   try {
     const data = await api.get(`/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
-    if (data) {
-      const addr = data.address || {};
-      const street =
-        addr.road || addr.suburb || addr.neighbourhood || addr.hamlet || addr.quarter || '';
-      const locality =
-        addr.city || addr.town || addr.village || addr.county || addr.state_district || '';
-      if (street || locality) {
-        return [street, locality].filter(Boolean).join(', ');
+    if (data && data.display_name) {
+      let addressText = data.display_name;
+      if (addressText.endsWith(', India')) {
+        addressText = addressText.replace(', India', '');
       }
-      if (data.display_name) {
-        const parts = (data.display_name as string)
-          .split(',')
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-        return parts.slice(0, 2).join(', ') || data.display_name;
-      }
+      return addressText;
     }
   } catch { /* non-critical */ }
   return 'Current Location';
@@ -160,9 +148,23 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
 
     const boot = async () => {
       console.log('[AppBoot] ▶ Starting boot sequence...');
+
+      // 1. FAST BOOT: If user already has a saved address OR we have cached GPS coords,
+      // boot instantly without forcing a blocking location check.
+      if (currentAddressIdRef.current || globalLocation) {
+        console.log('[AppBoot] ⚡ Fast boot: Using cached location/address');
+        setIsBooted(true);
+
+        // If relying purely on cached GPS (no explicit address selected), 
+        // do a silent background check to ensure the zone is still valid.
+        if (!currentAddressIdRef.current && globalLocation) {
+          runServiceabilityCheck(globalLocation, globalLocation.addressText);
+        }
+        return;
+      }
+
+      // 2. COLD BOOT: No saved location, force a check before letting them in
       dispatch(setServiceabilityChecking());
-      // GPS is primary — clear any stale persisted delivery address
-      dispatch(setAddress(null));
 
       try {
         const hasPermission = await requestLocationPermission();

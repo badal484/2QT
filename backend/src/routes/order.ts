@@ -207,15 +207,11 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
     }
     emitToKitchen(order.kitchen_id, 'order_cancelled', { orderId: id });
 
-    const { rows: userRows } = await query('SELECT phone FROM users WHERE id = $1', [order.customer_id]);
-    const customerPhone = userRows[0]?.phone;
-    if (customerPhone) {
-        await notificationsQueue.add('order_cancelled', {
-            phone: customerPhone,
-            displayId: order.display_id,
-            amount: order.total_amount_paise / 100
-        });
-    }
+    await notificationsQueue.add('order_cancelled', {
+        userId: order.customer_id,
+        displayId: order.display_id,
+        amount: String(order.total_amount_paise / 100),
+    });
 
     res.json({ success: true, message: 'Order cancelled and refunded to wallet' });
 });

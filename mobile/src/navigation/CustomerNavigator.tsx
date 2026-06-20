@@ -29,6 +29,7 @@ import RenewSubscriptionScreen from '../screens/RenewSubscriptionScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ScheduleOrderScreen from '../screens/ScheduleOrderScreen';
 import LiveKitchenScreen from '../screens/LiveKitchenScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createStackNavigator();
 
@@ -83,6 +84,7 @@ const CustomerNavigator = () => {
       <Stack.Screen name="SubscriptionDetail" component={SubscriptionDetailScreen} />
       <Stack.Screen name="RenewSubscription" component={RenewSubscriptionScreen} />
       <Stack.Screen name="LiveKitchen" component={LiveKitchenScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 };

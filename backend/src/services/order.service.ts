@@ -223,18 +223,10 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
         emitToUser(newOrder.customer_id, 'order_status_update', { orderId: newOrder.id, status: 'confirmed' });
         emitToAdmin('new_order', { orderId: newOrder.id, display_id: newOrder.display_id, status: 'confirmed' });
 
-        const userResult = await query('SELECT phone FROM users WHERE id = $1', [newOrder.customer_id]);
-
         await notificationsQueue.add('order_confirmed', {
-            phone: userResult?.rows[0]?.phone,
+            userId: newOrder.customer_id,
             displayId: newOrder.display_id,
-            minutes: 25
-        });
-
-        const { pushService } = require('./push.service');
-        await pushService.sendNotificationToUser(newOrder.customer_id, {
-            title: "Order Confirmed! 👨‍🍳",
-            body: `Your order ${newOrder.display_id} is confirmed and our chefs are on it!`
+            minutes: '25',
         });
 
         return { status: 'order_created', orderId: newOrder.id };

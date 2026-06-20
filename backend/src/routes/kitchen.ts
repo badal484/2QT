@@ -148,23 +148,17 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'super_admi
         emitToAdmin('order_status_update', { orderId: id, status, display_id: order.display_id });
 
         // 2. Notification Queue
-        const { rows: userRows } = await query('SELECT phone FROM users WHERE id = $1', [order.customer_id]);
-        const customerPhone = userRows[0]?.phone;
-
-        if (customerPhone) {
-            let notificationType: any = null;
-            if (status === 'preparing') notificationType = 'order_preparing';
-            if (status === 'ready_for_pickup') {
-                notificationType = 'order_ready';
-                emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id }, order.zone_id);
-            }
-            
-            if (notificationType) {
-                await notificationsQueue.add(notificationType, { 
-                    phone: customerPhone,
-                    displayId: order.display_id 
-                });
-            }
+        let notificationType: string | null = null;
+        if (status === 'preparing') notificationType = 'order_preparing';
+        if (status === 'ready_for_pickup') {
+            notificationType = 'order_ready';
+            emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id }, order.zone_id);
+        }
+        if (notificationType) {
+            await notificationsQueue.add(notificationType, {
+                userId: order.customer_id,
+                displayId: order.display_id,
+            });
         }
 
         res.json({ order });
