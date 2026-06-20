@@ -4,6 +4,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import * as Sentry from '@sentry/node';
 import { connectRedis } from './redis';
@@ -35,20 +36,21 @@ if (process.env.SENTRY_DSN) {
 }
 
 // Middleware
-app.use(helmet());
+app.use(compression({ level: 6, threshold: 1024 })); // gzip responses > 1KB
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors());
-app.use((req, res, next) => { console.log('[HTTP]', req.method, req.url); next(); });
+app.use((req, res, next) => {
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Keep-Alive', 'timeout=60');
+    next();
+});
 app.use(express.json({
     verify: (req: any, res, buf) => {
         req.rawBody = buf;
     }
 }));
-app.use('/public', express.static('public'));
+app.use('/public', express.static('public', { maxAge: '7d' }));
 app.use(generalLimiter);
-app.use((req, res, next) => {
-    console.log(`[REQUEST] ${req.method} ${req.url}`);
-    next();
-});
 
 // Health Check
 app.get('/api/v1/health', (req, res) => {

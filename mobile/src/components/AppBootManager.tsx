@@ -81,9 +81,9 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
     currentAddressIdRef.current = currentAddressId;
   }, [currentAddressId]);
 
-  // Keep at least 2.5 s of splash so the animation plays out
+  // Minimum splash duration — short enough to feel fast
   useEffect(() => {
-    const timer = setTimeout(() => setMinSplashDone(true), 2500);
+    const timer = setTimeout(() => setMinSplashDone(true), 1000);
     return () => clearTimeout(timer);
   }, []);
 

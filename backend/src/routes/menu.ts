@@ -63,50 +63,55 @@ router.get('/', async (req, res) => {
     if (!zoneId) return res.status(400).json({ error: 'MISSING_ZONE' });
 
     const cacheKey = keys.menu(zoneId as string);
-    
-    // Add safety timeout for Redis
+
+    // Redis with 500ms timeout — fail fast, never block menu load
     let cached = null;
     try {
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('REDIS_TIMEOUT')), 2000));
-        cached = await Promise.race([redis.get(cacheKey), timeoutPromise]);
-    } catch (e) {
-        console.warn('--- REDIS: CACHE FETCH FAILED OR TIMED OUT', e);
-    }
-    
+        cached = await Promise.race([
+            redis.get(cacheKey),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('REDIS_TIMEOUT')), 500)),
+        ]);
+    } catch { /* cache miss — continue to DB */ }
+
     if (cached) {
         res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
         return res.json({ ...JSON.parse(cached as string), fromCache: true });
     }
 
-    const { rows: items } = await query(
-        'SELECT * FROM menu_items WHERE zone_id = $1 ORDER BY sort_order, name',
-        [zoneId]
-    );
-
-    const { rows: zoneInfo } = await query(
-        'SELECT name, opening_time, closing_time, surge_enabled, surge_fee_paise FROM zones WHERE id = $1',
-        [zoneId]
-    );
-
-    const { rows: kitchenInfo } = await query(
-        `SELECT k.name, k.is_paused, k.pause_reason
-         FROM kitchens k
-         JOIN kitchen_zones kz ON k.id = kz.kitchen_id
-         WHERE kz.zone_id = $1 LIMIT 1`,
-        [zoneId]
-    );
+    // Run all 3 DB queries in parallel — 3x faster on cache miss
+    const [itemsResult, zoneResult, kitchenResult] = await Promise.all([
+        query(
+            `SELECT id, name, description, price_paise, photo_url, is_veg, available,
+                    category, kitchen_id, zone_id, sort_order, daily_limit,
+                    today_sold_count, sold_out_reason, preparation_time_minutes, badges
+             FROM menu_items WHERE zone_id = $1 ORDER BY sort_order, name`,
+            [zoneId]
+        ),
+        query(
+            'SELECT name, opening_time, closing_time, surge_enabled, surge_fee_paise FROM zones WHERE id = $1',
+            [zoneId]
+        ),
+        query(
+            `SELECT k.name, k.is_paused, k.pause_reason
+             FROM kitchens k
+             JOIN kitchen_zones kz ON k.id = kz.kitchen_id
+             WHERE kz.zone_id = $1 LIMIT 1`,
+            [zoneId]
+        ),
+    ]);
 
     const response = {
-        items,
-        zoneName: zoneInfo[0]?.name || null,
-        kitchenName: kitchenInfo[0]?.name || null,
-        kitchenPaused: kitchenInfo[0]?.is_paused || false,
-        pauseReason: kitchenInfo[0]?.pause_reason || null,
-        openingTime: zoneInfo[0]?.opening_time,
-        closingTime: zoneInfo[0]?.closing_time,
+        items: itemsResult.rows,
+        zoneName: zoneResult.rows[0]?.name || null,
+        kitchenName: kitchenResult.rows[0]?.name || null,
+        kitchenPaused: kitchenResult.rows[0]?.is_paused || false,
+        pauseReason: kitchenResult.rows[0]?.pause_reason || null,
+        openingTime: zoneResult.rows[0]?.opening_time,
+        closingTime: zoneResult.rows[0]?.closing_time,
     };
 
-    await redis.set(cacheKey, JSON.stringify(response), { EX: 300 }); // 5 mins
+    // Cache async — don't await, response goes out immediately
+    redis.set(cacheKey, JSON.stringify(response), { EX: 300 }).catch(() => {});
 
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json({ ...response, fromCache: false });
@@ -116,20 +121,24 @@ router.post('/validate-cart', async (req, res) => {
     const { items } = req.body;
     if (!items || !items.length) return res.json({ validItems: [], removedCount: 0, priceChanges: [] });
 
+    // Single query for all cart items instead of N queries
+    const ids = items.map((i: any) => i.menuItemId);
+    const { rows } = await query(
+        'SELECT id, price_paise, available FROM menu_items WHERE id = ANY($1::uuid[])',
+        [ids]
+    );
+    const dbMap = new Map(rows.map((r: any) => [r.id, r]));
+
     const validItems = [];
     const priceChanges = [];
     let removedCount = 0;
 
     for (const item of items) {
-        const { rows } = await query('SELECT price_paise, available, is_veg FROM menu_items WHERE id = $1', [item.menuItemId]);
-        if (rows.length === 0 || !rows[0].available) {
-            removedCount++;
-            continue;
-        }
-        
-        if (rows[0].price_paise !== item.pricePaise) {
-            priceChanges.push({ menuItemId: item.menuItemId, oldPrice: item.pricePaise, newPrice: rows[0].price_paise });
-            item.pricePaise = rows[0].price_paise;
+        const db = dbMap.get(item.menuItemId);
+        if (!db || !db.available) { removedCount++; continue; }
+        if (db.price_paise !== item.pricePaise) {
+            priceChanges.push({ menuItemId: item.menuItemId, oldPrice: item.pricePaise, newPrice: db.price_paise });
+            item.pricePaise = db.price_paise;
         }
         validItems.push(item);
     }
