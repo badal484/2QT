@@ -1,11 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator,
-  Alert, StyleSheet, StatusBar, Pressable,
+  Alert, StyleSheet, StatusBar, Pressable, Animated,
 } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, ShieldCheck, CircleCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const G = {
@@ -15,32 +15,137 @@ const G = {
   danger: '#EF4444',
 };
 
+// ── Success screen ────────────────────────────────────────────────────────────
+const SuccessScreen = ({ onDone }: { onDone: () => void }) => {
+  const insets = useSafeAreaInsets();
+  const scale = useRef(new Animated.Value(0.5)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const ring1 = useRef(new Animated.Value(0)).current;
+  const ring2 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Icon pop-in
+    Animated.spring(scale, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }).start();
+    Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+
+    // Ripple rings
+    const pulse = (anim: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ]),
+      ).start();
+
+    pulse(ring1, 0);
+    pulse(ring2, 600);
+  }, []);
+
+  const ringStyle = (anim: Animated.Value) => ({
+    position: 'absolute' as const,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 2,
+    borderColor: G.accent,
+    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }),
+    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] }) }],
+  });
+
+  return (
+    <View style={[suc.root, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+      <View style={suc.hero}>
+        {/* Ripple rings */}
+        <Animated.View style={ringStyle(ring1)} />
+        <Animated.View style={ringStyle(ring2)} />
+
+        {/* Icon */}
+        <Animated.View style={[suc.iconWrap, { transform: [{ scale }], opacity }]}>
+          <CircleCheck size={52} color={G.accent} strokeWidth={1.8} />
+        </Animated.View>
+
+        <Animated.View style={{ opacity }}>
+          <Text style={suc.title}>Delivered!</Text>
+          <Text style={suc.sub}>Order successfully delivered to the customer.</Text>
+        </Animated.View>
+      </View>
+
+      <Animated.View style={[suc.card, { opacity }]}>
+        <CircleCheck size={18} color={G.accent} strokeWidth={2} />
+        <Text style={suc.cardText}>OTP verified • Delivery confirmed</Text>
+      </Animated.View>
+
+      <TouchableOpacity style={suc.btn} onPress={onDone} activeOpacity={0.9}>
+        <Text style={suc.btnText}>Back to Dashboard</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const suc = StyleSheet.create({
+  root: {
+    flex: 1, backgroundColor: G.bg,
+    alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28,
+  },
+  hero: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24 },
+  iconWrap: {
+    width: 110, height: 110, borderRadius: 55,
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    borderWidth: 1.5, borderColor: 'rgba(16,185,129,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  title: { color: '#fff', fontSize: 34, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5 },
+  sub: { color: G.muted, fontSize: 15, textAlign: 'center', lineHeight: 22, marginTop: 8 },
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(16,185,129,0.08)',
+    borderWidth: 1, borderColor: 'rgba(16,185,129,0.18)',
+    paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16,
+    marginBottom: 20, width: '100%', justifyContent: 'center',
+  },
+  cardText: { color: G.accent, fontWeight: '700', fontSize: 13 },
+  btn: {
+    width: '100%', backgroundColor: G.accent,
+    paddingVertical: 18, borderRadius: 18, alignItems: 'center',
+    shadowColor: G.accent, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8,
+  },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+});
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 const DeliveryOTPScreen = ({ route, navigation }: any) => {
-  const { orderId } = route.params;
+  const { orderId, isCashCod, amountPaise, displayId } = route.params;
   const insets = useSafeAreaInsets();
   const [otp, setOtp] = useState('');
   const [focused, setFocused] = useState(false);
+  const [delivered, setDelivered] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const queryClient = useQueryClient();
 
+  const handleDone = () => {
+    queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+    queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
+    // Cash COD → must submit cash to finance before going home
+    if (isCashCod) {
+      navigation.replace('CashSubmit', { orderId, amountPaise, displayId });
+    } else {
+      navigation.navigate('RiderHome');
+    }
+  };
+
   const verifyMutation = useMutation({
     mutationFn: () => api.post('/riders/verify-otp', { orderId, otp }),
-    onSuccess: () => {
-      Alert.alert('Delivered!', 'Order successfully delivered.', [
-        {
-          text: 'Done', onPress: () => {
-            queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-            queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
-            navigation.navigate('RiderHome');
-          },
-        },
-      ]);
-    },
+    onSuccess: () => setDelivered(true),
     onError: () => {
       Alert.alert('Wrong Code', 'Ask the customer to check their OTP again.');
       setOtp('');
     },
   });
+
+  if (delivered) return <SuccessScreen onDone={handleDone} />;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

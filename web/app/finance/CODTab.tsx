@@ -178,7 +178,14 @@ export function CODTab() {
                     {/* Rider header */}
                     <div className="flex items-center justify-between p-4 border-b border-white/[0.05]">
                       <div>
-                        <div className="font-bold text-white">{rg.rider_name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">{rg.rider_name}</span>
+                          {rg.orders.some((o: any) => o.cash_submit_requested_at) && (
+                            <span className="text-[10px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-full">
+                              AT DESK
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-white/40">{rg.rider_phone} · {rg.orders.length} orders</div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -194,12 +201,26 @@ export function CODTab() {
                     {/* Order list */}
                     <div className="divide-y divide-white/[0.04]">
                       {rg.orders.map((o: any) => (
-                        <div key={o.id} className="flex items-center justify-between px-4 py-3">
+                        <div key={o.id} className={`flex items-center justify-between px-4 py-3 ${o.cash_submit_requested_at ? 'bg-emerald-500/5' : ''}`}>
                           <div>
-                            <span className="text-xs font-mono text-white/60">#{o.display_id}</span>
-                            <span className="text-xs text-white/30 ml-3">{new Date(o.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono text-white/60">#{o.display_id}</span>
+                              {o.cash_submit_requested_at && (
+                                <span className="text-[10px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                                  RIDER AT DESK
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-white/30">
+                              {o.cash_submit_requested_at
+                                ? `Submitted ${new Date(o.cash_submit_requested_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`
+                                : new Date(o.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+                              }
+                            </span>
                           </div>
-                          <span className="text-sm font-bold text-white">{fmt(parseInt(o.total_amount_paise))}</span>
+                          <span className={`text-sm font-bold ${o.cash_submit_requested_at ? 'text-emerald-400' : 'text-white'}`}>
+                            {fmt(parseInt(o.total_amount_paise))}
+                          </span>
                         </div>
                       ))}
                     </div>
