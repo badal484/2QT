@@ -134,8 +134,8 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
     if (req.user!.role === 'customer' && order.customer_id !== req.user!.userId) {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
-    if (!['pending_payment', 'confirmed', 'preparing'].includes(order.status)) {
-        return res.status(400).json({ error: 'CANNOT_CANCEL', message: `Cannot cancel order in ${order.status} state` });
+    if (!['pending_payment', 'confirmed'].includes(order.status)) {
+        return res.status(400).json({ error: 'CANNOT_CANCEL', message: 'Order cannot be cancelled once the kitchen has started preparing' });
     }
     // Bug 1 fix: double-refund protection
     if (order.payment_status === 'refunded') {
