@@ -14,6 +14,7 @@ import dynamic from "next/dynamic";
 import { useCart, useAuth } from "../providers";
 import { api } from "../lib/api";
 import PushNotifier from "../../components/PushNotifier";
+import { NotificationBell } from "../../components/NotificationBell";
 import { useHaptics } from "../../hooks/useHaptics";
 import { Toaster, toast } from "sonner";
 
@@ -690,6 +691,7 @@ export default function MenuPage() {
               <Link href="/subscription" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold hover:bg-brand-primary/20 transition-colors">
                 <Zap className="w-3 h-3" /> Meal Plans
               </Link>
+              <NotificationBell />
               <Link href="/profile" className="w-10 h-10 rounded-full bg-[#111] text-white flex items-center justify-center font-bold text-sm hover:scale-105 transition-transform shadow-md">
                  {user ? user.name?.[0]?.toUpperCase() : "V"}
               </Link>

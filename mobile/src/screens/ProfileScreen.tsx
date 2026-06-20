@@ -1,16 +1,17 @@
-import { 
-  CreditCard, 
-  User, 
-  Package, 
-  MapPin, 
-  Calendar, 
-  MessageCircle, 
-  ChevronRight, 
-  Star, 
+import {
+  CreditCard,
+  User,
+  Package,
+  MapPin,
+  Calendar,
+  MessageCircle,
+  ChevronRight,
+  Star,
   Gift,
   LogOut,
   ShieldCheck,
-  Wallet
+  Wallet,
+  Bell
 } from 'lucide-react-native';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Image, StyleSheet } from 'react-native';
@@ -180,7 +181,8 @@ const ProfileScreen = ({ navigation }: any) => {
         {/* HELP & SUPPORT GROUP */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={[styles.settingsGroup, { marginBottom: 40 }]}>
           <Text style={styles.groupLabel}>SUPPORT</Text>
-          <MinimalListItem icon={<MessageCircle size={20} color="#1A1A2E" />} title="Help Center" onPress={() => navigation.navigate('Support')} />
+          <MinimalListItem icon={<Bell size={20} color="#6366F1" />} title="Notifications" onPress={() => navigation.navigate('Notifications')} />
+          <MinimalListItem icon={<MessageCircle size={20} color="#1A1A2E" />} title="Help Center" onPress={() => navigation.navigate('Help')} />
           <MinimalListItem icon={<LogOut size={20} color="#EF4444" />} title="Sign Out" color="#EF4444" onPress={handleLogout} hideBorder={true} />
         </Animated.View>
 

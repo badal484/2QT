@@ -123,11 +123,15 @@ function LoginForm() {
     const redirectUrl = searchParams.get("redirect");
     if (redirectUrl && redirectUrl.startsWith("/")) {
       router.push(redirectUrl);
-    } else if (userRole === "super_admin") {
+    } else if (userRole === "super_admin" || userRole === "admin") {
       router.push("/admin");
+    } else if (userRole === "finance") {
+      router.push("/finance");
+    } else if (userRole === "partner_kitchen") {
+      router.push("/kitchen-portal");
     } else if (userRole === "chef") {
       router.push("/kitchen");
-    } else if (userRole === "rider") {
+    } else if (userRole === "rider" || userRole === "rider_captain") {
       router.push("/rider");
     } else {
       router.push("/menu");

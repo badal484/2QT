@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation } from "lucide-react";
+import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation, Bell } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
@@ -44,13 +44,26 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
   const [referral, setReferral] = useState<any>(null);
   const [riderApp, setRiderApp] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
+    order_updates: true, promotions: true, payouts: true,
+    push_enabled: true, whatsapp_enabled: true,
+  });
 
-  useEffect(() => { 
-    api.get("/customers/referrals/stats").then(setReferral).catch(() => {}); 
+  useEffect(() => {
+    api.get("/customers/referrals/stats").then(setReferral).catch(() => {});
     api.getApplicationStatus().then(d => {
       if (d && d.application) setRiderApp(d.application);
     }).catch(() => {});
+    api.get("/notifications/preferences")
+      .then((d: any) => { if (d.preferences) setNotifPrefs(d.preferences); })
+      .catch(() => {});
   }, []);
+
+  async function togglePref(key: string) {
+    const updated = { ...notifPrefs, [key]: !notifPrefs[key] };
+    setNotifPrefs(updated);
+    await api.patch("/notifications/preferences", { [key]: updated[key] }).catch(() => {});
+  }
 
   const save = async () => {
     setSaving(true);
@@ -219,6 +232,36 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
           </div>
         </section>
       )}
+
+      {/* Notification Preferences */}
+      <section className="bg-white rounded-3xl border border-zinc-200 p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-5">
+          <Bell className="w-4 h-4 text-zinc-500" />
+          <h3 className="font-bold text-zinc-900">Notification Preferences</h3>
+        </div>
+        <div className="space-y-3">
+          {[
+            { key: "order_updates", label: "Order updates", desc: "Confirmed, preparing, out for delivery, delivered" },
+            { key: "promotions", label: "Offers & promotions", desc: "Flash sales, coupons, personalised deals" },
+            { key: "payouts", label: "Payout alerts", desc: "When your earnings are transferred" },
+            { key: "push_enabled", label: "Push notifications", desc: "App & browser push" },
+            { key: "whatsapp_enabled", label: "WhatsApp messages", desc: "Key alerts via WhatsApp" },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between gap-4 py-2">
+              <div>
+                <p className="text-sm font-medium text-zinc-900">{label}</p>
+                <p className="text-xs text-zinc-500">{desc}</p>
+              </div>
+              <button
+                onClick={() => togglePref(key)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${notifPrefs[key] ? "bg-brand-primary" : "bg-zinc-200"}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${notifPrefs[key] ? "left-6" : "left-1"}`} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -755,8 +798,14 @@ function ProfileContent() {
   const [profile, setProfile] = useState<any>(user);
 
   useEffect(() => {
-    if (!authLoading && !user) { router.push("/login"); return; }
+    if (!authLoading && !user) { router.replace("/login"); return; }
     if (user) {
+      // Non-customer roles should never see this page — send them home
+      if (user.role === "super_admin" || user.role === "admin") { router.replace("/admin"); return; }
+      if (user.role === "finance") { router.replace("/finance"); return; }
+      if (user.role === "partner_kitchen") { router.replace("/kitchen-portal"); return; }
+      if (user.role === "chef") { router.replace("/kitchen"); return; }
+      if (user.role === "rider" || user.role === "rider_captain") { router.replace("/rider"); return; }
       setProfile((prev: any) => prev ?? user);
       api.get("/customers/me").then(d => { if (d.user) setProfile(d.user); }).catch(() => {});
     }

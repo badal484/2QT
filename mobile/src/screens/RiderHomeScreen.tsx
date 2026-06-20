@@ -12,6 +12,7 @@ import { RootState } from '../store';
 import { logout, updateUser } from '../store/slices/authSlice';
 import { getSocket } from '../socket/client';
 import { LogOut, ChevronRight, Check, X, Wallet, History } from 'lucide-react-native';
+import { registerDeviceToken, subscribeToTokenRefresh, subscribeToForegroundMessages } from '../services/push';
 import Geolocation from '@react-native-community/geolocation';
 
 const G = {
@@ -184,6 +185,17 @@ const RiderHomeScreen = ({ navigation }: any) => {
     );
     return () => Geolocation.clearWatch(watchId);
   }, [isOnline]);
+
+  // ── FCM device token registration ────────────────────────────────────────
+  useEffect(() => {
+    registerDeviceToken();
+    const unsubRefresh = subscribeToTokenRefresh();
+    const unsubMsg = subscribeToForegroundMessages((title, body) => {
+      // Foreground: show an in-app alert since the system won't display the notification
+      Alert.alert(title, body);
+    });
+    return () => { unsubRefresh(); unsubMsg(); };
+  }, []);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => () => clearTimer(), []);
