@@ -129,12 +129,12 @@ const ProfileScreen = ({ navigation }: any) => {
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.settingsGroup}>
           {isRider ? (
             <>
-              <MinimalListItem icon={<Wallet size={20} color="#10B981" />} title="Earnings" value={`₹${(riderStats?.totalEarnings || 0) / 100}`} onPress={() => navigation.navigate('RiderPayouts')} />
+              <MinimalListItem icon={<Wallet size={20} color="#10B981" />} title="Earnings" value={`₹${((riderStats?.totalEarnings ?? 0) / 100).toFixed(2)}`} onPress={() => navigation.navigate('RiderPayouts')} />
               <MinimalListItem icon={<Package size={20} color="#6B7280" />} title="Total Trips" value={riderStats?.totalDeliveries || 0} onPress={() => navigation.navigate('TripHistory')} hideBorder={true} />
             </>
           ) : (
             <>
-              <MinimalListItem icon={<Wallet size={20} color="#10B981" />} title="Wallet Balance" value={`₹${wallet?.balancePaise / 100 || '0.00'}`} onPress={() => navigation.navigate('Wallet')} />
+              <MinimalListItem icon={<Wallet size={20} color="#10B981" />} title="Wallet Balance" value={wallet ? `₹${(wallet.balancePaise / 100).toFixed(2)}` : '₹0.00'} onPress={() => navigation.navigate('Wallet')} />
               <MinimalListItem icon={<Star size={20} color="#F59E0B" />} title="Loyalty Points" value={loyalty?.points || 0} onPress={() => navigation.navigate('Loyalty')} hideBorder={true} />
             </>
           )}
