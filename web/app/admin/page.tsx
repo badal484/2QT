@@ -1262,7 +1262,7 @@ function AnalyticsTab() {
   
   useEffect(() => {
     api.get("/admin/dashboard").then(setStats);
-    api.get("/kitchen/feedback").then(setFeedback);
+    api.get("/admin/feedback").then(setFeedback);
   }, []);
 
   return (

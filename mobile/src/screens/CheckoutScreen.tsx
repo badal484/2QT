@@ -300,7 +300,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
     </View>
   );
 
-  const p = pricing?.pricing || { totalAmountPaise: 0, subtotalPaise: 0, deliveryFeePaise: 0, gstPaise: 0 };
+  const p = pricing?.pricing || { totalAmountPaise: 0, subtotalPaise: 0, deliveryFeePaise: 0, gstPaise: 0, cgstPaise: 0, sgstPaise: 0, discountPaise: 0, loyaltyDiscountPaise: 0, walletDeductionPaise: 0, gatewayAmountPaise: 0 };
 
   return (
     <View style={styles.container}>
@@ -459,17 +459,13 @@ const CheckoutScreen = ({ navigation, route }: any) => {
               style={styles.promoTicketInput}
             />
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.promoTicketBtn}
             onPress={() => {
               triggerHaptic('impactHeavy');
-              if (promoCode.toUpperCase() === '2QT50') {
-                dispatch(setPromoCodeAction(promoCode.toUpperCase()));
-                Alert.alert('Success', 'Promo code applied! You get 50% off.');
-              } else {
-                Alert.alert('Invalid Code', 'Try 2QT50 for a discount.');
-              }
-            }} 
+              dispatch(setPromoCodeAction(promoCode.toUpperCase()));
+              queryClient.invalidateQueries({ queryKey: ['pricing'] });
+            }}
           >
             <Text style={styles.promoTicketBtnText}>Apply</Text>
           </TouchableOpacity>
@@ -568,15 +564,16 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           disabled={placeOrderMutation.isPending || isFetching}
           onPress={() => {
             triggerHaptic('impactHeavy');
-            placeOrderMutation.mutate({ 
-              items: cart.items, 
-              addressId: route.params?.addressId, 
+            placeOrderMutation.mutate({
+              items: cart.items,
+              addressId: route.params?.addressId,
               useWallet,
               useLoyalty,
               promoCode,
               paymentMethod,
+              riderTipPaise: riderTip * 100,
               scheduledAt: route.params?.scheduledAt,
-              instructions: route.params?.instructions
+              instructions: deliveryInstructions,
             });
           }}
         >

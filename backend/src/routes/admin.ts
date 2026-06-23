@@ -88,6 +88,18 @@ router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), asyn
     }
 });
 
+router.get('/feedback', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { rows: avg } = await query('SELECT AVG(rating) as average, COUNT(*) as total FROM order_feedback');
+    const { rows: recent } = await query(`
+        SELECT f.*, o.display_id as order_display_id, k.name as kitchen_name
+        FROM order_feedback f
+        JOIN orders o ON f.order_id = o.id
+        JOIN kitchens k ON o.kitchen_id = k.id
+        ORDER BY f.created_at DESC LIMIT 20
+    `);
+    res.json({ feedbacks: recent, averageRating: parseFloat(avg[0].average || '0').toFixed(1), totalCount: parseInt(avg[0].total) });
+});
+
 router.get('/stats/growth', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows: users } = await query("SELECT count(*) FROM users WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'");
     const { rows: orders } = await query("SELECT count(*) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'");
