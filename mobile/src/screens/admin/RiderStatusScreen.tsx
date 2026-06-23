@@ -17,7 +17,7 @@ import {
 import MapView, { Marker as MapMarker, UrlTile } from 'react-native-maps';
 
 const RiderStatusScreen = ({ navigation }: any) => {
-  const [trackingRider, setTrackingRider] = useState<any>(null);
+  const [trackingRiderId, setTrackingRiderId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-riders'],
@@ -26,6 +26,7 @@ const RiderStatusScreen = ({ navigation }: any) => {
   });
 
   const riders = data?.riders || [];
+  const trackingRider = riders.find((r: any) => r.id === trackingRiderId) ?? null;
 
   if (isLoading) return (
     <View style={styles.loadingContainer}>
@@ -106,7 +107,7 @@ const RiderStatusScreen = ({ navigation }: any) => {
               
               <TouchableOpacity 
                 activeOpacity={0.7}
-                onPress={() => setTrackingRider(rider)}
+                onPress={() => setTrackingRiderId(rider.id)}
                 style={styles.trackButton}
               >
                 <MapPin size={18} color="white" />
@@ -137,8 +138,8 @@ const RiderStatusScreen = ({ navigation }: any) => {
                  <Text style={styles.modalSub}>GPS Satellite Link</Text>
                  <Text style={styles.modalTitle}>Live Tracking</Text>
               </View>
-              <TouchableOpacity 
-               onPress={() => setTrackingRider(null)}
+              <TouchableOpacity
+               onPress={() => setTrackingRiderId(null)}
                style={styles.closeButton}
               >
                  <X size={24} color="#999" />

@@ -186,10 +186,11 @@ router.post('/:id/resolve', authenticate, requireRole('super_admin', 'admin'), a
                         SET cod_deductions_paise = cod_deductions_paise + $1,
                             net_amount_paise = net_amount_paise - $1,
                             deduction_notes = COALESCE(deduction_notes, '') || 'Complaint refund ₹' || ($1/100) || ' for order #' || $2 || '; '
-                        WHERE rider_id = $3
-                        AND status = 'pending'
-                        ORDER BY created_at DESC
-                        LIMIT 1
+                        WHERE id = (
+                            SELECT id FROM weekly_payouts
+                            WHERE rider_id = $3 AND status = 'pending'
+                            ORDER BY created_at DESC LIMIT 1
+                        )
                     `, [refundPaise, complaint.display_id, complaint.rider_id]);
                 }
             }

@@ -83,7 +83,7 @@ router.get('/', async (req, res) => {
         query(
             `SELECT id, name, description, price_paise, photo_url, is_veg, available,
                     category, kitchen_id, zone_id, sort_order, daily_limit,
-                    today_sold_count, sold_out_reason, preparation_time_minutes, badges
+                    today_sold_count, sold_out_reason, prep_time_minutes
              FROM menu_items WHERE zone_id = $1 ORDER BY sort_order, name`,
             [zoneId]
         ),
@@ -151,9 +151,9 @@ router.get('/search', async (req, res) => {
     if (!q || !zoneId) return res.status(400).json({ error: 'INVALID_QUERY' });
 
     const { rows } = await query(
-        `SELECT *, ts_rank(search_vector, q) as rank 
-         FROM menu_items, to_tsquery('english', $1 || ':*') as q 
-         WHERE zone_id = $2 AND search_vector @@ q 
+        `SELECT *, ts_rank(search_vector, websearch_to_tsquery('english', $1)) as rank
+         FROM menu_items
+         WHERE zone_id = $2 AND search_vector @@ websearch_to_tsquery('english', $1)
          ORDER BY rank DESC LIMIT 20`,
         [q, zoneId]
     );

@@ -17,9 +17,14 @@ router.post('/razorpay', async (req, res) => {
     const body = req.body;
 
     if (process.env.NODE_ENV !== 'development' || (signature && signature !== 'MOCK_SIG')) {
+        const rawBody = (req as any).rawBody;
+        if (!rawBody) {
+            console.error('[WEBHOOK] rawBody missing — check express.json verify callback');
+            return res.status(400).send('Invalid Signature');
+        }
         const expectedSignature = crypto
             .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET || '')
-            .update((req as any).rawBody || JSON.stringify(body))
+            .update(rawBody)
             .digest('hex');
 
         if (expectedSignature !== signature) {

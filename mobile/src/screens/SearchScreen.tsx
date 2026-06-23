@@ -20,7 +20,7 @@ const SearchScreen = ({ navigation }: any) => {
 
   const { data: searchResults, isLoading } = useQuery({
     queryKey: ['search', query, zoneId || user?.zoneId],
-    queryFn: () => api.get(`/menu/search?q=${query}&zoneId=${zoneId || user?.zoneId}`),
+    queryFn: () => api.get(`/menu/search?q=${encodeURIComponent(query)}&zoneId=${zoneId || user?.zoneId}`),
     enabled: query.length > 2 && !!(zoneId || user?.zoneId),
   });
 

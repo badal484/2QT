@@ -298,7 +298,8 @@ export default function RiderPage() {
     try {
       await api.patch(`/riders/orders/${orderId}/status`, { status });
       if (status === "delivered") {
-        setEarningsFlash({ amount: activeOrder?.total_amount_paise ?? 5000 });
+        const earned = await api.get("/riders/earnings/today").catch(() => null);
+        setEarningsFlash({ amount: earned?.totalPaise ?? 2000 });
         setActiveOrder(null);
         fetchEarnings();
         fetchOrders();
@@ -319,7 +320,8 @@ export default function RiderPage() {
     try {
       await api.post("/riders/verify-otp", { orderId: verifyOtpFor, otp: otpInput });
       setVerifyOtpFor(null); setOtpInput("");
-      setEarningsFlash({ amount: activeOrder?.total_amount_paise ?? 5000 });
+      const earned = await api.get("/riders/earnings/today").catch(() => null);
+      setEarningsFlash({ amount: earned?.totalPaise ?? 2000 });
       setActiveOrder(null);
       fetchEarnings();
       fetchOrders();
