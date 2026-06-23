@@ -314,6 +314,14 @@ router.get('/stats', authenticate, requireRole('rider', 'rider_captain', 'super_
     });
 });
 
+router.get('/earnings/history', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { rows } = await query(
+        'SELECT * FROM rider_daily_earnings WHERE rider_id = $1 ORDER BY date DESC LIMIT 30',
+        [req.user!.userId]
+    );
+    res.json({ earnings: rows });
+});
+
 router.get('/earnings/today', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(
         'SELECT deliveries_count as "deliveriesCount", total_paise as "totalPaise", cash_collected_paise as "cashCollectedPaise" FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE',

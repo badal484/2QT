@@ -153,9 +153,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
   useEffect(() => {
     const socket = getSocket();
     if (!socket || !isOnline) return;
-    socket.on('new_order_assigned', () => {
-      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-    });
     socket.on('order_status_update', () => {
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
     });
@@ -163,7 +160,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
       queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
     });
     return () => {
-      socket.off('new_order_assigned');
       socket.off('order_status_update');
       socket.off('new_available_mission');
     };

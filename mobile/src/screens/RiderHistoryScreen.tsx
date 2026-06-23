@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, Package, Clock, CheckCircle2, XCircle, ShieldCheck, Trophy, CreditCard, Compass } from 'lucide-react-native';
+import { ArrowLeft, Package, Clock, Trophy, CreditCard, Compass } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const RiderHistoryScreen = ({ navigation }: any) => {
@@ -143,7 +143,7 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                   <View style={styles.locationsBox}>
                     <Text style={styles.locationLabel}>DESTINATION</Text>
                     <Text style={styles.locationValue} numberOfLines={1}>
-                      {order.customer_address_text || order.address_text || 'Premium Customer Location'}
+                      {order.delivery_address_text || 'Customer Location'}
                     </Text>
                   </View>
 
@@ -178,7 +178,7 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                         </Text>
                       </View>
                       <Text style={[styles.priceText, isDelivered ? styles.priceTextGreen : styles.priceTextRed]}>
-                        ₹{order.total_amount_paise / 100}
+                        ₹{parseInt(order.total_amount_paise || '0', 10) / 100}
                       </Text>
                     </View>
                   </View>
