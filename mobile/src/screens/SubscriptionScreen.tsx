@@ -53,7 +53,7 @@ const SubscriptionScreen = ({ navigation }: any) => {
               <View style={styles.activeCardHeader}>
                 <View>
                   <Text style={styles.cardSubLabel}>Active Plan</Text>
-                  <Text style={styles.cardPlanName}>{activeSub.plan_id.replace('sub_', '').toUpperCase()}</Text>
+                  <Text style={styles.cardPlanName}>{activeSub.plan_id.replace('sub_', '').replace(/_/g, ' ').toUpperCase()}</Text>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: activeSub.is_paused ? '#FFFBEB' : '#F0FDF4' }]}>
                   <Text style={[styles.statusBadgeText, { color: activeSub.is_paused ? '#D97706' : '#166534' }]}>

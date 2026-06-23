@@ -22,8 +22,8 @@ const UserManagementScreen = ({ navigation }: any) => {
   const [roleFilter, setRoleFilter] = useState('all');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: () => api.get('/admin/users'),
+    queryKey: ['admin-users', roleFilter],
+    queryFn: () => api.get(roleFilter === 'all' ? '/admin/users' : `/admin/users?role=${roleFilter}`),
   });
 
   const toggleStatusMutation = useMutation({

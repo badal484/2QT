@@ -71,7 +71,7 @@ router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req, 
         max_discount_paise, min_order_paise, winback_days, flash_start, flash_end,
         happy_hour_start, happy_hour_end, happy_hour_days, config
     } = req.body;
-    const userId = (req as any).user?.id;
+    const userId = req.user?.userId;
     try {
         const { rows } = await query(
             `INSERT INTO campaigns

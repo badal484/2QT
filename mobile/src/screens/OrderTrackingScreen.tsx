@@ -81,7 +81,7 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
   }, [o?.rider_lat, o?.rider_lng]);
 
   useEffect(() => {
-    if (o?.status && o.status !== status) {
+    if (o?.status) {
       setStatus(o.status);
       if (['ready_for_pickup', 'out_for_delivery', 'delivered'].includes(o.status)) {
         triggerHapticSuccess();

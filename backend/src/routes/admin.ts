@@ -676,7 +676,7 @@ router.get('/users', authenticate, requireRole('super_admin', 'admin'), async (r
     params.push(limit, offset);
 
     const { rows } = await query(
-        `SELECT id, name, phone, role, is_active, is_online, onboarding_complete, created_at
+        `SELECT id, name, phone, role, is_active, is_online, onboarding_complete, is_verified, created_at
          FROM users ${where}
          ORDER BY created_at DESC
          LIMIT $${params.length - 1} OFFSET $${params.length}`,

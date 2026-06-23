@@ -80,8 +80,13 @@ export function KitchensTab() {
 
   const loadStaff = async (kId: string) => {
     setStaffKitchenId(kId);
-    const data = await api.get(`/admin/kitchens/${kId}/staff`);
-    setStaffList(data.staff ?? []);
+    try {
+      const data = await api.get(`/admin/kitchens/${kId}/staff`);
+      setStaffList(data.staff ?? []);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load staff");
+      setStaffList([]);
+    }
   };
 
   const addStaff = async (e: React.FormEvent) => {
