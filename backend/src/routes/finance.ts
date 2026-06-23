@@ -462,8 +462,16 @@ router.get('/transactions', financeAccess, financeRole, async (req: AuthRequest,
     const params: any[] = [];
     let p = 1;
 
-    if (startDate) { conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') >= $${p++}`); params.push(startDate); }
-    if (endDate) { conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') <= $${p++}`); params.push(endDate); }
+    if (startDate) {
+      const startTz = new Date(`${startDate}T00:00:00+05:30`).toISOString();
+      conditions.push(`o.created_at >= $${p++}`);
+      params.push(startTz);
+    }
+    if (endDate) {
+      const endTz = new Date(`${endDate}T23:59:59.999+05:30`).toISOString();
+      conditions.push(`o.created_at <= $${p++}`);
+      params.push(endTz);
+    }
     if (paymentMethod) { conditions.push(`o.payment_method = $${p++}`); params.push(paymentMethod); }
     if (status) { conditions.push(`o.status = $${p++}`); params.push(status); }
 
@@ -543,8 +551,16 @@ router.get('/products/revenue', financeAccess, financeRole, async (req: AuthRequ
     const params: any[] = [];
     let p = 1;
 
-    if (startDate) { conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') >= $${p++}`); params.push(startDate); }
-    if (endDate) { conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') <= $${p++}`); params.push(endDate); }
+    if (startDate) {
+      const startTz = new Date(`${startDate}T00:00:00+05:30`).toISOString();
+      conditions.push(`o.created_at >= $${p++}`);
+      params.push(startTz);
+    }
+    if (endDate) {
+      const endTz = new Date(`${endDate}T23:59:59.999+05:30`).toISOString();
+      conditions.push(`o.created_at <= $${p++}`);
+      params.push(endTz);
+    }
     if (kitchenId) { conditions.push(`mi.kitchen_id = $${p++}`); params.push(kitchenId); }
 
     const { rows } = await query(`
