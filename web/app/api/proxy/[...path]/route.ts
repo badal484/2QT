@@ -17,8 +17,10 @@ async function handler(
   const headers = new Headers();
   const auth = req.headers.get('authorization');
   const ct = req.headers.get('content-type');
+  const pinggy = req.headers.get('x-pinggy-no-screen');
   if (auth) headers.set('authorization', auth);
   if (ct) headers.set('content-type', ct);
+  if (pinggy) headers.set('x-pinggy-no-screen', pinggy);
 
   let body: ArrayBuffer | undefined;
   if (req.method !== 'GET' && req.method !== 'HEAD') {

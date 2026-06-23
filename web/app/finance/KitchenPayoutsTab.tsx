@@ -165,6 +165,16 @@ export function KitchenPayoutsTab() {
   const [showGenerate, setShowGenerate] = useState(false);
   const [markPaying, setMarkPaying] = useState<any>(null);
 
+  // Always keep summary loaded so GenerateModal has kitchens regardless of active view
+  const loadSummary = useCallback(async () => {
+    try {
+      const res = await api.get("/finance/kitchen-payouts/summary");
+      setSummary(res.kitchens || []);
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadSummary(); }, [loadSummary]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -189,7 +199,6 @@ export function KitchenPayoutsTab() {
       const res = await api.post("/finance/kitchen-payouts/generate", { kitchenId, periodStart, periodEnd });
       toast.success(`Payout generated: ${fmt(res.payout.net_payout_paise)}`);
       setView("pending");
-      await load();
     } catch (e: any) {
       toast.error(e.message || "Failed to generate");
     }
@@ -321,9 +330,9 @@ export function KitchenPayoutsTab() {
                   <div className="text-sm font-bold text-pink-400">{fmt(parseInt(p.net_payout_paise))}</div>
                 </div>
               </div>
-              {p.upi_reference && (
+              {p.razorpay_payout_id && (
                 <div className="mt-2 text-xs text-white/30 pt-2 border-t border-white/[0.04]">
-                  UPI Ref: <span className="font-mono text-white/50">{p.upi_reference}</span>
+                  UPI Ref: <span className="font-mono text-white/50">{p.razorpay_payout_id}</span>
                 </div>
               )}
             </div>

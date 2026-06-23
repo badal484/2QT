@@ -39,12 +39,12 @@ function StatCard({ label, value, sub, icon: Icon, color, trend }: any) {
 
 function WeeklyChart({ data }: { data: { date: string; revenue_paise: number; orders: number }[] }) {
   if (!data.length) return null;
-  const max = Math.max(...data.map(d => d.revenue_paise)) || 1;
+  const max = Math.max(...data.map(d => parseInt(d.revenue_paise, 10))) || 1;
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   return (
     <div className="flex items-end gap-2 h-24 mt-2">
       {data.map((d, i) => {
-        const pct = (d.revenue_paise / max) * 100;
+        const pct = (parseInt(d.revenue_paise, 10) / max) * 100;
         const day = days[new Date(d.date).getDay()];
         const isToday = d.date === new Date().toISOString().split("T")[0];
         return (
@@ -81,7 +81,7 @@ function CODAlert({ riders }: { riders: any[] }) {
               <span className="text-sm text-white font-semibold">{r.rider_name}</span>
               <span className="text-xs text-white/40 ml-2">{r.order_count} orders</span>
             </div>
-            <span className="text-sm font-black text-amber-400">{fmt(r.cash_pending_paise)}</span>
+            <span className="text-sm font-black text-amber-400">{fmt(parseInt(r.cash_pending_paise, 10))}</span>
           </div>
         ))}
       </div>
