@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, Dimensions, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, SectionList, Dimensions, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone } from '../store/slices/cartSlice';
-import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User } from 'lucide-react-native';
+import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Menu } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
@@ -33,6 +33,9 @@ const HomeScreen = ({ navigation }: any) => {
   const { globalLocation: location, serviceabilityStatus, activeZoneId } = useSelector((state: RootState) => state.app);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const sectionListRef = React.useRef<SectionList>(null);
+  const [showMenuPopup, setShowMenuPopup] = useState(false);
   const [isVegOnly, setIsVegOnly] = useState(false);
 
   // Zone resolution:
@@ -70,17 +73,17 @@ const HomeScreen = ({ navigation }: any) => {
   }));
 
   useEffect(() => {
-    if (socket && zoneId) {
+    if (socket && effectiveZoneId) {
       socket.on('menu_updated', (data) => {
-        if (data.zoneId === zoneId) {
-          queryClient.invalidateQueries({ queryKey: ['menu', zoneId] });
+        if (data.zoneId === effectiveZoneId) {
+          queryClient.invalidateQueries({ queryKey: ['menu', effectiveZoneId] });
         }
       });
     }
     return () => {
       if (socket) socket.off('menu_updated');
     };
-  }, [socket, zoneId]);
+  }, [socket, effectiveZoneId]);
 
   const { data: menuData, isLoading } = useQuery({
     queryKey: ['menu', effectiveZoneId],
@@ -199,14 +202,30 @@ const HomeScreen = ({ navigation }: any) => {
     [menuData?.items],
   );
 
-  const filteredItems = useMemo(() => {
+  const sections = useMemo(() => {
     if (!menuData?.items) return [];
-    return menuData.items.filter((item: any) => {
-      if (selectedCategory !== 'All' && item.category !== selectedCategory) return false;
-      if (isVegOnly && !item.is_veg) return false;
-      if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      return true;
+    let items = menuData.items;
+    
+    if (isVegOnly) items = items.filter((item: any) => item.is_veg);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      items = items.filter((item: any) => item.name.toLowerCase().includes(q));
+    }
+
+    const grouped: Record<string, any[]> = {};
+    items.forEach((item: any) => {
+      if (!grouped[item.category]) grouped[item.category] = [];
+      grouped[item.category].push(item);
     });
+
+    if (selectedCategory !== 'All') {
+      return grouped[selectedCategory] ? [{ title: selectedCategory, data: grouped[selectedCategory] }] : [];
+    }
+
+    return Object.keys(grouped).sort().map(key => ({
+      title: key,
+      data: grouped[key]
+    }));
   }, [menuData?.items, selectedCategory, isVegOnly, searchQuery]);
 
   const cartTotal = useMemo(
@@ -242,112 +261,102 @@ const HomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.minimalHeader, { paddingTop: Math.max(insets.top + spacing.md, 50) }]}>
-        {/* ── Logo row ─────────────────────────────────────────── */}
-        <View style={styles.headerTopRow}>
-          <View>
-            <Text style={styles.logoText}>2QT<Text style={styles.logoDot}>.</Text></Text>
-            <View style={styles.deliveryTagRow}>
-              <Text style={styles.deliveryTagIcon}>⚡</Text>
-              <Text style={styles.deliveryTagText}>15-MIN DELIVERY</Text>
+      <View style={[
+        styles.minimalHeader, 
+        { 
+          paddingTop: Math.max(insets.top + 10, 20), 
+          paddingBottom: 16,
+          backgroundColor: colors.background, // Blend with the rest of the page
+          borderBottomWidth: 0, // No ugly line
+        }
+      ]}>
+        {/* ROW 1: Address and Profile */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
+            <MapPin size={28} color={colors.primary} weight="fill" style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+                onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
+              >
+                <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink }}>
+                  {user?.name ? `Hey ${user.name.split(' ')[0]} 👋` : 'Home'}
+                </Text>
+                <ChevronDown size={16} color={colors.ink} style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 }} numberOfLines={1}>
+                {location?.addressText || selectedAddress?.address_text || 'Set location'}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.headerActions}>
-            {/* Address pill */}
-            <TouchableOpacity
-              style={styles.addressPill}
-              onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
-            >
-              <MapPin size={12} color={unserviceableLocation || showNoLocation ? colors.danger : colors.primary} />
-              <Text style={[styles.addressPillText, (unserviceableLocation || showNoLocation) && { color: colors.danger }]} numberOfLines={1}>
-                {location?.addressText?.split(',')[0] || selectedAddress?.address_text?.split(',')[0] || 'Set location'}
-              </Text>
-              <ChevronDown size={12} color={colors.inkMuted} />
-            </TouchableOpacity>
-
-            {/* Profile */}
-            <TouchableOpacity
-              style={styles.profileButton}
-              onPress={() => { triggerHaptic(); navigation.navigate('ProfileTab'); }}
-            >
-              {user?.photo_url ? (
-                <NetworkImage uri={user.photo_url} style={styles.profileImage} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
-              ) : (
-                <User size={18} color={colors.primary} />
-              )}
-            </TouchableOpacity>
-
-          </View>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => { triggerHaptic(); navigation.navigate('ProfileTab'); }}
+          >
+            {user?.photo_url ? (
+              <NetworkImage uri={user.photo_url} style={styles.profileImage} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
+            ) : (
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderLight }}>
+                <User size={20} color={colors.ink} />
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Banner + Search — hidden when zone is unserviceable/unknown */}
+        {/* ROW 2: Sleek Permanent Search Bar */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
-          <Animated.View entering={FadeInDown.duration(400)}>
-            <TouchableOpacity
-              style={styles.liveKitchenBanner}
-              onPress={() => {
-                triggerHaptic();
-                navigation.navigate('LiveKitchen');
-              }}
-              activeOpacity={0.9}
-            >
-              <View style={styles.liveDotWrapper}>
-                <Animated.View style={[styles.liveDot, liveDotStyle]} />
-                <View style={styles.liveDotCore} />
-              </View>
-              <View style={styles.liveKitchenTextCol}>
-                <Text style={styles.liveKitchenText}>LIVE FROM</Text>
-                <Text style={styles.liveKitchenTitle}>{menuData?.kitchenName || '2QT Kitchen'}{menuData?.zoneName ? ` • ${menuData.zoneName}` : ''}</Text>
-              </View>
-              <View style={styles.deliveryTimeBadge}>
-                <Text style={styles.deliveryTimeText}>10-15</Text>
-                <Text style={styles.deliveryTimeSub}>MINS</Text>
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-
-        {!unserviceableLocation && !showNoLocation && !showNetworkError && (
-          <View style={styles.searchBarContainer}>
-            <Search size={20} color={colors.primary} style={styles.searchIcon} />
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            backgroundColor: colors.surface, 
+            borderRadius: 16, 
+            paddingHorizontal: 16, 
+            height: 52,
+            shadowColor: colors.ink,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
+            elevation: 2,
+            borderWidth: 1,
+            borderColor: colors.borderLight
+          }}>
+            <Search size={22} color={colors.inkMuted} style={{ marginRight: 12 }} />
             <TextInput
-              placeholder="Search for a craving..."
-              placeholderTextColor={colors.inkFaint}
-              style={styles.searchInput}
+              placeholder='Search "Biryani" or "Pizza"...'
+              placeholderTextColor={colors.inkMuted}
+              style={{ flex: 1, fontSize: 15, fontFamily: fontFamily.medium, color: colors.ink, padding: 0 }}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            <View style={styles.vegToggleContainer}>
-              <View style={styles.vegToggleWrapper}>
-                <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
-                <Switch
-                  value={isVegOnly}
-                  onValueChange={(val) => {
-                    triggerHaptic();
-                    setIsVegOnly(val);
-                  }}
-                  trackColor={{ false: colors.border, true: colors.primaryTint }}
-                  thumbColor={isVegOnly ? colors.primary : colors.white}
-                  style={styles.vegSwitch}
-                />
-              </View>
-            </View>
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => { triggerHaptic(); setSearchQuery(''); }}>
+                <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
 
-      <FlatList
-        data={
+
+      <SectionList
+        style={{ flex: 1 }}
+        ref={sectionListRef}
+        sections={
           isServiceabilityChecking || unserviceableLocation || showNoLocation || showNetworkError
             ? []
-            : filteredItems
+            : sections
         }
         keyExtractor={(item: any) => item.id}
         renderItem={renderItem}
+        renderSectionHeader={({ section: { title } }: any) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>✨ {title}</Text>
+          </View>
+        )}
+        stickySectionHeadersEnabled={true}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        removeClippedSubviews
         windowSize={5}
         maxToRenderPerBatch={5}
         initialNumToRender={6}
@@ -400,6 +409,20 @@ const HomeScreen = ({ navigation }: any) => {
             {!isLoading && categories.length > 1 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
               <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.mindContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mindScroll}>
+
+                <View style={[styles.vegToggleWrapper, { marginRight: spacing.md }]}>
+                  <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
+                  <Switch
+                    value={isVegOnly}
+                    onValueChange={(val) => {
+                      triggerHaptic();
+                      setIsVegOnly(val);
+                    }}
+                    trackColor={{ false: colors.border, true: colors.primaryTint }}
+                    thumbColor={isVegOnly ? colors.primary : colors.white}
+                    style={styles.vegSwitch}
+                  />
+                </View>
                   {categories.map((cat: any) => (
                     <CategoryPill
                       key={cat}
@@ -633,7 +656,6 @@ const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, k
     <TouchableOpacity style={styles.card} activeOpacity={0.93} onPress={onPress}>
       {/* ── Left: text content ─────────────────────────────── */}
       <View style={styles.cardLeft}>
-        {/* Veg / non-veg indicator */}
         <View style={[styles.vegBadge, { borderColor: vegColor }]}>
           <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
         </View>
@@ -645,52 +667,55 @@ const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, k
         ) : null}
       </View>
 
-      {/* ── Right: image fills full card height, button floats over it ── */}
-      <View style={styles.cardRight}>
-        {/* Image fills the whole right column */}
-        {item.photo_url ? (
-          <NetworkImage uri={item.photo_url} style={styles.cardImage} />
-        ) : (
-          <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-            <ChefHat size={32} color={colors.inkFaint} />
-          </View>
-        )}
-
-        {/* Sold-out dim */}
-        {unavailable && (
-          <View style={styles.soldOutOverlay}>
-            <Text style={styles.soldOutText}>Sold Out</Text>
-          </View>
-        )}
-
-        {/* ADD / qty — floats over bottom of image */}
-        {!unavailable && (
-          <View style={styles.cardBtnFloat}>
-            {cartItem ? (
-              <View style={styles.qtyControl}>
-                <TouchableOpacity
-                  onPress={() => onUpdate(cartItem.quantity - 1)}
-                  style={styles.qtyBtn}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
-                >
-                  <Text style={styles.qtyBtnText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyValue}>{cartItem.quantity}</Text>
-                <TouchableOpacity
-                  onPress={() => onUpdate(cartItem.quantity + 1)}
-                  style={styles.qtyBtn}
-                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                >
-                  <Text style={styles.qtyBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
+      {/* ── Right: Image and Floating Button ── */}
+      <View style={styles.cardRightWrapper}>
+        <View style={styles.cardRightRelative}>
+          {/* Image */}
+          <View style={styles.cardImageContainer}>
+            {item.photo_url ? (
+              <NetworkImage uri={item.photo_url} style={styles.cardImage} />
             ) : (
-              <TouchableOpacity style={styles.addBtn} onPress={onAdd} activeOpacity={0.85}>
-                <Text style={styles.addBtnText}>ADD</Text>
-              </TouchableOpacity>
+              <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+                <ChefHat size={32} color={colors.inkFaint} />
+              </View>
+            )}
+
+            {unavailable && (
+              <View style={styles.soldOutOverlay}>
+                <Text style={styles.soldOutText}>Sold Out</Text>
+              </View>
             )}
           </View>
-        )}
+
+          {/* ADD / qty — pinned to the bottom of the 130x130 box! */}
+          {!unavailable && (
+            <View style={styles.cardBtnFloat}>
+              {cartItem ? (
+                <View style={styles.qtyControl}>
+                  <TouchableOpacity
+                    onPress={() => onUpdate(cartItem.quantity - 1)}
+                    style={styles.qtyBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                  >
+                    <Text style={styles.qtyBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.qtyValue}>{cartItem.quantity}</Text>
+                  <TouchableOpacity
+                    onPress={() => onUpdate(cartItem.quantity + 1)}
+                    style={styles.qtyBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                  >
+                    <Text style={styles.qtyBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.addBtn} onPress={onAdd} activeOpacity={0.85}>
+                  <Text style={styles.addBtnText}>ADD</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -748,51 +773,55 @@ const styles = StyleSheet.create({
   // ── Card layout ──────────────────────────────────────────────────────────
   card: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    marginBottom: 12,
-    minHeight: 140,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
+    paddingVertical: 24, // Generous padding for high-end look
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight, // Very subtle separator
+    backgroundColor: 'transparent'
   },
-  cardLeft: { flex: 1, padding: 16, justifyContent: 'center' },
+  cardLeft: { flex: 1, paddingRight: 20, justifyContent: 'flex-start' }, // Top-align text
   vegBadge: {
-    width: 18, height: 18, borderWidth: 1.5, borderRadius: 4,
+    width: 14, height: 14, borderWidth: 1.5, borderRadius: 4,
     alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
-  vegDot: { width: 8, height: 8, borderRadius: 4 },
-  cardName: { fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 22 },
-  cardPrice: { fontSize: 15, fontFamily: fontFamily.extrabold, color: colors.ink, marginBottom: 5 },
-  cardDesc: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.medium, lineHeight: 17 },
+  vegDot: { width: 6, height: 6, borderRadius: 3 },
+  cardName: { fontSize: 17, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 6, lineHeight: 22 },
+  cardPrice: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 8 },
+  cardDesc: { fontSize: 14, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 18 },
 
-  // Right column: image fills full height, button floats over bottom
-  cardRight: { width: 130, position: 'relative' },
-  cardImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  cardImagePlaceholder: { backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
+  // Right column
+  cardRightWrapper: { width: 140, alignItems: 'center' }, // Outer wrapper just holds width
+  cardRightRelative: { width: 130, height: 130, position: 'relative' }, // Inner wrapper handles absolute positioning perfectly
+  cardImageContainer: {
+    width: 130, height: 130,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceMuted,
+  },
+  cardImage: { width: '100%', height: '100%' },
+  cardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
 
   // ADD / qty floats over image bottom
   cardBtnFloat: {
-    position: 'absolute', bottom: 10, left: 8, right: 8,
+    position: 'absolute', bottom: -12, alignSelf: 'center', width: 110, zIndex: 10,
   },
   qtyControl: {
-    flexDirection: 'row', backgroundColor: colors.accent, borderRadius: 12,
+    flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 8,
     alignItems: 'center', justifyContent: 'space-between', height: 38,
-    shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+    borderWidth: 1, borderColor: '#E5E7EB', // Clean border, NO shadow
+    elevation: 0, shadowOpacity: 0
   },
-  qtyBtn: { width: 36, height: 38, alignItems: 'center', justifyContent: 'center' },
-  qtyBtnText: { color: colors.white, fontSize: 22, fontFamily: fontFamily.bold },
-  qtyValue: { color: colors.white, fontSize: 15, fontFamily: fontFamily.extrabold },
+  qtyBtn: { width: 34, height: 38, alignItems: 'center', justifyContent: 'center' },
+  qtyBtnText: { color: colors.primary, fontSize: 22, fontFamily: fontFamily.bold },
+  qtyValue: { color: colors.ink, fontSize: 15, fontFamily: fontFamily.extrabold },
   addBtn: {
-    backgroundColor: colors.accent, borderRadius: 12,
-    paddingVertical: 9, alignItems: 'center',
-    shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+    backgroundColor: '#FFFFFF', borderRadius: 8,
+    height: 38, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#E5E7EB', // Clean border, NO shadow
+    elevation: 0, shadowOpacity: 0
   },
   addBtnDisabled: { backgroundColor: colors.surfaceMuted },
-  addBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 13, letterSpacing: 0.8 },
+  addBtnText: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 15, letterSpacing: 0.5 },
 
   liveKitchenBanner: {
     flexDirection: 'row',
@@ -842,7 +871,7 @@ const styles = StyleSheet.create({
   vegTextActive: { color: colors.primary },
   vegSwitch: { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] },
 
-  listContent: { paddingBottom: 200 },
+  listContent: { paddingBottom: 200, flexGrow: 1 },
   itemPadding: { paddingHorizontal: spacing.lg },
   headerSpacer: { height: spacing.xl },
 
@@ -1167,7 +1196,83 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: fontFamily.bold,
   },
-});
 
+  sectionHeader: {
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
+  },
+  sectionHeaderText: {
+    fontSize: 20,
+    fontFamily: fontFamily.black,
+    color: colors.ink,
+    letterSpacing: -0.5,
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 100,
+    alignSelf: 'center',
+    zIndex: 1000,
+  },
+  menuFab: {
+    backgroundColor: colors.ink,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 12,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  menuFabText: {
+    color: colors.white,
+    fontFamily: fontFamily.bold,
+    fontSize: 14,
+    marginLeft: spacing.sm,
+    letterSpacing: 1,
+  },
+  menuPopupOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    zIndex: 1001,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 160,
+  },
+  menuPopupContainer: {
+    backgroundColor: colors.surface,
+    width: 250,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  menuPopupItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  menuPopupText: {
+    fontSize: 15,
+    fontFamily: fontFamily.medium,
+    color: colors.ink,
+  },
+  menuPopupCount: {
+    fontSize: 13,
+    fontFamily: fontFamily.medium,
+    color: colors.inkFaint,
+  },
+
+});
 export default HomeScreen;
 // v2
