@@ -151,7 +151,7 @@ function OrderRow({ order }: { order: any }) {
         <div className="text-xs font-mono text-white/60">#{order.display_id}</div>
         <div className="text-xs text-white/30 mt-0.5">
           {new Date(order.updated_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-          {" · "}<span className="capitalize">{order.payment_type}</span>
+          {" · "}<span className="capitalize">{order.payment_method}</span>
         </div>
       </div>
       <div className="text-right">
@@ -379,6 +379,7 @@ export default function KitchenPortalPage() {
       const token = localStorage.getItem("2qt_kitchen_token");
       const stored = localStorage.getItem("2qt_kitchen_user");
       if (token && stored) {
+        localStorage.setItem("2qt_token", token);
         setUser(JSON.parse(stored));
       }
     } catch {}
@@ -402,6 +403,8 @@ export default function KitchenPortalPage() {
       localStorage.removeItem("2qt_kitchen_token");
       localStorage.removeItem("2qt_kitchen_refresh_token");
       localStorage.removeItem("2qt_kitchen_user");
+      localStorage.removeItem("2qt_token");
+      localStorage.removeItem("2qt_refresh_token");
     } catch {}
     setUser(null);
     toast.success("Signed out");
