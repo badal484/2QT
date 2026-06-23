@@ -133,22 +133,30 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
 
             // 4. Update Inventory & Item stats
             const { rows: items } = await client.query('SELECT menu_item_id, quantity FROM order_items WHERE order_id = $1', [order.id]);
-            for (const item of items) {
-                await client.query(`
-                    UPDATE menu_items SET 
-                        today_sold_count = today_sold_count + $1,
-                        available = CASE WHEN today_sold_count + $1 >= daily_limit THEN false ELSE available END,
-                        sold_out_reason = CASE WHEN today_sold_count + $1 >= daily_limit THEN 'daily_limit_reached' ELSE sold_out_reason END
-                    WHERE id = $2
-                `, [item.quantity, item.menu_item_id]);
 
+            // Batch menu_items update — single query instead of N
+            if (items.length > 0) {
+                const ids = items.map((i: any) => i.menu_item_id);
+                const qtys = items.map((i: any) => i.quantity);
+                await client.query(`
+                    UPDATE menu_items SET
+                        today_sold_count = today_sold_count + v.qty,
+                        available = CASE WHEN today_sold_count + v.qty >= daily_limit AND daily_limit > 0 THEN false ELSE available END,
+                        sold_out_reason = CASE WHEN today_sold_count + v.qty >= daily_limit AND daily_limit > 0 THEN 'daily_limit_reached' ELSE sold_out_reason END
+                    FROM (SELECT UNNEST($1::uuid[]) as id, UNNEST($2::int[]) as qty) v
+                    WHERE menu_items.id = v.id
+                `, [ids, qtys]);
+            }
+
+            // Ingredient deductions (per-item — cannot be batched cleanly due to JOIN chain)
+            for (const item of items) {
                 await client.query(`
                     UPDATE ingredients i
                     SET current_stock_grams = i.current_stock_grams - (ri.quantity_grams * $1)
                     FROM recipe_ingredients ri
                     JOIN recipes r ON ri.recipe_id = r.id
                     JOIN ingredients orig_i ON ri.ingredient_id = orig_i.id
-                    WHERE r.menu_item_id = $2 AND r.is_active = true 
+                    WHERE r.menu_item_id = $2 AND r.is_active = true
                     AND i.name = orig_i.name AND i.kitchen_id = $3
                 `, [item.quantity, item.menu_item_id, order.kitchen_id]);
             }

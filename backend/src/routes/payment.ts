@@ -269,7 +269,7 @@ router.post('/mock-success', authenticate, async (req: AuthRequest, res) => {
         if (!pendingData) return res.status(404).json({ error: 'PENDING_ORDER_NOT_FOUND' });
 
         const pending = JSON.parse(pendingData);
-        const result = await finalizeOrder(razorpayOrderId, 'online', pending.orderId || 'MOCK');
+        const result = await finalizeOrder(razorpayOrderId, 'online');
         res.json(result);
     } catch (err: any) {
         res.status(500).json({ error: 'MOCK_FAILED', message: err.message });
