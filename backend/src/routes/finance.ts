@@ -14,6 +14,8 @@ router.get('/summary', financeAccess, financeRole, async (req: AuthRequest, res)
   try {
     const { date } = req.query as { date?: string };
     const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetStartTz = new Date(`${targetDate}T00:00:00+05:30`).toISOString();
+    const targetEndTz = new Date(`${targetDate}T23:59:59.999+05:30`).toISOString();
 
     const [revenue, codPending, riderDue, kitchenDue, weekRevenue] = await Promise.all([
       // Today's revenue breakdown
@@ -29,8 +31,8 @@ router.get('/summary', financeAccess, financeRole, async (req: AuthRequest, res)
           COALESCE(SUM(commission_paise) FILTER (WHERE status = 'delivered'), 0) AS commission_earned_paise,
           COUNT(*) FILTER (WHERE status NOT IN ('delivered','cancelled')) AS active_orders
         FROM orders
-        WHERE DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $1
-      `, [targetDate]),
+        WHERE created_at >= $1 AND created_at <= $2
+      `, [targetStartTz, targetEndTz]),
 
       // COD cash in transit (delivered COD orders not yet collected)
       query(`
@@ -340,8 +342,8 @@ router.post('/kitchen-payouts/generate', financeAccess, financeRole, async (req:
       FROM orders
       WHERE kitchen_id = $1
         AND status = 'delivered'
-        AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') BETWEEN $2 AND $3
-    `, [kitchenId, periodStart, periodEnd]);
+        AND created_at >= $2 AND created_at <= $3
+    `, [kitchenId, new Date(`${periodStart}T00:00:00+05:30`).toISOString(), new Date(`${periodEnd}T23:59:59.999+05:30`).toISOString()]);
 
     const stats = orderStats[0];
     const grossSalesPaise = parseInt(stats.gross_sales_paise);
@@ -437,7 +439,7 @@ router.get('/kitchen-payouts/summary', financeAccess, financeRole, async (req: A
           (SELECT SUM(net_payout_paise) FROM kitchen_payouts WHERE kitchen_id = k.id AND status = 'pending'), 0
         ) AS pending_payout_paise,
         (SELECT COUNT(*) FROM orders WHERE kitchen_id = k.id AND status = 'delivered'
-          AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') >= CURRENT_DATE - 7
+          AND created_at >= NOW() - INTERVAL '7 days'
         ) AS orders_last_7_days
       FROM kitchens k
       WHERE k.is_partner = TRUE
