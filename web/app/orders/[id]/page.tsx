@@ -153,7 +153,7 @@ export default function OrderTrackingPage() {
     const onConnect    = () => { setSocketConnected(true);  joinRoom(); };
     const onDisconnect = () => { setSocketConnected(false); };
     const onStatus = ({ orderId, status }: { orderId: string; status: Order["status"] }) => {
-      if (orderId === id) setOrder(prev => prev ? { ...prev, status } : null);
+      if (orderId === id) setOrder(prev => prev ? { ...prev, status } : prev);
     };
     const onRiderLoc = (loc: { lat: number | string; lng: number | string }) => {
       setLiveRider({ lat: Number(loc.lat), lng: Number(loc.lng) });

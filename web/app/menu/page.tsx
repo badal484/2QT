@@ -275,7 +275,7 @@ export default function MenuPage() {
   useEffect(() => {
     if (!isCartOpen || !user) return;
     Promise.all([
-      api.get("/customers/wallet").catch(() => ({ balance_paise: 0 })),
+      api.get("/customers/wallet").catch(() => ({ balancePaise: 0 })),
       api.get("/customers/loyalty").catch(() => ({ points: 0 })),
     ]).then(([w, l]) => {
       setWalletBalance(w.balancePaise ?? 0);

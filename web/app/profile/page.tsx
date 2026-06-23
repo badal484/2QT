@@ -440,7 +440,7 @@ function WalletTab() {
                    </div>
                 </div>
                 <span className={`text-lg font-bold ${tx.type === "credit" ? "text-green-600" : "text-red-600"}`}>
-                  {tx.type === "credit" ? "+" : "-"}₹{tx.amount_paise / 100}
+                  {tx.type === "credit" ? "+" : "-"}₹{(tx.amountPaise / 100).toFixed(2)}
                 </span>
               </div>
             ))}
