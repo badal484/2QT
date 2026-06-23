@@ -129,8 +129,8 @@ router.post('/support/tickets', authenticate, async (req: AuthRequest, res) => {
 router.get('/support/tickets', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const { rows } = await query(`
-        SELECT id, issue_type as subject, description as message, status, created_at as "createdAt"
-        FROM support_tickets 
+        SELECT id, issue_type as subject, description as message, status, resolution, created_at as "createdAt"
+        FROM support_tickets
         WHERE customer_id = $1 
         ORDER BY created_at DESC
     `, [userId]);
