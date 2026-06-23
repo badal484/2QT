@@ -18,12 +18,21 @@ export const initSocket = (server: any) => {
 
     io.adapter(createAdapter(redisPub, redisSub));
 
-    io.use((socket, next) => {
+    io.use(async (socket, next) => {
         const token = socket.handshake.auth.token;
         if (!token) return next(new Error('Authentication error'));
 
         try {
             const decoded = jwt.verify(token, JWT_SECRET) as any;
+            // Refresh kitchen_id/zone_id from DB — JWT payload may be stale
+            // (e.g. admin assigned a zone/kitchen after the user last logged in)
+            try {
+                const { rows } = await query('SELECT kitchen_id, zone_id FROM users WHERE id = $1', [decoded.userId]);
+                if (rows[0]) {
+                    decoded.kitchenId = rows[0].kitchen_id ?? decoded.kitchenId;
+                    decoded.zoneId = rows[0].zone_id ?? decoded.zoneId;
+                }
+            } catch { /* non-critical — fall back to JWT payload values */ }
             (socket as any).user = decoded;
             next();
         } catch (err) {
@@ -121,11 +130,12 @@ export const emitToAdmin = (event: string, data: any) => {
 
 export const emitToRiders = (event: string, data: any, zoneId?: string) => {
     if (io) {
-        // Always emit to global riders room — catches riders with no zone_id set
-        io.to('riders').emit(event, data);
-        // Also emit to zone-specific room for targeted delivery
         if (zoneId) {
+            // Zone-specific: only emit to riders in that zone (avoids double-delivery to zoned riders)
             io.to(`riders:${zoneId}`).emit(event, data);
+        } else {
+            // Broadcast: no zone filter — catch all riders
+            io.to('riders').emit(event, data);
         }
     }
 };
