@@ -91,7 +91,7 @@ const WalletScreen = ({ navigation }: any) => {
         </TouchableOpacity>
         
         <Text style={styles.headerLabel}>2QT Wallet</Text>
-        <Text style={styles.balanceValue}>₹{wallet?.balancePaise / 100 || '0.00'}</Text>
+        <Text style={styles.balanceValue}>₹{wallet ? (wallet.balancePaise / 100).toFixed(2) : '0.00'}</Text>
         
         <View style={styles.actionRow}>
           <TouchableOpacity 
@@ -138,9 +138,9 @@ const WalletScreen = ({ navigation }: any) => {
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={[styles.txAmount, { color: tx.type === 'credit' ? '#22C55E' : '#EF4444' }]}>
-                  {tx.type === 'credit' ? '+' : '−'}₹{Math.abs(tx.amountPaise) / 100}
+                  {tx.type === 'credit' ? '+' : '−'}₹{(Math.abs(tx.amountPaise) / 100).toFixed(2)}
                 </Text>
-                <Text style={styles.txBalanceAfter}>Balance: ₹{tx.balanceAfterPaise / 100}</Text>
+                <Text style={styles.txBalanceAfter}>Balance: ₹{(tx.balanceAfterPaise / 100).toFixed(2)}</Text>
               </View>
             </Animated.View>
           ))
