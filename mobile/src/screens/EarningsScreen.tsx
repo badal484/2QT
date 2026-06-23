@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const EarningsScreen = ({ navigation }: any) => {
   const { data, isLoading } = useQuery({
     queryKey: ['rider-earnings-history'],
-    queryFn: () => api.get('/riders/earnings'),
+    queryFn: () => api.get('/riders/earnings/history'),
   });
 
   if (isLoading) return (
