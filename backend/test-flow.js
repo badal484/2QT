@@ -10,13 +10,19 @@ async function run() {
   try {
     // 1. Setup Test Users
     console.log("Setting up users...");
+    await pool.query("DELETE FROM loyalty_transactions WHERE customer_id IN (SELECT id FROM users WHERE phone IN ('911111111111', '912222222222', '913333333333'))");
+    await pool.query("DELETE FROM wallet_transactions WHERE customer_id IN (SELECT id FROM users WHERE phone IN ('911111111111', '912222222222', '913333333333'))");
+    await pool.query("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE customer_id IN (SELECT id FROM users WHERE phone IN ('911111111111', '912222222222', '913333333333')))");
+    await pool.query("DELETE FROM orders WHERE customer_id IN (SELECT id FROM users WHERE phone IN ('911111111111', '912222222222', '913333333333'))");
+    await pool.query("DELETE FROM addresses WHERE customer_id IN (SELECT id FROM users WHERE phone IN ('911111111111', '912222222222', '913333333333'))");
     await pool.query(`INSERT INTO users (phone, name, role, is_active) VALUES ('911111111111', 'Test Customer', 'customer', true) ON CONFLICT (phone) DO UPDATE SET role='customer', is_active=true`);
     await pool.query(`INSERT INTO users (phone, name, role, is_active, current_order_id) VALUES ('912222222222', 'Test Chef', 'chef', true, NULL) ON CONFLICT (phone) DO UPDATE SET role='chef', is_active=true, current_order_id=NULL`);
     await pool.query(`INSERT INTO users (phone, name, role, is_active, is_verified, is_online, current_order_id) VALUES ('913333333333', 'Test Rider', 'rider', true, true, true, NULL) ON CONFLICT (phone) DO UPDATE SET role='rider', is_verified=true, is_online=true, is_active=true, current_order_id=NULL`);
 
     const getAuth = async (phone) => {
-      await axios.post(`${API}/auth/send-otp`, { phone });
-      const res = await axios.post(`${API}/auth/verify-otp`, { phone, otp: '123456' });
+      const sendRes = await axios.post(`${API}/auth/send-otp`, { phone });
+      const otp = sendRes.data.devOtp || '123456';
+      const res = await axios.post(`${API}/auth/verify-otp`, { phone, otp });
       return res.data.accessToken;
     };
 
@@ -42,11 +48,12 @@ async function run() {
     const kCheck = await pool.query(`SELECT id FROM kitchens WHERE name='Test Kitchen'`);
     let kitchenId;
     if (kCheck.rows.length === 0) {
-      const kIns = await pool.query(`INSERT INTO kitchens (name, address, is_active, lat, lng, zone_id) VALUES ('Test Kitchen', 'Kitchen Addr', true, 12.97, 77.59, $1) RETURNING id`, [zoneId]);
+      const kIns = await pool.query(`INSERT INTO kitchens (name, address, is_active, lat, lng) VALUES ('Test Kitchen', 'Kitchen Addr', true, 12.97, 77.59) RETURNING id`);
       kitchenId = kIns.rows[0].id;
     } else {
       kitchenId = kCheck.rows[0].id;
     }
+    await pool.query(`INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [kitchenId, zoneId]);
     console.log("Kitchen setup:", kitchenId);
     
     await pool.query(`UPDATE users SET kitchen_id = $1 WHERE id = $2`, [kitchenId, kUserId]);
@@ -54,7 +61,7 @@ async function run() {
     // Create a Menu Item
     const mCheck = await pool.query(`SELECT id FROM menu_items WHERE name='Test Item'`);
     if (mCheck.rows.length === 0) {
-      await pool.query(`INSERT INTO menu_items (kitchen_id, name, description, price_paise, cost_price_paise, category, zone_id) VALUES ($1, 'Test Item', 'Desc', 10000, 8000, 'Test', $2)`, [kitchenId, zoneId]);
+      await pool.query(`INSERT INTO menu_items (name, description, price_paise, cost_price_paise, category, zone_id) VALUES ('Test Item', 'Desc', 10000, 8000, 'Test', $1)`, [zoneId]);
     }
     console.log("Menu Item setup");
 
@@ -63,7 +70,7 @@ async function run() {
     const addrs = await axios.get(`${API}/customers/addresses`, { headers: { Authorization: `Bearer ${cToken}` } });
     if (addrs.data.addresses.length === 0) {
       const newAddr = await axios.post(`${API}/customers/addresses`, { label: 'Home', addressText: 'Customer House', lat: 12.98, lng: 77.60, zoneId: zoneId }, { headers: { Authorization: `Bearer ${cToken}` } });
-      cAddressId = newAddr.data.id;
+      cAddressId = newAddr.data.address.id;
     } else { cAddressId = addrs.data.addresses[0].id; }
     console.log("Customer Address setup");
 

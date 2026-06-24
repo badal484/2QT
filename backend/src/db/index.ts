@@ -7,7 +7,7 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     max: 20, // High-performance pool for Bengaluru pilot
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 15000,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
@@ -31,7 +31,7 @@ export const query = async (text: string, params?: any[]) => {
         } catch (error: any) {
             attempts++;
             // Retry only on transient connection errors
-            if (attempts < maxAttempts && (error.code === '57P01' || error.code === '08006')) {
+            if (attempts < maxAttempts && (error.code === '57P01' || error.code === '08006' || error.message?.includes('timeout') || error.message?.includes('Connection terminated'))) {
                 console.warn(`--- SYSTEMATIC DB: Transient error, retrying attempt ${attempts}... ---`);
                 await new Promise(res => setTimeout(res, 1000 * attempts));
                 continue;

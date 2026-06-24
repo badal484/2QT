@@ -1,6 +1,12 @@
 const { Pool } = require('pg');
-process.env.PGUSER = "postgres";
-const pool = new Pool({
-  connectionString: "postgresql://postgres.kkftttimpfenlgtjafnj:Badal%404834@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-});
-console.log(pool.options.user);
+require('dotenv').config();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+async function test() {
+  try {
+    await pool.query('SELECT $1::text', [undefined]);
+    console.log('SUCCESS');
+  } catch(e) {
+    console.log('ERROR:', e.message);
+  }
+}
+test().finally(() => pool.end());

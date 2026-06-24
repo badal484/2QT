@@ -149,8 +149,9 @@ CREATE TABLE IF NOT EXISTS winback_sends (
   customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   campaign_id UUID NOT NULL REFERENCES campaigns(id),
   sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  sent_date DATE NOT NULL DEFAULT CURRENT_DATE,
   promo_code TEXT,
-  UNIQUE(customer_id, campaign_id, sent_at::DATE)
+  UNIQUE(customer_id, campaign_id, sent_date)
 );
 
 -- 9. Indexes

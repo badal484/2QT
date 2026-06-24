@@ -64,16 +64,16 @@ const seed = async () => {
 
       for (const item of menuItems) {
         await client.query(`
-          INSERT INTO menu_items (zone_id, name, description, price_paise, cost_price_paise, category, station, available, daily_limit, is_veg)
-          VALUES ($1, $2, 'Premium selection from 2QT Palace.', $3, $4, $5, $6, true, 50, $7)
-          ON CONFLICT (zone_id, name) DO UPDATE SET price_paise = $3
-        `, [zoneId, item.name, item.price, Math.round(item.price * 0.35), item.cat, item.station, item.veg]);
+          INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, available, daily_limit, is_veg)
+          VALUES ($1, $2, $3, 'Premium selection from 2QT Palace.', $4, $5, $6, $7, true, 50, $8)
+          ON CONFLICT (zone_id, name) DO UPDATE SET price_paise = $4
+        `, [zoneId, kitchenId, item.name, item.price, Math.round(item.price * 0.35), item.cat, item.station, item.veg]);
       }
 
       // 5. Create Promo Code
       await client.query(`
-        INSERT INTO promo_codes (code, discount_type, discount_percent, min_order_paise, max_discount_paise, expires_at, max_uses)
-        VALUES ('2QT50', 'percent', 50, 10000, 5000, NOW() + interval '1 month', 1000)
+        INSERT INTO promo_codes (code, discount_type, discount_percent, discount_value_paise, min_order_paise, max_discount_paise, valid_from, valid_until, max_uses)
+        VALUES ('2QT50', 'percent', 50, 0, 10000, 5000, NOW(), NOW() + interval '1 month', 1000)
         ON CONFLICT DO NOTHING
       `);
 
