@@ -567,7 +567,7 @@ router.get('/products/revenue', financeAccess, financeRole, async (req: AuthRequ
 
     const { rows } = await query(`
       SELECT
-        mi.id, mi.name, mi.image_url,
+        mi.id, mi.name, mi.photo_url AS image_url,
         k.name AS kitchen_name,
         COUNT(oi.id) AS units_sold,
         COALESCE(SUM(oi.quantity), 0) AS total_quantity,
