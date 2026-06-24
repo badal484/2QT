@@ -16,28 +16,28 @@ export const redisSub = createClient(redisConfig);
 
 // --- SAFE WRAPPERS TO PREVENT UPSTASH RATE LIMIT CRASHES ---
 const originalGet = redis.get.bind(redis);
-redis.get = async (...args: any[]) => {
-    try { return await originalGet(...args); } 
+redis.get = (async (...args: any[]) => {
+    try { return await (originalGet as any)(...args); } 
     catch (e: any) { console.error('[Redis Safe GET]', e.message); return null; }
-} as any;
+}) as any;
 
 const originalSet = redis.set.bind(redis);
-redis.set = async (...args: any[]) => {
-    try { return await originalSet(...args); } 
+redis.set = (async (...args: any[]) => {
+    try { return await (originalSet as any)(...args); } 
     catch (e: any) { console.error('[Redis Safe SET]', e.message); return null; }
-} as any;
+}) as any;
 
 const originalDel = redis.del.bind(redis);
-redis.del = async (...args: any[]) => {
-    try { return await originalDel(...args); } 
+redis.del = (async (...args: any[]) => {
+    try { return await (originalDel as any)(...args); } 
     catch (e: any) { console.error('[Redis Safe DEL]', e.message); return null; }
-} as any;
+}) as any;
 
 const originalSetEx = redis.setEx.bind(redis);
-redis.setEx = async (...args: any[]) => {
-    try { return await originalSetEx(...args); } 
+redis.setEx = (async (...args: any[]) => {
+    try { return await (originalSetEx as any)(...args); } 
     catch (e: any) { console.error('[Redis Safe SETEX]', e.message); return null; }
-} as any;
+}) as any;
 // -------------------------------------------------------------
 
 redis.on('error', (err) => console.error('Redis Client Error', err));
