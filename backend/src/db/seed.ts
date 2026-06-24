@@ -15,12 +15,18 @@ const seed = async () => {
       `);
       
       let zoneId;
-      if (zones.length > 0) {
+      if (zones.length > 0 && zones[0].id) {
         zoneId = zones[0].id;
       } else {
-        const existingZone = await client.query("SELECT id FROM zones WHERE name = 'Kundanahalli Central'");
-        zoneId = existingZone.rows[0].id;
+        const existingZone = await client.query("SELECT id FROM zones WHERE name = 'Kundanahalli Central' LIMIT 1");
+        if (existingZone.rows.length > 0) {
+          zoneId = existingZone.rows[0].id;
+        } else {
+          const anyZone = await client.query("SELECT id FROM zones LIMIT 1");
+          zoneId = anyZone.rows[0]?.id;
+        }
       }
+      if (!zoneId) throw new Error("Could not evaluate zoneId");
 
       // 2. Create Kitchen
       const { rows: kitchens } = await client.query(`
@@ -31,12 +37,18 @@ const seed = async () => {
       `);
 
       let kitchenId;
-      if (kitchens.length > 0) {
+      if (kitchens.length > 0 && kitchens[0].id) {
         kitchenId = kitchens[0].id;
       } else {
-        const existingKitchen = await client.query("SELECT id FROM kitchens WHERE name = '2QT Central Kitchen'");
-        kitchenId = existingKitchen.rows[0].id;
+        const existingKitchen = await client.query("SELECT id FROM kitchens WHERE name = '2QT Central Kitchen' LIMIT 1");
+        if (existingKitchen.rows.length > 0) {
+          kitchenId = existingKitchen.rows[0].id;
+        } else {
+          const anyKitchen = await client.query("SELECT id FROM kitchens LIMIT 1");
+          kitchenId = anyKitchen.rows[0]?.id;
+        }
       }
+      if (!kitchenId) throw new Error("Could not evaluate kitchenId");
 
       // Link Kitchen to Zone
       await client.query('INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [kitchenId, zoneId]);
