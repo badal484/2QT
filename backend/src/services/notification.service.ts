@@ -108,12 +108,12 @@ export async function sendNotification(type: NotifType, options: SendOptions): P
     if (channels.includes('push') && prefs.push_enabled && user.device_token) {
         tasks.push(
             sendFCM(user.device_token, title, body, { type, ...vars })
-                .then(result => {
+                .then((result: any) => {
                     if (result === 'invalid_token') {
                         return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
                     }
                 })
-                .catch(err => console.error('[NOTIF_FCM_ERR]', err.message))
+                .catch((err: any) => console.error('[NOTIF_FCM_ERR]', err.message))
         );
     }
 
