@@ -539,7 +539,7 @@ router.get('/transactions', financeAccess, financeRole, async (req: AuthRequest,
     });
   } catch (err) {
     console.error('[finance/transactions]', err);
-    res.status(500).json({ error: 'Failed to fetch transactions' });
+    res.status(500).json({ error: 'Failed to fetch transactions', details: (err as Error).message, stack: (err as Error).stack });
   }
 });
 
