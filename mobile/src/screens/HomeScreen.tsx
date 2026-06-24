@@ -351,7 +351,7 @@ const HomeScreen = ({ navigation }: any) => {
         renderItem={renderItem}
         renderSectionHeader={({ section: { title } }: any) => (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>✨ {title}</Text>
+            <Text style={styles.sectionHeaderText}>{title}</Text>
           </View>
         )}
         stickySectionHeadersEnabled={true}
@@ -773,11 +773,9 @@ const styles = StyleSheet.create({
   // ── Card layout ──────────────────────────────────────────────────────────
   card: {
     flexDirection: 'row',
-    paddingVertical: 24, // Generous padding for high-end look
+    paddingVertical: 20,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight, // Very subtle separator
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
   },
   cardLeft: { flex: 1, paddingRight: 20, justifyContent: 'flex-start' }, // Top-align text
   vegBadge: {
@@ -1200,14 +1198,14 @@ const styles = StyleSheet.create({
   sectionHeader: {
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.sm,
+    paddingTop: 28,
+    paddingBottom: 8,
   },
   sectionHeaderText: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: fontFamily.black,
     color: colors.ink,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   fabContainer: {
     position: 'absolute',
