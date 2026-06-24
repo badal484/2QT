@@ -106,9 +106,24 @@ export function OverviewTab() {
     }
   }, [date]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { 
+    load(); 
+    
+    // Listen for real-time updates
+    import('../lib/socket').then(({ socket }) => {
+      socket.connect();
+      socket.on("new_order", load);
+      socket.on("order_status_update", load);
+      
+      return () => {
+        socket.off("new_order", load);
+        socket.off("order_status_update", load);
+        socket.disconnect();
+      };
+    });
+  }, [load]);
 
-  if (loading) return (
+  if (loading && !data) return (
     <div className="flex items-center justify-center h-64">
       <RefreshCw className="w-6 h-6 text-white/20 animate-spin" />
     </div>
