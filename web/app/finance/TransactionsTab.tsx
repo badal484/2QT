@@ -61,7 +61,22 @@ export function TransactionsTab() {
     }
   }, [page, filters]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { 
+    load(); 
+    
+    // Listen for real-time updates
+    import('../lib/socket').then(({ socket }) => {
+      socket.connect();
+      socket.on("new_order", load);
+      socket.on("order_status_update", load);
+      
+      return () => {
+        socket.off("new_order", load);
+        socket.off("order_status_update", load);
+        socket.disconnect();
+      };
+    });
+  }, [load]);
 
   const exportCSV = async () => {
     setExporting(true);
