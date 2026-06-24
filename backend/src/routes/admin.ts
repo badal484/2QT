@@ -813,7 +813,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
                 is_active = COALESCE($8, is_active),
                 realistic_delivery_minutes = COALESCE($9, realistic_delivery_minutes),
                 surge_enabled = COALESCE($10, surge_enabled),
-                polygon_points = COALESCE($11, polygon_points),
+                polygon_points = COALESCE($11::jsonb, polygon_points),
                 kitchen_lat = COALESCE($13, kitchen_lat),
                 kitchen_lng = COALESCE($14, kitchen_lng),
                 updated_at = NOW()
@@ -822,7 +822,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
         `, [name, radius_km, delivery_fee_base_paise, surge_fee_paise,
             opening_time, closing_time, max_orders_per_hour, is_active,
             realistic_delivery_minutes, surge_enabled,
-            polygon_points ?? null, id,
+            polygon_points ? JSON.stringify(polygon_points) : null, id,
             computedKitchenLat ?? null, computedKitchenLng ?? null]);
         if (rows.length === 0) return res.status(404).json({ error: 'ZONE_NOT_FOUND' });
 
