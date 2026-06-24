@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../db';
-import { authenticate, requireRole } from '../middleware/auth';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import redis, { keys } from '../redis';
 
 const router = express.Router();
@@ -65,7 +65,7 @@ router.get('/', authenticate, requireRole('super_admin', 'admin'), async (req, r
 });
 
 // POST /campaigns — create new campaign
-router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const {
         name, type, is_active, discount_type, discount_percent, discount_flat_paise,
         max_discount_paise, min_order_paise, winback_days, flash_start, flash_end,
