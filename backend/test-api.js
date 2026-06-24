@@ -1,14 +1,38 @@
-const fs = require('fs');
-const token = require('jsonwebtoken').sign({ id: 'some-id', role: 'super_admin' }, require('dotenv').config().parsed.JWT_SECRET);
-const FormData = require('form-data');
-const form = new FormData();
-form.append('image', fs.createReadStream('test.png'));
+const axios = require('axios');
 
-fetch('http://localhost:8000/api/v1/admin/menu/upload', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer ' + token,
-    ...form.getHeaders()
-  },
-  body: form
-}).then(r => r.json()).then(console.log).catch(console.error);
+async function test() {
+  try {
+    const { Pool } = require('pg');
+    require('dotenv').config();
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const userRes = await pool.query("SELECT id, phone FROM users LIMIT 1");
+    if (userRes.rows.length === 0) {
+      await pool.query("INSERT INTO users (name, phone) VALUES ('Test', '9999999999')");
+    }
+
+    const authRes = await axios.post('http://localhost:8000/api/v1/auth/send-otp', { phone: '9999999999', role: 'customer' });
+    const verifyRes = await axios.post('http://localhost:8000/api/v1/auth/verify-otp', { phone: '9999999999', otp: authRes.data.devOtp, role: 'customer' });
+    const token = verifyRes.data.accessToken;
+
+    const zoneRes = await pool.query("SELECT id FROM zones LIMIT 1");
+    const zoneId = zoneRes.rows[0].id;
+
+    const postRes = await axios.post('http://localhost:8000/api/v1/customers/addresses', {
+        label: 'Home',
+        addressText: 'T4, Keredari',
+        // MISSING LAT AND LNG
+        zoneId: zoneId
+    }, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    console.log("Success:", postRes.data);
+  } catch (e) {
+    if (e.response) {
+      console.log("Error status:", e.response.status);
+      console.log("Error html/json:", e.response.data);
+    } else {
+      console.error(e.message);
+    }
+  }
+}
+test();

@@ -1,5 +1,5 @@
-const PROD_API_URL = 'https://twoqt.onrender.com/api/v1';
-const PROD_SOCKET_URL = 'https://twoqt.onrender.com';
+const PROD_API_URL = 'http://10.172.181.93:8000/api/v1';
+const PROD_SOCKET_URL = 'http://10.172.181.93:8000';
 
 export const ENV = {
   API_URL: PROD_API_URL,
