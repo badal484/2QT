@@ -39,12 +39,12 @@ function StatCard({ label, value, sub, icon: Icon, color, trend }: any) {
 
 function WeeklyChart({ data }: { data: { date: string; revenue_paise: number; orders: number }[] }) {
   if (!data.length) return null;
-  const max = Math.max(...data.map(d => parseInt(d.revenue_paise, 10))) || 1;
+  const max = Math.max(...data.map(d => Number(d.revenue_paise))) || 1;
   const days = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   return (
     <div className="flex items-end gap-2 h-24 mt-2">
       {data.map((d, i) => {
-        const pct = (parseInt(d.revenue_paise, 10) / max) * 100;
+        const pct = (Number(d.revenue_paise) / max) * 100;
         const day = days[new Date(d.date).getDay()];
         const isToday = d.date === new Date().toISOString().split("T")[0];
         return (
