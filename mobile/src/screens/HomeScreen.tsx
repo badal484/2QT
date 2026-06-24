@@ -607,7 +607,7 @@ const HomeScreen = ({ navigation }: any) => {
         }
       />
 
-      {cartItems.length > 0 && (
+      {cartItems.length > 0 && sections.length > 0 && (
         <Animated.View
           entering={FadeInDown.duration(300)}
           exiting={FadeInDown.duration(200).delay(0)}
