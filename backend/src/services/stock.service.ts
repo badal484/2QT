@@ -35,7 +35,7 @@ export const deductStockForOrder = async (orderId: string) => {
 
                 // 4. Alert if low stock
                 if (status.current_stock_grams <= status.reorder_threshold_grams) {
-                    await notificationsQueue.add('low_stock_alert', {
+                    notificationsQueue.add('low_stock_alert', {
                         ingredientName: status.name,
                         currentStock: status.current_stock_grams
                     });
@@ -53,7 +53,7 @@ export const checkAllStockThresholds = async () => {
     `);
 
     for (const ing of rows) {
-        await notificationsQueue.add('low_stock_alert', {
+        notificationsQueue.add('low_stock_alert', {
             ingredientName: ing.name,
             currentStock: ing.current_stock_grams
         });

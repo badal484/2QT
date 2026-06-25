@@ -37,23 +37,12 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token revoked' });
         }
 
-        // SYSTEMATIC INTEGRATION: Always verify user status against DB truth
-        // We use Redis to cache the status for 60 seconds to avoid DB pressure
-        const statusCacheKey = `user_status:${decoded.userId}`;
+        // Always verify user status from DB (Redis cache removed — saves 2 Redis cmds/request)
         let userData = null;
-
         try {
-            const cached = await redis.get(statusCacheKey);
-            if (cached) {
-                userData = JSON.parse(cached);
-            } else {
-                const { query } = require('../db');
-                const { rows } = await query('SELECT role, kitchen_id, zone_id, is_active FROM users WHERE id = $1', [decoded.userId]);
-                if (rows[0]) {
-                    userData = rows[0];
-                    await redis.set(statusCacheKey, JSON.stringify(userData), { EX: 60 });
-                }
-            }
+            const { query } = require('../db');
+            const { rows } = await query('SELECT role, kitchen_id, zone_id, is_active FROM users WHERE id = $1', [decoded.userId]);
+            if (rows[0]) userData = rows[0];
         } catch (e) {
             console.error('--- AUTH: STATUS CHECK FAILURE', e);
         }
