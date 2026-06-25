@@ -58,7 +58,7 @@ export const initCrons = () => {
                     `, [topup, rider.rider_id]);
                     
                     // Also notify the rider
-                    await notificationsQueue.add('rider_guarantee_payout', { 
+                    notificationsQueue.add('rider_guarantee_payout', { 
                         riderId: rider.rider_id, 
                         amountPaise: topup 
                     });

@@ -80,7 +80,7 @@ export const processReferral = async (referredId: string, firstOrderId: string) 
     emitToUser(referral.referrer_id, 'wallet_updated', { balancePaise: rWallet[0].balance_paise });
     
     if (referrer[0]?.phone) {
-        await notificationsQueue.add('broadcast_message', {
+        notificationsQueue.add('broadcast_message', {
             phone: referrer[0].phone,
             message: `2QT: Great news! Your referral reward of ₹50 is now in your wallet. Keep sharing and earning!`
         });

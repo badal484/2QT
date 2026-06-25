@@ -231,11 +231,11 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
         emitToUser(newOrder.customer_id, 'order_status_update', { orderId: newOrder.id, status: 'confirmed' });
         emitToAdmin('new_order', { orderId: newOrder.id, display_id: newOrder.display_id, status: 'confirmed' });
 
-        await notificationsQueue.add('order_confirmed', {
+        notificationsQueue.add('order_confirmed', {
             userId: newOrder.customer_id,
             displayId: newOrder.display_id,
             minutes: '25',
-        });
+        }).catch(e => console.error('[Queue] order_confirmed failed:', e.message));
 
         return { status: 'order_created', orderId: newOrder.id };
     } catch (err) {
@@ -274,10 +274,10 @@ export async function finalizeWalletRecharge(gatewayPaymentId: string, amountPai
         const userResult = await query('SELECT phone FROM users WHERE id = $1', [customerId]);
         const user = userResult?.rows;
         if (user?.[0]?.phone) {
-            await notificationsQueue.add('broadcast_message', {
+            notificationsQueue.add('broadcast_message', {
                 phone: user[0]?.phone,
                 message: `2QT: Your wallet recharge of ₹${amountPaise / 100} was successful! Balance updated instantly.`
-            });
+            }).catch(e => console.error('[Queue] wallet_recharge_notif failed:', e.message));
         }
 
         return { success: true };

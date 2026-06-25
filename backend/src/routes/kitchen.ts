@@ -155,7 +155,7 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'super_admi
             emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id }, order.zone_id);
         }
         if (notificationType) {
-            await notificationsQueue.add(notificationType, {
+            notificationsQueue.add(notificationType, {
                 userId: order.customer_id,
                 displayId: order.display_id,
             });
