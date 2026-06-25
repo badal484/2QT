@@ -151,7 +151,7 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             addressId,
             pricing,
             promoCode
-        }), { EX: 3600 });
+        }), { EX: 3600 }).catch(e => console.error('Redis pendingOrder set failed:', e.message));
 
         res.json({
             orderId: dbOrder.id,

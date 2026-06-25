@@ -105,7 +105,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
     
     let riderLocation = null;
     if (order.rider_id) {
-        const loc = await redis.get(keys.riderLocation(order.rider_id));
+        const loc = await redis.get(keys.riderLocation(order.rider_id)).catch(() => null);
         if (loc) riderLocation = JSON.parse(loc);
     }
     
@@ -197,7 +197,7 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
                 'UPDATE promo_codes SET times_used = GREATEST(0, times_used - 1) WHERE id = $1',
                 [order.promo_code_id]
             );
-            await redis.del(keys.activePromos());
+            await redis.del(keys.activePromos()).catch(() => null);
         }
 
         // Bug 8 fix: restore subscription meal credit
@@ -218,11 +218,11 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
     }
     emitToKitchen(order.kitchen_id, 'order_cancelled', { orderId: id });
 
-    await notificationsQueue.add('order_cancelled', {
+    notificationsQueue.add('order_cancelled', {
         userId: order.customer_id,
         displayId: order.display_id,
         amount: String(order.total_amount_paise / 100),
-    });
+    }).catch(e => console.error('Queue add failed:', e));
 
     res.json({ success: true, message: 'Order cancelled and refunded to wallet' });
 });
@@ -296,7 +296,7 @@ router.get('/:id/tracking', authenticate, async (req: AuthRequest, res) => {
 
     let riderLocation = null;
     if (order.rider_id) {
-        const loc = await redis.get(keys.riderLocation(order.rider_id));
+        const loc = await redis.get(keys.riderLocation(order.rider_id)).catch(() => null);
         if (loc) riderLocation = JSON.parse(loc);
     }
 
