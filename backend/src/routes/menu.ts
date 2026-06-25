@@ -16,8 +16,29 @@ router.get('/geocode/search', async (req, res) => {
         return res.status(400).json({ error: 'MISSING_QUERY' });
     }
     try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=in`;
-        const response = await fetch(url, { headers: { 'User-Agent': '2QTFoodApp/1.0' } });
+        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+        let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=in`;
+        
+        if (apiKey) {
+            url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&components=country:in&key=${apiKey}`;
+            const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+            const data = await response.json();
+            res.set('Cache-Control', 'public, max-age=60');
+            // Format Google Places response to match expected output
+            if (data.predictions) {
+                const formatted = data.predictions.map((p: any) => ({
+                    place_id: p.place_id,
+                    display_name: p.description,
+                }));
+                return res.json(formatted);
+            }
+            return res.json([]);
+        }
+
+        const response = await fetch(url, { 
+            headers: { 'User-Agent': '2QTFoodApp/1.0' },
+            signal: AbortSignal.timeout(3000) 
+        });
         const data = await response.json() as any[];
         res.set('Cache-Control', 'public, max-age=60');
         res.json(data);
@@ -32,8 +53,25 @@ router.get('/geocode/reverse', async (req, res) => {
     const lng = parseFloat(req.query.lng as string);
     if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'INVALID_COORDS' });
     try {
-        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
-        const response = await fetch(url, { headers: { 'User-Agent': '2QTFoodApp/1.0' } });
+        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+        let url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+        
+        if (apiKey) {
+            url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+            const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+            const data = await response.json();
+            res.set('Cache-Control', 'public, max-age=300');
+            // Extract the formatted_address from Google response
+            if (data.results && data.results.length > 0) {
+                return res.json({ display_name: data.results[0].formatted_address });
+            }
+            return res.json({ display_name: 'Current Location' });
+        }
+
+        const response = await fetch(url, { 
+            headers: { 'User-Agent': '2QTFoodApp/1.0' },
+            signal: AbortSignal.timeout(3000)
+        });
         const data = await response.json();
         res.set('Cache-Control', 'public, max-age=300');
         res.json(data);

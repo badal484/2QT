@@ -159,9 +159,10 @@ router.delete('/me', authenticate, async (req: AuthRequest, res) => {
 router.get('/addresses', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const { rows } = await query(`
-        SELECT a.*, z.name as zone_name, z.is_active as is_serviceable
+        SELECT a.*, z.name as zone_name, 
+               CASE WHEN a.zone_id IS NOT NULL AND z.is_active = true THEN true ELSE false END as is_serviceable
         FROM addresses a
-        JOIN zones z ON a.zone_id = z.id
+        LEFT JOIN zones z ON a.zone_id = z.id
         WHERE a.customer_id = $1 AND a.deleted_at IS NULL
     `, [userId]);
     res.json({ addresses: rows });

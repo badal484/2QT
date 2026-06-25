@@ -64,7 +64,7 @@ export async function createPendingOrder(data: any) {
 }
 
 export async function finalizeOrder(gatewayOrderId: string, paymentMethod: string, internalOrderId?: string) {
-    const processed = await redis.get(keys.processedWebhook(gatewayOrderId));
+    const processed = await redis.get(keys.processedWebhook(gatewayOrderId)).catch(() => null);
     if (processed) return { status: 'already_processed' };
 
     try {
@@ -218,8 +218,8 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
 
         const newOrder = result;
 
-        await redis.set(keys.processedWebhook(gatewayOrderId), '1', { EX: 90000 });
-        await redis.del(keys.pendingPayment(newOrder.customer_id));
+        await redis.set(keys.processedWebhook(gatewayOrderId), '1', { EX: 90000 }).catch(e => console.error('Redis set failed', e.message));
+        await redis.del(keys.pendingPayment(newOrder.customer_id)).catch(e => console.error('Redis del failed', e.message));
 
         const orderCountResult = await query('SELECT count(*) FROM orders WHERE customer_id = $1', [newOrder.customer_id]);
         if (parseInt(orderCountResult?.rows[0]?.count ?? '0') === 1) {
@@ -245,7 +245,7 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
 }
 
 export async function finalizeWalletRecharge(gatewayPaymentId: string, amountPaise: number, customerId: string) {
-    const processed = await redis.get(keys.processedWebhook(gatewayPaymentId));
+    const processed = await redis.get(keys.processedWebhook(gatewayPaymentId)).catch(() => null);
     if (processed) return { status: 'already_processed' };
 
     try {
@@ -264,7 +264,7 @@ export async function finalizeWalletRecharge(gatewayPaymentId: string, amountPai
             `, [customerId, amountPaise, gatewayPaymentId]);
         });
 
-        await redis.set(keys.processedWebhook(gatewayPaymentId), '1', { EX: 90000 });
+        await redis.set(keys.processedWebhook(gatewayPaymentId), '1', { EX: 90000 }).catch(e => console.error('Redis set failed', e.message));
 
         const walletResult = await query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [customerId]);
         const newBalance = walletResult?.rows[0]?.balance_paise ?? amountPaise;
