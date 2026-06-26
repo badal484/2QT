@@ -317,7 +317,11 @@ const HomeScreen = ({ navigation }: any) => {
     const filterByAdmin = adminCategories.length > 0;
 
     if (selectedCategory !== 'All') {
-      return grouped[selectedCategory] ? [{ title: selectedCategory, data: grouped[selectedCategory] }] : [];
+      // Case-insensitive match so slug "Rice & Biryani" matches item.category "rice & biryani"
+      const matchKey = Object.keys(grouped).find(
+        k => k.toLowerCase().trim() === selectedCategory.toLowerCase().trim()
+      );
+      return matchKey ? [{ title: matchKey, data: grouped[matchKey] }] : [];
     }
 
     return Object.keys(grouped)
@@ -455,6 +459,50 @@ const HomeScreen = ({ navigation }: any) => {
         )}
       </View>
 
+      {/* ── Sticky Category Strip ── */}
+      {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && adminCategories.length > 0 && (
+        <View style={styles.categoryStrip}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryStripScroll}>
+            {/* All */}
+            <TouchableOpacity
+              style={styles.categoryStripItem}
+              onPress={() => { triggerHaptic(); setSelectedCategory('All'); }}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.categoryStripCircle, selectedCategory === 'All' && styles.categoryStripCircleActive]}>
+                <Text style={{ fontSize: 20 }}>🍽️</Text>
+              </View>
+              <Text style={[styles.categoryStripLabel, selectedCategory === 'All' && styles.categoryStripLabelActive]}>All</Text>
+              {selectedCategory === 'All' && <View style={styles.categoryStripUnderline} />}
+            </TouchableOpacity>
+
+            {/* Admin categories */}
+            {adminCategories.map((cat) => {
+              const isActive = selectedCategory.toLowerCase().trim() === cat.slug.toLowerCase().trim();
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={styles.categoryStripItem}
+                  onPress={() => { triggerHaptic(); setSelectedCategory(cat.slug); }}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.categoryStripCircle, isActive && styles.categoryStripCircleActive]}>
+                    {cat.image_url ? (
+                      <NetworkImage uri={cat.image_url} style={styles.categoryStripImage} />
+                    ) : (
+                      <Text style={{ fontSize: 18 }}>🍴</Text>
+                    )}
+                  </View>
+                  <Text style={[styles.categoryStripLabel, isActive && styles.categoryStripLabelActive]} numberOfLines={1}>
+                    {cat.name}
+                  </Text>
+                  {isActive && <View style={styles.categoryStripUnderline} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       <SectionList
         style={{ flex: 1 }}
@@ -541,44 +589,6 @@ const HomeScreen = ({ navigation }: any) => {
                     </View>
                   )}
                 />
-              </Animated.View>
-            )}
-            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
-              <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.mindContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mindScroll}>
-                  {/* "All" pill */}
-                  <TouchableOpacity
-                    style={[styles.imageCategoryItem, selectedCategory === 'All' && styles.imageCategoryItemActive]}
-                    onPress={() => { triggerHaptic(); setSelectedCategory('All'); }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={[styles.imageCategoryCircle, selectedCategory === 'All' && styles.imageCategoryCircleActive]}>
-                      <Text style={{ fontSize: 24 }}>🍽️</Text>
-                    </View>
-                    <Text style={[styles.imageCategoryLabel, selectedCategory === 'All' && styles.imageCategoryLabelActive]} numberOfLines={2}>All</Text>
-                  </TouchableOpacity>
-
-                  {/* Admin-configured image categories */}
-                  {adminCategories.map((cat) => (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.imageCategoryItem, selectedCategory === cat.slug && styles.imageCategoryItemActive]}
-                      onPress={() => { triggerHaptic(); setSelectedCategory(cat.slug); }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.imageCategoryCircle, selectedCategory === cat.slug && styles.imageCategoryCircleActive]}>
-                        {cat.image_url ? (
-                          <NetworkImage uri={cat.image_url} style={styles.imageCategoryImage} />
-                        ) : (
-                          <Text style={{ fontSize: 22 }}>🍴</Text>
-                        )}
-                      </View>
-                      <Text style={[styles.imageCategoryLabel, selectedCategory === cat.slug && styles.imageCategoryLabelActive]} numberOfLines={2}>
-                        {cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
               </Animated.View>
             )}
             {!unserviceableLocation && !showNoLocation && !showNetworkError && <View style={styles.headerSpacer} />}
@@ -1574,7 +1584,72 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: fontFamily.black,
     fontSize: 14,
-  }
+  },
+
+  // ── Sticky category strip ──────────────────────────────────────────────────
+  categoryStrip: {
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: 10,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  categoryStripScroll: {
+    paddingHorizontal: spacing.lg,
+    gap: 6,
+  },
+  categoryStripItem: {
+    alignItems: 'center',
+    width: 64,
+    position: 'relative',
+  },
+  categoryStripCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  categoryStripCircleActive: {
+    borderColor: colors.primary,
+    borderWidth: 2.5,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  categoryStripImage: {
+    width: '100%',
+    height: '100%',
+  },
+  categoryStripLabel: {
+    fontSize: 10,
+    fontFamily: fontFamily.semibold,
+    color: colors.inkMuted,
+    textAlign: 'center',
+  },
+  categoryStripLabelActive: {
+    color: colors.primary,
+    fontFamily: fontFamily.extrabold,
+  },
+  categoryStripUnderline: {
+    position: 'absolute',
+    bottom: -10,
+    left: 8,
+    right: 8,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
 });
 export default HomeScreen;
 // v2
