@@ -22,6 +22,34 @@ const calculateBearing = (startLat: number, startLng: number, destLat: number, d
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 };
 
+const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const computeETA = (
+  riderLoc: { lat: number; lng: number } | null,
+  customerLoc: { lat: number; lng: number } | null,
+  status: string,
+): string => {
+  if (status === 'delivered') return 'Delivered';
+  if (status === 'out_for_delivery' && riderLoc && customerLoc) {
+    const km = haversineKm(riderLoc.lat, riderLoc.lng, customerLoc.lat, customerLoc.lng) * 1.4; // road factor
+    const mins = Math.ceil((km / 25) * 60); // 25 km/h avg city speed
+    if (mins < 1) return '< 1 min';
+    if (mins === 1) return '1 min';
+    return `${mins} mins`;
+  }
+  if (status === 'ready_for_pickup') return '~15 mins';
+  if (status === 'preparing') return '~20 mins';
+  return '~25 mins';
+};
+
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
 const StatusStep = ({ title, isActive, isDone }: any) => (
@@ -166,9 +194,7 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
           <View>
             <Text style={styles.timeLabel}>ESTIMATED ARRIVAL</Text>
             <Animated.Text layout={LinearTransition.springify()} style={styles.timeValue}>
-              {status === 'delivered' ? 'Delivered' :
-               status === 'out_for_delivery' ? '10 mins' :
-               status === 'ready_for_pickup' ? '15 mins' : '25 mins'}
+              {computeETA(effectiveRiderLocation, customerLocation, status)}
             </Animated.Text>
           </View>
           <View style={styles.onTrackBadge}>
