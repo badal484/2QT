@@ -99,28 +99,6 @@ const HomeScreen = ({ navigation }: any) => {
     };
   }, [socket, effectiveZoneId]);
 
-  const AnimatedSectionList = Animated.createAnimatedComponent(SectionList);
-
-  const scrollY = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-    },
-  });
-
-  const ADDRESS_HEIGHT = 65;
-  const TOTAL_HEADER_HEIGHT = 165;
-  const headerAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateY: interpolate(scrollY.value, [0, ADDRESS_HEIGHT], [0, -ADDRESS_HEIGHT], 'clamp') }],
-    };
-  });
-  const addressOpacityStyle = useAnimatedStyle(() => {
-    return {
-      opacity: interpolate(scrollY.value, [0, ADDRESS_HEIGHT / 2], [1, 0], 'clamp'),
-    };
-  });
-
   const { data: menuData, isLoading } = useQuery({
     queryKey: ['menu', effectiveZoneId],
     queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}`),
@@ -394,19 +372,17 @@ const HomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[
+      <View style={[
         styles.minimalHeader, 
         { 
-          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
           paddingTop: Math.max(insets.top + 10, 20), 
           paddingBottom: 16,
           backgroundColor: '#24B059', // Swish Vibrant Green
           borderBottomWidth: 0, 
-        },
-        headerAnimatedStyle
+        }
       ]}>
-        {/* ROW 1: Address and Profile (Collapsible) */}
-        <Animated.View style={[addressOpacityStyle, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }]}>
+        {/* ROW 1: Address and Profile */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
             <MapPin size={28} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 8 }} />
             <View style={{ flex: 1 }}>
@@ -482,12 +458,10 @@ const HomeScreen = ({ navigation }: any) => {
             )}
           </View>
         )}
-      </Animated.View>
+      </View>
 
-      <AnimatedSectionList
+      <SectionList
         style={{ flex: 1 }}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
         ref={sectionListRef}
         sections={
           isServiceabilityChecking || unserviceableLocation || showNoLocation || showNetworkError
@@ -517,7 +491,6 @@ const HomeScreen = ({ navigation }: any) => {
         }
         ListHeaderComponent={
           <View>
-            <View style={{ height: TOTAL_HEADER_HEIGHT }} />
             
             {/* ── Category Strip ── */}
             {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && adminCategories.length > 0 && (
