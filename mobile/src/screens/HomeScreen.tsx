@@ -1627,14 +1627,14 @@ const styles = StyleSheet.create({
     height: 130,
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: colors.ink,
+    backgroundColor: '#E0E0E0',
   },
-  bannerImage: { width: '100%', height: '100%', opacity: 0.75 },
+  bannerImage: { width: '100%', height: '100%', opacity: 1 },
   bannerOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     padding: spacing.lg,
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)'
+    backgroundColor: 'transparent',
   },
   bannerTag: { backgroundColor: colors.primary, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 8 },
   bannerTagText: { color: colors.white, fontSize: 10, fontFamily: fontFamily.extrabold, textTransform: 'uppercase' },
