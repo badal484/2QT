@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { query, withTransaction } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToKitchen, emitToAdmin } from '../socket';
-import { notificationsQueue } from '../jobs/queues';
+import { NotificationService } from '../services/notification.service';
 import { redis, keys } from '../redis';
 
 const router = Router();
@@ -218,11 +218,11 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
     }
     emitToKitchen(order.kitchen_id, 'order_cancelled', { orderId: id });
 
-    notificationsQueue.add('order_cancelled', {
+    NotificationService.send('order_cancelled', {
         userId: order.customer_id,
         displayId: order.display_id,
         amount: String(order.total_amount_paise / 100),
-    }).catch(e => console.error('Queue add failed:', e));
+    }).catch(() => {});
 
     res.json({ success: true, message: 'Order cancelled and refunded to wallet' });
 });
