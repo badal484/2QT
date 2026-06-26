@@ -29,6 +29,7 @@ const CampaignsTab = dynamic(() => import("./CampaignsTab").then(m => ({ default
 const ComplaintsTab = dynamic(() => import("./ComplaintsTab").then(m => ({ default: m.ComplaintsTab })), { ssr: false });
 const PartnersTab = dynamic(() => import("./PartnersTab").then(m => ({ default: m.PartnersTab })), { ssr: false });
 const NotificationsTab = dynamic(() => import("./NotificationsTab").then(m => ({ default: m.NotificationsTab })), { ssr: false });
+const DispatchTab = dynamic(() => import("./DispatchTab").then(m => ({ default: m.DispatchTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1633,6 +1634,7 @@ const TABS = [
   { name: "Menu", icon: Utensils, component: MenuTab },
   { name: "Inventory", icon: Box, component: InventoryTab },
   { name: "Fleet", icon: Bike, component: FleetTab },
+  { name: "Dispatch", icon: Package, component: DispatchTab },
   { name: "Applications", icon: Info, component: RiderApplicationsTab },
   { name: "Customers", icon: Users, component: CustomersTab },
   { name: "Complaints", icon: AlertTriangle, component: ComplaintsTab },

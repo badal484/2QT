@@ -130,6 +130,64 @@ router.get('/orders/live', authenticate, requireRole('super_admin', 'admin'), as
     res.json({ orders: rows });
 });
 
+// Dispatch history — all orders with rider assignment, searchable, for dispute resolution
+router.get('/orders/dispatch', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
+    const offset = (page - 1) * limit;
+    const search = (req.query.search as string || '').trim();
+    const status = (req.query.status as string || '').trim();
+    const riderId = (req.query.riderId as string || '').trim();
+    const date = (req.query.date as string || '').trim(); // YYYY-MM-DD
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let p = 1;
+
+    if (search) {
+        conditions.push(`(o.display_id ILIKE $${p} OR c.name ILIKE $${p} OR c.phone ILIKE $${p} OR r.name ILIKE $${p} OR r.phone ILIKE $${p})`);
+        params.push(`%${search}%`); p++;
+    }
+    if (status) { conditions.push(`o.status = $${p}`); params.push(status); p++; }
+    if (riderId) { conditions.push(`o.rider_id = $${p}`); params.push(riderId); p++; }
+    if (date) { conditions.push(`o.created_at::date = $${p}`); params.push(date); p++; }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const { rows } = await query(`
+        SELECT
+            o.id, o.display_id, o.status,
+            o.payment_method, o.payment_status,
+            o.total_amount_paise,
+            o.created_at, o.delivered_at, o.cod_collected_at,
+            c.id  AS customer_id,
+            c.name AS customer_name,
+            c.phone AS customer_phone,
+            r.id   AS rider_id,
+            r.name AS rider_name,
+            r.phone AS rider_phone,
+            (
+                SELECT json_agg(json_build_object('name', mi.name, 'qty', oi.quantity))
+                FROM order_items oi
+                JOIN menu_items mi ON oi.menu_item_id = mi.id
+                WHERE oi.order_id = o.id
+            ) AS items
+        FROM orders o
+        JOIN users c ON o.customer_id = c.id
+        LEFT JOIN users r ON o.rider_id = r.id
+        ${where}
+        ORDER BY o.created_at DESC
+        LIMIT $${p} OFFSET $${p + 1}
+    `, [...params, limit, offset]);
+
+    const { rows: countRows } = await query(
+        `SELECT COUNT(*) FROM orders o JOIN users c ON o.customer_id = c.id LEFT JOIN users r ON o.rider_id = r.id ${where}`,
+        params
+    );
+
+    res.json({ orders: rows, total: parseInt(countRows[0].count), page, limit });
+});
+
 router.get('/orders/scheduled', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(`
         SELECT so.*, u.name as customer_name
