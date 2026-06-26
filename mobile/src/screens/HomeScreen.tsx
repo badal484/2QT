@@ -6,7 +6,7 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
-import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Menu, Bike, ArrowRight } from 'lucide-react-native';
+import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
@@ -33,9 +33,7 @@ const HomeScreen = ({ navigation }: any) => {
   const { globalLocation: location, serviceabilityStatus, activeZoneId } = useSelector((state: RootState) => state.app);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
   const sectionListRef = React.useRef<SectionList>(null);
-  const [showMenuPopup, setShowMenuPopup] = useState(false);
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -297,10 +295,6 @@ const HomeScreen = ({ navigation }: any) => {
     }
   }, [cartItems, dispatch, triggerHaptic]);
 
-  const categories = useMemo(
-    () => ['All', ...new Set((menuData?.items || []).map((item: any) => item.category))],
-    [menuData?.items],
-  );
 
   const sections = useMemo(() => {
     if (!menuData?.items) return [];
@@ -511,38 +505,40 @@ const HomeScreen = ({ navigation }: any) => {
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(b: any) => b.uniqueId || b.id}
-                  snapToInterval={SCREEN_WIDTH - 32}
+                  snapToInterval={SCREEN_WIDTH}
                   decelerationRate="fast"
-                  contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 0 }}
+                  contentContainerStyle={{ paddingHorizontal: 0 }}
                   onMomentumScrollEnd={(ev) => {
-                    const newIndex = Math.round(ev.nativeEvent.contentOffset.x / (SCREEN_WIDTH - 32));
+                    const newIndex = Math.round(ev.nativeEvent.contentOffset.x / SCREEN_WIDTH);
                     bannerIndexRef.current = newIndex;
                   }}
                   getItemLayout={(_, index) => ({
-                    length: SCREEN_WIDTH - 32,
-                    offset: (SCREEN_WIDTH - 32) * index,
+                    length: SCREEN_WIDTH,
+                    offset: SCREEN_WIDTH * index,
                     index,
                   })}
                   renderItem={({ item: b }: any) => (
-                    <TouchableOpacity
-                      activeOpacity={0.9}
-                      onPress={() => {
-                        triggerHaptic();
-                        if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
-                      }}
-                      style={styles.bannerContainer}
-                    >
-                      <NetworkImage uri={b.image_url} style={styles.bannerImage} />
-                      <View style={styles.bannerOverlay}>
-                        {b.tag_text && (
-                          <View style={styles.bannerTag}>
-                            <Text style={styles.bannerTagText}>{b.tag_text}</Text>
-                          </View>
-                        )}
-                        <Text style={styles.bannerTitle}>{b.title}</Text>
-                        {b.subtitle && <Text style={styles.bannerSubtitle} numberOfLines={1}>{b.subtitle}</Text>}
-                      </View>
-                    </TouchableOpacity>
+                    <View style={{ width: SCREEN_WIDTH, paddingHorizontal: spacing.lg }}>
+                      <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={() => {
+                          triggerHaptic();
+                          if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
+                        }}
+                        style={styles.bannerContainer}
+                      >
+                        <NetworkImage uri={b.image_url} style={styles.bannerImage} />
+                        <View style={styles.bannerOverlay}>
+                          {b.tag_text && (
+                            <View style={styles.bannerTag}>
+                              <Text style={styles.bannerTagText}>{b.tag_text}</Text>
+                            </View>
+                          )}
+                          <Text style={styles.bannerTitle}>{b.title}</Text>
+                          {b.subtitle && <Text style={styles.bannerSubtitle} numberOfLines={1}>{b.subtitle}</Text>}
+                        </View>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 />
               </Animated.View>
@@ -837,13 +833,6 @@ const HomeScreen = ({ navigation }: any) => {
   );
 };
 
-const CategoryPill = React.memo(({ name, isSelected, onPress }: any) => {
-  return (
-    <TouchableOpacity style={[styles.categoryPill, isSelected && styles.categoryPillActive]} onPress={onPress}>
-      <Text style={[styles.categoryPillText, isSelected && styles.categoryPillTextActive]}>{name}</Text>
-    </TouchableOpacity>
-  );
-});
 
 const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaused }: any) => {
   const vegColor = item.is_veg ? '#22C55E' : colors.danger;
@@ -1249,7 +1238,7 @@ const styles = StyleSheet.create({
 
   bannersList: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.xl },
   bannerContainer: {
-    width: SCREEN_WIDTH - 32,
+    width: '100%',
     height: 180,
     borderRadius: 20,
     overflow: 'hidden',
