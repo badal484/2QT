@@ -164,7 +164,13 @@ const NotificationsScreen = ({ navigation }: any) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate('Home');
+          }
+        }} activeOpacity={0.7}>
           <ArrowLeft size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
