@@ -19,6 +19,7 @@ const MIGRATIONS = [
   '052_auto_payouts.sql',
   '053_partner_kitchen_setup.sql',
   '054_notifications.sql',
+  '064_menu_item_badges.sql',
 ];
 
 async function run() {

@@ -21,10 +21,11 @@ const COLUMN_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - 16) / 2;
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
 const CategoryScreen = ({ route, navigation }: any) => {
-  const { categorySlug, categoryName, categoryImage } = route.params as {
+  const { categorySlug, categoryName, categoryImage, categoryBannerUrl } = route.params as {
     categorySlug: string;
     categoryName: string;
     categoryImage?: string;
+    categoryBannerUrl?: string;
   };
 
   const dispatch = useDispatch();
@@ -123,10 +124,23 @@ const CategoryScreen = ({ route, navigation }: any) => {
               <ChefHat size={32} color={colors.inkFaint} />
             </View>
           )}
-          
+
+          {/* Veg badge — top left */}
           <View style={[styles.vegBadgeFloat, { borderColor: vegColor }]}>
             <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
           </View>
+
+          {/* Bestseller badge — top right */}
+          {item.is_bestseller && (
+            <View style={styles.bestsellerOverlay}>
+              <Text style={styles.bestsellerOverlayText}>★ Bestseller</Text>
+            </View>
+          )}
+          {!item.is_bestseller && item.is_new && (
+            <View style={styles.newOverlay}>
+              <Text style={styles.newOverlayText}>+ New</Text>
+            </View>
+          )}
 
           {unavailable && (
             <View style={styles.soldOutOverlay}>
@@ -168,8 +182,17 @@ const CategoryScreen = ({ route, navigation }: any) => {
 
         <View style={styles.gridCardInfo}>
           <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
+          {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
           <Text style={styles.cardPrice}>₹{item.price_paise / 100}</Text>
+          {item.tags?.length > 0 && (
+            <View style={styles.tagRow}>
+              {item.tags.slice(0, 2).map((tag: string) => (
+                <View key={tag} style={styles.tagChip}>
+                  <Text style={styles.tagChipText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -181,9 +204,9 @@ const CategoryScreen = ({ route, navigation }: any) => {
   const renderHeader = () => (
     <View style={styles.headerContainer}>
       {/* 1. Hero Image */}
-      {categoryImage ? (
+      {(categoryBannerUrl || categoryImage) ? (
         <View style={styles.heroImageContainer}>
-          <NetworkImage uri={categoryImage} style={styles.heroImage} />
+          <NetworkImage uri={categoryBannerUrl || categoryImage} style={styles.heroImage} />
           <View style={styles.heroGradient} />
         </View>
       ) : (

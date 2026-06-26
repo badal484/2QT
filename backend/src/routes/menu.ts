@@ -121,7 +121,8 @@ router.get('/', async (req, res) => {
         query(
             `SELECT id, name, description, price_paise, photo_url, is_veg, is_egg, available,
                     category, kitchen_id, zone_id, sort_order, daily_limit,
-                    today_sold_count, sold_out_reason, prep_time_minutes
+                    today_sold_count, sold_out_reason, prep_time_minutes,
+                    is_bestseller, is_new, tags
              FROM menu_items WHERE zone_id = $1 ORDER BY sort_order, name`,
             [zoneId]
         ),

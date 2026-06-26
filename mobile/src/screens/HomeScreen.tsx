@@ -519,7 +519,7 @@ const HomeScreen = ({ navigation }: any) => {
                       <TouchableOpacity
                         key={cat.id}
                         style={styles.categoryStripItem}
-                        onPress={() => { triggerHaptic(); navigation.navigate('Category', { categorySlug: cat.slug, categoryName: cat.name, categoryImage: cat.image_url }); }}
+                        onPress={() => { triggerHaptic(); navigation.navigate('Category', { categorySlug: cat.slug, categoryName: cat.name, categoryImage: cat.image_url, categoryBannerUrl: cat.banner_url }); }}
                         activeOpacity={0.8}
                       >
                         <View style={styles.categoryStripCircle}>
@@ -898,6 +898,7 @@ const HomeScreen = ({ navigation }: any) => {
 const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaused }: any) => {
   const vegColor = item.is_egg ? '#EAB308' : (item.is_veg ? '#22C55E' : colors.danger);
   const unavailable = !item.available || kitchenPaused;
+  const hasTags = item.tags?.length > 0;
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.93} onPress={onPress}>
@@ -907,11 +908,38 @@ const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, k
           <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
         </View>
 
+        {/* Bestseller / New badges */}
+        {(item.is_bestseller || item.is_new) && (
+          <View style={styles.badgeRow}>
+            {item.is_bestseller && (
+              <View style={styles.bestsellerBadge}>
+                <Text style={styles.bestsellerBadgeText}>★ Bestseller</Text>
+              </View>
+            )}
+            {item.is_new && (
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>+ New</Text>
+              </View>
+            )}
+          </View>
+        )}
+
         <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.cardPrice}>₹{item.price_paise / 100}</Text>
         {item.description ? (
           <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
         ) : null}
+
+        {/* Tags */}
+        {hasTags && (
+          <View style={styles.tagRow}>
+            {item.tags.slice(0, 3).map((tag: string) => (
+              <View key={tag} style={styles.tagChip}>
+                <Text style={styles.tagChipText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* ── Right: Image and Floating Button ── */}
@@ -934,7 +962,7 @@ const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, k
             )}
           </View>
 
-          {/* ADD / qty — pinned to the bottom of the 130x130 box! */}
+          {/* ADD / qty — pinned to the bottom of the 130x130 box */}
           {!unavailable && (
             <View style={styles.cardBtnFloat}>
               {cartItem ? (
@@ -956,9 +984,14 @@ const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, k
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.addBtn} onPress={onAdd} activeOpacity={0.85}>
-                  <Text style={styles.addBtnText}>ADD</Text>
-                </TouchableOpacity>
+                <View>
+                  <View style={styles.customisePill}>
+                    <Text style={styles.customisePillText}>Customise</Text>
+                  </View>
+                  <TouchableOpacity style={styles.addBtn} onPress={onAdd} activeOpacity={0.85}>
+                    <Text style={styles.addBtnText}>ADD</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
           )}
@@ -1051,22 +1084,34 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: -12, alignSelf: 'center', width: 110, zIndex: 10,
   },
   qtyControl: {
-    flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 8,
-    alignItems: 'center', justifyContent: 'space-between', height: 38,
-    borderWidth: 1, borderColor: '#E5E7EB', // Clean border, NO shadow
-    elevation: 0, shadowOpacity: 0
+    flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 10,
+    alignItems: 'center', justifyContent: 'space-between', height: 40,
+    shadowColor: '#24B059', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  qtyBtn: { width: 34, height: 38, alignItems: 'center', justifyContent: 'center' },
-  qtyBtnText: { color: colors.primary, fontSize: 22, fontFamily: fontFamily.bold },
-  qtyValue: { color: colors.ink, fontSize: 15, fontFamily: fontFamily.extrabold },
+  qtyBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
+  qtyBtnText: { color: '#FFFFFF', fontSize: 22, fontFamily: fontFamily.bold },
+  qtyValue: { color: '#FFFFFF', fontSize: 15, fontFamily: fontFamily.extrabold },
   addBtn: {
-    backgroundColor: '#FFFFFF', borderRadius: 8,
-    height: 38, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: '#E5E7EB', // Clean border, NO shadow
-    elevation: 0, shadowOpacity: 0
+    backgroundColor: '#24B059', borderRadius: 10,
+    height: 40, alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#24B059', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   addBtnDisabled: { backgroundColor: colors.surfaceMuted },
-  addBtnText: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 15, letterSpacing: 0.5 },
+  addBtnText: { color: '#FFFFFF', fontFamily: fontFamily.extrabold, fontSize: 15, letterSpacing: 0.5 },
+  customisePill: {
+    alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 6,
+    paddingHorizontal: 8, paddingVertical: 2, marginBottom: 3,
+    borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  customisePillText: { fontSize: 9, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase', letterSpacing: 0.3 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
+  bestsellerBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  bestsellerBadgeText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
+  newBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  newBadgeText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  tagChip: { backgroundColor: colors.surfaceMuted, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.border },
+  tagChipText: { fontSize: 10, fontFamily: fontFamily.bold, color: colors.inkMuted },
 
   liveKitchenBanner: {
     flexDirection: 'row',

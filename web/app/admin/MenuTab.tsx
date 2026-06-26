@@ -104,6 +104,172 @@ export function MenuTab() {
   const liveCount = filtered.filter(i => i.available).length;
   const offCount = filtered.filter(i => !i.available).length;
 
+  const renderGrid = useMemo(() => (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+      {filtered.map(item => (
+        <motion.div
+          key={item.id}
+          layout
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className={`group relative rounded-[24px] overflow-hidden cursor-pointer border transition-all shadow-2xl shadow-black/40 ${
+            selected.has(item.id) ? "border-swish-green/60 ring-1 ring-swish-green/30" : "border-white/10 hover:border-white/20"
+          } ${!item.available ? "opacity-60" : ""}`}
+          onClick={() => toggleSelect(item.id)}
+        >
+          {/* Photo */}
+          <div className="relative aspect-[4/3] bg-zinc-900">
+            {item.photo_url ? (
+              <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-white/[0.02]">
+                <Camera className="w-8 h-8 text-zinc-700" />
+              </div>
+            )}
+            {!item.available && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span className="text-[9px] font-black uppercase tracking-widest text-red-400 bg-black/60 px-3 py-1.5 rounded-full">Off Menu</span>
+              </div>
+            )}
+            {/* Checkbox */}
+            <div className={`absolute top-2.5 left-2.5 w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
+              selected.has(item.id) ? "bg-swish-green border-swish-green" : "border-white/40 bg-black/40 opacity-0 group-hover:opacity-100"
+            }`}>
+              {selected.has(item.id) && <CheckCircle2 className="w-3 h-3 text-black" />}
+            </div>
+            {/* Veg/Egg badge */}
+            <div className="absolute top-2.5 right-2.5">
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${item.is_egg ? "border-yellow-500 bg-yellow-500/20" : item.is_veg ? "border-green-500 bg-green-500/20" : "border-red-500 bg-red-500/20"}`}>
+                <div className={`w-2 h-2 rounded-full ${item.is_egg ? "bg-yellow-500" : item.is_veg ? "bg-green-500" : "bg-red-500"}`} />
+              </div>
+            </div>
+          </div>
+
+          {/* Info */}
+          <div className="p-3.5 bg-zinc-900/90 backdrop-blur-xl">
+            <h3 className="font-black text-sm text-white line-clamp-1 mb-0.5">{item.name}</h3>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-swish-green font-black text-sm">₹{(item.price_paise / 100).toLocaleString("en-IN")}</span>
+              <div className="flex items-center gap-1.5 ml-2">
+                {selectedZone === "All" && (
+                  <span className="text-[8px] font-black uppercase tracking-widest text-brand-primary truncate">{item.zone_name}</span>
+                )}
+                <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 truncate">{item.category}</span>
+              </div>
+            </div>
+            {/* Hover Actions */}
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={() => { setEditingItem(item); setShowAddModal(true); }}
+                className="flex-1 py-1.5 rounded-xl bg-white/[0.06] text-[9px] font-black uppercase tracking-widest hover:bg-zinc-700/80 text-white transition-all flex items-center justify-center gap-1"
+              >
+                <Edit3 className="w-3 h-3" /> Edit
+              </button>
+              <button
+                onClick={() => toggle(item.id, item.available)}
+                disabled={toggling === item.id}
+                className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
+                  item.available
+                    ? "bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white"
+                    : "bg-swish-green/15 text-swish-green hover:bg-swish-green hover:text-black"
+                }`}
+              >
+                {item.available ? "Disable" : "Enable"}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  ), [filtered, selected, toggling, selectedZone]);
+
+  const renderTable = useMemo(() => (
+    <div className="bg-white/[0.02] backdrop-blur-2xl border border-white/10 rounded-[28px] overflow-hidden">
+      <div className="grid grid-cols-[32px_1fr_130px_100px_80px_130px] gap-4 px-6 py-3 border-b border-white/10 bg-white/[0.02]">
+        <div />
+        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Item</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Category</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Price</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Status</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 text-right">Actions</div>
+      </div>
+      {filtered.map(item => (
+        <div
+          key={item.id}
+          className={`grid grid-cols-[32px_1fr_130px_100px_80px_130px] gap-4 px-6 py-4 items-center border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors group ${selected.has(item.id) ? "bg-swish-green/5" : ""}`}
+        >
+          <button
+            onClick={() => toggleSelect(item.id)}
+            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+              selected.has(item.id) ? "bg-swish-green border-swish-green" : "border-white/20 hover:border-white/40"
+            }`}
+          >
+            {selected.has(item.id) && <CheckCircle2 className="w-3 h-3 text-black" />}
+          </button>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-xl overflow-hidden bg-zinc-800 flex-shrink-0">
+              {item.photo_url
+                ? <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
+                : <div className="w-full h-full flex items-center justify-center"><Camera className="w-4 h-4 text-zinc-600" /></div>
+              }
+            </div>
+            <div className="min-w-0">
+              <div className="font-black text-sm text-white truncate">{item.name}</div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${item.is_egg ? "bg-yellow-500" : item.is_veg ? "bg-green-500" : "bg-red-500"}`} />
+                <span className="text-[9px] text-zinc-500 font-bold">{item.is_egg ? "Egg" : item.is_veg ? "Veg" : "Non-Veg"} · {item.station}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-bold text-zinc-400 truncate">{item.category}</span>
+            {selectedZone === "All" && (
+              <span className="text-[9px] font-black uppercase tracking-widest text-brand-primary truncate">{item.zone_name}</span>
+            )}
+          </div>
+          <span className="text-sm font-black text-swish-green">₹{(item.price_paise / 100).toLocaleString("en-IN")}</span>
+          <span className={`text-[9px] font-black uppercase tracking-widest ${item.available ? "text-swish-green" : "text-red-400"}`}>
+            {item.available ? "Live" : "Off"}
+          </span>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => { setEditingItem(item); setShowAddModal(true); }}
+              className="px-3 py-1.5 rounded-lg bg-white/[0.04] text-[9px] font-black uppercase tracking-widest hover:bg-zinc-700/80 text-white transition-all"
+            >Edit</button>
+            <button
+              onClick={() => toggle(item.id, item.available)}
+              disabled={toggling === item.id}
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
+                item.available
+                  ? "bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white"
+                  : "bg-swish-green/15 text-swish-green hover:bg-swish-green hover:text-black"
+              }`}
+            >{item.available ? "Disable" : "Enable"}</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  ), [filtered, selected, toggling, selectedZone]);
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+          {[1,2,3,4,5,6].map(i => <div key={i} className="aspect-[3/4] bg-white/[0.04] rounded-[28px] animate-pulse" />)}
+        </div>
+      );
+    }
+    if (filtered.length === 0) {
+      return (
+        <div className="py-24 text-center border border-white/10 border-dashed rounded-[32px]">
+          <Utensils className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+          <p className="text-zinc-500 font-bold text-sm">No items found</p>
+        </div>
+      );
+    }
+    return viewMode === "grid" ? renderGrid : renderTable;
+  };
+
   return (
     <div>
       {/* Header */}
@@ -196,171 +362,7 @@ export function MenuTab() {
 
       {/* Content */}
       {renderContent()}
-  const renderGrid = useMemo(() => (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-      {filtered.map(item => (
-        <motion.div
-          key={item.id}
-          layout
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className={`group relative rounded-[24px] overflow-hidden cursor-pointer border transition-all shadow-2xl shadow-black/40 ${
-            selected.has(item.id) ? "border-swish-green/60 ring-1 ring-swish-green/30" : "border-white/10 hover:border-white/20"
-          } ${!item.available ? "opacity-60" : ""}`}
-          onClick={() => toggleSelect(item.id)}
-        >
-          {/* Photo */}
-          <div className="relative aspect-[4/3] bg-zinc-900">
-            {item.photo_url ? (
-              <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-white/[0.02]">
-                <Camera className="w-8 h-8 text-zinc-700" />
-              </div>
-            )}
-            {!item.available && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <span className="text-[9px] font-black uppercase tracking-widest text-red-400 bg-black/60 px-3 py-1.5 rounded-full">Off Menu</span>
-              </div>
-            )}
-            {/* Checkbox */}
-            <div className={`absolute top-2.5 left-2.5 w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
-              selected.has(item.id) ? "bg-swish-green border-swish-green" : "border-white/40 bg-black/40 opacity-0 group-hover:opacity-100"
-            }`}>
-              {selected.has(item.id) && <CheckCircle2 className="w-3 h-3 text-black" />}
-            </div>
-            {/* Veg/Egg badge */}
-            <div className="absolute top-2.5 right-2.5">
-              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${item.is_egg ? "border-yellow-500 bg-yellow-500/20" : item.is_veg ? "border-green-500 bg-green-500/20" : "border-red-500 bg-red-500/20"}`}>
-                <div className={`w-2 h-2 rounded-full ${item.is_egg ? "bg-yellow-500" : item.is_veg ? "bg-green-500" : "bg-red-500"}`} />
-              </div>
-            </div>
-          </div>
 
-          {/* Info */}
-          <div className="p-3.5 bg-zinc-900/90 backdrop-blur-xl">
-            <h3 className="font-black text-sm text-white line-clamp-1 mb-0.5">{item.name}</h3>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-swish-green font-black text-sm">₹{(item.price_paise / 100).toLocaleString("en-IN")}</span>
-              <div className="flex items-center gap-1.5 ml-2">
-                {selectedZone === "All" && (
-                  <span className="text-[8px] font-black uppercase tracking-widest text-brand-primary truncate">{item.zone_name}</span>
-                )}
-                <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 truncate">{item.category}</span>
-              </div>
-            </div>
-            {/* Hover Actions */}
-            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all" onClick={e => e.stopPropagation()}>
-              <button
-                onClick={() => { setEditingItem(item); setShowAddModal(true); }}
-                className="flex-1 py-1.5 rounded-xl bg-white/[0.06] text-[9px] font-black uppercase tracking-widest hover:bg-zinc-700/80 text-white transition-all flex items-center justify-center gap-1"
-              >
-                <Edit3 className="w-3 h-3" /> Edit
-              </button>
-              <button
-                onClick={() => toggle(item.id, item.available)}
-                disabled={toggling === item.id}
-                className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
-                  item.available
-                    ? "bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white"
-                    : "bg-swish-green/15 text-swish-green hover:bg-swish-green hover:text-black"
-                }`}
-              >
-                {item.available ? "Disable" : "Enable"}
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  ), [filtered, selected, toggling, selectedZone]);
-      ) : (
-  const renderTable = useMemo(() => (
-    <div className="bg-white/[0.02] backdrop-blur-2xl border border-white/10 rounded-[28px] overflow-hidden">
-      <div className="grid grid-cols-[32px_1fr_130px_100px_80px_130px] gap-4 px-6 py-3 border-b border-white/10 bg-white/[0.02]">
-        <div />
-        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Item</div>
-        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Category</div>
-        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Price</div>
-        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Status</div>
-        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 text-right">Actions</div>
-      </div>
-      {filtered.map(item => (
-        <div
-          key={item.id}
-          className={`grid grid-cols-[32px_1fr_130px_100px_80px_130px] gap-4 px-6 py-4 items-center border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors group ${selected.has(item.id) ? "bg-swish-green/5" : ""}`}
-        >
-          <button
-            onClick={() => toggleSelect(item.id)}
-            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-              selected.has(item.id) ? "bg-swish-green border-swish-green" : "border-white/20 hover:border-white/40"
-            }`}
-          >
-            {selected.has(item.id) && <CheckCircle2 className="w-3 h-3 text-black" />}
-          </button>
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-xl overflow-hidden bg-zinc-800 flex-shrink-0">
-              {item.photo_url
-                ? <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
-                : <div className="w-full h-full flex items-center justify-center"><Camera className="w-4 h-4 text-zinc-600" /></div>
-              }
-            </div>
-            <div className="min-w-0">
-              <div className="font-black text-sm text-white truncate">{item.name}</div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${item.is_egg ? "bg-yellow-500" : item.is_veg ? "bg-green-500" : "bg-red-500"}`} />
-                <span className="text-[9px] text-zinc-500 font-bold">{item.is_egg ? "Egg" : item.is_veg ? "Veg" : "Non-Veg"} · {item.station}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-bold text-zinc-400 truncate">{item.category}</span>
-            {selectedZone === "All" && (
-              <span className="text-[9px] font-black uppercase tracking-widest text-brand-primary truncate">{item.zone_name}</span>
-            )}
-          </div>
-          <span className="text-sm font-black text-swish-green">₹{(item.price_paise / 100).toLocaleString("en-IN")}</span>
-          <span className={`text-[9px] font-black uppercase tracking-widest ${item.available ? "text-swish-green" : "text-red-400"}`}>
-            {item.available ? "Live" : "Off"}
-          </span>
-          <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={() => { setEditingItem(item); setShowAddModal(true); }}
-              className="px-3 py-1.5 rounded-lg bg-white/[0.04] text-[9px] font-black uppercase tracking-widest hover:bg-zinc-700/80 text-white transition-all"
-            >Edit</button>
-            <button
-              onClick={() => toggle(item.id, item.available)}
-              disabled={toggling === item.id}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
-                item.available
-                  ? "bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white"
-                  : "bg-swish-green/15 text-swish-green hover:bg-swish-green hover:text-black"
-              }`}
-            >{item.available ? "Disable" : "Enable"}</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  ), [filtered, selected, toggling, selectedZone]);
-
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-          {[1,2,3,4,5,6].map(i => <div key={i} className="aspect-[3/4] bg-white/[0.04] rounded-[28px] animate-pulse" />)}
-        </div>
-      );
-    }
-    if (filtered.length === 0) {
-      return (
-        <div className="py-24 text-center border border-white/10 border-dashed rounded-[32px]">
-          <Utensils className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-          <p className="text-zinc-500 font-bold text-sm">No items found</p>
-        </div>
-      );
-    }
-    return viewMode === "grid" ? renderGrid : renderTable;
-  };
 
       {/* Add/Edit Modal */}
       <AnimatePresence>
@@ -390,6 +392,7 @@ export function MenuTab() {
                       return;
                     }
                     const formData = new FormData(e.currentTarget);
+                    const rawTags = (formData.get("tags") as string || "").split(",").map(t => t.trim()).filter(Boolean);
                     const data = {
                       name: formData.get("name"),
                       zone_id: formData.get("zone_id"),
@@ -400,6 +403,9 @@ export function MenuTab() {
                       photo_url: imageUrl,
                       is_veg: formData.get("dietary_type") === "veg",
                       is_egg: formData.get("dietary_type") === "egg",
+                      is_bestseller: formData.get("is_bestseller") === "on",
+                      is_new: formData.get("is_new") === "on",
+                      tags: rawTags,
                       available: true
                     };
                     try {
@@ -537,6 +543,24 @@ export function MenuTab() {
                       <option value="non_veg" className="bg-zinc-900">Non-Veg</option>
                       <option value="egg" className="bg-zinc-900">Egg</option>
                     </select>
+                  </div>
+
+                  {/* Badges */}
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-3 flex-1 px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 cursor-pointer hover:border-yellow-500/30 transition-all">
+                      <input type="checkbox" name="is_bestseller" defaultChecked={!!editingItem?.is_bestseller} className="w-4 h-4 accent-yellow-500 rounded" />
+                      <span className="text-xs font-black text-zinc-300">★ Bestseller</span>
+                    </label>
+                    <label className="flex items-center gap-3 flex-1 px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 cursor-pointer hover:border-purple-500/30 transition-all">
+                      <input type="checkbox" name="is_new" defaultChecked={!!editingItem?.is_new} className="w-4 h-4 accent-purple-500 rounded" />
+                      <span className="text-xs font-black text-zinc-300">+ New</span>
+                    </label>
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Tags <span className="text-zinc-600 font-medium normal-case tracking-normal">(comma-separated, e.g. Serves 1, High Protein)</span></label>
+                    <input name="tags" defaultValue={editingItem?.tags?.join(", ") || ""} placeholder="Serves 1, High Protein, 2 Pieces" className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white placeholder-zinc-600" />
                   </div>
 
                   {/* Action buttons */}
