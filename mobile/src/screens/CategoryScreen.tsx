@@ -35,7 +35,6 @@ const CategoryScreen = ({ route, navigation }: any) => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [dietaryFilter, setDietaryFilter] = useState<'All' | 'Veg' | 'Non-Veg' | 'Egg'>('All');
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('All Items');
   const [isSearching, setIsSearching] = useState(false);
 
   const triggerHaptic = useCallback(
@@ -59,33 +58,20 @@ const CategoryScreen = ({ route, navigation }: any) => {
 
     return menuData.items.filter((item: any) => {
       const itemCat = (item.category || '').toLowerCase().trim();
-      return itemCat.includes(slugLower) || itemCat.includes(nameLower) || itemCat === slugLower;
+      return itemCat === slugLower || itemCat === nameLower;
     });
   }, [menuData?.items, categorySlug, categoryName]);
 
-  // 2. Extract dynamic subcategories from base items
-  const subcategories = useMemo(() => {
-    const subs = new Set<string>();
-    baseItems.forEach((item: any) => {
-      if (item.category) subs.add(item.category);
-    });
-    return ['All Items', ...Array.from(subs)];
-  }, [baseItems]);
-
-  // 3. Apply user filters (Dietary, Search, Subcategory)
+  // 3. Apply user filters (Dietary, Search)
   const filteredItems = useMemo(() => {
     let items = baseItems;
 
-    if (selectedSubcategory !== 'All Items') {
-      items = items.filter((item: any) => item.category === selectedSubcategory);
-    }
-
     if (dietaryFilter === 'Veg') {
-      items = items.filter((item: any) => item.is_veg && !item.name.toLowerCase().includes('egg'));
+      items = items.filter((item: any) => item.is_veg && !item.is_egg);
     } else if (dietaryFilter === 'Non-Veg') {
-      items = items.filter((item: any) => !item.is_veg && !item.name.toLowerCase().includes('egg'));
+      items = items.filter((item: any) => !item.is_veg && !item.is_egg);
     } else if (dietaryFilter === 'Egg') {
-      items = items.filter((item: any) => item.name.toLowerCase().includes('egg'));
+      items = items.filter((item: any) => item.is_egg);
     }
 
     if (searchQuery) {
@@ -94,7 +80,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
     }
 
     return items;
-  }, [baseItems, selectedSubcategory, dietaryFilter, searchQuery]);
+  }, [baseItems, dietaryFilter, searchQuery]);
 
   const handleAddToCart = useCallback((item: any) => {
     triggerHaptic();
@@ -244,24 +230,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
         </View>
       )}
 
-      {/* 2. Subcategory Pills */}
-      {subcategories.length > 1 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subcategoryScroll}>
-          {subcategories.map(sub => (
-            <TouchableOpacity
-              key={sub}
-              style={[styles.subcategoryPill, selectedSubcategory === sub && styles.subcategoryPillActive]}
-              onPress={() => { triggerHaptic(); setSelectedSubcategory(sub); }}
-            >
-              <Text style={[styles.subcategoryText, selectedSubcategory === sub && styles.subcategoryTextActive]}>
-                {sub}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-      {/* 3. Dietary Filters (Swish Style) */}
+      {/* 2. Dietary Filters (Swish Style) */}
       <View style={styles.dietaryRow}>
         {(['Veg', 'Non-Veg', 'Egg'] as const).map((type) => {
           const isActive = dietaryFilter === type;
