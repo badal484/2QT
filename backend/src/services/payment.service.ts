@@ -112,9 +112,9 @@ export const calculatePricing = async ({
     // 5. Surge (Stub for now - needs zoneId)
     let surgePaise = 0;
 
-    // 6. GST (5%)
+    // 6. GST
     const taxableAmount = Math.max(0, subtotalPaise - subscriptionDiscountPaise - discountPaise - loyaltyDiscountPaise);
-    const gstPaise = Math.round(taxableAmount * 0.05);
+    const gstPaise = Math.round(taxableAmount * (TWO_QT.GST.RATE_PERCENT / 100));
     const cgstPaise = Math.round(gstPaise / 2);
     const sgstPaise = gstPaise - cgstPaise;
 
