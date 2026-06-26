@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
     if (!zoneId) return res.status(400).json({ error: 'zoneId is required' });
     try {
         const { rows } = await query(
-            `SELECT id, name, slug, image_url, sort_order
+            `SELECT id, name, slug, image_url, banner_url, sort_order
              FROM menu_categories
              WHERE zone_id = $1 AND is_active = TRUE
              ORDER BY sort_order ASC, created_at ASC`,
@@ -77,16 +77,16 @@ router.get('/admin/slugs', authenticate, requireRole('super_admin', 'admin'), as
 
 // ─── Admin: CREATE category ──────────────────────────────────────────────────
 router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const { zone_id, name, slug, image_url, sort_order, is_active } = req.body;
+    const { zone_id, name, slug, image_url, banner_url, sort_order, is_active } = req.body;
     if (!zone_id || !name || !slug) {
         return res.status(400).json({ error: 'zone_id, name and slug are required' });
     }
     try {
         const { rows } = await query(
-            `INSERT INTO menu_categories (zone_id, name, slug, image_url, sort_order, is_active)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            `INSERT INTO menu_categories (zone_id, name, slug, image_url, banner_url, sort_order, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING *`,
-            [zone_id, name, slug.trim(), image_url || '', sort_order ?? 0, is_active ?? true]
+            [zone_id, name, slug.trim(), image_url || '', banner_url || '', sort_order ?? 0, is_active ?? true]
         );
         res.status(201).json({ category: rows[0] });
     } catch (err: any) {
@@ -101,19 +101,20 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
 // ─── Admin: UPDATE category ──────────────────────────────────────────────────
 router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { name, slug, image_url, sort_order, is_active } = req.body;
+    const { name, slug, image_url, banner_url, sort_order, is_active } = req.body;
     try {
         const { rows } = await query(
             `UPDATE menu_categories
              SET name       = COALESCE($1, name),
                  slug       = COALESCE($2, slug),
                  image_url  = COALESCE($3, image_url),
-                 sort_order = COALESCE($4, sort_order),
-                 is_active  = COALESCE($5, is_active),
+                 banner_url = COALESCE($4, banner_url),
+                 sort_order = COALESCE($5, sort_order),
+                 is_active  = COALESCE($6, is_active),
                  updated_at = NOW()
-             WHERE id = $6
+             WHERE id = $7
              RETURNING *`,
-            [name, slug, image_url, sort_order, is_active, id]
+            [name, slug, image_url, banner_url, sort_order, is_active, id]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Category not found' });
         res.json({ category: rows[0] });

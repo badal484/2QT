@@ -11,6 +11,7 @@ interface Category {
   name: string;
   slug: string;
   image_url: string;
+  banner_url: string;
   sort_order: number;
   is_active: boolean;
 }
@@ -62,7 +63,7 @@ const SlugPicker = ({ value, onChange, zoneId }: { value: string; onChange: (v: 
 };
 
 // ── Image Upload ───────────────────────────────────────────────────────────────
-const ImageUpload = ({ value, onChange }: { value: string; onChange: (url: string) => void }) => {
+const ImageUpload = ({ value, onChange, label, hint }: { value: string; onChange: (url: string) => void; label: string; hint?: string }) => {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -83,7 +84,8 @@ const ImageUpload = ({ value, onChange }: { value: string; onChange: (url: strin
 
   return (
     <div className="space-y-1">
-      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Category Image</label>
+      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</label>
+      {hint && <p className="text-[11px] text-gray-500 mb-1 leading-tight">{hint}</p>}
       <div className="flex items-center gap-3">
         <div
           className="w-20 h-20 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden bg-gray-800 cursor-pointer hover:border-orange-500 transition-colors flex-shrink-0"
@@ -131,6 +133,7 @@ const CategoryModal = ({
     name: category?.name ?? "",
     slug: category?.slug ?? "",
     image_url: category?.image_url ?? "",
+    banner_url: category?.banner_url ?? "",
     sort_order: category?.sort_order ?? 0,
     is_active: category?.is_active ?? true,
   });
@@ -193,7 +196,21 @@ const CategoryModal = ({
           </div>
 
           <SlugPicker value={form.slug} onChange={(v) => setForm(f => ({ ...f, slug: v }))} zoneId={form.zone_id} />
-          <ImageUpload value={form.image_url} onChange={(url) => setForm(f => ({ ...f, image_url: url }))} />
+          
+          <div className="space-y-4 pt-2 border-t border-gray-800">
+            <ImageUpload 
+              value={form.image_url} 
+              onChange={(url) => setForm(f => ({ ...f, image_url: url }))} 
+              label="Home Screen Icon"
+              hint="Circular icon shown on the Home screen. Recommended: 150x150 square."
+            />
+            <ImageUpload 
+              value={form.banner_url} 
+              onChange={(url) => setForm(f => ({ ...f, banner_url: url }))} 
+              label="Top Banner Image"
+              hint="Hero banner shown at the top of the Category screen. Recommended size: 1000x600 (landscape)."
+            />
+          </div>
 
           <div className="flex gap-4">
             <div className="flex-1 space-y-1">
