@@ -119,7 +119,7 @@ router.get('/', async (req, res) => {
     // Run all 3 DB queries in parallel — 3x faster on cache miss
     const [itemsResult, zoneResult, kitchenResult] = await Promise.all([
         query(
-            `SELECT id, name, description, price_paise, photo_url, is_veg, available,
+            `SELECT id, name, description, price_paise, photo_url, is_veg, is_egg, available,
                     category, kitchen_id, zone_id, sort_order, daily_limit,
                     today_sold_count, sold_out_reason, prep_time_minutes
              FROM menu_items WHERE zone_id = $1 ORDER BY sort_order, name`,

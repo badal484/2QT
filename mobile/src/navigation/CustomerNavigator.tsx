@@ -3,7 +3,7 @@ import { createStackNavigator, TransitionPresets } from '@react-navigation/stack
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
-import HomeScreenSDUI from '../screens/HomeScreenSDUI';
+import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import ItemDetailScreen from '../screens/ItemDetailScreen';
 import CartScreen from '../screens/CartScreen';
@@ -44,7 +44,7 @@ const CustomerNavigator = () => {
       detachInactiveScreens={false}
     >
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-      <Stack.Screen name="Home" component={HomeScreenSDUI} />
+      <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen
         name="ItemDetail"

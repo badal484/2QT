@@ -30,6 +30,7 @@ const MenuItemSchema = z.object({
     photo_url: z.string().url().optional().nullable(),
     available: z.boolean().optional().default(true),
     is_veg: z.boolean().optional().default(false),
+    is_egg: z.boolean().optional().default(false),
 });
 
 const KitchenSchema = z.object({
@@ -612,7 +613,7 @@ router.post('/payouts/:id/approve', authenticate, requireRole('super_admin', 'ad
 
 router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema), async (req: AuthRequest, res) => {
     try {
-        const { name, zone_id, description, price_paise, category, station, photo_url, available, is_veg } = req.body;
+        const { name, zone_id, description, price_paise, category, station, photo_url, available, is_veg, is_egg } = req.body;
         
         const cost_price_paise = req.body.cost_price_paise ?? Math.floor(price_paise * 0.7);
 
@@ -624,8 +625,8 @@ router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate
         const kitchen_id = kitchenRows[0].kitchen_id;
 
         const { rows } = await query(
-            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, available, is_veg) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-            [zone_id, kitchen_id, name, description || null, price_paise, cost_price_paise, category, station || 'hot_section', photo_url || null, available ?? true, is_veg ?? false]
+            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, available, is_veg, is_egg) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+            [zone_id, kitchen_id, name, description || null, price_paise, cost_price_paise, category, station || 'hot_section', photo_url || null, available ?? true, is_veg ?? false, is_egg ?? false]
         );
         
         // Clear menu cache for all zones
@@ -680,7 +681,7 @@ router.delete('/menu/:id', authenticate, requireRole('super_admin', 'admin'), as
 router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema.partial()), async (req: AuthRequest, res) => {
     try {
         const { id } = req.params;
-        const { zone_id, name, description, price_paise, category, station, photo_url, available, is_veg } = req.body;
+        const { zone_id, name, description, price_paise, category, station, photo_url, available, is_veg, is_egg } = req.body;
         
         let kitchen_id = undefined;
         if (zone_id) {
@@ -701,9 +702,10 @@ router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), valid
                 station = COALESCE($7, station),
                 photo_url = COALESCE($8, photo_url),
                 available = COALESCE($9, available),
-                is_veg = COALESCE($10, is_veg)
-             WHERE id = $11 RETURNING *`,
-            [zone_id ?? null, kitchen_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null, station ?? null, photo_url ?? null, available ?? null, is_veg ?? null, id]
+                is_veg = COALESCE($10, is_veg),
+                is_egg = COALESCE($11, is_egg)
+             WHERE id = $12 RETURNING *`,
+            [zone_id ?? null, kitchen_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null, station ?? null, photo_url ?? null, available ?? null, is_veg ?? null, is_egg ?? null, id]
         );
 
         // Clear menu cache for all zones

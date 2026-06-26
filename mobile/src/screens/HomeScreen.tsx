@@ -11,6 +11,8 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, interpolate, Extrapolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
 import { EmptyState, SkeletonRow } from '../components/ui';
+
+const AnimatedSectionList = Animated.createAnimatedComponent(SectionList);
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { radius, spacing } from '../theme/spacing';
@@ -125,6 +127,14 @@ const HomeScreen = ({ navigation }: any) => {
   const mainBanners = banners.filter((b: any) => !b.banner_type || b.banner_type === 'MAIN');
   const miniBanners = banners.filter((b: any) => b.banner_type === 'MINI');
   const stripBanners = banners.filter((b: any) => b.banner_type === 'STRIP');
+
+  const { data: feedData } = useQuery({
+    queryKey: ['homeFeed', effectiveZoneId],
+    queryFn: () => api.get(`/home/feed?zoneId=${effectiveZoneId || ''}`),
+    enabled: !!effectiveZoneId,
+    staleTime: 3 * 60 * 1000,
+  });
+  const feed = feedData?.feed || [];
 
   // ── Admin-configured image categories (zone-specific) ──────────────────
   const { data: menuCategoriesData } = useQuery({
@@ -370,32 +380,123 @@ const HomeScreen = ({ navigation }: any) => {
 
   const totalCartQty = cartItems.reduce((acc, i) => acc + i.quantity, 0);
 
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const LOCATION_HEIGHT = 50;
+  const locationRowStyle = useAnimatedStyle(() => {
+    const height = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [LOCATION_HEIGHT, 0], Extrapolate.CLAMP);
+    const opacity = interpolate(scrollY.value, [0, LOCATION_HEIGHT / 2], [1, 0], Extrapolate.CLAMP);
+    const marginBottom = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [16, 0], Extrapolate.CLAMP);
+    return { height, opacity, marginBottom, overflow: 'hidden' };
+  });
+
+  const renderBlock = (item: any, index: number) => {
+    if (item.type === 'COLLECTION') {
+      return (
+        <View key={item.id} style={{ marginBottom: 24, paddingHorizontal: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <View>
+              <Text style={{ fontSize: 22, fontFamily: fontFamily.black, color: colors.ink }}>{item.title}</Text>
+              {item.subtitle && <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 }}>{item.subtitle}</Text>}
+            </View>
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => { triggerHaptic(); }}>
+              <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: '#007A5E' }}>View all</Text>
+              <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: '#007A5E', marginLeft: 2 }}>{'>'}</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={item.data}
+            keyExtractor={mi => mi.id}
+            contentContainerStyle={{ gap: 16, paddingRight: 16 }}
+            renderItem={({ item: mi }) => {
+              const cartItem = cartItems.find((ci: any) => ci.menuItemId === mi.id);
+              const vegColor = mi.is_egg ? '#EAB308' : (mi.is_veg ? '#22C55E' : colors.danger);
+              const unavailable = !mi.available || menuData?.kitchenPaused;
+              return (
+                <TouchableOpacity style={{ width: 140 }} activeOpacity={0.93} onPress={() => { if (mi.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item: mi }); } }}>
+                  <View style={{ width: 140, height: 140, borderRadius: 16, backgroundColor: colors.surface, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
+                    {mi.photo_url ? (
+                      <NetworkImage uri={mi.photo_url} style={{ width: '100%', height: '100%', borderRadius: 16 }} />
+                    ) : (
+                      <View style={{ width: '100%', height: '100%', borderRadius: 16, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+                        <ChefHat size={32} color={colors.inkFaint} />
+                      </View>
+                    )}
+                    <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#FFFFFF', padding: 4, borderRadius: 6, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 }}>
+                      <View style={{ width: 12, height: 12, borderRadius: 2, borderWidth: 1, borderColor: vegColor, alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: vegColor }} />
+                      </View>
+                    </View>
+                    {!unavailable && (
+                      <View style={{ position: 'absolute', bottom: -12, alignSelf: 'center', width: '80%', zIndex: 10 }}>
+                        {cartItem ? (
+                          <View style={{ flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', height: 32, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, elevation: 4 }}>
+                            <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartItem.quantity - 1 })); }} style={{ width: 28, height: 32, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: colors.white, fontSize: 18, fontFamily: fontFamily.bold }}>−</Text></TouchableOpacity>
+                            <Text style={{ color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold }}>{cartItem.quantity}</Text>
+                            <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartItem.quantity + 1 })); }} style={{ width: 28, height: 32, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: colors.white, fontSize: 18, fontFamily: fontFamily.bold }}>+</Text></TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity style={{ backgroundColor: '#24B059', borderRadius: 8, height: 32, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, elevation: 4 }} onPress={() => handleAddToCart(mi)} activeOpacity={0.85}>
+                            <Text style={{ color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14 }}>ADD</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ paddingHorizontal: 4, marginTop: 12 }}>
+                    <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4 }} numberOfLines={2}>{mi.name}</Text>
+                    <Text style={{ fontSize: 14, fontFamily: fontFamily.black, color: colors.ink }}>₹{mi.price_paise / 100}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      );
+    }
+    if (item.type === 'STRIP_BANNER') {
+      return (
+        <TouchableOpacity style={{ marginHorizontal: 16, marginBottom: 24, borderRadius: 16, overflow: 'hidden' }} activeOpacity={0.9} onPress={() => { if (item.data.destination_screen) { navigation.navigate(item.data.destination_screen, item.data.destination_params || {}); } }}>
+          <NetworkImage uri={item.data.image_url} style={{ width: '100%', aspectRatio: 21/9, backgroundColor: colors.surface }} />
+        </TouchableOpacity>
+      );
+    }
+    return null;
+  };
+
   return (
     <View style={styles.container}>
-      <View style={[
-        styles.minimalHeader, 
+      <Animated.View style={[
         { 
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
           paddingTop: Math.max(insets.top + 10, 20), 
           paddingBottom: 16,
-          backgroundColor: '#24B059', // Swish Vibrant Green
-          borderBottomWidth: 0, 
+          backgroundColor: colors.surface, 
+          paddingHorizontal: 16
         }
       ]}>
-        {/* ROW 1: Address and Profile */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        {/* ROW 1: Address and Profile (Animated) */}
+        <Animated.View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, locationRowStyle]}>
           <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <MapPin size={28} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 8 }} />
+            <MapPin size={28} color={colors.primary} fill={colors.primaryTint} style={{ marginRight: 8 }} />
             <View style={{ flex: 1 }}>
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center' }}
                 onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
               >
-                <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: '#FFFFFF' }}>
+                <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink }}>
                   {user?.name ? `Hey ${user.name.split(' ')[0]} 👋` : 'Home'}
                 </Text>
-                <ChevronDown size={16} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                <ChevronDown size={16} color={colors.ink} style={{ marginLeft: 4 }} />
               </TouchableOpacity>
-              <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: 'rgba(255,255,255,0.9)', marginTop: 2 }} numberOfLines={1}>
+              <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 }} numberOfLines={1}>
                 {location?.addressText || selectedAddress?.address_text || 'Set location'}
               </Text>
             </View>
@@ -406,14 +507,14 @@ const HomeScreen = ({ navigation }: any) => {
             onPress={() => { triggerHaptic(); navigation.navigate('ProfileTab'); }}
           >
             {user?.photo_url ? (
-              <NetworkImage uri={user.photo_url} style={[styles.profileImage, { borderWidth: 2, borderColor: '#FFFFFF' }]} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
+              <NetworkImage uri={user.photo_url} style={Object.assign({}, styles.profileImage as object, { borderWidth: 2, borderColor: colors.border })} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
             ) : (
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' }}>
-                <User size={20} color="#FFFFFF" />
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
+                <User size={20} color={colors.inkMuted} />
               </View>
             )}
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
         {/* ROW 2: Search Bar with VEG toggle */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
@@ -434,7 +535,7 @@ const HomeScreen = ({ navigation }: any) => {
           }}>
             <Search size={22} color={colors.inkMuted} style={{ marginRight: 12 }} />
             <TextInput
-              placeholder='Search "Biryani" or "Pizza"...'
+              placeholder='Search for food...'
               placeholderTextColor={colors.inkMuted}
               style={{ flex: 1, fontSize: 15, fontFamily: fontFamily.medium, color: colors.ink, padding: 0 }}
               value={searchQuery}
@@ -458,11 +559,11 @@ const HomeScreen = ({ navigation }: any) => {
             )}
           </View>
         )}
-      </View>
+      </Animated.View>
 
-      <SectionList
+      <AnimatedSectionList
         style={{ flex: 1 }}
-        ref={sectionListRef}
+        ref={sectionListRef as any}
         sections={
           isServiceabilityChecking || unserviceableLocation || showNoLocation || showNetworkError
             ? []
@@ -473,7 +574,9 @@ const HomeScreen = ({ navigation }: any) => {
         renderSectionHeader={() => null}
         stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 10, 20) + 16 + 52 + LOCATION_HEIGHT + 16 }]}
         windowSize={5}
         maxToRenderPerBatch={5}
         initialNumToRender={6}
@@ -573,7 +676,7 @@ const HomeScreen = ({ navigation }: any) => {
                     offset: SCREEN_WIDTH * index,
                     index,
                   })}
-                  renderItem={({ item: b }: any) => (
+                  renderItem={({ item: b, index }: any) => (
                     <View style={{ width: SCREEN_WIDTH, paddingHorizontal: spacing.lg }}>
                       <TouchableOpacity
                         activeOpacity={0.9}
@@ -584,7 +687,10 @@ const HomeScreen = ({ navigation }: any) => {
                         style={[styles.bannerContainer, { height: 180 }]}
                       >
                         <NetworkImage uri={b.image_url} style={[styles.bannerImage, { borderRadius: 16 }]} />
-                        {/* Removed dark overlay and text to allow pure image banners (Swish-style) */}
+                        <View style={[styles.bannerOverlay, { borderRadius: 16 }]}>
+                          <Text style={styles.bannerTitle} numberOfLines={2}>{b.title}</Text>
+                          {b.subtitle && <Text style={styles.bannerSubtitle} numberOfLines={2}>{b.subtitle}</Text>}
+                        </View>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -606,6 +712,10 @@ const HomeScreen = ({ navigation }: any) => {
                     style={styles.stripBannerCard}
                   >
                     <NetworkImage uri={banner.image_url} style={styles.stripBannerImage} />
+                    <View style={styles.stripBannerOverlay}>
+                      <Text style={styles.stripBannerTitle}>{banner.title}</Text>
+                      {banner.subtitle && <Text style={styles.stripBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -789,6 +899,11 @@ const HomeScreen = ({ navigation }: any) => {
             />
           )
         }
+        ListFooterComponent={
+          <View style={{ paddingBottom: 40, marginTop: 24 }}>
+            {feed.map((block: any, i: number) => renderBlock(block, i))}
+          </View>
+        }
       />
 
       {cartItems.length > 0 && sections.length > 0 && (
@@ -865,7 +980,7 @@ const HomeScreen = ({ navigation }: any) => {
 
 
 const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaused }: any) => {
-  const vegColor = item.is_veg ? '#22C55E' : colors.danger;
+  const vegColor = item.is_egg ? '#EAB308' : (item.is_veg ? '#22C55E' : colors.danger);
   const unavailable = !item.available || kitchenPaused;
 
   return (
@@ -1189,19 +1304,20 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   miniBannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     padding: spacing.sm + 2,
     justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.3)'
   },
   miniBannerTitle: {
     fontSize: 12,
     fontFamily: fontFamily.extrabold,
-    color: colors.ink,
+    color: colors.white,
   },
   miniBannerSubtitle: {
     fontSize: 10,
     fontFamily: fontFamily.bold,
-    color: colors.inkMuted,
+    color: 'rgba(255,255,255,0.9)',
     marginTop: 2,
   },
 
@@ -1217,6 +1333,23 @@ const styles = StyleSheet.create({
   stripBannerImage: {
     width: '100%',
     height: '100%',
+  },
+  stripBannerOverlay: {
+    ...StyleSheet.absoluteFill,
+    padding: spacing.lg,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  stripBannerTitle: {
+    fontSize: 16,
+    fontFamily: fontFamily.black,
+    color: colors.white,
+  },
+  stripBannerSubtitle: {
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 2,
   },
 
   itemsContainer: { paddingHorizontal: spacing.lg, marginTop: spacing.xl, paddingBottom: spacing.xxxl },
@@ -1653,15 +1786,8 @@ const styles = StyleSheet.create({
 
   // ── Sticky category strip ──────────────────────────────────────────────────
   categoryStrip: {
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
     paddingVertical: 10,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
   },
   categoryStripScroll: {
     paddingHorizontal: spacing.lg,

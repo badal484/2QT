@@ -238,10 +238,10 @@ export function MenuTab() {
                 }`}>
                   {selected.has(item.id) && <CheckCircle2 className="w-3 h-3 text-black" />}
                 </div>
-                {/* Veg badge */}
+                {/* Veg/Egg badge */}
                 <div className="absolute top-2.5 right-2.5">
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${item.is_veg ? "border-green-500 bg-green-500/20" : "border-red-500 bg-red-500/20"}`}>
-                    <div className={`w-2 h-2 rounded-full ${item.is_veg ? "bg-green-500" : "bg-red-500"}`} />
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${item.is_egg ? "border-yellow-500 bg-yellow-500/20" : item.is_veg ? "border-green-500 bg-green-500/20" : "border-red-500 bg-red-500/20"}`}>
+                    <div className={`w-2 h-2 rounded-full ${item.is_egg ? "bg-yellow-500" : item.is_veg ? "bg-green-500" : "bg-red-500"}`} />
                   </div>
                 </div>
               </div>
@@ -316,8 +316,8 @@ export function MenuTab() {
                 <div className="min-w-0">
                   <div className="font-black text-sm text-white truncate">{item.name}</div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <div className={`w-1.5 h-1.5 rounded-full ${item.is_veg ? "bg-green-500" : "bg-red-500"}`} />
-                    <span className="text-[9px] text-zinc-500 font-bold">{item.is_veg ? "Veg" : "Non-Veg"} · {item.station}</span>
+                    <div className={`w-1.5 h-1.5 rounded-full ${item.is_egg ? "bg-yellow-500" : item.is_veg ? "bg-green-500" : "bg-red-500"}`} />
+                    <span className="text-[9px] text-zinc-500 font-bold">{item.is_egg ? "Egg" : item.is_veg ? "Veg" : "Non-Veg"} · {item.station}</span>
                   </div>
                 </div>
               </div>
@@ -387,7 +387,8 @@ export function MenuTab() {
                       price_paise: Math.round(parseFloat(formData.get("price") as string) * 100),
                       station: formData.get("station"),
                       photo_url: imageUrl,
-                      is_veg: formData.get("is_veg") === "true",
+                      is_veg: formData.get("dietary_type") === "veg",
+                      is_egg: formData.get("dietary_type") === "egg",
                       available: true
                     };
                     try {
@@ -520,9 +521,10 @@ export function MenuTab() {
                   {/* Dietary */}
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Dietary Type</label>
-                    <select name="is_veg" defaultValue={editingItem?.is_veg ? "true" : "false"} className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none">
-                      <option value="true" className="bg-zinc-900">Veg</option>
-                      <option value="false" className="bg-zinc-900">Non-Veg</option>
+                    <select name="dietary_type" defaultValue={editingItem?.is_egg ? "egg" : (editingItem?.is_veg ? "veg" : "non_veg")} className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none">
+                      <option value="veg" className="bg-zinc-900">Veg</option>
+                      <option value="non_veg" className="bg-zinc-900">Non-Veg</option>
+                      <option value="egg" className="bg-zinc-900">Egg</option>
                     </select>
                   </div>
 

@@ -27,7 +27,7 @@ router.get('/feed', async (req, res) => {
                 COALESCE(json_agg(
                     json_build_object(
                         'id', m.id, 'name', m.name, 'description', m.description,
-                        'price_paise', m.price_paise, 'is_veg', m.is_veg,
+                        'price_paise', m.price_paise, 'is_veg', m.is_veg, 'is_egg', m.is_egg,
                         'photo_url', m.photo_url, 'kitchen_id', m.kitchen_id,
                         'available', m.available
                     ) ORDER BY ci.sort_order ASC
@@ -42,7 +42,7 @@ router.get('/feed', async (req, res) => {
                 COALESCE(json_agg(
                     json_build_object(
                         'id', m.id, 'name', m.name, 'description', m.description,
-                        'price_paise', m.price_paise, 'is_veg', m.is_veg,
+                        'price_paise', m.price_paise, 'is_veg', m.is_veg, 'is_egg', m.is_egg,
                         'photo_url', m.photo_url, 'kitchen_id', m.kitchen_id,
                         'available', m.available
                     ) ORDER BY ci.sort_order ASC
