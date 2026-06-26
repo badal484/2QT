@@ -125,6 +125,21 @@ const HomeScreen = ({ navigation }: any) => {
   });
   const banners = bannersData?.banners || [];
 
+  // ── Admin-configured image categories (zone-specific) ──────────────────
+  const { data: menuCategoriesData } = useQuery({
+    queryKey: ['menu-categories', effectiveZoneId],
+    queryFn: () => api.get(`/categories?zoneId=${effectiveZoneId}`),
+    enabled: !!effectiveZoneId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+  });
+  const adminCategories: { id: string; name: string; slug: string; image_url: string }[] =
+    menuCategoriesData?.categories ?? [];
+  // Set of slugs that admin has configured — used to HIDE unregistered categories
+  const adminCategorySlugSet = new Set(
+    adminCategories.map((c) => c.slug.toLowerCase().trim())
+  );
+
   const infiniteBanners = useMemo(() => {
     if (!banners || banners.length === 0) return [];
     if (banners.length === 1) return banners;
@@ -303,15 +318,27 @@ const HomeScreen = ({ navigation }: any) => {
       grouped[item.category].push(item);
     });
 
+    // If admin has configured categories, only show those categories in sections
+    // (HIDDEN fallback: unconfigured categories are not shown)
+    const filterByAdmin = adminCategories.length > 0;
+
     if (selectedCategory !== 'All') {
       return grouped[selectedCategory] ? [{ title: selectedCategory, data: grouped[selectedCategory] }] : [];
     }
 
-    return Object.keys(grouped).sort().map(key => ({
-      title: key,
-      data: grouped[key]
-    }));
-  }, [menuData?.items, selectedCategory, isVegOnly, searchQuery]);
+    return Object.keys(grouped)
+      .filter((key) => !filterByAdmin || adminCategorySlugSet.has(key.toLowerCase().trim()))
+      .sort((a, b) => {
+        // Sort by admin sort_order if available
+        if (filterByAdmin) {
+          const aIdx = adminCategories.findIndex(c => c.slug.toLowerCase() === a.toLowerCase());
+          const bIdx = adminCategories.findIndex(c => c.slug.toLowerCase() === b.toLowerCase());
+          return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+        }
+        return a.localeCompare(b);
+      })
+      .map(key => ({ title: key, data: grouped[key] }));
+  }, [menuData?.items, selectedCategory, isVegOnly, searchQuery, adminCategories, adminCategorySlugSet]);
 
   const cartTotal = useMemo(
     () => cartItems.reduce((acc, item) => acc + item.quantity * item.pricePaise, 0),
@@ -509,33 +536,52 @@ const HomeScreen = ({ navigation }: any) => {
                 />
               </Animated.View>
             )}
-            {!isLoading && categories.length > 1 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
+            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
               <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.mindContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mindScroll}>
-
-                <View style={[styles.vegToggleWrapper, { marginRight: spacing.md }]}>
-                  <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
-                  <Switch
-                    value={isVegOnly}
-                    onValueChange={(val) => {
-                      triggerHaptic();
-                      setIsVegOnly(val);
-                    }}
-                    trackColor={{ false: colors.border, true: colors.primaryTint }}
-                    thumbColor={isVegOnly ? colors.primary : colors.white}
-                    style={styles.vegSwitch}
-                  />
-                </View>
-                  {categories.map((cat: any) => (
-                    <CategoryPill
-                      key={cat}
-                      name={cat}
-                      isSelected={selectedCategory === cat}
-                      onPress={() => {
-                        triggerHaptic();
-                        setSelectedCategory(cat);
-                      }}
+                  {/* Veg toggle */}
+                  <View style={[styles.vegToggleWrapper, { marginRight: spacing.md }]}>
+                    <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
+                    <Switch
+                      value={isVegOnly}
+                      onValueChange={(val) => { triggerHaptic(); setIsVegOnly(val); }}
+                      trackColor={{ false: colors.border, true: colors.primaryTint }}
+                      thumbColor={isVegOnly ? colors.primary : colors.white}
+                      style={styles.vegSwitch}
                     />
+                  </View>
+
+                  {/* "All" pill */}
+                  <TouchableOpacity
+                    style={[styles.imageCategoryItem, selectedCategory === 'All' && styles.imageCategoryItemActive]}
+                    onPress={() => { triggerHaptic(); setSelectedCategory('All'); }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.imageCategoryCircle, selectedCategory === 'All' && styles.imageCategoryCircleActive]}>
+                      <Text style={{ fontSize: 24 }}>🍽️</Text>
+                    </View>
+                    <Text style={[styles.imageCategoryLabel, selectedCategory === 'All' && styles.imageCategoryLabelActive]} numberOfLines={2}>All</Text>
+                  </TouchableOpacity>
+
+                  {/* Admin-configured image categories */}
+                  {adminCategories.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[styles.imageCategoryItem, selectedCategory === cat.slug && styles.imageCategoryItemActive]}
+                      onPress={() => { triggerHaptic(); setSelectedCategory(cat.slug); }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[styles.imageCategoryCircle, selectedCategory === cat.slug && styles.imageCategoryCircleActive]}>
+                        {cat.image_url ? (
+                          <NetworkImage uri={cat.image_url} style={styles.imageCategoryImage} />
+                        ) : (
+                          <Text style={{ fontSize: 22 }}>🍴</Text>
+                        )}
+                      </View>
+                      <Text style={[styles.imageCategoryLabel, selectedCategory === cat.slug && styles.imageCategoryLabelActive]} numberOfLines={2}>
+                        {cat.name}
+                      </Text>
+                    </TouchableOpacity>
                   ))}
                 </ScrollView>
               </Animated.View>
@@ -1059,6 +1105,56 @@ const styles = StyleSheet.create({
   categoryPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   categoryPillText: { fontSize: 14, fontFamily: fontFamily.extrabold, color: colors.inkMuted },
   categoryPillTextActive: { color: colors.white },
+
+  // ── Swish-style circular image categories ──────────────────────────────────
+  imageCategoryItem: {
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    width: 72,
+    marginRight: 4,
+  },
+  imageCategoryItemActive: {},
+  imageCategoryCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 2.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  imageCategoryCircleActive: {
+    borderColor: colors.primary,
+    borderWidth: 2.5,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  imageCategoryImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 36,
+  },
+  imageCategoryLabel: {
+    fontSize: 11,
+    fontFamily: fontFamily.semibold,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 14,
+  },
+  imageCategoryLabelActive: {
+    color: colors.primary,
+    fontFamily: fontFamily.extrabold,
+  },
 
   itemsContainer: { paddingHorizontal: spacing.lg, marginTop: spacing.xl, paddingBottom: spacing.xxxl },
   modernItemsList: { width: '100%' },
