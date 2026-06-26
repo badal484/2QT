@@ -128,14 +128,6 @@ const HomeScreen = ({ navigation }: any) => {
   const miniBanners = banners.filter((b: any) => b.banner_type === 'MINI');
   const stripBanners = banners.filter((b: any) => b.banner_type === 'STRIP');
 
-  const { data: feedData } = useQuery({
-    queryKey: ['homeFeed', effectiveZoneId],
-    queryFn: () => api.get(`/home/feed?zoneId=${effectiveZoneId || ''}`),
-    enabled: !!effectiveZoneId,
-    staleTime: 3 * 60 * 1000,
-  });
-  const feed = feedData?.feed || [];
-
   // ── Admin-configured image categories (zone-specific) ──────────────────
   const { data: menuCategoriesData } = useQuery({
     queryKey: ['menu-categories', effectiveZoneId],
@@ -395,81 +387,7 @@ const HomeScreen = ({ navigation }: any) => {
     return { height, opacity, marginBottom, overflow: 'hidden' };
   });
 
-  const renderBlock = (item: any, index: number) => {
-    if (item.type === 'COLLECTION') {
-      return (
-        <View key={item.id} style={{ marginBottom: 24, paddingHorizontal: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <View>
-              <Text style={{ fontSize: 22, fontFamily: fontFamily.black, color: colors.ink }}>{item.title}</Text>
-              {item.subtitle && <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 }}>{item.subtitle}</Text>}
-            </View>
-            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => { triggerHaptic(); }}>
-              <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: '#007A5E' }}>View all</Text>
-              <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: '#007A5E', marginLeft: 2 }}>{'>'}</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={item.data}
-            keyExtractor={mi => mi.id}
-            contentContainerStyle={{ gap: 16, paddingRight: 16 }}
-            renderItem={({ item: mi }) => {
-              const cartItem = cartItems.find((ci: any) => ci.menuItemId === mi.id);
-              const vegColor = mi.is_egg ? '#EAB308' : (mi.is_veg ? '#22C55E' : colors.danger);
-              const unavailable = !mi.available || menuData?.kitchenPaused;
-              return (
-                <TouchableOpacity style={{ width: 140 }} activeOpacity={0.93} onPress={() => { if (mi.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item: mi }); } }}>
-                  <View style={{ width: 140, height: 140, borderRadius: 16, backgroundColor: colors.surface, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
-                    {mi.photo_url ? (
-                      <NetworkImage uri={mi.photo_url} style={{ width: '100%', height: '100%', borderRadius: 16 }} />
-                    ) : (
-                      <View style={{ width: '100%', height: '100%', borderRadius: 16, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-                        <ChefHat size={32} color={colors.inkFaint} />
-                      </View>
-                    )}
-                    <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#FFFFFF', padding: 4, borderRadius: 6, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 }}>
-                      <View style={{ width: 12, height: 12, borderRadius: 2, borderWidth: 1, borderColor: vegColor, alignItems: 'center', justifyContent: 'center' }}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: vegColor }} />
-                      </View>
-                    </View>
-                    {!unavailable && (
-                      <View style={{ position: 'absolute', bottom: -12, alignSelf: 'center', width: '80%', zIndex: 10 }}>
-                        {cartItem ? (
-                          <View style={{ flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', height: 32, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, elevation: 4 }}>
-                            <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartItem.quantity - 1 })); }} style={{ width: 28, height: 32, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: colors.white, fontSize: 18, fontFamily: fontFamily.bold }}>−</Text></TouchableOpacity>
-                            <Text style={{ color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold }}>{cartItem.quantity}</Text>
-                            <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartItem.quantity + 1 })); }} style={{ width: 28, height: 32, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: colors.white, fontSize: 18, fontFamily: fontFamily.bold }}>+</Text></TouchableOpacity>
-                          </View>
-                        ) : (
-                          <TouchableOpacity style={{ backgroundColor: '#24B059', borderRadius: 8, height: 32, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, elevation: 4 }} onPress={() => handleAddToCart(mi)} activeOpacity={0.85}>
-                            <Text style={{ color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14 }}>ADD</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                  <View style={{ paddingHorizontal: 4, marginTop: 12 }}>
-                    <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4 }} numberOfLines={2}>{mi.name}</Text>
-                    <Text style={{ fontSize: 14, fontFamily: fontFamily.black, color: colors.ink }}>₹{mi.price_paise / 100}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
-      );
-    }
-    if (item.type === 'STRIP_BANNER') {
-      return (
-        <TouchableOpacity style={{ marginHorizontal: 16, marginBottom: 24, borderRadius: 16, overflow: 'hidden' }} activeOpacity={0.9} onPress={() => { if (item.data.destination_screen) { navigation.navigate(item.data.destination_screen, item.data.destination_params || {}); } }}>
-          <NetworkImage uri={item.data.image_url} style={{ width: '100%', aspectRatio: 21/9, backgroundColor: colors.surface }} />
-        </TouchableOpacity>
-      );
-    }
-    return null;
-  };
+
 
   return (
     <View style={styles.container}>
@@ -900,9 +818,7 @@ const HomeScreen = ({ navigation }: any) => {
           )
         }
         ListFooterComponent={
-          <View style={{ paddingBottom: 40, marginTop: 24 }}>
-            {feed.map((block: any, i: number) => renderBlock(block, i))}
-          </View>
+          <View style={{ paddingBottom: 40, marginTop: 24 }} />
         }
       />
 
