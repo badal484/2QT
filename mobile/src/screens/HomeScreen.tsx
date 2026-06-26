@@ -133,10 +133,6 @@ const HomeScreen = ({ navigation }: any) => {
   });
   const adminCategories: { id: string; name: string; slug: string; image_url: string }[] =
     menuCategoriesData?.categories ?? [];
-  // Set of slugs that admin has configured — used to HIDE unregistered categories
-  const adminCategorySlugSet = new Set(
-    adminCategories.map((c) => c.slug.toLowerCase().trim())
-  );
 
   const infiniteBanners = useMemo(() => {
     if (!banners || banners.length === 0) return [];
@@ -312,9 +308,7 @@ const HomeScreen = ({ navigation }: any) => {
       grouped[item.category].push(item);
     });
 
-    // If admin has configured categories, only show those categories in sections
-    // (HIDDEN fallback: unconfigured categories are not shown)
-    const filterByAdmin = adminCategories.length > 0;
+    const hasAdminCategories = adminCategories.length > 0;
 
     if (selectedCategory !== 'All') {
       // Case-insensitive match so slug "Rice & Biryani" matches item.category "rice & biryani"
@@ -324,19 +318,19 @@ const HomeScreen = ({ navigation }: any) => {
       return matchKey ? [{ title: matchKey, data: grouped[matchKey] }] : [];
     }
 
+    // "All" view — always show every item. Admin slugs only control sort order.
     return Object.keys(grouped)
-      .filter((key) => !filterByAdmin || adminCategorySlugSet.has(key.toLowerCase().trim()))
       .sort((a, b) => {
-        // Sort by admin sort_order if available
-        if (filterByAdmin) {
+        if (hasAdminCategories) {
           const aIdx = adminCategories.findIndex(c => c.slug.toLowerCase() === a.toLowerCase());
           const bIdx = adminCategories.findIndex(c => c.slug.toLowerCase() === b.toLowerCase());
+          // Configured categories come first (sorted by sort_order); unconfigured go to end
           return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
         }
         return a.localeCompare(b);
       })
       .map(key => ({ title: key, data: grouped[key] }));
-  }, [menuData?.items, selectedCategory, isVegOnly, searchQuery, adminCategories, adminCategorySlugSet]);
+  }, [menuData?.items, selectedCategory, isVegOnly, searchQuery, adminCategories]);
 
   const cartTotal = useMemo(
     () => cartItems.reduce((acc, item) => acc + item.quantity * item.pricePaise, 0),
@@ -463,19 +457,6 @@ const HomeScreen = ({ navigation }: any) => {
       {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && adminCategories.length > 0 && (
         <View style={styles.categoryStrip}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryStripScroll}>
-            {/* All */}
-            <TouchableOpacity
-              style={styles.categoryStripItem}
-              onPress={() => { triggerHaptic(); setSelectedCategory('All'); }}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.categoryStripCircle, selectedCategory === 'All' && styles.categoryStripCircleActive]}>
-                <Text style={{ fontSize: 20 }}>🍽️</Text>
-              </View>
-              <Text style={[styles.categoryStripLabel, selectedCategory === 'All' && styles.categoryStripLabelActive]}>All</Text>
-              {selectedCategory === 'All' && <View style={styles.categoryStripUnderline} />}
-            </TouchableOpacity>
-
             {/* Admin categories */}
             {adminCategories.map((cat) => {
               const isActive = selectedCategory.toLowerCase().trim() === cat.slug.toLowerCase().trim();
@@ -483,7 +464,7 @@ const HomeScreen = ({ navigation }: any) => {
                 <TouchableOpacity
                   key={cat.id}
                   style={styles.categoryStripItem}
-                  onPress={() => { triggerHaptic(); setSelectedCategory(cat.slug); }}
+                  onPress={() => { triggerHaptic(); setSelectedCategory(isActive ? 'All' : cat.slug); }}
                   activeOpacity={0.8}
                 >
                   <View style={[styles.categoryStripCircle, isActive && styles.categoryStripCircleActive]}>
