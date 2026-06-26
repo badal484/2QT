@@ -64,29 +64,15 @@ export const initSocket = (server: any) => {
             socket.join(`order:${orderId}`);
         });
 
-        // Rider location heartbeat via socket (avoids extra HTTP round-trip every 8s)
+        // Rider location heartbeat via socket (avoids extra HTTP round-trip every 5s)
         if (user.role === 'rider' || user.role === 'rider_captain') {
             socket.on('update_location', async (data: { lat: number; lng: number }) => {
+                const riderId = user.userId;
+                const zoneId = user.zoneId;
+
+                // 1. Forward to customer order room FIRST — real-time priority, must not be
+                //    blocked by Redis writes. DB query is cheap and non-failing.
                 try {
-                    const riderId = user.userId;
-                    const zoneId = user.zoneId;
-
-                    // Store in Redis (60s TTL — if rider disappears, location expires)
-                    await redis.set(
-                        keys.riderLocation(riderId),
-                        JSON.stringify({ lat: data.lat, lng: data.lng, updatedAt: new Date() }),
-                        { EX: 60 }
-                    );
-
-                    // Zone capacity heartbeat
-                    if (zoneId) {
-                        const capacityKey = keys.activeRidersInZone(zoneId);
-                        const now = Date.now();
-                        await redis.zAdd(capacityKey, { score: now, value: riderId });
-                        await redis.zRemRangeByScore(capacityKey, '-inf', now - 60000);
-                    }
-
-                    // Forward location to any customer watching this rider's active order
                     const { rows } = await query(
                         'SELECT current_order_id FROM users WHERE id = $1',
                         [riderId]
@@ -97,8 +83,22 @@ export const initSocket = (server: any) => {
                             lng: data.lng,
                         });
                     }
-                } catch (_) {
-                    // Non-critical — location update failure should never crash socket
+                } catch (_) {}
+
+                // 2. Persist to Redis (fire-and-forget — Redis errors must not block real-time path)
+                redis.set(
+                    keys.riderLocation(riderId),
+                    JSON.stringify({ lat: data.lat, lng: data.lng, updatedAt: new Date() }),
+                    { EX: 300 }  // 5 min TTL — covers stationary riders waiting at kitchen
+                ).catch(() => {});
+
+                // 3. Zone capacity heartbeat (fire-and-forget)
+                if (zoneId) {
+                    const capacityKey = keys.activeRidersInZone(zoneId);
+                    const now = Date.now();
+                    redis.zAdd(capacityKey, { score: now, value: riderId })
+                        .then(() => redis.zRemRangeByScore(capacityKey, '-inf', now - 60000))
+                        .catch(() => {});
                 }
             });
         }
