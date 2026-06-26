@@ -416,14 +416,14 @@ const HomeScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        {/* ROW 2: Sleek Permanent Search Bar */}
+        {/* ROW 2: Search Bar with VEG toggle */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            backgroundColor: colors.surface, 
-            borderRadius: 16, 
-            paddingHorizontal: 16, 
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            paddingHorizontal: 16,
             height: 52,
             shadowColor: colors.ink,
             shadowOffset: { width: 0, height: 2 },
@@ -441,10 +441,21 @@ const HomeScreen = ({ navigation }: any) => {
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            {searchQuery.length > 0 && (
+            {searchQuery.length > 0 ? (
               <TouchableOpacity onPress={() => { triggerHaptic(); setSearchQuery(''); }}>
                 <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
               </TouchableOpacity>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 12, marginLeft: 8 }}>
+                <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
+                <Switch
+                  value={isVegOnly}
+                  onValueChange={(val) => { triggerHaptic(); setIsVegOnly(val); }}
+                  trackColor={{ false: colors.border, true: colors.primaryTint }}
+                  thumbColor={isVegOnly ? colors.primary : colors.white}
+                  style={styles.vegSwitch}
+                />
+              </View>
             )}
           </View>
         )}
@@ -500,16 +511,16 @@ const HomeScreen = ({ navigation }: any) => {
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(b: any) => b.uniqueId || b.id}
-                  snapToInterval={SCREEN_WIDTH}
+                  snapToInterval={SCREEN_WIDTH - 32}
                   decelerationRate="fast"
-                  contentContainerStyle={{ paddingHorizontal: 0, gap: 0 }}
+                  contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 0 }}
                   onMomentumScrollEnd={(ev) => {
-                    const newIndex = Math.round(ev.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                    const newIndex = Math.round(ev.nativeEvent.contentOffset.x / (SCREEN_WIDTH - 32));
                     bannerIndexRef.current = newIndex;
                   }}
                   getItemLayout={(_, index) => ({
-                    length: SCREEN_WIDTH,
-                    offset: SCREEN_WIDTH * index,
+                    length: SCREEN_WIDTH - 32,
+                    offset: (SCREEN_WIDTH - 32) * index,
                     index,
                   })}
                   renderItem={({ item: b }: any) => (
@@ -519,7 +530,7 @@ const HomeScreen = ({ navigation }: any) => {
                         triggerHaptic();
                         if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
                       }}
-                      style={[styles.bannerContainer, { width: SCREEN_WIDTH, borderRadius: 0, marginHorizontal: 0 }]}
+                      style={styles.bannerContainer}
                     >
                       <NetworkImage uri={b.image_url} style={styles.bannerImage} />
                       <View style={styles.bannerOverlay}>
@@ -539,18 +550,6 @@ const HomeScreen = ({ navigation }: any) => {
             {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
               <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.mindContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mindScroll}>
-                  {/* Veg toggle */}
-                  <View style={[styles.vegToggleWrapper, { marginRight: spacing.md }]}>
-                    <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
-                    <Switch
-                      value={isVegOnly}
-                      onValueChange={(val) => { triggerHaptic(); setIsVegOnly(val); }}
-                      trackColor={{ false: colors.border, true: colors.primaryTint }}
-                      thumbColor={isVegOnly ? colors.primary : colors.white}
-                      style={styles.vegSwitch}
-                    />
-                  </View>
-
                   {/* "All" pill */}
                   <TouchableOpacity
                     style={[styles.imageCategoryItem, selectedCategory === 'All' && styles.imageCategoryItemActive]}
@@ -1250,13 +1249,13 @@ const styles = StyleSheet.create({
 
   bannersList: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.xl },
   bannerContainer: {
-    width: SCREEN_WIDTH - spacing.lg * 2,
-    height: 160,
-    borderRadius: radius.xl,
+    width: SCREEN_WIDTH - 32,
+    height: 180,
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: colors.ink,
   },
-  bannerImage: { width: '100%', height: '100%', opacity: 0.6 },
+  bannerImage: { width: '100%', height: '100%', opacity: 0.75 },
   bannerOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     padding: spacing.lg,
