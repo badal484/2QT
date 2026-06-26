@@ -5,7 +5,7 @@ import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToAdmin, emitToKitchen } from '../socket';
-import { notificationsQueue } from '../jobs/queues';
+import { NotificationService } from '../services/notification.service';
 import { logSystemEvent } from '../utils/logger';
 import ImageKit from '@imagekit/nodejs';
 import multer from 'multer';
@@ -283,13 +283,13 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
         if (ms > 0) delay = ms;
     }
 
-    // 2. Queue notifications
+    // 2. Send notifications directly (no queue dependency)
     for (const user of rows) {
-        notificationsQueue.add('broadcast_message', {
+        NotificationService.send('broadcast_message', {
             phone: user.phone,
-            message: `${title}\n\n${message}`,
-            imageUrl: imageUrl || undefined
-        }, { delay }).catch(e => console.error('[Queue] broadcast failed:', e.message));
+            title,
+            body: message,
+        }).catch(() => {});
     }
 
     console.log(`[ADMIN] Broadcast queued for ${rows.length} users (target: ${target}, segment: ${segment}): ${title}`);
@@ -336,7 +336,7 @@ router.post('/users/:id/verify', authenticate, requireRole('super_admin', 'admin
 
     const { rows } = await query('SELECT phone, name FROM users WHERE id = $1', [id]);
     if (rows[0]?.phone) {
-        notificationsQueue.add('rider_verified', {
+        NotificationService.send('rider_verified', {
             phone: rows[0].phone,
             name: rows[0].name
         });
@@ -382,7 +382,7 @@ router.post('/rider-applications/:id/:action', authenticate, requireRole('super_
                 
                 const { rows: uRows } = await client.query('SELECT phone, name FROM users WHERE id = $1', [userId]);
                 if (uRows[0]?.phone) {
-                    notificationsQueue.add('rider_verified', { phone: uRows[0].phone, name: uRows[0].name });
+                    NotificationService.send('rider_verified', { phone: uRows[0].phone, name: uRows[0].name }).catch(() => {});
                 }
             }
         });
@@ -502,7 +502,7 @@ router.post('/riders/:id/verify', authenticate, requireRole('super_admin', 'admi
     await query('UPDATE users SET is_verified = true, is_active = true WHERE id = $1', [id]);
     const { rows } = await query('SELECT phone, name FROM users WHERE id = $1', [id]);
     if (rows[0]?.phone) {
-        notificationsQueue.add('rider_verified', { phone: rows[0].phone, name: rows[0].name });
+        NotificationService.send('rider_verified', { phone: rows[0].phone, name: rows[0].name }).catch(() => {});
     }
     emitToUser(id, 'user_updated', { is_verified: true, is_active: true });
     res.json({ success: true });
@@ -557,10 +557,11 @@ router.post('/orders/:id/refund', authenticate, requireRole('super_admin', 'admi
             newWalletBalance = wb[0]?.balance_paise ?? refundAmount;
 
             const { rows: userRows } = await client.query('SELECT phone FROM users WHERE id = $1', [order.customer_id]);
-            notificationsQueue.add('broadcast_message', {
+            NotificationService.send('broadcast_message', {
                 phone: userRows[0]?.phone,
-                message: `2QT: A refund of ₹${refundAmount/100} has been credited to your wallet for Order #${order.display_id}. Sorry for the inconvenience!`
-            });
+                title: 'Refund Credited',
+                body: `2QT: A refund of ₹${refundAmount/100} has been credited to your wallet for Order #${order.display_id}. Sorry for the inconvenience!`,
+            }).catch(() => {});
         });
 
         emitToUser(

@@ -2,7 +2,6 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { withTransaction, query } from '../db';
 import { redis, keys } from '../redis';
-import { notificationsQueue } from '../jobs/queues';
 import { emitToKitchen, emitToUser, emitToOrder } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { finalizeOrder } from '../services/order.service';

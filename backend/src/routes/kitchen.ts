@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToKitchen, emitToRiders, emitToAdmin, emitToOrder, emitToAll } from '../socket';
-import { notificationsQueue } from '../jobs/queues';
+import { NotificationService } from '../services/notification.service';
 import { redis, keys } from '../redis';
 
 async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> {
@@ -155,10 +155,10 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'super_admi
             emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id }, order.zone_id);
         }
         if (notificationType) {
-            notificationsQueue.add(notificationType, {
+            NotificationService.send(notificationType as any, {
                 userId: order.customer_id,
                 displayId: order.display_id,
-            });
+            }).catch(() => {});
         }
 
         res.json({ order });

@@ -2,7 +2,7 @@ import express from 'express';
 import { query, withTransaction } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser } from '../socket';
-import { notificationsQueue } from '../jobs/queues';
+import { NotificationService } from '../services/notification.service';
 import { logSystemEvent } from '../utils/logger';
 
 const router = express.Router();
@@ -213,10 +213,11 @@ router.post('/:id/resolve', authenticate, requireRole('super_admin', 'admin'), a
             // Notify customer
             const { rows: userRows } = await client.query('SELECT phone FROM users WHERE id = $1', [complaint.customer_id]);
             if (userRows[0]?.phone && refundPaise > 0) {
-                notificationsQueue.add('broadcast_message', {
+                NotificationService.send('broadcast_message', {
                     phone: userRows[0].phone,
-                    message: `2QT: Your complaint for Order #${complaint.display_id} has been resolved. ₹${refundPaise/100} refunded to your wallet. Sorry for the trouble!`
-                });
+                    title: 'Complaint Resolved',
+                    body: `2QT: Your complaint for Order #${complaint.display_id} has been resolved. ₹${refundPaise/100} refunded to your wallet. Sorry for the trouble!`,
+                }).catch(() => {});
             }
         });
 
@@ -252,10 +253,11 @@ router.post('/:id/reject', authenticate, requireRole('super_admin', 'admin'), as
         const { rows: orderRows } = await query('SELECT display_id FROM orders WHERE id = $1', [rows[0].order_id]);
         const { rows: userRows } = await query('SELECT phone FROM users WHERE id = $1', [rows[0].customer_id]);
         if (userRows[0]?.phone) {
-            notificationsQueue.add('broadcast_message', {
+            NotificationService.send('broadcast_message', {
                 phone: userRows[0].phone,
-                message: `2QT: We reviewed your complaint for Order #${orderRows[0]?.display_id}. Unfortunately we could not process a refund. ${admin_note ? 'Reason: ' + admin_note : 'Contact support for more details.'}`
-            });
+                title: 'Complaint Update',
+                body: `2QT: We reviewed your complaint for Order #${orderRows[0]?.display_id}. Unfortunately we could not process a refund. ${admin_note ? 'Reason: ' + admin_note : 'Contact support for more details.'}`,
+            }).catch(() => {});
         }
 
         res.json({ success: true });

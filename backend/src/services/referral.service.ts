@@ -1,7 +1,7 @@
 import { query, withTransaction } from '../db';
 import { TWO_QT } from '../config/constants';
 import { emitToUser } from '../socket';
-import { notificationsQueue } from '../jobs/queues';
+import { NotificationService } from './notification.service';
 
 export const processReferral = async (referredId: string, firstOrderId: string) => {
     const { rows: referrals } = await query('SELECT * FROM referrals WHERE referred_id = $1 AND status = \'pending\'', [referredId]);
@@ -80,10 +80,11 @@ export const processReferral = async (referredId: string, firstOrderId: string) 
     emitToUser(referral.referrer_id, 'wallet_updated', { balancePaise: rWallet[0].balance_paise });
     
     if (referrer[0]?.phone) {
-        notificationsQueue.add('broadcast_message', {
+        NotificationService.send('broadcast_message', {
             phone: referrer[0].phone,
-            message: `2QT: Great news! Your referral reward of ₹50 is now in your wallet. Keep sharing and earning!`
-        });
+            title: 'Referral Reward!',
+            body: `2QT: Great news! Your referral reward of ₹50 is now in your wallet. Keep sharing and earning!`,
+        }).catch(() => {});
     }
 
     console.log(`--- SYSTEMATIC REFERRAL COMPLETE: Referrer ${referral.referrer_id} rewarded ---`);

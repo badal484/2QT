@@ -1,5 +1,5 @@
 import { query, withTransaction } from '../db';
-import { notificationsQueue } from '../jobs/queues';
+import { NotificationService } from './notification.service';
 
 export const deductStockForOrder = async (orderId: string) => {
     await withTransaction(async (client) => {
@@ -35,10 +35,10 @@ export const deductStockForOrder = async (orderId: string) => {
 
                 // 4. Alert if low stock
                 if (status.current_stock_grams <= status.reorder_threshold_grams) {
-                    notificationsQueue.add('low_stock_alert', {
+                    NotificationService.send('low_stock_alert', {
                         ingredientName: status.name,
-                        currentStock: status.current_stock_grams
-                    });
+                        currentStock: status.current_stock_grams,
+                    }).catch(() => {});
                 }
             }
         }
@@ -53,9 +53,9 @@ export const checkAllStockThresholds = async () => {
     `);
 
     for (const ing of rows) {
-        notificationsQueue.add('low_stock_alert', {
+        NotificationService.send('low_stock_alert', {
             ingredientName: ing.name,
-            currentStock: ing.current_stock_grams
-        });
+            currentStock: ing.current_stock_grams,
+        }).catch(() => {});
     }
 };

@@ -4,7 +4,8 @@ import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToRiders, emitToAdmin, emitToOrder } from '../socket';
-import { notificationsQueue, invoicesQueue } from '../jobs/queues';
+import { invoicesQueue } from '../jobs/queues';
+import { NotificationService } from '../services/notification.service';
 import { TWO_QT } from '../config/constants';
 import { pushService } from '../services/push.service';
 import Razorpay from 'razorpay';
@@ -176,14 +177,14 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
     emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });
     emitToOrder(id, 'order_status_update', { orderId: id, status });
 
-    // 2. Notification Queue
+    // 2. Push notification — direct call, no queue dependency
     if (status === 'out_for_delivery') {
         const { rows: riderRows } = await query('SELECT name FROM users WHERE id = $1', [riderId]);
-        notificationsQueue.add('order_out_for_delivery', {
+        NotificationService.send('order_out_for_delivery', {
             userId: order.customer_id,
             riderName: riderRows[0]?.name ?? 'Your rider',
             otp: String(order.delivery_otp ?? ''),
-        }).catch(e => console.error('[Queue] out_for_delivery notif failed:', e.message));
+        }).catch(() => {});
     }
 
     res.json({ success: true, status });
@@ -277,7 +278,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     emitToOrder(orderId, 'order_status_update', { orderId, status: 'delivered' });
     
     // 3. Queue delivery notification and invoice (fire-and-forget — Redis limit must not kill delivery)
-    notificationsQueue.add('order_delivered', { userId: order.customer_id }).catch(e => console.error('[Queue] delivered notif failed:', e.message));
+    NotificationService.send('order_delivered', { userId: order.customer_id }).catch(() => {});
     invoicesQueue.add('generate_invoice', { orderId }).catch(e => console.error('[Queue] invoice failed:', e.message));
 
     res.json({ success: true });
