@@ -13,10 +13,10 @@ router.get('/feed', async (req, res) => {
         // 1. Fetch Banners
         // We use IS NULL OR zone_id = $1 to handle global and zone-specific banners
         const bannerQuery = zoneId 
-            ? 'SELECT id, image_url, destination_screen, destination_params, banner_type FROM promotional_banners WHERE is_active = true AND (zone_id IS NULL OR zone_id = $1) ORDER BY sort_order ASC'
-            : 'SELECT id, image_url, destination_screen, destination_params, banner_type FROM promotional_banners WHERE is_active = true AND zone_id IS NULL ORDER BY sort_order ASC';
+            ? 'SELECT id, image_url, NULL as destination_screen, NULL as destination_params, NULL as banner_type FROM promotional_banners WHERE is_active = true ORDER BY display_order ASC'
+            : 'SELECT id, image_url, NULL as destination_screen, NULL as destination_params, NULL as banner_type FROM promotional_banners WHERE is_active = true ORDER BY display_order ASC';
         const bannerParams = zoneId ? [zoneId] : [];
-        const { rows: banners } = await query(bannerQuery, bannerParams);
+        const { rows: banners } = await query(bannerQuery);
 
         const miniBanners = banners.filter(b => b.banner_type === 'MINI');
         const stripBanners = banners.filter(b => b.banner_type === 'STRIP');
