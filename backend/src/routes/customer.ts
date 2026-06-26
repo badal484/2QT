@@ -73,7 +73,8 @@ router.get('/loyalty', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const { rows: pointsRes } = await query(`
         SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN points ELSE -points END), 0) as total_points
-        FROM loyalty_transactions WHERE customer_id = $1
+        FROM loyalty_transactions
+        WHERE customer_id = $1 AND (expires_at IS NULL OR expires_at > NOW())
     `, [userId]);
 
     const { rows: history } = await query(`
