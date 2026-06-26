@@ -204,7 +204,12 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
             }
             if (pointsToAward > 0) {
                 // Fetch current points to send accurate balance
-                const { rows: pts } = await client.query('SELECT SUM(CASE WHEN type = \'earn\' THEN points ELSE -points END) as total FROM loyalty_transactions WHERE customer_id = $1', [order.customer_id]);
+                const { rows: pts } = await client.query(
+                    `SELECT SUM(CASE WHEN type = 'earn' THEN points ELSE -points END) as total
+                     FROM loyalty_transactions
+                     WHERE customer_id = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
+                    [order.customer_id]
+                );
                 emitToUser(order.customer_id, 'loyalty_updated', { points: parseInt(pts[0].total || '0') });
             }
             if (order.is_subscription_order) {
