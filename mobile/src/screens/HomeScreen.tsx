@@ -465,7 +465,7 @@ const HomeScreen = ({ navigation }: any) => {
               </Animated.View>
             )}
             {infiniteBanners.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
-              <Animated.View entering={FadeInDown.delay(150).duration(400)}>
+              <Animated.View entering={FadeInDown.delay(150).duration(400)} style={{ overflow: 'hidden', marginTop: spacing.xl }}>
                 <FlatList
                   ref={bannerListRef}
                   data={infiniteBanners}
@@ -473,16 +473,16 @@ const HomeScreen = ({ navigation }: any) => {
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(b: any) => b.uniqueId || b.id}
-                  snapToInterval={SCREEN_WIDTH - spacing.lg * 2 + spacing.sm}
+                  snapToInterval={SCREEN_WIDTH}
                   decelerationRate="fast"
-                  contentContainerStyle={styles.bannersList}
+                  contentContainerStyle={{ paddingHorizontal: 0, gap: 0 }}
                   onMomentumScrollEnd={(ev) => {
-                    const newIndex = Math.round(ev.nativeEvent.contentOffset.x / (SCREEN_WIDTH - spacing.lg * 2 + spacing.sm));
+                    const newIndex = Math.round(ev.nativeEvent.contentOffset.x / SCREEN_WIDTH);
                     bannerIndexRef.current = newIndex;
                   }}
                   getItemLayout={(_, index) => ({
-                    length: SCREEN_WIDTH - spacing.lg * 2 + spacing.sm,
-                    offset: (SCREEN_WIDTH - spacing.lg * 2 + spacing.sm) * index,
+                    length: SCREEN_WIDTH,
+                    offset: SCREEN_WIDTH * index,
                     index,
                   })}
                   renderItem={({ item: b }: any) => (
@@ -492,7 +492,7 @@ const HomeScreen = ({ navigation }: any) => {
                         triggerHaptic();
                         if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
                       }}
-                      style={styles.bannerContainer}
+                      style={[styles.bannerContainer, { width: SCREEN_WIDTH, borderRadius: 0, marginHorizontal: 0 }]}
                     >
                       <NetworkImage uri={b.image_url} style={styles.bannerImage} />
                       <View style={styles.bannerOverlay}>
