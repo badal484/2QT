@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS collections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  subtitle VARCHAR(255),
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  zone_id UUID REFERENCES zones(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS collection_items (
+  collection_id UUID NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+  menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  sort_order INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (collection_id, menu_item_id)
+);

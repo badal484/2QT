@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "1613467594",
+    "project_id": "qqtt-ddd83",
+    "storage_bucket": "qqtt-ddd83.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1613467594:android:77870d0dbc381c13a04933",
+        "android_client_info": {
+          "package_name": "com.veltomobile.buyer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaLm5vOs9lw9QsF6v89HrNNbYiD5rqKg0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1613467594:android:c1aaabb873c29e04a04933",
+        "android_client_info": {
+          "package_name": "com.veltomobile.kitchen"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaLm5vOs9lw9QsF6v89HrNNbYiD5rqKg0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1613467594:android:fbe8b7193efbc44aa04933",
+        "android_client_info": {
+          "package_name": "com.veltomobile.rider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaLm5vOs9lw9QsF6v89HrNNbYiD5rqKg0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

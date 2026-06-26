@@ -20,12 +20,16 @@ import promocodesRoutes from './promocodes';
 import financeRoutes from './finance';
 import campaignsRoutes from './campaigns';
 import complaintsRoutes from './complaints';
+import homeRoutes from './home';
+import collectionsRoutes from './collections';
 // ... other routes
 
 const router = Router();
 
 router.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
+router.use('/home', homeRoutes);
+router.use('/collections', collectionsRoutes);
 router.use('/admin', adminRoutes);
 router.use('/app', appRoutes);
 router.use('/auth', authRoutes);

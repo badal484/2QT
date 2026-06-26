@@ -3,7 +3,7 @@ import { createStackNavigator, TransitionPresets } from '@react-navigation/stack
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
-import HomeScreen from '../screens/HomeScreen';
+import HomeScreenSDUI from '../screens/HomeScreenSDUI';
 import SearchScreen from '../screens/SearchScreen';
 import ItemDetailScreen from '../screens/ItemDetailScreen';
 import CartScreen from '../screens/CartScreen';
@@ -29,6 +29,7 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 import ScheduleOrderScreen from '../screens/ScheduleOrderScreen';
 import LiveKitchenScreen from '../screens/LiveKitchenScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import CategoryScreen from '../screens/CategoryScreen';
 
 const Stack = createStackNavigator();
 
@@ -43,7 +44,7 @@ const CustomerNavigator = () => {
       detachInactiveScreens={false}
     >
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Home" component={HomeScreenSDUI} />
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen
         name="ItemDetail"
@@ -83,6 +84,7 @@ const CustomerNavigator = () => {
       <Stack.Screen name="RenewSubscription" component={RenewSubscriptionScreen} />
       <Stack.Screen name="LiveKitchen" component={LiveKitchenScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Category" component={CategoryScreen} />
     </Stack.Navigator>
   );
 };
