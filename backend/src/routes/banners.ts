@@ -33,14 +33,14 @@ router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (r
 
 // CREATE new banner (admin)
 router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
-    const { title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order } = req.body;
+    const { title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type } = req.body;
     try {
         const { rows } = await query(
             `INSERT INTO promotional_banners 
-            (title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *`,
-            [title, subtitle, tag_text, image_url, action_type || 'NONE', action_payload || '', is_active ?? true, display_order ?? 0]
+            [title, subtitle, tag_text, image_url, action_type || 'NONE', action_payload || '', is_active ?? true, display_order ?? 0, banner_type || 'MAIN']
         );
         res.status(201).json({ banner: rows[0] });
     } catch (err: any) {
@@ -52,7 +52,7 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
 // UPDATE banner (admin)
 router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { id } = req.params;
-    const { title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order } = req.body;
+    const { title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type } = req.body;
     try {
         const { rows } = await query(
             `UPDATE promotional_banners 
@@ -64,10 +64,11 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
                  action_payload = COALESCE($6, action_payload),
                  is_active = COALESCE($7, is_active),
                  display_order = COALESCE($8, display_order),
+                 banner_type = COALESCE($9, banner_type),
                  updated_at = NOW()
-             WHERE id = $9
+             WHERE id = $10
              RETURNING *`,
-            [title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, id]
+            [title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type, id]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Banner not found' });
         res.json({ banner: rows[0] });
