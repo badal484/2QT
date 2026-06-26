@@ -23,25 +23,6 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
     const { items, addressId, promoCode, useWallet, useLoyalty, isSubscriptionOrder, paymentMethod = 'online', dryRun, instructions, scheduledAt, riderTipPaise, deliveryContactName, deliveryContactPhone } = req.body;
 
     try {
-        const pricing = await calculatePricing({
-            cartItems: items,
-            addressId,
-            promoCode,
-            walletAmountPaise: useWallet ? 99999999 : 0,
-            useLoyalty,
-            isSubscriptionOrder,
-            customerId,
-            riderTipPaise
-        });
-
-        const { rows: wallet } = await query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [customerId]);
-        const availableWallet = wallet[0]?.balance_paise || 0;
-
-        if (dryRun) {
-            return res.json({ pricing, availableWallet });
-        }
-
-        // SMART ORDER ROUTING (World-Class Quick Commerce)
         const { rows: addrInfo } = await query('SELECT zone_id, lat, lng FROM addresses WHERE id = $1 AND customer_id = $2', [addressId, customerId]);
         if (!addrInfo[0]) throw new Error('ADDRESS_NOT_FOUND');
         const { zone_id: zoneId, lat: custLat, lng: custLng } = addrInfo[0];
@@ -82,6 +63,26 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
                 kitchenId = k.id;
             }
         });
+
+        const pricing = await calculatePricing({
+            cartItems: items,
+            addressId,
+            promoCode,
+            walletAmountPaise: useWallet ? 99999999 : 0,
+            useLoyalty,
+            isSubscriptionOrder,
+            customerId,
+            riderTipPaise,
+            zoneId,
+            distanceKm: minDistance
+        });
+
+        const { rows: wallet } = await query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [customerId]);
+        const availableWallet = wallet[0]?.balance_paise || 0;
+
+        if (dryRun) {
+            return res.json({ pricing, availableWallet });
+        }
 
         const dbOrder = await createPendingOrder({
             customerId,

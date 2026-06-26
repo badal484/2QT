@@ -1,44 +1,31 @@
-/**
- * FCM push notification service for React Native
- *
- * SETUP REQUIRED before this file works:
- *   1. npm install @react-native-firebase/app @react-native-firebase/messaging
- *   2. cd android && ./gradlew clean
- *   3. Add google-services.json to android/app/
- *   4. Follow RN Firebase setup guide for android/build.gradle patches
- *
- * Until the package is installed, every function below is a no-op so the
- * app still builds and runs.
- */
-
 import { api } from '../api/client';
 
-let messagingModule: any = null;
+let messagingInstance: any = null;
+let initAttempted = false;
 
+// Returns the initialized messaging instance, or null if Firebase isn't available.
+// Calling the messaging factory (mod()) triggers firebase.app() — keep it inside try/catch.
 function getMessaging() {
-    if (messagingModule) return messagingModule;
+    if (initAttempted) return messagingInstance;
+    initAttempted = true;
     try {
-        messagingModule = require('@react-native-firebase/messaging').default;
+        const mod = require('@react-native-firebase/messaging').default;
+        messagingInstance = mod();
     } catch {
-        // Package not installed yet — silent no-op
+        // Firebase native module not available (New Architecture interop not wired)
     }
-    return messagingModule;
+    return messagingInstance;
 }
 
-// Register the device's FCM token with the backend
 export async function registerDeviceToken() {
-    const messaging = getMessaging();
-    if (!messaging) return;
-
+    const msg = getMessaging();
+    if (!msg) return;
     try {
-        const authStatus = await messaging().requestPermission();
-        const granted = [
-            messaging.AuthorizationStatus.AUTHORIZED,
-            messaging.AuthorizationStatus.PROVISIONAL,
-        ].includes(authStatus);
-        if (!granted) return;
+        const authStatus = await msg.requestPermission();
+        // AUTHORIZED = 1, PROVISIONAL = 2
+        if (authStatus < 1) return;
 
-        const token = await messaging().getToken();
+        const token = await msg.getToken();
         if (token) {
             await api.patch('/notifications/device-token', { token });
             console.log('[PUSH] Device token registered');
@@ -48,47 +35,49 @@ export async function registerDeviceToken() {
     }
 }
 
-// Refresh token if FCM rotates it
 export function subscribeToTokenRefresh() {
-    const messaging = getMessaging();
-    if (!messaging) return () => {};
-
-    const unsubscribe = messaging().onTokenRefresh(async (token: string) => {
-        try {
-            await api.patch('/notifications/device-token', { token });
-        } catch {}
-    });
-    return unsubscribe;
+    const msg = getMessaging();
+    if (!msg) return () => {};
+    try {
+        return msg.onTokenRefresh(async (token: string) => {
+            try { await api.patch('/notifications/device-token', { token }); } catch {}
+        });
+    } catch {
+        return () => {};
+    }
 }
 
-// Handle notifications when app is in foreground
 export function subscribeToForegroundMessages(
     onMessage: (title: string, body: string, data: Record<string, string>) => void
 ) {
-    const messaging = getMessaging();
-    if (!messaging) return () => {};
-
-    return messaging().onMessage(async (remoteMessage: any) => {
-        const title = remoteMessage.notification?.title ?? '';
-        const body  = remoteMessage.notification?.body  ?? '';
-        const data  = remoteMessage.data ?? {};
-        onMessage(title, body, data);
-    });
+    const msg = getMessaging();
+    if (!msg) return () => {};
+    try {
+        return msg.onMessage(async (remoteMessage: any) => {
+            const title = remoteMessage.notification?.title ?? '';
+            const body  = remoteMessage.notification?.body  ?? '';
+            const data  = remoteMessage.data ?? {};
+            onMessage(title, body, data);
+        });
+    } catch {
+        return () => {};
+    }
 }
 
-// Call once on app mount to handle tapped notifications (background → open)
 export function setupBackgroundHandler() {
-    const messaging = getMessaging();
-    if (!messaging) return;
-
-    messaging().setBackgroundMessageHandler(async (_remoteMessage: any) => {
-        // Android only — iOS handled by system
-    });
+    const msg = getMessaging();
+    if (!msg) return;
+    try {
+        msg.setBackgroundMessageHandler(async (_remoteMessage: any) => {});
+    } catch {}
 }
 
-// Get the notification that launched the app from killed state
 export async function getInitialNotification() {
-    const messaging = getMessaging();
-    if (!messaging) return null;
-    return messaging().getInitialNotification();
+    const msg = getMessaging();
+    if (!msg) return null;
+    try {
+        return msg.getInitialNotification();
+    } catch {
+        return null;
+    }
 }

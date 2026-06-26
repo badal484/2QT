@@ -84,7 +84,7 @@ const RootNavigator = () => {
             OrdersTab: {
               screens: {
                 OrderHistory: 'history',
-                OrderTracking: 'track/:orderId',
+                OrderPlaced: 'placed/:orderId',
               }
             },
             ProfileTab: {

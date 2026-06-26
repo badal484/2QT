@@ -2,26 +2,30 @@ import { ArrowLeft, Home, Briefcase, MapPin, Trash2, Plus, ArrowRight, Navigatio
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, StyleSheet, Dimensions, Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { LeafletMap } from '../components/LeafletMap';
+import MapView, { PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { api } from '../api/client';
 import { useDispatch } from 'react-redux';
 import { setAddress, setZone } from '../store/slices/cartSlice';
 import { useLocation } from '../hooks/useLocation';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, FadeInDown } from 'react-native-reanimated';
 import { AddressSearchModal } from '../components/AddressSearchModal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
 const AddressBookScreen = ({ navigation, route }: any) => {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
+  
   const [newLabel, setNewLabel] = useState('Home');
   const [newAddress, setNewAddress] = useState('');
+  const [houseNo, setHouseNo] = useState('');
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
-  const [serviceable, setServiceable] = useState<boolean | null>(null);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   
   const [mapRegion, setMapRegion] = useState({
     latitude: 20.5937,
@@ -56,6 +60,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const onRegionChange = () => {
     if (!isDragging) {
       setIsDragging(true);
+      setShowDetails(false); // Hide details when moving map
       ReactNativeHapticFeedback.trigger('impactLight');
       pinTranslateY.value = withSpring(-20, { damping: 10, stiffness: 200 });
     }
@@ -73,196 +78,197 @@ const AddressBookScreen = ({ navigation, route }: any) => {
         setNewAddress(data.display_name);
       }
     } catch (e) {
-      // non-critical — address text stays as-is
+      // non-critical
     }
   };
-
-
-  const { data: addresses, isLoading } = useQuery({
-    queryKey: ['addresses'],
-    queryFn: () => api.get('/customers/addresses'),
-  });
-
-  const { data: zonesData } = useQuery({
-    queryKey: ['active-zones'],
-    queryFn: () => api.get('/menu/zones'),
-  });
-
-  const zones = zonesData?.zones || [];
 
   const addMutation = useMutation({
     mutationFn: (data: any) => api.post('/customers/addresses', data),
     onSuccess: () => {
       ReactNativeHapticFeedback.trigger('notificationSuccess');
-      setNewAddress('');
-      setServiceable(null);
-      setSelectedZoneId(null);
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      // Go back to the select screen or home
       navigation.goBack();
     },
   });
 
-  const checkServiceability = async (lat: number, lng: number): Promise<{ zoneId: string | null; networkError: boolean }> => {
-    setIsChecking(true);
+  const checkServiceability = async (lat: number, lng: number): Promise<string | null> => {
     try {
       const res = await api.get(`/menu/zones/check?lat=${lat}&lng=${lng}`);
-      setServiceable(res.serviceable);
       if (res.serviceable && res.zone) {
-        setSelectedZoneId(res.zone.id);
-        return { zoneId: res.zone.id, networkError: false };
-      } else {
-        setSelectedZoneId(null);
-        return { zoneId: null, networkError: false };
+        return res.zone.id;
       }
-    } catch (err) {
-      return { zoneId: null, networkError: true };
-    } finally {
-      setIsChecking(false);
-    }
+    } catch (err) {}
+    return null;
   };
 
+  const handleSave = async () => {
+    if (!showDetails) {
+      setShowDetails(true);
+      return;
+    }
 
-  if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
-    </View>
-  );
+    if (!houseNo.trim()) {
+      Alert.alert('Missing Details', 'Please provide a house or flat number.');
+      return;
+    }
+
+    setIsChecking(true);
+    ReactNativeHapticFeedback.trigger('impactHeavy');
+    
+    // Check zone but DO NOT BLOCK if unserviceable
+    const zoneId = await checkServiceability(mapRegion.latitude, mapRegion.longitude);
+    
+    const fullAddress = `${houseNo.trim()}, ${newAddress}`;
+
+    addMutation.mutate({
+        label: newLabel,
+        addressText: fullAddress,
+        zoneId: zoneId, // Might be null if unserviceable, which is now supported!
+        lat: mapRegion.latitude,
+        lng: mapRegion.longitude
+    });
+    
+    setIsChecking(false);
+  };
 
   return (
     <View style={styles.container}>
-        <View style={styles.mapFullscreenContainer}>
-          <LeafletMap
-            style={styles.map}
-            latitude={mapRegion.latitude}
-            longitude={mapRegion.longitude}
-            zoom={16}
-            onRegionChange={onRegionChange}
-            onRegionChangeComplete={onRegionChangeComplete}
-          />
+        {/* Clean White Header matching Screenshot 2 */}
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
+          <View style={styles.headerTopRow}>
+            <TouchableOpacity 
+              style={styles.backBtn}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+            >
+              <ArrowLeft size={22} color="#1A1A2E" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Add delivery location</Text>
+          </View>
           
-          {/* Animated Center Pin */}
+          <TouchableOpacity 
+            style={styles.searchBarContainer}
+            onPress={() => {
+              ReactNativeHapticFeedback.trigger('impactLight');
+              setIsSearchVisible(true);
+            }}
+            activeOpacity={0.9}
+          >
+            <Search size={20} color="#10B981" style={{ marginRight: 12 }} />
+            <Text style={styles.searchBarText}>Search delivery location</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.mapContainer}>
+          <MapView
+            provider={PROVIDER_GOOGLE}
+            style={styles.map}
+            region={{
+              latitude: mapRegion.latitude,
+              longitude: mapRegion.longitude,
+              latitudeDelta: 0.005,
+              longitudeDelta: 0.005,
+            }}
+            onRegionChange={onRegionChange}
+            onRegionChangeComplete={(region) => onRegionChangeComplete({ latitude: region.latitude, longitude: region.longitude })}
+            showsUserLocation={true}
+            showsMyLocationButton={false}
+            pitchEnabled={false}
+            toolbarEnabled={false}
+            mapType="none"
+          >
+            <UrlTile
+              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maximumZ={19}
+              flipY={false}
+            />
+          </MapView>
+          
+          {/* Animated Center Pin (Red) */}
           <View style={styles.mapCenterMarker} pointerEvents="none">
             <Animated.View style={[styles.pinWrapper, animatedPinStyle]}>
               <View style={styles.pinBubble}>
-                <MapPin size={24} color="#FFFFFF" fill="#10B981" />
+                <MapPin size={28} color="#FFFFFF" fill="#EF4444" />
               </View>
-              <View style={styles.pinTail} />
             </Animated.View>
-            <View style={styles.centerPinDot} />
           </View>
           
-          {/* Top Actions: Back & Search */}
-          <View style={styles.topActionsContainer}>
-            <TouchableOpacity 
-              style={styles.actionCircleBtn}
-              onPress={() => {
-                ReactNativeHapticFeedback.trigger('impactLight');
-                navigation.goBack();
-              }}
-            >
-              <ArrowLeft size={24} color="#1A1A2E" />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.searchBarContainer}
-              onPress={() => {
-                ReactNativeHapticFeedback.trigger('impactLight');
-                setIsSearchVisible(true);
-              }}
-            >
-              <Search size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
-              <Text style={styles.searchBarText}>Search area or street name...</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Floating Locate Me */}
+          {/* Floating LOCATE ME */}
           <TouchableOpacity 
-            style={styles.floatingLocateBtn}
+            style={[styles.floatingLocateBtn, { bottom: showDetails ? 380 : 180 }]}
             onPress={() => {
-              ReactNativeHapticFeedback.trigger('impactLight');
+              ReactNativeHapticFeedback.trigger('impactMedium');
               fetchLocation();
             }}
+            activeOpacity={0.8}
           >
-            {loadingLocation ? <ActivityIndicator size="small" color="#10B981" /> : <Navigation size={24} color="#10B981" />}
-          </TouchableOpacity>
-
-          {/* Premium Bottom Sheet */}
-          <View style={styles.premiumBottomCard}>
-            <View style={styles.dragHandle} />
-            
-            <View style={styles.locationHeaderRow}>
-              <MapPin size={24} color="#FF6B35" style={{ marginRight: 12 }} />
-              <View style={styles.locationHeaderTextContainer}>
-                <Text style={styles.locationHeaderTitle}>Select delivery location</Text>
-                <Text style={styles.locationHeaderSubtitle} numberOfLines={1}>
-                  {newAddress || "Locating..."}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.formSectionLabel}>Save Address As</Text>
-            <View style={styles.labelPickerRow}>
-                {['Home', 'Work', 'Other'].map(l => (
-                    <TouchableOpacity 
-                        key={l}
-                        onPress={() => {
-                          ReactNativeHapticFeedback.trigger('selection');
-                          setNewLabel(l);
-                        }}
-                        style={[styles.labelChip, newLabel === l ? styles.labelChipActive : styles.labelChipInactive]}
-                    >
-                        <Text style={[styles.labelChipText, newLabel === l ? styles.labelChipTextActive : styles.labelChipTextInactive]}>{l}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            <View style={styles.inputWrapper}>
-              <TextInput 
-                  placeholder="Flat / House No. / Building / Area"
-                  placeholderTextColor="#9CA3AF"
-                  value={newAddress}
-                  onChangeText={setNewAddress}
-                  style={styles.premiumInput}
-                  multiline
-                  numberOfLines={2}
-              />
-            </View>
-
-            <TouchableOpacity 
-                style={[styles.premiumSaveBtn, (!newAddress || isDragging) ? styles.premiumSaveBtnDisabled : styles.premiumSaveBtnEnabled]}
-                disabled={!newAddress || isDragging || addMutation.isPending || isChecking}
-                onPress={async () => {
-                  ReactNativeHapticFeedback.trigger('impactHeavy');
-                  if (newAddress.trim().length < 5) {
-                    Alert.alert('Invalid Address', 'Please provide a more detailed address.');
-                    return;
-                  }
-                  const { zoneId: currentZoneId, networkError } = await checkServiceability(mapRegion.latitude, mapRegion.longitude);
-                  if (currentZoneId) {
-                    addMutation.mutate({
-                        label: newLabel,
-                        addressText: newAddress.trim(),
-                        zoneId: currentZoneId,
-                        lat: mapRegion.latitude,
-                        lng: mapRegion.longitude
-                    });
-                  } else if (networkError) {
-                    Alert.alert('Connection Error', 'Could not verify delivery availability. Please check your connection and try again.');
-                  }
-                }}
-            >
-                {addMutation.isPending || isChecking ? (
-                    <ActivityIndicator color="white" />
-                ) : (
-                    <Text style={styles.premiumSaveBtnText}>
-                        Save Address
-                    </Text>
-                )}
-            </TouchableOpacity>
-            {serviceable === false && (
-                <Text style={styles.errorText}>Oops! We don't serve this location yet.</Text>
+            {loadingLocation ? (
+              <ActivityIndicator size="small" color="#10B981" />
+            ) : (
+              <>
+                <Navigation size={18} color="#10B981" style={{ marginRight: 6 }} />
+                <Text style={styles.locateMeText}>LOCATE ME</Text>
+              </>
             )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Sheet */}
+        <View style={styles.bottomSheet}>
+          <View style={styles.locationHeaderRow}>
+            <Navigation size={22} color="#10B981" fill="#10B981" style={{ marginRight: 16, marginTop: 4 }} />
+            <View style={styles.locationHeaderTextContainer}>
+              <Text style={styles.locationHeaderTitle} numberOfLines={1}>
+                {newAddress.split(',')[0] || "Locating..."}
+              </Text>
+              <Text style={styles.locationHeaderSubtitle} numberOfLines={2}>
+                {newAddress}
+              </Text>
+            </View>
           </View>
+
+          {showDetails && (
+            <Animated.View entering={FadeInDown.duration(300)}>
+              <TextInput 
+                  placeholder="House / Flat / Block No."
+                  placeholderTextColor="#9CA3AF"
+                  value={houseNo}
+                  onChangeText={setHouseNo}
+                  style={styles.detailInput}
+                  autoFocus
+              />
+              <View style={styles.labelPickerRow}>
+                  {['Home', 'Work', 'Other'].map(l => (
+                      <TouchableOpacity 
+                          key={l}
+                          onPress={() => {
+                            ReactNativeHapticFeedback.trigger('selection');
+                            setNewLabel(l);
+                          }}
+                          style={[styles.labelChip, newLabel === l ? styles.labelChipActive : styles.labelChipInactive]}
+                      >
+                          <Text style={[styles.labelChipText, newLabel === l ? styles.labelChipTextActive : styles.labelChipTextInactive]}>{l}</Text>
+                      </TouchableOpacity>
+                  ))}
+              </View>
+            </Animated.View>
+          )}
+
+          <TouchableOpacity 
+              style={[styles.saveBtn, (!newAddress || isDragging) ? styles.saveBtnDisabled : styles.saveBtnEnabled]}
+              disabled={!newAddress || isDragging || addMutation.isPending || isChecking}
+              onPress={handleSave}
+              activeOpacity={0.9}
+          >
+              {addMutation.isPending || isChecking ? (
+                  <ActivityIndicator color="white" />
+              ) : (
+                  <Text style={styles.saveBtnText}>
+                      {showDetails ? "Save Address" : "Enter complete address"}
+                  </Text>
+              )}
+          </TouchableOpacity>
         </View>
 
         <AddressSearchModal 
@@ -281,197 +287,151 @@ const AddressBookScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F3F4F6',
   },
-  loadingContainer: {
-    flex: 1,
+  header: {
     backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    zIndex: 10,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 16,
   },
-  mapFullscreenContainer: {
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A1A2E',
+  },
+  searchBarContainer: {
+    height: 48,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchBarText: {
+    color: '#9CA3AF',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  mapContainer: {
     flex: 1,
   },
   map: {
     flex: 1,
   },
-  
-  // --- Floating UI Elements ---
-  topActionsContainer: {
-    position: 'absolute',
-    top: 64,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  actionCircleBtn: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-    marginRight: 12,
-  },
-  searchBarContainer: {
-    flex: 1,
-    height: 48,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  searchBarText: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  floatingLocateBtn: {
-    position: 'absolute',
-    bottom: 340, // Just above the bottom card
-    right: 16,
-    width: 48,
-    height: 48,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-    zIndex: 10,
-  },
-
-  // --- Map Pin Animations ---
   mapCenterMarker: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginTop: -160, 
-    marginLeft: -20,
+    marginTop: -40, 
+    marginLeft: -14,
     zIndex: 2,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    width: 40,
-    height: 80,
   },
   pinWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   pinBubble: {
-    backgroundColor: '#10B981',
-    borderRadius: 20,
-    padding: 6,
-    shadowColor: '#10B981',
+    shadowColor: '#EF4444',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
   },
-  pinTail: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#10B981',
-    marginTop: -1,
-  },
-  centerPinDot: {
-    width: 8,
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 4,
+  floatingLocateBtn: {
     position: 'absolute',
-    bottom: 0,
-    transform: [{ scaleY: 0.5 }],
-  },
-
-  // --- Premium Bottom Sheet ---
-  premiumBottomCard: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    alignSelf: 'center',
+    flexDirection: 'row',
     backgroundColor: '#fff',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  locateMeText: {
+    color: '#10B981',
+    fontWeight: '700',
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  bottomSheet: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 32,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 24,
     elevation: 15,
   },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
   locationHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 24,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   locationHeaderTextContainer: {
     flex: 1,
   },
   locationHeaderTitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 18,
+    color: '#1A1A2E',
+    fontWeight: '800',
     marginBottom: 4,
   },
   locationHeaderSubtitle: {
-    fontSize: 16,
-    color: '#1A1A2E',
-    fontWeight: '800',
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    lineHeight: 18,
   },
-  formSectionLabel: {
+  detailInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 15,
+    fontWeight: '500',
     color: '#1A1A2E',
-    fontWeight: '900',
     marginBottom: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    fontSize: 11,
   },
   labelPickerRow: {
     flexDirection: 'row',
     marginBottom: 24,
   },
   labelChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 100,
     marginRight: 10,
   },
@@ -479,15 +439,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   labelChipInactive: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   labelChipText: {
-    fontWeight: '800',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    fontSize: 13,
   },
   labelChipTextActive: {
     color: '#fff',
@@ -495,52 +453,22 @@ const styles = StyleSheet.create({
   labelChipTextInactive: {
     color: '#6B7280',
   },
-  inputWrapper: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: 24,
-  },
-  premiumInput: {
-    padding: 16,
-    fontWeight: '600',
-    color: '#1A1A2E',
-    fontSize: 14,
-    textAlignVertical: 'top',
-  },
-  premiumSaveBtn: {
-    height: 56,
-    borderRadius: 100,
+  saveBtn: {
+    height: 54,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
   },
-  premiumSaveBtnEnabled: {
+  saveBtnEnabled: {
     backgroundColor: '#10B981',
   },
-  premiumSaveBtnDisabled: {
-    backgroundColor: '#E5E7EB',
-    shadowOpacity: 0,
-    elevation: 0,
+  saveBtnDisabled: {
+    backgroundColor: '#D1D5DB',
   },
-  premiumSaveBtnText: {
+  saveBtnText: {
     color: '#fff',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontSize: 14,
-  },
-  errorText: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 16,
-    textAlign: 'center',
+    fontWeight: '800',
+    fontSize: 15,
   },
 });
 

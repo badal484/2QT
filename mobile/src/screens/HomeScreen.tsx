@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, SectionList, Dimensions, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
-import { addItem, setQuantity, setZone } from '../store/slices/cartSlice';
+import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Menu } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
@@ -37,20 +37,30 @@ const HomeScreen = ({ navigation }: any) => {
   const sectionListRef = React.useRef<SectionList>(null);
   const [showMenuPopup, setShowMenuPopup] = useState(false);
   const [isVegOnly, setIsVegOnly] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Zone resolution:
-  //   • If user picked a delivery address → use its validated zone (trust AddressScreen)
-  //   • Otherwise → use the GPS-verified zone from AppBootManager / foreground recheck
-  // NOTE: user?.zoneId is intentionally excluded — it's a stale login-time value and
-  //       would cause menus to appear even when the user is outside the delivery area.
-  const effectiveZoneId = addressId ? zoneId : activeZoneId;
+  // If address has a zone use it; if address exists but has no zone, fall back to GPS zone
+  const effectiveZoneId = zoneId || activeZoneId;
 
-  // Serviceability derived flags (only meaningful when no saved address is selected)
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['menu', effectiveZoneId] }),
+      queryClient.invalidateQueries({ queryKey: ['banners'] }),
+      queryClient.invalidateQueries({ queryKey: ['zones'] }),
+      queryClient.invalidateQueries({ queryKey: ['addresses'] })
+    ]);
+    setRefreshing(false);
+  }, [queryClient, effectiveZoneId]);
+
+  // Serviceability derived flags — trigger even with an address if effectiveZoneId is still null
+  // Also treat 'serviceable' with no zone as checking — happens when persist is stale/corrupt
   const isServiceabilityChecking =
-    !addressId && (serviceabilityStatus === 'idle' || serviceabilityStatus === 'checking');
-  const unserviceableLocation = !addressId && serviceabilityStatus === 'unserviceable';
-  const showNoLocation = !addressId && serviceabilityStatus === 'no_location';
-  const showNetworkError = !addressId && serviceabilityStatus === 'network_error';
+    !effectiveZoneId && (serviceabilityStatus === 'idle' || serviceabilityStatus === 'checking' || serviceabilityStatus === 'serviceable');
+  const unserviceableLocation = !effectiveZoneId && serviceabilityStatus === 'unserviceable';
+  const showNoLocation = !effectiveZoneId && serviceabilityStatus === 'no_location';
+  const showNetworkError = !effectiveZoneId && serviceabilityStatus === 'network_error';
   const insets = useSafeAreaInsets();
   const [requestStep, setRequestStep] = useState<'info' | 'form' | 'done'>('info');
   const [reqForm, setReqForm] = useState({ area_name: '', pincode: '' });
@@ -79,9 +89,15 @@ const HomeScreen = ({ navigation }: any) => {
           queryClient.invalidateQueries({ queryKey: ['menu', effectiveZoneId] });
         }
       });
+      socket.on('order_status_update', () => {
+        queryClient.invalidateQueries({ queryKey: ['activeOrders'] });
+      });
     }
     return () => {
-      if (socket) socket.off('menu_updated');
+      if (socket) {
+        socket.off('menu_updated');
+        socket.off('order_status_update');
+      }
     };
   }, [socket, effectiveZoneId]);
 
@@ -93,6 +109,14 @@ const HomeScreen = ({ navigation }: any) => {
     gcTime: 10 * 60 * 1000,
   });
 
+  const { data: activeOrdersData } = useQuery({
+    queryKey: ['activeOrders'],
+    queryFn: () => api.get('/orders/active'),
+    refetchInterval: 15000,
+  });
+  const activeOrders = activeOrdersData?.activeOrders?.filter((o: any) => !['cancelled_by_restaurant', 'refunded', 'pending_payment', 'payment_failed'].includes(o.status)) || [];
+  const primaryActiveOrder = activeOrders[0];
+
   const { data: bannersData } = useQuery({
     queryKey: ['banners'],
     queryFn: () => api.get('/banners'),
@@ -100,6 +124,58 @@ const HomeScreen = ({ navigation }: any) => {
     gcTime: 30 * 60 * 1000,
   });
   const banners = bannersData?.banners || [];
+
+  const infiniteBanners = useMemo(() => {
+    if (!banners || banners.length === 0) return [];
+    if (banners.length === 1) return banners;
+    const repeated = [];
+    for (let i = 0; i < 500; i++) {
+      for (let j = 0; j < banners.length; j++) {
+        repeated.push({ ...banners[j], uniqueId: `${banners[j].id}-${i}` });
+      }
+    }
+    return repeated;
+  }, [banners]);
+
+  const bannerListRef = useRef<FlatList>(null);
+  const bannerIndexRef = useRef(banners.length > 1 ? banners.length * 250 : 0);
+  const hasInitializedBanner = useRef(false);
+
+  useEffect(() => {
+    if (infiniteBanners.length <= 1) return;
+    
+    // Jump to the middle instantly on mount
+    if (!hasInitializedBanner.current) {
+      setTimeout(() => {
+        try {
+          bannerListRef.current?.scrollToIndex({ index: bannerIndexRef.current, animated: false });
+          hasInitializedBanner.current = true;
+        } catch (e) {}
+      }, 100);
+    }
+
+    const interval = setInterval(() => {
+      if (!bannerListRef.current || infiniteBanners.length === 0) return;
+      
+      // If we somehow go out of bounds, silently reset to the middle
+      if (bannerIndexRef.current >= infiniteBanners.length - 1) {
+        bannerIndexRef.current = Math.floor(infiniteBanners.length / 2);
+        try { bannerListRef.current.scrollToIndex({ index: bannerIndexRef.current, animated: false }); } catch(e) {}
+        return;
+      }
+
+      bannerIndexRef.current += 1;
+      try {
+        bannerListRef.current.scrollToIndex({
+          index: bannerIndexRef.current,
+          animated: true,
+        });
+      } catch (e) {
+        // Suppress out of range errors
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [infiniteBanners.length]);
 
   const { data: zonesData } = useQuery({
     queryKey: ['zones'],
@@ -109,7 +185,7 @@ const HomeScreen = ({ navigation }: any) => {
   });
   const liveZones: any[] = zonesData?.zones || [];
 
-  const { data: addresses } = useQuery({
+  const { data: addresses, isSuccess: addressesLoaded } = useQuery({
     queryKey: ['addresses'],
     queryFn: () => api.get('/customers/addresses'),
     enabled: !!user,
@@ -120,6 +196,15 @@ const HomeScreen = ({ navigation }: any) => {
   const selectedAddress = addresses?.addresses?.find((a: any) => a.id === addressId);
 
   // GPS is the primary zone source on launch — do NOT auto-select saved addresses here.
+  // We only care about ensuring the current addressId is still valid.
+  useEffect(() => {
+    if (addressesLoaded && addressId && addresses?.addresses) {
+      const exists = addresses.addresses.some((a: any) => a.id === addressId);
+      if (!exists) {
+        dispatch(setAddress(null));
+      }
+    }
+  }, [addressesLoaded, addressId, addresses?.addresses, dispatch]);
   // Users explicitly choose an address from AddressScreen if they want to override GPS.
 
   // When the boot check resolves to a zone and no saved address is selected,
@@ -273,7 +358,7 @@ const HomeScreen = ({ navigation }: any) => {
         {/* ROW 1: Address and Profile */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <MapPin size={28} color={colors.primary} weight="fill" style={{ marginRight: 8 }} />
+            <MapPin size={28} color={colors.primary} fill={colors.primary} style={{ marginRight: 8 }} />
             <View style={{ flex: 1 }}>
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center' }}
@@ -297,7 +382,7 @@ const HomeScreen = ({ navigation }: any) => {
             {user?.photo_url ? (
               <NetworkImage uri={user.photo_url} style={styles.profileImage} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
             ) : (
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderLight }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
                 <User size={20} color={colors.ink} />
               </View>
             )}
@@ -319,7 +404,7 @@ const HomeScreen = ({ navigation }: any) => {
             shadowRadius: 8,
             elevation: 2,
             borderWidth: 1,
-            borderColor: colors.borderLight
+            borderColor: colors.border
           }}>
             <Search size={22} color={colors.inkMuted} style={{ marginRight: 12 }} />
             <TextInput
@@ -360,6 +445,14 @@ const HomeScreen = ({ navigation }: any) => {
         windowSize={5}
         maxToRenderPerBatch={5}
         initialNumToRender={6}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.primary} 
+            colors={[colors.primary]} 
+          />
+        }
         ListHeaderComponent={
           <View>
             {menuData?.kitchenPaused && (
@@ -371,17 +464,27 @@ const HomeScreen = ({ navigation }: any) => {
                 </View>
               </Animated.View>
             )}
-            {banners.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
+            {infiniteBanners.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
               <Animated.View entering={FadeInDown.delay(150).duration(400)}>
                 <FlatList
-                  data={banners}
+                  ref={bannerListRef}
+                  data={infiniteBanners}
                   horizontal
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
-                  keyExtractor={(b: any) => b.id}
+                  keyExtractor={(b: any) => b.uniqueId || b.id}
                   snapToInterval={SCREEN_WIDTH - spacing.lg * 2 + spacing.sm}
                   decelerationRate="fast"
                   contentContainerStyle={styles.bannersList}
+                  onMomentumScrollEnd={(ev) => {
+                    const newIndex = Math.round(ev.nativeEvent.contentOffset.x / (SCREEN_WIDTH - spacing.lg * 2 + spacing.sm));
+                    bannerIndexRef.current = newIndex;
+                  }}
+                  getItemLayout={(_, index) => ({
+                    length: SCREEN_WIDTH - spacing.lg * 2 + spacing.sm,
+                    offset: (SCREEN_WIDTH - spacing.lg * 2 + spacing.sm) * index,
+                    index,
+                  })}
                   renderItem={({ item: b }: any) => (
                     <TouchableOpacity
                       activeOpacity={0.9}
@@ -558,14 +661,19 @@ const HomeScreen = ({ navigation }: any) => {
                 <>
                   {/* Fanned food cards */}
                   <View style={styles.foodCarousel}>
-                    <View style={[styles.foodCardDeco, styles.foodCardLeft]}><ChefHat size={32} color={colors.inkFaint} /></View>
-                    <View style={[styles.foodCardDeco, styles.foodCardCenter]}><ChefHat size={44} color={colors.primary} /></View>
-                    <View style={[styles.foodCardDeco, styles.foodCardRight]}><ChefHat size={32} color={colors.inkFaint} /></View>
+                    <View style={[styles.foodCardDeco, styles.foodCardLeft]}>
+                      <Image source={{ uri: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=300&q=80' }} style={styles.foodCardImage} />
+                    </View>
+                    <View style={[styles.foodCardDeco, styles.foodCardCenter]}>
+                      <Image source={{ uri: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=300&q=80' }} style={styles.foodCardImage} />
+                    </View>
+                    <View style={[styles.foodCardDeco, styles.foodCardRight]}>
+                      <Image source={{ uri: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=300&q=80' }} style={styles.foodCardImage} />
+                    </View>
                   </View>
 
                   {/* Heading */}
-                  <Text style={styles.comingSoonLabel}>COMING SOON</Text>
-                  <Text style={styles.comingSoonHeading}>To Your{'\n'}Doorstep</Text>
+                  <Text style={styles.comingSoonHeading}>COMING SOON TO{"\n"}YOUR DOORSTEP</Text>
                   <Text style={styles.comingSoonSub}>
                     {location?.addressText
                       ? `We're not serving ${location.addressText} yet — but we're growing fast!`
@@ -588,15 +696,20 @@ const HomeScreen = ({ navigation }: any) => {
                   )}
 
                   {/* CTAs */}
-                  <TouchableOpacity style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}>
+                  <TouchableOpacity style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }} activeOpacity={0.9}>
                     <Text style={styles.ctaPrimaryText}>Change Address</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.ctaOutline} onPress={() => { triggerHaptic(); setRequestStep('form'); }}>
+                  <TouchableOpacity style={styles.ctaOutline} onPress={() => { triggerHaptic(); setRequestStep('form'); }} activeOpacity={0.8}>
                     <Text style={styles.ctaOutlineText}>Request Service in My Area</Text>
                   </TouchableOpacity>
                 </>
               )}
             </Animated.View>
+          ) : !effectiveZoneId ? (
+            /* Zone still resolving — show skeleton instead of "Nothing found" */
+            <View style={[styles.skeletonList, styles.itemPadding]}>
+              <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
+            </View>
           ) : (
             <EmptyState
               icon={<PackageOpen size={32} color={colors.primary} />}
@@ -613,7 +726,6 @@ const HomeScreen = ({ navigation }: any) => {
           exiting={FadeInDown.duration(200).delay(0)}
           style={[
             styles.floatingCartContainer,
-            // insets.bottom covers gesture-nav area; fallback 16 keeps bar above any nav overlay
             { bottom: Math.max(insets.bottom, 16) + 8 },
           ]}
         >
@@ -632,6 +744,46 @@ const HomeScreen = ({ navigation }: any) => {
             <View style={styles.viewCartAction}>
               <Text style={styles.viewCartText}>View Cart</Text>
               <ShoppingBag size={16} color={colors.white} style={{ marginLeft: 6 }} />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {primaryActiveOrder && (
+        <Animated.View entering={FadeInDown.duration(400).springify()} style={[
+          styles.activeOrderPillContainer,
+          { bottom: totalCartQty > 0 ? Math.max(insets.bottom, 16) + 84 : Math.max(insets.bottom, 16) + 8 }
+        ]}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              triggerHaptic();
+              navigation.navigate('OrderConfirmed', { orderId: primaryActiveOrder.id });
+            }}
+            style={styles.activeOrderPill}
+          >
+            <View style={styles.activeOrderIconContainer}>
+              <View style={styles.activeOrderDotBase}>
+                <Animated.View style={[styles.activeOrderDotPulse, liveDotStyle]} />
+              </View>
+              {primaryActiveOrder.status === 'out_for_delivery' ? (
+                <MapPin size={20} color={colors.primary} style={{ marginLeft: 6 }} />
+              ) : (
+                <ChefHat size={20} color={colors.primary} style={{ marginLeft: 6 }} />
+              )}
+            </View>
+            <View style={styles.activeOrderTextContainer}>
+              <Text style={styles.activeOrderTitle}>
+                {primaryActiveOrder.status === 'placed' ? 'Order Placed' :
+                 primaryActiveOrder.status === 'accepted' ? 'Preparing your food' :
+                 primaryActiveOrder.status === 'preparing' ? 'Preparing your food' :
+                 primaryActiveOrder.status === 'ready' ? 'Food is ready' :
+                 primaryActiveOrder.status === 'out_for_delivery' ? 'On the way!' : 'Active Order'}
+              </Text>
+              <Text style={styles.activeOrderSubtitle}>Tap to track live status</Text>
+            </View>
+            <View style={styles.activeOrderArrow}>
+              <Text style={styles.activeOrderArrowText}>→</Text>
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -1104,22 +1256,15 @@ const styles = StyleSheet.create({
   },
 
   // Heading text
-  comingSoonLabel: {
-    fontSize: 11,
-    fontFamily: fontFamily.extrabold,
-    color: colors.inkFaint,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    marginBottom: spacing.sm,
-  },
   comingSoonHeading: {
-    fontSize: 36,
+    fontSize: 26,
     fontFamily: fontFamily.black,
     color: colors.ink,
     textAlign: 'center',
-    letterSpacing: -1,
-    lineHeight: 42,
+    letterSpacing: -0.5,
+    lineHeight: 32,
     marginBottom: spacing.lg,
+    textTransform: 'uppercase',
   },
   comingSoonSub: {
     fontSize: 15,
@@ -1270,7 +1415,77 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.medium,
     color: colors.inkFaint,
   },
-
+  activeOrderPillContainer: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+  },
+  activeOrderPill: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    paddingHorizontal: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: '#D1FAE5',
+  },
+  activeOrderIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    backgroundColor: '#ECFDF5',
+    padding: 10,
+    borderRadius: 20,
+  },
+  activeOrderDotBase: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  activeOrderDotPulse: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    top: -8,
+    left: -8,
+  },
+  activeOrderTextContainer: {
+    flex: 1,
+  },
+  activeOrderTitle: {
+    color: colors.ink,
+    fontFamily: fontFamily.black,
+    fontSize: 16,
+  },
+  activeOrderSubtitle: {
+    color: colors.primary,
+    fontFamily: fontFamily.bold,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  activeOrderArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeOrderArrowText: {
+    color: colors.ink,
+    fontFamily: fontFamily.black,
+    fontSize: 16,
+  }
 });
 export default HomeScreen;
 // v2
