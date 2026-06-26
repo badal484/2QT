@@ -132,6 +132,7 @@ export function MarketingTab() {
               <select value={newBanner.banner_type} onChange={e=>setNewBanner({...newBanner, banner_type: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary">
                 <option value="MAIN" className="text-black">Main Banner (Large)</option>
                 <option value="MINI" className="text-black">Mini Banner (Quick Filter)</option>
+                <option value="STRIP" className="text-black">Strip Banner (Wide & Short)</option>
               </select>
             </div>
             <div>
@@ -167,7 +168,7 @@ export function MarketingTab() {
                <p className="text-sm text-zinc-400 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
                <div className="flex items-center justify-between border-t border-white/10 pt-4">
                  <div className="text-xs font-bold uppercase text-zinc-500">
-                   {banner.banner_type === 'MINI' ? 'Type: MINI' : 'Type: MAIN'} | Order: {banner.display_order}
+                   {banner.banner_type === 'MINI' ? 'Type: MINI' : banner.banner_type === 'STRIP' ? 'Type: STRIP' : 'Type: MAIN'} | Order: {banner.display_order}
                  </div>
                  <div className="text-xs font-bold bg-white/5 px-2 py-1 rounded text-zinc-400">
                    {banner.action_type} {banner.action_payload && `(${banner.action_payload})`}
