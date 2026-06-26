@@ -20,6 +20,7 @@ const MIGRATIONS = [
   '053_partner_kitchen_setup.sql',
   '054_notifications.sql',
   '064_menu_item_badges.sql',
+  '065_force_delete_fk_fix.sql',
 ];
 
 async function run() {
