@@ -19,7 +19,8 @@ export function MarketingTab() {
     action_type: "NONE",
     action_payload: "",
     display_order: 0,
-    is_active: true
+    is_active: true,
+    banner_type: "MAIN"
   });
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
 
@@ -46,7 +47,7 @@ export function MarketingTab() {
       setIsCreating(false);
       setNewBanner({
         title: "", subtitle: "", tag_text: "", image_url: "",
-        action_type: "NONE", action_payload: "", display_order: 0, is_active: true
+        action_type: "NONE", action_payload: "", display_order: 0, is_active: true, banner_type: "MAIN"
       });
       fetchBanners();
     } catch (e: any) {
@@ -127,6 +128,13 @@ export function MarketingTab() {
               </select>
             </div>
             <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Banner Type</label>
+              <select value={newBanner.banner_type} onChange={e=>setNewBanner({...newBanner, banner_type: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary">
+                <option value="MAIN" className="text-black">Main Banner (Large)</option>
+                <option value="MINI" className="text-black">Mini Banner (Quick Filter)</option>
+              </select>
+            </div>
+            <div>
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Action Payload</label>
               <input value={newBanner.action_payload} onChange={e=>setNewBanner({...newBanner, action_payload: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="e.g. FIRST50 or Pizza" />
             </div>
@@ -158,7 +166,9 @@ export function MarketingTab() {
                <h3 className="font-bold text-lg leading-tight text-white mb-1">{banner.title}</h3>
                <p className="text-sm text-zinc-400 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
                <div className="flex items-center justify-between border-t border-white/10 pt-4">
-                 <div className="text-xs font-bold uppercase text-zinc-500">Order: {banner.display_order}</div>
+                 <div className="text-xs font-bold uppercase text-zinc-500">
+                   {banner.banner_type === 'MINI' ? 'Type: MINI' : 'Type: MAIN'} | Order: {banner.display_order}
+                 </div>
                  <div className="text-xs font-bold bg-white/5 px-2 py-1 rounded text-zinc-400">
                    {banner.action_type} {banner.action_payload && `(${banner.action_payload})`}
                  </div>

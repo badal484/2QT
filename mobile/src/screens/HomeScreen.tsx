@@ -8,7 +8,7 @@ import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, interpolate, Extrapolate, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
 import { EmptyState, SkeletonRow } from '../components/ui';
 import { colors } from '../theme/colors';
@@ -99,6 +99,25 @@ const HomeScreen = ({ navigation }: any) => {
     };
   }, [socket, effectiveZoneId]);
 
+  const AnimatedSectionList = Animated.createAnimatedComponent(SectionList);
+
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const ADDRESS_HEIGHT = 56;
+  const topRowStyle = useAnimatedStyle(() => {
+    return {
+      height: interpolate(scrollY.value, [0, ADDRESS_HEIGHT], [ADDRESS_HEIGHT, 0], 'clamp'),
+      opacity: interpolate(scrollY.value, [0, ADDRESS_HEIGHT / 2], [1, 0], 'clamp'),
+      marginBottom: interpolate(scrollY.value, [0, ADDRESS_HEIGHT], [16, 0], 'clamp'),
+      overflow: 'hidden',
+    };
+  });
+
   const { data: menuData, isLoading } = useQuery({
     queryKey: ['menu', effectiveZoneId],
     queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}`),
@@ -122,6 +141,8 @@ const HomeScreen = ({ navigation }: any) => {
     gcTime: 30 * 60 * 1000,
   });
   const banners = bannersData?.banners || [];
+  const mainBanners = banners.filter((b: any) => !b.banner_type || b.banner_type === 'MAIN');
+  const miniBanners = banners.filter((b: any) => b.banner_type === 'MINI');
 
   // ── Admin-configured image categories (zone-specific) ──────────────────
   const { data: menuCategoriesData } = useQuery({
@@ -133,18 +154,22 @@ const HomeScreen = ({ navigation }: any) => {
   });
   const adminCategories: { id: string; name: string; slug: string; image_url: string }[] =
     menuCategoriesData?.categories ?? [];
+  // Set of slugs that admin has configured — used to HIDE unregistered categories
+  const adminCategorySlugSet = new Set(
+    adminCategories.map((c) => c.slug.toLowerCase().trim())
+  );
 
   const infiniteBanners = useMemo(() => {
-    if (!banners || banners.length === 0) return [];
-    if (banners.length === 1) return banners;
+    if (!mainBanners || mainBanners.length === 0) return [];
+    if (mainBanners.length === 1) return mainBanners;
     const repeated = [];
     for (let i = 0; i < 500; i++) {
-      for (let j = 0; j < banners.length; j++) {
-        repeated.push({ ...banners[j], uniqueId: `${banners[j].id}-${i}` });
+      for (let j = 0; j < mainBanners.length; j++) {
+        repeated.push({ ...mainBanners[j], uniqueId: `${mainBanners[j].id}-${i}` });
       }
     }
     return repeated;
-  }, [banners]);
+  }, [mainBanners]);
 
   const bannerListRef = useRef<FlatList>(null);
   const bannerIndexRef = useRef(banners.length > 1 ? banners.length * 250 : 0);
@@ -370,25 +395,25 @@ const HomeScreen = ({ navigation }: any) => {
         { 
           paddingTop: Math.max(insets.top + 10, 20), 
           paddingBottom: 16,
-          backgroundColor: colors.background, // Blend with the rest of the page
-          borderBottomWidth: 0, // No ugly line
+          backgroundColor: '#24B059', // Swish Vibrant Green
+          borderBottomWidth: 0, 
         }
       ]}>
-        {/* ROW 1: Address and Profile */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        {/* ROW 1: Address and Profile (Collapsible) */}
+        <Animated.View style={[topRowStyle, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
           <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <MapPin size={28} color={colors.primary} fill={colors.primary} style={{ marginRight: 8 }} />
+            <MapPin size={28} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 8 }} />
             <View style={{ flex: 1 }}>
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center' }}
                 onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
               >
-                <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink }}>
+                <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: '#FFFFFF' }}>
                   {user?.name ? `Hey ${user.name.split(' ')[0]} 👋` : 'Home'}
                 </Text>
-                <ChevronDown size={16} color={colors.ink} style={{ marginLeft: 4 }} />
+                <ChevronDown size={16} color="#FFFFFF" style={{ marginLeft: 4 }} />
               </TouchableOpacity>
-              <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 }} numberOfLines={1}>
+              <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: 'rgba(255,255,255,0.9)', marginTop: 2 }} numberOfLines={1}>
                 {location?.addressText || selectedAddress?.address_text || 'Set location'}
               </Text>
             </View>
@@ -399,14 +424,14 @@ const HomeScreen = ({ navigation }: any) => {
             onPress={() => { triggerHaptic(); navigation.navigate('ProfileTab'); }}
           >
             {user?.photo_url ? (
-              <NetworkImage uri={user.photo_url} style={styles.profileImage} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
+              <NetworkImage uri={user.photo_url} style={[styles.profileImage, { borderWidth: 2, borderColor: '#FFFFFF' }]} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
             ) : (
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
-                <User size={20} color={colors.ink} />
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' }}>
+                <User size={20} color="#FFFFFF" />
               </View>
             )}
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
         {/* ROW 2: Search Bar with VEG toggle */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
@@ -459,25 +484,23 @@ const HomeScreen = ({ navigation }: any) => {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryStripScroll}>
             {/* Admin categories */}
             {adminCategories.map((cat) => {
-              const isActive = selectedCategory.toLowerCase().trim() === cat.slug.toLowerCase().trim();
               return (
                 <TouchableOpacity
                   key={cat.id}
                   style={styles.categoryStripItem}
-                  onPress={() => { triggerHaptic(); setSelectedCategory(isActive ? 'All' : cat.slug); }}
+                  onPress={() => { triggerHaptic(); navigation.navigate('Category', { categorySlug: cat.slug, categoryName: cat.name, categoryImage: cat.image_url }); }}
                   activeOpacity={0.8}
                 >
-                  <View style={[styles.categoryStripCircle, isActive && styles.categoryStripCircleActive]}>
+                  <View style={styles.categoryStripCircle}>
                     {cat.image_url ? (
                       <NetworkImage uri={cat.image_url} style={styles.categoryStripImage} />
                     ) : (
                       <Text style={{ fontSize: 18 }}>🍴</Text>
                     )}
                   </View>
-                  <Text style={[styles.categoryStripLabel, isActive && styles.categoryStripLabelActive]} numberOfLines={1}>
+                  <Text style={styles.categoryStripLabel} numberOfLines={1}>
                     {cat.name}
                   </Text>
-                  {isActive && <View style={styles.categoryStripUnderline} />}
                 </TouchableOpacity>
               );
             })}
@@ -485,8 +508,35 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
-      <SectionList
+      {/* ── Mini Banners (Quick Filters) ── */}
+      {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && miniBanners.length > 0 && (
+        <View style={styles.miniBannersContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.miniBannersScroll}>
+            {miniBanners.map((banner: any) => (
+              <TouchableOpacity
+                key={banner.id}
+                activeOpacity={0.8}
+                onPress={() => {
+                  triggerHaptic();
+                  if (banner.action_type === 'FILTER_CATEGORY') setSelectedCategory(banner.action_payload);
+                }}
+                style={styles.miniBannerCard}
+              >
+                <NetworkImage uri={banner.image_url} style={styles.miniBannerImage} />
+                <View style={styles.miniBannerOverlay}>
+                  <Text style={styles.miniBannerTitle}>{banner.title}</Text>
+                  {banner.subtitle && <Text style={styles.miniBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <AnimatedSectionList
         style={{ flex: 1 }}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         ref={sectionListRef}
         sections={
           isServiceabilityChecking || unserviceableLocation || showNoLocation || showNetworkError
@@ -554,18 +604,10 @@ const HomeScreen = ({ navigation }: any) => {
                           triggerHaptic();
                           if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
                         }}
-                        style={styles.bannerContainer}
+                        style={[styles.bannerContainer, { height: 180 }]}
                       >
-                        <NetworkImage uri={b.image_url} style={styles.bannerImage} />
-                        <View style={styles.bannerOverlay}>
-                          {b.tag_text && (
-                            <View style={styles.bannerTag}>
-                              <Text style={styles.bannerTagText}>{b.tag_text}</Text>
-                            </View>
-                          )}
-                          <Text style={styles.bannerTitle}>{b.title}</Text>
-                          {b.subtitle && <Text style={styles.bannerSubtitle} numberOfLines={1}>{b.subtitle}</Text>}
-                        </View>
+                        <NetworkImage uri={b.image_url} style={[styles.bannerImage, { borderRadius: 16 }]} />
+                        {/* Removed dark overlay and text to allow pure image banners (Swish-style) */}
                       </TouchableOpacity>
                     </View>
                   )}
@@ -1133,6 +1175,38 @@ const styles = StyleSheet.create({
   imageCategoryLabelActive: {
     color: colors.primary,
     fontFamily: fontFamily.extrabold,
+  },
+
+  // ── Mini Banners (Quick Filters) ──────────────────────────────────────────
+  miniBannersContainer: { marginTop: spacing.md, marginBottom: spacing.sm },
+  miniBannersScroll: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  miniBannerCard: {
+    width: 130,
+    height: 80,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceMuted,
+  },
+  miniBannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  miniBannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    padding: spacing.sm + 2,
+    justifyContent: 'flex-start',
+    // Slight shadow to make text legible if needed, or rely on admin design
+  },
+  miniBannerTitle: {
+    fontSize: 12,
+    fontFamily: fontFamily.extrabold,
+    color: colors.ink, // Admin should upload light background images
+  },
+  miniBannerSubtitle: {
+    fontSize: 10,
+    fontFamily: fontFamily.bold,
+    color: colors.inkMuted,
+    marginTop: 2,
   },
 
   itemsContainer: { paddingHorizontal: spacing.lg, marginTop: spacing.xl, paddingBottom: spacing.xxxl },
