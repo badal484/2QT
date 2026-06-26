@@ -670,12 +670,23 @@ res.json({ url: (response as any).url });
 router.delete('/menu/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
         const { id } = req.params;
-        await query('DELETE FROM menu_items WHERE id = $1', [id]);
+        let softDeleted = false;
+        try {
+            await query('DELETE FROM menu_items WHERE id = $1', [id]);
+        } catch (delErr: any) {
+            // FK violation (23503) — item has order history, soft-delete instead
+            if (delErr.code === '23503') {
+                await query('UPDATE menu_items SET available = false WHERE id = $1', [id]);
+                softDeleted = true;
+            } else {
+                throw delErr;
+            }
+        }
         const { rows: zones } = await query('SELECT id FROM zones');
         for (const zone of zones) {
             await redis.del(keys.menu(zone.id));
         }
-        res.json({ success: true });
+        res.json({ success: true, softDeleted });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to delete menu item', details: err.message });
     }
