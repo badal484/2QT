@@ -6,7 +6,7 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
-import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Menu } from 'lucide-react-native';
+import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Menu, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
@@ -750,12 +750,12 @@ const HomeScreen = ({ navigation }: any) => {
       )}
 
       {primaryActiveOrder && (
-        <Animated.View entering={FadeInDown.duration(400).springify()} style={[
+        <Animated.View entering={FadeInDown.duration(400).springify().damping(15)} style={[
           styles.activeOrderPillContainer,
-          { bottom: totalCartQty > 0 ? Math.max(insets.bottom, 16) + 84 : Math.max(insets.bottom, 16) + 8 }
+          { bottom: totalCartQty > 0 ? Math.max(insets.bottom, 16) + 84 : Math.max(insets.bottom, 16) + 16 }
         ]}>
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.8}
             onPress={() => {
               triggerHaptic();
               navigation.navigate('OrderConfirmed', { orderId: primaryActiveOrder.id });
@@ -767,23 +767,23 @@ const HomeScreen = ({ navigation }: any) => {
                 <Animated.View style={[styles.activeOrderDotPulse, liveDotStyle]} />
               </View>
               {primaryActiveOrder.status === 'out_for_delivery' ? (
-                <MapPin size={20} color={colors.primary} style={{ marginLeft: 6 }} />
+                <Bike size={16} color="#34D399" style={{ marginLeft: 6 }} />
               ) : (
-                <ChefHat size={20} color={colors.primary} style={{ marginLeft: 6 }} />
+                <ChefHat size={16} color="#FBBF24" style={{ marginLeft: 6 }} />
               )}
             </View>
             <View style={styles.activeOrderTextContainer}>
               <Text style={styles.activeOrderTitle}>
                 {primaryActiveOrder.status === 'placed' ? 'Order Placed' :
-                 primaryActiveOrder.status === 'accepted' ? 'Preparing your food' :
-                 primaryActiveOrder.status === 'preparing' ? 'Preparing your food' :
-                 primaryActiveOrder.status === 'ready' ? 'Food is ready' :
-                 primaryActiveOrder.status === 'out_for_delivery' ? 'On the way!' : 'Active Order'}
+                 primaryActiveOrder.status === 'accepted' ? 'Preparing food' :
+                 primaryActiveOrder.status === 'preparing' ? 'Preparing food' :
+                 primaryActiveOrder.status === 'ready' ? 'Ready for pickup' :
+                 primaryActiveOrder.status === 'out_for_delivery' ? 'Arriving soon' : 'Active Order'}
               </Text>
-              <Text style={styles.activeOrderSubtitle}>Tap to track live status</Text>
+              <Text style={styles.activeOrderSubtitle}>View live tracking</Text>
             </View>
             <View style={styles.activeOrderArrow}>
-              <Text style={styles.activeOrderArrowText}>→</Text>
+              <ArrowRight size={16} color="#9CA3AF" />
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -1417,74 +1417,79 @@ const styles = StyleSheet.create({
   },
   activeOrderPillContainer: {
     position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
+    alignSelf: 'center',
+    zIndex: 999,
   },
   activeOrderPill: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 30,
+    backgroundColor: '#1C1C1E', // Sleek dark capsule
+    borderRadius: 100,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
-    borderWidth: 1.5,
-    borderColor: '#D1FAE5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   activeOrderIconContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    backgroundColor: '#ECFDF5',
-    padding: 10,
+    marginRight: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
     borderRadius: 20,
   },
   activeOrderDotBase: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34D399',
   },
   activeOrderDotPulse: {
     position: 'absolute',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    top: -8,
-    left: -8,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#34D399',
+    top: -5,
+    left: -5,
+    opacity: 0.4,
   },
   activeOrderTextContainer: {
-    flex: 1,
+    marginRight: 12,
+    justifyContent: 'center',
   },
   activeOrderTitle: {
-    color: colors.ink,
+    color: '#F9FAFB',
     fontFamily: fontFamily.black,
-    fontSize: 16,
+    fontSize: 13,
+    letterSpacing: -0.2,
   },
   activeOrderSubtitle: {
-    color: colors.primary,
+    color: '#9CA3AF',
     fontFamily: fontFamily.bold,
-    fontSize: 12,
+    fontSize: 10,
     marginTop: 2,
+    letterSpacing: 0.1,
   },
   activeOrderArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   activeOrderArrowText: {
-    color: colors.ink,
+    color: '#FFFFFF',
     fontFamily: fontFamily.black,
-    fontSize: 16,
+    fontSize: 14,
   }
 });
 export default HomeScreen;
