@@ -239,6 +239,7 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
         NotificationService.send('order_confirmed', {
             userId: newOrder.customer_id,
             displayId: newOrder.display_id,
+            orderId: newOrder.id,
             minutes: '25',
         }).catch(() => {});
 

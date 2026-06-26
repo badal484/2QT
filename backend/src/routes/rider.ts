@@ -182,6 +182,8 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
         const { rows: riderRows } = await query('SELECT name FROM users WHERE id = $1', [riderId]);
         NotificationService.send('order_out_for_delivery', {
             userId: order.customer_id,
+            displayId: order.display_id,
+            orderId: id,
             riderName: riderRows[0]?.name ?? 'Your rider',
             otp: String(order.delivery_otp ?? ''),
         }).catch(() => {});
@@ -278,7 +280,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     emitToOrder(orderId, 'order_status_update', { orderId, status: 'delivered' });
     
     // 3. Queue delivery notification and invoice (fire-and-forget — Redis limit must not kill delivery)
-    NotificationService.send('order_delivered', { userId: order.customer_id }).catch(() => {});
+    NotificationService.send('order_delivered', { userId: order.customer_id, orderId }).catch(() => {});
     invoicesQueue.add('generate_invoice', { orderId }).catch(e => console.error('[Queue] invoice failed:', e.message));
 
     res.json({ success: true });

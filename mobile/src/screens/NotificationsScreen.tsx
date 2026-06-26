@@ -4,7 +4,7 @@ import {
   StyleSheet, RefreshControl, Switch,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Bell, BellOff, Check, CheckCheck, Package, Bike, Tag, Gift, Info, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, Bell, BellOff, Check, CheckCheck, Package, Bike, Tag, Gift, Info, AlertCircle, CheckCircle2, XCircle, Sparkles, Megaphone, Wallet } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
@@ -16,25 +16,30 @@ const haptic = () => ReactNativeHapticFeedback.trigger('impactLight', { enableVi
 
 // ── Icon per notification type ──────────────────────────────────────────────
 const NotifIcon = ({ type, read }: { type: string; read: boolean }) => {
-  const tint = read ? colors.inkFaint : colors.primary;
-  const size = 18;
-  if (type?.includes('order') || type?.includes('confirmed') || type?.includes('preparing') || type?.includes('delivered'))
-    return <Package size={size} color={tint} />;
-  if (type?.includes('rider') || type?.includes('delivery') || type?.includes('pickup'))
-    return <Bike size={size} color={tint} />;
-  if (type?.includes('promo') || type?.includes('discount') || type?.includes('campaign'))
-    return <Tag size={size} color={tint} />;
-  if (type?.includes('wallet') || type?.includes('reward') || type?.includes('loyalty'))
-    return <Gift size={size} color={tint} />;
+  const size = 20;
+  if (read) return <Bell size={size} color={colors.inkFaint} />;
   if (type?.includes('alert') || type?.includes('cancel') || type?.includes('fail'))
-    return <AlertCircle size={size} color={read ? colors.inkFaint : colors.danger} />;
-  return <Info size={size} color={tint} />;
+    return <XCircle size={size} color="#EF4444" />;
+  if (type?.includes('confirm') || type?.includes('deliver') || type?.includes('success'))
+    return <CheckCircle2 size={size} color="#10B981" />;
+  if (type?.includes('promo') || type?.includes('discount') || type?.includes('campaign') || type?.includes('offer'))
+    return <Sparkles size={size} color="#F59E0B" />;
+  if (type?.includes('wallet') || type?.includes('payout') || type?.includes('reward') || type?.includes('loyalty'))
+    return <Wallet size={size} color="#8B5CF6" />;
+  if (type?.includes('order') || type?.includes('preparing'))
+    return <Package size={size} color={colors.primary} />;
+  if (type?.includes('rider') || type?.includes('pickup'))
+    return <Bike size={size} color="#3B82F6" />;
+  return <Bell size={size} color={colors.primary} />;
 };
 
 const iconBg = (type: string, read: boolean) => {
   if (read) return colors.surfaceMuted;
-  if (type?.includes('alert') || type?.includes('cancel') || type?.includes('fail'))
-    return '#FEE2E2';
+  if (type?.includes('alert') || type?.includes('cancel') || type?.includes('fail')) return '#FEE2E2';
+  if (type?.includes('confirm') || type?.includes('deliver') || type?.includes('success')) return '#DCFCE7';
+  if (type?.includes('promo') || type?.includes('discount') || type?.includes('campaign') || type?.includes('offer')) return '#FEF3C7';
+  if (type?.includes('wallet') || type?.includes('payout') || type?.includes('reward') || type?.includes('loyalty')) return '#EDE9FE';
+  if (type?.includes('rider') || type?.includes('pickup')) return '#DBEAFE';
   return colors.primaryTint;
 };
 
@@ -235,6 +240,14 @@ const NotificationsScreen = ({ navigation }: any) => {
                     haptic();
                     readMutation.mutate(n.id);
                   }
+                  
+                  // Deep linking logic
+                  try {
+                    const parsedData = n.data ? JSON.parse(n.data) : {};
+                    if (parsedData.orderId) {
+                      navigation.navigate('OrderConfirmed', { orderId: parsedData.orderId });
+                    }
+                  } catch (err) {}
                 }}
                 activeOpacity={0.85}
               >
@@ -323,30 +336,30 @@ const styles = StyleSheet.create({
 
   notifCard: {
     flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: colors.white, borderRadius: 16,
-    padding: 14, marginBottom: 8,
-    borderWidth: 1, borderColor: colors.border,
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 }, elevation: 1,
+    backgroundColor: colors.white, borderRadius: 20,
+    padding: 16, marginBottom: 12,
+    borderWidth: 0,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
   notifCardUnread: {
-    borderColor: colors.primary + '30',
-    backgroundColor: colors.primaryTint + '50',
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1, borderColor: colors.primary + '20',
   },
   notifIconBox: {
-    width: 42, height: 42, borderRadius: 12,
+    width: 48, height: 48, borderRadius: 24,
     alignItems: 'center', justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   notifBody: { flex: 1 },
   notifTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  notifTitle: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted, flex: 1, marginRight: 8 },
-  notifTitleUnread: { fontFamily: fontFamily.bold, color: colors.ink },
-  notifTime: { fontSize: 10, fontFamily: fontFamily.medium, color: colors.inkFaint },
-  notifMessage: { fontSize: 13, fontFamily: fontFamily.regular, color: colors.inkMuted, lineHeight: 18 },
+  notifTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, flex: 1, marginRight: 8 },
+  notifTitleUnread: { fontFamily: fontFamily.black, color: colors.ink },
+  notifTime: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkFaint },
+  notifMessage: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 18 },
   unreadDot: {
     width: 8, height: 8, borderRadius: 4,
-    backgroundColor: colors.primary, marginLeft: 8, marginTop: 4,
+    backgroundColor: colors.primary, marginLeft: 10, marginTop: 6,
   },
 
   // Preferences
