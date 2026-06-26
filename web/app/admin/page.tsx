@@ -1731,7 +1731,7 @@ export default function AdminPage() {
         <div className="flex-1 px-3 overflow-y-auto pb-4 space-y-6">
           {[
             { section: "Main", items: ["Overview", "Analytics", "Orders", "Scheduled", "Dispatch", "Fleet", "Customers", "Support"] },
-            { section: "Operations", items: ["Menu", "Inventory", "Zones", "Delivery Pricing", "Kitchens", "Partners", "Finance", "Applications"] },
+            { section: "Operations", items: ["Menu", "Inventory", "Categories", "Zones", "Delivery Pricing", "Kitchens", "Partners", "Finance", "Applications"] },
             { section: "System", items: ["Broadcast", "Marketing", "Promo Codes", "Systems", "Settings"] },
           ].map(group => (
             <div key={group.section}>
