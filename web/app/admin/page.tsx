@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -21,6 +21,7 @@ import dynamic from "next/dynamic";
 const MarketingTab = dynamic(() => import("./MarketingTab").then(m => ({ default: m.MarketingTab })), { ssr: false });
 const MenuTab = dynamic(() => import("./MenuTab").then(m => ({ default: m.MenuTab })), { ssr: false });
 const ZonesTab = dynamic(() => import("./ZonesTab").then(m => ({ default: m.ZonesTab })), { ssr: false });
+const CategoriesTab = dynamic(() => import("./CategoriesTab").then(m => ({ default: m.CategoriesTab })), { ssr: false });
 const DeliveryPricingTab = dynamic(() => import("./DeliveryPricingTab").then(m => ({ default: m.DeliveryPricingTab })), { ssr: false });
 const KitchensTab = dynamic(() => import("./KitchensTab").then(m => ({ default: m.KitchensTab })), { ssr: false });
 const PromoCodesTab = dynamic(() => import("./PromoCodesTab").then(m => ({ default: m.PromoCodesTab })), { ssr: false });
@@ -1648,6 +1649,7 @@ const TABS = [
   { name: "Marketing", icon: Zap, component: MarketingTab },
   { name: "Promo Codes", icon: Ticket, component: PromoCodesTab },
   { name: "Zones", icon: MapPin, component: ZonesTab },
+  { name: "Categories", icon: LayoutGrid, component: CategoriesTab },
   { name: "Delivery Pricing", icon: Receipt, component: DeliveryPricingTab },
   { name: "Kitchens", icon: Store, component: KitchensTab },
   { name: "Partners", icon: Store, component: PartnersTab },
