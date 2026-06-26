@@ -22,10 +22,28 @@ export function MenuTab() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
+  const [modalZoneId, setModalZoneId] = useState<string>("");
+  const [modalCategories, setModalCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    if (showAddModal) setImageUrl(editingItem?.photo_url || "");
+    if (showAddModal) {
+      setImageUrl(editingItem?.photo_url || "");
+      const zoneId = editingItem?.zone_id || (selectedZone !== "All" ? selectedZone : zones[0]?.id || "");
+      setModalZoneId(zoneId);
+    }
   }, [showAddModal, editingItem]);
+
+  // Fetch categories from CategoriesTab whenever the modal zone changes
+  const FALLBACK_CATEGORIES = ["Starters","Main Course","Breads","Rice & Biryani","Curries","Soups","Salads","Pasta","Burgers","Sandwiches","Pizza","Desserts","Beverages","Snacks","Healthy Bowls","Combos"];
+  useEffect(() => {
+    if (!modalZoneId) return;
+    api.get(`/categories/admin?zoneId=${modalZoneId}`)
+      .then((res) => {
+        const cats: string[] = (res?.categories ?? []).map((c: any) => c.slug);
+        setModalCategories(cats.length > 0 ? cats : FALLBACK_CATEGORIES);
+      })
+      .catch(() => setModalCategories(FALLBACK_CATEGORIES));
+  }, [modalZoneId]);
 
   const load = async () => {
     try {
@@ -446,7 +464,13 @@ export function MenuTab() {
                   {/* Zone Selector */}
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Menu Zone</label>
-                    <select name="zone_id" defaultValue={editingItem?.zone_id || (selectedZone !== "All" ? selectedZone : "")} required className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none">
+                    <select
+                      name="zone_id"
+                      value={modalZoneId}
+                      onChange={(e) => setModalZoneId(e.target.value)}
+                      required
+                      className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none"
+                    >
                       <option value="" disabled className="bg-zinc-900">Select Delivery Zone…</option>
                       {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">{z.name}</option>)}
                     </select>
@@ -462,7 +486,7 @@ export function MenuTab() {
                       <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Category</label>
                       <select name="category" defaultValue={editingItem?.category ?? ""} required className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none">
                         <option value="" disabled className="bg-zinc-900">Select…</option>
-                        {["Starters","Main Course","Breads","Rice & Biryani","Curries","Soups","Salads","Pasta","Burgers","Sandwiches","Pizza","Desserts","Beverages","Snacks","Healthy Bowls","Combos"].map(c => (
+                        {modalCategories.map(c => (
                           <option key={c} value={c} className="bg-zinc-900">{c}</option>
                         ))}
                       </select>
