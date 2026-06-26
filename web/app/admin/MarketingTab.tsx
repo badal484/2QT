@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Trash2, Edit, Save, X, Zap } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Edit, Save, X, Zap, Upload, ImageIcon } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -23,6 +23,21 @@ export function MarketingTab() {
     banner_type: "MAIN"
   });
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const res = await api.uploadImage(file);
+      setNewBanner(b => ({ ...b, image_url: res.url }));
+      toast.success("Image uploaded");
+    } catch (e: any) {
+      toast.error(e.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const fetchBanners = async () => {
     try {
@@ -116,8 +131,58 @@ export function MarketingTab() {
               <input value={newBanner.tag_text} onChange={e=>setNewBanner({...newBanner, tag_text: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="30 MIN" />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Image URL</label>
-              <input value={newBanner.image_url} onChange={e=>setNewBanner({...newBanner, image_url: e.target.value})} className="w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary" placeholder="https://..." />
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Banner Image</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }}
+              />
+              {newBanner.image_url ? (
+                <div className="relative w-full h-28 rounded-xl overflow-hidden border border-white/10 group">
+                  <Image src={newBanner.image_url} alt="Preview" fill className="object-cover" />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+                    >
+                      <Upload className="w-3 h-3" /> Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewBanner(b => ({ ...b, image_url: "" }))}
+                      className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+                    >
+                      <X className="w-3 h-3" /> Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full h-28 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-brand-primary/50 hover:bg-brand-primary/5 transition-all disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <ImageIcon className="w-6 h-6 text-zinc-500" />
+                      <span className="text-xs font-semibold text-zinc-500">Click to upload image</span>
+                    </>
+                  )}
+                </button>
+              )}
+              <p className="mt-1.5 text-xs text-zinc-500">
+                Recommended:&nbsp;
+                <span className="font-semibold text-zinc-400">
+                  {newBanner.banner_type === 'STRIP' ? '1200 × 300 px' : newBanner.banner_type === 'MINI' ? '400 × 400 px' : '1200 × 520 px'}
+                </span>
+                &nbsp;· JPEG or WebP
+              </p>
             </div>
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Action Type</label>

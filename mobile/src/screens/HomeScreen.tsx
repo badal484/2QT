@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, SectionList, Dimensions, ActivityIndicator, Image, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, Dimensions, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
@@ -8,11 +8,10 @@ import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, interpolate, Extrapolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
 import { EmptyState, SkeletonRow } from '../components/ui';
 
-const AnimatedSectionList = Animated.createAnimatedComponent(SectionList);
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { radius, spacing } from '../theme/spacing';
@@ -35,9 +34,10 @@ const HomeScreen = ({ navigation }: any) => {
   const { globalLocation: location, serviceabilityStatus, activeZoneId } = useSelector((state: RootState) => state.app);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const sectionListRef = React.useRef<SectionList>(null);
+
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [phIndex, setPhIndex] = useState(0);
 
   // If address has a zone use it; if address exists but has no zone, fall back to GPS zone
   const effectiveZoneId = zoneId || activeZoneId;
@@ -136,12 +136,8 @@ const HomeScreen = ({ navigation }: any) => {
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
   });
-  const adminCategories: { id: string; name: string; slug: string; image_url: string }[] =
+  const adminCategories: { id: string; name: string; slug: string; image_url: string; banner_url?: string }[] =
     menuCategoriesData?.categories ?? [];
-  // Set of slugs that admin has configured — used to HIDE unregistered categories
-  const adminCategorySlugSet = new Set(
-    adminCategories.map((c) => c.slug.toLowerCase().trim())
-  );
 
   const infiniteBanners = useMemo(() => {
     if (!mainBanners || mainBanners.length === 0) return [];
@@ -194,6 +190,20 @@ const HomeScreen = ({ navigation }: any) => {
     }, 3000);
     return () => clearInterval(interval);
   }, [infiniteBanners.length]);
+
+  // Animated search placeholder — cycles through menu item names
+  const placeholderNames = useMemo(() => {
+    const items: any[] = menuData?.items ?? [];
+    return items.filter((i: any) => i.available).map((i: any) => i.name as string).slice(0, 12);
+  }, [menuData?.items]);
+
+  useEffect(() => {
+    if (placeholderNames.length < 2) return;
+    const id = setInterval(() => {
+      setPhIndex(i => (i + 1) % placeholderNames.length);
+    }, 2500);
+    return () => clearInterval(id);
+  }, [placeholderNames.length]);
 
   const { data: zonesData } = useQuery({
     queryKey: ['zones'],
@@ -346,26 +356,193 @@ const HomeScreen = ({ navigation }: any) => {
     [cartItems],
   );
 
+  // Build flat list data: category-preview → explore-header → section-header + item-rows per category
+  const listData = useMemo(() => {
+    if (sections.length === 0) return [];
+    // One representative item (first) per category for the preview strip
+    const previewItems = sections
+      .map(s => s.data.find((i: any) => i.available) ?? null)
+      .filter(Boolean);
+    const result: any[] = [
+      { type: 'category-preview', id: 'category-preview', items: previewItems },
+      { type: 'explore-header', id: 'explore-header' },
+    ];
+    sections.forEach(section => {
+      result.push({ type: 'section-header', id: `sh-${section.title}`, title: section.title, count: section.data.length });
+      for (let i = 0; i < section.data.length; i += 2) {
+        result.push({ type: 'item-row', id: `ir-${section.data[i].id}`, left: section.data[i], right: section.data[i + 1] || null });
+      }
+    });
+    return result;
+  }, [sections]);
+
   const renderItem = useCallback(({ item }: { item: any }) => {
-    const cartItem = cartItems.find((ci: any) => ci.menuItemId === item.id);
+    if (item.type === 'category-preview') {
+      return (
+        <View style={styles.catPreviewWrap}>
+          {/* Heading */}
+          <View style={styles.catPreviewHeadingRow}>
+            <View style={styles.catPreviewHeadingAccent} />
+            <Text style={styles.catPreviewHeading}>Highlights</Text>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catPreviewScroll}>
+            {item.items.map((mi: any) => {
+              const ci = cartItems.find((c: any) => c.menuItemId === mi.id);
+              const vegColor = mi.is_egg ? '#EAB308' : (mi.is_veg ? '#22C55E' : colors.danger);
+              const unavailable = !mi.available || menuData?.kitchenPaused;
+              return (
+                <TouchableOpacity
+                  key={mi.id}
+                  style={styles.catPreviewCard}
+                  activeOpacity={0.93}
+                  onPress={() => { triggerHaptic(); navigation.navigate('ItemDetail', { item: mi }); }}
+                >
+                  {/* ── Image block ── */}
+                  <View style={styles.catPreviewImgBox}>
+                    {mi.photo_url
+                      ? <NetworkImage uri={mi.photo_url} style={styles.catPreviewImg} />
+                      : <View style={[styles.catPreviewImg, styles.catPreviewImgPlaceholder]}>
+                          <ChefHat size={30} color={colors.inkFaint} />
+                        </View>}
+
+                    {/* Category pill over image */}
+                    <View style={styles.catPreviewCatPill}>
+                      <Text style={styles.catPreviewCatText} numberOfLines={1}>{mi.category}</Text>
+                    </View>
+
+                    {/* Bestseller badge */}
+                    {mi.is_bestseller && (
+                      <View style={styles.catPreviewBestBadge}>
+                        <Text style={styles.catPreviewBestText}>★ Bestseller</Text>
+                      </View>
+                    )}
+
+                    {/* Sold out overlay */}
+                    {unavailable && (
+                      <View style={styles.catPreviewSoldOut}>
+                        <Text style={styles.catPreviewSoldOutText}>Sold Out</Text>
+                      </View>
+                    )}
+
+                    {/* ADD / qty — floats at bottom-right of image */}
+                    {!unavailable && (
+                      <View style={styles.catPreviewAddFloat}>
+                        {ci ? (
+                          <View style={styles.catPreviewQty}>
+                            <TouchableOpacity
+                              onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: ci.quantity - 1 })); }}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                            >
+                              <Text style={styles.catPreviewQtyBtn}>−</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.catPreviewQtyVal}>{ci.quantity}</Text>
+                            <TouchableOpacity
+                              onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: ci.quantity + 1 })); }}
+                              hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                            >
+                              <Text style={styles.catPreviewQtyBtn}>+</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity style={styles.catPreviewAddBtn} onPress={() => handleAddToCart(mi)} activeOpacity={0.8}>
+                            <Text style={styles.catPreviewAddText}>ADD</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* ── Info block ── */}
+                  <View style={styles.catPreviewInfo}>
+                    <View style={styles.catPreviewNameRow}>
+                      <View style={[styles.catPreviewVegBadge, { borderColor: vegColor }]}>
+                        <View style={[styles.catPreviewVegDot, { backgroundColor: vegColor }]} />
+                      </View>
+                      <Text style={styles.catPreviewName} numberOfLines={2}>{mi.name}</Text>
+                    </View>
+                    <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (item.type === 'explore-header') {
+      return <ExploreMenuBanner />;
+    }
+
+    if (item.type === 'section-header') {
+      return (
+        <View style={styles.categorySectionHeader}>
+          <Text style={styles.categorySectionTitle}>{item.title}</Text>
+          <Text style={styles.categorySectionCount}>{item.count} {item.count === 1 ? 'item' : 'items'}</Text>
+        </View>
+      );
+    }
+
+    // Local helper — not a hook, just a closure over renderItem's deps
+    const renderCard = (menuItem: any) => {
+      const cartItem = cartItems.find((ci: any) => ci.menuItemId === menuItem.id);
+      const vegColor = menuItem.is_egg ? '#EAB308' : (menuItem.is_veg ? '#22C55E' : colors.danger);
+      const unavailable = !menuItem.available || menuData?.kitchenPaused;
+      return (
+        <TouchableOpacity key={menuItem.id} style={styles.homeGridCard} activeOpacity={0.93}
+          onPress={() => { if (menuItem.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item: menuItem }); } }}>
+          <View style={styles.homeGridImageContainer}>
+            {menuItem.photo_url
+              ? <NetworkImage uri={menuItem.photo_url} style={styles.homeGridImage} />
+              : <View style={[styles.homeGridImage, styles.homeGridImagePlaceholder]}><ChefHat size={28} color={colors.inkFaint} /></View>}
+            <View style={[styles.homeGridVegBadge, { borderColor: vegColor }]}>
+              <View style={[styles.homeGridVegDot, { backgroundColor: vegColor }]} />
+            </View>
+            {menuItem.is_bestseller && <View style={styles.homeGridBestsellerBadge}><Text style={styles.homeGridBestsellerText}>★ Bestseller</Text></View>}
+            {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text style={styles.homeGridNewText}>+ New</Text></View>}
+            {unavailable && <View style={styles.homeGridSoldOut}><Text style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
+            {!unavailable && (
+              <View style={styles.homeGridAddFloat}>
+                {cartItem ? (
+                  <View style={styles.homeGridQtyControl}>
+                    <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
+                      <Text style={styles.homeGridQtyBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.homeGridQtyValue}>{cartItem.quantity}</Text>
+                    <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                      <Text style={styles.homeGridQtyBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.homeGridAddBtn} onPress={() => handleAddToCart(menuItem)} activeOpacity={0.85}>
+                    <Text style={styles.homeGridAddBtnText}>ADD</Text>
+                    <View style={styles.homeGridCustomiseBadge}><Text style={styles.homeGridCustomiseText}>Customise</Text></View>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+          <View style={styles.homeGridInfo}>
+            <Text style={styles.homeGridName} numberOfLines={2}>{menuItem.name}</Text>
+            {menuItem.description ? <Text style={styles.homeGridDesc} numberOfLines={2}>{menuItem.description}</Text> : null}
+            <Text style={styles.homeGridPrice}>₹{menuItem.price_paise / 100}</Text>
+            {menuItem.tags?.length > 0 && (
+              <View style={styles.homeGridTagRow}>
+                {menuItem.tags.slice(0, 2).map((tag: string) => (
+                  <View key={tag} style={styles.homeGridTagChip}><Text style={styles.homeGridTagText}>{tag}</Text></View>
+                ))}
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    };
+
     return (
-      <View style={styles.itemPadding}>
-        <ModernItemCard
-          item={item}
-          cartItem={cartItem}
-          kitchenPaused={menuData?.kitchenPaused}
-          onPress={() => {
-            if (item.available) {
-              triggerHaptic();
-              navigation.navigate('ItemDetail', { item });
-            }
-          }}
-          onAdd={() => handleAddToCart(item)}
-          onUpdate={(qty: number) => {
-            triggerHaptic();
-            dispatch(setQuantity({ menuItemId: item.id, quantity: qty }));
-          }}
-        />
+      <View style={styles.homeGridRow}>
+        {renderCard(item.left)}
+        {item.right ? renderCard(item.right) : <View style={styles.homeGridCard} />}
       </View>
     );
   }, [cartItems, menuData?.kitchenPaused, handleAddToCart, triggerHaptic, dispatch, navigation]);
@@ -381,9 +558,9 @@ const HomeScreen = ({ navigation }: any) => {
 
   const LOCATION_HEIGHT = 50;
   const locationRowStyle = useAnimatedStyle(() => {
-    const height = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [LOCATION_HEIGHT, 0], Extrapolate.CLAMP);
-    const opacity = interpolate(scrollY.value, [0, LOCATION_HEIGHT / 2], [1, 0], Extrapolate.CLAMP);
-    const marginBottom = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [16, 0], Extrapolate.CLAMP);
+    const height = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [LOCATION_HEIGHT, 0], 'clamp');
+    const opacity = interpolate(scrollY.value, [0, LOCATION_HEIGHT / 2], [1, 0], 'clamp');
+    const marginBottom = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [16, 0], 'clamp');
     return { height, opacity, marginBottom, overflow: 'hidden' };
   });
 
@@ -434,70 +611,82 @@ const HomeScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* ROW 2: Search Bar with VEG toggle */}
+        {/* ROW 2: Search Bar + 2QT badge */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: colors.surface,
-            borderRadius: 16,
-            paddingHorizontal: 16,
-            height: 52,
-            shadowColor: colors.ink,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            elevation: 2,
-            borderWidth: 1,
-            borderColor: colors.border
-          }}>
-            <Search size={22} color={colors.inkMuted} style={{ marginRight: 12 }} />
-            <TextInput
-              placeholder='Search for food...'
-              placeholderTextColor={colors.inkMuted}
-              style={{ flex: 1, fontSize: 15, fontFamily: fontFamily.medium, color: colors.ink, padding: 0 }}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 ? (
-              <TouchableOpacity onPress={() => { triggerHaptic(); setSearchQuery(''); }}>
-                <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 12, marginLeft: 8 }}>
-                <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
-                <Switch
-                  value={isVegOnly}
-                  onValueChange={(val) => { triggerHaptic(); setIsVegOnly(val); }}
-                  trackColor={{ false: colors.border, true: colors.primaryTint }}
-                  thumbColor={isVegOnly ? colors.primary : colors.white}
-                  style={styles.vegSwitch}
-                />
-              </View>
-            )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            {/* Slim pill search bar */}
+            <View style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.surface,
+              borderRadius: 23,
+              paddingHorizontal: 14,
+              height: 46,
+              shadowColor: colors.ink,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.04,
+              shadowRadius: 8,
+              elevation: 2,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}>
+              <Search size={18} color={colors.inkMuted} style={{ marginRight: 10 }} />
+              <TextInput
+                placeholder={
+                  placeholderNames.length > 0
+                    ? `Search "${placeholderNames[phIndex]}"`
+                    : 'Search for food...'
+                }
+                placeholderTextColor={colors.inkMuted}
+                style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, padding: 0 }}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 ? (
+                <TouchableOpacity onPress={() => { triggerHaptic(); setSearchQuery(''); }}>
+                  <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 10, marginLeft: 6 }}>
+                  <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
+                  <Switch
+                    value={isVegOnly}
+                    onValueChange={(val) => { triggerHaptic(); setIsVegOnly(val); }}
+                    trackColor={{ false: colors.border, true: colors.primaryTint }}
+                    thumbColor={isVegOnly ? colors.primary : colors.white}
+                    style={styles.vegSwitch}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* 2QT brand mark */}
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+              <Text style={{ fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -1 }}>
+                2QT<Text style={{ color: colors.primary, fontSize: 28 }}>.</Text>
+              </Text>
+            </View>
           </View>
         )}
       </Animated.View>
 
-      <AnimatedSectionList
+      <Animated.FlatList
         style={{ flex: 1 }}
-        ref={sectionListRef as any}
-        sections={
+        data={
           isServiceabilityChecking || unserviceableLocation || showNoLocation || showNetworkError
             ? []
-            : sections
+            : listData
         }
         keyExtractor={(item: any) => item.id}
         renderItem={renderItem}
-        renderSectionHeader={() => null}
-        stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 10, 20) + 16 + 52 + LOCATION_HEIGHT + 16 }]}
         windowSize={5}
-        maxToRenderPerBatch={5}
-        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        initialNumToRender={8}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -594,7 +783,7 @@ const HomeScreen = ({ navigation }: any) => {
                     offset: SCREEN_WIDTH * index,
                     index,
                   })}
-                  renderItem={({ item: b, index }: any) => (
+                  renderItem={({ item: b }: any) => (
                     <View style={{ width: SCREEN_WIDTH, paddingHorizontal: spacing.lg }}>
                       <TouchableOpacity
                         activeOpacity={0.9}
@@ -602,7 +791,7 @@ const HomeScreen = ({ navigation }: any) => {
                           triggerHaptic();
                           if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
                         }}
-                        style={[styles.bannerContainer, { height: 180 }]}
+                        style={[styles.bannerContainer, { height: 130 }]}
                       >
                         <NetworkImage uri={b.image_url} style={[styles.bannerImage, { borderRadius: 16 }]} />
                         <View style={[styles.bannerOverlay, { borderRadius: 16 }]}>
@@ -822,7 +1011,7 @@ const HomeScreen = ({ navigation }: any) => {
         }
       />
 
-      {cartItems.length > 0 && sections.length > 0 && (
+      {cartItems.length > 0 && listData.length > 0 && (
         <Animated.View
           entering={FadeInDown.duration(300)}
           exiting={FadeInDown.duration(200).delay(0)}
@@ -895,110 +1084,94 @@ const HomeScreen = ({ navigation }: any) => {
 };
 
 
-const ModernItemCard = React.memo(({ item, cartItem, onAdd, onUpdate, onPress, kitchenPaused }: any) => {
-  const vegColor = item.is_egg ? '#EAB308' : (item.is_veg ? '#22C55E' : colors.danger);
-  const unavailable = !item.available || kitchenPaused;
-  const hasTags = item.tags?.length > 0;
 
-  return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.93} onPress={onPress}>
-      {/* ── Left: text content ─────────────────────────────── */}
-      <View style={styles.cardLeft}>
-        <View style={[styles.vegBadge, { borderColor: vegColor }]}>
-          <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
-        </View>
+const ExploreMenuBanner = React.memo(() => (
+  <View style={ebS.wrapper}>
+    {/* Giant ghost "MENU" — 5% opacity, gives depth without any background */}
+    <Text style={ebS.ghost} numberOfLines={1}>MENU</Text>
 
-        {/* Bestseller / New badges */}
-        {(item.is_bestseller || item.is_new) && (
-          <View style={styles.badgeRow}>
-            {item.is_bestseller && (
-              <View style={styles.bestsellerBadge}>
-                <Text style={styles.bestsellerBadgeText}>★ Bestseller</Text>
-              </View>
-            )}
-            {item.is_new && (
-              <View style={styles.newBadge}>
-                <Text style={styles.newBadgeText}>+ New</Text>
-              </View>
-            )}
-          </View>
-        )}
+    {/* Top diamond rule */}
+    <View style={ebS.ruleRow}>
+      <View style={ebS.ruleLine} />
+      <Text style={ebS.diamond}>◆</Text>
+      <View style={ebS.ruleLine} />
+    </View>
 
-        <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.cardPrice}>₹{item.price_paise / 100}</Text>
-        {item.description ? (
-          <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
-        ) : null}
+    {/* Eyebrow label */}
+    <Text style={ebS.eyebrow}>E X P L O R E</Text>
 
-        {/* Tags */}
-        {hasTags && (
-          <View style={styles.tagRow}>
-            {item.tags.slice(0, 3).map((tag: string) => (
-              <View key={tag} style={styles.tagChip}>
-                <Text style={styles.tagChipText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
+    {/* Main title — two weights inline */}
+    <View style={ebS.titleRow}>
+      <Text style={ebS.titleLight}>our </Text>
+      <Text style={ebS.titleBold}>menu</Text>
+    </View>
 
-      {/* ── Right: Image and Floating Button ── */}
-      <View style={styles.cardRightWrapper}>
-        <View style={styles.cardRightRelative}>
-          {/* Image */}
-          <View style={styles.cardImageContainer}>
-            {item.photo_url ? (
-              <NetworkImage uri={item.photo_url} style={styles.cardImage} />
-            ) : (
-              <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-                <ChefHat size={32} color={colors.inkFaint} />
-              </View>
-            )}
+    {/* Bottom diamond rule */}
+    <View style={ebS.ruleRow}>
+      <View style={ebS.ruleLine} />
+      <Text style={ebS.diamond}>◆</Text>
+      <View style={ebS.ruleLine} />
+    </View>
+  </View>
+));
 
-            {unavailable && (
-              <View style={styles.soldOutOverlay}>
-                <Text style={styles.soldOutText}>Sold Out</Text>
-              </View>
-            )}
-          </View>
-
-          {/* ADD / qty — pinned to the bottom of the 130x130 box */}
-          {!unavailable && (
-            <View style={styles.cardBtnFloat}>
-              {cartItem ? (
-                <View style={styles.qtyControl}>
-                  <TouchableOpacity
-                    onPress={() => onUpdate(cartItem.quantity - 1)}
-                    style={styles.qtyBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
-                  >
-                    <Text style={styles.qtyBtnText}>−</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.qtyValue}>{cartItem.quantity}</Text>
-                  <TouchableOpacity
-                    onPress={() => onUpdate(cartItem.quantity + 1)}
-                    style={styles.qtyBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                  >
-                    <Text style={styles.qtyBtnText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View>
-                  <View style={styles.customisePill}>
-                    <Text style={styles.customisePillText}>Customise</Text>
-                  </View>
-                  <TouchableOpacity style={styles.addBtn} onPress={onAdd} activeOpacity={0.85}>
-                    <Text style={styles.addBtnText}>ADD</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+const ebS = StyleSheet.create({
+  wrapper: {
+    paddingVertical: 20,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  ghost: {
+    position: 'absolute',
+    fontFamily: fontFamily.black,
+    fontSize: 108,
+    color: 'rgba(46, 125, 50, 0.05)',
+    letterSpacing: 10,
+    top: '50%',
+    marginTop: -54,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '78%',
+    marginVertical: 5,
+  },
+  ruleLine: {
+    flex: 1,
+    height: 0.8,
+    backgroundColor: 'rgba(94, 175, 99, 0.45)',
+  },
+  diamond: {
+    fontSize: 7,
+    color: 'rgba(94, 175, 99, 0.7)',
+  },
+  eyebrow: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: 10,
+    color: '#7DC880',
+    letterSpacing: 5,
+    marginBottom: 2,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  titleLight: {
+    fontFamily: fontFamily.medium,
+    fontStyle: 'italic',
+    fontSize: 38,
+    color: '#81C784',
+    letterSpacing: 0.5,
+  },
+  titleBold: {
+    fontFamily: fontFamily.black,
+    fontSize: 42,
+    color: '#1B5E20',
+    letterSpacing: -0.5,
+  },
 });
 
 const styles = StyleSheet.create({
@@ -1098,6 +1271,49 @@ const styles = StyleSheet.create({
   },
   addBtnDisabled: { backgroundColor: colors.surfaceMuted },
   addBtnText: { color: '#FFFFFF', fontFamily: fontFamily.extrabold, fontSize: 15, letterSpacing: 0.5 },
+
+  // ── Home grid card (2-column) ──────────────────────────────────────────────
+  // Explore Menu divider
+  exploreHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: 20 },
+  exploreLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  explorePill: { marginHorizontal: 12, backgroundColor: colors.surface, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: colors.border },
+  exploreText: { fontSize: 12, fontFamily: fontFamily.extrabold, color: colors.ink, letterSpacing: 0.3 },
+
+  // Category section header
+  categorySectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: 8, paddingBottom: 16 },
+  categorySectionTitle: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.3 },
+  categorySectionCount: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted },
+
+  // Grid row (2 cards per row)
+  homeGridRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: 16, marginBottom: 24 },
+  homeGridCard: { flex: 1, backgroundColor: 'transparent', marginBottom: 4 },
+  homeGridImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: colors.surfaceMuted, position: 'relative', marginBottom: 12 },
+  homeGridImage: { width: '100%', height: '100%' },
+  homeGridImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  homeGridVegBadge: { position: 'absolute', top: 12, left: 12, width: 16, height: 16, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  homeGridVegDot: { width: 8, height: 8, borderRadius: 4 },
+  homeGridBestsellerBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
+  homeGridBestsellerText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
+  homeGridNewBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
+  homeGridNewText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
+  homeGridSoldOut: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
+  homeGridSoldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  homeGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '80%', zIndex: 10 },
+  homeGridQtyControl: { flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 12, alignItems: 'center', justifyContent: 'space-between', height: 40, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  homeGridQtyBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
+  homeGridQtyBtnText: { color: colors.white, fontSize: 22, fontFamily: fontFamily.bold },
+  homeGridQtyValue: { color: colors.white, fontSize: 15, fontFamily: fontFamily.extrabold },
+  homeGridAddBtn: { backgroundColor: '#24B059', borderRadius: 12, height: 40, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, position: 'relative' },
+  homeGridAddBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 16, letterSpacing: 0.5 },
+  homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' },
+  homeGridCustomiseText: { fontSize: 9, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
+  homeGridInfo: { paddingHorizontal: 4 },
+  homeGridName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
+  homeGridDesc: { fontSize: 12, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 16, marginBottom: 6 },
+  homeGridPrice: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink },
+  homeGridTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  homeGridTagChip: { backgroundColor: colors.surfaceMuted, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: colors.border },
+  homeGridTagText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
   customisePill: {
     alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 6,
     paddingHorizontal: 8, paddingVertical: 2, marginBottom: 3,
@@ -1408,7 +1624,7 @@ const styles = StyleSheet.create({
   bannersList: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.xl },
   bannerContainer: {
     width: '100%',
-    height: 180,
+    height: 130,
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: colors.ink,
@@ -1793,6 +2009,113 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: fontFamily.extrabold,
   },
+  // ── Category Preview Strip ──────────────────────────────────────
+  catPreviewWrap: { paddingTop: 10, paddingBottom: 4 },
+  catPreviewHeadingRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: spacing.lg, marginBottom: 14,
+  },
+  catPreviewHeadingAccent: {
+    width: 4, height: 20, borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
+  catPreviewHeading: {
+    fontFamily: fontFamily.black,
+    fontSize: 20,
+    color: colors.ink,
+    letterSpacing: -0.3,
+  },
+  catPreviewScroll: { paddingHorizontal: spacing.lg, gap: 14, paddingBottom: 4 },
+  catPreviewCard: {
+    width: 152,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.09,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  catPreviewImgBox: { width: '100%', height: 130, position: 'relative' },
+  catPreviewImg: { width: '100%', height: '100%' },
+  catPreviewImgPlaceholder: {
+    backgroundColor: colors.background,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  catPreviewCatPill: {
+    position: 'absolute', top: 8, left: 8,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3,
+    maxWidth: 100,
+  },
+  catPreviewCatText: { fontSize: 9, color: '#fff', fontFamily: fontFamily.bold },
+  catPreviewBestBadge: {
+    position: 'absolute', top: 8, right: 8,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  catPreviewBestText: { fontSize: 9, color: '#92400E', fontFamily: fontFamily.extrabold },
+  catPreviewSoldOut: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  catPreviewSoldOutText: { color: '#fff', fontFamily: fontFamily.extrabold, fontSize: 12 },
+  catPreviewAddFloat: {
+    position: 'absolute', bottom: 8, right: 8,
+  },
+  catPreviewAddBtn: {
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingHorizontal: 14, paddingVertical: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  catPreviewAddText: { fontFamily: fontFamily.extrabold, fontSize: 12, color: colors.primary },
+  catPreviewQty: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.primary, borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 5, gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  catPreviewQtyBtn: { fontFamily: fontFamily.extrabold, fontSize: 16, color: '#fff', lineHeight: 18 },
+  catPreviewQtyVal: {
+    fontFamily: fontFamily.extrabold, fontSize: 13,
+    color: '#fff', minWidth: 18, textAlign: 'center',
+  },
+  catPreviewInfo: { padding: 10, paddingTop: 10 },
+  catPreviewNameRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6,
+  },
+  catPreviewVegBadge: {
+    width: 15, height: 15, borderRadius: 3, borderWidth: 1.5,
+    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, marginTop: 1,
+  },
+  catPreviewVegDot: { width: 7, height: 7, borderRadius: 3.5 },
+  catPreviewName: {
+    fontFamily: fontFamily.bold,
+    fontSize: 13, lineHeight: 17,
+    color: colors.ink,
+    flex: 1,
+  },
+  catPreviewPrice: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: 15,
+    color: colors.ink,
+    marginTop: 2,
+  },
+  // ────────────────────────────────────────────────────────────────
   categoryStripUnderline: {
     position: 'absolute',
     bottom: -10,
