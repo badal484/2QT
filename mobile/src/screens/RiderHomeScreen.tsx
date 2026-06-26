@@ -177,7 +177,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
         }
       },
       () => {},
-      { enableHighAccuracy: false, distanceFilter: 20, interval: 8000 },
+      { enableHighAccuracy: true, distanceFilter: 5, interval: 4000 },
     );
     return () => Geolocation.clearWatch(watchId);
   }, [isOnline]);

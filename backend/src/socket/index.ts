@@ -60,8 +60,22 @@ export const initSocket = (server: any) => {
             if (user.zoneId) socket.join(`riders:${user.zoneId}`);
         }
 
-        socket.on('join_order', (orderId) => {
+        socket.on('join_order', async (orderId) => {
             socket.join(`order:${orderId}`);
+            // Immediately push last known rider location so buyer doesn't wait for next heartbeat
+            try {
+                const { rows } = await query(
+                    'SELECT rider_id FROM orders WHERE id = $1',
+                    [orderId]
+                );
+                if (rows[0]?.rider_id) {
+                    const loc = await redis.get(keys.riderLocation(rows[0].rider_id)).catch(() => null);
+                    if (loc) {
+                        const parsed = JSON.parse(loc);
+                        socket.emit('rider_location', { lat: parsed.lat, lng: parsed.lng });
+                    }
+                }
+            } catch (_) {}
         });
 
         // Rider location heartbeat via socket (avoids extra HTTP round-trip every 5s)
