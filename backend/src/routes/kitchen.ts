@@ -26,7 +26,7 @@ router.get('/menu', authenticate, requireRole('chef', 'super_admin'), async (req
     if (zoneRows.length === 0) return res.status(400).json({ error: 'KITCHEN_NOT_IN_ZONE' });
     const zoneId = zoneRows[0].zone_id;
 
-    const { rows } = await query('SELECT id, name, description, price_paise, category, station, available, is_veg FROM menu_items WHERE zone_id = $1 ORDER BY name', [zoneId]);
+    const { rows } = await query('SELECT id, name, description, price_paise, category, station, available, is_veg, is_egg FROM menu_items WHERE zone_id = $1 ORDER BY name', [zoneId]);
     
     const { rows: kitchenInfo } = await query('SELECT is_paused, pause_reason FROM kitchens WHERE id = $1', [kitchenId]);
 

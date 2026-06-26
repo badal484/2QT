@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Image, Text, StyleSheet, ImageStyle } from 'react-native';
+import { View, Image, Text, StyleSheet, ImageStyle, StyleProp } from 'react-native';
 
 interface Props {
   uri: string;
-  style?: ImageStyle;
+  style?: StyleProp<ImageStyle>;
   fallbackText?: string;
 }
 

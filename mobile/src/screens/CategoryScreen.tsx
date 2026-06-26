@@ -112,7 +112,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
   // Swish-style Vertical Grid Card
   const renderItem = useCallback(({ item, index }: { item: any, index: number }) => {
     const cartItem = cartItems.find((ci: any) => ci.menuItemId === item.id);
-    const vegColor = item.is_veg ? '#22C55E' : colors.danger;
+    const vegColor = item.is_egg ? '#EAB308' : (item.is_veg ? '#22C55E' : colors.danger);
     const unavailable = !item.available || menuData?.kitchenPaused;
 
     // We only add margin to the left item in the pair to create the gap
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   customiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' },
   customiseText: { fontSize: 9, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
   
-  soldOutOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
+  soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
   soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
 
   // Floating cart
