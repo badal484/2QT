@@ -213,12 +213,13 @@ async function sendSMS(phone: string, message: string) {
 
 export class NotificationService {
     static async send(type: NotifType, data: any) {
-        const { userId, phone, displayId, riderName, otp, minutes, amount, upiId, count, message, title, body } = data;
+        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body } = data;
         await sendNotification(type, {
             userId: userId || undefined,
             phone: phone || undefined,
             vars: {
                 displayId:  String(displayId  ?? ''),
+                orderId:    String(orderId    ?? ''),
                 riderName:  String(riderName  ?? ''),
                 otp:        String(otp         ?? ''),
                 minutes:    String(minutes     ?? ''),

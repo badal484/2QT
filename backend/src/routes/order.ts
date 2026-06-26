@@ -221,6 +221,7 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
     NotificationService.send('order_cancelled', {
         userId: order.customer_id,
         displayId: order.display_id,
+        orderId: id,
         amount: String(order.total_amount_paise / 100),
     }).catch(() => {});
 

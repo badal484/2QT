@@ -158,6 +158,7 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'super_admi
             NotificationService.send(notificationType as any, {
                 userId: order.customer_id,
                 displayId: order.display_id,
+                orderId: id,
             }).catch(() => {});
         }
 
