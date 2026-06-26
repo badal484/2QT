@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { LayoutGrid, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, Upload, X, AlertCircle, CheckCircle2 } from "lucide-react";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
 interface Category {
   id: string;
   zone_id: string;
@@ -15,7 +13,6 @@ interface Category {
   image_url: string;
   sort_order: number;
   is_active: boolean;
-  created_at: string;
 }
 
 interface Zone {
@@ -23,14 +20,17 @@ interface Zone {
   name: string;
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// ── Slug Picker ────────────────────────────────────────────────────────────────
 const SlugPicker = ({ value, onChange, zoneId }: { value: string; onChange: (v: string) => void; zoneId: string }) => {
-  const { data } = useQuery({
-    queryKey: ["category-slugs", zoneId],
-    queryFn: () => api.get(`/categories/admin/slugs?zoneId=${zoneId}`),
-    enabled: !!zoneId,
-  });
-  const slugs: string[] = data?.slugs ?? [];
+  const [slugs, setSlugs] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!zoneId) return;
+    api.get(`/categories/admin/slugs?zoneId=${zoneId}`)
+      .then((res) => setSlugs(res?.slugs ?? []))
+      .catch(() => {});
+  }, [zoneId]);
+
   return (
     <div className="space-y-1">
       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Category Slug</label>
@@ -61,6 +61,7 @@ const SlugPicker = ({ value, onChange, zoneId }: { value: string; onChange: (v: 
   );
 };
 
+// ── Image Upload ───────────────────────────────────────────────────────────────
 const ImageUpload = ({ value, onChange }: { value: string; onChange: (url: string) => void }) => {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -110,11 +111,7 @@ const ImageUpload = ({ value, onChange }: { value: string; onChange: (url: strin
             )}
           </button>
           {value && (
-            <button
-              type="button"
-              onClick={() => onChange("")}
-              className="w-full text-xs text-red-400 hover:text-red-300 transition-colors"
-            >
+            <button type="button" onClick={() => onChange("")} className="w-full text-xs text-red-400 hover:text-red-300 transition-colors">
               Remove image
             </button>
           )}
@@ -125,19 +122,11 @@ const ImageUpload = ({ value, onChange }: { value: string; onChange: (url: strin
   );
 };
 
-// ── Main Modal ─────────────────────────────────────────────────────────────────
+// ── Modal ──────────────────────────────────────────────────────────────────────
 const CategoryModal = ({
-  category,
-  zones,
-  defaultZoneId,
-  onClose,
-  onSaved,
+  category, zones, defaultZoneId, onClose, onSaved,
 }: {
-  category?: Category;
-  zones: Zone[];
-  defaultZoneId: string;
-  onClose: () => void;
-  onSaved: () => void;
+  category?: Category; zones: Zone[]; defaultZoneId: string; onClose: () => void; onSaved: () => void;
 }) => {
   const [form, setForm] = useState({
     zone_id: category?.zone_id ?? defaultZoneId,
@@ -174,7 +163,6 @@ const CategoryModal = ({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-800">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
             <LayoutGrid size={18} className="text-orange-400" />
@@ -183,9 +171,7 @@ const CategoryModal = ({
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400"><X size={18} /></button>
         </div>
 
-        {/* Body */}
         <div className="p-5 space-y-5">
-          {/* Zone */}
           <div className="space-y-1">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Zone</label>
             <select
@@ -197,7 +183,6 @@ const CategoryModal = ({
             </select>
           </div>
 
-          {/* Name */}
           <div className="space-y-1">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Display Name</label>
             <input
@@ -209,20 +194,14 @@ const CategoryModal = ({
             />
           </div>
 
-          {/* Slug picker */}
           <SlugPicker value={form.slug} onChange={(v) => setForm(f => ({ ...f, slug: v }))} zoneId={form.zone_id} />
-
-          {/* Image upload */}
           <ImageUpload value={form.image_url} onChange={(url) => setForm(f => ({ ...f, image_url: url }))} />
 
-          {/* Sort order + Active */}
           <div className="flex gap-4">
             <div className="flex-1 space-y-1">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sort Order</label>
               <input
-                type="number"
-                min={0}
-                value={form.sort_order}
+                type="number" min={0} value={form.sort_order}
                 onChange={(e) => setForm(f => ({ ...f, sort_order: Number(e.target.value) }))}
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
@@ -240,12 +219,10 @@ const CategoryModal = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex gap-3 p-5 border-t border-gray-800">
           <button onClick={onClose} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-xl font-semibold transition-colors">Cancel</button>
           <button
-            onClick={handleSubmit}
-            disabled={saving}
+            onClick={handleSubmit} disabled={saving}
             className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold transition-colors"
           >
             {saving ? "Saving…" : category ? "Update" : "Create"}
@@ -258,63 +235,83 @@ const CategoryModal = ({
 
 // ── Main Tab ───────────────────────────────────────────────────────────────────
 export const CategoriesTab = () => {
-  const queryClient = useQueryClient();
-  const [selectedZoneId, setSelectedZoneId] = useState<string>("");
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedZoneId, setSelectedZoneId] = useState("");
+  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | undefined>();
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-
-  // Load zones
-  const { data: zonesData } = useQuery({
-    queryKey: ["admin-zones-cat"],
-    queryFn: () => api.get("/admin/zones"),
-  });
-  const zones: Zone[] = zonesData?.zones ?? [];
+  const [deleting, setDeleting] = useState(false);
 
   const effectiveZoneId = selectedZoneId || zones[0]?.id || "";
 
-  // Load categories for selected zone
-  const { data: catData, isLoading, refetch } = useQuery({
-    queryKey: ["admin-categories", effectiveZoneId],
-    queryFn: () => api.get(`/categories/admin?zoneId=${effectiveZoneId}`),
-    enabled: !!effectiveZoneId,
-  });
-  const categories: Category[] = catData?.categories ?? [];
+  useEffect(() => {
+    api.get("/admin/zones").then((res) => {
+      const z = res?.zones ?? [];
+      setZones(z);
+      if (z.length > 0) setSelectedZoneId(z[0].id);
+    }).catch(() => {});
+  }, []);
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/categories/admin/${id}`),
-    onSuccess: () => {
+  const loadCategories = useCallback(() => {
+    if (!effectiveZoneId) return;
+    setLoading(true);
+    api.get(`/categories/admin?zoneId=${effectiveZoneId}`)
+      .then((res) => setCategories(res?.categories ?? []))
+      .catch(() => toast.error("Failed to load categories"))
+      .finally(() => setLoading(false));
+  }, [effectiveZoneId]);
+
+  useEffect(() => { loadCategories(); }, [loadCategories]);
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/categories/admin/${deleteConfirm}`);
       toast.success("Category deleted");
       setDeleteConfirm(null);
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-    },
-    onError: () => toast.error("Delete failed"),
-  });
+      loadCategories();
+    } catch {
+      toast.error("Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-  const reorderMutation = useMutation({
-    mutationFn: (orders: { id: string; sort_order: number }[]) =>
-      api.patch("/categories/admin/reorder", { orders }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
-      api.patch(`/categories/admin/${id}`, { is_active }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
-  });
+  const handleReorder = async (updated: Category[]) => {
+    try {
+      await api.patch("/categories/admin/reorder", {
+        orders: updated.map((c, i) => ({ id: c.id, sort_order: i })),
+      });
+      loadCategories();
+    } catch {
+      toast.error("Reorder failed");
+    }
+  };
 
   const handleMoveUp = (index: number) => {
     if (index === 0) return;
     const updated = [...categories];
     [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
-    reorderMutation.mutate(updated.map((c, i) => ({ id: c.id, sort_order: i })));
+    handleReorder(updated);
   };
 
   const handleMoveDown = (index: number) => {
     if (index === categories.length - 1) return;
     const updated = [...categories];
     [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
-    reorderMutation.mutate(updated.map((c, i) => ({ id: c.id, sort_order: i })));
+    handleReorder(updated);
+  };
+
+  const handleToggle = async (cat: Category) => {
+    try {
+      await api.patch(`/categories/admin/${cat.id}`, { is_active: !cat.is_active });
+      loadCategories();
+    } catch {
+      toast.error("Failed to update");
+    }
   };
 
   return (
@@ -323,12 +320,9 @@ export const CategoriesTab = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            <LayoutGrid className="text-orange-400" size={24} />
-            Menu Categories
+            <LayoutGrid className="text-orange-400" size={24} /> Menu Categories
           </h2>
-          <p className="text-gray-400 text-sm mt-1">
-            Zone-specific image categories shown on the customer app
-          </p>
+          <p className="text-gray-400 text-sm mt-1">Zone-specific image categories shown on the customer app</p>
         </div>
         <button
           onClick={() => { setEditingCategory(undefined); setModalOpen(true); }}
@@ -354,22 +348,18 @@ export const CategoriesTab = () => {
         </div>
       </div>
 
-      {/* Info card */}
+      {/* Info */}
       <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex gap-3">
         <AlertCircle size={16} className="text-blue-400 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-300">
-          <strong>Categories are zone-specific.</strong> Each zone has its own category list.
-          The <code className="bg-blue-900/40 px-1 rounded">slug</code> must exactly match the category name used on menu items in this zone.
-          Categories with no matching menu items are safely hidden.
-        </div>
+        <p className="text-sm text-blue-300">
+          <strong>Categories are zone-specific.</strong> The <code className="bg-blue-900/40 px-1 rounded">slug</code> must exactly match the category name used on menu items in this zone.
+        </p>
       </div>
 
-      {/* Category list */}
-      {isLoading ? (
+      {/* List */}
+      {loading ? (
         <div className="space-y-3">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-20 bg-gray-800 rounded-2xl animate-pulse" />
-          ))}
+          {[...Array(4)].map((_, i) => <div key={i} className="h-20 bg-gray-800 rounded-2xl animate-pulse" />)}
         </div>
       ) : categories.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
@@ -384,7 +374,6 @@ export const CategoriesTab = () => {
               key={cat.id}
               className={`bg-gray-800/60 border rounded-2xl p-4 flex items-center gap-4 transition-all ${cat.is_active ? "border-gray-700" : "border-gray-800 opacity-60"}`}
             >
-              {/* Image preview */}
               <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-700 flex-shrink-0 border-2 border-gray-600">
                 {cat.image_url ? (
                   <img src={cat.image_url} alt={cat.name} className="w-full h-full object-cover" />
@@ -395,13 +384,10 @@ export const CategoriesTab = () => {
                 )}
               </div>
 
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-white truncate">{cat.name}</span>
-                  {!cat.is_active && (
-                    <span className="text-xs bg-gray-700 text-gray-400 px-2 py-0.5 rounded-full">Hidden</span>
-                  )}
+                  {!cat.is_active && <span className="text-xs bg-gray-700 text-gray-400 px-2 py-0.5 rounded-full">Hidden</span>}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <code className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded">{cat.slug}</code>
@@ -409,43 +395,20 @@ export const CategoriesTab = () => {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleMoveUp(index)}
-                  disabled={index === 0}
-                  className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 disabled:opacity-20 transition-colors"
-                  title="Move up"
-                >
+                <button onClick={() => handleMoveUp(index)} disabled={index === 0} className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 disabled:opacity-20 transition-colors">
                   <ChevronUp size={16} />
                 </button>
-                <button
-                  onClick={() => handleMoveDown(index)}
-                  disabled={index === categories.length - 1}
-                  className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 disabled:opacity-20 transition-colors"
-                  title="Move down"
-                >
+                <button onClick={() => handleMoveDown(index)} disabled={index === categories.length - 1} className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 disabled:opacity-20 transition-colors">
                   <ChevronDown size={16} />
                 </button>
-                <button
-                  onClick={() => toggleMutation.mutate({ id: cat.id, is_active: !cat.is_active })}
-                  className={`p-2 rounded-lg transition-colors ${cat.is_active ? "hover:bg-gray-700 text-emerald-400" : "hover:bg-gray-700 text-gray-500"}`}
-                  title={cat.is_active ? "Hide category" : "Show category"}
-                >
+                <button onClick={() => handleToggle(cat)} className={`p-2 rounded-lg transition-colors ${cat.is_active ? "hover:bg-gray-700 text-emerald-400" : "hover:bg-gray-700 text-gray-500"}`}>
                   {cat.is_active ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
-                <button
-                  onClick={() => { setEditingCategory(cat); setModalOpen(true); }}
-                  className="p-2 rounded-lg hover:bg-gray-700 text-blue-400 transition-colors"
-                  title="Edit"
-                >
+                <button onClick={() => { setEditingCategory(cat); setModalOpen(true); }} className="p-2 rounded-lg hover:bg-gray-700 text-blue-400 transition-colors">
                   <Pencil size={16} />
                 </button>
-                <button
-                  onClick={() => setDeleteConfirm(cat.id)}
-                  className="p-2 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors"
-                  title="Delete"
-                >
+                <button onClick={() => setDeleteConfirm(cat.id)} className="p-2 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -469,12 +432,8 @@ export const CategoriesTab = () => {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setDeleteConfirm(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-xl font-semibold transition-colors">Cancel</button>
-              <button
-                onClick={() => deleteMutation.mutate(deleteConfirm)}
-                disabled={deleteMutation.isPending}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-semibold transition-colors disabled:opacity-50"
-              >
-                {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              <button onClick={handleDelete} disabled={deleting} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-semibold transition-colors disabled:opacity-50">
+                {deleting ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>
@@ -488,7 +447,7 @@ export const CategoriesTab = () => {
           zones={zones}
           defaultZoneId={effectiveZoneId}
           onClose={() => { setModalOpen(false); setEditingCategory(undefined); }}
-          onSaved={() => { queryClient.invalidateQueries({ queryKey: ["admin-categories"] }); refetch(); }}
+          onSaved={loadCategories}
         />
       )}
     </div>
