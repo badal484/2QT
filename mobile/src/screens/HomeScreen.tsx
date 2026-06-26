@@ -8,7 +8,7 @@ import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, interpolate, Extrapolate, useAnimatedScrollHandler } from 'react-native-reanimated';
+import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, interpolate, Extrapolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
 import { EmptyState, SkeletonRow } from '../components/ui';
 import { colors } from '../theme/colors';
@@ -108,13 +108,16 @@ const HomeScreen = ({ navigation }: any) => {
     },
   });
 
-  const ADDRESS_HEIGHT = 56;
-  const topRowStyle = useAnimatedStyle(() => {
+  const ADDRESS_HEIGHT = 65;
+  const TOTAL_HEADER_HEIGHT = 165;
+  const headerAnimatedStyle = useAnimatedStyle(() => {
     return {
-      height: interpolate(scrollY.value, [0, ADDRESS_HEIGHT], [ADDRESS_HEIGHT, 0], 'clamp'),
+      transform: [{ translateY: interpolate(scrollY.value, [0, ADDRESS_HEIGHT], [0, -ADDRESS_HEIGHT], 'clamp') }],
+    };
+  });
+  const addressOpacityStyle = useAnimatedStyle(() => {
+    return {
       opacity: interpolate(scrollY.value, [0, ADDRESS_HEIGHT / 2], [1, 0], 'clamp'),
-      marginBottom: interpolate(scrollY.value, [0, ADDRESS_HEIGHT], [16, 0], 'clamp'),
-      overflow: 'hidden',
     };
   });
 
@@ -143,6 +146,7 @@ const HomeScreen = ({ navigation }: any) => {
   const banners = bannersData?.banners || [];
   const mainBanners = banners.filter((b: any) => !b.banner_type || b.banner_type === 'MAIN');
   const miniBanners = banners.filter((b: any) => b.banner_type === 'MINI');
+  const stripBanners = banners.filter((b: any) => b.banner_type === 'STRIP');
 
   // ── Admin-configured image categories (zone-specific) ──────────────────
   const { data: menuCategoriesData } = useQuery({
@@ -390,17 +394,19 @@ const HomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <View style={[
+      <Animated.View style={[
         styles.minimalHeader, 
         { 
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
           paddingTop: Math.max(insets.top + 10, 20), 
           paddingBottom: 16,
           backgroundColor: '#24B059', // Swish Vibrant Green
           borderBottomWidth: 0, 
-        }
+        },
+        headerAnimatedStyle
       ]}>
         {/* ROW 1: Address and Profile (Collapsible) */}
-        <Animated.View style={[topRowStyle, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+        <Animated.View style={[addressOpacityStyle, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }]}>
           <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
             <MapPin size={28} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 8 }} />
             <View style={{ flex: 1 }}>
@@ -476,62 +482,7 @@ const HomeScreen = ({ navigation }: any) => {
             )}
           </View>
         )}
-      </View>
-
-      {/* ── Sticky Category Strip ── */}
-      {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && adminCategories.length > 0 && (
-        <View style={styles.categoryStrip}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryStripScroll}>
-            {/* Admin categories */}
-            {adminCategories.map((cat) => {
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={styles.categoryStripItem}
-                  onPress={() => { triggerHaptic(); navigation.navigate('Category', { categorySlug: cat.slug, categoryName: cat.name, categoryImage: cat.image_url }); }}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.categoryStripCircle}>
-                    {cat.image_url ? (
-                      <NetworkImage uri={cat.image_url} style={styles.categoryStripImage} />
-                    ) : (
-                      <Text style={{ fontSize: 18 }}>🍴</Text>
-                    )}
-                  </View>
-                  <Text style={styles.categoryStripLabel} numberOfLines={1}>
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* ── Mini Banners (Quick Filters) ── */}
-      {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && miniBanners.length > 0 && (
-        <View style={styles.miniBannersContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.miniBannersScroll}>
-            {miniBanners.map((banner: any) => (
-              <TouchableOpacity
-                key={banner.id}
-                activeOpacity={0.8}
-                onPress={() => {
-                  triggerHaptic();
-                  if (banner.action_type === 'FILTER_CATEGORY') setSelectedCategory(banner.action_payload);
-                }}
-                style={styles.miniBannerCard}
-              >
-                <NetworkImage uri={banner.image_url} style={styles.miniBannerImage} />
-                <View style={styles.miniBannerOverlay}>
-                  <Text style={styles.miniBannerTitle}>{banner.title}</Text>
-                  {banner.subtitle && <Text style={styles.miniBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+      </Animated.View>
 
       <AnimatedSectionList
         style={{ flex: 1 }}
@@ -566,6 +517,63 @@ const HomeScreen = ({ navigation }: any) => {
         }
         ListHeaderComponent={
           <View>
+            <View style={{ height: TOTAL_HEADER_HEIGHT }} />
+            
+            {/* ── Category Strip ── */}
+            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && adminCategories.length > 0 && (
+              <View style={styles.categoryStrip}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryStripScroll}>
+                  {/* Admin categories */}
+                  {adminCategories.map((cat) => {
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={styles.categoryStripItem}
+                        onPress={() => { triggerHaptic(); navigation.navigate('Category', { categorySlug: cat.slug, categoryName: cat.name, categoryImage: cat.image_url }); }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.categoryStripCircle}>
+                          {cat.image_url ? (
+                            <NetworkImage uri={cat.image_url} style={styles.categoryStripImage} />
+                          ) : (
+                            <Text style={{ fontSize: 18 }}>🍴</Text>
+                          )}
+                        </View>
+                        <Text style={styles.categoryStripLabel} numberOfLines={1}>
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* ── Mini Banners (Quick Filters) ── */}
+            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && miniBanners.length > 0 && (
+              <View style={styles.miniBannersContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.miniBannersScroll}>
+                  {miniBanners.map((banner: any) => (
+                    <TouchableOpacity
+                      key={banner.id}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        triggerHaptic();
+                        if (banner.action_type === 'FILTER_CATEGORY') setSelectedCategory(banner.action_payload);
+                      }}
+                      style={styles.miniBannerCard}
+                    >
+                      <NetworkImage uri={banner.image_url} style={styles.miniBannerImage} />
+                      <View style={styles.miniBannerOverlay}>
+                        <Text style={styles.miniBannerTitle}>{banner.title}</Text>
+                        {banner.subtitle && <Text style={styles.miniBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {menuData?.kitchenPaused && (
               <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.kitchenPausedBanner}>
                 <ChefHat size={20} color={colors.danger} style={styles.pausedIcon} />
@@ -614,6 +622,26 @@ const HomeScreen = ({ navigation }: any) => {
                 />
               </Animated.View>
             )}
+
+            {/* ── Strip Banners ── */}
+            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && stripBanners.length > 0 && (
+              <View style={styles.stripBannersContainer}>
+                {stripBanners.map((banner: any) => (
+                  <TouchableOpacity
+                    key={banner.id}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      triggerHaptic();
+                      if (banner.action_type === 'FILTER_CATEGORY') setSelectedCategory(banner.action_payload);
+                    }}
+                    style={styles.stripBannerCard}
+                  >
+                    <NetworkImage uri={banner.image_url} style={styles.stripBannerImage} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             {!unserviceableLocation && !showNoLocation && !showNetworkError && <View style={styles.headerSpacer} />}
           </View>
         }
@@ -1195,18 +1223,31 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     padding: spacing.sm + 2,
     justifyContent: 'flex-start',
-    // Slight shadow to make text legible if needed, or rely on admin design
   },
   miniBannerTitle: {
     fontSize: 12,
     fontFamily: fontFamily.extrabold,
-    color: colors.ink, // Admin should upload light background images
+    color: colors.ink,
   },
   miniBannerSubtitle: {
     fontSize: 10,
     fontFamily: fontFamily.bold,
     color: colors.inkMuted,
     marginTop: 2,
+  },
+
+  // ── Strip Banners (Wide & Short) ──────────────────────────────────────────
+  stripBannersContainer: { marginTop: spacing.md, paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.lg },
+  stripBannerCard: {
+    width: '100%',
+    height: 90,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceMuted,
+  },
+  stripBannerImage: {
+    width: '100%',
+    height: '100%',
   },
 
   itemsContainer: { paddingHorizontal: spacing.lg, marginTop: spacing.xl, paddingBottom: spacing.xxxl },
