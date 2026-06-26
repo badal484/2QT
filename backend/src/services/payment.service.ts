@@ -14,7 +14,9 @@ export const calculatePricing = async ({
     useLoyalty = false,
     isSubscriptionOrder = false,
     customerId,
-    riderTipPaise = 0
+    riderTipPaise = 0,
+    zoneId,
+    distanceKm
 }: {
     cartItems: CartItem[];
     addressId: string;
@@ -24,6 +26,8 @@ export const calculatePricing = async ({
     isSubscriptionOrder?: boolean;
     customerId: string;
     riderTipPaise?: number;
+    zoneId: string;
+    distanceKm: number;
 }) => {
     // 1. Fetch item prices
     const itemIds = cartItems.map(i => i.menuItemId);
@@ -106,11 +110,41 @@ export const calculatePricing = async ({
         }
     }
 
-    // 4. Delivery Fee
-    let deliveryFeePaise = isSubscriptionOrder ? TWO_QT.DELIVERY.SUBSCRIBER_FEE_PAISE : TWO_QT.DELIVERY.BASE_FEE_PAISE;
+    // 4. Delivery Fee & Surge from Zone Settings
+    const { rows: zoneRows } = await query(`
+        SELECT delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise, base_distance_km, free_delivery_above_paise, surge_multiplier
+        FROM zones WHERE id = $1
+    `, [zoneId]);
 
-    // 5. Surge (Stub for now - needs zoneId)
+    let deliveryFeePaise = isSubscriptionOrder ? TWO_QT.DELIVERY.SUBSCRIBER_FEE_PAISE : TWO_QT.DELIVERY.BASE_FEE_PAISE;
     let surgePaise = 0;
+
+    if (zoneRows.length > 0 && !isSubscriptionOrder) {
+        const z = zoneRows[0];
+        
+        // Dynamic Delivery Fee Calculation
+        if (z.delivery_fee_type === 'per_km') {
+            const extraKm = Math.max(0, distanceKm - parseFloat(z.base_distance_km));
+            // e.g. distance is 3.5km, base is 2km. We charge for 1.5km. Or we can ceil it. Let's just use exact math:
+            const distanceFee = Math.ceil(extraKm) * z.per_km_fee_paise;
+            deliveryFeePaise = z.base_delivery_fee_paise + distanceFee;
+        } else {
+            // Flat Fee
+            deliveryFeePaise = z.base_delivery_fee_paise;
+        }
+
+        // Surge Multiplier
+        if (z.surge_multiplier && parseFloat(z.surge_multiplier) > 1.0) {
+            const totalWithSurge = Math.floor(deliveryFeePaise * parseFloat(z.surge_multiplier));
+            surgePaise = totalWithSurge - deliveryFeePaise;
+        }
+
+        // Free Delivery Threshold
+        if (z.free_delivery_above_paise != null && subtotalPaise >= z.free_delivery_above_paise) {
+            deliveryFeePaise = 0;
+            surgePaise = 0;
+        }
+    }
 
     // 6. GST
     const taxableAmount = Math.max(0, subtotalPaise - subscriptionDiscountPaise - discountPaise - loyaltyDiscountPaise);

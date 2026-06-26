@@ -11,7 +11,6 @@ import AddressScreen from '../screens/AddressScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import OrderConfirmedScreen from '../screens/OrderConfirmedScreen';
 import OrderPlacedScreen from '../screens/OrderPlacedScreen';
-import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 import RateOrderScreen from '../screens/RateOrderScreen';
 import OrderHistoryScreen from '../screens/OrderHistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -67,7 +66,6 @@ const CustomerNavigator = () => {
           },
         }}
       />
-      <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
       <Stack.Screen name="RateOrder" component={RateOrderScreen} />
       <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
       <Stack.Screen name="OrdersTab" component={OrderHistoryScreen} />

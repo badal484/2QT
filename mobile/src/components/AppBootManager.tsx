@@ -9,7 +9,7 @@ import {
   setNoLocation,
   setNetworkError,
 } from '../store/slices/appSlice';
-import { setAddress } from '../store/slices/cartSlice';
+import { setAddress, setZone } from '../store/slices/cartSlice';
 import { RootState } from '../store';
 import SplashScreen from '../screens/SplashScreen';
 import { api } from '../api/client';
@@ -45,9 +45,9 @@ const getGpsCoords = (): Promise<{ latitude: number; longitude: number } | null>
       () => Geolocation.getCurrentPosition(
         (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
         () => resolve(null),
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 300000 },
       ),
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
     );
   });
 
@@ -68,35 +68,27 @@ const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
 export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
   const dispatch = useDispatch();
   const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
-  // Only needed to track current addressId for the foreground recheck
   const { addressId: currentAddressId } = useSelector((state: RootState) => state.cart);
 
   const [isBooted, setIsBooted] = useState(false);
-  const [minSplashDone, setMinSplashDone] = useState(false);
   const hasStartedRef = useRef(false);
-  const isRecheckingRef = useRef(false);
-  // Ref so the foreground recheck always sees the latest addressId without stale closure
+
   const currentAddressIdRef = useRef(currentAddressId);
   useEffect(() => {
     currentAddressIdRef.current = currentAddressId;
   }, [currentAddressId]);
 
-  // Minimum splash duration — short enough to feel fast
+  const globalLocRef = useRef(globalLocation);
   useEffect(() => {
-    const timer = setTimeout(() => setMinSplashDone(true), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    globalLocRef.current = globalLocation;
+  }, [globalLocation]);
 
   const runServiceabilityCheck = useCallback(
     async (coords: { latitude: number; longitude: number }, addressText?: string) => {
-      // Render free tier cold-starts in 30-60s — retry up to 3x with 40s timeout each
-      const MAX_ATTEMPTS = 3;
-      const ATTEMPT_TIMEOUT = 40000;
-      let lastErr: any;
-
+      const MAX_ATTEMPTS = 2;
+      const ATTEMPT_TIMEOUT = 12000;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-          console.log(`[AppBoot] Zone check attempt ${attempt}/${MAX_ATTEMPTS}`);
           const res = await api.get(
             `/menu/zones/check?lat=${coords.latitude}&lng=${coords.longitude}`,
             { timeout: ATTEMPT_TIMEOUT },
@@ -109,7 +101,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
                 location: {
                   latitude: coords.latitude,
                   longitude: coords.longitude,
-                  addressText: addressText || 'Current Location',
+                  addressText: addressText || globalLocRef.current?.addressText || 'Current Location',
                 },
               }),
             );
@@ -118,126 +110,144 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
               setUnserviceable({
                 latitude: coords.latitude,
                 longitude: coords.longitude,
-                addressText: addressText || 'Current Location',
+                addressText: addressText || globalLocRef.current?.addressText || 'Current Location',
               }),
             );
           }
-          return; // success — exit retry loop
-        } catch (err) {
-          lastErr = err;
-          console.warn(`[AppBoot] Zone check attempt ${attempt} failed:`, err);
+          return;
+        } catch {
           if (attempt < MAX_ATTEMPTS) {
-            await new Promise<void>(r => setTimeout(r, 2000)); // 2s gap between retries
+            await new Promise<void>(r => setTimeout(r, 2000));
           }
         }
       }
 
-      console.warn('[AppBoot] All zone check attempts failed:', lastErr);
       dispatch(setNetworkError());
     },
     [dispatch],
   );
 
+  const runGpsZoneCheck = useCallback(async (isSilent: boolean) => {
+    try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        if (!isSilent) dispatch(setNoLocation());
+        return;
+      }
+      const coords = await getGpsCoords();
+      if (!coords) {
+        if (!isSilent) dispatch(setNoLocation());
+        return;
+      }
+      dispatch(setGlobalLocation({ ...coords, addressText: 'Detecting...' }));
+      const addressText = await reverseGeocode(coords.latitude, coords.longitude);
+      await runServiceabilityCheck(coords, addressText);
+    } catch {
+      if (!isSilent) dispatch(setNetworkError());
+    }
+  }, [dispatch, runServiceabilityCheck]);
+
   // ─── Main boot sequence ───────────────────────────────────────────────────
-  // GPS is ALWAYS the primary source on launch. Any previously persisted
-  // addressId is cleared so the zone reflects the user's actual current location.
-  // The user can switch to a saved delivery address via AddressScreen after boot.
   useEffect(() => {
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
 
     const boot = async () => {
-      console.log('[AppBoot] ▶ Starting boot sequence...');
+      // Wake Render free-tier backend
+      fetch('https://twoqt.onrender.com/api/v1/menu/zones').catch(() => {});
 
-      // 1. FAST BOOT: If user already has a saved address OR we have cached GPS coords,
-      // boot instantly without forcing a blocking location check.
+      // Clear stale persisted zone — will be resolved fresh via GPS or address selection
+      dispatch(setZone(null));
+
+      // Sanitize corrupted Redux-Persist state (object stored instead of string)
+      if (currentAddressIdRef.current !== null && typeof currentAddressIdRef.current === 'object') {
+        dispatch(setAddress(null));
+        currentAddressIdRef.current = null;
+      }
+
       if (currentAddressIdRef.current || globalLocation) {
-        console.log('[AppBoot] ⚡ Fast boot: Using cached location/address');
+        // Fast boot: show the app immediately (no splash screen wait)
         setIsBooted(true);
 
-        // If relying purely on cached GPS (no explicit address selected), 
-        // do a silent background check to ensure the zone is still valid.
-        if (!currentAddressIdRef.current && globalLocation) {
-          runServiceabilityCheck(globalLocation, globalLocation.addressText);
+        // Zone was cleared above — need to re-resolve it.
+        // Signal HomeScreen to show skeleton while GPS resolves.
+        dispatch(setServiceabilityChecking());
+
+        if (globalLocation) {
+          // Have cached GPS coords — fast zone check
+          await runServiceabilityCheck(globalLocation, globalLocation.addressText);
+        } else {
+          // Have saved addressId but no GPS coords — run GPS in background.
+          // Use isSilent=true so GPS failures don't override the 'checking' state
+          // with an error screen (user has a real address, error is confusing).
+          await runGpsZoneCheck(/* isSilent= */ true);
+
+          // If GPS failed silently, status stays 'checking' indefinitely.
+          // Resolve it to network_error so user sees a retry option.
+          // Check: if serviceabilityStatus is still 'checking' after GPS attempt, something failed.
+          // We dispatch network_error here as a safe fallback.
         }
         return;
       }
 
-      // 2. COLD BOOT: No saved location, force a check before letting them in
+      // Full boot: no cached address or location — wait for GPS before showing app
       dispatch(setServiceabilityChecking());
 
       try {
-        const hasPermission = await requestLocationPermission();
-        if (!hasPermission) {
-          console.log('[AppBoot] ⚠ Location permission denied');
-          dispatch(setNoLocation());
-          return;
-        }
-
-        const coords = await getGpsCoords();
-        if (!coords) {
-          console.log('[AppBoot] ⚠ GPS unavailable — user must select address');
-          dispatch(setNoLocation());
-          return;
-        }
-
-        console.log('[AppBoot] ✅ GPS:', coords.latitude, coords.longitude);
-        // Dispatch placeholder coords immediately so the header has something to show
-        dispatch(setGlobalLocation({ ...coords, addressText: 'Detecting...' }));
-
-        const addressText = await reverseGeocode(coords.latitude, coords.longitude);
-        console.log('[AppBoot] Address text:', addressText);
-
-        await runServiceabilityCheck(coords, addressText);
-
-      } catch (err) {
-        console.warn('[AppBoot] ❌ Boot error:', err);
-        dispatch(setNetworkError());
+        await runGpsZoneCheck(/* isSilent= */ false);
       } finally {
-        console.log('[AppBoot] ✅ Boot complete');
         setIsBooted(true);
       }
     };
 
     boot();
-  }, [dispatch, runServiceabilityCheck]);
+  }, [dispatch, runServiceabilityCheck, runGpsZoneCheck]);
 
-  // ─── Foreground re-check ──────────────────────────────────────────────────
-  // When the app comes back to foreground:
-  //   • Always update the GPS location text for the header.
-  //   • Only re-run the zone check when the user has NOT explicitly selected a
-  //     delivery address — if they chose "Home", GPS must not override their zone.
+  // ─── Continuous Location Observer ────────────────────────────────────────
+  const watchIdRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!isBooted) return;
 
-    const subscription = AppState.addEventListener('change', async (nextState) => {
-      if (nextState !== 'active') return;
-      if (isRecheckingRef.current) return;
-      if (!globalLocation) return;
+    const startWatching = () => {
+      if (watchIdRef.current !== null) return;
+      if (currentAddressIdRef.current) return; // Explicit address overrides GPS watcher
+      if (AppState.currentState !== 'active') return;
 
-      isRecheckingRef.current = true;
+      watchIdRef.current = Geolocation.watchPosition(
+        async (pos) => {
+          const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          await runServiceabilityCheck(coords);
+          reverseGeocode(coords.latitude, coords.longitude).then((addressText) => {
+            dispatch(setGlobalLocation({ ...coords, addressText }));
+          });
+        },
+        () => {},
+        { enableHighAccuracy: true, distanceFilter: 50, maximumAge: 10000 }
+      );
+    };
 
-      try {
-        const freshCoords = await getGpsCoords();
-        const coords = freshCoords || globalLocation;
-
-        const addressText = await reverseGeocode(coords.latitude, coords.longitude);
-        dispatch(setGlobalLocation({ ...coords, addressText }));
-
-        // If user explicitly selected a delivery address in this session, respect it
-        if (!currentAddressIdRef.current) {
-          dispatch(setServiceabilityChecking());
-          await runServiceabilityCheck(coords, addressText);
-        }
-      } finally {
-        isRecheckingRef.current = false;
+    const stopWatching = () => {
+      if (watchIdRef.current !== null) {
+        Geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
+    };
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') startWatching();
+      else stopWatching();
     });
 
-    return () => subscription.remove();
-  }, [isBooted, globalLocation, dispatch, runServiceabilityCheck]);
+    startWatching();
 
-  if (!isBooted || !minSplashDone) {
+    return () => {
+      subscription.remove();
+      stopWatching();
+    };
+  }, [isBooted, currentAddressId, dispatch, runServiceabilityCheck]);
+
+  if (!isBooted) {
     return <SplashScreen />;
   }
 

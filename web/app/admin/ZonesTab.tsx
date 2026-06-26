@@ -11,7 +11,7 @@ const MapPolygonPicker = dynamic(() => import("../../components/MapPolygonPicker
 
 const EMPTY_ZONE = {
   name: "", city: "",
-  polygon_points: [], delivery_fee_base_paise: "2500",
+  polygon_points: [], base_delivery_fee_paise: "2500", delivery_fee_type: "flat",
   opening_time: "10:00", closing_time: "22:00",
   max_orders_per_hour: "60", realistic_delivery_minutes: "15",
 };
@@ -53,7 +53,8 @@ export function ZonesTab() {
         kitchen_lat: addForm.polygon_points[0].lat,
         kitchen_lng: addForm.polygon_points[0].lng,
         radius_km: 0,
-        delivery_fee_base_paise: parseInt(addForm.delivery_fee_base_paise),
+        base_delivery_fee_paise: parseInt(addForm.base_delivery_fee_paise),
+        delivery_fee_type: addForm.delivery_fee_type || 'flat',
         max_orders_per_hour: parseInt(addForm.max_orders_per_hour),
         realistic_delivery_minutes: parseInt(addForm.realistic_delivery_minutes),
       });
@@ -73,7 +74,12 @@ export function ZonesTab() {
     setForm({
       name: zone.name,
       polygon_points: zone.polygon_points || [],
-      delivery_fee_base_paise: zone.delivery_fee_base_paise,
+      base_delivery_fee_paise: zone.base_delivery_fee_paise || zone.delivery_fee_base_paise,
+      delivery_fee_type: zone.delivery_fee_type || 'flat',
+      per_km_fee_paise: zone.per_km_fee_paise || 500,
+      base_distance_km: zone.base_distance_km || 0,
+      free_delivery_above_paise: zone.free_delivery_above_paise,
+      surge_multiplier: zone.surge_multiplier || 1.0,
       opening_time: zone.opening_time,
       closing_time: zone.closing_time,
       max_orders_per_hour: zone.max_orders_per_hour,
@@ -92,7 +98,12 @@ export function ZonesTab() {
       await api.patch(`/admin/zones/${id}`, {
         ...form,
         radius_km: 0,
-        delivery_fee_base_paise: parseInt(form.delivery_fee_base_paise || "0", 10),
+        base_delivery_fee_paise: parseInt(form.base_delivery_fee_paise || "0", 10),
+        delivery_fee_type: form.delivery_fee_type || 'flat',
+        per_km_fee_paise: parseInt(form.per_km_fee_paise || "0", 10),
+        base_distance_km: parseFloat(form.base_distance_km || "0"),
+        free_delivery_above_paise: form.free_delivery_above_paise ? parseInt(form.free_delivery_above_paise, 10) : null,
+        surge_multiplier: parseFloat(form.surge_multiplier || "1.0"),
         max_orders_per_hour: parseInt(form.max_orders_per_hour || "0", 10),
         realistic_delivery_minutes: parseInt(form.realistic_delivery_minutes || "0", 10),
         ...(centroidLat != null && !isNaN(centroidLat) && { kitchen_lat: centroidLat, kitchen_lng: centroidLng }),
@@ -130,6 +141,12 @@ export function ZonesTab() {
             className="w-4 h-4 accent-brand-primary rounded" />
           <span className="text-xs font-semibold text-white">{form[key] ? "Yes" : "No"}</span>
         </label>
+      ) : type === "select" ? (
+        <select value={form[key] ?? "flat"} onChange={e => setForm({ ...form, [key]: e.target.value })}
+          className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50">
+          <option value="flat">Flat Fee</option>
+          <option value="per_km">Per KM</option>
+        </select>
       ) : (
         <input type={type} value={form[key] ?? ""} onChange={e => setForm({ ...form, [key]: e.target.value })}
           className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50" />
@@ -169,7 +186,7 @@ export function ZonesTab() {
             {[
               { label: "Zone Name", key: "name", type: "text", placeholder: "e.g. Koramangala" },
               { label: "City", key: "city", type: "text", placeholder: "City name" },
-              { label: "Delivery Fee (paise)", key: "delivery_fee_base_paise", type: "number", placeholder: "2500" },
+              { label: "Base Fee (paise)", key: "base_delivery_fee_paise", type: "number", placeholder: "2500" },
               { label: "Opens At", key: "opening_time", type: "time", placeholder: "" },
               { label: "Closes At", key: "closing_time", type: "time", placeholder: "" },
               { label: "Max Orders/Hour", key: "max_orders_per_hour", type: "number", placeholder: "60" },
@@ -243,7 +260,12 @@ export function ZonesTab() {
                     />
                   </div>
                   {field("Zone Name", "name")}
-                  {field("Delivery Fee (paise)", "delivery_fee_base_paise", "number")}
+                  {field("Fee Type", "delivery_fee_type", "select")}
+                  {field("Base Fee (paise)", "base_delivery_fee_paise", "number")}
+                  {field("Per KM Fee (paise)", "per_km_fee_paise", "number")}
+                  {field("Base Distance (KM)", "base_distance_km", "number")}
+                  {field("Free Delivery Above (paise)", "free_delivery_above_paise", "number")}
+                  {field("Surge Multiplier", "surge_multiplier", "number")}
                   {field("Opens At", "opening_time", "time")}
                   {field("Closes At", "closing_time", "time")}
                   {field("Max Orders/Hour", "max_orders_per_hour", "number")}
@@ -254,14 +276,14 @@ export function ZonesTab() {
               ) : (
                 <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: "Points", value: zone.polygon_points ? `${zone.polygon_points.length} nodes` : '0 nodes' },
-                    { label: "Delivery Fee", value: `₹${zone.delivery_fee_base_paise / 100}` },
+                    { label: "Type", value: zone.delivery_fee_type === 'per_km' ? 'Per KM' : 'Flat' },
+                    { label: "Base Fee", value: `₹${(zone.base_delivery_fee_paise || zone.delivery_fee_base_paise) / 100}` },
+                    { label: "Free Above", value: zone.free_delivery_above_paise ? `₹${zone.free_delivery_above_paise / 100}` : '—' },
+                    { label: "Per KM Rate", value: `₹${(zone.per_km_fee_paise || 0) / 100} / km` },
                     { label: "Hours", value: `${zone.opening_time?.slice(0,5)} – ${zone.closing_time?.slice(0,5)}` },
-                    { label: "Max Orders/hr", value: zone.max_orders_per_hour },
                     { label: "Est. Delivery", value: `${zone.realistic_delivery_minutes} min` },
-                    { label: "Surge", value: zone.surge_enabled ? "On" : "Off" },
-                    { label: "Kitchen Lat", value: zone.kitchen_lat ? Number(zone.kitchen_lat).toFixed(4) : "— not set" },
-                    { label: "Kitchen Lng", value: zone.kitchen_lng ? Number(zone.kitchen_lng).toFixed(4) : "— not set" },
+                    { label: "Surge Mult.", value: `${zone.surge_multiplier || 1.0}x` },
+                    { label: "Points", value: zone.polygon_points ? `${zone.polygon_points.length} nodes` : '0 nodes' },
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">{label}</div>

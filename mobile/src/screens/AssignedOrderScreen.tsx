@@ -12,6 +12,7 @@ import {
   CreditCard, ChevronRight, Info, ExternalLink, AlertTriangle,
 } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
+import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
 
 const G = {
   bg: '#070F0C', surface: '#0F1F18', card: '#152318',
@@ -39,6 +40,21 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [currentStatus, setCurrentStatus] = useState(order.status);
   const queryClient = useQueryClient();
+  // Start background GPS foreground service — keep running even when navigating away.
+  // Stop ONLY when order is done (delivered/unclaimed), never on component unmount.
+  useEffect(() => {
+    const { store } = require('../store');
+    const token = store.getState().auth.accessToken;
+    if (token) startRiderLocationService(token);
+    // No cleanup here — service must survive back navigation
+  }, []);
+
+  // Stop service when order reaches a terminal state
+  useEffect(() => {
+    if (currentStatus === 'delivered') {
+      stopRiderLocationService();
+    }
+  }, [currentStatus]);
 
   // Socket — live status updates
   useEffect(() => {
@@ -104,6 +120,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const unclaimMutation = useMutation({
     mutationFn: () => api.post(`/riders/orders/${order.id}/unclaim`, {}),
     onSuccess: () => {
+      stopRiderLocationService();  // Order released — stop tracking
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       queryClient.invalidateQueries({ queryKey: ['me'] });
       navigation.goBack();

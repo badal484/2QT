@@ -10,14 +10,19 @@ import { NetworkObserver } from './src/components/NetworkObserver';
 import { AppBootManager } from './src/components/AppBootManager';
 import SplashScreen from './src/screens/SplashScreen';
 
-console.log('--- 2QT SYSTEM INITIALIZING ---');
-console.log('STORE_STATUS:', !!store);
+if (!__DEV__) {
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000,
-      retry: false,
+      staleTime: 5 * 60 * 1000,   // 5 min — don't refetch on every focus
+      gcTime: 30 * 60 * 1000,      // 30 min in memory
+      retry: 1,
+      retryDelay: 1000,
     },
   },
 });

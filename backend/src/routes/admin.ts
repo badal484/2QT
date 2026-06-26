@@ -51,6 +51,12 @@ const ZoneSchema = z.object({
     kitchen_lng: z.number(),
     radius_km: z.number().nonnegative().optional().default(4),
     delivery_fee_base_paise: z.number().int().nonnegative().optional().default(2500),
+    delivery_fee_type: z.enum(['flat', 'per_km']).optional().default('flat'),
+    base_delivery_fee_paise: z.number().int().nonnegative().optional().default(2500),
+    per_km_fee_paise: z.number().int().nonnegative().optional().default(500),
+    base_distance_km: z.number().nonnegative().optional().default(0),
+    free_delivery_above_paise: z.number().int().nonnegative().optional().nullable(),
+    surge_multiplier: z.number().nonnegative().optional().default(1.0),
     opening_time: z.string().regex(/^\d{2}:\d{2}$/).optional().default('10:00'),
     closing_time: z.string().regex(/^\d{2}:\d{2}$/).optional().default('22:00'),
     max_orders_per_hour: z.number().int().positive().optional().default(60),
@@ -824,18 +830,28 @@ router.get('/zones', authenticate, requireRole('super_admin', 'admin'), async (r
 router.post('/zones', authenticate, requireRole('super_admin', 'admin'), validate(ZoneSchema), async (req: AuthRequest, res) => {
     const { name, city, kitchen_lat, kitchen_lng, radius_km,
             delivery_fee_base_paise, opening_time, closing_time,
-            max_orders_per_hour, realistic_delivery_minutes, polygon_points } = req.body;
+            max_orders_per_hour, realistic_delivery_minutes, polygon_points,
+            delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise,
+            base_distance_km, free_delivery_above_paise, surge_multiplier } = req.body;
     try {
         const { rows } = await query(`
             INSERT INTO zones (name, city, kitchen_lat, kitchen_lng, radius_km,
                 delivery_fee_base_paise, opening_time, closing_time,
-                max_orders_per_hour, realistic_delivery_minutes, polygon_points)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                max_orders_per_hour, realistic_delivery_minutes, polygon_points,
+                delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise,
+                base_distance_km, free_delivery_above_paise, surge_multiplier)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING *
         `, [name, city, kitchen_lat, kitchen_lng, radius_km,
             delivery_fee_base_paise, opening_time, closing_time,
             max_orders_per_hour, realistic_delivery_minutes,
-            polygon_points ? JSON.stringify(polygon_points) : null]);
+            polygon_points ? JSON.stringify(polygon_points) : null,
+            delivery_fee_type || 'flat',
+            base_delivery_fee_paise ?? delivery_fee_base_paise ?? 2500,
+            per_km_fee_paise ?? 500,
+            base_distance_km ?? 0,
+            free_delivery_above_paise ?? null,
+            surge_multiplier ?? 1.0]);
         res.status(201).json({ zone: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to create zone', details: err.message });
@@ -849,6 +865,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
         opening_time, closing_time, max_orders_per_hour, is_active,
         realistic_delivery_minutes, surge_enabled, polygon_points,
         kitchen_lat, kitchen_lng,
+        delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise, base_distance_km, free_delivery_above_paise, surge_multiplier
     } = req.body;
 
     // Auto-compute zone center from polygon centroid when polygon changes
@@ -875,6 +892,12 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
                 polygon_points = COALESCE($11::jsonb, polygon_points),
                 kitchen_lat = COALESCE($13, kitchen_lat),
                 kitchen_lng = COALESCE($14, kitchen_lng),
+                delivery_fee_type = COALESCE($15, delivery_fee_type),
+                base_delivery_fee_paise = COALESCE($16, base_delivery_fee_paise),
+                per_km_fee_paise = COALESCE($17, per_km_fee_paise),
+                base_distance_km = COALESCE($18, base_distance_km),
+                free_delivery_above_paise = COALESCE($19, free_delivery_above_paise),
+                surge_multiplier = COALESCE($20, surge_multiplier),
                 updated_at = NOW()
             WHERE id = $12
             RETURNING *
@@ -882,7 +905,9 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
             opening_time, closing_time, max_orders_per_hour, is_active,
             realistic_delivery_minutes, surge_enabled,
             polygon_points ? JSON.stringify(polygon_points) : null, id,
-            computedKitchenLat ?? null, computedKitchenLng ?? null]);
+            computedKitchenLat ?? null, computedKitchenLng ?? null,
+            delivery_fee_type ?? null, base_delivery_fee_paise ?? null, per_km_fee_paise ?? null,
+            base_distance_km ?? null, free_delivery_above_paise ?? null, surge_multiplier ?? null]);
         if (rows.length === 0) return res.status(404).json({ error: 'ZONE_NOT_FOUND' });
 
         // Sync kitchen lat/lng to the new zone center so maps show the correct spot

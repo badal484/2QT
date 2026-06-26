@@ -1,12 +1,13 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Animated, Dimensions, Platform,
+  Animated, Dimensions
 } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { ArrowLeft, Navigation, MapPin, Search, Loader } from 'lucide-react-native';
+import MapView, { PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
+import { ArrowLeft, Navigation, MapPin, Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Geolocation from '@react-native-community/geolocation';
+import { api } from '../api/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 
@@ -21,67 +22,6 @@ interface Props {
   onSearchPress?: () => void;
 }
 
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': '2QT-App/1.0' } }
-    );
-    const data = await res.json();
-    if (data?.display_name) {
-      // Shorten: take road + suburb + city
-      const a = data.address || {};
-      const parts = [
-        a.road || a.pedestrian || a.footway,
-        a.suburb || a.neighbourhood || a.village || a.town,
-        a.city || a.county,
-      ].filter(Boolean);
-      return parts.length ? parts.join(', ') : data.display_name.split(',').slice(0, 3).join(',');
-    }
-  } catch {}
-  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-}
-
-const MAP_HTML = (lat: number, lng: number) => `
-<!DOCTYPE html><html>
-<head>
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body,html,#map{width:100%;height:100%;background:#1a1a2e}
-    .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
-  </style>
-</head>
-<body>
-<div id="map"></div>
-<script>
-  var map = L.map('map',{zoomControl:false,tap:true}).setView([${lat},${lng}],17);
-  /* Esri World Imagery — true satellite with good India coverage */
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-    maxZoom:19, attribution:''
-  }).addTo(map);
-  /* Street-name labels on top of satellite */
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{
-    maxZoom:19, attribution:''
-  }).addTo(map);
-
-  map.on('dragstart movestart', function(){
-    window.ReactNativeWebView.postMessage(JSON.stringify({type:'moving'}));
-  });
-  map.on('moveend', function(){
-    var c = map.getCenter();
-    window.ReactNativeWebView.postMessage(JSON.stringify({type:'moved',lat:c.lat,lng:c.lng}));
-  });
-
-  window.flyTo = function(lat,lng){
-    map.flyTo([lat,lng],16,{animate:true,duration:0.8});
-  };
-</script>
-</body></html>
-`;
-
 export const MapPinPicker: React.FC<Props> = ({
   initialLat = 23.637,
   initialLng = 85.52,
@@ -90,9 +30,7 @@ export const MapPinPicker: React.FC<Props> = ({
   onSearchPress,
 }) => {
   const insets = useSafeAreaInsets();
-  const webviewRef = useRef<WebView>(null);
-  const webviewReady = useRef(false);
-  const pendingFlyTo = useRef<{ lat: number; lng: number } | null>(null);
+  const mapRef = useRef<MapView>(null);
 
   const [center, setCenter] = useState({ lat: initialLat, lng: initialLng });
   const [address, setAddress] = useState('');
@@ -121,34 +59,29 @@ export const MapPinPicker: React.FC<Props> = ({
     ]).start();
   }, [pinY, shadowScale]);
 
-  const flyToCoords = useCallback((lat: number, lng: number) => {
-    if (webviewRef.current && webviewReady.current) {
-      webviewRef.current.injectJavaScript(`window.flyTo(${lat},${lng}); true;`);
-    } else {
-      // WebView not ready yet — queue it
-      pendingFlyTo.current = { lat, lng };
-    }
-  }, []);
-
   const geocodeAndSet = useCallback(async (lat: number, lng: number) => {
     setGeocoding(true);
     setCenter({ lat, lng });
-    const a = await reverseGeocode(lat, lng);
-    setAddress(a);
+    try {
+      const data = await api.get(`/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
+      setAddress(data?.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    } catch {
+      setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    }
     setGeocoding(false);
   }, []);
 
-  // On mount: request fresh GPS fix — maximumAge:0 forces device to get new position
   useEffect(() => {
     Geolocation.requestAuthorization();
     Geolocation.getCurrentPosition(
       pos => {
         const { latitude, longitude } = pos.coords;
-        flyToCoords(latitude, longitude);
+        mapRef.current?.animateToRegion({
+          latitude, longitude, latitudeDelta: 0.005, longitudeDelta: 0.005
+        }, 800);
         geocodeAndSet(latitude, longitude);
       },
       () => {
-        // Permission denied or timeout — fall back to props passed by AddressScreen
         geocodeAndSet(initialLat, initialLng);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
@@ -156,79 +89,73 @@ export const MapPinPicker: React.FC<Props> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced reverse geocode after user pans map
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleMoved = useCallback(async (lat: number, lng: number) => {
-    setCenter({ lat, lng });
+  
+  const handleRegionChange = () => {
+    if (!moving) {
+      setMoving(true);
+      animatePin(true);
+    }
+  };
+
+  const handleRegionChangeComplete = useCallback(async (region: any) => {
+    setCenter({ lat: region.latitude, lng: region.longitude });
     setMoving(false);
     animatePin(false);
+    
     if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
-    geocodeTimer.current = setTimeout(async () => {
-      setGeocoding(true);
-      const a = await reverseGeocode(lat, lng);
-      setAddress(a);
-      setGeocoding(false);
+    geocodeTimer.current = setTimeout(() => {
+      geocodeAndSet(region.latitude, region.longitude);
     }, 400);
-  }, [animatePin]);
+  }, [animatePin, geocodeAndSet]);
 
   const flyToGPS = useCallback(() => {
     setLocating(true);
     Geolocation.getCurrentPosition(
       pos => {
         setLocating(false);
-        flyToCoords(pos.coords.latitude, pos.coords.longitude);
-        // Immediately start reverse-geocoding the fresh GPS position
-        setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGeocoding(true);
-        reverseGeocode(pos.coords.latitude, pos.coords.longitude).then(a => {
-          setAddress(a);
-          setGeocoding(false);
-        });
+        const { latitude, longitude } = pos.coords;
+        mapRef.current?.animateToRegion({
+          latitude, longitude, latitudeDelta: 0.005, longitudeDelta: 0.005
+        }, 800);
+        geocodeAndSet(latitude, longitude);
       },
       () => {
         setLocating(false);
-        // Fallback: fly to initial prop location
-        flyToCoords(initialLat, initialLng);
+        mapRef.current?.animateToRegion({
+          latitude: initialLat, longitude: initialLng, latitudeDelta: 0.005, longitudeDelta: 0.005
+        }, 800);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
-  }, [flyToCoords, initialLat, initialLng]);
+  }, [geocodeAndSet, initialLat, initialLng]);
 
   return (
     <View style={styles.container}>
-      {/* Map */}
-      <WebView
-        ref={webviewRef}
-        originWhitelist={['*']}
-        source={{ html: MAP_HTML(initialLat, initialLng), baseUrl: 'https://leafletjs.com/' }}
-        scrollEnabled={false}
-        bounces={false}
-        javaScriptEnabled
-        domStorageEnabled
-        mixedContentMode="always"
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFill}
-        onLoad={() => {
-          webviewReady.current = true;
-          if (pendingFlyTo.current) {
-            const { lat, lng } = pendingFlyTo.current;
-            webviewRef.current?.injectJavaScript(`window.flyTo(${lat},${lng}); true;`);
-            pendingFlyTo.current = null;
-          }
+        initialRegion={{
+          latitude: initialLat,
+          longitude: initialLng,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
         }}
-        onMessage={e => {
-          try {
-            const d = JSON.parse(e.nativeEvent.data);
-            if (d.type === 'moving') {
-              setMoving(true);
-              animatePin(true);
-            } else if (d.type === 'moved') {
-              handleMoved(d.lat, d.lng);
-            }
-          } catch {}
-        }}
-      />
+        onRegionChange={handleRegionChange}
+        onRegionChangeComplete={handleRegionChangeComplete}
+        showsUserLocation={true}
+        showsMyLocationButton={false}
+        pitchEnabled={false}
+        toolbarEnabled={false}
+        mapType="none"
+      >
+        <UrlTile
+          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maximumZ={19}
+          flipY={false}
+        />
+      </MapView>
 
       {/* Fixed center pin */}
       <View style={styles.pinContainer} pointerEvents="none">
@@ -242,7 +169,7 @@ export const MapPinPicker: React.FC<Props> = ({
       </View>
 
       {/* Top bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 20) }]}>
         <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.85}>
           <ArrowLeft size={20} color={colors.ink} />
         </TouchableOpacity>
@@ -267,7 +194,7 @@ export const MapPinPicker: React.FC<Props> = ({
       </TouchableOpacity>
 
       {/* Bottom sheet */}
-      <View style={[styles.bottomSheet, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.bottomSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <View style={styles.dragHandle} />
 
         <View style={styles.locationRow}>

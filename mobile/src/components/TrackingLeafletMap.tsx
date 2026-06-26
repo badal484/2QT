@@ -135,85 +135,31 @@ function closestIdx(lat,lng){
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 function riderIcon(hdg){
-  // Top-down motorcycle handlebar — single continuous outline path
-  // Anatomy (SVG y-axis goes DOWN, so lower-y = forward/front of bike):
-  //
-  //   [green fork tip, y=1..13]        ← direction of travel
-  //   [center clamp rect]
-  //   ╭──────────────────────────╮     ← top edge of bar arches toward front
-  //   │  left arm    right arm   │       as it sweeps outward from center
-  //   │                          │
-  //   [left grip]          [right grip] ← cylindrical ends, curved tips
-  //   │                          │       ribbing lines cross the grips
-  //   [steering stem going back]
-  //
-  // The bar outline is ONE filled path: arch up to center, arc round each grip end, arch back.
-  // Arc A6,6,0,0,1 = clockwise (right-side bulge for right grip)
-  // Arc A6,6,0,0,0 = counter-clockwise (left-side bulge for left grip)
   return L.divIcon({
-    html:'<div style="transform:rotate('+hdg+'deg);position:relative;width:68px;height:60px">'
-      +'<div class="rider-pulse"></div>'
-      +'<svg width="68" height="60" viewBox="-2 0 70 60" xmlns="http://www.w3.org/2000/svg" overflow="visible">'
-      +'<defs>'
-      +'<filter id="rsh" x="-40%" y="-40%" width="180%" height="180%">'
-      +'<feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="#000" flood-opacity="1"/>'
-      +'</filter>'
-      +'</defs>'
-      +'<g filter="url(#rsh)">'
-      // Green fork tip (direction of travel)
-      +'<polygon points="33,1 26,13 40,13" fill="#10B981"/>'
-      // ── Handlebar tube: single filled outline ──
-      // Top edge: left grip-top → arch up to center-top → right grip-top
-      // Then arc clockwise around right grip end
-      // Bottom edge: right grip-bot → arch down to center-bot → left grip-bot
-      // Then arc counter-clockwise around left grip end → close
-      +'<path d="M4,30 C9,20 21,13 33,12 C45,13 57,20 62,30 A6,6,0,0,1,62,42 C57,36 45,25 33,24 C21,25 9,36 4,42 A6,6,0,0,0,4,30 Z" fill="white"/>'
-      // Center clamp (slightly wider block over the bar center)
-      +'<rect x="27" y="11" width="12" height="14" rx="4" fill="white"/>'
-      // Steering stem going toward rider
-      +'<rect x="30" y="24" width="6" height="24" rx="3" fill="white"/>'
-      // Top-of-tube highlight — faint stripe simulates round-tube 3-D
-      +'<path d="M5,29 C10,20 21,13 33,12 C45,13 56,20 61,29" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="5" stroke-linecap="round"/>'
-      +'</g>'
-      // ── Grip ribbing — drawn on top (no shadow), perpendicular bands across grip ──
-      // Left grip area: x ≈ -2..10, y = 30..42
-      +'<line x1="-2" y1="32" x2="9" y2="32" stroke="#666" stroke-width="1.8" stroke-linecap="round"/>'
-      +'<line x1="-2" y1="36" x2="9" y2="36" stroke="#666" stroke-width="1.8" stroke-linecap="round"/>'
-      +'<line x1="-2" y1="40" x2="8" y2="40" stroke="#666" stroke-width="1.8" stroke-linecap="round"/>'
-      // Right grip area: x ≈ 57..70, y = 30..42
-      +'<line x1="68" y1="32" x2="57" y2="32" stroke="#666" stroke-width="1.8" stroke-linecap="round"/>'
-      +'<line x1="68" y1="36" x2="57" y2="36" stroke="#666" stroke-width="1.8" stroke-linecap="round"/>'
-      +'<line x1="68" y1="40" x2="58" y2="40" stroke="#666" stroke-width="1.8" stroke-linecap="round"/>'
-      +'</svg></div>',
-    className:'', iconSize:[68,60], iconAnchor:[34,30]
+    html:'<div style="transform:rotate('+hdg+'deg);position:relative;width:64px;height:64px">'
+      +'<div class="rider-pulse" style="width:84px;height:84px;"></div>'
+      +'<img src="https://twoqt.onrender.com/public/images/bike_handle.png?v=1" style="width:100%;height:100%;object-fit:contain;"/>'
+      +'</div>',
+    className:'', iconSize:[64,64], iconAnchor:[32,32]
   });
 }
 
 function homeIcon(){
   return L.divIcon({
     html:'<div style="position:relative;width:52px;height:52px;display:flex;align-items:center;justify-content:center">'
-      +'<div class="home-pulse"></div>'
-      +'<svg width="52" height="52" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">'
-      +'<circle cx="26" cy="26" r="23" fill="#111827" stroke="#10B981" stroke-width="2.5"/>'
-      +'<path d="M26 14 L15 24 L17.5 24 L17.5 38 L23 38 L23 31 L29 31 L29 38 L34.5 38 L34.5 24 L37 24 Z" fill="#10B981"/>'
-      +'</svg></div>',
+      +'<div class="home-pulse" style="top:90%"></div>'
+      +'<div style="width: 52px; height: 52px; background-image: url(https://twoqt.onrender.com/public/images/customer_icon.png?v=4); background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 10;"></div>'
+      +'</div>',
     className:'', iconSize:[52,52], iconAnchor:[26,52]
   });
 }
 
 function kitchenIcon(){
   return L.divIcon({
-    html:'<svg width="44" height="56" viewBox="0 0 44 56" xmlns="http://www.w3.org/2000/svg">'
-      +'<path d="M22 0C9.85 0 0 9.85 0 22C0 38.5 22 56 22 56C22 56 44 38.5 44 22C44 9.85 34.15 0 22 0Z" fill="#F97316"/>'
-      +'<circle cx="22" cy="22" r="14" fill="#C2410C"/>'
-      +'<path d="M15 17C14.5 15.5 15.5 14 15 12.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>'
-      +'<path d="M22 16C21.5 14.5 22.5 13 22 11.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>'
-      +'<path d="M29 17C28.5 15.5 29.5 14 29 12.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>'
-      +'<line x1="10" y1="22" x2="34" y2="22" stroke="white" stroke-width="2.2" stroke-linecap="round"/>'
-      +'<path d="M11 22C11 30.5 33 30.5 33 22" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"/>'
-      +'<line x1="16" y1="32" x2="28" y2="32" stroke="white" stroke-width="2" stroke-linecap="round"/>'
-      +'</svg>',
-    className:'', iconSize:[44,56], iconAnchor:[22,56]
+    html:'<div style="position:relative;width:52px;height:52px;display:flex;align-items:center;justify-content:center">'
+      +'<div style="width: 52px; height: 52px; background-image: url(https://twoqt.onrender.com/public/images/kitchen_icon.png?v=4); background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 10;"></div>'
+      +'</div>',
+    className:'', iconSize:[52,52], iconAnchor:[26,52]
   });
 }
 
@@ -422,7 +368,7 @@ window.fitAll();
 
   return (
     <WebView
-      key="tracking-map-v4"
+      key="tracking-map-v16"
       ref={webviewRef}
       originWhitelist={['*']}
       source={{ html, baseUrl: 'https://leafletjs.com/' }}
