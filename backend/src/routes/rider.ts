@@ -7,6 +7,12 @@ import { emitToUser, emitToRiders, emitToAdmin, emitToOrder } from '../socket';
 import { notificationsQueue, invoicesQueue } from '../jobs/queues';
 import { TWO_QT } from '../config/constants';
 import { pushService } from '../services/push.service';
+import Razorpay from 'razorpay';
+
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID || '',
+    key_secret: process.env.RAZORPAY_KEY_SECRET || '',
+});
 
 const router = Router();
 const DEV_TEST_DELIVERY_OTP = process.env.TEST_DELIVERY_OTP || '654321';
@@ -511,6 +517,49 @@ router.post('/payouts/request', authenticate, requireRole('rider', 'rider_captai
 // ─── Confirm Door Payment (UPI at door or Cash) ───────────────────────────────
 // Called just before OTP. Records how the customer paid at the door.
 // UPI → payment_status='paid', cod_cash_collected=TRUE (no cash with rider)
+// Creates a Razorpay payment link for COD UPI collection.
+// Returns short_url used as the QR value — payment is verified via webhook, not rider's word.
+router.post('/orders/:orderId/upi-payment-link', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { orderId } = req.params;
+    const riderId = req.user!.userId;
+    try {
+        const { rows } = await query(
+            'SELECT id, display_id, total_amount_paise, payment_method, payment_status FROM orders WHERE id = $1 AND rider_id = $2',
+            [orderId, riderId]
+        );
+        if (!rows.length) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        const order = rows[0];
+        if (order.payment_method !== 'cod') return res.status(400).json({ error: 'NOT_COD' });
+
+        // If already paid (e.g. customer paid before link was shown), return immediately
+        if (order.payment_status === 'paid') return res.json({ alreadyPaid: true });
+
+        // Reuse existing link if created in the last 30 min
+        const cacheKey = `cod_plink:${orderId}`;
+        const cached = await redis.get(cacheKey).catch(() => null);
+        if (cached) {
+            const { short_url, amount } = JSON.parse(cached);
+            return res.json({ short_url, amount, alreadyPaid: false });
+        }
+
+        const link = await razorpay.paymentLink.create({
+            amount: order.total_amount_paise,
+            currency: 'INR',
+            description: `COD payment for order #${order.display_id}`,
+            reference_id: orderId,   // used in webhook to find the order
+            notify: { sms: false, email: false },
+            reminder_enable: false,
+        });
+
+        const result = { short_url: link.short_url, amount: order.total_amount_paise };
+        redis.set(cacheKey, JSON.stringify(result), { EX: 1800 }).catch(() => {});
+        res.json({ ...result, alreadyPaid: false });
+    } catch (err: any) {
+        console.error('[upi-payment-link]', err);
+        res.status(500).json({ error: 'LINK_CREATION_FAILED', message: err.message });
+    }
+});
+
 // Cash → keep payment_status='cod_pending' (finance collects cash from rider later)
 router.post('/confirm-door-payment', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const { orderId, method } = req.body as { orderId: string; method: 'upi' | 'cash' };

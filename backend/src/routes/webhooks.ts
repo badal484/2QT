@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { withTransaction, query } from '../db';
 import { redis, keys } from '../redis';
 import { notificationsQueue } from '../jobs/queues';
-import { emitToKitchen, emitToUser } from '../socket';
+import { emitToKitchen, emitToUser, emitToOrder } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { finalizeOrder } from '../services/order.service';
 
@@ -33,13 +33,38 @@ router.post('/razorpay', async (req, res) => {
     }
 
     const { event, payload } = body;
+
     if (event === 'order.paid') {
         const rzpOrderId = payload.order.entity.id;
         const internalOrderId = payload.order.entity.notes?.orderId;
         const paymentMethod = payload.payment.entity.method;
-
         const result = await finalizeOrder(rzpOrderId, paymentMethod, internalOrderId);
         return res.json(result);
+    }
+
+    // COD UPI payment via Razorpay Payment Link — auto-confirms without rider tapping anything
+    if (event === 'payment_link.paid') {
+        const orderId = payload.payment_link.entity.reference_id;
+        if (!orderId) return res.json({ status: 'no_reference_id' });
+
+        try {
+            await query(
+                `UPDATE orders
+                 SET payment_status = 'paid',
+                     cod_cash_collected = TRUE,
+                     cod_collected_at = NOW()
+                 WHERE id = $1 AND payment_method = 'cod' AND payment_status != 'paid'`,
+                [orderId]
+            );
+            // Notify rider app that payment came through
+            const { rows } = await query('SELECT rider_id FROM orders WHERE id = $1', [orderId]);
+            if (rows[0]?.rider_id) {
+                emitToUser(rows[0].rider_id, 'cod_payment_confirmed', { orderId });
+            }
+        } catch (err) {
+            console.error('[webhook payment_link.paid]', err);
+        }
+        return res.json({ status: 'ok' });
     }
 
     res.json({ status: 'ignored_event' });
