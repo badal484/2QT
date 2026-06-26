@@ -192,7 +192,14 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
         {/* Floating back button */}
         <TouchableOpacity
           style={[styles.backBtn, { top: insets.top + 12 }]}
-          onPress={() => { triggerHaptic(); navigation.goBack(); }}
+          onPress={() => { 
+            triggerHaptic(); 
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Home');
+            }
+          }}
           activeOpacity={0.85}
         >
           <ArrowLeft size={20} color={colors.ink} />
