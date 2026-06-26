@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sips -Z 700 /tmp/r2.png --out /tmp/r2_small.png)",
+      "Bash(python3 -c \"from PIL import Image; im = Image.open\\('s3.png'\\); print\\(im.size\\)\")",
+      "Bash(adb wait-for-device *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8081/status)",
+      "Bash(python3 -c \"from PIL import Image; im = Image.open\\('s1.png'\\); print\\(im.size\\)\")",
+      "Bash(python3 -c \"from PIL import Image; im = Image.open\\('/tmp/x4.png'\\); print\\(im.size\\)\")",
+      "Bash(python3 -c \"from PIL import Image; print\\(Image.open\\('/tmp/z1.png'\\).size\\)\")",
+      "Bash(PGPASSWORD='Mac@4834' psql -U velto -h localhost -d velto -c \"SELECT id, kitchen_id, chef_id, notes, cleaning_completed, gas_safety_checked, created_at FROM shift_handovers ORDER BY created_at DESC LIMIT 3;\")",
+      "Bash(python3 -c \"from PIL import Image; print\\(Image.open\\('/tmp/p3.png'\\).size\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" --max-time 3 http://localhost:3000/health)"
+    ]
+  }
+}
