@@ -88,7 +88,12 @@ export const calculatePricing = async ({
     // 3. Loyalty
     let loyaltyDiscountPaise = 0;
     if (useLoyalty) {
-        const { rows: loyaltyRes } = await query("SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN points ELSE -points END), 0) as total_points FROM loyalty_transactions WHERE customer_id = $1", [customerId]);
+        const { rows: loyaltyRes } = await query(
+            `SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN points ELSE -points END), 0) as total_points
+             FROM loyalty_transactions
+             WHERE customer_id = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
+            [customerId]
+        );
         const totalPoints = parseInt(loyaltyRes[0].total_points || '0');
         
         if (totalPoints > 0) {
