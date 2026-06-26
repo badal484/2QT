@@ -71,9 +71,7 @@ const ImageUpload = ({ value, onChange }: { value: string; onChange: (url: strin
     if (!file) return;
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append("image", file);
-      const res = await api.upload("/admin/menu/upload", form);
+      const res = await api.uploadImage(file);
       onChange(res.url);
       toast.success("Image uploaded!");
     } catch {
