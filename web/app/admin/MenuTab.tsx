@@ -590,12 +590,21 @@ export function MenuTab() {
         confirmText="Delete Item"
         onConfirm={async () => {
           if (!confirmDialog.id) return;
-          await api.delete(`/admin/menu/${confirmDialog.id}`);
-          setShowAddModal(false);
-          setEditingItem(null);
-          load();
-          toast.success("Item deleted");
-          setConfirmDialog({ isOpen: false, id: null });
+          try {
+            const result = await api.delete(`/admin/menu/${confirmDialog.id}`);
+            setShowAddModal(false);
+            setEditingItem(null);
+            load();
+            if (result?.softDeleted) {
+              toast.success("Item has orders — marked as unavailable instead of deleted");
+            } else {
+              toast.success("Item deleted");
+            }
+          } catch (err: any) {
+            toast.error(err.message || "Failed to delete item");
+          } finally {
+            setConfirmDialog({ isOpen: false, id: null });
+          }
         }}
         onCancel={() => setConfirmDialog({ isOpen: false, id: null })}
         isDanger={true}
