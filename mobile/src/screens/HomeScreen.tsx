@@ -413,7 +413,7 @@ const HomeScreen = ({ navigation }: any) => {
               </View>
             )}
           </TouchableOpacity>
-        </Animated.View>
+        </View>
 
         {/* ROW 2: Search Bar with VEG toggle */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
@@ -470,12 +470,8 @@ const HomeScreen = ({ navigation }: any) => {
         }
         keyExtractor={(item: any) => item.id}
         renderItem={renderItem}
-        renderSectionHeader={({ section: { title } }: any) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{title}</Text>
-          </View>
-        )}
-        stickySectionHeadersEnabled={true}
+        renderSectionHeader={() => null}
+        stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         windowSize={5}
