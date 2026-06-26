@@ -45,29 +45,23 @@ router.post('/location', authenticate, requireRole('rider', 'rider_captain', 'su
     const riderId = req.user!.userId;
     const zoneId = req.user!.zoneId;
 
-    // 1. Individual Location Key (for customer tracking)
-    await redis.set(keys.riderLocation(riderId), JSON.stringify({ lat, lng, updatedAt: new Date() }), { EX: 60 });
-
-    // 2. SYSTEMATIC INTEGRATION: Zone Capacity Heartbeat
-    if (zoneId) {
-        const capacityKey = keys.activeRidersInZone(zoneId);
-        const now = Date.now();
-        
-        // Add/Update rider in the zone's active set
-        await redis.zAdd(capacityKey, { score: now, value: riderId });
-        
-        // Cleanup: Remove any riders who haven't pulsed in the last 60 seconds
-        await redis.zRemRangeByScore(capacityKey, '-inf', now - 60000);
-        
-        if (process.env.NODE_ENV === 'development') {
-            const count = await redis.zCard(capacityKey);
-            console.log(`--- SYSTEMATIC CAPACITY: Zone ${zoneId} has ${count} active Captains ---`);
-        }
-    }
-
+    // 1. Emit to customer order room immediately (non-blocking)
     const { rows } = await query('SELECT current_order_id FROM users WHERE id = $1', [riderId]);
     if (rows[0]?.current_order_id) {
         emitToOrder(rows[0].current_order_id, 'rider_location', { lat, lng });
+    }
+
+    // 2. Persist location to Redis (fire-and-forget, 5 min TTL)
+    redis.set(keys.riderLocation(riderId), JSON.stringify({ lat, lng, updatedAt: new Date() }), { EX: 300 })
+        .catch(() => {});
+
+    // 3. Zone Capacity Heartbeat (fire-and-forget)
+    if (zoneId) {
+        const capacityKey = keys.activeRidersInZone(zoneId);
+        const now = Date.now();
+        redis.zAdd(capacityKey, { score: now, value: riderId })
+            .then(() => redis.zRemRangeByScore(capacityKey, '-inf', now - 60000))
+            .catch(() => {});
     }
 
     res.json({ success: true });
