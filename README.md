@@ -1,34 +1,52 @@
-# VELTO Food Palace
+# 2QT — Food Delivery Platform
 
-A full-stack food delivery platform built for a cloud-kitchen / single-brand delivery operation. It covers the entire order lifecycle — from customer checkout to kitchen prep to rider dispatch to payout — across three apps sharing one backend.
+A full-stack food delivery platform built for a cloud-kitchen operation. Covers the entire order lifecycle — customer ordering → kitchen prep → rider dispatch → payout — across **one backend** serving **five distinct apps**.
+
+---
+
+## Apps Overview
+
+| App | Tech | Who uses it | What it does |
+|---|---|---|---|
+| **Customer Web** | Next.js (PWA) | Customers | Browse menu, place orders, track delivery live, manage wallet/subscriptions/loyalty |
+| **Admin Panel** | Next.js (same codebase, `/admin` route) | Super admin | Manage menu, zones, kitchens, riders, promos, campaigns, dispatch, finance |
+| **Finance Dashboard** | Next.js (same codebase, `/finance` route) | Finance team | Revenue overview, rider payouts, kitchen payouts, COD settlements, transactions |
+| **Kitchen Portal** | Next.js (same codebase, `/kitchen` & `/kitchen-portal` routes) | Kitchen staff (web) | Live KDS — incoming orders, prep status updates |
+| **Mobile App** | React Native (single APK, role-based) | Customers · Riders · Kitchen staff · Admins | One app, four roles — each role gets its own navigator and screen set |
+
+The web app is one Next.js project. The mobile app is one React Native project. Role is determined at login and drives navigation in both.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                        Backend                          │
-│              Node.js + Express + PostgreSQL             │
-│         Socket.IO  ·  BullMQ  ·  Redis  ·  Firebase    │
-└────────────┬──────────────┬───────────────┬────────────┘
-             │              │               │
-     ┌───────▼──────┐ ┌─────▼──────┐ ┌─────▼──────────┐
-     │  Customer &  │ │   Admin /  │ │  Rider + Kitchen│
-     │  Web Portal  │ │  Finance   │ │  Mobile App     │
-     │  (Next.js)   │ │  (Next.js) │ │ (React Native) │
-     └──────────────┘ └────────────┘ └────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                          Backend                             │
+│             Node.js · Express · TypeScript · PostgreSQL      │
+│          Socket.IO · BullMQ · Redis · Firebase FCM           │
+└──────┬───────────┬────────────┬──────────────┬──────────────┘
+       │           │            │              │
+  ┌────▼────┐ ┌────▼────┐ ┌────▼────┐   ┌────▼────────────────┐
+  │Customer │ │  Admin  │ │Finance / │   │   Mobile App (RN)   │
+  │  Web    │ │  Panel  │ │ Kitchen  │   │ Customer / Rider /  │
+  │ (PWA)   │ │         │ │ Portals  │   │ Kitchen / Admin     │
+  └─────────┘ └─────────┘ └─────────┘   └─────────────────────┘
+        ◄── all served from the same Next.js project ──►
 ```
 
 | Layer | Tech |
 |---|---|
-| Backend | Node.js, Express, TypeScript, PostgreSQL, Redis, BullMQ, Socket.IO |
-| Web (Customer + Admin) | Next.js 15, React, Tailwind CSS, Framer Motion, Leaflet |
-| Mobile (Rider + Kitchen) | React Native (New Architecture / Fabric), NativeWind, Redux Toolkit, React Query |
-| Payments | Razorpay (checkout + payouts) |
+| Backend API | Node.js, Express, TypeScript · port 8000 · routes at `/api/v1` |
+| Database | PostgreSQL |
+| Cache / Queues | Redis + BullMQ (notifications, invoices) |
+| Realtime | Socket.IO (order status, rider location, dispatch) |
+| Web frontend | Next.js 15, Tailwind CSS, Framer Motion, Leaflet |
+| Mobile | React Native (New Architecture / Fabric), NativeWind, Redux Toolkit, React Query |
+| Payments | Razorpay — checkout, wallet top-up, UPI payouts |
 | Push Notifications | Firebase Cloud Messaging (FCM) |
 | Media | Cloudinary / ImageKit |
-| Maps | Leaflet (web), React Native Maps (mobile) |
+| Maps | Leaflet (web), React Native Maps + Google Directions (mobile) |
 
 ---
 
@@ -36,164 +54,146 @@ A full-stack food delivery platform built for a cloud-kitchen / single-brand del
 
 ```
 /
-├── backend/          # Express API server
+├── backend/
 │   ├── src/
-│   │   ├── routes/   # REST endpoints per domain
-│   │   ├── services/ # Business logic
-│   │   ├── config/   # Constants, env, DB
-│   │   └── crons/    # Scheduled jobs
+│   │   ├── routes/          # One file per domain (auth, order, payment, rider, kitchen, admin, finance…)
+│   │   ├── services/        # Business logic (order, payment, invoice, loyalty, push, payout…)
+│   │   ├── config/          # Constants, env, DB connection
+│   │   └── crons/           # Scheduled jobs
 │   └── Dockerfile
 │
-├── web/              # Next.js web app
+├── web/                     # Single Next.js app — all portals
 │   └── app/
-│       ├── (customer pages)
-│       ├── admin/    # Admin panel tabs
-│       ├── kitchen/  # Kitchen portal
-│       ├── rider/    # Rider web view
-│       └── finance/  # Finance dashboard
+│       ├── page.tsx         # Customer landing / home
+│       ├── menu/            # Menu browsing
+│       ├── orders/          # Order tracking
+│       ├── profile/         # Customer profile, wallet, loyalty
+│       ├── subscription/    # Meal plan management
+│       ├── admin/           # Admin panel (tabs: Menu, Zones, Kitchens, Riders, Promos, Dispatch, etc.)
+│       ├── finance/         # Finance dashboard (overview, payouts, COD, transactions)
+│       ├── kitchen/         # Kitchen order board (KDS)
+│       ├── kitchen-portal/  # Kitchen partner portal
+│       ├── rider/           # Rider web view
+│       ├── become-a-rider/  # Rider onboarding / application
+│       └── partner/         # Kitchen partner onboarding
 │
-├── mobile/           # React Native app
-│   └── src/
-│       ├── screens/  # ~40 screens (customer, rider, kitchen)
-│       ├── services/ # Push, socket, API
-│       └── config/
-│
-└── docker-compose.yml
+└── mobile/                  # Single React Native app — role-based navigators
+    └── src/
+        ├── navigation/
+        │   ├── RootNavigator.tsx      # Picks navigator based on user role
+        │   ├── CustomerNavigator.tsx
+        │   ├── RiderNavigator.tsx
+        │   ├── KitchenNavigator.tsx
+        │   └── AdminNavigator.tsx
+        ├── screens/
+        │   ├── (customer screens)     # Home, Cart, Checkout, Tracking, Wallet, Loyalty, etc.
+        │   ├── (rider screens)        # RiderHome, AssignedOrder, Earnings, Payouts, Batch, etc.
+        │   ├── (kitchen screens)      # KitchenBoard, LiveKitchen, MorningPrep, Stock, etc.
+        │   └── admin/                 # Dashboard, LiveOrders, MenuManager, Riders, Payouts, etc.
+        └── services/                  # Push, socket, API client
 ```
 
 ---
 
-## Features
+## Feature Highlights
 
-### Customer
-- OTP phone login, onboarding, address book (map pin picker)
-- Menu browsing, cart, item details with daily limits
-- Checkout with promo codes, wallet, loyalty points, rider tip
-- Razorpay payment gateway + wallet top-up
+### Customer (Web + Mobile)
+- Phone OTP login, address book with map pin picker
+- Menu with daily limits, cart, promo codes, wallet, loyalty points, rider tip
+- Razorpay payment + wallet top-up
 - Subscription meal plans with per-day credits
-- Live order tracking (Socket.IO + Leaflet map)
-- Order history, invoices, ratings, complaints
-- Loyalty rewards, referral program
-- Scheduled orders, campaign banners
+- Live order tracking on map (Socket.IO)
+- Scheduled orders, referral program, in-app complaints
+- PDF invoices
 
-### Rider (Mobile)
-- Rider onboarding + verification flow
-- Real-time order assignment with batch support
-- Live map navigation (Google Maps Directions)
+### Rider (Mobile only)
+- Onboarding + verification flow
+- Real-time order assignment, batch delivery support
+- Live map navigation (Google Directions)
 - Delivery OTP confirmation, door-step cash collection
 - Shift handover, earnings dashboard
-- UPI payout request + QR code display
-- Background location tracking
+- UPI payout request with QR code
 
-### Kitchen
-- Kitchen login (separate role)
-- Live order board (KDS) — new orders appear in real time
-- Morning prep screen (daily item stock management)
-- Mark items sold / unavailable
-- Batch view for grouped orders
+### Kitchen Staff (Mobile + Web portal)
+- Live KDS — new orders appear in real time via Socket.IO
+- Morning prep screen — set daily stock per item
+- Mark items unavailable / sold out
+- Batch order view
 
-### Admin Panel (Web)
-- Dashboard with real-time dispatch log
-- Menu management (items, categories, daily limits)
-- Zone management (delivery zones with polygon maps)
-- Kitchen health monitoring
-- Promo codes, campaigns, banners
-- Team management (riders, kitchen staff)
-- Finance dashboard (revenue, payouts, settlements)
-- Push notification broadcasts
-- Complaints & service requests
+### Admin (Web panel + Mobile admin screens)
+- Real-time dispatch log
+- Menu, zones (polygon maps), kitchens, rider management
+- Promo codes, campaign banners, push notification broadcasts
+- Finance: revenue, rider payouts, kitchen payouts, COD settlements
+- Complaints & service requests, kitchen health monitoring
 
 ---
 
 ## Pricing Engine
 
-All order pricing is computed server-side in `backend/src/services/payment.service.ts`:
+Computed server-side in `backend/src/services/payment.service.ts` before every checkout:
 
-| Component | Value |
+| Component | Logic |
 |---|---|
-| Delivery fee | Rs. 25 (configurable per zone) |
-| Subscriber delivery | Rs. 0 (free) |
-| GST | 5% (2.5% CGST + 2.5% SGST) — legally fixed |
-| Loyalty discount | Points redeemable at checkout |
-| Surge | Zone-based multiplier (configurable) |
-| Wallet | Partial or full payment from wallet balance |
+| Delivery fee | Flat Rs. 25 (free for subscribers) — zone-configurable |
+| Discount | Promo code (% or flat) |
+| Loyalty discount | Points redeemed at checkout (capped at % of subtotal) |
+| GST | 5% on discounted subtotal (2.5% CGST + 2.5% SGST — legally fixed) |
+| Wallet | Partial/full deduction from customer wallet balance |
+| Rider tip | Optional, added on top |
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 20+
-- PostgreSQL 15+
-- Redis 7+
+- Node.js 20+, PostgreSQL 15+, Redis 7+
 - Android Studio / Xcode for mobile
 
 ### Backend
-
 ```bash
 cd backend
-cp .env.example .env   # fill in DB, Redis, Razorpay, Firebase keys
+cp .env.example .env   # fill DB, Redis, Razorpay, Firebase keys
 npm install
-npm run migrate        # run DB migrations
-npm run dev
+npm run dev            # port 8000
 ```
 
 ### Web
-
 ```bash
 cd web
 cp .env.example .env.local
 npm install
-npm run dev
+npm run dev            # port 3000
 ```
 
 ### Mobile
-
 ```bash
 cd mobile
 npm install
-npx react-native run-android   # or run-ios
+npx react-native run-android
 ```
 
-Or with Docker (backend + Redis + Postgres):
-
+Or spin up the full stack with Docker:
 ```bash
 docker-compose up
 ```
 
 ---
 
-## Environment Variables
+## Key Environment Variables
 
 | Variable | Used by | Purpose |
 |---|---|---|
-| `DATABASE_URL` | Backend | PostgreSQL connection string |
-| `REDIS_URL` | Backend | Redis for BullMQ + Socket.IO adapter |
+| `DATABASE_URL` | Backend | PostgreSQL connection |
+| `REDIS_URL` | Backend | Redis (BullMQ + Socket.IO adapter) |
 | `JWT_SECRET` | Backend | Auth token signing |
-| `RAZORPAY_KEY_ID / SECRET` | Backend | Payment gateway |
-| `RAZORPAY_ACCOUNT_NUMBER` | Backend | Payout source account |
+| `RAZORPAY_KEY_ID/SECRET` | Backend | Payment gateway |
+| `RAZORPAY_ACCOUNT_NUMBER` | Backend | UPI payout source |
 | `FIREBASE_SERVICE_ACCOUNT` | Backend | FCM push notifications |
 | `CLOUDINARY_URL` | Backend | Image uploads |
 | `NEXT_PUBLIC_API_URL` | Web | Backend base URL |
 | `NEXT_PUBLIC_RAZORPAY_KEY` | Web | Client-side Razorpay key |
 | `API_BASE_URL` | Mobile | Backend base URL |
-
----
-
-## Key API Domains
-
-| Route prefix | Responsibility |
-|---|---|
-| `/auth` | OTP login, token refresh |
-| `/menu` | Items, categories |
-| `/payment` | Pricing calculation, checkout, wallet |
-| `/order` | Order lifecycle, tracking |
-| `/rider` | Assignment, location, earnings |
-| `/kitchen` | KDS, stock, prep |
-| `/admin` | All admin operations |
-| `/finance` | Revenue, payout management |
-| `/subscription` | Meal plans |
-| `/notifications` | FCM broadcasts |
 
 ---
 
