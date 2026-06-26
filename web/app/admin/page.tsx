@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -21,6 +21,7 @@ import dynamic from "next/dynamic";
 const MarketingTab = dynamic(() => import("./MarketingTab").then(m => ({ default: m.MarketingTab })), { ssr: false });
 const MenuTab = dynamic(() => import("./MenuTab").then(m => ({ default: m.MenuTab })), { ssr: false });
 const ZonesTab = dynamic(() => import("./ZonesTab").then(m => ({ default: m.ZonesTab })), { ssr: false });
+const DeliveryPricingTab = dynamic(() => import("./DeliveryPricingTab").then(m => ({ default: m.DeliveryPricingTab })), { ssr: false });
 const KitchensTab = dynamic(() => import("./KitchensTab").then(m => ({ default: m.KitchensTab })), { ssr: false });
 const PromoCodesTab = dynamic(() => import("./PromoCodesTab").then(m => ({ default: m.PromoCodesTab })), { ssr: false });
 const KitchenHealthTab = dynamic(() => import("./KitchenHealthTab").then(m => ({ default: m.KitchenHealthTab })), { ssr: false });
@@ -1647,6 +1648,7 @@ const TABS = [
   { name: "Marketing", icon: Zap, component: MarketingTab },
   { name: "Promo Codes", icon: Ticket, component: PromoCodesTab },
   { name: "Zones", icon: MapPin, component: ZonesTab },
+  { name: "Delivery Pricing", icon: Receipt, component: DeliveryPricingTab },
   { name: "Kitchens", icon: Store, component: KitchensTab },
   { name: "Partners", icon: Store, component: PartnersTab },
   { name: "Team", icon: Users, component: TeamTab },
@@ -1727,7 +1729,7 @@ export default function AdminPage() {
         <div className="flex-1 px-3 overflow-y-auto pb-4 space-y-6">
           {[
             { section: "Main", items: ["Overview", "Analytics", "Orders", "Scheduled", "Dispatch", "Fleet", "Customers", "Support"] },
-            { section: "Operations", items: ["Menu", "Inventory", "Zones", "Kitchens", "Partners", "Finance", "Applications"] },
+            { section: "Operations", items: ["Menu", "Inventory", "Zones", "Delivery Pricing", "Kitchens", "Partners", "Finance", "Applications"] },
             { section: "System", items: ["Broadcast", "Marketing", "Promo Codes", "Systems", "Settings"] },
           ].map(group => (
             <div key={group.section}>
