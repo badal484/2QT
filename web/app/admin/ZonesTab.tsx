@@ -175,33 +175,55 @@ export function ZonesTab() {
             <span className="text-sm font-black text-white uppercase tracking-wider">New Zone</span>
             <button onClick={() => setShowAdd(false)} className="text-zinc-500 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
           </div>
-          <div className="p-5 grid grid-cols-2 gap-4 border-b border-white/5">
-            <div className="col-span-2">
-              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-2">Delivery Zone Boundary</div>
-              <MapPolygonPicker
-                polygonPoints={addForm.polygon_points || []}
-                onChange={(points) => setAddForm((f: any) => ({ ...f, polygon_points: points }))}
-              />
-            </div>
-            {[
-              { label: "Zone Name", key: "name", type: "text", placeholder: "e.g. Koramangala" },
-              { label: "City", key: "city", type: "text", placeholder: "City name" },
-              { label: "Base Fee (paise)", key: "base_delivery_fee_paise", type: "number", placeholder: "2500" },
-              { label: "Opens At", key: "opening_time", type: "time", placeholder: "" },
-              { label: "Closes At", key: "closing_time", type: "time", placeholder: "" },
-              { label: "Max Orders/Hour", key: "max_orders_per_hour", type: "number", placeholder: "60" },
-              { label: "Est. Delivery (min)", key: "realistic_delivery_minutes", type: "number", placeholder: "30" },
-            ].map(({ label, key, type, placeholder }) => (
-              <div key={key}>
-                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">{label}</div>
-                <input
-                  type={type} placeholder={placeholder} value={addForm[key]}
-                  onChange={e => setAddForm((f: any) => ({ ...f, [key]: e.target.value }))}
-                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50 placeholder:text-zinc-600"
+            <div className="p-5 grid grid-cols-2 gap-4 border-b border-white/5">
+              <div className="col-span-2">
+                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-2">Delivery Zone Boundary</div>
+                <MapPolygonPicker
+                  polygonPoints={addForm.polygon_points || []}
+                  onChange={(points) => setAddForm((f: any) => ({ ...f, polygon_points: points }))}
                 />
               </div>
-            ))}
-          </div>
+              
+              {/* Use a helper function for the add form to support selects */}
+              {(() => {
+                const addField = (label: string, key: string, type = "text", placeholder = "") => (
+                  <div key={key}>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">{label}</div>
+                    {type === "select" ? (
+                      <select value={addForm[key] ?? "flat"} onChange={e => setAddForm({ ...addForm, [key]: e.target.value })}
+                        className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50">
+                        <option value="flat">Flat Fee</option>
+                        <option value="per_km">Per KM</option>
+                      </select>
+                    ) : (
+                      <input type={type} placeholder={placeholder} value={addForm[key] ?? ""} onChange={e => setAddForm({ ...addForm, [key]: e.target.value })}
+                        className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50 placeholder:text-zinc-600" />
+                    )}
+                  </div>
+                );
+
+                return (
+                  <>
+                    {addField("Zone Name", "name", "text", "e.g. Koramangala")}
+                    {addField("City", "city", "text", "City name")}
+                    {addField("Delivery Fee Type", "delivery_fee_type", "select")}
+                    {addField(addForm.delivery_fee_type === 'per_km' ? "Base Fee (paise)" : "Flat Fee (paise)", "base_delivery_fee_paise", "number", "2500")}
+                    {addForm.delivery_fee_type === 'per_km' && (
+                      <>
+                        {addField("Per KM Rate (paise)", "per_km_fee_paise", "number", "500")}
+                        {addField("Base Distance (KM)", "base_distance_km", "number", "0")}
+                      </>
+                    )}
+                    {addField("Free Delivery Above (paise)", "free_delivery_above_paise", "number", "e.g. 30000")}
+                    {addField("Surge Multiplier", "surge_multiplier", "number", "e.g. 1.5")}
+                    {addField("Opens At", "opening_time", "time")}
+                    {addField("Closes At", "closing_time", "time")}
+                    {addField("Max Orders/Hour", "max_orders_per_hour", "number", "60")}
+                    {addField("Est. Delivery (min)", "realistic_delivery_minutes", "number", "30")}
+                  </>
+                );
+              })()}
+            </div>
           <div className="px-5 pb-5 flex justify-end gap-3">
             <button onClick={() => setShowAdd(false)} className="px-4 py-2 rounded-xl bg-white/[0.05] text-xs font-black uppercase tracking-widest text-white hover:bg-white/10">Cancel</button>
             <button onClick={createZone} disabled={saving}
