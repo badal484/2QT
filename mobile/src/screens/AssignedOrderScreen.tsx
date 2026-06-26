@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Linking,
-  ActivityIndicator, Alert, StyleSheet, StatusBar, Platform,
+  ActivityIndicator, Alert, StyleSheet, StatusBar, Platform, AppState,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -65,9 +65,31 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
         });
       },
       () => {},
-      { enableHighAccuracy: true, distanceFilter: 10, interval: 5000 },
+      { enableHighAccuracy: true, distanceFilter: 5, interval: 4000 },
     );
     return () => Geolocation.clearWatch(watchId);
+  }, []);
+
+  // When rider returns from Google Maps (or any external app), immediately push location
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        const socket = getSocket();
+        Geolocation.getCurrentPosition(
+          pos => {
+            socket?.emit('update_location', {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 },
+        );
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
   }, []);
 
   const updateStatusMutation = useMutation({

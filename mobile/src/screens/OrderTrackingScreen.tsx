@@ -127,12 +127,18 @@ const OrderTrackingScreen = ({ route, navigation }: any) => {
       ? { lat: parseFloat(o.kitchen_lat), lng: parseFloat(o.kitchen_lng) }
       : null;
 
+  // When rider is out for delivery but no GPS location received yet, seed their
+  // marker at the kitchen so the map isn't blank — it will snap to real GPS on first update.
+  const effectiveRiderLocation = riderLocation ?? (
+    status === 'out_for_delivery' && kitchenLocation ? kitchenLocation : null
+  );
+
   return (
     <View style={styles.container}>
       {/* Map */}
       <View style={styles.mapContainer}>
         <TrackingLeafletMap
-          riderLocation={riderLocation}
+          riderLocation={effectiveRiderLocation}
           customerLocation={customerLocation}
           kitchenLocation={kitchenLocation}
           riderHeading={heading}
