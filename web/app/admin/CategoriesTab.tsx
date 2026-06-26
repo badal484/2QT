@@ -246,9 +246,12 @@ export const CategoriesTab = () => {
 
   useEffect(() => {
     api.get("/admin/zones").then((res) => {
-      const z = res?.zones ?? [];
-      setZones(z);
-      if (z.length > 0) setSelectedZoneId(z[0].id);
+      const raw: Zone[] = res?.zones ?? [];
+      // Deduplicate by id (guards against duplicate rows in DB)
+      const seen = new Set<string>();
+      const unique = raw.filter(z => { if (seen.has(z.id)) return false; seen.add(z.id); return true; });
+      setZones(unique);
+      if (unique.length > 0) setSelectedZoneId(unique[0].id);
     }).catch(() => {});
   }, []);
 
