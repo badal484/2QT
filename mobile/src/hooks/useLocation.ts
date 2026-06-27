@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
-import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { api } from '../api/client';
+import { reverseGeocode } from '../utils/geocode';
 
 export interface LocationData {
   latitude: number;
@@ -37,41 +37,13 @@ export const useLocation = () => {
     return true;
   };
 
-  // Proxy through backend so the device never calls Nominatim directly.
-  // Old code used axios with no timeout → connection to nominatim hung for 60-120s
-  // on the emulator, keeping loadingLocation=true indefinitely.
-  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
-    try {
-      const data = await api.get(`/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
-      if (data) {
-        const addr = data.address || {};
-        const street =
-          addr.road || addr.suburb || addr.neighbourhood || addr.hamlet || addr.quarter || '';
-        const locality =
-          addr.city || addr.town || addr.village || addr.county || addr.state_district || '';
-        if (street || locality) {
-          return [street, locality].filter(Boolean).join(', ');
-        }
-        if (data.display_name) {
-          const parts = (data.display_name as string)
-            .split(',')
-            .map((s: string) => s.trim())
-            .filter(Boolean);
-          return parts.slice(0, 2).join(', ') || data.display_name;
-        }
-      }
-    } catch { /* non-critical */ }
-    return 'Current Location';
-  };
-
-  const fetchLocation = useCallback(async (silent = false) => {
+  const fetchLocation = useCallback(async () => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
     setLoadingLocation(true);
     setLocationError(null);
 
     const hasPermission = await requestPermissions();
-
     if (!hasPermission) {
       setLocationError('Location permission denied');
       setLoadingLocation(false);
@@ -81,10 +53,15 @@ export const useLocation = () => {
 
     const onSuccess = async (position: any) => {
       const { latitude, longitude } = position.coords;
-      const addressText = await reverseGeocode(latitude, longitude);
-      setLocation({ latitude, longitude, addressText });
+
+      // Move the map IMMEDIATELY — don't wait for address text
+      setLocation({ latitude, longitude, addressText: '' });
       setLoadingLocation(false);
       isFetchingRef.current = false;
+
+      // Fetch address in background — updates label once ready
+      const addressText = await reverseGeocode(latitude, longitude);
+      setLocation({ latitude, longitude, addressText });
     };
 
     const onError = (error: any) => {
@@ -92,20 +69,17 @@ export const useLocation = () => {
       setLocationError(error.message);
       setLoadingLocation(false);
       isFetchingRef.current = false;
-      if (!silent) {
-        Alert.alert('Location Error', 'Could not get GPS. Try again or select an address.');
-      }
     };
 
-    // Try fast network-based location first; retry with GPS if it fails
+    // Try fast network-based first, retry with GPS if it fails
     Geolocation.getCurrentPosition(
       onSuccess,
       () => {
         Geolocation.getCurrentPosition(onSuccess, onError, {
-          enableHighAccuracy: true, timeout: 20000, maximumAge: 60000,
+          enableHighAccuracy: true, timeout: 20000, maximumAge: 10000,
         });
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 10000 },
     );
   }, []);
 
