@@ -1,41 +1,16 @@
-// Uses OpenStreetMap Nominatim — free, no API key, no billing required.
-// Rate limit: 1 req/sec which is fine since we call it rarely (boot, drag end, locate me).
+import { ENV } from '../config/env';
+
+// Routes through our backend which tries Google Geocoding then falls back to Nominatim.
+// More reliable than calling Nominatim directly from the device (no rate limits, stable server).
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+    const url = `${ENV.API_URL}/menu/geocode/reverse?lat=${lat}&lng=${lng}`;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': '2QT-FoodDelivery/1.0',
-        'Accept-Language': 'en',
-      },
-    });
+    const timer = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timer);
     const data = await res.json();
-
-    if (data?.address) {
-      const a = data.address;
-      const locality =
-        a.suburb || a.neighbourhood || a.village || a.town || a.city_district || a.city;
-      const district = a.county || a.district || a.state_district;
-      const state = a.state;
-
-      // Build short readable string, deduplicated
-      const parts: string[] = [locality, district, state].filter(Boolean) as string[];
-      const unique = parts.filter((v, i, arr) => arr.indexOf(v) === i);
-      if (unique.length > 0) return unique.join(', ');
-
-      // Fallback: trim display_name to first 3 meaningful parts
-      if (data.display_name) {
-        return (data.display_name as string)
-          .split(', ')
-          .filter((p: string) => p !== 'India' && !/^\d{5,6}$/.test(p))
-          .slice(0, 3)
-          .join(', ');
-      }
-    }
+    if (data?.display_name) return data.display_name;
   } catch {}
   return 'Current Location';
 }
