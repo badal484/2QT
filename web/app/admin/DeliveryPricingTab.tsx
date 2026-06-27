@@ -44,6 +44,7 @@ export function DeliveryPricingTab() {
         ...zone,
         delivery_fee_type: form.delivery_fee_type || 'flat',
         base_delivery_fee_paise: parseInt(form.base_delivery_fee_paise || "0", 10),
+        delivery_fee_base_paise: parseInt(form.base_delivery_fee_paise || "0", 10),
         per_km_fee_paise: parseInt(form.per_km_fee_paise || "0", 10),
         base_distance_km: parseFloat(form.base_distance_km || "0"),
         free_delivery_above_paise: form.free_delivery_above_paise ? parseInt(form.free_delivery_above_paise, 10) : null,
@@ -152,6 +153,7 @@ export function DeliveryPricingTab() {
                   {[
                     { label: "Type", value: zone.delivery_fee_type === 'per_km' ? 'Per KM' : 'Flat', icon: Bike },
                     { label: "Base Fee", value: `₹${(zone.base_delivery_fee_paise || zone.delivery_fee_base_paise) / 100}`, icon: DollarSign },
+                    { label: "Base Dist.", value: zone.delivery_fee_type === 'per_km' ? `${zone.base_distance_km || 0} km` : '—', icon: MapPin },
                     { label: "Per KM Rate", value: zone.delivery_fee_type === 'per_km' ? `₹${(zone.per_km_fee_paise || 0) / 100} / km` : '—', icon: MapPin },
                     { label: "Free Above", value: zone.free_delivery_above_paise ? `₹${zone.free_delivery_above_paise / 100}` : '—', icon: DollarSign },
                     { label: "Surge Mult.", value: `${zone.surge_multiplier || 1.0}x`, icon: Percent },
