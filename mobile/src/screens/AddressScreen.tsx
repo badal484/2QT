@@ -1,10 +1,10 @@
 import {
-  ArrowLeft, Home, Briefcase, MapPin, Navigation, Plus, Trash2, Search, ChevronRight, CheckCircle2,
+  ArrowLeft, Home, Briefcase, MapPin, Navigation, Plus, Trash2, Search,
 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert,
-  StyleSheet, TextInput, KeyboardAvoidingView, Platform, Dimensions
+  StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
@@ -19,7 +19,6 @@ import { fontFamily } from '../theme/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-const { width } = Dimensions.get('window');
 
 const triggerHaptic = (type = 'impactLight') =>
   ReactNativeHapticFeedback.trigger(type as any, { enableVibrateFallback: true });
@@ -64,28 +63,30 @@ const AddressScreen = ({ navigation }: any) => {
   const selectAddress = async (addr: any) => {
     triggerHaptic('impactMedium');
     setSelectingId(addr.id);
+    const addrLocation = { latitude: addr.lat, longitude: addr.lng, addressText: addr.address_text };
     try {
-      // Always re-verify zone by coordinates — stored zone_id may be stale or wrong
+      // Always re-verify zone by coordinates — stored zone_id may be stale
       const res = await api.get(`/menu/zones/check?lat=${addr.lat}&lng=${addr.lng}`);
       dispatch(setAddress(addr.id));
       if (res.serviceable && res.zone?.id) {
         dispatch(setZone(res.zone.id));
-        dispatch(setServiceable({ zoneId: res.zone.id, zoneName: res.zone.name || null }));
+        // Pass location so globalLocation is updated to this address — fixes cold-boot zone check
+        dispatch(setServiceable({ zoneId: res.zone.id, zoneName: res.zone.name || null, location: addrLocation }));
         queryClient.invalidateQueries({ queryKey: ['menu'] });
       } else {
         dispatch(setZone(null));
-        dispatch(setUnserviceable({ latitude: addr.lat, longitude: addr.lng, addressText: addr.address_text }));
+        dispatch(setUnserviceable(addrLocation));
       }
     } catch {
       // Network error — fall back to stored zone
       dispatch(setAddress(addr.id));
       if (addr.zone_id) {
         dispatch(setZone(addr.zone_id));
-        dispatch(setServiceable({ zoneId: addr.zone_id, zoneName: addr.zone_name || null }));
+        dispatch(setServiceable({ zoneId: addr.zone_id, zoneName: addr.zone_name || null, location: addrLocation }));
         queryClient.invalidateQueries({ queryKey: ['menu'] });
       } else {
         dispatch(setZone(null));
-        dispatch(setUnserviceable({ latitude: addr.lat, longitude: addr.lng, addressText: addr.address_text }));
+        dispatch(setUnserviceable(addrLocation));
       }
     } finally {
       setSelectingId(null);
