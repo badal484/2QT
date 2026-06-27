@@ -16,9 +16,10 @@ async function nominatimReverse(lat: number, lng: number): Promise<GeocodeResult
     );
     clearTimeout(timer);
     const data = await res.json();
-    if (data?.address || data?.display_name) {
+    if (data) {
       const a = data.address || {};
-      const name = a.road || a.suburb || a.neighbourhood || a.quarter ||
+      const name = data.name ||
+                   a.road || a.suburb || a.neighbourhood || a.quarter ||
                    a.village || a.hamlet || a.town || a.city_district || a.city ||
                    a.county || a.state_district || a.state;
       const locality = a.suburb || a.neighbourhood || a.village || a.town ||

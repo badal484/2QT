@@ -91,17 +91,17 @@ router.get('/geocode/reverse', async (req, res) => {
             signal: AbortSignal.timeout(6000),
         });
         const data = await response.json();
-        if (data?.address || data?.display_name) {
+        if (data) {
             const a = data.address || {};
-            // Rural areas (Jharkhand etc.) only have county/state — include those as fallback
-            const name = a.road || a.suburb || a.neighbourhood || a.quarter ||
+            // data.name is the most precise local label Nominatim knows (e.g. "Barkagaon")
+            const name = data.name ||
+                         a.road || a.suburb || a.neighbourhood || a.quarter ||
                          a.village || a.hamlet || a.town || a.city_district || a.city ||
                          a.county || a.state_district || a.state;
             const locality = a.suburb || a.neighbourhood || a.village || a.town ||
                              a.county || a.state_district;
-            const rawFull = [a.road, locality, a.county || a.state_district, a.state]
-                .filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(', ');
-            // Fall back to display_name (trim postcode + country)
+            const rawFull = [a.road || data.name, locality, a.county || a.state_district, a.state]
+                .filter(Boolean).filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i).join(', ');
             const fallbackFull = (data.display_name as string || '')
                 .split(', ').filter((p: string) => p !== 'India' && !/^\d{5,6}$/.test(p))
                 .join(', ');
