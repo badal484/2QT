@@ -16,15 +16,20 @@ async function nominatimReverse(lat: number, lng: number): Promise<GeocodeResult
     );
     clearTimeout(timer);
     const data = await res.json();
-    if (data?.address) {
-      const a = data.address;
-      const name = a.road || a.suburb || a.neighbourhood || a.quarter || a.village || a.hamlet || a.town || a.city_district || a.city;
-      const locality = a.suburb || a.neighbourhood || a.village || a.town || a.county || a.district;
-      const full = [a.road, locality, a.county || a.district, a.state]
-        .filter(Boolean)
-        .filter((v, i, arr) => arr.indexOf(v) === i)
-        .join(', ');
-      if (name) return { name, address: full || name };
+    if (data?.address || data?.display_name) {
+      const a = data.address || {};
+      const name = a.road || a.suburb || a.neighbourhood || a.quarter ||
+                   a.village || a.hamlet || a.town || a.city_district || a.city ||
+                   a.county || a.state_district || a.state;
+      const locality = a.suburb || a.neighbourhood || a.village || a.town ||
+                       a.county || a.state_district;
+      const rawFull = [a.road, locality, a.county || a.state_district, a.state]
+        .filter(Boolean).filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i).join(', ');
+      const fallbackFull = (data.display_name as string || '')
+        .split(', ').filter((p: string) => p !== 'India' && !/^\d{5,6}$/.test(p)).join(', ');
+      const finalName = name || fallbackFull.split(', ')[0];
+      const finalAddress = rawFull || fallbackFull;
+      if (finalName) return { name: finalName, address: finalAddress || finalName };
     }
   } catch {
     clearTimeout(timer);
