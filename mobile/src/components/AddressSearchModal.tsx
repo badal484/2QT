@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, Modal, StyleSheet, ActivityIndicator, SafeAreaView } from 'react-native';
-import { ArrowLeft, Search, MapPin } from 'lucide-react-native';
+import React, { useState, useCallback } from 'react';
+import {
+  View, Modal, StyleSheet, TouchableOpacity, Text,
+  TextInput, FlatList, ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ArrowLeft, MapPin } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import { api } from '../api/client';
+import { colors } from '../theme/colors';
+import { fontFamily } from '../theme/typography';
 
 interface AddressSearchModalProps {
   visible: boolean;
@@ -10,207 +15,157 @@ interface AddressSearchModalProps {
   onSelect: (lat: number, lon: number, displayName: string) => void;
 }
 
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  address?: Record<string, string>;
+}
+
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const AddressSearchModal: React.FC<AddressSearchModalProps> = ({ visible, onClose, onSelect }) => {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<NominatimResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [networkError, setNetworkError] = useState(false);
 
-  useEffect(() => {
-    if (!visible) {
-      setQuery('');
-      setResults([]);
-      setNetworkError(false);
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (query.trim().length > 2) {
-        searchAddress(query);
-      } else {
-        setResults([]);
-      }
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [query]);
-
-  const searchAddress = async (searchQuery: string) => {
+  const search = useCallback(async (text: string) => {
+    if (text.trim().length < 2) { setResults([]); return; }
     setLoading(true);
-    setNetworkError(false);
     try {
-      const data = await api.get(`/menu/geocode/search?q=${encodeURIComponent(searchQuery)}`);
-      setResults(Array.isArray(data) ? data : []);
-    } catch (e) {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&addressdetails=1&limit=6&countrycodes=in`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': '2QT-FoodDelivery/1.0', 'Accept-Language': 'en' },
+      });
+      const data: NominatimResult[] = await res.json();
+      setResults(data);
+    } catch {
       setResults([]);
-      setNetworkError(true);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const onChangeText = (text: string) => {
+    setQuery(text);
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => search(text), 400);
   };
 
-  const handleSelect = (item: any) => {
+  const handleSelect = (item: NominatimResult) => {
     ReactNativeHapticFeedback.trigger('impactMedium');
-    onSelect(parseFloat(item.lat), parseFloat(item.lon), item.display_name);
+    // Build a short readable display name from address components
+    const a = item.address || {};
+    const parts = [
+      a.suburb || a.neighbourhood || a.village || a.town || a.city_district,
+      a.county || a.district || a.state_district,
+      a.state,
+    ].filter(Boolean);
+    const shortName = parts.length > 0 ? parts.join(', ') : item.display_name.split(', ').slice(0, 3).join(', ');
+    onSelect(parseFloat(item.lat), parseFloat(item.lon), shortName);
+    setQuery('');
+    setResults([]);
+  };
+
+  const handleClose = () => {
+    ReactNativeHapticFeedback.trigger('impactLight');
+    setQuery('');
+    setResults([]);
+    onClose();
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <SafeAreaView style={styles.container}>
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => {
-            ReactNativeHapticFeedback.trigger('impactLight');
-            onClose();
-          }} style={styles.backBtn}>
+          <TouchableOpacity onPress={handleClose} style={styles.backBtn}>
             <ArrowLeft color="#1A1A2E" size={24} />
           </TouchableOpacity>
-          <View style={styles.searchContainer}>
-            <Search color="#9CA3AF" size={20} style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search for your city or address..."
-              placeholderTextColor="#9CA3AF"
-              value={query}
-              onChangeText={setQuery}
-              autoFocus
-            />
-          </View>
+          <Text style={styles.headerTitle}>Search Location</Text>
         </View>
 
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF6B35" />
-            <Text style={styles.loadingText}>Searching globally...</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={results}
-            keyExtractor={(item) => item.place_id.toString()}
-            contentContainerStyle={styles.listContainer}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.resultItem} onPress={() => handleSelect(item)}>
-                <View style={styles.iconContainer}>
-                  <MapPin color="#FF6B35" size={24} />
+        {/* Search input */}
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            placeholder="Search for area, street, city..."
+            placeholderTextColor="#9CA3AF"
+            value={query}
+            onChangeText={onChangeText}
+            autoFocus
+            returnKeyType="search"
+          />
+          {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 12 }} />}
+        </View>
+
+        {/* Results */}
+        <FlatList
+          data={results}
+          keyExtractor={item => String(item.place_id)}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => {
+            const a = item.address || {};
+            const title = a.suburb || a.village || a.town || a.city_district || a.road || item.display_name.split(', ')[0];
+            const subtitle = item.display_name.split(', ').slice(1, 4).join(', ');
+            return (
+              <TouchableOpacity style={styles.row} onPress={() => handleSelect(item)} activeOpacity={0.7}>
+                <View style={styles.pinBox}>
+                  <MapPin size={18} color={colors.primary} />
                 </View>
-                <View style={styles.resultTextContainer}>
-                  <Text style={styles.resultTitle} numberOfLines={1}>
-                    {item.name || item.address?.city || item.address?.town || item.address?.village || 'Unknown Place'}
-                  </Text>
-                  <Text style={styles.resultSubtitle} numberOfLines={2}>
-                    {item.display_name}
-                  </Text>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
+                  <Text style={styles.rowSub} numberOfLines={1}>{subtitle}</Text>
                 </View>
               </TouchableOpacity>
-            )}
-            ListEmptyComponent={() => (
-              query.length > 2 && !loading ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>
-                    {networkError
-                      ? 'Search unavailable. Check your internet connection.'
-                      : 'No matching locations found.'}
-                  </Text>
-                </View>
-              ) : null
-            )}
-          />
-        )}
+            );
+          }}
+          ItemSeparatorComponent={() => <View style={styles.sep} />}
+          ListEmptyComponent={
+            query.length >= 2 && !loading ? (
+              <Text style={styles.empty}>No results found</Text>
+            ) : null
+          }
+        />
       </SafeAreaView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  backBtn: {
-    padding: 8,
-    marginRight: 8,
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  backBtn: { padding: 8, marginRight: 8 },
+  headerTitle: { fontSize: 18, fontFamily: fontFamily.extrabold, color: '#1A1A2E' },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    margin: 16,
     backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    height: 50,
+    borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
+    paddingHorizontal: 14,
   },
-  searchIcon: {
+  input: {
+    flex: 1, height: 48,
+    fontSize: 15, fontFamily: fontFamily.medium, color: '#1A1A2E',
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  pinBox: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: colors.primaryTint,
+    alignItems: 'center', justifyContent: 'center',
     marginRight: 12,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1A1A2E',
-    fontWeight: '600',
-  },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  resultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  resultTextContainer: {
-    flex: 1,
-  },
-  resultTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#1A1A2E',
-    marginBottom: 4,
-  },
-  resultSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#9CA3AF',
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 64,
-  },
-  emptyText: {
-    color: '#9CA3AF',
-    fontWeight: '600',
-    fontSize: 16,
-  },
+  rowText: { flex: 1 },
+  rowTitle: { fontSize: 15, fontFamily: fontFamily.semibold, color: '#1A1A2E', marginBottom: 2 },
+  rowSub: { fontSize: 13, fontFamily: fontFamily.regular, color: '#6B7280' },
+  sep: { height: 1, backgroundColor: '#F9FAFB', marginLeft: 64 },
+  empty: { textAlign: 'center', color: '#9CA3AF', marginTop: 32, fontFamily: fontFamily.medium },
 });
