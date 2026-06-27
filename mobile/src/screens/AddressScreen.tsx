@@ -44,6 +44,8 @@ const AddressScreen = ({ navigation }: any) => {
   const { data: addresses, isLoading } = useQuery({
     queryKey: ['addresses'],
     queryFn: () => api.get('/customers/addresses'),
+    staleTime: 0,       // always re-fetch on mount so zone status is current
+    gcTime: 0,          // don't serve inactive-zone data from cache
   });
 
   const deleteMutation = useMutation({
@@ -79,16 +81,11 @@ const AddressScreen = ({ navigation }: any) => {
         dispatch(setUnserviceable(addrLocation));
       }
     } catch {
-      // Network error — fall back to stored zone
+      // Network error — cannot verify zone status, so treat as unserviceable.
+      // Stored zone_id may be stale (zone could have been deactivated since save).
       dispatch(setAddress(addr.id));
-      if (addr.zone_id) {
-        dispatch(setZone(addr.zone_id));
-        dispatch(setServiceable({ zoneId: addr.zone_id, zoneName: addr.zone_name || null, location: addrLocation }));
-        queryClient.invalidateQueries({ queryKey: ['menu'] });
-      } else {
-        dispatch(setZone(null));
-        dispatch(setUnserviceable(addrLocation));
-      }
+      dispatch(setZone(null));
+      dispatch(setUnserviceable(addrLocation));
     } finally {
       setSelectingId(null);
       navigation.goBack();
