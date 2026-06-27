@@ -71,10 +71,12 @@ router.get('/geocode/reverse', async (req, res) => {
                 };
                 // "name" = most specific local label (road → sub-locality → locality)
                 const name = get('route', 'sublocality_level_2', 'sublocality_level_1', 'neighborhood', 'sublocality', 'locality', 'administrative_area_level_2');
-                // "address" = full formatted string minus country and Plus Codes (e.g. "R9X2+64")
+                // "address" = formatted string, strip Plus Code prefix within segments, strip country
+                // e.g. "R9X2+64 Naiparam, Jharkhand, India" → "Naiparam, Jharkhand"
                 const fullAddress = (data.results[0].formatted_address as string || '')
                     .split(', ')
-                    .filter((p: string) => p !== 'India' && !/^[A-Z0-9]{4,}\+[A-Z0-9]{2,}/.test(p))
+                    .map((p: string) => p.replace(/^[A-Z0-9]{4,}\+[A-Z0-9]{2,}\s*/, ''))
+                    .filter((p: string) => p && p !== 'India')
                     .join(', ')
                     .trim();
                 if (name) {
@@ -110,7 +112,8 @@ router.get('/geocode/reverse', async (req, res) => {
                 .split(', ').filter((p: string) => p !== 'India' && !/^\d{5,6}$/.test(p))
                 .join(', ');
             const finalName = name || fallbackFull.split(', ')[0];
-            const finalAddress = rawFull || fallbackFull;
+            // Prefer display_name-based fallback — rawFull can be just "Jharkhand" when Nominatim omits village/county fields
+            const finalAddress = rawFull.split(', ').length >= 2 ? rawFull : (fallbackFull || rawFull);
             if (finalName) {
                 res.set('Cache-Control', 'public, max-age=300');
                 return res.json({ name: finalName, address: finalAddress || finalName });
