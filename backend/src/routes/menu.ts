@@ -91,15 +91,25 @@ router.get('/geocode/reverse', async (req, res) => {
             signal: AbortSignal.timeout(6000),
         });
         const data = await response.json();
-        if (data?.address) {
-            const a = data.address;
-            const name = a.road || a.suburb || a.neighbourhood || a.quarter || a.village || a.hamlet || a.town || a.city_district || a.city;
-            const locality = a.suburb || a.neighbourhood || a.village || a.town || a.county || a.district;
-            const fullAddress = [a.road, locality, a.county || a.district, a.state]
+        if (data?.address || data?.display_name) {
+            const a = data.address || {};
+            // Rural areas (Jharkhand etc.) only have county/state — include those as fallback
+            const name = a.road || a.suburb || a.neighbourhood || a.quarter ||
+                         a.village || a.hamlet || a.town || a.city_district || a.city ||
+                         a.county || a.state_district || a.state;
+            const locality = a.suburb || a.neighbourhood || a.village || a.town ||
+                             a.county || a.state_district;
+            const rawFull = [a.road, locality, a.county || a.state_district, a.state]
                 .filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(', ');
-            if (name) {
+            // Fall back to display_name (trim postcode + country)
+            const fallbackFull = (data.display_name as string || '')
+                .split(', ').filter((p: string) => p !== 'India' && !/^\d{5,6}$/.test(p))
+                .join(', ');
+            const finalName = name || fallbackFull.split(', ')[0];
+            const finalAddress = rawFull || fallbackFull;
+            if (finalName) {
                 res.set('Cache-Control', 'public, max-age=300');
-                return res.json({ name, address: fullAddress || name });
+                return res.json({ name: finalName, address: finalAddress || finalName });
             }
         }
     } catch (err) {
