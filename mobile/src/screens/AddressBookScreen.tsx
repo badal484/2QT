@@ -291,6 +291,8 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             showsMyLocationButton={false}
             pitchEnabled={false}
             toolbarEnabled={false}
+            userInterfaceStyle="light"
+            customMapStyle={[]}
           />
 
           {/* Center pin — animates up on drag */}
