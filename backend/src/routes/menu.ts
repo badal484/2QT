@@ -52,25 +52,49 @@ router.get('/geocode/reverse', async (req, res) => {
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
     if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'INVALID_COORDS' });
-    try {
-        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ error: 'GOOGLE_MAPS_NOT_CONFIGURED' });
+
+    // Try Google Geocoding first, fall back to Nominatim
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (apiKey) {
+        try {
+            const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+            const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+            const data = await response.json();
+            if (data.results && data.results.length > 0) {
+                res.set('Cache-Control', 'public, max-age=300');
+                return res.json({ display_name: data.results[0].formatted_address });
+            }
+        } catch {
+            // Google failed — fall through to Nominatim
         }
-        
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
-        const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
-        const data = await response.json();
-        res.set('Cache-Control', 'public, max-age=300');
-        // Extract the formatted_address from Google response
-        if (data.results && data.results.length > 0) {
-            return res.json({ display_name: data.results[0].formatted_address });
-        }
-        return res.json({ display_name: 'Current Location' });
-    } catch (err) {
-        console.error('[Geocode] Reverse failed:', err);
-        res.status(502).json({ error: 'GEOCODE_UNAVAILABLE' });
     }
+
+    // Nominatim fallback (free, no key)
+    try {
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+        const response = await fetch(url, {
+            headers: { 'User-Agent': '2QT-FoodDelivery/1.0', 'Accept-Language': 'en' },
+            signal: AbortSignal.timeout(6000),
+        });
+        const data = await response.json();
+        if (data?.address) {
+            const a = data.address;
+            const parts = [
+                a.suburb || a.neighbourhood || a.village || a.town || a.city_district || a.city,
+                a.county || a.district || a.state_district,
+                a.state,
+            ].filter(Boolean);
+            const unique = parts.filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i);
+            if (unique.length > 0) {
+                res.set('Cache-Control', 'public, max-age=300');
+                return res.json({ display_name: unique.join(', ') });
+            }
+        }
+    } catch (err) {
+        console.error('[Geocode] Nominatim reverse failed:', err);
+    }
+
+    res.json({ display_name: null });
 });
 
 router.get('/zones', async (req, res) => {
