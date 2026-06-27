@@ -52,7 +52,9 @@ export default function MapViewer({ lat, lng, label = "Customer Location", hideC
         attributionControl: false,
       });
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        attribution: '&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+      }).addTo(map);
       L.marker([lat, lng]).addTo(map);
 
       mapInstanceRef.current = map;

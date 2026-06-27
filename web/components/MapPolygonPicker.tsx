@@ -53,20 +53,11 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
     
     setLoading(true);
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`, {
-        headers: {
-          'Accept-Language': 'en-US,en;q=0.9',
-          'User-Agent': '2QTFoodPalace/1.0'
-        }
-      });
+      const res = await fetch(`http://localhost:3000/menu/geocode/search?q=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
       
       if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
-        if (mapInstance) {
-          mapInstance.flyTo([lat, lon], 14, { animate: true, duration: 1.5 });
-        }
+        toast.info(`Found: ${data[0].display_name}. Please drop points manually.`);
       } else {
         toast.error("Location not found. Try a different search.");
       }
@@ -162,8 +153,8 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
         style={{ height: '100%', width: '100%', zIndex: 1, backgroundColor: '#222' }}
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         />
         <MapEvents polygonPoints={polygonPoints} onChange={onChange} setMapInstance={setMapInstance} positions={positions} />
         {positions.length > 0 && (

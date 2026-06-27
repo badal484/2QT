@@ -851,7 +851,7 @@ router.post('/zones', authenticate, requireRole('super_admin', 'admin'), validat
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING *
         `, [name, city, kitchen_lat, kitchen_lng, radius_km,
-            delivery_fee_base_paise, opening_time, closing_time,
+            base_delivery_fee_paise ?? delivery_fee_base_paise ?? 2500, opening_time, closing_time,
             max_orders_per_hour, realistic_delivery_minutes,
             polygon_points ? JSON.stringify(polygon_points) : null,
             delivery_fee_type || 'flat',
@@ -889,7 +889,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
             UPDATE zones SET
                 name = COALESCE($1, name),
                 radius_km = COALESCE($2, radius_km),
-                delivery_fee_base_paise = COALESCE($3, delivery_fee_base_paise),
+                delivery_fee_base_paise = COALESCE($3, COALESCE($16, delivery_fee_base_paise)),
                 surge_fee_paise = COALESCE($4, surge_fee_paise),
                 opening_time = COALESCE($5, opening_time),
                 closing_time = COALESCE($6, closing_time),

@@ -8,7 +8,7 @@ import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
 import { EmptyState, SkeletonRow } from '../components/ui';
 
@@ -611,18 +611,18 @@ const HomeScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* ROW 2: Search Bar + 2QT badge */}
+        {/* ROW 2: Search Bar with VEG toggle */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            {/* Slim pill search bar */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <View style={{
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
               backgroundColor: colors.surface,
-              borderRadius: 23,
-              paddingHorizontal: 14,
-              height: 46,
+              borderRadius: 20,
+              paddingLeft: 10,
+              paddingRight: 6,
+              height: 42,
               shadowColor: colors.ink,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.04,
@@ -631,40 +631,125 @@ const HomeScreen = ({ navigation }: any) => {
               borderWidth: 1,
               borderColor: colors.border,
             }}>
-              <Search size={18} color={colors.inkMuted} style={{ marginRight: 10 }} />
-              <TextInput
-                placeholder={
-                  placeholderNames.length > 0
-                    ? `Search "${placeholderNames[phIndex]}"`
-                    : 'Search for food...'
-                }
-                placeholderTextColor={colors.inkMuted}
-                style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, padding: 0 }}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
+              <Search size={16} color={colors.inkMuted} style={{ marginRight: 6, flexShrink: 0 }} />
+              <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
+                <TextInput
+                  placeholder=""
+                  placeholderTextColor="transparent"
+                  style={{ 
+                    flex: 1, 
+                    fontSize: 13, 
+                    fontFamily: fontFamily.medium, 
+                    color: colors.ink, 
+                    paddingVertical: 0, 
+                    paddingHorizontal: 0,
+                    height: '100%',
+                    textAlignVertical: 'center',
+                    minWidth: 50,
+                    zIndex: 2
+                  }}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery === '' && (
+                  <View 
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      height: '100%',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      zIndex: 1
+                    }}
+                  >
+                    {placeholderNames.length > 0 ? (
+                      <>
+                        <Text style={{
+                          fontSize: 13,
+                          fontFamily: fontFamily.medium,
+                          color: colors.inkMuted,
+                        }}>
+                          Search{" "}
+                        </Text>
+                        <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
+                          <Animated.Text
+                            key={phIndex}
+                            entering={FadeInDown.duration(350)}
+                            exiting={FadeOutUp.duration(350)}
+                            style={{
+                              fontSize: 13,
+                              fontFamily: fontFamily.medium,
+                              color: colors.inkMuted,
+                            }}
+                          >
+                            "{placeholderNames[phIndex]}"
+                          </Animated.Text>
+                        </View>
+                      </>
+                    ) : (
+                      <Text style={{
+                        fontSize: 13,
+                        fontFamily: fontFamily.medium,
+                        color: colors.inkMuted,
+                      }}>
+                        Search for food...
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
               {searchQuery.length > 0 ? (
-                <TouchableOpacity onPress={() => { triggerHaptic(); setSearchQuery(''); }}>
-                  <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
+                <TouchableOpacity onPress={() => { triggerHaptic(); setSearchQuery(''); }} style={{ paddingLeft: 6, paddingRight: 2, flexShrink: 0 }}>
+                  <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
                 </TouchableOpacity>
               ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 10, marginLeft: 6 }}>
-                  <Text style={[styles.vegText, isVegOnly && styles.vegTextActive]}>VEG</Text>
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  flexShrink: 0 
+                }}>
+                  <Text style={{
+                    fontSize: 9,
+                    fontFamily: fontFamily.extrabold,
+                    color: isVegOnly ? '#22C55E' : colors.inkMuted,
+                    letterSpacing: 0.5,
+                    marginLeft: 4,
+                    flexShrink: 0
+                  }} numberOfLines={1}>
+                    VEG
+                  </Text>
+                  
+                  <View style={{ 
+                    width: 1, 
+                    height: 16, 
+                    backgroundColor: colors.border, 
+                    marginHorizontal: 6,
+                    flexShrink: 0
+                  }} />
+
                   <Switch
                     value={isVegOnly}
                     onValueChange={(val) => { triggerHaptic(); setIsVegOnly(val); }}
-                    trackColor={{ false: colors.border, true: colors.primaryTint }}
-                    thumbColor={isVegOnly ? colors.primary : colors.white}
-                    style={styles.vegSwitch}
+                    trackColor={{ false: '#E2E8F0', true: '#BBF7D0' }}
+                    thumbColor={isVegOnly ? '#22C55E' : '#FFFFFF'}
+                    style={{ 
+                      transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }],
+                      marginRight: -4,
+                      marginLeft: -4,
+                      marginTop: -4,
+                      marginBottom: -4
+                    }}
                   />
                 </View>
               )}
             </View>
 
             {/* 2QT brand mark */}
-            <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-              <Text style={{ fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -1 }}>
-                2QT<Text style={{ color: colors.primary, fontSize: 28 }}>.</Text>
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingRight: 2, flexShrink: 0 }}>
+              <Text style={{ fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -1 }}>
+                2QT<Text style={{ color: colors.primary, fontSize: 20 }}>.</Text>
               </Text>
             </View>
           </View>

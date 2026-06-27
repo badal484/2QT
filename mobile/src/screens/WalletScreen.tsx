@@ -8,6 +8,8 @@ import ReactNativeHapticFeedback from "react-native-haptic-feedback";
 import Animated, { FadeInDown, Layout, FadeIn } from 'react-native-reanimated';
 
 import { getSocket } from '../socket/client';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 
 const hapticOptions = {
   enableVibrateFallback: true,
@@ -40,9 +42,28 @@ const WalletScreen = ({ navigation }: any) => {
     };
   }, [socket]);
 
+  const { user } = useSelector((state: RootState) => state.auth);
+
   const rechargeMutation = useMutation({
     mutationFn: (amount: number) => api.post('/payment/wallet/recharge', { amountPaise: amount * 100 }),
     onSuccess: async (data, amount) => {
+        if (__DEV__ && !data.keyId) {
+            try {
+                await api.post('/payment/mock-success', {
+                    razorpayOrderId: data.razorpayOrderId,
+                    type: 'wallet',
+                    amountPaise: amount * 100
+                });
+                triggerHapticHeavy();
+                Alert.alert('Success', 'Wallet recharged successfully! (Mock)');
+                queryClient.invalidateQueries({ queryKey: ['wallet'] });
+            } catch (error: any) {
+                console.error('MOCK_PAYMENT_ERROR:', error);
+                Alert.alert('Mock Payment Failed', error.message || 'Transaction cancelled');
+            }
+            return;
+        }
+
         const options = {
             description: '2QT Wallet Recharge',
             image: 'https://2qt.app/logo.png',
@@ -52,9 +73,9 @@ const WalletScreen = ({ navigation }: any) => {
             name: '2QT',
             order_id: data.razorpayOrderId,
             prefill: {
-                email: 'customer@example.com',
-                contact: '9100000000',
-                name: '2QT User'
+                email: user?.email || 'customer@2qt.app',
+                contact: user?.phone || '9999999999',
+                name: user?.name || '2QT User'
             },
             theme: { color: '#FF6B35' }
         };
@@ -71,7 +92,39 @@ const WalletScreen = ({ navigation }: any) => {
             queryClient.invalidateQueries({ queryKey: ['wallet'] });
         } catch (error: any) {
             console.error('PAYMENT_ERROR:', error);
-            Alert.alert('Payment Failed', error.description || 'Transaction cancelled');
+            
+            // If in dev mode and Razorpay fails, automatically fall back to mock success
+            if (__DEV__) {
+                try {
+                    await api.post('/payment/mock-success', {
+                        razorpayOrderId: data.razorpayOrderId,
+                        type: 'wallet',
+                        amountPaise: amount * 100
+                    });
+                    triggerHapticHeavy();
+                    Alert.alert('Dev Mock Success', 'Razorpay failed, but wallet recharged via Mock.');
+                    queryClient.invalidateQueries({ queryKey: ['wallet'] });
+                } catch (mockErr: any) {
+                    Alert.alert('Payment Failed', error?.error?.description || error.description || 'Transaction cancelled');
+                }
+            } else {
+                let msg = 'Transaction cancelled';
+                try {
+                  const errStr = typeof error === 'string' ? error : (error?.description || JSON.stringify(error));
+                  if (errStr && errStr.includes('{')) {
+                    const parsed = JSON.parse(errStr);
+                    msg = parsed?.error?.description || parsed?.description || msg;
+                  } else if (error?.description) {
+                    msg = error.description;
+                  } else if (error?.message) {
+                    msg = error.message;
+                  }
+                } catch (e) {
+                  msg = error?.description || error?.message || 'Transaction cancelled';
+                }
+                if (msg === 'undefined' || !msg) msg = 'Transaction cancelled';
+                Alert.alert('Payment Failed', msg);
+            }
         }
     }
   });

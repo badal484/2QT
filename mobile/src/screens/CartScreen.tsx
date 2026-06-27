@@ -8,9 +8,9 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
-import { setQuantity, clearCart, setPromoCode as setPromoCodeAction } from '../store/slices/cartSlice';
+import { setQuantity, clearCart, setPromoCode as setPromoCodeAction, addItem as addItemAction } from '../store/slices/cartSlice';
 import { getSocket } from '../socket/client';
-import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2 } from 'lucide-react-native';
+import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
@@ -65,45 +65,40 @@ const toggleStyles = StyleSheet.create({
   },
 });
 
-const VerifyingOverlay = () => (
-  <View style={styles.overlay}>
-    <ActivityIndicator size="large" color={ACCENT} />
-    <Text style={styles.overlayTitle}>Verifying Payment</Text>
-    <Text style={styles.overlaySub}>Confirming your order with the kitchen…</Text>
-  </View>
-);
-
 const CartScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
-  const { items, addressId } = useSelector((state: RootState) => state.cart);
+  
+  const { items, addressId, zoneId } = useSelector((state: RootState) => state.cart);
   const { user } = useSelector((state: RootState) => state.auth);
+  const activeZoneId = useSelector((state: any) => state.app.activeZoneId);
+  const effectiveZoneId = zoneId || activeZoneId;
 
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
-  const [useLoyalty, setUseLoyalty] = useState(false);
-  const [useWallet, setUseWallet] = useState(false);
+  const [riderTip, setRiderTip] = useState<number>(0);
+  const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [altReceiver, setAltReceiver] = useState(false);
   const [altName, setAltName] = useState('');
   const [altPhone, setAltPhone] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
+
+  const { data: activePromosData } = useQuery({
+    queryKey: ['active-promos'],
+    queryFn: () => api.get('/promocodes/active'),
+    staleTime: 30 * 1000,
+  });
+  const hasActivePromos = (activePromosData?.promoCodes?.length ?? 0) > 0;
 
   React.useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['your-order-pricing'] });
-      queryClient.invalidateQueries({ queryKey: ['loyalty-pts'] });
     };
     socket.on('menu_updated', refresh);
-    socket.on('wallet_updated', refresh);
-    socket.on('loyalty_updated', refresh);
     return () => {
       socket.off('menu_updated', refresh);
-      socket.off('wallet_updated', refresh);
-      socket.off('loyalty_updated', refresh);
     };
   }, [queryClient]);
 
@@ -115,18 +110,27 @@ const CartScreen = ({ navigation }: any) => {
   const selectedAddress = addressesData?.addresses?.find((a: any) => a.id === addressId);
   const isOutOfZone = !!addressId && !!selectedAddress && !selectedAddress.is_serviceable;
 
-  const { data: loyaltyData } = useQuery({
-    queryKey: ['loyalty-pts'],
-    queryFn: () => api.get('/customers/loyalty'),
-    enabled: !!user,
+  const { data: menuData } = useQuery({
+    queryKey: ['menu', effectiveZoneId],
+    queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}`),
+    enabled: !!effectiveZoneId,
+    staleTime: 3 * 60 * 1000,
   });
+
+  const recommendations = React.useMemo(() => {
+    if (!menuData?.items || items.length === 0) return [];
+    const kitchenId = items[0]?.kitchenId;
+    return menuData.items
+      .filter((i: any) => i.available && i.kitchen_id === kitchenId && !items.some(ci => ci.menuItemId === i.id))
+      .slice(0, 6);
+  }, [menuData?.items, items]);
 
   const fallbackSubtotal = items.reduce((s, i) => s + i.quantity * i.pricePaise, 0);
   const { data: pricingData, isFetching: pricingFetching } = useQuery({
-    queryKey: ['your-order-pricing', items, addressId, appliedPromoCode, useLoyalty, useWallet],
+    queryKey: ['your-order-pricing', items, addressId, appliedPromoCode],
     queryFn: () =>
       api.post('/payment/create-order', {
-        items, addressId, promoCode: appliedPromoCode, useLoyalty, useWallet, dryRun: true,
+        items, addressId, promoCode: appliedPromoCode, riderTipPaise: riderTip * 100, dryRun: true,
       }),
     enabled: items.length > 0 && !!addressId && !isOutOfZone,
     placeholderData: keepPreviousData,
@@ -141,115 +145,11 @@ const CartScreen = ({ navigation }: any) => {
     totalAmountPaise: fallbackSubtotal,
     gatewayAmountPaise: fallbackSubtotal,
     discountPaise: 0,
-    loyaltyDiscountPaise: 0,
-    walletDeductionPaise: 0,
   };
-  const availableWallet = pricingData?.availableWallet || 0;
   const subtotal = p.subtotalPaise / 100;
   const deliveryFee = p.deliveryFeePaise / 100;
   const tax = ((p.gstPaise || 0) + (p.cgstPaise || 0) + (p.sgstPaise || 0)) / 100;
-  const grandTotal = p.gatewayAmountPaise / 100;
-
-  const verifyOrder = (orderId: string) => {
-    setIsVerifying(true);
-    let attempts = 0;
-    let navigated = false;
-    const id = setInterval(async () => {
-      if (navigated) return;
-      attempts++;
-      try {
-        const res: any = await api.get(`/orders/${orderId}`);
-        if (['confirmed', 'preparing'].includes(res.order?.status)) {
-          clearInterval(id);
-          navigated = true;
-          setIsVerifying(false);
-          dispatch(clearCart());
-          queryClient.invalidateQueries({ queryKey: ['order-history'] });
-          navigation.navigate('OrderPlaced', { orderId, displayId: res.order?.display_id });
-          return;
-        }
-      } catch (_) {}
-      if (attempts >= 15) {
-        clearInterval(id);
-        navigated = true;
-        setIsVerifying(false);
-        navigation.navigate('OrderHistory');
-      }
-    }, 2000);
-  };
-
-  const placeOrderMutation = useMutation({
-    mutationFn: (data: any) => api.post('/payment/create-order', data),
-    onSuccess: (res: any) => {
-      if (res.status === 'confirmed') {
-        dispatch(clearCart());
-        navigation.navigate('OrderPlaced', { orderId: res.orderId, displayId: res.displayId });
-        return;
-      }
-      if (__DEV__ && !res.keyId) {
-        api
-          .post('/payment/mock-success', { razorpayOrderId: res.razorpayOrderId })
-          .then(() => verifyOrder(res.orderId))
-          .catch((err: any) => Alert.alert('Mock Payment Failed', err.message));
-        return;
-      }
-      const options = {
-        description: '2QT Food Order',
-        currency: 'INR',
-        key: res.keyId,
-        amount: res.amount,
-        name: '2QT',
-        order_id: res.razorpayOrderId,
-        prefill: {
-          email: user?.email || 'customer@2qt.app',
-          contact: user?.phone || '',
-          name: user?.name || 'Customer',
-        },
-        theme: { color: ACCENT },
-      };
-      if (RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
-        RazorpayCheckout.open(options)
-          .then((data: any) => {
-            api
-              .post('/payment/verify-payment', {
-                razorpay_order_id: data.razorpay_order_id,
-                razorpay_payment_id: data.razorpay_payment_id,
-                razorpay_signature: data.razorpay_signature,
-                type: 'order',
-              })
-              .then(() => verifyOrder(res.orderId))
-              .catch(() => verifyOrder(res.orderId));
-          })
-          .catch((err: any) => {
-            const msg =
-              err?.error?.description ||
-              (typeof err?.description === 'string' ? err.description : null) ||
-              'Transaction cancelled or failed.';
-            Alert.alert('Payment Failed', msg);
-          });
-      } else {
-        Alert.alert('Error', 'Payment gateway unavailable on this device.');
-      }
-    },
-    onError: (err: any) => Alert.alert('Order Failed', err.message || 'Could not place order'),
-  });
-
-  const handlePlaceOrder = () => {
-    if (!addressId) {
-      Alert.alert('Missing Address', 'Please select a delivery address first.');
-      navigation.navigate('Address');
-      return;
-    }
-    if (altReceiver && altPhone.length < 10) {
-      Alert.alert('Invalid Phone', 'Please enter a valid 10-digit phone number for the alternate receiver.');
-      return;
-    }
-    placeOrderMutation.mutate({
-      items, addressId, promoCode: appliedPromoCode, useLoyalty, useWallet, paymentMethod, dryRun: false,
-      deliveryContactName: altReceiver && altName.trim() ? altName.trim() : undefined,
-      deliveryContactPhone: altReceiver && altPhone.trim() ? altPhone.trim() : undefined,
-    });
-  };
+  const grandTotal = (p.gatewayAmountPaise || p.totalAmountPaise) / 100;
 
   if (items.length === 0) {
     return (
@@ -269,30 +169,47 @@ const CartScreen = ({ navigation }: any) => {
     );
   }
 
-  const busy = placeOrderMutation.isPending || pricingFetching;
+  const busy = pricingFetching;
   const totalItemCount = items.reduce((s, i) => s + i.quantity, 0);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {isVerifying && <VerifyingOverlay />}
-
+      
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Your Order</Text>
+          <Text style={styles.headerTitle}>Order confirmation</Text>
           <Text style={styles.headerSub}>{totalItemCount} {totalItemCount === 1 ? 'item' : 'items'}</Text>
         </View>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => { triggerHaptic(); navigation.goBack(); }}>
-          <X size={18} color={colors.ink} />
+        <TouchableOpacity style={styles.clearCartBtn} onPress={() => { triggerHaptic(); dispatch(clearCart()); }}>
+          <Text style={styles.clearCartText}>Clear Cart</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Saved banner exactly like Screenshot 1 */}
+      {p.discountPaise > 0 && (
+        <View style={styles.savingsBanner}>
+          <Text style={styles.savingsBannerText}>You saved ₹{p.discountPaise / 100} on this order</Text>
+        </View>
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Delivery Estimate */}
+        <Animated.View entering={FadeInDown.duration(300)} style={styles.estimateCard}>
+          <View style={styles.estimateIconBox}>
+            <Star size={16} color={colors.success} fill={colors.success} />
+          </View>
+          <View>
+            <Text style={styles.estimateTitle}>15 minutes</Text>
+            <Text style={styles.estimateSub}>From our neighbourhood kitchens</Text>
+          </View>
+        </Animated.View>
+
         {/* Cart Items Card */}
-        <Animated.View entering={FadeInDown.duration(300)} style={styles.card}>
+        <Animated.View entering={FadeInDown.delay(30).duration(300)} style={styles.card}>
           {items.map((item, index) => (
             <View key={item.menuItemId}>
               <View style={styles.itemRow}>
@@ -306,7 +223,12 @@ const CartScreen = ({ navigation }: any) => {
                   )}
                 </View>
                 <View style={styles.itemMeta}>
-                  <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                    <View style={[styles.vegBadgeMini, { borderColor: item.isVeg ? '#22C55E' : colors.danger }]}>
+                      <View style={[styles.vegDotMini, { backgroundColor: item.isVeg ? '#22C55E' : colors.danger }]} />
+                    </View>
+                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                  </View>
                   <Text style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
                 </View>
                 <View style={styles.qtyRow}>
@@ -330,8 +252,110 @@ const CartScreen = ({ navigation }: any) => {
           ))}
         </Animated.View>
 
+        {/* You Might Like This Cross-Selling Carousel */}
+        {recommendations.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(50).duration(300)} style={styles.card}>
+            <Text style={styles.cardTitle}>You might like this</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+              {recommendations.map((rec: any) => {
+                const vegColor = rec.is_egg ? '#EAB308' : (rec.is_veg ? '#22C55E' : colors.danger);
+                return (
+                  <View key={rec.id} style={styles.recCard}>
+                    {rec.photo_url ? (
+                      <Image source={{ uri: rec.photo_url }} style={styles.recImg} />
+                    ) : (
+                      <View style={[styles.recImg, styles.recImgPlaceholder]}>
+                        <ChefHat size={20} color={colors.inkFaint} />
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.recAddBtn}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        triggerHaptic();
+                        dispatch(
+                          addItemAction({
+                            menuItemId: rec.id,
+                            name: rec.name,
+                            pricePaise: rec.price_paise,
+                            quantity: 1,
+                            photoUrl: rec.photo_url,
+                            isVeg: rec.is_veg,
+                            kitchenId: rec.kitchen_id,
+                          })
+                        );
+                      }}
+                    >
+                      <Text style={styles.recAddText}>+</Text>
+                    </TouchableOpacity>
+                    <View style={styles.recMeta}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                        <View style={[styles.vegBadgeMini, { borderColor: vegColor, width: 6, height: 6 }]}>
+                          <View style={[styles.vegDotMini, { backgroundColor: vegColor, width: 3, height: 3 }]} />
+                        </View>
+                        <Text style={styles.recQuantityText}>1 Piece</Text>
+                      </View>
+                      <Text style={styles.recName} numberOfLines={1}>{rec.name}</Text>
+                      <Text style={styles.recPrice}>₹{rec.price_paise / 100}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </Animated.View>
+        )}
+
+        {/* Promo Code Card */}
+        {hasActivePromos && (
+          <Animated.View entering={FadeInDown.delay(70).duration(300)} style={styles.card}>
+            <Text style={styles.cardTitle}>Offers & Coupons</Text>
+            <View style={styles.promoRow}>
+              <View style={styles.promoIconBox}>
+                <Tag size={15} color={colors.success} />
+              </View>
+              {appliedPromoCode ? (
+                <View style={styles.promoAppliedRow}>
+                  <CheckCircle2 size={14} color={colors.success} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.promoAppliedText}>{appliedPromoCode}</Text>
+                    {p.discountPaise > 0 && (
+                      <Text style={styles.promoSavingText}>50% upto ₹150 Off</Text>
+                    )}
+                  </View>
+                </View>
+              ) : (
+                <TextInput
+                  style={styles.promoInput}
+                  placeholder="Enter promo code"
+                  placeholderTextColor={colors.inkFaint}
+                  value={promoCode}
+                  onChangeText={setPromoCode}
+                  autoCapitalize="characters"
+                  returnKeyType="done"
+                />
+              )}
+              <TouchableOpacity
+                style={[styles.applyBtn, !promoCode && !appliedPromoCode && styles.applyBtnDisabled]}
+                onPress={() => {
+                  triggerHaptic();
+                  if (appliedPromoCode) {
+                    setAppliedPromoCode('');
+                    setPromoCode('');
+                  } else if (promoCode) {
+                    setAppliedPromoCode(promoCode.toUpperCase());
+                  }
+                }}
+              >
+                <Text style={[styles.applyBtnText, !promoCode && !appliedPromoCode && styles.applyBtnTextDisabled]}>
+                  {appliedPromoCode ? 'Remove' : 'Apply'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Delivery Address Card */}
-        <Animated.View entering={FadeInDown.delay(60).duration(300)} style={styles.card}>
+        <Animated.View entering={FadeInDown.delay(90).duration(300)} style={styles.card}>
           <TouchableOpacity
             style={styles.addressRow}
             activeOpacity={0.7}
@@ -360,182 +384,106 @@ const CartScreen = ({ navigation }: any) => {
         </Animated.View>
 
         {/* Alternate Receiver Card */}
-        <Animated.View entering={FadeInDown.delay(75).duration(300)} style={styles.card}>
-          <View style={styles.savingsRow}>
-            <View style={styles.savingsLeft}>
-              <View style={styles.savingsIconBox}>
-                <UserRound size={14} color={ACCENT} />
-              </View>
+        <Animated.View entering={FadeInDown.delay(100).duration(300)} style={styles.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <UserRound size={18} color={ACCENT} style={{ marginRight: 12 }} />
               <View>
-                <Text style={styles.savingsTitle}>Someone else will receive</Text>
-                <Text style={styles.savingsSubtitle}>Add alternate contact for rider</Text>
+                <Text style={styles.cardTitleInline}>Someone else will receive?</Text>
+                <Text style={styles.cardSubInline}>Add alternate contact for rider</Text>
               </View>
             </View>
-            <Toggle value={altReceiver} onValueChange={setAltReceiver} />
+            <Toggle value={altReceiver} onValueChange={setAltReceiver} activeColor={ACCENT} />
           </View>
           {altReceiver && (
-            <>
-              <View style={styles.cardDivider} />
-              <View style={styles.altFieldRow}>
-                <UserRound size={14} color={colors.inkFaint} />
+            <Animated.View entering={FadeInDown.duration(200)} style={{ marginTop: 16, gap: 12 }}>
+              <View style={styles.inputBox}>
+                <UserRound size={16} color={colors.inkFaint} style={{ marginRight: 10 }} />
                 <TextInput
-                  style={styles.altInput}
                   placeholder="Receiver's name"
                   placeholderTextColor={colors.inkFaint}
                   value={altName}
                   onChangeText={setAltName}
+                  style={styles.inputText}
                   returnKeyType="next"
                 />
               </View>
-              <View style={[styles.altFieldRow, { marginTop: 10 }]}>
-                <Phone size={14} color={colors.inkFaint} />
+              <View style={styles.inputBox}>
+                <Phone size={16} color={colors.inkFaint} style={{ marginRight: 10 }} />
                 <TextInput
-                  style={styles.altInput}
                   placeholder="Receiver's phone number"
                   placeholderTextColor={colors.inkFaint}
                   value={altPhone}
                   onChangeText={setAltPhone}
                   keyboardType="phone-pad"
                   maxLength={10}
+                  style={styles.inputText}
                   returnKeyType="done"
                 />
               </View>
-            </>
+            </Animated.View>
           )}
         </Animated.View>
 
-        {/* Promo Code Card */}
-        <Animated.View entering={FadeInDown.delay(90).duration(300)} style={styles.card}>
-          <View style={styles.promoRow}>
-            <View style={styles.promoIconBox}>
-              <Tag size={15} color={ACCENT} />
-            </View>
-            {appliedPromoCode ? (
-              <View style={styles.promoAppliedRow}>
-                <CheckCircle2 size={14} color={colors.success} />
-                <Text style={styles.promoAppliedText}>{appliedPromoCode}</Text>
-                {p.discountPaise > 0 && (
-                  <Text style={styles.promoSavingText}>−₹{p.discountPaise / 100}</Text>
-                )}
-                {p.discountPaise === 0 && (
-                  <Text style={styles.promoInvalidText}>Invalid code</Text>
-                )}
-              </View>
-            ) : (
-              <TextInput
-                style={styles.promoInput}
-                placeholder="Enter promo code"
-                placeholderTextColor={colors.inkFaint}
-                value={promoCode}
-                onChangeText={setPromoCode}
-                autoCapitalize="characters"
-                returnKeyType="done"
-              />
-            )}
-            <TouchableOpacity
-              style={[styles.applyBtn, !promoCode && !appliedPromoCode && styles.applyBtnDisabled]}
-              onPress={() => {
-                triggerHaptic();
-                if (appliedPromoCode) {
-                  setAppliedPromoCode('');
-                  setPromoCode('');
-                } else if (promoCode) {
-                  setAppliedPromoCode(promoCode);
-                }
-              }}
-            >
-              <Text style={[styles.applyBtnText, !promoCode && !appliedPromoCode && styles.applyBtnTextDisabled]}>
-                {appliedPromoCode ? 'Remove' : 'Apply'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Loyalty toggle */}
-          {!!loyaltyData?.points && (
-            <>
-              <View style={styles.cardDivider} />
-              <View style={styles.savingsRow}>
-                <View style={styles.savingsLeft}>
-                  <View style={styles.savingsIconBox}>
-                    <Star size={14} color={ACCENT} fill={ACCENT} />
-                  </View>
-                  <View>
-                    <Text style={styles.savingsTitle}>Loyalty Points</Text>
-                    <Text style={styles.savingsSubtitle}>{loyaltyData.points} pts available</Text>
-                  </View>
-                </View>
-                <Toggle value={useLoyalty} onValueChange={setUseLoyalty} />
-              </View>
-            </>
-          )}
-
-          {/* Wallet toggle */}
-          {availableWallet > 0 && (
-            <>
-              <View style={styles.cardDivider} />
-              <View style={styles.savingsRow}>
-                <View style={styles.savingsLeft}>
-                  <View style={styles.savingsIconBox}>
-                    <Wallet size={14} color={colors.primary} />
-                  </View>
-                  <View>
-                    <Text style={styles.savingsTitle}>Wallet Balance</Text>
-                    <Text style={styles.savingsSubtitle}>
-                      ₹{(availableWallet / 100).toFixed(2)} available
-                      {useWallet && p.walletDeductionPaise > 0
-                        ? `  ·  −₹${(p.walletDeductionPaise / 100).toFixed(2)} applied`
-                        : ''}
-                    </Text>
-                  </View>
-                </View>
-                <Toggle value={useWallet} onValueChange={setUseWallet} activeColor={colors.primary} />
-              </View>
-            </>
-          )}
+        {/* Delivery Instructions */}
+        <Animated.View entering={FadeInDown.delay(110).duration(300)} style={styles.card}>
+          <Text style={styles.cardTitle}>Delivery Instructions</Text>
+          <TextInput 
+            placeholder="e.g. Leave at door, don't ring bell..."
+            placeholderTextColor={colors.inkFaint}
+            value={deliveryInstructions}
+            onChangeText={setDeliveryInstructions}
+            style={styles.textArea}
+            multiline
+          />
         </Animated.View>
 
-        {/* Payment Method Card */}
+        {/* Tip the Rider */}
         <Animated.View entering={FadeInDown.delay(120).duration(300)} style={styles.card}>
-          <Text style={styles.cardTitle}>Payment Method</Text>
-          <View style={styles.paymentRow}>
-            <TouchableOpacity
-              style={[styles.payBtn, paymentMethod === 'online' && styles.payBtnActive]}
-              onPress={() => { triggerHaptic(); setPaymentMethod('online'); }}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.payBtnText, paymentMethod === 'online' && styles.payBtnTextActive]}>
-                Pay Online
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.payBtn, paymentMethod === 'cod' && styles.payBtnActive]}
-              onPress={() => { triggerHaptic(); setPaymentMethod('cod'); }}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.payBtnText, paymentMethod === 'cod' && styles.payBtnTextActive]}>
-                Cash on Delivery
-              </Text>
-            </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <Heart size={18} color="#D97B4F" style={{ marginRight: 8 }} />
+            <Text style={styles.cardTitle}>Tip your delivery partner</Text>
+          </View>
+          <Text style={styles.tipSub}>100% of your tip goes directly to your rider. Thank you!</Text>
+          <View style={styles.tipOptionsRow}>
+            {[20, 50, 100].map((amt) => (
+              <TouchableOpacity 
+                key={amt}
+                style={[styles.tipChip, riderTip === amt && styles.tipChipActive]}
+                onPress={() => {
+                  triggerHaptic();
+                  setRiderTip(riderTip === amt ? 0 : amt);
+                }}
+              >
+                <Text style={[styles.tipChipText, riderTip === amt && styles.tipChipTextActive]}>
+                  ₹{amt}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </Animated.View>
 
-        {/* Bill Summary Card */}
-        <Animated.View entering={FadeInDown.delay(150).duration(300)} style={styles.card}>
-          <Text style={styles.cardTitle}>Order Summary</Text>
+        {/* Billing Details Card */}
+        <Animated.View entering={FadeInDown.delay(110).duration(300)} style={styles.card}>
+          <Text style={styles.cardTitle}>Billing details</Text>
 
           <View style={styles.billRow}>
             <Text style={styles.billLabel}>Subtotal</Text>
             <Text style={styles.billValue}>₹{subtotal}</Text>
           </View>
-          {deliveryFee > 0 && (
+          {addressId && (
             <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Delivery Fee</Text>
-              <Text style={styles.billValue}>₹{deliveryFee}</Text>
+              <Text style={styles.billLabel}>Delivery</Text>
+              {deliveryFee === 0 ? (
+                <Text style={[styles.billValue, { color: '#22C55E', fontWeight: '800' }]}>Free</Text>
+              ) : (
+                <Text style={styles.billValue}>₹{deliveryFee}</Text>
+              )}
             </View>
           )}
           {!addressId && (
             <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: colors.inkFaint, fontStyle: 'italic' }]}>Delivery fee</Text>
+              <Text style={[styles.billLabel, { color: colors.inkFaint, fontStyle: 'italic' }]}>Delivery</Text>
               <Text style={[styles.billValue, { color: colors.inkFaint, fontSize: 12 }]}>Add address</Text>
             </View>
           )}
@@ -547,28 +495,22 @@ const CartScreen = ({ navigation }: any) => {
           )}
           {p.discountPaise > 0 && (
             <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: colors.success }]}>Promo Discount</Text>
-              <Text style={[styles.billValue, { color: colors.success }]}>−₹{p.discountPaise / 100}</Text>
-            </View>
-          )}
-          {p.loyaltyDiscountPaise > 0 && (
-            <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: colors.success }]}>Loyalty Points</Text>
-              <Text style={[styles.billValue, { color: colors.success }]}>−₹{p.loyaltyDiscountPaise / 100}</Text>
-            </View>
-          )}
-          {p.walletDeductionPaise > 0 && (
-            <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: colors.primary }]}>Wallet</Text>
-              <Text style={[styles.billValue, { color: colors.primary }]}>−₹{(p.walletDeductionPaise / 100).toFixed(2)}</Text>
+              <Text style={[styles.billLabel, { color: '#22C55E' }]}>Discount ({appliedPromoCode})</Text>
+              <Text style={[styles.billValue, { color: '#22C55E' }]}>−₹{p.discountPaise / 100}</Text>
             </View>
           )}
 
           <View style={styles.totalSeparator} />
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
           </View>
+
+          {p.discountPaise > 0 && (
+            <View style={styles.billTotalSavedBanner}>
+              <Text style={styles.billTotalSavedText}>Total saved on this order: ₹{p.discountPaise / 100}</Text>
+            </View>
+          )}
         </Animated.View>
 
         {isOutOfZone && (
@@ -578,31 +520,57 @@ const CartScreen = ({ navigation }: any) => {
         )}
       </ScrollView>
 
-      {/* Footer */}
+      {/* Sticky Bottom Bar matching Screenshots */}
       <Animated.View
         entering={SlideInDown.duration(400)}
         style={[styles.footer, { paddingBottom: Math.max(insets.bottom + 8, 20) }]}
       >
-        <TouchableOpacity
-          style={[styles.placeOrderBtn, (busy || isOutOfZone) && styles.placeOrderBtnDisabled]}
-          disabled={busy || isOutOfZone}
-          activeOpacity={0.88}
-          onPress={handlePlaceOrder}
-        >
-          {busy ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <View style={styles.placeOrderContent}>
-              <View>
-                <Text style={styles.placeOrderText}>Place Order</Text>
-              </View>
-              <View style={styles.placeOrderRight}>
-                <Text style={styles.placeOrderTotal}>₹{grandTotal.toFixed(2)}</Text>
-                <Text style={styles.placeOrderArrow}>›</Text>
-              </View>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.footerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, fontFamily: fontFamily.extrabold, color: colors.inkFaint, textTransform: 'uppercase' }}>Item Total</Text>
+            <Text style={{ fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 }}>₹{grandTotal.toFixed(2)}</Text>
+          </View>
+          
+          <TouchableOpacity
+            style={[styles.footerCta, (busy || isOutOfZone) && styles.placeOrderBtnDisabled]}
+            disabled={busy || isOutOfZone}
+            activeOpacity={0.88}
+            onPress={() => {
+              triggerHaptic();
+              if (!addressId) {
+                Alert.alert('Address Required', 'Please select a delivery address.');
+                return;
+              }
+              if (altReceiver) {
+                if (!altName.trim()) {
+                  Alert.alert('Required Field', 'Please enter the receiver\'s name.');
+                  return;
+                }
+                if (altPhone.trim().length < 10) {
+                  Alert.alert('Required Field', 'Please enter a valid 10-digit phone number.');
+                  return;
+                }
+              }
+              navigation.navigate('Checkout', { 
+                addressId, 
+                promoCode: appliedPromoCode,
+                riderTip,
+                instructions: deliveryInstructions,
+                altReceiver,
+                altName,
+                altPhone
+              });
+            }}
+          >
+            {busy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.footerCtaText}>
+                {addressId ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay') : 'Select Address'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </Animated.View>
     </View>
   );
@@ -611,206 +579,335 @@ const CartScreen = ({ navigation }: any) => {
 export default CartScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: '#F7F8FA' }, // Off-white premium background
 
   // Header
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14,
-    backgroundColor: BG,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+    backgroundColor: '#F7F8FA',
+    zIndex: 10,
   },
-  headerTitle: { fontSize: 26, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
-  headerSub: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 1 },
-  closeBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: 'center', justifyContent: 'center',
+  headerTitle: { fontSize: 22, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
+  headerSub: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 },
+  clearCartBtn: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+  },
+  clearCartText: {
+    fontSize: 12, fontFamily: fontFamily.bold, color: colors.inkMuted,
   },
 
-  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 12 },
+  savingsBanner: {
+    backgroundColor: '#ECFDF5',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  savingsBannerText: {
+    fontSize: 13,
+    fontFamily: fontFamily.black,
+    color: '#1B5E46',
+    letterSpacing: 0.2,
+  },
+
+  scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 150, gap: 16 },
+
+  // Estimate
+  estimateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    gap: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 3,
+  },
+  estimateIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F0FDF4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  estimateTitle: {
+    fontSize: 16,
+    fontFamily: fontFamily.black,
+    color: '#1B5E46',
+  },
+  estimateSub: {
+    fontSize: 13,
+    fontFamily: fontFamily.medium,
+    color: colors.inkMuted,
+    marginTop: 2,
+  },
 
   // Card base
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
-  cardDivider: { height: 1, backgroundColor: colors.border, marginVertical: 14 },
+  cardDivider: { height: 1, backgroundColor: '#E5E7EB', borderStyle: 'dashed', borderWidth: 1, borderRadius: 1, marginVertical: 16, borderColor: '#E5E7EB' },
   cardTitle: {
-    fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink,
-    marginBottom: 14,
+    fontSize: 16, fontFamily: fontFamily.black, color: colors.ink,
+    marginBottom: 16, letterSpacing: -0.3,
   },
   cardSectionLabel: {
-    fontSize: 11, fontFamily: fontFamily.extrabold, color: colors.inkFaint,
-    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 3,
+    fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted,
+    letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4,
   },
 
   // Cart items
   itemRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 8,
   },
-  itemImgBox: { width: 60, height: 60, borderRadius: 12, overflow: 'hidden', marginRight: 12 },
+  itemImgBox: { width: 56, height: 56, borderRadius: 12, overflow: 'hidden', marginRight: 14, backgroundColor: '#F7F8FA' },
   itemImg: { width: '100%', height: '100%' },
-  itemImgPlaceholder: { backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
-  itemMeta: { flex: 1, marginRight: 8 },
-  itemName: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 4, lineHeight: 18 },
-  itemPrice: { fontSize: 14, fontFamily: fontFamily.bold, color: ACCENT },
+  itemImgPlaceholder: { backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' },
+  itemMeta: { flex: 1, marginRight: 12 },
+  itemName: { fontSize: 14, fontFamily: fontFamily.black, color: colors.ink, lineHeight: 20, letterSpacing: -0.2 },
+  itemPrice: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 },
+  vegBadgeMini: {
+    width: 10,
+    height: 10,
+    borderWidth: 1,
+    borderRadius: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vegDotMini: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
 
   // Qty stepper
-  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F7F8FA', borderRadius: 14, padding: 4 },
   qtyBtn: {
-    width: 30, height: 30, borderRadius: 9,
-    backgroundColor: colors.surfaceMuted,
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
   },
-  qtyBtnActive: { backgroundColor: ACCENT },
-  qtyBtnText: { fontSize: 17, color: colors.ink, fontFamily: fontFamily.bold, lineHeight: 20 },
+  qtyBtnActive: { backgroundColor: '#1B5E46' },
+  qtyBtnText: { fontSize: 18, color: colors.ink, fontFamily: fontFamily.black, lineHeight: 20 },
   qtyBtnActiveText: { color: '#FFFFFF' },
-  qtyNum: { fontSize: 15, fontFamily: fontFamily.extrabold, color: colors.ink, minWidth: 18, textAlign: 'center' },
+  qtyNum: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink, minWidth: 20, textAlign: 'center' },
 
   // Address
   addressRow: { flexDirection: 'row', alignItems: 'flex-start' },
   addressIconCircle: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: colors.accentTint,
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: '#F0FDF4',
     alignItems: 'center', justifyContent: 'center',
-    marginRight: 12, marginTop: 2,
+    marginRight: 14, marginTop: 2,
   },
   addressBody: { flex: 1, marginRight: 8 },
-  addressLabel: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2 },
-  addressText: { fontSize: 12, fontFamily: fontFamily.regular, color: colors.inkMuted, lineHeight: 18 },
-  changeText: { fontSize: 13, fontFamily: fontFamily.bold, color: ACCENT, marginTop: 2 },
-
-  // Alternate receiver
-  altFieldRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  altInput: {
-    flex: 1, height: 42,
-    fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
-  },
+  addressLabel: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 4, letterSpacing: -0.2 },
+  addressText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 20 },
+  changeText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#1B5E46', marginTop: 4 },
 
   // Promo
-  promoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   promoIconBox: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: colors.accentTint,
+    width: 42, height: 42, borderRadius: 12,
+    backgroundColor: '#F7F8FA',
     alignItems: 'center', justifyContent: 'center',
   },
   promoInput: {
-    flex: 1, height: 42,
-    fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+    flex: 1, height: 46,
+    fontSize: 14, fontFamily: fontFamily.black, color: colors.ink, textTransform: 'uppercase', letterSpacing: 1,
+    borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
   },
   promoAppliedRow: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  promoAppliedText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.success },
-  promoSavingText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.success },
-  promoInvalidText: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.danger },
+  promoAppliedText: { fontSize: 15, fontFamily: fontFamily.black, color: '#1B5E46' },
+  promoSavingText: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 },
+  promoInvalidText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.dangerTint },
   applyBtn: {
-    height: 42, paddingHorizontal: 16, borderRadius: 12,
-    backgroundColor: ACCENT,
+    height: 46, paddingHorizontal: 20, borderRadius: 14,
+    backgroundColor: '#1B5E46',
     alignItems: 'center', justifyContent: 'center',
   },
-  applyBtnDisabled: { backgroundColor: colors.surfaceMuted },
-  applyBtnText: { fontSize: 14, fontFamily: fontFamily.bold, color: '#FFFFFF' },
+  applyBtnDisabled: { backgroundColor: '#F7F8FA' },
+  applyBtnText: { fontSize: 14, fontFamily: fontFamily.black, color: '#FFFFFF' },
   applyBtnTextDisabled: { color: colors.inkFaint },
 
-  // Savings rows (loyalty + wallet)
-  savingsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  savingsLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 },
-  savingsIconBox: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: colors.accentTint,
-    alignItems: 'center', justifyContent: 'center',
+  // Recommendations Carousel
+  recCard: {
+    width: 120,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginRight: 12,
+    paddingBottom: 10,
+    overflow: 'visible',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
-  savingsTitle: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink },
-  savingsSubtitle: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 1 },
-
-  // Payment
-  paymentRow: { flexDirection: 'row', gap: 10 },
-  payBtn: {
-    flex: 1, paddingVertical: 13, borderRadius: 12,
-    borderWidth: 1.5, borderColor: colors.border,
-    backgroundColor: colors.surface, alignItems: 'center',
+  recImg: {
+    width: '100%',
+    height: 90,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
-  payBtnActive: { borderColor: ACCENT, backgroundColor: colors.accentTint },
-  payBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted },
-  payBtnTextActive: { color: ACCENT, fontFamily: fontFamily.bold },
+  recImgPlaceholder: {
+    backgroundColor: '#F7F8FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recAddBtn: {
+    position: 'absolute',
+    top: 75,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1B5E46',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+    zIndex: 5,
+  },
+  recAddText: {
+    fontSize: 20,
+    color: '#fff',
+    fontFamily: fontFamily.black,
+    lineHeight: 22,
+  },
+  recMeta: {
+    paddingHorizontal: 8,
+    paddingTop: 10,
+  },
+  recQuantityText: {
+    fontSize: 9,
+    fontFamily: fontFamily.bold,
+    color: '#D97706',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  recName: {
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: colors.ink,
+    marginVertical: 4,
+    lineHeight: 16,
+  },
+  recPrice: {
+    fontSize: 13,
+    fontFamily: fontFamily.black,
+    color: colors.ink,
+  },
 
   // Bill
   billRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 14,
   },
   billLabel: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted },
-  billValue: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink },
+  billValue: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
 
-  totalSeparator: { height: 1, backgroundColor: colors.border, marginVertical: 12 },
+  totalSeparator: { height: 1, backgroundColor: '#E5E7EB', borderStyle: 'dashed', borderWidth: 1, borderRadius: 1, marginVertical: 16, borderColor: '#E5E7EB' },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
-  totalValue: { fontSize: 22, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
+  totalLabel: { fontSize: 16, fontFamily: fontFamily.black, color: colors.ink },
+  totalValue: { fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -1 },
+
+  billTotalSavedBanner: {
+    backgroundColor: '#F0FDF4',
+    padding: 12,
+    borderRadius: 14,
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  billTotalSavedText: {
+    fontSize: 13,
+    fontFamily: fontFamily.black,
+    color: '#1B5E46',
+  },
 
   // Out-of-zone
   outOfZoneBanner: {
-    backgroundColor: colors.dangerTint, borderRadius: 12,
-    padding: 14,
+    backgroundColor: '#FEF2F2', borderRadius: 16,
+    padding: 16,
   },
-  outOfZoneText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.danger, textAlign: 'center', lineHeight: 19 },
+  outOfZoneText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.dangerTint, textAlign: 'center', lineHeight: 20 },
 
   // Footer
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: BG,
-    paddingHorizontal: 16, paddingTop: 12,
-    borderTopWidth: 1, borderTopColor: colors.border,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20, paddingTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 16,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
-  placeOrderBtn: {
-    height: 58, borderRadius: 18,
-    backgroundColor: ACCENT,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  placeOrderBtnDisabled: { opacity: 0.55 },
-  placeOrderContent: {
+  footerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  placeOrderText: { fontSize: 17, fontFamily: fontFamily.extrabold, color: '#FFFFFF' },
-  placeOrderRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  placeOrderTotal: { fontSize: 17, fontFamily: fontFamily.bold, color: 'rgba(255,255,255,0.9)' },
-  placeOrderArrow: { fontSize: 22, color: '#FFFFFF', marginTop: -1 },
+  footerCta: {
+    height: 56,
+    backgroundColor: '#1B5E46',
+    borderRadius: 16,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#1B5E46', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6,
+  },
+  footerCtaText: {
+    fontSize: 16,
+    fontFamily: fontFamily.black,
+    color: '#FFFFFF',
+  },
+  placeOrderBtnDisabled: { opacity: 0.55 },
 
   // Empty state
   emptyContainer: {
-    flex: 1, backgroundColor: BG,
+    flex: 1, backgroundColor: '#F7F8FA',
     alignItems: 'center', justifyContent: 'center', padding: 40,
   },
   emptyIconBox: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: colors.accentTint, alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+    width: 110, height: 110, borderRadius: 55,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 28,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 3,
   },
-  emptyTitle: { fontSize: 22, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 8 },
-  emptySub: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 12, letterSpacing: -0.5 },
+  emptySub: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', lineHeight: 24 },
   exploreBtn: {
-    marginTop: 28, backgroundColor: ACCENT,
-    paddingHorizontal: 32, paddingVertical: 14, borderRadius: 16,
+    marginTop: 32, backgroundColor: '#1B5E46',
+    paddingHorizontal: 36, paddingVertical: 16, borderRadius: 16,
+    shadowColor: '#1B5E46', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6,
   },
-  exploreBtnText: { fontSize: 14, fontFamily: fontFamily.extrabold, color: '#FFFFFF' },
+  exploreBtnText: { fontSize: 15, fontFamily: fontFamily.black, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 },
 
-  // Verifying overlay
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center', justifyContent: 'center',
-    zIndex: 9999,
-  },
-  overlayTitle: { marginTop: 20, fontSize: 20, fontFamily: fontFamily.extrabold, color: colors.ink },
-  overlaySub: { marginTop: 8, fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center' },
+  // New Styles for Added UI
+  cardTitleInline: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2 },
+  cardSubInline: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkFaint },
+  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, height: 48 },
+  inputText: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
+  textArea: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, minHeight: 80, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, textAlignVertical: 'top' },
+  tipSub: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkFaint, marginBottom: 12, lineHeight: 18 },
+  tipOptionsRow: { flexDirection: 'row', gap: 10 },
+  tipChip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', alignItems: 'center' },
+  tipChipActive: { borderColor: '#D97B4F', backgroundColor: '#FFF5F0' },
+  tipChipText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
+  tipChipTextActive: { color: '#D97B4F' },
 });

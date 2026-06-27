@@ -49,7 +49,7 @@ const CustomerNavigator = () => {
       <Stack.Screen
         name="ItemDetail"
         component={ItemDetailScreen}
-        options={{ presentation: 'transparentModal', cardStyle: { backgroundColor: 'transparent' } }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen name="Cart" component={CartScreen} />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
