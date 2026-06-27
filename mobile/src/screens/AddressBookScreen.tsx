@@ -1,5 +1,5 @@
 import { ArrowLeft, MapPin, Navigation, Search } from 'lucide-react-native';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ActivityIndicator, TextInput,
   StyleSheet, Alert, ScrollView,
@@ -7,7 +7,7 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { api } from '../api/client';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setAddress, setZone } from '../store/slices/cartSlice';
 import { setServiceable, setUnserviceable } from '../store/slices/appSlice';
 import { useLocation } from '../hooks/useLocation';
@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { reverseGeocode } from '../utils/geocode';
-
+import { RootState } from '../store';
 
 const LABELS = [
   { key: 'Home',   icon: '🏠' },
@@ -35,8 +35,16 @@ const AddressBookScreen = ({ navigation, route }: any) => {
 
   const { initialLat, initialLng, initialAddress } = route?.params || {};
 
+  // Use Redux globalLocation as initial fallback — avoids black map / India center problem
+  const savedLocation = useSelector((state: RootState) => state.app.globalLocation);
+
+  const startLat = initialLat || savedLocation?.latitude || 20.5937;
+  const startLng = initialLng || savedLocation?.longitude || 78.9629;
+
   const [label, setLabel] = useState('Home');
-  const [addressText, setAddressText] = useState(initialAddress || '');
+  const [addressText, setAddressText] = useState(
+    initialAddress || savedLocation?.addressText || ''
+  );
   const [flatNumber, setFlatNumber] = useState('');
   const [buildingName, setBuildingName] = useState('');
   const [showDetails, setShowDetails] = useState(false);
@@ -44,46 +52,57 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const [isChecking, setIsChecking] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
-  const [mapRegion, setMapRegion] = useState({
-    latitude: initialLat || 20.5937,
-    longitude: initialLng || 78.9629,
-  });
+  const [mapRegion, setMapRegion] = useState({ latitude: startLat, longitude: startLng });
+  const mapRef = useRef<MapView>(null);
+  // Ref prevents stale closure in onRegionChangeComplete
+  const isDraggingRef = useRef(false);
 
   const { location, loadingLocation, fetchLocation } = useLocation();
 
   const pinY = useSharedValue(0);
   const animatedPin = useAnimatedStyle(() => ({ transform: [{ translateY: pinY.value }] }));
 
-  // If no initial coords from search, use GPS
+  // If no initial coords from search, get GPS
   useEffect(() => {
     if (!initialLat && !initialLng) fetchLocation();
   }, []);
 
+  // When GPS resolves, animate map to it — programmatic animation, no onPanDrag, no haptics
   useEffect(() => {
     if (location && !initialLat) {
-      setMapRegion({ latitude: location.latitude, longitude: location.longitude });
-      setAddressText(location.addressText || '');
+      mapRef.current?.animateToRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      }, 800);
+      if (location.addressText && location.addressText !== 'Current Location') {
+        setAddressText(location.addressText);
+      }
     }
   }, [location]);
 
-  const onRegionChange = () => {
-    if (!isDragging) {
+  // onPanDrag fires ONLY on real user touch-drags — NOT on programmatic animateToRegion
+  const onPanDrag = () => {
+    if (!isDraggingRef.current) {
+      isDraggingRef.current = true;
       setIsDragging(true);
-      setShowDetails(false);
       ReactNativeHapticFeedback.trigger('impactLight');
       pinY.value = withSpring(-20, { damping: 10, stiffness: 200 });
     }
   };
 
-  const onRegionChangeComplete = async (region: any) => {
-    setMapRegion(region);
+  const onRegionChangeComplete = async (r: any) => {
+    const coords = { latitude: r.latitude, longitude: r.longitude };
+    setMapRegion(coords);
+
+    if (!isDraggingRef.current) return; // programmatic animation — ignore
+    isDraggingRef.current = false;
     setIsDragging(false);
-    ReactNativeHapticFeedback.trigger('impactMedium');
     pinY.value = withSpring(0, { damping: 12, stiffness: 300 });
-    try {
-      const text = await reverseGeocode(region.latitude, region.longitude);
-      if (text && text !== 'Current Location') setAddressText(text);
-    } catch {}
+
+    const text = await reverseGeocode(coords.latitude, coords.longitude);
+    if (text) setAddressText(text);
   };
 
   const addMutation = useMutation({
@@ -91,10 +110,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     onSuccess: (res, variables) => {
       ReactNativeHapticFeedback.trigger('notificationSuccess');
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
-      // Set address in cart and dispatch zone
-      if (res?.address?.id) {
-        dispatch(setAddress(res.address.id));
-      }
+      if (res?.address?.id) dispatch(setAddress(res.address.id));
       if (variables.zoneId) {
         dispatch(setZone(variables.zoneId));
         dispatch(setServiceable({ zoneId: variables.zoneId, zoneName: null }));
@@ -107,7 +123,6 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           addressText: variables.addressText,
         }));
       }
-      // Go back two screens (AddressBook → Address → Home)
       navigation.pop(2);
     },
     onError: () => Alert.alert('Error', 'Could not save address. Please try again.'),
@@ -124,8 +139,6 @@ const AddressBookScreen = ({ navigation, route }: any) => {
       return;
     }
     setIsChecking(true);
-    ReactNativeHapticFeedback.trigger('impactHeavy');
-
     let zoneId: string | null = null;
     try {
       const res = await api.get(`/menu/zones/check?lat=${mapRegion.latitude}&lng=${mapRegion.longitude}`);
@@ -145,11 +158,12 @@ const AddressBookScreen = ({ navigation, route }: any) => {
       flatNumber: flatNumber.trim(),
       buildingName: buildingName.trim() || null,
     });
-
     setIsChecking(false);
   };
 
   const isBusy = addMutation.isPending || isChecking;
+
+  const addressLine1 = addressText.split(',')[0]?.trim() || '';
 
   return (
     <View style={styles.container}>
@@ -179,7 +193,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           contentContainerStyle={styles.detailsScroll}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Mini map preview */}
+          {/* Mini map preview — non-interactive */}
           <View style={styles.mapPreview} pointerEvents="none">
             <MapView
               provider={PROVIDER_GOOGLE}
@@ -200,12 +214,12 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             </View>
           </View>
 
-          {/* Confirmed address + Change */}
+          {/* Confirmed address row */}
           <View style={styles.confirmedRow}>
             <Navigation size={18} color={colors.primary} fill={colors.primary} />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.confirmedStreet} numberOfLines={1}>
-                {addressText.split(',')[0] || 'Selected Location'}
+                {addressLine1 || 'Selected Location'}
               </Text>
               <Text style={styles.confirmedFull} numberOfLines={2}>{addressText}</Text>
             </View>
@@ -219,9 +233,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
 
           <View style={styles.divider} />
 
-          {/* Inputs */}
           <Text style={styles.sectionTitle}>Add Address</Text>
-
           <TextInput
             style={styles.input}
             placeholder="House No / Flat / Floor"
@@ -238,7 +250,6 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             onChangeText={setBuildingName}
           />
 
-          {/* Label chips */}
           <Text style={styles.sectionTitle}>Add Label</Text>
           <View style={styles.labelRow}>
             {LABELS.map(l => {
@@ -263,23 +274,24 @@ const AddressBookScreen = ({ navigation, route }: any) => {
         /* ── Step 1: Map Pin Picker ── */
         <View style={styles.mapContainer}>
           <MapView
+            ref={mapRef}
             provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFill}
-            region={{
-              latitude: mapRegion.latitude,
-              longitude: mapRegion.longitude,
+            initialRegion={{
+              latitude: startLat,
+              longitude: startLng,
               latitudeDelta: 0.005,
               longitudeDelta: 0.005,
             }}
-            onRegionChange={onRegionChange}
-            onRegionChangeComplete={r => onRegionChangeComplete({ latitude: r.latitude, longitude: r.longitude })}
+            onPanDrag={onPanDrag}
+            onRegionChangeComplete={r => onRegionChangeComplete(r)}
             showsUserLocation
             showsMyLocationButton={false}
             pitchEnabled={false}
             toolbarEnabled={false}
           />
 
-          {/* Center pin */}
+          {/* Center pin — animates up on drag */}
           <View style={styles.centerPin} pointerEvents="none">
             <Animated.View style={animatedPin}>
               <View style={styles.pinShadow}>
@@ -288,10 +300,13 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             </Animated.View>
           </View>
 
-          {/* Locate Me */}
+          {/* Locate Me button */}
           <TouchableOpacity
             style={[styles.locateBtn, { bottom: 200 }]}
-            onPress={() => { ReactNativeHapticFeedback.trigger('impactMedium'); fetchLocation(); }}
+            onPress={() => {
+              ReactNativeHapticFeedback.trigger('impactMedium');
+              fetchLocation();
+            }}
             activeOpacity={0.8}
           >
             {loadingLocation
@@ -309,9 +324,11 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             <Navigation size={20} color={colors.primary} fill={colors.primary} style={{ marginRight: 14, marginTop: 2 }} />
             <View style={{ flex: 1 }}>
               <Text style={styles.addressPreviewStreet} numberOfLines={1}>
-                {isDragging ? 'Moving…' : (addressText.split(',')[0] || 'Locating…')}
+                {isDragging ? 'Moving…' : (addressLine1 || (loadingLocation ? 'Locating…' : 'Drop pin on map'))}
               </Text>
-              <Text style={styles.addressPreviewFull} numberOfLines={2}>{addressText}</Text>
+              <Text style={styles.addressPreviewFull} numberOfLines={2}>
+                {isDragging ? '' : addressText}
+              </Text>
             </View>
           </View>
         )}
@@ -334,8 +351,15 @@ const AddressBookScreen = ({ navigation, route }: any) => {
         onClose={() => setIsSearchVisible(false)}
         onSelect={(lat, lon, name) => {
           setIsSearchVisible(false);
-          setMapRegion({ latitude: lat, longitude: lon });
+          // Animate map to searched location — doesn't trigger onPanDrag
+          mapRef.current?.animateToRegion({
+            latitude: lat,
+            longitude: lon,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          }, 500);
           setAddressText(name);
+          setMapRegion({ latitude: lat, longitude: lon });
         }}
       />
     </View>
