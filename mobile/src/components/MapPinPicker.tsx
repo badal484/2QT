@@ -148,13 +148,8 @@ export const MapPinPicker: React.FC<Props> = ({
         showsMyLocationButton={false}
         pitchEnabled={false}
         toolbarEnabled={false}
-        mapType="none"
+        mapType="standard"
       >
-        <UrlTile
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-          flipY={false}
-        />
       </MapView>
 
       {/* Fixed center pin */}

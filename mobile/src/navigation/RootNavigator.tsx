@@ -18,6 +18,26 @@ const { RoleModule } = NativeModules;
 const BUILD_ROLE = RoleModule?.BUILD_ROLE; // 'customer', 'rider', 'kitchen', 'admin' or undefined
 console.log('--- DETECTED BUILD ROLE:', BUILD_ROLE);
 
+// Defined outside component so the reference is stable across re-renders
+const linking = {
+  prefixes: ['2qt://', 'https://2qt.app'],
+  config: {
+    screens: {
+      MainTabs: {
+        screens: {
+          MenuTab: { screens: { Home: 'home' } },
+          OrdersTab: { screens: { OrderHistory: 'history', OrderPlaced: 'placed/:orderId' } },
+          ProfileTab: { screens: { Profile: 'profile' } },
+        },
+      },
+      RiderOnboarding: 'rider/onboarding',
+      RiderHome: 'rider/home',
+      AssignedOrder: 'mission/:orderId',
+      Payouts: 'rider/payouts',
+    },
+  },
+};
+
 const RootNavigator = () => {
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch();
@@ -68,39 +88,6 @@ const RootNavigator = () => {
 
   // If the app is hardcoded for a specific role, we use that
   const activeRole = BUILD_ROLE || user?.role;
-
-  // SYSTEMATIC INTEGRATION: Deep Linking Configuration
-  const linking = {
-    prefixes: ['2qt://', 'https://2qt.app'],
-    config: {
-      screens: {
-        MainTabs: {
-          screens: {
-            MenuTab: {
-              screens: {
-                Home: 'home',
-              }
-            },
-            OrdersTab: {
-              screens: {
-                OrderHistory: 'history',
-                OrderPlaced: 'placed/:orderId',
-              }
-            },
-            ProfileTab: {
-              screens: {
-                Profile: 'profile'
-              }
-            }
-          }
-        },
-        RiderOnboarding: 'rider/onboarding',
-        RiderHome: 'rider/home',
-        AssignedOrder: 'mission/:orderId',
-        Payouts: 'rider/payouts'
-      }
-    }
-  };
 
   return (
     <NavigationContainer linking={linking as any}>

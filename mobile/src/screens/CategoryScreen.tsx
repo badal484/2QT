@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Dimensions, ScrollView
+  TextInput, ActivityIndicator, Dimensions
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
@@ -206,7 +206,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
       {/* 1. Hero Image */}
       {(categoryBannerUrl || categoryImage) ? (
         <View style={styles.heroImageContainer}>
-          <NetworkImage uri={categoryBannerUrl || categoryImage} style={styles.heroImage} />
+          <NetworkImage uri={(categoryBannerUrl || categoryImage)!} style={styles.heroImage} />
           <View style={styles.heroGradient} />
         </View>
       ) : (
@@ -406,6 +406,14 @@ const styles = StyleSheet.create({
   
   soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
   soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+
+  bestsellerOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
+  bestsellerOverlayText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
+  newOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
+  newOverlayText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  tagChip: { backgroundColor: colors.surfaceMuted, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: colors.border },
+  tagChipText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
 
   // Floating cart
   floatingCart: {

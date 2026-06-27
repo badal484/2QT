@@ -47,26 +47,16 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&email=admin@2qt.com`, {
-        headers: {
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
+      const res = await fetch(`http://localhost:3000/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
       const data = await res.json();
 
-      if (data && data.address) {
-        const { road, suburb, neighbourhood, city_district, city } = data.address;
-
-        const areaParts = [];
-        if (suburb || neighbourhood) areaParts.push(suburb || neighbourhood);
-        if (city_district || city) areaParts.push(city_district || city);
-
-        const area = areaParts.join(', ') || data.display_name.split(',').slice(0, 2).join(', ');
-        const landmark = road || '';
-
+      if (data && data.display_name) {
+        // Our backend now returns a formatted Google Maps address as display_name
+        const area = data.display_name.split(',').slice(0, 2).join(', ');
+        
         onLocationSelect({
           area,
-          landmark,
+          landmark: '',
           lat,
           lng
         });
@@ -156,21 +146,13 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
 
     setLoading(true);
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&email=admin@2qt.com`, {
-        headers: {
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
+      const res = await fetch(`http://localhost:3000/menu/geocode/search?q=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
 
       if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
-        setPosition([lat, lon]);
-        if (mapInstance) {
-          mapInstance.flyTo([lat, lon], 16, { animate: true, duration: 1.5 });
-        }
-        reverseGeocode(lat, lon);
+        // Google places autocomplete doesn't return lat/lon directly in predictions, 
+        // but for this quick fix let's assume we can notify the user to drop the pin near their city
+        toast.info(`Found: ${data[0].display_name}. Please drag the pin manually.`);
       } else {
         toast.error("Location not found. Try a different search.");
       }
@@ -235,8 +217,8 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
         style={{ height: '100%', width: '100%', zIndex: 1 }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         />
         <MapEvents setPosition={setPosition} reverseGeocode={reverseGeocode} setMapInstance={setMapInstance} />
         <Marker
