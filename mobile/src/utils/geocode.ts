@@ -29,7 +29,7 @@ async function nominatimReverse(lat: number, lng: number): Promise<GeocodeResult
       const fallbackFull = (data.display_name as string || '')
         .split(', ').filter((p: string) => p !== 'India' && !/^\d{5,6}$/.test(p)).join(', ');
       const finalName = name || fallbackFull.split(', ')[0];
-      const finalAddress = rawFull || fallbackFull;
+      const finalAddress = rawFull.split(', ').length >= 2 ? rawFull : (fallbackFull || rawFull);
       if (finalName) return { name: finalName, address: finalAddress || finalName };
     }
   } catch {
