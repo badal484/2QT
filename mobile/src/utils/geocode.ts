@@ -1,11 +1,52 @@
 import { ENV } from '../config/env';
 
 export interface GeocodeResult {
-  name: string;    // short label for HomeScreen header
-  address: string; // full address for map picker subtitle
+  name: string;    // short label shown in HomeScreen header
+  address: string; // full address shown in map picker subtitle
 }
 
-// Nominatim directly from device — free, no key, works when backend is cold
+// Google Geocoding HTTP API — called directly from device, same as Swish
+async function googleReverse(lat: number, lng: number): Promise<GeocodeResult | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${ENV.GOOGLE_GEOCODING_KEY}`,
+      { signal: controller.signal },
+    );
+    clearTimeout(timer);
+    const data = await res.json();
+    if (data.status === 'OK' && data.results?.length > 0) {
+      const components: any[] = data.results[0].address_components || [];
+      const get = (...types: string[]) => {
+        for (const type of types) {
+          const c = components.find((c: any) => c.types.includes(type));
+          if (c) return c.long_name as string;
+        }
+        return null;
+      };
+      const name = get(
+        'route',
+        'sublocality_level_2', 'sublocality_level_1',
+        'neighborhood', 'sublocality',
+        'locality', 'administrative_area_level_2',
+      );
+      // Strip Plus Code prefix from segments, strip country
+      const address = (data.results[0].formatted_address as string || '')
+        .split(', ')
+        .map((p: string) => p.replace(/^[A-Z0-9]{4,}\+[A-Z0-9]{2,}\s*/, ''))
+        .filter((p: string) => p && p !== 'India')
+        .join(', ')
+        .trim();
+      if (name) return { name, address: address || name };
+    }
+  } catch {
+    clearTimeout(timer);
+  }
+  return null;
+}
+
+// Nominatim — free fallback when Google fails (no key, works offline)
 async function nominatimReverse(lat: number, lng: number): Promise<GeocodeResult | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
@@ -38,34 +79,18 @@ async function nominatimReverse(lat: number, lng: number): Promise<GeocodeResult
   return null;
 }
 
-async function callBackend(lat: number, lng: number): Promise<GeocodeResult | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    const res = await fetch(`${ENV.API_URL}/menu/geocode/reverse?lat=${lat}&lng=${lng}`, { signal: controller.signal });
-    clearTimeout(timer);
-    const data = await res.json();
-    if (data?.name) return { name: data.name, address: data.address || data.name };
-  } catch {
-    clearTimeout(timer);
-  }
-  return null;
-}
-
-// Backend first (Google → Nominatim on server), then direct Nominatim if backend is cold/slow
+// Google first (direct, no backend), Nominatim as fallback
 async function geocode(lat: number, lng: number): Promise<GeocodeResult | null> {
-  const result = await callBackend(lat, lng);
+  const result = await googleReverse(lat, lng);
   if (result) return result;
   return nominatimReverse(lat, lng);
 }
 
-// Short name only — used by HomeScreen header and globalLocation.addressText
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   const result = await geocode(lat, lng);
   return result?.name ?? 'Current Location';
 }
 
-// Full result — used by AddressBookScreen bottom bar (title + subtitle)
 export async function reverseGeocodeDetailed(lat: number, lng: number): Promise<GeocodeResult> {
   const result = await geocode(lat, lng);
   return result ?? { name: 'Drop pin on map', address: '' };
