@@ -71,8 +71,12 @@ router.get('/geocode/reverse', async (req, res) => {
                 };
                 // "name" = most specific local label (road → sub-locality → locality)
                 const name = get('route', 'sublocality_level_2', 'sublocality_level_1', 'neighborhood', 'sublocality', 'locality', 'administrative_area_level_2');
-                // "address" = full formatted string minus country
-                const fullAddress = (data.results[0].formatted_address as string || '').replace(', India', '').trim();
+                // "address" = full formatted string minus country and Plus Codes (e.g. "R9X2+64")
+                const fullAddress = (data.results[0].formatted_address as string || '')
+                    .split(', ')
+                    .filter((p: string) => p !== 'India' && !/^[A-Z0-9]{4,}\+[A-Z0-9]{2,}/.test(p))
+                    .join(', ')
+                    .trim();
                 if (name) {
                     res.set('Cache-Control', 'public, max-age=300');
                     return res.json({ name, address: fullAddress || name });
