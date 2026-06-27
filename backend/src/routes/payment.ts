@@ -9,6 +9,7 @@ import { paymentLimiter } from '../middleware/rateLimiter';
 import { query } from '../db';
 import { finalizeOrder, createPendingOrder, finalizeWalletRecharge } from '../services/order.service';
 import { TWO_QT } from '../config/constants';
+import { getDistanceKm } from '../utils/googleMaps';
 
 const router = Router();
 
@@ -48,6 +49,9 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
         
         let kitchenId = kitchens[0].id;
         let minDistance = Infinity;
+        let closestKitchenLat = kitchens[0].lat;
+        let closestKitchenLng = kitchens[0].lng;
+        
         const toRad = (val: number) => val * Math.PI / 180;
         
         kitchens.forEach(k => {
@@ -61,8 +65,21 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             if (dist < minDistance) {
                 minDistance = dist;
                 kitchenId = k.id;
+                closestKitchenLat = k.lat;
+                closestKitchenLng = k.lng;
             }
         });
+
+        // Use Google Maps for exact driving distance if available, else keep Haversine
+        let finalDistanceKm = minDistance;
+        try {
+            const googleDist = await getDistanceKm(closestKitchenLat, closestKitchenLng, custLat, custLng);
+            if (googleDist !== null) {
+                finalDistanceKm = googleDist;
+            }
+        } catch (e) {
+            console.error('Google Maps Distance fallback failed:', e);
+        }
 
         const pricing = await calculatePricing({
             cartItems: items,
@@ -74,7 +91,7 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             customerId,
             riderTipPaise,
             zoneId,
-            distanceKm: minDistance
+            distanceKm: finalDistanceKm
         });
 
         const { rows: wallet } = await query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [customerId]);
@@ -121,6 +138,20 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
                 `UPDATE orders SET payment_status = 'cod_pending' WHERE id = $1`,
                 [dbOrder.id]
             );
+            return res.json({
+                success: true,
+                orderId: dbOrder.id,
+                displayId: dbOrder.display_id,
+                status: 'confirmed'
+            });
+        }
+
+        // 2.5 Handle Fully Wallet/Loyalty Paid Order
+        if (pricing.gatewayAmountPaise <= 0) {
+            const finalResult = await finalizeOrder(`WALLET_${dbOrder.id.slice(0, 8)}`, 'wallet', dbOrder.id);
+            if (finalResult?.status === 'already_processed') {
+                return res.status(409).json({ error: 'ORDER_ALREADY_PLACED' });
+            }
             return res.json({
                 success: true,
                 orderId: dbOrder.id,
@@ -266,9 +297,15 @@ router.post('/mock-success', authenticate, async (req: AuthRequest, res) => {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
 
-    const { razorpayOrderId } = req.body;
+    const { razorpayOrderId, type = 'order', amountPaise } = req.body;
     
     try {
+        if (type === 'wallet') {
+            const customerId = req.user!.userId;
+            await finalizeWalletRecharge(razorpayOrderId, amountPaise, customerId);
+            return res.json({ success: true, message: 'Wallet recharged (Mock)' });
+        }
+        
         const pendingData = await redis.get(keys.pendingOrder(razorpayOrderId));
         if (!pendingData) return res.status(404).json({ error: 'PENDING_ORDER_NOT_FOUND' });
 
