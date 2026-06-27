@@ -53,23 +53,6 @@ router.get('/geocode/reverse', async (req, res) => {
     const lng = parseFloat(req.query.lng as string);
     if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'INVALID_COORDS' });
 
-    // Helper: build short "Locality, District" from Google address_components
-    const shortFromGoogle = (components: any[]): string | null => {
-        const get = (...types: string[]) => {
-            for (const type of types) {
-                const c = components.find((c: any) => c.types.includes(type));
-                if (c) return c.long_name as string;
-            }
-            return null;
-        };
-        const local = get('sublocality_level_2', 'sublocality_level_1', 'neighborhood', 'sublocality');
-        const city   = get('locality', 'administrative_area_level_2', 'administrative_area_level_3');
-        if (local && city && local !== city) return `${local}, ${city}`;
-        if (local) return local;
-        if (city)  return city;
-        return null;
-    };
-
     // Try Google Geocoding first
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (apiKey) {
@@ -77,11 +60,22 @@ router.get('/geocode/reverse', async (req, res) => {
             const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
             const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
             const data = await response.json();
-            if (data.results && data.results.length > 0) {
-                const short = shortFromGoogle(data.results[0].address_components || []);
-                if (short) {
+            if (data.results && data.results.length > 0 && data.status !== 'REQUEST_DENIED') {
+                const components: any[] = data.results[0].address_components || [];
+                const get = (...types: string[]) => {
+                    for (const type of types) {
+                        const c = components.find((c: any) => c.types.includes(type));
+                        if (c) return c.long_name as string;
+                    }
+                    return null;
+                };
+                // "name" = most specific local label (road → sub-locality → locality)
+                const name = get('route', 'sublocality_level_2', 'sublocality_level_1', 'neighborhood', 'sublocality', 'locality', 'administrative_area_level_2');
+                // "address" = full formatted string minus country
+                const fullAddress = (data.results[0].formatted_address as string || '').replace(', India', '').trim();
+                if (name) {
                     res.set('Cache-Control', 'public, max-age=300');
-                    return res.json({ display_name: short });
+                    return res.json({ name, address: fullAddress || name });
                 }
             }
         } catch {
@@ -89,7 +83,7 @@ router.get('/geocode/reverse', async (req, res) => {
         }
     }
 
-    // Nominatim fallback — return 2 parts max (locality + district, skip state)
+    // Nominatim fallback
     try {
         const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
         const response = await fetch(url, {
@@ -99,19 +93,20 @@ router.get('/geocode/reverse', async (req, res) => {
         const data = await response.json();
         if (data?.address) {
             const a = data.address;
-            const local   = a.suburb || a.neighbourhood || a.quarter || a.village || a.hamlet || a.town || a.city_district;
-            const district = a.county || a.district || a.state_district || a.city;
-            const parts = [local, district].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i);
-            if (parts.length > 0) {
+            const name = a.road || a.suburb || a.neighbourhood || a.quarter || a.village || a.hamlet || a.town || a.city_district || a.city;
+            const locality = a.suburb || a.neighbourhood || a.village || a.town || a.county || a.district;
+            const fullAddress = [a.road, locality, a.county || a.district, a.state]
+                .filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(', ');
+            if (name) {
                 res.set('Cache-Control', 'public, max-age=300');
-                return res.json({ display_name: parts.join(', ') });
+                return res.json({ name, address: fullAddress || name });
             }
         }
     } catch (err) {
         console.error('[Geocode] Nominatim reverse failed:', err);
     }
 
-    res.json({ display_name: null });
+    res.json({ name: null, address: null });
 });
 
 router.get('/zones', async (req, res) => {

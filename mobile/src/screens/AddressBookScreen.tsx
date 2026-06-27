@@ -17,7 +17,7 @@ import { AddressSearchModal } from '../components/AddressSearchModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
-import { reverseGeocode } from '../utils/geocode';
+import { reverseGeocodeDetailed } from '../utils/geocode';
 import { RootState } from '../store';
 
 const LABELS = [
@@ -45,6 +45,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const [addressText, setAddressText] = useState(
     initialAddress || savedLocation?.addressText || ''
   );
+  const [addressFull, setAddressFull] = useState('');
   const [flatNumber, setFlatNumber] = useState('');
   const [buildingName, setBuildingName] = useState('');
   const [showDetails, setShowDetails] = useState(false);
@@ -78,6 +79,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
       }, 800);
       if (location.addressText && location.addressText !== 'Current Location') {
         setAddressText(location.addressText);
+        setAddressFull('');
       }
     }
   }, [location]);
@@ -101,8 +103,9 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     setIsDragging(false);
     pinY.value = withSpring(0, { damping: 12, stiffness: 300 });
 
-    const text = await reverseGeocode(coords.latitude, coords.longitude);
-    if (text) setAddressText(text);
+    const result = await reverseGeocodeDetailed(coords.latitude, coords.longitude);
+    setAddressText(result.name);
+    setAddressFull(result.address);
   };
 
   const addMutation = useMutation({
@@ -145,9 +148,10 @@ const AddressBookScreen = ({ navigation, route }: any) => {
       if (res.serviceable && res.zone?.id) zoneId = res.zone.id;
     } catch {}
 
+    const baseAddress = addressFull || addressText;
     const fullAddress = buildingName.trim()
-      ? `${flatNumber.trim()}, ${buildingName.trim()}, ${addressText}`
-      : `${flatNumber.trim()}, ${addressText}`;
+      ? `${flatNumber.trim()}, ${buildingName.trim()}, ${baseAddress}`
+      : `${flatNumber.trim()}, ${baseAddress}`;
 
     addMutation.mutate({
       label,
@@ -162,8 +166,6 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   };
 
   const isBusy = addMutation.isPending || isChecking;
-
-  const addressLine1 = addressText.split(',')[0]?.trim() || '';
 
   return (
     <View style={styles.container}>
@@ -219,9 +221,9 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             <Navigation size={18} color={colors.primary} fill={colors.primary} />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.confirmedStreet} numberOfLines={1}>
-                {addressLine1 || 'Selected Location'}
+                {addressText || 'Selected Location'}
               </Text>
-              <Text style={styles.confirmedFull} numberOfLines={2}>{addressText}</Text>
+              <Text style={styles.confirmedFull} numberOfLines={2}>{addressFull || addressText}</Text>
             </View>
             <TouchableOpacity
               onPress={() => { ReactNativeHapticFeedback.trigger('impactLight'); setShowDetails(false); }}
@@ -324,10 +326,10 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             <Navigation size={20} color={colors.primary} fill={colors.primary} style={{ marginRight: 14, marginTop: 2 }} />
             <View style={{ flex: 1 }}>
               <Text style={styles.addressPreviewStreet} numberOfLines={1}>
-                {isDragging ? 'Moving…' : (addressLine1 || (loadingLocation ? 'Locating…' : 'Drop pin on map'))}
+                {isDragging ? 'Moving…' : (addressText || (loadingLocation ? 'Locating…' : 'Drop pin on map'))}
               </Text>
               <Text style={styles.addressPreviewFull} numberOfLines={2}>
-                {isDragging ? '' : addressText}
+                {isDragging ? '' : (addressFull || addressText)}
               </Text>
             </View>
           </View>
