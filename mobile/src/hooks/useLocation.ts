@@ -71,16 +71,10 @@ export const useLocation = () => {
       isFetchingRef.current = false;
     };
 
-    // Try fast network-based first, retry with GPS if it fails
-    Geolocation.getCurrentPosition(
-      onSuccess,
-      () => {
-        Geolocation.getCurrentPosition(onSuccess, onError, {
-          enableHighAccuracy: true, timeout: 20000, maximumAge: 10000,
-        });
-      },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 10000 },
-    );
+    // High-accuracy GPS only — network-based location is unreliable in rural areas (500m-5km off)
+    Geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: true, timeout: 20000, maximumAge: 5000,
+    });
   }, []);
 
   return { location, loadingLocation, locationError, fetchLocation };
