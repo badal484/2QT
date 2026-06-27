@@ -306,7 +306,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
 
           {/* Locate Me button */}
           <TouchableOpacity
-            style={[styles.locateBtn, { bottom: 200 }]}
+            style={[styles.locateBtn, { bottom: 16 }]}
             onPress={() => {
               ReactNativeHapticFeedback.trigger('impactMedium');
               fetchLocation();
