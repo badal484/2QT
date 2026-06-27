@@ -11,7 +11,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import Geolocation from '@react-native-community/geolocation';
 import { api } from '../api/client';
 import { setAddress, setZone } from '../store/slices/cartSlice';
-import { setServiceable, setUnserviceable } from '../store/slices/appSlice';
+import { setServiceable, setUnserviceable, setGlobalLocation } from '../store/slices/appSlice';
+import { reverseGeocode } from '../utils/geocode';
 import { AddressSearchModal } from '../components/AddressSearchModal';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { colors } from '../theme/colors';
@@ -98,24 +99,29 @@ const AddressScreen = ({ navigation }: any) => {
     triggerHaptic('impactMedium');
     setGpsChecking(true);
     Geolocation.requestAuthorization();
-    
+
     Geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         try {
-          const res = await api.get(`/menu/zones/check?lat=${latitude}&lng=${longitude}`);
+          const [addressText, res] = await Promise.all([
+            reverseGeocode(latitude, longitude),
+            api.get(`/menu/zones/check?lat=${latitude}&lng=${longitude}`),
+          ]);
+          const location = { latitude, longitude, addressText };
+          dispatch(setGlobalLocation(location));
           if (res.serviceable && res.zone?.id) {
             dispatch(setZone(res.zone.id));
-            dispatch(setServiceable({ zoneId: res.zone.id, zoneName: res.zone.name || null }));
+            dispatch(setServiceable({ zoneId: res.zone.id, zoneName: res.zone.name || null, location }));
             queryClient.invalidateQueries({ queryKey: ['menu'] });
           } else {
             dispatch(setZone(null));
-            dispatch(setUnserviceable({ latitude, longitude, addressText: 'Current Location' }));
+            dispatch(setUnserviceable(location));
           }
           dispatch(setAddress('gps'));
           navigation.goBack();
         } catch {
-           Alert.alert('Error', 'Could not verify location.');
+          Alert.alert('Error', 'Could not verify location.');
         } finally {
           setGpsChecking(false);
         }

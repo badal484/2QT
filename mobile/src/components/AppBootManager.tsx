@@ -162,8 +162,18 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
         dispatch(setServiceabilityChecking());
 
         if (globalLocation) {
-          // Have cached GPS coords — fast zone check
+          // Have cached coords — fast zone check with existing address text
           await runServiceabilityCheck(globalLocation, globalLocation.addressText);
+          // Refresh stale address text in background (e.g. 'Current Location' placeholder)
+          const isStale =
+            !globalLocation.addressText ||
+            globalLocation.addressText === 'Current Location' ||
+            globalLocation.addressText === 'Detecting...';
+          if (isStale) {
+            reverseGeocode(globalLocation.latitude, globalLocation.longitude).then(addressText => {
+              dispatch(setGlobalLocation({ ...globalLocation, addressText }));
+            });
+          }
         } else {
           // Have saved addressId but no GPS coords — run GPS in background.
           // Use isSilent=true so GPS failures don't override the 'checking' state
