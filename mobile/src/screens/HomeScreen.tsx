@@ -571,10 +571,10 @@ const HomeScreen = ({ navigation }: any) => {
       <Animated.View style={[
         { 
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
-          paddingTop: Math.max(insets.top + 10, 20), 
-          paddingBottom: 16,
+          paddingTop: Math.max(insets.top + 8, 12), 
+          paddingBottom: 8,
           backgroundColor: colors.surface, 
-          paddingHorizontal: 16
+          paddingHorizontal: 12
         }
       ]}>
         {/* ROW 1: Address and Profile (Animated) */}
@@ -582,18 +582,19 @@ const HomeScreen = ({ navigation }: any) => {
           <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
             <MapPin size={28} color={colors.primary} fill={colors.primaryTint} style={{ marginRight: 8 }} />
             <View style={{ flex: 1 }}>
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-                onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
-              >
-                <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink }}>
-                  {user?.name ? `Hey ${user.name.split(' ')[0]} 👋` : 'Home'}
-                </Text>
-                <ChevronDown size={16} color={colors.ink} style={{ marginLeft: 4 }} />
-              </TouchableOpacity>
-              <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 }} numberOfLines={1}>
-                {location?.addressText || selectedAddress?.address_text || 'Set location'}
+              <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink }}>
+                {user?.name ? `Hey ${user.name.split(' ')[0]} 👋` : 'Hello'}
               </Text>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}
+                onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted }} numberOfLines={1}>
+                  {location?.addressText || selectedAddress?.address_text || 'Set location'}
+                </Text>
+                <ChevronDown size={14} color={colors.inkMuted} style={{ marginLeft: 3 }} />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -1260,13 +1261,13 @@ const ebS = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   minimalHeader: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F3F4F6',
   },
   headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
@@ -1300,11 +1301,11 @@ const styles = StyleSheet.create({
   addressLabelRow: { flexDirection: 'row', alignItems: 'center' },
   chevron: { marginLeft: spacing.xs },
   locationTitle: { color: colors.ink, fontSize: 13, fontFamily: fontFamily.extrabold, letterSpacing: 0.3 },
-  addressValue: { color: colors.inkMuted, fontSize: 13, fontFamily: fontFamily.semibold, marginTop: 2 },
+  addressValue: { color: colors.inkMuted, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 2 },
   profileButton: {
-    width: 44, height: 44, backgroundColor: colors.primaryTint, borderRadius: 22,
+    width: 36, height: 36, backgroundColor: colors.primaryTint, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-    borderWidth: 1, borderColor: colors.primaryTint,
+    borderWidth: 0,
   },
   profileImage: { width: '100%', height: '100%' },
 
@@ -1365,54 +1366,54 @@ const styles = StyleSheet.create({
   exploreText: { fontSize: 12, fontFamily: fontFamily.extrabold, color: colors.ink, letterSpacing: 0.3 },
 
   // Category section header
-  categorySectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: 8, paddingBottom: 16 },
-  categorySectionTitle: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.3 },
-  categorySectionCount: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted },
+  categorySectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 4, paddingBottom: 10 },
+  categorySectionTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.3 },
+  categorySectionCount: { fontSize: 12, fontFamily: fontFamily.semibold, color: colors.inkMuted },
 
   // Grid row (2 cards per row)
-  homeGridRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: 16, marginBottom: 24 },
-  homeGridCard: { flex: 1, backgroundColor: 'transparent', marginBottom: 4 },
-  homeGridImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: colors.surfaceMuted, position: 'relative', marginBottom: 12 },
+  homeGridRow: { flexDirection: 'row', paddingHorizontal: 12, gap: 12, marginBottom: 16 },
+  homeGridCard: { flex: 1, backgroundColor: '#FFFFFF', marginBottom: 2 },
+  homeGridImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F9FAFB', position: 'relative', marginBottom: 8 },
   homeGridImage: { width: '100%', height: '100%' },
   homeGridImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  homeGridVegBadge: { position: 'absolute', top: 12, left: 12, width: 16, height: 16, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  homeGridVegBadge: { position: 'absolute', top: 8, left: 8, width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   homeGridVegDot: { width: 8, height: 8, borderRadius: 4 },
   homeGridBestsellerBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
   homeGridBestsellerText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
   homeGridNewBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
   homeGridNewText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
   homeGridSoldOut: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  homeGridSoldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
-  homeGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '80%', zIndex: 10 },
-  homeGridQtyControl: { flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 12, alignItems: 'center', justifyContent: 'space-between', height: 40, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
-  homeGridQtyBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
-  homeGridQtyBtnText: { color: colors.white, fontSize: 22, fontFamily: fontFamily.bold },
-  homeGridQtyValue: { color: colors.white, fontSize: 15, fontFamily: fontFamily.extrabold },
-  homeGridAddBtn: { backgroundColor: '#24B059', borderRadius: 12, height: 40, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, position: 'relative' },
-  homeGridAddBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 16, letterSpacing: 0.5 },
-  homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' },
-  homeGridCustomiseText: { fontSize: 9, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
+  homeGridSoldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
+  homeGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
+  homeGridQtyControl: { flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', height: 32, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  homeGridQtyBtn: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
+  homeGridQtyBtnText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
+  homeGridQtyValue: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
+  homeGridAddBtn: { backgroundColor: '#24B059', borderRadius: 8, height: 32, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1, position: 'relative' },
+  homeGridAddBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
+  homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F3F4F6' },
+  homeGridCustomiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
   homeGridInfo: { paddingHorizontal: 4 },
-  homeGridName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
-  homeGridDesc: { fontSize: 12, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 16, marginBottom: 6 },
-  homeGridPrice: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink },
-  homeGridTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
-  homeGridTagChip: { backgroundColor: colors.surfaceMuted, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: colors.border },
+  homeGridName: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2, lineHeight: 18 },
+  homeGridDesc: { fontSize: 11, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 14, marginBottom: 4 },
+  homeGridPrice: { fontSize: 14, fontFamily: fontFamily.black, color: colors.ink },
+  homeGridTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  homeGridTagChip: { backgroundColor: '#F9FAFB', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 0 },
   homeGridTagText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
   customisePill: {
-    alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 2, marginBottom: 3,
-    borderWidth: 1, borderColor: '#E5E7EB',
+    alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 4,
+    paddingHorizontal: 6, paddingVertical: 2, marginBottom: 3,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: '#F3F4F6',
   },
-  customisePillText: { fontSize: 9, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase', letterSpacing: 0.3 },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-  bestsellerBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  bestsellerBadgeText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
-  newBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  newBadgeText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  tagChip: { backgroundColor: colors.surfaceMuted, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.border },
-  tagChipText: { fontSize: 10, fontFamily: fontFamily.bold, color: colors.inkMuted },
+  customisePillText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase', letterSpacing: 0.3 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 4 },
+  bestsellerBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  bestsellerBadgeText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
+  newBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  newBadgeText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  tagChip: { backgroundColor: '#F9FAFB', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 0 },
+  tagChipText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
 
   liveKitchenBanner: {
     flexDirection: 'row',
@@ -1446,21 +1447,21 @@ const styles = StyleSheet.create({
   deliveryTimeSub: { color: colors.inkMuted, fontSize: 8, fontFamily: fontFamily.bold, letterSpacing: 0.5 },
 
   searchBarContainer: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.lg,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    height: 52,
-    marginTop: spacing.xl,
+    paddingHorizontal: 12,
+    height: 40,
+    marginTop: 12,
   },
-  searchIcon: { marginRight: spacing.md },
-  searchInput: { flex: 1, fontSize: 15, fontFamily: fontFamily.semibold, color: colors.ink },
-  vegToggleContainer: { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: spacing.md, marginLeft: spacing.sm },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 13, fontFamily: fontFamily.semibold, color: colors.ink },
+  vegToggleContainer: { borderLeftWidth: 1, borderLeftColor: '#E5E7EB', paddingLeft: 8, marginLeft: 8 },
   vegToggleWrapper: { flexDirection: 'row', alignItems: 'center' },
-  vegText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.inkFaint, marginRight: spacing.xs, letterSpacing: 0.5 },
+  vegText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: colors.inkFaint, marginRight: 4, letterSpacing: 0.5 },
   vegTextActive: { color: colors.primary },
-  vegSwitch: { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] },
+  vegSwitch: { transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] },
 
   listContent: { paddingBottom: 200, flexGrow: 1 },
   itemPadding: { paddingHorizontal: spacing.lg },
@@ -1482,20 +1483,15 @@ const styles = StyleSheet.create({
   pausedTitle: { color: colors.danger, fontSize: 15, fontFamily: fontFamily.extrabold },
   pausedReason: { color: colors.danger, fontSize: 12, fontFamily: fontFamily.medium, marginTop: 2 },
 
-  mindContainer: { marginTop: spacing.xl },
-  mindScroll: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  mindContainer: { marginTop: 16 },
+  mindScroll: { paddingHorizontal: 12, gap: 8 },
   categoryPill: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E7EB',
   },
   categoryPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   categoryPillText: { fontSize: 14, fontFamily: fontFamily.extrabold, color: colors.inkMuted },
@@ -1505,25 +1501,20 @@ const styles = StyleSheet.create({
   imageCategoryItem: {
     alignItems: 'center',
     justifyContent: 'flex-start',
-    width: 72,
+    width: 60,
     marginRight: 4,
   },
   imageCategoryItemActive: {},
   imageCategoryCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
-    borderWidth: 2.5,
-    borderColor: colors.border,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
   },
   imageCategoryCircleActive: {
     borderColor: colors.primary,
@@ -1614,85 +1605,81 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  itemsContainer: { paddingHorizontal: spacing.lg, marginTop: spacing.xl, paddingBottom: spacing.xxxl },
+  itemsContainer: { paddingHorizontal: 12, marginTop: 16, paddingBottom: 60 },
   modernItemsList: { width: '100%' },
 
   modernCard: {
     width: '100%',
-    marginBottom: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 4,
+    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E7EB',
   },
   modernCardInner: { flexDirection: 'row', alignItems: 'center' },
 
-  modernImageCol: { width: 80, alignItems: 'center', marginRight: spacing.lg },
-  modernImageWrapper: { width: 80, height: 80, borderRadius: radius.md, backgroundColor: colors.surfaceMuted, overflow: 'hidden' },
+  modernImageCol: { width: 70, alignItems: 'center', marginRight: 12 },
+  modernImageWrapper: { width: 70, height: 70, borderRadius: 8, backgroundColor: '#F9FAFB', overflow: 'hidden' },
   modernImage: { width: '100%', height: '100%' },
   modernImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  modernInfo: { flex: 1, paddingRight: spacing.sm },
-  modernTagsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-  vegIndicatorModern: { width: 12, height: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm, borderRadius: 3 },
-  vegDotModern: { width: 5, height: 5, borderRadius: 3 },
-  bestsellerTagModern: { backgroundColor: colors.warningTint, paddingHorizontal: spacing.xs + 2, paddingVertical: 2, borderRadius: 6 },
-  bestsellerTagTextModern: { color: colors.warning, fontSize: 9, fontFamily: fontFamily.extrabold, textTransform: 'uppercase' },
-  modernName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, lineHeight: 20, marginBottom: spacing.xs },
-  modernPrice: { fontSize: 14, fontFamily: fontFamily.extrabold, color: colors.ink, marginBottom: spacing.xs },
-  modernDesc: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.medium, lineHeight: 16 },
+  modernInfo: { flex: 1, paddingRight: 4 },
+  modernTagsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  vegIndicatorModern: { width: 10, height: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 4, borderRadius: 3 },
+  vegDotModern: { width: 4, height: 4, borderRadius: 2 },
+  bestsellerTagModern: { backgroundColor: colors.warningTint, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
+  bestsellerTagTextModern: { color: colors.warning, fontSize: 8, fontFamily: fontFamily.extrabold, textTransform: 'uppercase' },
+  modernName: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, lineHeight: 18, marginBottom: 2 },
+  modernPrice: { fontSize: 13, fontFamily: fontFamily.extrabold, color: colors.ink, marginBottom: 2 },
+  modernDesc: { fontSize: 11, color: colors.inkMuted, fontFamily: fontFamily.medium, lineHeight: 14 },
 
   addBtnContainerRight: { marginLeft: 'auto' },
   floatingAddButtonModern: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm + 2,
-    backgroundColor: colors.primaryTint,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.primaryTint,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    borderWidth: 0,
   },
-  floatingAddButtonDisabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-  floatingAddButtonTextModern: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
+  floatingAddButtonDisabled: { backgroundColor: '#F9FAFB' },
+  floatingAddButtonTextModern: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 13, letterSpacing: 0.5 },
 
   floatingQuantityControlModern: {
-    width: 80,
-    height: 36,
+    width: 70,
+    height: 28,
     backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: radius.sm,
+    borderRadius: 6,
   },
-  floatingQtyBtnModern: { paddingHorizontal: spacing.sm + 2, height: '100%', justifyContent: 'center' },
-  floatingQtyTextModern: { color: colors.white, fontSize: 18, fontFamily: fontFamily.extrabold },
-  floatingQtyValueModern: { color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold },
+  floatingQtyBtnModern: { paddingHorizontal: 6, height: '100%', justifyContent: 'center' },
+  floatingQtyTextModern: { color: colors.white, fontSize: 16, fontFamily: fontFamily.extrabold },
+  floatingQtyValueModern: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
 
   soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
+  soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1 },
 
   skeletonList: { width: '100%' },
 
   floatingCartContainer: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 12,
+    right: 12,
     zIndex: 999,
     backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   floatingCartButton: {
     flex: 1,
@@ -1702,10 +1689,8 @@ const styles = StyleSheet.create({
   },
   cartLeftRow: { flexDirection: 'row', alignItems: 'center' },
   cartItemCount: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: fontFamily.extrabold, letterSpacing: 1, textTransform: 'uppercase' },
-  cartTotalText: { color: colors.white, fontSize: 22, fontFamily: fontFamily.black, letterSpacing: -0.5 },
+  cartTotalText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.black, letterSpacing: -0.5 },
   viewCartAction: { flexDirection: 'row', alignItems: 'center' },
-  viewCartText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.3 },
-
   bannersList: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.xl },
   bannerContainer: {
     width: '100%',
@@ -2098,34 +2083,31 @@ const styles = StyleSheet.create({
   catPreviewWrap: { paddingTop: 10, paddingBottom: 4 },
   catPreviewHeadingRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: spacing.lg, marginBottom: 14,
+    paddingHorizontal: 12, marginBottom: 10,
   },
   catPreviewHeadingAccent: {
-    width: 4, height: 20, borderRadius: 2,
+    width: 4, height: 16, borderRadius: 2,
     backgroundColor: colors.primary,
   },
   catPreviewHeading: {
     fontFamily: fontFamily.black,
-    fontSize: 20,
+    fontSize: 18,
     color: colors.ink,
     letterSpacing: -0.3,
   },
-  catPreviewScroll: { paddingHorizontal: spacing.lg, gap: 14, paddingBottom: 4 },
+  catPreviewScroll: { paddingHorizontal: 12, gap: 10, paddingBottom: 4 },
   catPreviewCard: {
-    width: 152,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
+    width: 140,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#F3F4F6',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.09,
-    shadowRadius: 10,
-    elevation: 4,
   },
-  catPreviewImgBox: { width: '100%', height: 130, position: 'relative' },
+  catPreviewImgBox: { width: '100%', height: 100, position: 'relative' },
   catPreviewImg: { width: '100%', height: '100%' },
   catPreviewImgPlaceholder: {
-    backgroundColor: colors.background,
+    backgroundColor: '#F9FAFB',
     alignItems: 'center', justifyContent: 'center',
   },
   catPreviewCatPill: {
