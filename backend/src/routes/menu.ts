@@ -53,7 +53,24 @@ router.get('/geocode/reverse', async (req, res) => {
     const lng = parseFloat(req.query.lng as string);
     if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'INVALID_COORDS' });
 
-    // Try Google Geocoding first, fall back to Nominatim
+    // Helper: build short "Locality, District" from Google address_components
+    const shortFromGoogle = (components: any[]): string | null => {
+        const get = (...types: string[]) => {
+            for (const type of types) {
+                const c = components.find((c: any) => c.types.includes(type));
+                if (c) return c.long_name as string;
+            }
+            return null;
+        };
+        const local = get('sublocality_level_2', 'sublocality_level_1', 'neighborhood', 'sublocality');
+        const city   = get('locality', 'administrative_area_level_2', 'administrative_area_level_3');
+        if (local && city && local !== city) return `${local}, ${city}`;
+        if (local) return local;
+        if (city)  return city;
+        return null;
+    };
+
+    // Try Google Geocoding first
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (apiKey) {
         try {
@@ -61,15 +78,18 @@ router.get('/geocode/reverse', async (req, res) => {
             const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
             const data = await response.json();
             if (data.results && data.results.length > 0) {
-                res.set('Cache-Control', 'public, max-age=300');
-                return res.json({ display_name: data.results[0].formatted_address });
+                const short = shortFromGoogle(data.results[0].address_components || []);
+                if (short) {
+                    res.set('Cache-Control', 'public, max-age=300');
+                    return res.json({ display_name: short });
+                }
             }
         } catch {
-            // Google failed — fall through to Nominatim
+            // fall through to Nominatim
         }
     }
 
-    // Nominatim fallback (free, no key)
+    // Nominatim fallback — return 2 parts max (locality + district, skip state)
     try {
         const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
         const response = await fetch(url, {
@@ -79,15 +99,12 @@ router.get('/geocode/reverse', async (req, res) => {
         const data = await response.json();
         if (data?.address) {
             const a = data.address;
-            const parts = [
-                a.suburb || a.neighbourhood || a.village || a.town || a.city_district || a.city,
-                a.county || a.district || a.state_district,
-                a.state,
-            ].filter(Boolean);
-            const unique = parts.filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i);
-            if (unique.length > 0) {
+            const local   = a.suburb || a.neighbourhood || a.quarter || a.village || a.hamlet || a.town || a.city_district;
+            const district = a.county || a.district || a.state_district || a.city;
+            const parts = [local, district].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i);
+            if (parts.length > 0) {
                 res.set('Cache-Control', 'public, max-age=300');
-                return res.json({ display_name: unique.join(', ') });
+                return res.json({ display_name: parts.join(', ') });
             }
         }
     } catch (err) {
