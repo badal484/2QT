@@ -170,14 +170,14 @@ router.get('/addresses', authenticate, async (req: AuthRequest, res) => {
 });
 
 router.post('/addresses', authenticate, async (req: AuthRequest, res) => {
-    const { label, addressText, lat, lng, zoneId } = req.body;
+    const { label, addressText, lat, lng, zoneId, flatNumber, buildingName } = req.body;
     const userId = req.user!.userId;
 
     const { rows } = await query(`
-        INSERT INTO addresses (customer_id, label, address_text, lat, lng, zone_id)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO addresses (customer_id, label, address_text, lat, lng, zone_id, flat_number, building_name)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
-    `, [userId, label, addressText, lat, lng, zoneId]);
+    `, [userId, label, addressText, lat, lng, zoneId ?? null, flatNumber ?? null, buildingName ?? null]);
 
     res.json({ address: rows[0] });
 });
