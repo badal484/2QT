@@ -17,6 +17,7 @@ import { AddressSearchModal } from '../components/AddressSearchModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
+import { reverseGeocode } from '../utils/geocode';
 
 
 const LABELS = [
@@ -80,8 +81,8 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     ReactNativeHapticFeedback.trigger('impactMedium');
     pinY.value = withSpring(0, { damping: 12, stiffness: 300 });
     try {
-      const data = await api.get(`/menu/geocode/reverse?lat=${region.latitude}&lng=${region.longitude}`);
-      if (data?.display_name) setAddressText(data.display_name);
+      const text = await reverseGeocode(region.latitude, region.longitude);
+      if (text && text !== 'Current Location') setAddressText(text);
     } catch {}
   };
 

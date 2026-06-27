@@ -13,6 +13,7 @@ import { setAddress, setZone } from '../store/slices/cartSlice';
 import { RootState } from '../store';
 import SplashScreen from '../screens/SplashScreen';
 import { api } from '../api/client';
+import { reverseGeocode } from '../utils/geocode';
 import Geolocation from '@react-native-community/geolocation';
 
 const requestLocationPermission = async (): Promise<boolean> => {
@@ -51,19 +52,6 @@ const getGpsCoords = (): Promise<{ latitude: number; longitude: number } | null>
     );
   });
 
-const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
-  try {
-    const data = await api.get(`/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
-    if (data && data.display_name) {
-      let addressText = data.display_name;
-      if (addressText.endsWith(', India')) {
-        addressText = addressText.replace(', India', '');
-      }
-      return addressText;
-    }
-  } catch { /* non-critical */ }
-  return 'Current Location';
-};
 
 export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
   const dispatch = useDispatch();
