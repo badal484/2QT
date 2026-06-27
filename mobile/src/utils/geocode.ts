@@ -1,56 +1,43 @@
 import { ENV } from '../config/env';
 
 export interface GeocodeResult {
-  name: string;    // short label — road name or locality
-  address: string; // full formatted address shown as subtitle
+  name: string;    // short label — road name or locality (for HomeScreen header)
+  address: string; // raw formatted_address from Google (for map picker subtitle)
 }
 
 async function googleReverse(lat: number, lng: number): Promise<GeocodeResult | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    // Two calls in parallel: route-filtered (snaps to nearest road) + full geocode
-    // Route-filtered wins when near a road (returns highway name like Swish)
-    // Full geocode wins when in a locality/area with no named road nearby
-    const [routeRes, fullRes] = await Promise.all([
-      fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&result_type=route&key=${ENV.GOOGLE_GEOCODING_KEY}`,
-        { signal: controller.signal },
-      ),
-      fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${ENV.GOOGLE_GEOCODING_KEY}`,
-        { signal: controller.signal },
-      ),
-    ]);
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${ENV.GOOGLE_GEOCODING_KEY}`,
+      { signal: controller.signal },
+    );
     clearTimeout(timer);
+    const data = await res.json();
+    if (data.status !== 'OK' || !data.results?.length) return null;
 
-    const [routeData, fullData] = await Promise.all([routeRes.json(), fullRes.json()]);
-
-    // Parse address_components to get the most specific name
-    const parse = (data: any): GeocodeResult | null => {
-      if (data.status !== 'OK' || !data.results?.length) return null;
-      const components: any[] = data.results[0].address_components || [];
-      const get = (...types: string[]) => {
-        for (const type of types) {
-          const c = components.find((c: any) => c.types.includes(type));
-          if (c) return c.long_name as string;
-        }
-        return null;
-      };
-      const name = get(
-        'route',
-        'sublocality_level_2', 'sublocality_level_1',
-        'neighborhood', 'sublocality',
-        'locality', 'administrative_area_level_2',
-      );
-      // Show full formatted_address exactly as Google returns it — same as Swish
-      const address = (data.results[0].formatted_address as string || '').trim();
-      if (name) return { name, address: address || name };
+    const components: any[] = data.results[0].address_components || [];
+    const get = (...types: string[]) => {
+      for (const type of types) {
+        const c = components.find((c: any) => c.types.includes(type));
+        if (c) return c.long_name as string;
+      }
       return null;
     };
 
-    // Prefer route-filtered result (gives road name); fall back to full geocode
-    return parse(routeData) || parse(fullData);
+    const name = get(
+      'route',
+      'sublocality_level_2', 'sublocality_level_1',
+      'neighborhood', 'sublocality',
+      'locality', 'administrative_area_level_2',
+    );
+
+    // Raw formatted_address exactly as Google returns — same as Swish
+    // e.g. "V367+C5M, Jharkhand State Highway 7, Bhadaikhap, Peto, Jharkhand 825321, India"
+    const address = (data.results[0].formatted_address as string || '').trim();
+
+    if (name) return { name, address: address || name };
   } catch {
     clearTimeout(timer);
   }
