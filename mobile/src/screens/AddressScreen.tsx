@@ -215,6 +215,11 @@ const AddressScreen = ({ navigation }: any) => {
                           </Text>
                         </View>
                       </View>
+                      {(addr.flat_number || addr.building_name) && (
+                        <Text style={styles.addrDetail} numberOfLines={1}>
+                          {[addr.flat_number, addr.building_name].filter(Boolean).join(', ')}
+                        </Text>
+                      )}
                       <Text style={styles.addrText} numberOfLines={2}>{addr.address_text}</Text>
                     </View>
 
@@ -258,9 +263,8 @@ const AddressScreen = ({ navigation }: any) => {
           onClose={() => setSearchVisible(false)}
           onSelect={(lat, lon, name) => {
             setSearchVisible(false);
-            // Wait a tick then navigate to AddressBook to drop the pin
             setTimeout(() => {
-              navigation.navigate('AddressBook');
+              navigation.navigate('AddressBook', { initialLat: lat, initialLng: lon, initialAddress: name });
             }, 100);
           }}
         />
@@ -404,11 +408,17 @@ const styles = StyleSheet.create({
     fontSize: 10, 
     fontFamily: fontFamily.bold 
   },
-  addrText: { 
-    fontSize: 13, 
-    fontFamily: fontFamily.regular, 
-    color: '#6B7280', 
-    lineHeight: 18 
+  addrDetail: {
+    fontSize: 13,
+    fontFamily: fontFamily.semibold,
+    color: '#374151',
+    marginBottom: 2,
+  },
+  addrText: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    color: '#6B7280',
+    lineHeight: 18
   },
   deleteBtn: { padding: 8 },
 
