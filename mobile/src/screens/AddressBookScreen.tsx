@@ -79,7 +79,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
       }, 800);
       if (location.addressText && location.addressText !== 'Current Location') {
         setAddressText(location.addressText);
-        setAddressFull('');
+        setAddressFull(location.addressFull || '');
       }
     }
   }, [location]);

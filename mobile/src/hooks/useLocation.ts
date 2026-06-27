@@ -1,12 +1,13 @@
 import { useState, useCallback, useRef } from 'react';
 import { Platform, PermissionsAndroid } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { reverseGeocode } from '../utils/geocode';
+import { reverseGeocodeDetailed } from '../utils/geocode';
 
 export interface LocationData {
   latitude: number;
   longitude: number;
-  addressText: string;
+  addressText: string;  // short name for HomeScreen header
+  addressFull: string;  // full formatted_address for map picker subtitle
 }
 
 export const useLocation = () => {
@@ -54,14 +55,14 @@ export const useLocation = () => {
     const onSuccess = async (position: any) => {
       const { latitude, longitude } = position.coords;
 
-      // Move the map IMMEDIATELY — don't wait for address text
-      setLocation({ latitude, longitude, addressText: '' });
+      // Move map immediately — don't wait for address
+      setLocation({ latitude, longitude, addressText: '', addressFull: '' });
       setLoadingLocation(false);
       isFetchingRef.current = false;
 
-      // Fetch address in background — updates label once ready
-      const addressText = await reverseGeocode(latitude, longitude);
-      setLocation({ latitude, longitude, addressText });
+      // Fetch both name + full address in background
+      const result = await reverseGeocodeDetailed(latitude, longitude);
+      setLocation({ latitude, longitude, addressText: result.name, addressFull: result.address });
     };
 
     const onError = (error: any) => {
@@ -71,7 +72,7 @@ export const useLocation = () => {
       isFetchingRef.current = false;
     };
 
-    // High-accuracy GPS only — network-based location is unreliable in rural areas (500m-5km off)
+    // High-accuracy GPS only — network location is 500m+ off in rural areas
     Geolocation.getCurrentPosition(onSuccess, onError, {
       enableHighAccuracy: true, timeout: 20000, maximumAge: 5000,
     });
