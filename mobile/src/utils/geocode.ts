@@ -5,48 +5,61 @@ export interface GeocodeResult {
   address: string; // full address shown in map picker subtitle
 }
 
-// Google Geocoding HTTP API — called directly from device, same as Swish
-async function googleReverse(lat: number, lng: number): Promise<GeocodeResult | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6000);
-  try {
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${ENV.GOOGLE_GEOCODING_KEY}`,
-      { signal: controller.signal },
-    );
-    clearTimeout(timer);
-    const data = await res.json();
-    if (data.status === 'OK' && data.results?.length > 0) {
-      const components: any[] = data.results[0].address_components || [];
-      const get = (...types: string[]) => {
-        for (const type of types) {
-          const c = components.find((c: any) => c.types.includes(type));
-          if (c) return c.long_name as string;
-        }
-        return null;
-      };
-      const name = get(
-        'route',
-        'sublocality_level_2', 'sublocality_level_1',
-        'neighborhood', 'sublocality',
-        'locality', 'administrative_area_level_2',
-      );
-      // Strip Plus Code prefix from segments, strip country
-      const address = (data.results[0].formatted_address as string || '')
-        .split(', ')
-        .map((p: string) => p.replace(/^[A-Z0-9]{4,}\+[A-Z0-9]{2,}\s*/, ''))
-        .filter((p: string) => p && p !== 'India')
-        .join(', ')
-        .trim();
-      if (name) return { name, address: address || name };
+function parseGoogleResult(data: any): GeocodeResult | null {
+  if (data.status !== 'OK' || !data.results?.length) return null;
+  const components: any[] = data.results[0].address_components || [];
+  const get = (...types: string[]) => {
+    for (const type of types) {
+      const c = components.find((c: any) => c.types.includes(type));
+      if (c) return c.long_name as string;
     }
-  } catch {
-    clearTimeout(timer);
-  }
+    return null;
+  };
+  const name = get(
+    'route',
+    'sublocality_level_2', 'sublocality_level_1',
+    'neighborhood', 'sublocality',
+    'locality', 'administrative_area_level_2',
+  );
+  const address = (data.results[0].formatted_address as string || '')
+    .split(', ')
+    .map((p: string) => p.replace(/^[A-Z0-9]{4,}\+[A-Z0-9]{2,}\s*/, ''))
+    .filter((p: string) => p && p !== 'India')
+    .join(', ')
+    .trim();
+  if (name) return { name, address: address || name };
   return null;
 }
 
-// Nominatim — free fallback when Google fails (no key, works offline)
+async function fetchGoogle(url: string): Promise<any | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return await res.json();
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+// Google Geocoding — tries road-level first (result_type=route), then full geocode
+// This matches Swish behaviour: pin near a road shows the road name not the locality
+async function googleReverse(lat: number, lng: number): Promise<GeocodeResult | null> {
+  const base = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${ENV.GOOGLE_GEOCODING_KEY}`;
+
+  // First pass: force road-level result — returns highway/street name if within ~200m
+  const roadData = await fetchGoogle(`${base}&result_type=route`);
+  const roadResult = parseGoogleResult(roadData);
+  if (roadResult) return roadResult;
+
+  // Second pass: full geocode — returns locality, sublocality, etc.
+  const fullData = await fetchGoogle(base);
+  return parseGoogleResult(fullData);
+}
+
+// Nominatim — free fallback when Google fails
 async function nominatimReverse(lat: number, lng: number): Promise<GeocodeResult | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
@@ -79,7 +92,6 @@ async function nominatimReverse(lat: number, lng: number): Promise<GeocodeResult
   return null;
 }
 
-// Google first (direct, no backend), Nominatim as fallback
 async function geocode(lat: number, lng: number): Promise<GeocodeResult | null> {
   const result = await googleReverse(lat, lng);
   if (result) return result;
