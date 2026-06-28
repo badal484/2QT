@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Clock,
@@ -13,6 +13,12 @@ import {
   Package,
   AlertCircle,
   RefreshCw,
+  MapPin,
+  Bike,
+  UserCheck,
+  CircleDot,
+  ChevronDown,
+  Zap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -35,6 +41,26 @@ interface Order {
   customer_name: string;
   items: OrderItem[];
   created_at: string;
+}
+
+interface LiveRider {
+  id: string;
+  name: string;
+  phone: string;
+  current_order_id: string | null;
+  order_status: string | null;
+  order_display_id: string | null;
+  delivery_address: string | null;
+  location: { lat: number; lng: number; updatedAt: string } | null;
+}
+
+interface UnassignedOrder {
+  id: string;
+  display_id: string;
+  customer_name: string;
+  delivery_address: string;
+  created_at: string;
+  items: { menu_item_name: string; quantity: number }[];
 }
 
 function minutesSince(ts: string) {
@@ -60,6 +86,15 @@ export default function KitchenPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [view, setView] = useState<"kds" | "dispatch">("kds");
+
+  // Dispatch state
+  const [riders, setRiders] = useState<LiveRider[]>([]);
+  const [unassigned, setUnassigned] = useState<UnassignedOrder[]>([]);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [selectedRider, setSelectedRider] = useState<Record<string, string>>({});
+  const dispatchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const { user, logout, loading: authLoading } = useAuth()!;
   const router = useRouter();
 
@@ -109,10 +144,15 @@ export default function KitchenPage() {
       fetchOrders();
     });
 
+    socket.on("order_status_update", () => {
+      fetchOrders();
+    });
+
     return () => {
       socket.off("new_order");
       socket.off("order_cancelled");
       socket.off("order_updated");
+      socket.off("order_status_update");
       socket.disconnect();
     };
   }, [fetchOrders]);
@@ -130,6 +170,64 @@ export default function KitchenPage() {
     }
   };
 
+  // ── Dispatch data fetching ────────────────────────────────────────────────
+  const fetchDispatch = useCallback(async () => {
+    try {
+      const [ridersData, unassignedData] = await Promise.all([
+        api.get("/kitchen/riders/live"),
+        api.get("/kitchen/orders/unassigned"),
+      ]);
+      setRiders(ridersData.riders || []);
+      setUnassigned(unassignedData.orders || []);
+    } catch {
+      // silent — dispatch panel just won't refresh
+    }
+  }, []);
+
+  useEffect(() => {
+    if (view === "dispatch") {
+      fetchDispatch();
+      dispatchIntervalRef.current = setInterval(fetchDispatch, 5000);
+    } else {
+      if (dispatchIntervalRef.current) {
+        clearInterval(dispatchIntervalRef.current);
+        dispatchIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (dispatchIntervalRef.current) {
+        clearInterval(dispatchIntervalRef.current);
+        dispatchIntervalRef.current = null;
+      }
+    };
+  }, [view, fetchDispatch]);
+
+  // Also refresh dispatch on order_updated socket when in dispatch view
+  useEffect(() => {
+    const handler = () => { if (view === "dispatch") fetchDispatch(); };
+    socket.on("order_updated", handler);
+    return () => { socket.off("order_updated", handler); };
+  }, [view, fetchDispatch]);
+
+  const assignRider = async (orderId: string) => {
+    const riderId = selectedRider[orderId];
+    if (!riderId) { toast.error("Select a rider first"); return; }
+    setAssigningId(orderId);
+    try {
+      await api.post(`/kitchen/orders/${orderId}/assign-rider`, { riderId });
+      toast.success("Rider assigned!");
+      setSelectedRider(prev => { const n = { ...prev }; delete n[orderId]; return n; });
+      fetchDispatch();
+    } catch (err: any) {
+      toast.error(err.message || "Could not assign rider");
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
+  const idleRiders = riders.filter(r => !r.current_order_id);
+  const busyRiders = riders.filter(r => !!r.current_order_id);
+
   const activeCount = orders.filter(o => ["confirmed", "preparing"].includes(o.status)).length;
   const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
@@ -144,12 +242,32 @@ export default function KitchenPage() {
               2QT<span className="text-brand-primary">.</span>{" "}
               <span className="text-zinc-400 font-medium">Kitchen</span>
             </Link>
+            {/* ── View toggle ── */}
+            <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10">
+              <button
+                onClick={() => setView("kds")}
+                className={`px-5 py-2 rounded-lg text-sm font-black uppercase tracking-widest transition-all ${view === "kds" ? "bg-green-500 text-black shadow-[0_0_16px_rgba(34,197,94,0.4)]" : "text-zinc-400 hover:text-white"}`}
+              >
+                KDS
+              </button>
+              <button
+                onClick={() => setView("dispatch")}
+                className={`px-5 py-2 rounded-lg text-sm font-black uppercase tracking-widest transition-all flex items-center gap-2 ${view === "dispatch" ? "bg-orange-500 text-black shadow-[0_0_16px_rgba(249,115,22,0.4)]" : "text-zinc-400 hover:text-white"}`}
+              >
+                <Zap className="w-4 h-4" /> Dispatch
+                {unassigned.length > 0 && (
+                  <span className="bg-red-500 text-white text-xs font-black rounded-full w-5 h-5 flex items-center justify-center ml-1">
+                    {unassigned.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-8">
             {/* Clock */}
             <div className="text-3xl font-black tracking-tight">{currentTime}</div>
-            
+
             {/* Active Tickets */}
             <div className="text-xl font-medium text-zinc-400">
               <span className="text-white font-bold">{activeCount}</span> Active Tickets
@@ -173,10 +291,169 @@ export default function KitchenPage() {
         </div>
       </header>
 
-      {/* ── Main KDS Layout ── */}
+      {/* ── Main Content ── */}
       <main className="flex-1 p-6 overflow-hidden flex gap-6">
-        
-        {loading && orders.length === 0 ? (
+
+        {/* ════════════════════════════════ DISPATCH VIEW ══════════════════════════ */}
+        {view === "dispatch" && (
+          <div className="flex-1 flex gap-6 overflow-hidden">
+
+            {/* Left — Riders panel */}
+            <div className="w-80 shrink-0 flex flex-col gap-4 overflow-y-auto pb-6 custom-scrollbar">
+              <div className="sticky top-0 bg-[#050505] pb-2 z-10">
+                <h2 className="text-xl font-black uppercase tracking-widest text-orange-400 flex items-center gap-2">
+                  <Bike className="w-5 h-5" /> Riders Online
+                </h2>
+                <p className="text-zinc-500 text-sm mt-1">{riders.length} online · {idleRiders.length} idle · {busyRiders.length} delivering</p>
+              </div>
+
+              {riders.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-40 text-zinc-600">
+                  <Bike className="w-10 h-10 mb-3" />
+                  <p className="font-bold">No riders online</p>
+                </div>
+              )}
+
+              {/* Idle riders */}
+              {idleRiders.map(rider => (
+                <div key={rider.id} className="bg-[#0F1F18] border border-green-500/20 rounded-2xl p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80] shrink-0" />
+                    <span className="font-black text-white">{rider.name}</span>
+                    <span className="ml-auto text-[10px] font-black uppercase tracking-widest bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full">IDLE</span>
+                  </div>
+                  <p className="text-zinc-500 text-xs">{rider.phone}</p>
+                  {rider.location && (
+                    <p className="text-zinc-600 text-xs mt-1 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {rider.location.lat.toFixed(4)}, {rider.location.lng.toFixed(4)}
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              {/* Busy riders */}
+              {busyRiders.map(rider => (
+                <div key={rider.id} className="bg-[#1a1200] border border-amber-500/20 rounded-2xl p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                    <span className="font-black text-white">{rider.name}</span>
+                    <span className="ml-auto text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">DELIVERING</span>
+                  </div>
+                  <p className="text-zinc-500 text-xs">{rider.phone}</p>
+                  {rider.order_display_id && (
+                    <p className="text-amber-400/70 text-xs mt-2 font-bold">
+                      Order #{rider.order_display_id}
+                    </p>
+                  )}
+                  {rider.delivery_address && (
+                    <p className="text-zinc-600 text-xs mt-1 flex items-center gap-1 line-clamp-2">
+                      <MapPin className="w-3 h-3 shrink-0" />{rider.delivery_address}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Right — Orders panel */}
+            <div className="flex-1 flex flex-col gap-4 overflow-y-auto pb-6 custom-scrollbar">
+              <div className="sticky top-0 bg-[#050505] pb-2 z-10">
+                <h2 className="text-xl font-black uppercase tracking-widest text-red-400 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  Needs Assignment
+                  {unassigned.length > 0 && (
+                    <span className="bg-red-500 text-white text-sm font-black rounded-full w-7 h-7 flex items-center justify-center">{unassigned.length}</span>
+                  )}
+                </h2>
+                <p className="text-zinc-500 text-sm mt-1">Ready at kitchen, no rider assigned</p>
+              </div>
+
+              {unassigned.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-40 text-zinc-600">
+                  <UserCheck className="w-10 h-10 mb-3 text-green-700" />
+                  <p className="font-bold text-green-700">All orders have riders</p>
+                </div>
+              )}
+
+              <AnimatePresence>
+                {unassigned.map(order => {
+                  const waited = minutesSince(order.created_at);
+                  const isUrgent = waited > 10;
+                  const availableRiders = idleRiders;
+
+                  return (
+                    <motion.div
+                      key={order.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className={`rounded-2xl border p-5 ${isUrgent ? "bg-red-950/30 border-red-500/40" : "bg-[#111] border-white/10"}`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="text-2xl font-black text-white">#{order.display_id}</div>
+                          <div className="text-zinc-400 text-sm mt-1">{order.customer_name}</div>
+                        </div>
+                        <div className={`text-right ${isUrgent ? "text-red-400" : "text-zinc-400"}`}>
+                          <div className="text-xl font-black">{waited}m</div>
+                          {isUrgent && <div className="text-xs font-black uppercase text-red-400 animate-pulse">URGENT</div>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-1 text-zinc-500 text-xs mb-3">
+                        <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+                        <span className="line-clamp-2">{order.delivery_address}</span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1 mb-4">
+                        {order.items.map((item, i) => (
+                          <span key={i} className="bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg text-xs text-zinc-300 font-semibold">
+                            {item.quantity}× {item.menu_item_name}
+                          </span>
+                        ))}
+                      </div>
+
+                      {availableRiders.length === 0 ? (
+                        <div className="text-center text-zinc-600 text-sm py-2 border border-white/5 rounded-xl">
+                          No idle riders available
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <select
+                              value={selectedRider[order.id] || ""}
+                              onChange={e => setSelectedRider(prev => ({ ...prev, [order.id]: e.target.value }))}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white appearance-none cursor-pointer hover:bg-white/10 transition-all pr-8"
+                            >
+                              <option value="">Select rider…</option>
+                              {availableRiders.map(r => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                          </div>
+                          <button
+                            onClick={() => assignRider(order.id)}
+                            disabled={!selectedRider[order.id] || assigningId === order.id}
+                            className="px-5 py-2.5 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-black rounded-xl text-sm uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(249,115,22,0.3)] flex items-center gap-2"
+                          >
+                            {assigningId === order.id
+                              ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                              : <><CircleDot className="w-4 h-4" /> Assign</>
+                            }
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════════ KDS VIEW ═══════════════════════════════ */}
+        {view === "kds" && (loading && orders.length === 0 ? (
           <div className="w-full flex items-center justify-center">
             <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
           </div>
@@ -291,7 +568,7 @@ export default function KitchenPage() {
               </div>
             );
           })
-        )}
+        ))}
       </main>
     </div>
   );

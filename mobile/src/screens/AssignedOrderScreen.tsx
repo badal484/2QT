@@ -17,7 +17,7 @@ import { startRiderLocationService, stopRiderLocationService } from '../services
 const G = {
   bg: '#070F0C', surface: '#0F1F18', card: '#152318',
   accent: '#10B981', accentDim: 'rgba(16,185,129,0.12)',
-  orange: '#F97316', orangeDim: 'rgba(249,115,22,0.12)',
+  orange: G.primary, orangeDim: 'rgba(249,115,22,0.12)',
   danger: '#EF4444', dangerDim: 'rgba(239,68,68,0.1)',
   white: '#FFFFFF', muted: '#6B9E85', border: 'rgba(16,185,129,0.15)',
 };

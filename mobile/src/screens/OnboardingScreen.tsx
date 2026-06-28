@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useMutation } from '@tanstack/react-query';
@@ -114,7 +115,7 @@ const OnboardingScreen = ({ navigation }: any) => {
         </View>
 
         {isRider ? (
-          <TouchableOpacity
+          <BouncingButton
             activeOpacity={0.9}
             onPress={handleSave}
             disabled={!name.trim() || updateMutation.isPending}
@@ -133,7 +134,7 @@ const OnboardingScreen = ({ navigation }: any) => {
                 Register as Captain
               </Text>
             )}
-          </TouchableOpacity>
+          </BouncingButton>
         ) : (
           <Button
             label="Complete Setup"
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 10,
   },
@@ -276,7 +277,7 @@ const styles = StyleSheet.create({
     width: '100%',
     shadowColor: '#FF6B35',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 8,
   },

@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
 import { socket } from "../lib/socket";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -243,6 +244,8 @@ export default function RiderPage() {
       clearInterval(pollPool);
     };
   }, [user, isOnline, fetchOrders]);
+
+  useSocketRefresh(["order_status_update", "order_cancelled", "order_updated"], fetchOrders);
 
   // ── Countdown timer for incoming order ─────────────────────────────────────
   useEffect(() => {

@@ -7,6 +7,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
+import { ConfirmModal } from "../../components/ConfirmModal";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import PushNotifier from "../../components/PushNotifier";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -701,6 +703,9 @@ function SupportTab() {
   };
 
   useEffect(() => { loadTickets(); }, []);
+
+  useSocketRefresh(['ticket_status_updated', 'user_updated'], load);
+  useSocketRefresh(["ticket_updated"], loadTickets);
 
   const submit = async () => {
     if (!subject.trim() || !message.trim()) return;

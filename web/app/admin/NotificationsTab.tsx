@@ -5,6 +5,7 @@ import { Bell, Edit3, Save, X, RefreshCw, Send, CheckCircle2, XCircle, ChevronDo
 import { toast } from "sonner";
 import { api } from "../lib/api";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -270,6 +271,8 @@ function LogPanel() {
   }, [typeFilter, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  useSocketRefresh(["new_notification", "notification_updated"], load);
 
   const filtered = search
     ? logs.filter(l =>

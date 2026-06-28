@@ -3,6 +3,7 @@ import { query } from '../db';
 import { redis } from '../redis';
 import { sendFCM } from './fcm.service';
 import { pushService } from './push.service'; // web-push VAPID for browser
+import { emitToUser } from '../socket';
 
 export type NotifType =
     | 'order_confirmed' | 'order_preparing' | 'order_ready'
@@ -136,7 +137,9 @@ export async function sendNotification(type: NotifType, options: SendOptions): P
             `INSERT INTO notifications (user_id, type, title, body, data, channel, delivery_status)
              VALUES ($1, $2, $3, $4, $5, $6, 'sent')`,
             [user.id, type, title, body, JSON.stringify(vars), channels[0] ?? 'push']
-        ).catch(err => console.error('[NOTIF_DB_ERR]', err.message))
+        ).then(() => {
+            emitToUser(user!.id, 'new_notification', { type, title, body });
+        }).catch(err => console.error('[NOTIF_DB_ERR]', err.message))
     );
 
     await Promise.allSettled(tasks);

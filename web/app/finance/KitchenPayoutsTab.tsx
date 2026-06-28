@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, CheckCircle2, Utensils, X, Plus, ChevronRight } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
 const pct = (r: number) => `${(r * 100).toFixed(0)}%`;
@@ -173,7 +174,7 @@ export function KitchenPayoutsTab() {
     } catch {}
   }, []);
 
-  useEffect(() => { loadSummary(); }, [loadSummary]);
+
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -226,7 +227,7 @@ export function KitchenPayoutsTab() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-pink-500 text-white text-sm font-bold hover:bg-pink-400 transition-colors">
             <Plus className="w-4 h-4" /> Generate Payout
           </button>
-          <button onClick={load} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10">
+          <button onClick={() => load()} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10">
             <RefreshCw className={`w-4 h-4 text-white/60 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>

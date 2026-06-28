@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, Dimensions, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +9,8 @@ import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutUp, SlideInDown, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
+import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../utils/kitchenHours';
 import { NetworkImage } from '../components/NetworkImage';
 import { EmptyState, SkeletonRow } from '../components/ui';
 
@@ -38,6 +40,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [phIndex, setPhIndex] = useState(0);
+  const [closedSheetDismissed, setClosedSheetDismissed] = useState(false);
 
   // If address has a zone use it; if address exists but has no zone, fall back to GPS zone
   const effectiveZoneId = zoneId || activeZoneId;
@@ -82,24 +85,7 @@ const HomeScreen = ({ navigation }: any) => {
     opacity: 1 - pulseAnim.value,
   }));
 
-  useEffect(() => {
-    if (socket && effectiveZoneId) {
-      socket.on('menu_updated', (data) => {
-        if (data.zoneId === effectiveZoneId) {
-          queryClient.invalidateQueries({ queryKey: ['menu', effectiveZoneId] });
-        }
-      });
-      socket.on('order_status_update', () => {
-        queryClient.invalidateQueries({ queryKey: ['activeOrders'] });
-      });
-    }
-    return () => {
-      if (socket) {
-        socket.off('menu_updated');
-        socket.off('order_status_update');
-      }
-    };
-  }, [socket, effectiveZoneId]);
+
 
   const { data: menuData, isLoading } = useQuery({
     queryKey: ['menu', effectiveZoneId],
@@ -392,7 +378,7 @@ const HomeScreen = ({ navigation }: any) => {
               const vegColor = mi.is_egg ? '#EAB308' : (mi.is_veg ? '#22C55E' : colors.danger);
               const unavailable = !mi.available || menuData?.kitchenPaused;
               return (
-                <TouchableOpacity
+                <BouncingButton
                   key={mi.id}
                   style={styles.catPreviewCard}
                   activeOpacity={0.93}
@@ -430,24 +416,24 @@ const HomeScreen = ({ navigation }: any) => {
                       <View style={styles.catPreviewAddFloat}>
                         {ci ? (
                           <View style={styles.catPreviewQty}>
-                            <TouchableOpacity
+                            <BouncingButton
                               onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: ci.quantity - 1 })); }}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
                             >
                               <Text style={styles.catPreviewQtyBtn}>−</Text>
-                            </TouchableOpacity>
+                            </BouncingButton>
                             <Text style={styles.catPreviewQtyVal}>{ci.quantity}</Text>
-                            <TouchableOpacity
+                            <BouncingButton
                               onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: ci.quantity + 1 })); }}
                               hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                             >
                               <Text style={styles.catPreviewQtyBtn}>+</Text>
-                            </TouchableOpacity>
+                            </BouncingButton>
                           </View>
                         ) : (
-                          <TouchableOpacity style={styles.catPreviewAddBtn} onPress={() => handleAddToCart(mi)} activeOpacity={0.8}>
+                          <BouncingButton style={styles.catPreviewAddBtn} onPress={() => handleAddToCart(mi)} activeOpacity={0.8}>
                             <Text style={styles.catPreviewAddText}>ADD</Text>
-                          </TouchableOpacity>
+                          </BouncingButton>
                         )}
                       </View>
                     )}
@@ -463,7 +449,7 @@ const HomeScreen = ({ navigation }: any) => {
                     </View>
                     <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
                   </View>
-                </TouchableOpacity>
+                </BouncingButton>
               );
             })}
           </ScrollView>
@@ -490,7 +476,7 @@ const HomeScreen = ({ navigation }: any) => {
       const vegColor = menuItem.is_egg ? '#EAB308' : (menuItem.is_veg ? '#22C55E' : colors.danger);
       const unavailable = !menuItem.available || menuData?.kitchenPaused;
       return (
-        <TouchableOpacity key={menuItem.id} style={styles.homeGridCard} activeOpacity={0.93}
+        <BouncingButton key={menuItem.id} style={styles.homeGridCard} activeOpacity={0.93}
           onPress={() => { if (menuItem.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item: menuItem }); } }}>
           <View style={styles.homeGridImageContainer}>
             {menuItem.photo_url
@@ -506,19 +492,19 @@ const HomeScreen = ({ navigation }: any) => {
               <View style={styles.homeGridAddFloat}>
                 {cartItem ? (
                   <View style={styles.homeGridQtyControl}>
-                    <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
+                    <BouncingButton onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
                       <Text style={styles.homeGridQtyBtnText}>−</Text>
-                    </TouchableOpacity>
+                    </BouncingButton>
                     <Text style={styles.homeGridQtyValue}>{cartItem.quantity}</Text>
-                    <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                    <BouncingButton onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
                       <Text style={styles.homeGridQtyBtnText}>+</Text>
-                    </TouchableOpacity>
+                    </BouncingButton>
                   </View>
                 ) : (
-                  <TouchableOpacity style={styles.homeGridAddBtn} onPress={() => handleAddToCart(menuItem)} activeOpacity={0.85}>
+                  <BouncingButton style={styles.homeGridAddBtn} onPress={() => handleAddToCart(menuItem)} activeOpacity={0.85}>
                     <Text style={styles.homeGridAddBtnText}>ADD</Text>
                     <View style={styles.homeGridCustomiseBadge}><Text style={styles.homeGridCustomiseText}>Customise</Text></View>
-                  </TouchableOpacity>
+                  </BouncingButton>
                 )}
               </View>
             )}
@@ -535,7 +521,7 @@ const HomeScreen = ({ navigation }: any) => {
               </View>
             )}
           </View>
-        </TouchableOpacity>
+        </BouncingButton>
       );
     };
 
@@ -585,7 +571,7 @@ const HomeScreen = ({ navigation }: any) => {
               <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink }}>
                 {user?.name ? `Hey ${user.name.split(' ')[0]} 👋` : 'Hello'}
               </Text>
-              <TouchableOpacity
+              <BouncingButton
                 style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}
                 onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
                 activeOpacity={0.7}
@@ -594,11 +580,11 @@ const HomeScreen = ({ navigation }: any) => {
                   {location?.addressText || selectedAddress?.address_text || 'Set location'}
                 </Text>
                 <ChevronDown size={14} color={colors.inkMuted} style={{ marginLeft: 3 }} />
-              </TouchableOpacity>
+              </BouncingButton>
             </View>
           </View>
 
-          <TouchableOpacity
+          <BouncingButton
             style={styles.profileButton}
             onPress={() => { triggerHaptic(); navigation.navigate('ProfileTab'); }}
           >
@@ -609,7 +595,7 @@ const HomeScreen = ({ navigation }: any) => {
                 <User size={20} color={colors.inkMuted} />
               </View>
             )}
-          </TouchableOpacity>
+          </BouncingButton>
         </Animated.View>
 
         {/* ROW 2: Search Bar with VEG toggle */}
@@ -627,8 +613,8 @@ const HomeScreen = ({ navigation }: any) => {
               shadowColor: colors.ink,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 2,
+              shadowRadius: 16,
+              elevation: 4,
               borderWidth: 1,
               borderColor: colors.border,
             }}>
@@ -702,9 +688,9 @@ const HomeScreen = ({ navigation }: any) => {
                 )}
               </View>
               {searchQuery.length > 0 ? (
-                <TouchableOpacity onPress={() => { triggerHaptic(); setSearchQuery(''); }} style={{ paddingLeft: 6, paddingRight: 2, flexShrink: 0 }}>
+                <BouncingButton onPress={() => { triggerHaptic(); setSearchQuery(''); }} style={{ paddingLeft: 6, paddingRight: 2, flexShrink: 0 }}>
                   <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
-                </TouchableOpacity>
+                </BouncingButton>
               ) : (
                 <View style={{ 
                   flexDirection: 'row', 
@@ -791,7 +777,7 @@ const HomeScreen = ({ navigation }: any) => {
                   {/* Admin categories */}
                   {adminCategories.map((cat) => {
                     return (
-                      <TouchableOpacity
+                      <BouncingButton
                         key={cat.id}
                         style={styles.categoryStripItem}
                         onPress={() => { triggerHaptic(); navigation.navigate('Category', { categorySlug: cat.slug, categoryName: cat.name, categoryImage: cat.image_url, categoryBannerUrl: cat.banner_url }); }}
@@ -807,7 +793,7 @@ const HomeScreen = ({ navigation }: any) => {
                         <Text style={styles.categoryStripLabel} numberOfLines={1}>
                           {cat.name}
                         </Text>
-                      </TouchableOpacity>
+                      </BouncingButton>
                     );
                   })}
                 </ScrollView>
@@ -819,7 +805,7 @@ const HomeScreen = ({ navigation }: any) => {
               <View style={styles.miniBannersContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.miniBannersScroll}>
                   {miniBanners.map((banner: any) => (
-                    <TouchableOpacity
+                    <BouncingButton
                       key={banner.id}
                       activeOpacity={0.8}
                       onPress={() => {
@@ -833,7 +819,7 @@ const HomeScreen = ({ navigation }: any) => {
                         <Text style={styles.miniBannerTitle}>{banner.title}</Text>
                         {banner.subtitle && <Text style={styles.miniBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
                       </View>
-                    </TouchableOpacity>
+                    </BouncingButton>
                   ))}
                 </ScrollView>
               </View>
@@ -871,7 +857,7 @@ const HomeScreen = ({ navigation }: any) => {
                   })}
                   renderItem={({ item: b }: any) => (
                     <View style={{ width: SCREEN_WIDTH, paddingHorizontal: spacing.lg }}>
-                      <TouchableOpacity
+                      <BouncingButton
                         activeOpacity={0.9}
                         onPress={() => {
                           triggerHaptic();
@@ -884,7 +870,7 @@ const HomeScreen = ({ navigation }: any) => {
                           <Text style={styles.bannerTitle} numberOfLines={2}>{b.title}</Text>
                           {b.subtitle && <Text style={styles.bannerSubtitle} numberOfLines={2}>{b.subtitle}</Text>}
                         </View>
-                      </TouchableOpacity>
+                      </BouncingButton>
                     </View>
                   )}
                 />
@@ -895,7 +881,7 @@ const HomeScreen = ({ navigation }: any) => {
             {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && stripBanners.length > 0 && (
               <View style={styles.stripBannersContainer}>
                 {stripBanners.map((banner: any) => (
-                  <TouchableOpacity
+                  <BouncingButton
                     key={banner.id}
                     activeOpacity={0.9}
                     onPress={() => {
@@ -909,7 +895,7 @@ const HomeScreen = ({ navigation }: any) => {
                       <Text style={styles.stripBannerTitle}>{banner.title}</Text>
                       {banner.subtitle && <Text style={styles.stripBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
                     </View>
-                  </TouchableOpacity>
+                  </BouncingButton>
                 ))}
               </View>
             )}
@@ -940,9 +926,9 @@ const HomeScreen = ({ navigation }: any) => {
               <Text style={styles.comingSoonSub}>
                 Allow location access so we can detect your zone instantly, or pick an address manually.
               </Text>
-              <TouchableOpacity style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}>
+              <BouncingButton style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}>
                 <Text style={styles.ctaPrimaryText}>Select Delivery Address</Text>
-              </TouchableOpacity>
+              </BouncingButton>
             </Animated.View>
           ) : showNetworkError ? (
             /* ── Network error ── */
@@ -956,9 +942,9 @@ const HomeScreen = ({ navigation }: any) => {
               <Text style={styles.comingSoonSub}>
                 Couldn't verify your delivery area. Check your connection, then retry or change address.
               </Text>
-              <TouchableOpacity style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}>
+              <BouncingButton style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}>
                 <Text style={styles.ctaPrimaryText}>Retry / Change Address</Text>
-              </TouchableOpacity>
+              </BouncingButton>
             </Animated.View>
           ) : unserviceableLocation ? (
             /* ── Out of zone — full screen like reference ── */
@@ -967,9 +953,9 @@ const HomeScreen = ({ navigation }: any) => {
                 <View style={styles.reqDoneCard}>
                   <Text style={styles.reqDoneTitle}>You're on the list!</Text>
                   <Text style={styles.reqDoneSub}>We'll notify you the day we launch in {reqForm.area_name || 'your area'}!</Text>
-                  <TouchableOpacity style={styles.ctaOutline} onPress={() => setRequestStep('info')}>
+                  <BouncingButton style={styles.ctaOutline} onPress={() => setRequestStep('info')}>
                     <Text style={styles.ctaOutlineText}>Back</Text>
-                  </TouchableOpacity>
+                  </BouncingButton>
                 </View>
               ) : requestStep === 'form' ? (
                 <View style={styles.reqFormCard}>
@@ -1019,15 +1005,15 @@ const HomeScreen = ({ navigation }: any) => {
 
                     {!!reqError && <Text style={styles.reqErrorText}>{reqError}</Text>}
 
-                    <TouchableOpacity style={styles.reqSubmitBtn} onPress={handleRequestService} disabled={reqLoading}>
+                    <BouncingButton style={styles.reqSubmitBtn} onPress={handleRequestService} disabled={reqLoading}>
                       {reqLoading
                         ? <ActivityIndicator color={colors.white} />
                         : <Text style={styles.reqSubmitBtnText}>Submit Request</Text>}
-                    </TouchableOpacity>
+                    </BouncingButton>
 
-                    <TouchableOpacity style={styles.reqCancelLink} onPress={() => { triggerHaptic(); setRequestStep('info'); }}>
+                    <BouncingButton style={styles.reqCancelLink} onPress={() => { triggerHaptic(); setRequestStep('info'); }}>
                       <Text style={styles.reqCancelLinkText}>Cancel</Text>
-                    </TouchableOpacity>
+                    </BouncingButton>
                   </View>
                 </View>
               ) : (
@@ -1070,12 +1056,12 @@ const HomeScreen = ({ navigation }: any) => {
                   )}
 
                   {/* CTAs */}
-                  <TouchableOpacity style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }} activeOpacity={0.9}>
+                  <BouncingButton style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }} activeOpacity={0.9}>
                     <Text style={styles.ctaPrimaryText}>Change Address</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.ctaOutline} onPress={() => { triggerHaptic(); setRequestStep('form'); }} activeOpacity={0.8}>
+                  </BouncingButton>
+                  <BouncingButton style={styles.ctaOutline} onPress={() => { triggerHaptic(); setRequestStep('form'); }} activeOpacity={0.8}>
                     <Text style={styles.ctaOutlineText}>Request Service in My Area</Text>
-                  </TouchableOpacity>
+                  </BouncingButton>
                 </>
               )}
             </Animated.View>
@@ -1106,7 +1092,7 @@ const HomeScreen = ({ navigation }: any) => {
             { bottom: Math.max(insets.bottom, 16) + 8 },
           ]}
         >
-          <TouchableOpacity
+          <BouncingButton
             style={styles.floatingCartButton}
             activeOpacity={0.9}
             onPress={() => {
@@ -1122,7 +1108,7 @@ const HomeScreen = ({ navigation }: any) => {
               <Text style={styles.viewCartText}>View Cart</Text>
               <ShoppingBag size={16} color={colors.white} style={{ marginLeft: 6 }} />
             </View>
-          </TouchableOpacity>
+          </BouncingButton>
         </Animated.View>
       )}
 
@@ -1131,7 +1117,7 @@ const HomeScreen = ({ navigation }: any) => {
           styles.activeOrderPillContainer,
           { bottom: totalCartQty > 0 ? Math.max(insets.bottom, 16) + 84 : Math.max(insets.bottom, 16) + 16 }
         ]}>
-          <TouchableOpacity
+          <BouncingButton
             activeOpacity={0.8}
             onPress={() => {
               triggerHaptic();
@@ -1162,8 +1148,16 @@ const HomeScreen = ({ navigation }: any) => {
             <View style={styles.activeOrderArrow}>
               <ArrowRight size={16} color="#9CA3AF" />
             </View>
-          </TouchableOpacity>
+          </BouncingButton>
         </Animated.View>
+      )}
+
+      {!isKitchenOpen(menuData?.openingTime, menuData?.closingTime) &&
+        !!effectiveZoneId && !isLoading && !!menuData && !closedSheetDismissed && (
+        <ClosedBottomSheet
+          openingTime={menuData.openingTime}
+          onDismiss={() => setClosedSheetDismissed(true)}
+        />
       )}
     </View>
   );
@@ -1343,17 +1337,17 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: -12, alignSelf: 'center', width: 110, zIndex: 10,
   },
   qtyControl: {
-    flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 10,
+    flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 16,
     alignItems: 'center', justifyContent: 'space-between', height: 40,
-    shadowColor: '#24B059', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+    shadowColor: '#24B059', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   qtyBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
   qtyBtnText: { color: '#FFFFFF', fontSize: 22, fontFamily: fontFamily.bold },
   qtyValue: { color: '#FFFFFF', fontSize: 15, fontFamily: fontFamily.extrabold },
   addBtn: {
-    backgroundColor: '#24B059', borderRadius: 10,
+    backgroundColor: '#24B059', borderRadius: 16,
     height: 40, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#24B059', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+    shadowColor: '#24B059', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   addBtnDisabled: { backgroundColor: colors.surfaceMuted },
   addBtnText: { color: '#FFFFFF', fontFamily: fontFamily.extrabold, fontSize: 15, letterSpacing: 0.5 },
@@ -1385,11 +1379,11 @@ const styles = StyleSheet.create({
   homeGridSoldOut: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
   homeGridSoldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
   homeGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
-  homeGridQtyControl: { flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 8, alignItems: 'center', justifyContent: 'space-between', height: 32, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  homeGridQtyControl: { flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 16, alignItems: 'center', justifyContent: 'space-between', height: 32, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
   homeGridQtyBtn: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
   homeGridQtyBtnText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
   homeGridQtyValue: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
-  homeGridAddBtn: { backgroundColor: '#24B059', borderRadius: 8, height: 32, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1, position: 'relative' },
+  homeGridAddBtn: { backgroundColor: '#24B059', borderRadius: 16, height: 32, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4, position: 'relative' },
   homeGridAddBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
   homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F3F4F6' },
   homeGridCustomiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
@@ -1426,7 +1420,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primaryTint,
   },
   liveDotWrapper: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
-  liveDot: { position: 'absolute', width: 16, height: 16, borderRadius: 8, backgroundColor: colors.primary },
+  liveDot: { position: 'absolute', width: 16, height: 16, borderRadius: 16, backgroundColor: colors.primary },
   liveDotCore: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   liveKitchenTextCol: { marginLeft: spacing.md, flex: 1 },
   liveKitchenText: { color: colors.primary, fontSize: 10, fontFamily: fontFamily.extrabold, letterSpacing: 1 },
@@ -1440,15 +1434,15 @@ const styles = StyleSheet.create({
     shadowColor: colors.ink,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 16,
+    elevation: 4,
   },
   deliveryTimeText: { color: colors.primary, fontSize: 14, fontFamily: fontFamily.extrabold },
   deliveryTimeSub: { color: colors.inkMuted, fontSize: 8, fontFamily: fontFamily.bold, letterSpacing: 0.5 },
 
   searchBarContainer: {
     backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
@@ -1520,8 +1514,8 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderWidth: 2.5,
     shadowColor: colors.primary,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 6,
   },
   imageCategoryImage: {
@@ -1612,7 +1606,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 8,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
@@ -1620,7 +1614,7 @@ const styles = StyleSheet.create({
   modernCardInner: { flexDirection: 'row', alignItems: 'center' },
 
   modernImageCol: { width: 70, alignItems: 'center', marginRight: 12 },
-  modernImageWrapper: { width: 70, height: 70, borderRadius: 8, backgroundColor: '#F9FAFB', overflow: 'hidden' },
+  modernImageWrapper: { width: 70, height: 70, borderRadius: 16, backgroundColor: '#F9FAFB', overflow: 'hidden' },
   modernImage: { width: '100%', height: '100%' },
   modernImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
@@ -1669,7 +1663,7 @@ const styles = StyleSheet.create({
     right: 12,
     zIndex: 999,
     backgroundColor: colors.primary,
-    borderRadius: 8,
+    borderRadius: 16,
     paddingVertical: 10,
     paddingHorizontal: 12,
     flexDirection: 'row',
@@ -1677,8 +1671,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 4,
   },
   floatingCartButton: {
@@ -1690,6 +1684,11 @@ const styles = StyleSheet.create({
   cartLeftRow: { flexDirection: 'row', alignItems: 'center' },
   cartItemCount: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: fontFamily.extrabold, letterSpacing: 1, textTransform: 'uppercase' },
   cartTotalText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.black, letterSpacing: -0.5 },
+  viewCartText: {
+    color: "#fff",
+    fontFamily: fontFamily.black,
+    fontSize: 14,
+  },
   viewCartAction: { flexDirection: 'row', alignItems: 'center' },
   bannersList: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.xl },
   bannerContainer: {
@@ -1785,7 +1784,7 @@ const styles = StyleSheet.create({
     zIndex: 3,
     width: 160,
     height: 180,
-    shadowOpacity: 0.14,
+    shadowOpacity: 0.08,
     elevation: 8,
   },
   foodCardRight: {
@@ -1906,8 +1905,8 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 8,
   },
   menuFabText: {
@@ -1932,7 +1931,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.08,
     shadowRadius: 15,
     elevation: 10,
   },
@@ -1968,7 +1967,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.08,
     shadowRadius: 16,
     elevation: 10,
     borderWidth: 1,
@@ -1994,7 +1993,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 16,
     height: 16,
-    borderRadius: 8,
+    borderRadius: 16,
     backgroundColor: '#34D399',
     top: -5,
     left: -5,
@@ -2061,8 +2060,8 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderWidth: 2.5,
     shadowColor: colors.primary,
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 4,
   },
   categoryStripImage: {
@@ -2099,7 +2098,7 @@ const styles = StyleSheet.create({
   catPreviewCard: {
     width: 140,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#F3F4F6',
     overflow: 'hidden',
@@ -2120,7 +2119,7 @@ const styles = StyleSheet.create({
   catPreviewBestBadge: {
     position: 'absolute', top: 8, right: 8,
     backgroundColor: '#FEF3C7',
-    borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 16, paddingHorizontal: 6, paddingVertical: 2,
   },
   catPreviewBestText: { fontSize: 9, color: '#92400E', fontFamily: fontFamily.extrabold },
   catPreviewSoldOut: {
@@ -2134,26 +2133,26 @@ const styles = StyleSheet.create({
   },
   catPreviewAddBtn: {
     backgroundColor: colors.surface,
-    borderRadius: 10,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: colors.primary,
     paddingHorizontal: 14, paddingVertical: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   catPreviewAddText: { fontFamily: fontFamily.extrabold, fontSize: 12, color: colors.primary },
   catPreviewQty: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.primary, borderRadius: 10,
+    backgroundColor: colors.primary, borderRadius: 16,
     paddingHorizontal: 8, paddingVertical: 5, gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   catPreviewQtyBtn: { fontFamily: fontFamily.extrabold, fontSize: 16, color: '#fff', lineHeight: 18 },
   catPreviewQtyVal: {
@@ -2193,5 +2192,136 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
 });
+
+const SLAT_COUNT = 6;
+
+const ClosedBottomSheet = ({
+  openingTime,
+  onDismiss,
+}: {
+  openingTime?: string | null;
+  onDismiss: () => void;
+}) => {
+  const insets = useSafeAreaInsets();
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const minsLeft = minutesUntilOpen(openingTime);
+  const opensVerySoon = minsLeft > 0 && minsLeft <= 30;
+  const openLabel = openingTime ? formatTime12h(openingTime) : '10:00 AM';
+
+  return (
+    <Animated.View entering={SlideInDown.springify().damping(18).stiffness(120)} style={closedSS.sheet}>
+      {/* Roller shutter illustration */}
+      <View style={closedSS.shutterBox}>
+        <View style={closedSS.rail} />
+        {Array.from({ length: SLAT_COUNT }).map((_, i) => (
+          <View key={i} style={closedSS.slat} />
+        ))}
+        <View style={closedSS.rail} />
+        <View style={closedSS.handle} />
+      </View>
+
+      <Text style={closedSS.title}>Closed for Now, Back Soon!</Text>
+
+      {opensVerySoon ? (
+        <Text style={closedSS.subtitle}>
+          Opening in <Text style={closedSS.highlight}>{minsLeft} min</Text>
+        </Text>
+      ) : (
+        <Text style={closedSS.subtitle}>
+          We open at <Text style={closedSS.highlight}>{openLabel}</Text>
+        </Text>
+      )}
+
+      <Text style={closedSS.body}>
+        We're closed for now, but we'll be back soon!{'\n'}Thank you for your patience.
+      </Text>
+
+      <TouchableOpacity
+        style={[closedSS.btn, { marginBottom: Math.max(insets.bottom, 20) }]}
+        onPress={onDismiss}
+        activeOpacity={0.85}
+      >
+        <Text style={closedSS.btnText}>Browse Menu</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+const closedSS = StyleSheet.create({
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 28,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  shutterBox: {
+    width: 170,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    marginBottom: 20,
+  },
+  rail: { height: 9, backgroundColor: '#9CA3AF' },
+  slat: { height: 15, backgroundColor: '#E5E7EB', borderBottomWidth: 1, borderBottomColor: '#9CA3AF' },
+  handle: { alignSelf: 'center', width: 44, height: 7, backgroundColor: '#6B7280', borderRadius: 4, marginVertical: 5 },
+  title: {
+    fontSize: 22,
+    fontFamily: fontFamily.black,
+    color: colors.ink,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 15,
+    fontFamily: fontFamily.medium,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  highlight: {
+    fontFamily: fontFamily.extrabold,
+    color: colors.primary,
+  },
+  body: {
+    fontSize: 13,
+    fontFamily: fontFamily.medium,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  btn: {
+    width: '100%',
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  btnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: fontFamily.extrabold,
+  },
+});
+
 export default HomeScreen;
 // v2

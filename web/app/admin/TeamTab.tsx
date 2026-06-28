@@ -2,23 +2,27 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Plus, X, RefreshCw, ShieldCheck, IndianRupee, UserX, Phone } from "lucide-react";
+import { Users, Plus, X, RefreshCw, ShieldCheck, IndianRupee, UserX, Phone, ChefHat, Bike } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const ROLE_META: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  finance:     { label: "Finance",     color: "text-emerald-400", bg: "bg-emerald-400/10", icon: IndianRupee },
-  admin:       { label: "Admin",       color: "text-blue-400",    bg: "bg-blue-400/10",    icon: ShieldCheck },
-  super_admin: { label: "Super Admin", color: "text-purple-400",  bg: "bg-purple-400/10",  icon: ShieldCheck },
+  finance:       { label: "Finance",       color: "text-emerald-400", bg: "bg-emerald-400/10", icon: IndianRupee },
+  admin:         { label: "Admin",         color: "text-blue-400",    bg: "bg-blue-400/10",    icon: ShieldCheck },
+  super_admin:   { label: "Super Admin",   color: "text-purple-400",  bg: "bg-purple-400/10",  icon: ShieldCheck },
+  chef:          { label: "Kitchen Staff", color: "text-orange-400",  bg: "bg-orange-400/10",  icon: ChefHat },
+  rider:         { label: "Rider",         color: "text-yellow-400",  bg: "bg-yellow-400/10",  icon: Bike },
+  rider_captain: { label: "Rider Captain", color: "text-amber-400",   bg: "bg-amber-400/10",   icon: Bike },
 };
 
 function AddUserModal({ open, onAdd, onClose }: any) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"finance" | "admin">("finance");
+  const [role, setRole] = useState<"finance" | "admin" | "chef" | "rider">("finance");
   const [loading, setLoading] = useState(false);
 
-  const reset = () => { setName(""); setPhone(""); setRole("finance"); };
+  const reset = () => { setName(""); setPhone(""); setRole("finance" as any); };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +84,7 @@ function AddUserModal({ open, onAdd, onClose }: any) {
           <div>
             <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Role</label>
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {(["finance", "admin"] as const).map(r => {
+              {(["finance", "admin", "chef", "rider"] as const).map(r => {
                 const m = ROLE_META[r];
                 return (
                   <button
@@ -100,7 +104,10 @@ function AddUserModal({ open, onAdd, onClose }: any) {
               })}
             </div>
             <p className="text-xs text-white/30 mt-1.5">
-              {role === "finance" ? "Finance: can access /finance dashboard only" : "Admin: can access admin panel"}
+              {role === "finance" && "Accesses /finance dashboard only"}
+              {role === "admin" && "Accesses admin panel"}
+              {role === "chef" && "Logs in at /kitchen — KDS + Dispatch access"}
+              {role === "rider" && "Logs in via the Rider mobile app"}
             </p>
           </div>
           <button
@@ -135,6 +142,8 @@ export function TeamTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  useSocketRefresh(["new_user", "user_updated"], load);
+
   const handleAdd = async (name: string, phone: string, role: string) => {
     try {
       await api.post("/admin/team/users", { name, phone, role });
@@ -159,6 +168,8 @@ export function TeamTab() {
 
   const financeUsers = users.filter(u => u.role === "finance");
   const adminUsers = users.filter(u => ["admin", "super_admin"].includes(u.role));
+  const kitchenUsers = users.filter(u => u.role === "chef");
+  const riderUsers = users.filter(u => ["rider", "rider_captain"].includes(u.role));
 
   return (
     <div className="p-6 space-y-6">
@@ -180,13 +191,27 @@ export function TeamTab() {
         </div>
       </div>
 
-      {/* How to give access info card */}
-      <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-2xl p-4 flex gap-3">
-        <IndianRupee className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-        <div>
-          <div className="text-sm font-bold text-emerald-400">Finance Portal Access</div>
-          <div className="text-xs text-white/40 mt-0.5">
-            Finance users log in at <span className="font-mono text-white/60">2-qt.vercel.app/finance</span> using their phone number + OTP. No password needed.
+      {/* Access info cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-2xl p-4 flex gap-3">
+          <IndianRupee className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="text-sm font-bold text-emerald-400">Finance</div>
+            <div className="text-xs text-white/40 mt-0.5">Login at <span className="font-mono text-white/60">/finance</span> · Phone + OTP</div>
+          </div>
+        </div>
+        <div className="bg-orange-500/5 border border-orange-500/15 rounded-2xl p-4 flex gap-3">
+          <ChefHat className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="text-sm font-bold text-orange-400">Kitchen Staff</div>
+            <div className="text-xs text-white/40 mt-0.5">Login at <span className="font-mono text-white/60">/kitchen</span> · Phone + OTP</div>
+          </div>
+        </div>
+        <div className="bg-yellow-500/5 border border-yellow-500/15 rounded-2xl p-4 flex gap-3">
+          <Bike className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="text-sm font-bold text-yellow-400">Riders</div>
+            <div className="text-xs text-white/40 mt-0.5">Login via <span className="font-mono text-white/60">Rider App</span> · Phone + OTP</div>
           </div>
         </div>
       </div>
@@ -225,6 +250,44 @@ export function TeamTab() {
                 <UserRow key={u.id} user={u} onDeactivate={handleDeactivate} />
               ))}
             </div>
+          </div>
+
+          {/* Kitchen Staff */}
+          <div>
+            <div className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">Kitchen Staff ({kitchenUsers.length})</div>
+            {kitchenUsers.length === 0 ? (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+                <ChefHat className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                <p className="text-white/30 text-sm">No kitchen staff yet.</p>
+                <p className="text-white/20 text-xs mt-1">Kitchen staff log in at <span className="font-mono text-white/40">/kitchen</span> using phone + OTP</p>
+                <button onClick={() => setShowAdd(true)} className="text-orange-400 text-sm font-bold mt-2 hover:underline">Add kitchen staff →</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {kitchenUsers.map(u => (
+                  <UserRow key={u.id} user={u} onDeactivate={handleDeactivate} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Riders */}
+          <div>
+            <div className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">Riders ({riderUsers.length})</div>
+            {riderUsers.length === 0 ? (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+                <Bike className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                <p className="text-white/30 text-sm">No riders yet.</p>
+                <p className="text-white/20 text-xs mt-1">Riders log in via the Rider mobile app using phone + OTP</p>
+                <button onClick={() => setShowAdd(true)} className="text-yellow-400 text-sm font-bold mt-2 hover:underline">Add rider →</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {riderUsers.map(u => (
+                  <UserRow key={u.id} user={u} onDeactivate={handleDeactivate} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

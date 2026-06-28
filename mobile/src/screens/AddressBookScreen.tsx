@@ -1,5 +1,6 @@
 import { ArrowLeft, MapPin, Navigation, Search } from 'lucide-react-native';
 import React, { useState, useEffect, useRef } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, TouchableOpacity, ActivityIndicator, TextInput,
   StyleSheet, Alert, ScrollView,
@@ -172,19 +173,19 @@ const AddressBookScreen = ({ navigation, route }: any) => {
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <BouncingButton style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
             <ArrowLeft size={22} color="#1A1A2E" />
-          </TouchableOpacity>
+          </BouncingButton>
           <Text style={styles.headerTitle}>
             {showDetails ? 'Add address details' : 'Add delivery location'}
           </Text>
         </View>
 
         {!showDetails && (
-          <TouchableOpacity style={styles.searchBar} onPress={() => setIsSearchVisible(true)} activeOpacity={0.9}>
+          <BouncingButton style={styles.searchBar} onPress={() => setIsSearchVisible(true)} activeOpacity={0.9}>
             <Search size={20} color={colors.primary} style={{ marginRight: 12 }} />
             <Text style={styles.searchBarText}>Search delivery location</Text>
-          </TouchableOpacity>
+          </BouncingButton>
         )}
       </View>
 
@@ -225,12 +226,12 @@ const AddressBookScreen = ({ navigation, route }: any) => {
               </Text>
               <Text style={styles.confirmedFull} numberOfLines={2}>{addressFull || addressText}</Text>
             </View>
-            <TouchableOpacity
+            <BouncingButton
               onPress={() => { ReactNativeHapticFeedback.trigger('impactLight'); setShowDetails(false); }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={styles.changeText}>Change</Text>
-            </TouchableOpacity>
+            </BouncingButton>
           </View>
 
           <View style={styles.divider} />
@@ -257,7 +258,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             {LABELS.map(l => {
               const active = label === l.key;
               return (
-                <TouchableOpacity
+                <BouncingButton
                   key={l.key}
                   onPress={() => { ReactNativeHapticFeedback.trigger('selection'); setLabel(l.key); }}
                   style={[styles.chip, active && styles.chipActive]}
@@ -265,7 +266,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
                 >
                   <Text style={styles.chipIcon}>{l.icon}</Text>
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>{l.key}</Text>
-                </TouchableOpacity>
+                </BouncingButton>
               );
             })}
           </View>
@@ -305,7 +306,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           </View>
 
           {/* Locate Me button */}
-          <TouchableOpacity
+          <BouncingButton
             style={[styles.locateBtn, { bottom: 16 }]}
             onPress={() => {
               ReactNativeHapticFeedback.trigger('impactMedium');
@@ -317,7 +318,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
               ? <ActivityIndicator size="small" color={colors.primary} />
               : <><Navigation size={18} color={colors.primary} style={{ marginRight: 6 }} /><Text style={styles.locateText}>LOCATE ME</Text></>
             }
-          </TouchableOpacity>
+          </BouncingButton>
         </View>
       )}
 
@@ -337,7 +338,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           </View>
         )}
 
-        <TouchableOpacity
+        <BouncingButton
           style={[styles.btn, (!addressText || isDragging || isBusy) && styles.btnDisabled]}
           disabled={!addressText || isDragging || isBusy}
           onPress={showDetails ? handleSave : handleConfirm}
@@ -347,7 +348,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.btnText}>{showDetails ? 'Save Address' : 'Confirm'}</Text>
           }
-        </TouchableOpacity>
+        </BouncingButton>
       </View>
 
       <AddressSearchModal
@@ -383,8 +384,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 16,
+    elevation: 4,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   backBtn: {
@@ -396,7 +397,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row', alignItems: 'center',
     height: 48, backgroundColor: '#fff',
-    borderRadius: 12, paddingHorizontal: 16,
+    borderRadius: 20, paddingHorizontal: 16,
     borderWidth: 1, borderColor: '#E5E7EB',
   },
   searchBarText: { color: '#9CA3AF', fontSize: 15, fontFamily: fontFamily.medium },
@@ -409,7 +410,7 @@ const styles = StyleSheet.create({
   },
   pinShadow: {
     shadowColor: '#EF4444', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 8,
   },
   locateBtn: {
     position: 'absolute', alignSelf: 'center',
@@ -417,7 +418,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 12,
     borderRadius: 100, alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12, shadowRadius: 12, elevation: 6,
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 6,
     borderWidth: 1, borderColor: '#E5E7EB', zIndex: 10,
   },
   locateText: { color: colors.primary, fontFamily: fontFamily.bold, fontSize: 13, letterSpacing: 0.5 },
@@ -445,7 +446,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: '#1A1A2E', marginBottom: 12 },
   input: {
     backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB',
-    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
+    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14,
     fontSize: 15, fontFamily: fontFamily.medium, color: '#1A1A2E',
     marginBottom: 12,
   },

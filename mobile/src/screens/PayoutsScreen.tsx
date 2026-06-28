@@ -14,8 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const G = {
   bg: '#07080A', surface: '#10141A', card: '#161C25',
   accent: '#10B981', accentDim: 'rgba(16,185,129,0.12)',
-  orange: '#F97316', orangeDim: 'rgba(249,115,22,0.12)',
-  amber: '#F59E0B', amberDim: 'rgba(245,158,11,0.12)',
+  orange: G.primary, orangeDim: 'rgba(249,115,22,0.12)',
+  amber: G.primary, amberDim: 'rgba(245,158,11,0.12)',
   white: '#FFFFFF', muted: '#6B7A8D', border: 'rgba(255,255,255,0.07)',
 };
 

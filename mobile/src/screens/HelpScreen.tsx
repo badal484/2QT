@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Linking, StyleSheet, TextInput,
@@ -106,7 +107,7 @@ const FaqItem = ({ item, idx }: { item: { q: string; a: string }; idx: number })
 
   return (
     <Animated.View entering={FadeInDown.delay(idx * 30).duration(200)} style={styles.faqItem}>
-      <TouchableOpacity
+      <BouncingButton
         style={styles.faqQuestion}
         onPress={() => { haptic(); setOpen(v => !v); }}
         activeOpacity={0.8}
@@ -116,7 +117,7 @@ const FaqItem = ({ item, idx }: { item: { q: string; a: string }; idx: number })
           ? <ChevronUp size={16} color={colors.primary} />
           : <ChevronDown size={16} color={colors.inkMuted} />
         }
-      </TouchableOpacity>
+      </BouncingButton>
       {open && (
         <Animated.View entering={FadeInDown.duration(180)} style={styles.faqAnswer}>
           <Text style={styles.faqAnswerText}>{item.a}</Text>
@@ -148,9 +149,9 @@ const HelpScreen = ({ navigation }: any) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+        <BouncingButton style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <ArrowLeft size={20} color={colors.ink} />
-        </TouchableOpacity>
+        </BouncingButton>
         <Text style={styles.headerTitle}>Help Center</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -178,22 +179,22 @@ const HelpScreen = ({ navigation }: any) => {
         {/* Category pills */}
         {!query && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillsRow}>
-            <TouchableOpacity
+            <BouncingButton
               style={[styles.pill, !activeCategory && styles.pillActive]}
               onPress={() => { haptic(); setActiveCategory(null); }}
               activeOpacity={0.8}
             >
               <Text style={[styles.pillText, !activeCategory && styles.pillTextActive]}>All</Text>
-            </TouchableOpacity>
+            </BouncingButton>
             {categories.map(cat => (
-              <TouchableOpacity
+              <BouncingButton
                 key={cat}
                 style={[styles.pill, activeCategory === cat && styles.pillActive]}
                 onPress={() => { haptic(); setActiveCategory(activeCategory === cat ? null : cat); }}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.pillText, activeCategory === cat && styles.pillTextActive]}>{cat}</Text>
-              </TouchableOpacity>
+              </BouncingButton>
             ))}
           </ScrollView>
         )}
@@ -225,7 +226,7 @@ const HelpScreen = ({ navigation }: any) => {
           </View>
           <Text style={styles.contactSub}>Our support team is available 9 AM – 11 PM daily.</Text>
 
-          <TouchableOpacity
+          <BouncingButton
             style={styles.contactBtn}
             onPress={() => navigation.navigate('Support')}
             activeOpacity={0.85}
@@ -236,9 +237,9 @@ const HelpScreen = ({ navigation }: any) => {
               <Text style={styles.contactBtnSub}>We reply within 24 hours</Text>
             </View>
             <ExternalLink size={14} color="rgba(255,255,255,0.6)" style={{ marginLeft: 'auto' }} />
-          </TouchableOpacity>
+          </BouncingButton>
 
-          <TouchableOpacity
+          <BouncingButton
             style={[styles.contactBtn, styles.whatsappBtn]}
             onPress={() => Linking.openURL('https://wa.me/918800000000')}
             activeOpacity={0.85}
@@ -248,9 +249,9 @@ const HelpScreen = ({ navigation }: any) => {
               <Text style={styles.contactBtnTitle}>Chat on WhatsApp</Text>
               <Text style={styles.contactBtnSub}>Fastest — avg 2 min response</Text>
             </View>
-          </TouchableOpacity>
+          </BouncingButton>
 
-          <TouchableOpacity
+          <BouncingButton
             style={[styles.contactBtn, styles.callBtn]}
             onPress={() => Linking.openURL('tel:918800000000')}
             activeOpacity={0.85}
@@ -260,7 +261,7 @@ const HelpScreen = ({ navigation }: any) => {
               <Text style={styles.contactBtnTitle}>Call Support</Text>
               <Text style={styles.contactBtnSub}>9 AM – 11 PM, all days</Text>
             </View>
-          </TouchableOpacity>
+          </BouncingButton>
         </View>
       </ScrollView>
     </View>

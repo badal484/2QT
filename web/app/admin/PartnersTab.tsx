@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const pct = (r: number | string) => `${(parseFloat(String(r)) * 100).toFixed(0)}%`;
 const fmt = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
@@ -329,6 +330,8 @@ export function PartnersTab() {
   }, [view, appStatus]);
 
   useEffect(() => { load(); }, [load]);
+
+  useSocketRefresh(["partner_updated"], load);
 
   // Fetch zones once
   useEffect(() => {
