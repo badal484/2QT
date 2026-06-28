@@ -115,7 +115,7 @@ const mapOptions = {
 export default function DispatchMap({ riders }: DispatchMapProps) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyAEmfB-2bB76ng9ZjII7noxN9hPbq29VZU",
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
