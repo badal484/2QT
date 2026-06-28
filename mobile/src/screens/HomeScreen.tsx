@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, Dimensions, ActivityIndicator, Image, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, Dimensions, ActivityIndicator, Image, RefreshControl, Animated as RNAnimated, PanResponder } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
@@ -8,7 +8,7 @@ import { api } from '../api/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeIn, FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../utils/kitchenHours';
 import { NetworkImage } from '../components/NetworkImage';
 import { EmptyState, SkeletonRow } from '../components/ui';
@@ -19,7 +19,7 @@ import { radius, spacing } from '../theme/spacing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { registerDeviceToken, subscribeToTokenRefresh } from '../services/push';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const hapticOptions = {
   enableVibrateFallback: true,
@@ -2220,10 +2220,58 @@ const ClosedBottomSheet = ({
   const minsLeft = minutesUntilOpen(openingTime);
   const opensVerySoon = minsLeft > 0 && minsLeft <= 30;
   const openLabel = openingTime ? formatTime12h(openingTime) : '10:00 AM';
+
+  // Sheet sits just below the sticky header
   const headerHeight = Math.max(insets.top + 8, 12) + 116;
+  const sheetHeight = SCREEN_HEIGHT - headerHeight - 12;
+
+  const translateY = useRef(new RNAnimated.Value(sheetHeight)).current;
+
+  useEffect(() => {
+    RNAnimated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 10,
+    }).start();
+  }, []);
+
+  const dismiss = useCallback(() => {
+    RNAnimated.timing(translateY, {
+      toValue: sheetHeight,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => onDismiss());
+  }, [sheetHeight, onDismiss]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && Math.abs(dy) > Math.abs(dx),
+      onPanResponderMove: (_, { dy }) => {
+        if (dy > 0) translateY.setValue(dy);
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 80 || vy > 0.5) {
+          RNAnimated.timing(translateY, {
+            toValue: sheetHeight,
+            duration: 220,
+            useNativeDriver: true,
+          }).start(() => onDismiss());
+        } else {
+          RNAnimated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={[closedSS.sheet, { paddingTop: headerHeight }]}>
+    <RNAnimated.View
+      style={[closedSS.sheet, { height: sheetHeight, transform: [{ translateY }] }]}
+      {...panResponder.panHandlers}
+    >
+      {/* Drag handle */}
+      <View style={closedSS.dragHandle} />
+
       <View style={closedSS.content}>
         {/* Roller shutter illustration */}
         <View style={closedSS.shutterBox}>
@@ -2232,7 +2280,7 @@ const ClosedBottomSheet = ({
             <View key={i} style={closedSS.slat} />
           ))}
           <View style={closedSS.rail} />
-          <View style={closedSS.handle} />
+          <View style={closedSS.shutterHandle} />
         </View>
 
         <Text style={closedSS.title}>Closed for Now, Back Soon!</Text>
@@ -2253,28 +2301,43 @@ const ClosedBottomSheet = ({
       </View>
 
       <TouchableOpacity
-        style={[closedSS.btn, { marginBottom: Math.max(insets.bottom, 20) + 100 }]}
-        onPress={onDismiss}
+        style={[closedSS.btn, { marginBottom: Math.max(insets.bottom, 16) + 16 }]}
+        onPress={dismiss}
         activeOpacity={0.85}
       >
         <Text style={closedSS.btnText}>Browse Menu</Text>
       </TouchableOpacity>
-    </Animated.View>
+    </RNAnimated.View>
   );
 };
 
 const closedSS = StyleSheet.create({
   sheet: {
     position: 'absolute',
-    top: 0,
     bottom: 0,
     left: 0,
     right: 0,
     zIndex: 50,
     backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingHorizontal: 24,
+    paddingTop: 12,
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#D1D5DB',
+    marginBottom: 20,
+    alignSelf: 'center',
   },
   content: {
     flex: 1,
@@ -2292,7 +2355,7 @@ const closedSS = StyleSheet.create({
   },
   rail: { height: 9, backgroundColor: '#9CA3AF' },
   slat: { height: 15, backgroundColor: '#E5E7EB', borderBottomWidth: 1, borderBottomColor: '#9CA3AF' },
-  handle: { alignSelf: 'center', width: 44, height: 7, backgroundColor: '#6B7280', borderRadius: 4, marginVertical: 5 },
+  shutterHandle: { alignSelf: 'center', width: 44, height: 7, backgroundColor: '#6B7280', borderRadius: 4, marginVertical: 5 },
   title: {
     fontSize: 22,
     fontFamily: fontFamily.black,
