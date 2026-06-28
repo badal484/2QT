@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
   StyleSheet, RefreshControl, Switch,
@@ -164,7 +165,7 @@ const NotificationsScreen = ({ navigation }: any) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => {
+        <BouncingButton style={styles.backBtn} onPress={() => {
           if (navigation.canGoBack()) {
             navigation.goBack();
           } else {
@@ -172,7 +173,7 @@ const NotificationsScreen = ({ navigation }: any) => {
           }
         }} activeOpacity={0.7}>
           <ArrowLeft size={20} color={colors.ink} />
-        </TouchableOpacity>
+        </BouncingButton>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Notifications</Text>
           {unreadCount > 0 && (
@@ -180,7 +181,7 @@ const NotificationsScreen = ({ navigation }: any) => {
           )}
         </View>
         {tab === 'inbox' && unreadCount > 0 && (
-          <TouchableOpacity
+          <BouncingButton
             style={styles.markAllBtn}
             onPress={() => readAllMutation.mutate()}
             disabled={readAllMutation.isPending}
@@ -188,13 +189,13 @@ const NotificationsScreen = ({ navigation }: any) => {
           >
             <CheckCheck size={15} color={colors.primary} />
             <Text style={styles.markAllText}>Mark all read</Text>
-          </TouchableOpacity>
+          </BouncingButton>
         )}
       </View>
 
       {/* Tabs */}
       <View style={styles.tabRow}>
-        <TouchableOpacity
+        <BouncingButton
           style={[styles.tabBtn, tab === 'inbox' && styles.tabBtnActive]}
           onPress={() => { haptic(); setTab('inbox'); }}
           activeOpacity={0.8}
@@ -204,15 +205,15 @@ const NotificationsScreen = ({ navigation }: any) => {
           {unreadCount > 0 && tab !== 'inbox' && (
             <View style={styles.tabBadge}><Text style={styles.tabBadgeText}>{unreadCount}</Text></View>
           )}
-        </TouchableOpacity>
-        <TouchableOpacity
+        </BouncingButton>
+        <BouncingButton
           style={[styles.tabBtn, tab === 'settings' && styles.tabBtnActive]}
           onPress={() => { haptic(); setTab('settings'); }}
           activeOpacity={0.8}
         >
           <BellOff size={14} color={tab === 'settings' ? colors.primary : colors.inkMuted} />
           <Text style={[styles.tabText, tab === 'settings' && styles.tabTextActive]}>Settings</Text>
-        </TouchableOpacity>
+        </BouncingButton>
       </View>
 
       {/* Content */}
@@ -239,7 +240,7 @@ const NotificationsScreen = ({ navigation }: any) => {
         >
           {notifications.map((n: any, i: number) => (
             <Animated.View key={n.id} entering={FadeInDown.delay(i * 30).duration(200)}>
-              <TouchableOpacity
+              <BouncingButton
                 style={[styles.notifCard, !n.is_read && styles.notifCardUnread]}
                 onPress={() => {
                   if (!n.is_read) {
@@ -275,7 +276,7 @@ const NotificationsScreen = ({ navigation }: any) => {
 
                 {/* Unread dot */}
                 {!n.is_read && <View style={styles.unreadDot} />}
-              </TouchableOpacity>
+              </BouncingButton>
             </Animated.View>
           ))}
         </ScrollView>

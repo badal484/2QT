@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Zap, Clock, Gift, RotateCcw, Cake, TrendingUp, Star, ToggleLeft, ToggleRight, Edit3, X, Check, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const TYPE_META: Record<string, { label: string; color: string; icon: any; desc: string }> = {
   welcome:      { label: "Welcome",      color: "orange", icon: Gift,       desc: "First-time user discount" },
@@ -269,6 +270,8 @@ export function CampaignsTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useSocketRefresh(["campaign_updated"], load);
 
   return (
     <div className="space-y-6">

@@ -6,6 +6,7 @@ import { Search, Utensils, Plus, CheckCircle2, Camera, Edit3, XCircle } from "lu
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 export function MenuTab() {
   const [items, setItems] = useState<any[]>([]);
@@ -59,6 +60,8 @@ export function MenuTab() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useSocketRefresh(["menu_updated"], load);
 
   const toggle = async (id: string, current: boolean) => {
     setToggling(id);

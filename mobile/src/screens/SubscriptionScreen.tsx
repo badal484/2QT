@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react-native';
 import React from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -40,9 +41,9 @@ const SubscriptionScreen = ({ navigation }: any) => {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
             <ArrowLeft size={24} color="#1A1A2E" />
-          </TouchableOpacity>
+          </BouncingButton>
           <Text style={styles.headerLabel}>Your Membership</Text>
           <Text style={styles.headerTitle}>2QT PRO</Text>
         </View>
@@ -80,30 +81,30 @@ const SubscriptionScreen = ({ navigation }: any) => {
               </View>
 
               <View style={styles.actionRow}>
-                <TouchableOpacity 
+                <BouncingButton 
                   onPress={() => activeSub.is_paused ? resumeMutation.mutate(activeSub.id) : pauseMutation.mutate(activeSub.id)}
                   style={styles.pauseResumeBtn}
                 >
                   <Text style={styles.pauseResumeText}>{activeSub.is_paused ? 'RESUME' : 'PAUSE'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
+                </BouncingButton>
+                <BouncingButton 
                   onPress={() => navigation.navigate('RenewSubscription', { activeSub })}
                   style={styles.renewBtn}
                 >
                   <Text style={styles.renewText}>RENEW</Text>
-                </TouchableOpacity>
+                </BouncingButton>
               </View>
             </View>
           ) : (
             <View style={styles.upsellCard}>
               <Text style={styles.upsellTitle}>Get Unlimited Free Delivery</Text>
               <Text style={styles.upsellSub}>Subscribe to a meal plan and save over ₹2500 monthly.</Text>
-              <TouchableOpacity 
+              <BouncingButton 
                 style={styles.viewPlansBtn}
                 onPress={() => navigation.navigate('RenewSubscription', { activeSub: null })}
               >
                 <Text style={styles.viewPlansText}>VIEW PLANS</Text>
-              </TouchableOpacity>
+              </BouncingButton>
             </View>
           )}
         </View>
@@ -111,7 +112,7 @@ const SubscriptionScreen = ({ navigation }: any) => {
         <View style={styles.plansSection}>
           <Text style={styles.plansTitle}>Available Plans</Text>
           {plansData?.plans?.map((plan: any) => (
-            <TouchableOpacity 
+            <BouncingButton 
               key={plan.id}
               activeOpacity={0.8}
               style={styles.planCard}
@@ -121,7 +122,7 @@ const SubscriptionScreen = ({ navigation }: any) => {
                 <Text style={styles.planDetailsText}>{plan.meals} Meals • {plan.type}</Text>
               </View>
               <Text style={styles.planPriceText}>₹{plan.pricePaise / 100}</Text>
-            </TouchableOpacity>
+            </BouncingButton>
           ))}
         </View>
 
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 10,
     borderWidth: 1,
@@ -286,7 +287,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 10,
   },
@@ -309,7 +310,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#FF6B35',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 4,
   },

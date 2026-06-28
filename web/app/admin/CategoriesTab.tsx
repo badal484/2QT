@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "../lib/api";
+import { ConfirmModal } from "../../components/ConfirmModal";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
 import { LayoutGrid, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, Upload, X, AlertCircle, CheckCircle2 } from "lucide-react";
 
@@ -282,6 +284,8 @@ export const CategoriesTab = () => {
   }, [effectiveZoneId]);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
+
+  useSocketRefresh(["menu_updated"], loadCategories);
 
   const handleDelete = async () => {
     if (!deleteConfirm) return;

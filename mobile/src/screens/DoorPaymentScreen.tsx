@@ -13,7 +13,7 @@ import { ENV } from '../config/env';
 const G = {
   bg: '#070F0C', surface: '#0F1F18',
   accent: '#10B981', accentDim: 'rgba(16,185,129,0.12)',
-  amber: '#F59E0B', amberDim: 'rgba(245,158,11,0.12)',
+  amber: G.primary, amberDim: 'rgba(245,158,11,0.12)',
   white: '#FFFFFF', muted: '#6B9E85', border: 'rgba(16,185,129,0.15)',
 };
 

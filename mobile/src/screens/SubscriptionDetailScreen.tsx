@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react-native';
 import React from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -29,9 +30,9 @@ const SubscriptionDetailScreen = ({ route, navigation }: any) => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft size={24} color="#fff" />
-        </TouchableOpacity>
+        </BouncingButton>
         <Text style={styles.planName}>{subscription.plan_name}</Text>
         <View style={[styles.statusBadge, { backgroundColor: subscription.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(234, 179, 8, 0.2)' }]}>
           <Text style={[styles.statusText, { color: subscription.status === 'active' ? '#4ADE80' : '#FACC15' }]}>
@@ -71,27 +72,27 @@ const SubscriptionDetailScreen = ({ route, navigation }: any) => {
 
         {/* Actions */}
         {subscription.status === 'active' ? (
-            <TouchableOpacity 
+            <BouncingButton 
                 style={styles.pauseBtn}
                 onPress={() => pauseMutation.mutate()}
             >
                 <Text style={styles.pauseBtnText}>PAUSE SUBSCRIPTION</Text>
-            </TouchableOpacity>
+            </BouncingButton>
         ) : (
-            <TouchableOpacity 
+            <BouncingButton 
                 style={styles.resumeBtn}
                 onPress={() => resumeMutation.mutate()}
             >
                 <Text style={styles.resumeBtnText}>RESUME SUBSCRIPTION</Text>
-            </TouchableOpacity>
+            </BouncingButton>
         )}
         
-        <TouchableOpacity 
+        <BouncingButton 
             style={styles.cancelBtn}
             onPress={() => Alert.alert('Cancel Plan', 'Cancellation is only allowed if no meals have been consumed.')}
         >
             <Text style={styles.cancelBtnText}>CANCEL PLAN</Text>
-        </TouchableOpacity>
+        </BouncingButton>
       </View>
     </ScrollView>
   );

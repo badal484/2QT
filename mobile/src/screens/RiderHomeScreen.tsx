@@ -22,7 +22,7 @@ const G = {
   primary: '#1B5E46',
   accent: '#10B981',
   accentDim: 'rgba(16,185,129,0.15)',
-  orange: '#F97316',
+  orange: G.primary,
   orangeDim: 'rgba(249,115,22,0.15)',
   danger: '#EF4444',
   white: '#FFFFFF',
@@ -95,12 +95,20 @@ const RiderHomeScreen = ({ navigation }: any) => {
     },
   });
 
+  const unclaimMutation = useMutation({
+    mutationFn: (orderId: string) => api.post(`/riders/orders/${orderId}/unclaim`, {}),
+    onSettled: () => {
+      hideNotification();
+      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+    },
+  });
+
   // ── Incoming order notification slide ─────────────────────────────────────
-  const showNotification = (order: any) => {
+  const showNotification = (order: any, timeoutSeconds = 15) => {
     setPendingOrder(order);
-    setCountdown(15);
+    setCountdown(timeoutSeconds);
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 80 }).start();
-    startTimer(order.id);
+    startTimer(order._kitchenAssigned ? order.orderId : order.id, timeoutSeconds, order._kitchenAssigned);
   };
 
   const hideNotification = () => {
@@ -110,16 +118,20 @@ const RiderHomeScreen = ({ navigation }: any) => {
     clearTimer();
   };
 
-  const startTimer = (orderId: string) => {
+  const startTimer = (orderId: string, seconds = 15, kitchenAssigned = false) => {
     clearTimer();
-    let count = 15;
+    let count = seconds;
     countdownRef.current = setInterval(() => {
       count -= 1;
       setCountdown(count);
       if (count <= 0) {
         clearTimer();
-        setSkippedIds(prev => [...prev, orderId]);
-        hideNotification();
+        if (kitchenAssigned) {
+          unclaimMutation.mutate(orderId);
+        } else {
+          setSkippedIds(prev => [...prev, orderId]);
+          hideNotification();
+        }
       }
     }, 1000);
   };
@@ -136,6 +148,23 @@ const RiderHomeScreen = ({ navigation }: any) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolData, activeOrder]);
 
+  // ── Kitchen push-assign listener ──────────────────────────────────────────
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const handler = (data: { orderId: string; displayId: string; assignedBy: string }) => {
+      if (!isOnline) return;
+      // Show full-screen modal with 40s countdown; mark as kitchen-assigned
+      showNotification(
+        { ...data, id: data.orderId, display_id: data.displayId, _kitchenAssigned: true },
+        40,
+      );
+    };
+    socket.on('order_assigned', handler);
+    return () => { socket.off('order_assigned', handler); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline]);
+
   // ── Pulsing dot animation ──────────────────────────────────────────────────
   useEffect(() => {
     if (!isOnline || activeOrder) return;
@@ -149,21 +178,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     return () => loop.stop();
   }, [isOnline, activeOrder, pulseAnim]);
 
-  // ── Socket ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const socket = getSocket();
-    if (!socket || !isOnline) return;
-    socket.on('order_status_update', () => {
-      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-    });
-    socket.on('new_available_mission', () => {
-      queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
-    });
-    return () => {
-      socket.off('order_status_update');
-      socket.off('new_available_mission');
-    };
-  }, [isOnline, queryClient]);
+
 
   // ── GPS location heartbeat ─────────────────────────────────────────────────
   useEffect(() => {
@@ -328,15 +343,17 @@ const RiderHomeScreen = ({ navigation }: any) => {
           {/* Header */}
           <View style={styles.notifHeader}>
             <View style={styles.notifHeaderLeft}>
-              <View style={styles.notifDot} />
-              <Text style={styles.notifLabel}>NEW ORDER</Text>
+              <View style={[styles.notifDot, pendingOrder._kitchenAssigned && { backgroundColor: '#F97316' }]} />
+              <Text style={styles.notifLabel}>
+                {pendingOrder._kitchenAssigned ? 'ASSIGNED BY KITCHEN' : 'NEW ORDER'}
+              </Text>
             </View>
-            <View style={styles.countdownCircle}>
-              <Text style={[styles.countdownText, { color: countdown <= 5 ? G.danger : G.accent }]}>{countdown}</Text>
+            <View style={[styles.countdownCircle, pendingOrder._kitchenAssigned && { borderColor: '#F97316' }]}>
+              <Text style={[styles.countdownText, { color: countdown <= 10 ? G.danger : pendingOrder._kitchenAssigned ? '#F97316' : G.accent }]}>{countdown}</Text>
             </View>
           </View>
 
-          <Text style={styles.notifOrderId}>{pendingOrder.display_id}</Text>
+          <Text style={styles.notifOrderId}>{pendingOrder.display_id || pendingOrder.displayId}</Text>
 
           {/* Details row */}
           <View style={styles.notifDetailsRow}>
@@ -344,12 +361,14 @@ const RiderHomeScreen = ({ navigation }: any) => {
               <Text style={styles.notifDetailLabel}>DELIVER TO</Text>
               <Text style={styles.notifDetailValue} numberOfLines={1}>{pendingOrder.delivery_address_text || 'Nearby'}</Text>
             </View>
-            <View style={[styles.notifDetail, { alignItems: 'flex-end' }]}>
-              <Text style={styles.notifDetailLabel}>EARNINGS</Text>
-              <Text style={[styles.notifDetailValue, { color: G.orange }]}>
-                ₹{pendingOrder.delivery_fee_paise ? Math.round(pendingOrder.delivery_fee_paise / 100) : '—'}
-              </Text>
-            </View>
+            {!pendingOrder._kitchenAssigned && (
+              <View style={[styles.notifDetail, { alignItems: 'flex-end' }]}>
+                <Text style={styles.notifDetailLabel}>EARNINGS</Text>
+                <Text style={[styles.notifDetailValue, { color: G.orange }]}>
+                  ₹{pendingOrder.delivery_fee_paise ? Math.round(pendingOrder.delivery_fee_paise / 100) : '—'}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Buttons */}
@@ -357,18 +376,35 @@ const RiderHomeScreen = ({ navigation }: any) => {
             <TouchableOpacity
               style={styles.skipBtn}
               onPress={() => {
-                setSkippedIds(prev => [...prev, pendingOrder.id]);
-                hideNotification();
+                if (pendingOrder._kitchenAssigned) {
+                  unclaimMutation.mutate(pendingOrder.orderId || pendingOrder.id);
+                } else {
+                  setSkippedIds(prev => [...prev, pendingOrder.id]);
+                  hideNotification();
+                }
               }}
+              disabled={unclaimMutation.isPending}
               activeOpacity={0.8}
             >
               <X size={18} color='#EF4444' />
-              <Text style={styles.skipBtnText}>Skip</Text>
+              <Text style={styles.skipBtnText}>Decline</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.acceptBtn, claimMutation.isPending && { opacity: 0.7 }]}
-              onPress={() => claimMutation.mutate(pendingOrder.id)}
-              disabled={claimMutation.isPending}
+              style={[styles.acceptBtn, (claimMutation.isPending || unclaimMutation.isPending) && { opacity: 0.7 },
+                pendingOrder._kitchenAssigned && { backgroundColor: '#F97316' }]}
+              onPress={() => {
+                if (pendingOrder._kitchenAssigned) {
+                  clearTimer();
+                  setPendingOrder(null);
+                  queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+                  navigation.navigate('AssignedOrder', {
+                    order: { id: pendingOrder.orderId, display_id: pendingOrder.displayId },
+                  });
+                } else {
+                  claimMutation.mutate(pendingOrder.id);
+                }
+              }}
+              disabled={claimMutation.isPending || unclaimMutation.isPending}
               activeOpacity={0.9}
             >
               <Check size={18} color={G.white} />

@@ -1,5 +1,6 @@
 import { ArrowLeft, CreditCard, Plus, History } from 'lucide-react-native';
 import React from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Modal, TextInput } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -30,17 +31,7 @@ const WalletScreen = ({ navigation }: any) => {
     queryFn: () => api.get('/customers/wallet'),
   });
 
-  React.useEffect(() => {
-    if (socket) {
-      socket.on('wallet_updated', () => {
-        triggerHapticHeavy();
-        queryClient.invalidateQueries({ queryKey: ['wallet'] });
-      });
-    }
-    return () => {
-      if (socket) socket.off('wallet_updated');
-    };
-  }, [socket]);
+
 
   const { user } = useSelector((state: RootState) => state.auth);
 
@@ -139,15 +130,15 @@ const WalletScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header Card */}
       <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <TouchableOpacity onPress={() => { triggerHaptic(); navigation.goBack(); }} style={styles.backButton}>
+        <BouncingButton onPress={() => { triggerHaptic(); navigation.goBack(); }} style={styles.backButton}>
           <ArrowLeft size={24} color="#fff" />
-        </TouchableOpacity>
+        </BouncingButton>
         
         <Text style={styles.headerLabel}>2QT Wallet</Text>
         <Text style={styles.balanceValue}>₹{wallet ? (wallet.balancePaise / 100).toFixed(2) : '0.00'}</Text>
         
         <View style={styles.actionRow}>
-          <TouchableOpacity 
+          <BouncingButton 
             style={styles.addMoneyBtn}
             onPress={() => { triggerHaptic(); setModalVisible(true); }}
             disabled={rechargeMutation.isPending}
@@ -158,7 +149,7 @@ const WalletScreen = ({ navigation }: any) => {
                     <Text style={styles.addMoneyText}>Add Money</Text>
                 </>
             )}
-          </TouchableOpacity>
+          </BouncingButton>
         </View>
         <View style={styles.glassDecoration} />
         <View style={styles.glassDecoration2} />
@@ -215,10 +206,10 @@ const WalletScreen = ({ navigation }: any) => {
               autoFocus
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { triggerHaptic(); setModalVisible(false); }}>
+              <BouncingButton style={styles.modalCancelBtn} onPress={() => { triggerHaptic(); setModalVisible(false); }}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
+              </BouncingButton>
+              <BouncingButton 
                 style={styles.modalAddBtn} 
                 onPress={() => {
                   triggerHapticHeavy();
@@ -233,7 +224,7 @@ const WalletScreen = ({ navigation }: any) => {
                 }}
               >
                 <Text style={styles.modalAddText}>Add</Text>
-              </TouchableOpacity>
+              </BouncingButton>
             </View>
           </View>
         </View>
@@ -245,14 +236,14 @@ const WalletScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   loadingContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  header: { paddingTop: 80, paddingHorizontal: 32, paddingBottom: 48, backgroundColor: '#1A1A2E', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 8, overflow: 'hidden' },
+  header: { paddingTop: 80, paddingHorizontal: 32, paddingBottom: 48, backgroundColor: '#1A1A2E', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 8, overflow: 'hidden' },
   glassDecoration: { position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255, 107, 53, 0.15)' },
   glassDecoration2: { position: 'absolute', bottom: -20, left: -60, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
   backButton: { marginBottom: 24, alignSelf: 'flex-start' },
   headerLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 4, marginBottom: 8 },
   balanceValue: { color: '#fff', fontSize: 48, fontWeight: '900', letterSpacing: -1 },
   actionRow: { flexDirection: 'row', marginTop: 40 },
-  addMoneyBtn: { backgroundColor: '#fff', paddingHorizontal: 32, paddingVertical: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 2 },
+  addMoneyBtn: { backgroundColor: '#fff', paddingHorizontal: 32, paddingVertical: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
   addMoneyText: { color: '#1A1A2E', fontWeight: '900', fontSize: 14, textTransform: 'uppercase' },
   scrollView: { flex: 1, paddingHorizontal: 32, paddingTop: 32 },
   transactionHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
@@ -270,11 +261,11 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: '#fff', width: '80%', borderRadius: 24, padding: 24 },
   modalTitle: { fontSize: 20, fontWeight: '900', color: '#1A1A2E' },
   modalSub: { fontSize: 12, color: '#9CA3AF', marginTop: 4, marginBottom: 24 },
-  modalInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 16, fontSize: 24, fontWeight: '900', color: '#1A1A2E', marginBottom: 24, textAlign: 'center' },
+  modalInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, padding: 16, fontSize: 24, fontWeight: '900', color: '#1A1A2E', marginBottom: 24, textAlign: 'center' },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  modalCancelBtn: { flex: 1, padding: 16, alignItems: 'center', marginRight: 8, backgroundColor: '#F3F4F6', borderRadius: 12 },
+  modalCancelBtn: { flex: 1, padding: 16, alignItems: 'center', marginRight: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
   modalCancelText: { color: '#9CA3AF', fontWeight: '900' },
-  modalAddBtn: { flex: 1, padding: 16, alignItems: 'center', marginLeft: 8, backgroundColor: '#FF6B35', borderRadius: 12 },
+  modalAddBtn: { flex: 1, padding: 16, alignItems: 'center', marginLeft: 8, backgroundColor: '#FF6B35', borderRadius: 20 },
   modalAddText: { color: '#fff', fontWeight: '900' },
 });
 

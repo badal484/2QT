@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, Dimensions, Alert,
+  StatusBar, Dimensions, Alert, Image
 } from 'react-native';
-import Svg, { Path, Rect, Circle, Text as SvgText, Line } from 'react-native-svg';
+import Svg, { Path, Rect, Circle, Text as SvgText, Line, Ellipse } from 'react-native-svg';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,44 +22,15 @@ const HERO_H = Math.round(SCREEN_W * 0.82);
 const GREEN = '#2E7D32';
 const GREEN_LIGHT = '#E8F5E9';
 
-const Bag2QT = () => (
-  <Svg width={148} height={200} viewBox="0 0 148 200">
-    {/* ── Right gusset — 3D side depth panel ── */}
-    <Path d="M 94 65 L 118 50 L 118 172 L 94 182 Z" fill="#C4C4C4" />
-
-    {/* ── Top-right triangle — fold seen from gusset angle ── */}
-    <Path d="M 94 65 L 118 50 L 56 30 Z" fill="#ADADAD" />
-
-    {/* ── Bag front body ── */}
-    <Rect x="12" y="65" width="82" height="117" fill="#FFFFFF" stroke="#E0E0E0" strokeWidth="1.5" />
-
-    {/* ── Left edge depth shadow ── */}
-    <Rect x="12" y="65" width="7" height="117" fill="rgba(0,0,0,0.045)" />
-
-    {/* ── Top fold panel (tent fold) ── */}
-    <Path d="M 12 65 L 56 30 L 94 65 Z" fill="#EFEFEF" />
-
-    {/* ── Fold crease line ── */}
-    <Line x1="12" y1="65" x2="94" y2="65" stroke="rgba(0,0,0,0.09)" strokeWidth="1.2" />
-
-    {/* ── Seal — green circle on fold crease ── */}
-    <Circle cx="56" cy="65" r="16" fill={GREEN} />
-
-    {/* ── Seal inner ring ── */}
-    <Circle cx="56" cy="65" r="13" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
-
-    {/* ── 4-pointed star (yellow) ── */}
-    <Path
-      d="M 56 57 L 58.2 62.8 L 64 65 L 58.2 67.2 L 56 73 L 53.8 67.2 L 48 65 L 53.8 62.8 Z"
-      fill="#FFD600"
+const PremiumBag = () => (
+  <View style={{ width: 180, height: 240, alignItems: 'center', justifyContent: 'center' }}>
+    {/* White 2QT bag with transparent background */}
+    <Image 
+      source={require('../../assets/images/white_bag_2qt_clean_transparent.png')} 
+      style={{ width: '100%', height: '100%' }} 
+      resizeMode="contain" 
     />
-
-    {/* ── ✦ sparkle before logo ── */}
-    <SvgText x="16" y="166" fill={GREEN} fontSize="13" fontWeight="bold">✦</SvgText>
-
-    {/* ── 2QT logo ── */}
-    <SvgText x="32" y="166" fill={GREEN} fontSize="22" fontWeight="bold">2QT</SvgText>
-  </Svg>
+  </View>
 );
 
 function haptic() {
@@ -137,23 +109,20 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
 
-      {/* ── Header ── */}
-      <View style={[s.header, { paddingTop: insets.top + 6 }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
+      {/* ── Floating Header ── */}
+      <View style={[s.header, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
+        <BouncingButton style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
           <ChevronLeft size={22} color={colors.ink} strokeWidth={2.5} />
-        </TouchableOpacity>
-        <View style={s.headerMid}>
-          <Text style={s.headerTitle} numberOfLines={1}>{item.name}</Text>
-          {!!serveTag && <Text style={s.headerSub}>{serveTag}</Text>}
-        </View>
+        </BouncingButton>
       </View>
 
       <ScrollView
         style={s.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 160 + insets.bottom }}
+        bounces={false}
       >
         {/* ── Hero image ── */}
         <View style={s.heroBox}>
@@ -192,7 +161,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
 
           {(item.tags?.length ?? 0) > 0 && (
             <>
-              <TouchableOpacity
+              <BouncingButton
                 style={s.detailToggle}
                 onPress={() => { haptic(); setShowDetails(v => !v); }}
                 activeOpacity={0.7}
@@ -200,7 +169,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                 <Text style={s.detailToggleText}>
                   {showDetails ? 'Hide dish details ∧' : 'Show dish details ∨'}
                 </Text>
-              </TouchableOpacity>
+              </BouncingButton>
               {showDetails && (
                 <View style={s.tagsWrap}>
                   {(item.tags as string[]).map((tag: string) => (
@@ -229,7 +198,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                   const riCart = cartItems.find(ci => ci.menuItemId === ri.id);
                   const riVeg = ri.is_egg ? '#EAB308' : ri.is_veg ? '#22C55E' : '#EF4444';
                   return (
-                    <TouchableOpacity
+                    <BouncingButton
                       key={ri.id}
                       style={s.relatedCard}
                       activeOpacity={0.92}
@@ -248,40 +217,42 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                             <Text style={s.relatedBadgeText}>★ Bestseller</Text>
                           </View>
                         )}
-                        {ri.available && !riCart ? (
-                          <TouchableOpacity
-                            style={s.relatedAddBtn}
-                            onPress={() => {
-                              haptic();
-                              dispatch(addItem({
-                                menuItemId: ri.id, name: ri.name,
-                                pricePaise: ri.price_paise, quantity: 1,
-                                photoUrl: ri.photo_url, isVeg: ri.is_veg,
-                                kitchenId: ri.kitchen_id,
-                              }));
-                            }}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={s.relatedAddText}>+</Text>
-                          </TouchableOpacity>
-                        ) : ri.available && riCart ? (
-                          <View style={s.relatedQtyBox}>
-                            <TouchableOpacity
-                              hitSlop={{ top: 6, bottom: 6, left: 8, right: 4 }}
-                              onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }}
-                            >
-                              <Text style={s.relatedQtyBtn}>−</Text>
-                            </TouchableOpacity>
-                            <Text style={s.relatedQtyVal}>{riCart.quantity}</Text>
-                            <TouchableOpacity
-                              hitSlop={{ top: 6, bottom: 6, left: 4, right: 8 }}
-                              onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }}
-                            >
-                              <Text style={s.relatedQtyBtn}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : null}
                       </View>
+                      
+                      {/* Floating Add/Qty Button */}
+                      {ri.available && !riCart ? (
+                        <BouncingButton
+                          style={s.relatedAddBtn}
+                          onPress={() => {
+                            haptic();
+                            dispatch(addItem({
+                              menuItemId: ri.id, name: ri.name,
+                              pricePaise: ri.price_paise, quantity: 1,
+                              photoUrl: ri.photo_url, isVeg: ri.is_veg,
+                              kitchenId: ri.kitchen_id,
+                            }));
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={s.relatedAddText}>ADD</Text>
+                        </BouncingButton>
+                      ) : ri.available && riCart ? (
+                        <View style={s.relatedQtyBox}>
+                          <BouncingButton
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }}
+                          >
+                            <Text style={s.relatedQtyBtn}>−</Text>
+                          </BouncingButton>
+                          <Text style={s.relatedQtyVal}>{riCart.quantity}</Text>
+                          <BouncingButton
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }}
+                          >
+                            <Text style={s.relatedQtyBtn}>+</Text>
+                          </BouncingButton>
+                        </View>
+                      ) : null}
                       <View style={s.relatedMeta}>
                         <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
                           <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
@@ -294,7 +265,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                       </View>
                       <Text style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
                       <Text style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
-                    </TouchableOpacity>
+                    </BouncingButton>
                   );
                 })}
               </ScrollView>
@@ -315,7 +286,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
             <View style={[s.brandSide, { alignItems: 'flex-end' }]}>
               <Text style={s.brandSideText}>FRESH{'\n'}QUICK{'\n'}DELICIOUS</Text>
             </View>
-            <Bag2QT />
+            <PremiumBag />
             <View style={[s.brandSide, { alignItems: 'flex-start' }]}>
               <Text style={s.brandSideText}>FRESH FOOD{'\n'}DELIVERED{'\n'}FAST</Text>
             </View>
@@ -361,7 +332,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
       <View style={[s.stickyBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {/* View Cart strip — appears when anything is in the cart */}
         {cartCount > 0 && (
-          <TouchableOpacity
+          <BouncingButton
             style={s.viewCartRow}
             onPress={() => navigation.navigate('Cart')}
             activeOpacity={0.88}
@@ -370,7 +341,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
               {cartCount} item{cartCount > 1 ? 's' : ''}  ·  ₹{cartTotal % 1 === 0 ? cartTotal : cartTotal.toFixed(0)}
             </Text>
             <Text style={s.viewCartRight}>View Cart  →</Text>
-          </TouchableOpacity>
+          </BouncingButton>
         )}
         {/* Main item row */}
         <View style={s.stickyMain}>
@@ -392,28 +363,28 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                 <Text style={s.customiseLabel}>Customise</Text>
                 {qty > 0 ? (
                   <View style={s.qtyControl}>
-                    <TouchableOpacity
+                    <BouncingButton
                       hitSlop={{ top: 8, bottom: 8, left: 10, right: 6 }}
                       onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: qty - 1 })); }}
                     >
                       <Text style={s.qtyCtrlBtn}>−</Text>
-                    </TouchableOpacity>
+                    </BouncingButton>
                     <Text style={s.qtyCtrlVal}>{qty}</Text>
-                    <TouchableOpacity
+                    <BouncingButton
                       hitSlop={{ top: 8, bottom: 8, left: 6, right: 10 }}
                       onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: qty + 1 })); }}
                     >
                       <Text style={s.qtyCtrlBtn}>+</Text>
-                    </TouchableOpacity>
+                    </BouncingButton>
                   </View>
                 ) : (
-                  <TouchableOpacity
+                  <BouncingButton
                     style={s.addBtn}
                     onPress={() => { haptic(); handleAdd(); }}
                     activeOpacity={0.88}
                   >
                     <Text style={s.addBtnText}>Add</Text>
-                  </TouchableOpacity>
+                  </BouncingButton>
                 )}
               </>
             )}
@@ -426,47 +397,40 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FFFFFF' },
-
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerMid: { flex: 1 },
-  headerTitle: {
-    fontSize: 17,
-    fontFamily: fontFamily.bold,
-    color: colors.ink,
-    lineHeight: 22,
-  },
-  headerSub: {
-    fontSize: 12,
-    fontFamily: fontFamily.regular,
-    color: colors.inkMuted,
-    marginTop: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
 
   scroll: { flex: 1 },
-
-  heroBox: { width: SCREEN_W, height: HERO_H, backgroundColor: colors.background },
+  heroBox: { width: SCREEN_W, height: Math.round(SCREEN_W * 0.82), backgroundColor: '#F9FAFB' },
   heroImg: { width: '100%', height: '100%' },
-  heroPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0F0F0' },
-  heroEmoji: { fontSize: 64 },
+  heroPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  heroEmoji: { fontSize: 70 },
 
-  infoBlock: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20 },
+  infoBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -24,
+  },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   vegBox: {
     width: 18,
@@ -504,19 +468,19 @@ const s = StyleSheet.create({
     color: '#92400E',
   },
   itemName: {
-    fontSize: 28,
+    fontSize: 22,
     fontFamily: fontFamily.black,
     color: colors.ink,
-    lineHeight: 34,
+    lineHeight: 28,
     letterSpacing: -0.5,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   itemDesc: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: fontFamily.regular,
     color: colors.inkMuted,
-    lineHeight: 22,
-    marginBottom: 14,
+    lineHeight: 18,
+    marginBottom: 10,
   },
   detailToggle: { alignSelf: 'flex-start', marginTop: 4 },
   detailToggleText: {
@@ -541,36 +505,27 @@ const s = StyleSheet.create({
 
   section: { paddingTop: 18, paddingBottom: 6 },
   sectionTitle: {
-    fontSize: 19,
+    fontSize: 17,
     fontFamily: fontFamily.black,
     color: colors.ink,
     letterSpacing: -0.3,
-    marginBottom: 14,
-    paddingHorizontal: 20,
+    marginBottom: 12,
+    paddingHorizontal: 16,
   },
-  relatedRow: { paddingHorizontal: 16, gap: 12 },
+  relatedRow: { paddingHorizontal: 16, paddingBottom: 16 },
 
   relatedCard: {
-    width: 148,
+    width: 130,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-    padding: 8,
-    marginBottom: 4,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
+    marginRight: 16,
   },
   relatedImgBox: {
     width: '100%',
     height: 120,
-    borderRadius: 10,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#F0F0F0',
-    marginBottom: 8,
+    backgroundColor: '#F9FAFB',
+    marginBottom: 24, // Space for the floating button
   },
   relatedImg: { width: '100%', height: '100%' },
   relatedBadge: {
@@ -589,49 +544,58 @@ const s = StyleSheet.create({
   },
   relatedAddBtn: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 32,
+    top: 104, // 120 (img height) - 16 (half of btn height)
+    alignSelf: 'center',
+    width: 90,
     height: 32,
     borderRadius: 16,
-    backgroundColor: GREEN,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    zIndex: 10,
   },
   relatedAddText: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    lineHeight: 24,
-    fontFamily: fontFamily.bold,
+    fontSize: 14,
+    color: GREEN,
+    fontFamily: fontFamily.black,
+    letterSpacing: 0.5,
   },
   relatedQtyBox: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
+    top: 104,
+    alignSelf: 'center',
+    width: 90,
+    height: 32,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: GREEN,
-    borderRadius: 14,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    gap: 6,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    zIndex: 10,
   },
   relatedQtyBtn: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#FFFFFF',
     fontFamily: fontFamily.bold,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   relatedQtyVal: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#FFFFFF',
     fontFamily: fontFamily.bold,
-    minWidth: 14,
     textAlign: 'center',
   },
   relatedMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
@@ -651,30 +615,37 @@ const s = StyleSheet.create({
 
   // 2QT Brand section
   brandSection: {
-    paddingTop: 12,
-    paddingBottom: 28,
+    paddingTop: 30,
+    paddingBottom: 40,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   brandGhostBox: {
+    position: 'absolute',
+    top: 20,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    marginBottom: 4,
+    zIndex: 0,
   },
   brandGhostScript: {
     fontFamily: fontFamily.medium,
     fontStyle: 'italic',
-    fontSize: 34,
-    color: 'rgba(0,0,0,0.055)',
-    letterSpacing: 1,
-    lineHeight: 38,
+    fontSize: 54,
+    color: 'rgba(0,0,0,0.035)',
+    letterSpacing: 2,
+    lineHeight: 60,
   },
   brandGhostBold: {
     fontFamily: fontFamily.black,
-    fontSize: 40,
-    color: 'rgba(0,0,0,0.055)',
-    letterSpacing: 5,
-    lineHeight: 44,
-    marginTop: -6,
+    fontSize: 64,
+    color: 'rgba(0,0,0,0.035)',
+    letterSpacing: 4,
+    lineHeight: 70,
+    marginTop: -20,
   },
   brandTagline: {
     fontFamily: fontFamily.medium,
@@ -682,22 +653,23 @@ const s = StyleSheet.create({
     color: 'rgba(0,0,0,0.28)',
     letterSpacing: 1.5,
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 20,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    gap: 16,
+    gap: 20,
+    zIndex: 1,
   },
   brandSide: { flex: 1 },
   brandSideText: {
-    fontSize: 9,
-    fontFamily: fontFamily.semibold,
-    color: 'rgba(0,0,0,0.28)',
-    letterSpacing: 1.5,
-    lineHeight: 17,
+    fontSize: 10,
+    fontFamily: fontFamily.bold,
+    color: 'rgba(0,0,0,0.25)',
+    letterSpacing: 1.2,
+    lineHeight: 18,
   },
 
   // Coupon
@@ -707,7 +679,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     backgroundColor: '#F0FBF0',
-    borderRadius: 12,
+    borderRadius: 20,
     paddingVertical: 12,
     paddingHorizontal: 14,
     width: SCREEN_W - 64,
@@ -741,22 +713,17 @@ const s = StyleSheet.create({
     right: 0,
     backgroundColor: '#FFFFFF',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: '#E5E7EB',
     flexDirection: 'column',
     paddingHorizontal: 16,
     paddingTop: 10,
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -3 },
   },
   viewCartRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: GREEN,
-    borderRadius: 10,
+    borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 8,
@@ -777,22 +744,23 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  stickyLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  stickyThumb: { width: 44, height: 44, borderRadius: 10, backgroundColor: colors.background },
-  stickyPrice: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
-  stickyRight: { alignItems: 'center' },
+  stickyLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  stickyThumb: { width: 48, height: 48, borderRadius: 20, backgroundColor: '#F9FAFB' },
+  stickyPrice: { fontSize: 22, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
+  stickyRight: { alignItems: 'flex-end', justifyContent: 'center' },
   customiseLabel: {
     fontSize: 10,
-    fontFamily: fontFamily.medium,
+    fontFamily: fontFamily.bold,
     color: colors.inkMuted,
     letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 4,
+    marginRight: 4,
   },
   addBtn: {
     width: 116,
     height: 42,
     backgroundColor: GREEN,
-    borderRadius: 10,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -801,7 +769,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: GREEN,
-    borderRadius: 10,
+    borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 14,
@@ -819,7 +787,7 @@ const s = StyleSheet.create({
   soldOutBadge: {
     width: 116,
     height: 42,
-    borderRadius: 10,
+    borderRadius: 16,
     backgroundColor: '#F5F5F5',
     borderWidth: 1,
     borderColor: '#E0E0E0',

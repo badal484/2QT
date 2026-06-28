@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import Image from "next/image";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const EMPTY_BANNER = {
   title: "", subtitle: "", tag_text: "", image_url: "",
@@ -159,6 +160,8 @@ export function MarketingTab() {
   };
 
   useEffect(() => { fetchBanners(); }, []);
+
+  useSocketRefresh(["promo_updated", "campaign_updated"], fetchBanners);
 
   const makeUploader = (
     setter: (fn: (b: any) => any) => void,

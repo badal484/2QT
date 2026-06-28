@@ -3,8 +3,8 @@ export const colors = {
   primaryDark: '#123F30',
   primaryTint: '#E8F2EC',
 
-  accent: '#D97B4F',
-  accentTint: '#FBEAE0',
+  accent: '#1B5E46',
+  accentTint: '#E8F2EC',
 
   background: '#FAF8F4',
   surface: '#FFFFFF',

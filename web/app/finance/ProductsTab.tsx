@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { RefreshCw, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
 
@@ -34,6 +35,8 @@ export function ProductsTab() {
   }, [filters]);
 
   useEffect(() => { load(); }, [load]);
+
+  useSocketRefresh(["inventory_updated"], load);
 
   const totalRevenue = products.reduce((s, p) => s + parseInt(p.total_revenue_paise), 0);
   const totalUnits = products.reduce((s, p) => s + parseInt(p.total_quantity), 0);

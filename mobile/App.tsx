@@ -9,6 +9,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { NetworkObserver } from './src/components/NetworkObserver';
 import { AppBootManager } from './src/components/AppBootManager';
 import SplashScreen from './src/screens/SplashScreen';
+import { GlobalSocketListener } from './src/socket/GlobalSocketListener';
 
 if (!__DEV__) {
   console.log = () => {};
@@ -36,6 +37,7 @@ const App = () => {
             <QueryClientProvider client={queryClient}>
               <ErrorBoundary>
                 <NetworkObserver />
+                <GlobalSocketListener />
                 <AppBootManager>
                   <RootNavigator />
                 </AppBootManager>

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   ActivityIndicator, Alert, Linking,
@@ -190,7 +191,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
           style={StyleSheet.absoluteFill}
         />
         {/* Floating back button */}
-        <TouchableOpacity
+        <BouncingButton
           style={[styles.backBtn, { top: insets.top + 12 }]}
           onPress={() => { 
             triggerHaptic(); 
@@ -203,7 +204,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
           activeOpacity={0.85}
         >
           <ArrowLeft size={20} color={colors.ink} />
-        </TouchableOpacity>
+        </BouncingButton>
         {/* Order ID badge */}
         {o?.display_id && (
           <View style={[styles.orderIdBadge, { top: insets.top + 16 }]}>
@@ -253,12 +254,12 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                 <Text style={[styles.riderMeta, { color: colors.primary }]}>FINANCIAL RECORD</Text>
                 <Text style={styles.riderName}>Invoice is Ready</Text>
               </View>
-              <TouchableOpacity
+              <BouncingButton
                 style={[styles.riderAction, { backgroundColor: colors.primary, borderColor: colors.primary }]}
                 onPress={() => Linking.openURL(o.invoice_url)}
               >
                 <Text style={{ color: '#fff', fontFamily: fontFamily.extrabold, fontSize: 10 }}>VIEW</Text>
-              </TouchableOpacity>
+              </BouncingButton>
             </View>
           ) : (
             <View
@@ -278,12 +279,12 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                 </Text>
               </View>
               {o?.rider_phone && (
-                <TouchableOpacity
+                <BouncingButton
                   style={[styles.riderAction, styles.riderCallBtn]}
                   onPress={() => { triggerHaptic(); Linking.openURL(`tel:${o.rider_phone}`); }}
                 >
                   <Phone size={17} color="#fff" />
-                </TouchableOpacity>
+                </BouncingButton>
               )}
             </View>
           )}
@@ -348,7 +349,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                 <Text style={styles.cancelTitle}>Cancel Order</Text>
                 <Text style={styles.cancelSub}>Refund to wallet</Text>
               </View>
-              <TouchableOpacity
+              <BouncingButton
                 style={[styles.cancelBtn, cancelMutation.isPending && { opacity: 0.6 }]}
                 onPress={handleCancel}
                 disabled={cancelMutation.isPending}
@@ -357,7 +358,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                 {cancelMutation.isPending
                   ? <ActivityIndicator size="small" color="#fff" />
                   : <Text style={styles.cancelBtnText}>Cancel</Text>}
-              </TouchableOpacity>
+              </BouncingButton>
             </View>
           )}
 
@@ -367,24 +368,24 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               <Text style={styles.helpTitle}>Need help?</Text>
               <Text style={styles.helpSub}>Support available 24/7</Text>
             </View>
-            <TouchableOpacity
+            <BouncingButton
               style={styles.helpBtn}
               onPress={() => navigation.navigate('Support')}
               activeOpacity={0.85}
             >
               <MessageCircle size={14} color={colors.ink} />
               <Text style={styles.helpBtnText}>Contact Us</Text>
-            </TouchableOpacity>
+            </BouncingButton>
           </View>
 
           {/* Back to home */}
-          <TouchableOpacity
+          <BouncingButton
             style={styles.homeBtn}
             onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] })}
             activeOpacity={0.7}
           >
             <Text style={styles.homeBtnText}>Back to Home</Text>
-          </TouchableOpacity>
+          </BouncingButton>
 
           {isLoading && !o && <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />}
         </ScrollView>
@@ -406,15 +407,15 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 20,
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
   orderIdBadge: {
     position: 'absolute', alignSelf: 'center', left: 0, right: 0, marginHorizontal: 80,
     backgroundColor: '#fff', borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 9, alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
   orderIdText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink },
 
@@ -492,14 +493,14 @@ const styles = StyleSheet.create({
   cancelCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.dangerTint, borderRadius: 16, padding: 16, marginTop: 16 },
   cancelTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.danger },
   cancelSub: { fontSize: 12, fontFamily: fontFamily.regular, color: colors.danger + 'AA', marginTop: 2 },
-  cancelBtn: { backgroundColor: colors.danger, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10, minWidth: 80, alignItems: 'center' },
+  cancelBtn: { backgroundColor: colors.danger, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10, minWidth: 80, alignItems: 'center' },
   cancelBtnText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#fff' },
 
   // Help
   helpCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1, borderColor: '#F3F4F6' },
   helpTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
   helpSub: { fontSize: 12, fontFamily: fontFamily.regular, color: colors.inkMuted, marginTop: 2 },
-  helpBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surfaceMuted, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  helpBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surfaceMuted, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
   helpBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.ink },
 
   // Home

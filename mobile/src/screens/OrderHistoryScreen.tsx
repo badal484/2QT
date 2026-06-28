@@ -1,5 +1,6 @@
 import { Package, RotateCcw, ArrowLeft, Bike, AlertTriangle, Download, FileText } from 'lucide-react-native';
 import React, { useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -9,6 +10,8 @@ import { addItem } from '../store/slices/cartSlice';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fontFamily } from '../theme/typography';
+import { colors } from '../theme/colors';
 
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
@@ -90,7 +93,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top + 16, 40) }]}>
-        <TouchableOpacity
+        <BouncingButton
           style={styles.backBtn}
           onPress={() => {
             ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
@@ -98,7 +101,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
           }}
         >
           <ArrowLeft size={24} color="#1A1A2E" />
-        </TouchableOpacity>
+        </BouncingButton>
         <View style={{ marginLeft: 16 }}>
           <Text style={styles.headerTitle}>Your Orders</Text>
           <Text style={styles.headerSub}>Past & Active Deliveries</Text>
@@ -113,17 +116,17 @@ const OrderHistoryScreen = ({ navigation }: any) => {
             </View>
             <Text style={styles.emptyTitle}>No orders yet</Text>
             <Text style={styles.emptySubText}>Your delicious journey is just one tap away.</Text>
-            <TouchableOpacity
+            <BouncingButton
               style={styles.browseBtn}
               onPress={() => navigation.navigate('Home')}
             >
               <Text style={styles.browseBtnText}>Browse Menu</Text>
-            </TouchableOpacity>
+            </BouncingButton>
           </View>
         ) : (
           orders.map((order: any, index: number) => (
             <Animated.View key={order.id} entering={FadeInDown.delay(index * 80)}>
-              <TouchableOpacity
+              <BouncingButton
                 activeOpacity={0.9}
                 style={styles.orderCard}
                 onPress={() => ['delivered', 'cancelled'].includes(order.status) ? null : navigation.navigate('OrderConfirmed', { orderId: order.id })}
@@ -172,7 +175,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                       </Text>
                       <Text style={[
                         styles.footerValue,
-                        order.payment_method === 'cod' && order.payment_status === 'cod_pending' && { color: '#F59E0B' }
+                        order.payment_method === 'cod' && order.payment_status === 'cod_pending' && { color: G.primary }
                       ]}>
                         ₹{(order.total_amount_paise / 100).toFixed(2)}
                       </Text>
@@ -181,7 +184,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                     {!['delivered', 'cancelled'].includes(order.status) ? (
                       <View style={styles.footerBtnRow}>
                         {['pending_payment', 'confirmed'].includes(order.status) && (
-                          <TouchableOpacity
+                          <BouncingButton
                             style={styles.cancelBtn}
                             onPress={() => {
                               ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
@@ -189,9 +192,9 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                             }}
                           >
                             <Text style={styles.cancelBtnText}>Cancel</Text>
-                          </TouchableOpacity>
+                          </BouncingButton>
                         )}
-                        <TouchableOpacity
+                        <BouncingButton
                           style={styles.trackBtn}
                           onPress={() => {
                             ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
@@ -200,13 +203,13 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                         >
                           <Bike size={16} color="white" style={{ marginRight: 8 }} />
                           <Text style={styles.trackBtnText}>Track Order</Text>
-                        </TouchableOpacity>
+                        </BouncingButton>
                       </View>
                     ) : (
                       <View style={styles.footerBtnRow}>
                         {order.status === 'delivered' && (
                           <>
-                            <TouchableOpacity
+                            <BouncingButton
                               style={styles.invoiceIconBtn}
                               onPress={() => openInvoice(order.id)}
                               disabled={invoiceLoading.has(order.id)}
@@ -215,17 +218,17 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                                 ? <ActivityIndicator size="small" color="#10B981" />
                                 : <Download size={18} color="#10B981" />
                               }
-                            </TouchableOpacity>
-                            <TouchableOpacity
+                            </BouncingButton>
+                            <BouncingButton
                               style={[styles.actionBtn, styles.supportBtn]}
                               onPress={callSupport}
                             >
                               <AlertTriangle size={14} color="#EF4444" style={{ marginRight: 6 }} />
                               <Text style={styles.supportBtnText} numberOfLines={1} adjustsFontSizeToFit>Support</Text>
-                            </TouchableOpacity>
+                            </BouncingButton>
                           </>
                         )}
-                        <TouchableOpacity
+                        <BouncingButton
                           style={[styles.actionBtn, styles.reorderBtn]}
                           disabled={reorderLoading.has(order.id)}
                           onPress={async () => {
@@ -277,11 +280,11 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                             : <RotateCcw size={14} color="#1A1A2E" style={{ marginRight: 6 }} />
                           }
                           <Text style={styles.reorderBtnText} numberOfLines={1} adjustsFontSizeToFit>Reorder</Text>
-                        </TouchableOpacity>
+                        </BouncingButton>
                       </View>
                     )}
                   </View>
-                </TouchableOpacity>
+                </BouncingButton>
               </Animated.View>
             ))
           )}
@@ -302,14 +305,14 @@ const OrderHistoryScreen = ({ navigation }: any) => {
               <Text style={styles.modalTitle}>Cancel Order?</Text>
               <Text style={styles.modalSub}>This action cannot be undone. Your order will be cancelled immediately.</Text>
               <View style={styles.modalBtnRow}>
-                <TouchableOpacity
+                <BouncingButton
                   style={styles.modalKeepBtn}
                   onPress={() => setCancelTargetId(null)}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.modalKeepText}>Keep Order</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </BouncingButton>
+                <BouncingButton
                   style={styles.modalCancelBtn}
                   onPress={() => cancelTargetId && cancelMutation.mutate(cancelTargetId)}
                   activeOpacity={0.8}
@@ -319,7 +322,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                     ? <ActivityIndicator size="small" color="#fff" />
                     : <Text style={styles.modalCancelText}>Yes, Cancel</Text>
                   }
-                </TouchableOpacity>
+                </BouncingButton>
               </View>
             </Pressable>
           </Pressable>
@@ -331,66 +334,66 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFC' },
     loadingContainer: { flex: 1, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
-    loadingText: { marginTop: 16, color: '#94A3B8', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, fontSize: 10 },
-    header: { paddingHorizontal: 24, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', zIndex: 10 },
-    backBtn: { width: 44, height: 44, backgroundColor: '#FFFFFF', borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#94A3B8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 3 },
-    headerTitle: { color: '#0F172A', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
-    headerSub: { color: '#64748B', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, fontSize: 10, marginTop: 4 },
+    loadingText: { marginTop: 16, color: colors.inkMuted, fontFamily: fontFamily.bold, textTransform: 'uppercase', letterSpacing: 1.5, fontSize: 11 },
+    header: { paddingHorizontal: 20, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', zIndex: 10 },
+    backBtn: { width: 44, height: 44, backgroundColor: '#FFFFFF', borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4 },
+    headerTitle: { color: colors.ink, fontSize: 20, fontFamily: fontFamily.black, letterSpacing: -0.2 },
+    headerSub: { color: colors.inkMuted, fontFamily: fontFamily.bold, textTransform: 'uppercase', letterSpacing: 1.5, fontSize: 10, marginTop: 4 },
     scrollView: { flex: 1 },
-    scrollContent: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 10 },
+    scrollContent: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 10 },
 
     emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-    emptyIconWrapper: { width: 88, height: 88, backgroundColor: '#FFFFFF', borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowColor: '#10B981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 4 },
-    emptyTitle: { color: '#0F172A', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-    emptySubText: { color: '#64748B', textAlign: 'center', marginTop: 10, paddingHorizontal: 40, fontWeight: '500', fontSize: 15, lineHeight: 22 },
-    browseBtn: { marginTop: 36, backgroundColor: '#10B981', paddingHorizontal: 36, paddingVertical: 18, borderRadius: 28, shadowColor: '#10B981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 8 },
-    browseBtnText: { color: '#fff', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5, fontSize: 13 },
+    emptyIconWrapper: { width: 88, height: 88, backgroundColor: '#FFFFFF', borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowColor: '#10B981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
+    emptyTitle: { color: colors.ink, fontSize: 18, fontFamily: fontFamily.black, letterSpacing: -0.2 },
+    emptySubText: { color: colors.inkMuted, textAlign: 'center', marginTop: 10, paddingHorizontal: 40, fontFamily: fontFamily.medium, fontSize: 14, lineHeight: 22 },
+    browseBtn: { marginTop: 32, backgroundColor: '#10B981', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 24, shadowColor: '#10B981', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+    browseBtnText: { color: '#fff', fontFamily: fontFamily.bold, textTransform: 'uppercase', letterSpacing: 1, fontSize: 13 },
 
-    orderCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 22, marginBottom: 20, shadowColor: '#94A3B8', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 4, borderWidth: 1, borderColor: 'rgba(226,232,240,0.5)' },
-    orderCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-    orderIdText: { color: '#0F172A', fontSize: 18, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
-    orderDateText: { color: '#94A3B8', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginTop: 6 },
-    statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, gap: 6 },
+    orderCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 4 },
+    orderCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    orderIdText: { color: colors.ink, fontSize: 16, fontFamily: fontFamily.black, letterSpacing: 0.5 },
+    orderDateText: { color: colors.inkMuted, fontSize: 11, fontFamily: fontFamily.bold, textTransform: 'uppercase', letterSpacing: 1, marginTop: 4 },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, gap: 6 },
     statusDot: { width: 6, height: 6, borderRadius: 3 },
-    statusBadgeText: { fontWeight: '800', fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
-    codBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, marginTop: 6, alignSelf: 'flex-end' },
-    codBadgeText: { color: '#B45309', fontWeight: '800', fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
+    statusBadgeText: { fontFamily: fontFamily.bold, fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
+    codBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, marginTop: 6, alignSelf: 'flex-end' },
+    codBadgeText: { color: '#B45309', fontFamily: fontFamily.bold, fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
 
-    itemsListContainer: { marginBottom: 24, backgroundColor: '#F8FAFC', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9' },
-    itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-    itemBadge: { backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 12, borderWidth: 1, borderColor: '#D1FAE5' },
-    itemQty: { color: '#059669', fontWeight: '900', fontSize: 12 },
-    itemName: { color: '#334155', fontWeight: '700', fontSize: 14, flex: 1, letterSpacing: 0.2 },
+    itemsListContainer: { marginBottom: 16, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 20, borderWidth: 1, borderColor: '#F1F5F9' },
+    itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    itemBadge: { backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16, marginRight: 12, borderWidth: 1, borderColor: '#D1FAE5' },
+    itemQty: { color: '#059669', fontFamily: fontFamily.black, fontSize: 12 },
+    itemName: { color: colors.ink, fontFamily: fontFamily.bold, fontSize: 13, flex: 1 },
 
-    orderCardFooter: { flexDirection: 'column', paddingTop: 20, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+    orderCardFooter: { flexDirection: 'column', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
     footerTotalRow: { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     footerBtnRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    footerLabel: { color: '#64748B', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5 },
-    footerValue: { color: '#0F172A', fontWeight: '900', fontSize: 22, letterSpacing: -0.5 },
+    footerLabel: { color: colors.inkMuted, fontSize: 11, fontFamily: fontFamily.bold, textTransform: 'uppercase', letterSpacing: 1.5 },
+    footerValue: { color: colors.ink, fontFamily: fontFamily.black, fontSize: 18, letterSpacing: -0.2 },
 
-    cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: '#EF4444', paddingVertical: 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-    cancelBtnText: { color: '#EF4444', fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
-    trackBtn: { flex: 2, backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#10B981', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 4 },
-    trackBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5 },
+    cancelBtn: { flex: 1, borderWidth: 1, borderColor: '#EF4444', paddingVertical: 12, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    cancelBtnText: { color: '#EF4444', fontFamily: fontFamily.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+    trackBtn: { flex: 2, backgroundColor: '#10B981', paddingVertical: 12, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
+    trackBtnText: { color: '#FFFFFF', fontFamily: fontFamily.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
     
-    invoiceIconBtn: { width: 48, height: 48, backgroundColor: '#ECFDF5', borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A7F3D0' },
-    actionBtn: { flex: 1, paddingHorizontal: 12, paddingVertical: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    invoiceIconBtn: { width: 44, height: 44, backgroundColor: '#ECFDF5', borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A7F3D0' },
+    actionBtn: { flex: 1, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
     supportBtn: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
-    supportBtnText: { color: '#DC2626', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
+    supportBtnText: { color: '#DC2626', fontFamily: fontFamily.bold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
     reorderBtn: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-    reorderBtnText: { color: '#0F172A', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
+    reorderBtnText: { color: colors.ink, fontFamily: fontFamily.bold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
 
     // Cancel modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-    modalCard: { backgroundColor: '#FFFFFF', borderRadius: 32, paddingHorizontal: 32, paddingVertical: 40, width: '100%', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 24 }, shadowOpacity: 0.2, shadowRadius: 48, elevation: 24 },
-    modalIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginBottom: 24, borderWidth: 4, borderColor: '#FEE2E2' },
-    modalTitle: { fontSize: 24, fontWeight: '900', color: '#0F172A', marginBottom: 12, letterSpacing: -0.5 },
-    modalSub: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, marginBottom: 32, fontWeight: '500' },
+    modalCard: { backgroundColor: '#FFFFFF', borderRadius: 24, paddingHorizontal: 24, paddingVertical: 32, width: '100%', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 12 },
+    modalIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 4, borderColor: '#FEE2E2' },
+    modalTitle: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 8, letterSpacing: -0.2 },
+    modalSub: { fontSize: 13, color: colors.inkMuted, textAlign: 'center', lineHeight: 20, marginBottom: 24, fontFamily: fontFamily.medium },
     modalBtnRow: { flexDirection: 'row', width: '100%', gap: 12 },
-    modalKeepBtn: { flex: 1, backgroundColor: '#F1F5F9', paddingVertical: 16, borderRadius: 20, alignItems: 'center' },
-    modalKeepText: { fontWeight: '800', fontSize: 14, color: '#334155', textTransform: 'uppercase', letterSpacing: 1 },
-    modalCancelBtn: { flex: 1, backgroundColor: '#EF4444', paddingVertical: 16, borderRadius: 20, alignItems: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 4 },
-    modalCancelText: { fontWeight: '900', fontSize: 14, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 },
+    modalKeepBtn: { flex: 1, backgroundColor: '#F1F5F9', paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+    modalKeepText: { fontFamily: fontFamily.bold, fontSize: 13, color: colors.ink, textTransform: 'uppercase', letterSpacing: 0.5 },
+    modalCancelBtn: { flex: 1, backgroundColor: '#EF4444', paddingVertical: 14, borderRadius: 14, alignItems: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
+    modalCancelText: { fontFamily: fontFamily.bold, fontSize: 13, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 0.5 },
   });
 
   export default OrderHistoryScreen;

@@ -5,6 +5,7 @@ import { Plus, Trash2, Ticket, X, ToggleLeft, ToggleRight, Tag, Shield, User } f
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const EMPTY_FORM = {
   code: "",
@@ -62,6 +63,8 @@ export function PromoCodesTab() {
   };
 
   useEffect(() => { fetchPromos(); }, []);
+
+  useSocketRefresh(["promo_updated"], fetchPromos);
 
   const handleCreate = async () => {
     if (!form.code) return toast.error("Enter a code");

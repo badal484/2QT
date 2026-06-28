@@ -1,5 +1,6 @@
 import { ArrowLeft, Star, Crown, Pizza } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, AppState } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -26,16 +27,7 @@ const LoyaltyScreen = ({ navigation }: any) => {
     queryFn: () => api.get('/customers/loyalty'),
   });
 
-  React.useEffect(() => {
-    if (socket) {
-      socket.on('loyalty_updated', () => {
-        queryClient.invalidateQueries({ queryKey: ['loyalty'] });
-      });
-    }
-    return () => {
-      if (socket) socket.off('loyalty_updated');
-    };
-  }, [socket]);
+
 
   if (isLoading) return (
     <View style={styles.loadingContainer}>
@@ -51,9 +43,9 @@ const LoyaltyScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header Card */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft size={24} color="#1A1A2E" />
-        </TouchableOpacity>
+        </BouncingButton>
         
         <View style={styles.headerContentRow}>
           <View>
@@ -143,7 +135,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.08,
     shadowRadius: 30,
     elevation: 10,
   },
@@ -152,7 +144,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -253,8 +245,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowRadius: 16,
+    elevation: 4,
   },
   earnInfo: {
     flex: 1,

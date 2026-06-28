@@ -1,5 +1,6 @@
 import { ArrowLeft, ChefHat, Search, SearchX, Utensils, X } from 'lucide-react-native';
 import React, { useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import Animated, { FadeIn, BounceIn } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
@@ -56,9 +57,9 @@ const SearchScreen = ({ navigation }: any) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
             <ArrowLeft size={24} color="#1A1A2E" />
-          </TouchableOpacity>
+          </BouncingButton>
           <View style={styles.searchBar}>
             <Search size={20} color="#9CA3AF" style={{ marginRight: 12 }} />
             <TextInput 
@@ -72,15 +73,15 @@ const SearchScreen = ({ navigation }: any) => {
               returnKeyType="search"
             />
             {query.length > 0 && (
-              <TouchableOpacity onPress={() => setQuery('')}>
+              <BouncingButton onPress={() => setQuery('')}>
                 <X size={16} color="#9CA3AF" />
-              </TouchableOpacity>
+              </BouncingButton>
             )}
           </View>
         </View>
 
         <View style={styles.filterRow}>
-            <TouchableOpacity 
+            <BouncingButton 
                 style={[styles.filterChip, vegOnly ? styles.filterChipActive : null]}
                 onPress={() => setVegOnly(!vegOnly)}
             >
@@ -88,7 +89,7 @@ const SearchScreen = ({ navigation }: any) => {
                     <View style={styles.vegDot} />
                 </View>
                 <Text style={[styles.filterChipText, vegOnly ? styles.filterChipTextActive : null]}>Pure Veg</Text>
-            </TouchableOpacity>
+            </BouncingButton>
         </View>
       </View>
 
@@ -104,14 +105,14 @@ const SearchScreen = ({ navigation }: any) => {
                     <Text style={[styles.sectionLabel, { marginBottom: 16 }]}>Recent Searches</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                         {recentSearches.map(rs => (
-                            <TouchableOpacity 
+                            <BouncingButton 
                                 key={rs}
                                 style={styles.recentSearchChip}
                                 onPress={() => setQuery(rs)}
                             >
                                 <Search size={12} color="#6B7280" style={{ marginRight: 6 }} />
                                 <Text style={styles.recentSearchText}>{rs}</Text>
-                            </TouchableOpacity>
+                            </BouncingButton>
                         ))}
                     </View>
                 </View>
@@ -138,7 +139,7 @@ const SearchScreen = ({ navigation }: any) => {
             {filteredResults.map((item: any) => {
               const cartItem = cartItems.find(ci => ci.menuItemId === item.id);
               return (
-                <TouchableOpacity 
+                <BouncingButton 
                   key={item.id}
                   activeOpacity={0.9}
                   onPress={() => {
@@ -170,16 +171,16 @@ const SearchScreen = ({ navigation }: any) => {
                     <View style={styles.itemFooter}>
                       {cartItem ? (
                         <View style={styles.quantityControl}>
-                          <TouchableOpacity onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity - 1 }))}>
+                          <BouncingButton onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity - 1 }))}>
                             <Text style={styles.quantityBtnText}>−</Text>
-                          </TouchableOpacity>
+                          </BouncingButton>
                           <Text style={styles.quantityValueText}>{cartItem.quantity}</Text>
-                          <TouchableOpacity onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity + 1 }))}>
+                          <BouncingButton onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity + 1 }))}>
                             <Text style={styles.quantityBtnText}>+</Text>
-                          </TouchableOpacity>
+                          </BouncingButton>
                         </View>
                       ) : (
-                        <TouchableOpacity 
+                        <BouncingButton 
                           style={styles.addButton}
                           onPress={() => dispatch(addItem({ 
                             menuItemId: item.id, 
@@ -192,11 +193,11 @@ const SearchScreen = ({ navigation }: any) => {
                           }))}
                         >
                           <Text style={styles.addButtonText}>Add</Text>
-                        </TouchableOpacity>
+                        </BouncingButton>
                       )}
                     </View>
                   </View>
-                </TouchableOpacity>
+                </BouncingButton>
               );
             })}
           </View>
@@ -325,8 +326,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowRadius: 16,
+    elevation: 4,
   },
   itemImageWrapper: {
     width: 80,
@@ -388,7 +389,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1A1A2E',
-    borderRadius: 12,
+    borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
@@ -438,7 +439,7 @@ const styles = StyleSheet.create({
     borderColor: '#FF6B35',
     paddingHorizontal: 16,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 20,
   },
   addButtonText: {
     color: '#FF6B35',

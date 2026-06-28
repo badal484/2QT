@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, CheckCircle, XCircle, Clock, Banknote, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const TYPE_LABELS: Record<string, string> = {
   wrong_item: "Wrong item",
@@ -187,6 +188,8 @@ export function ComplaintsTab() {
   }, [statusFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  useSocketRefresh(["new_ticket", "ticket_updated"], load);
 
   const openCount = complaints.filter((c: any) => c.status === "open").length;
 

@@ -1,5 +1,6 @@
 import { ArrowLeft, Calendar } from 'lucide-react-native';
 import React from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -19,9 +20,9 @@ const MyPlansScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft size={24} color="#1A1A2E" />
-        </TouchableOpacity>
+        </BouncingButton>
         <Text style={styles.headerTitle}>My Subscriptions</Text>
         <View style={{ width: 48 }} />
       </View>
@@ -33,16 +34,16 @@ const MyPlansScreen = ({ navigation }: any) => {
               <Calendar size={48} color="#9CA3AF" />
             </View>
             <Text style={styles.emptyTitle}>No active plans</Text>
-            <TouchableOpacity 
+            <BouncingButton 
               style={styles.browseBtn}
               onPress={() => navigation.navigate('Subscription')}
             >
               <Text style={styles.browseBtnText}>Browse Plans</Text>
-            </TouchableOpacity>
+            </BouncingButton>
           </View>
         ) : (
           data?.subscriptions?.map((sub: any) => (
-            <TouchableOpacity 
+            <BouncingButton 
               key={sub.id}
               activeOpacity={0.8}
               style={styles.planCard}
@@ -66,7 +67,7 @@ const MyPlansScreen = ({ navigation }: any) => {
                 <Text style={styles.infoLabel}>Expires On</Text>
                 <Text style={styles.infoValue}>{new Date(sub.expires_at).toLocaleDateString()}</Text>
               </View>
-            </TouchableOpacity>
+            </BouncingButton>
           ))
         )}
       </ScrollView>
@@ -106,8 +107,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowRadius: 16,
+    elevation: 4,
     borderWidth: 1,
     borderColor: '#f3f4f6',
   },
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     shadowColor: '#FF6B35',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 4,
   },
@@ -167,8 +168,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowRadius: 16,
+    elevation: 4,
   },
   cardHeader: {
     flexDirection: 'row',

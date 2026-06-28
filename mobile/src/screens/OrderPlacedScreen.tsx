@@ -1,4 +1,5 @@
 import React from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { CircleCheck, Bike, Home } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,15 +48,15 @@ const OrderPlacedScreen = ({ route, navigation }: any) => {
 
       {/* Buttons */}
       <View style={styles.btnGroup}>
-        <TouchableOpacity style={styles.trackBtn} onPress={handleTrack} activeOpacity={0.85}>
+        <BouncingButton style={styles.trackBtn} onPress={handleTrack} activeOpacity={0.85}>
           <Bike size={18} color="#fff" />
           <Text style={styles.trackBtnText}>Track Order</Text>
-        </TouchableOpacity>
+        </BouncingButton>
 
-        <TouchableOpacity style={styles.homeBtn} onPress={handleHome} activeOpacity={0.85}>
+        <BouncingButton style={styles.homeBtn} onPress={handleHome} activeOpacity={0.85}>
           <Home size={18} color={colors.primary} />
           <Text style={styles.homeBtnText}>Back to Home</Text>
-        </TouchableOpacity>
+        </BouncingButton>
       </View>
     </View>
   );

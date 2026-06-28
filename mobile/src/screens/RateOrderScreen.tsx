@@ -1,5 +1,6 @@
 import { ArrowLeft, Star } from 'lucide-react-native';
 import React, { useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -20,9 +21,9 @@ const RateOrderScreen = ({ route, navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
         <ArrowLeft size={24} color="#1A1A2E" />
-      </TouchableOpacity>
+      </BouncingButton>
 
       <Text style={styles.title}>Rate your experience</Text>
       <Text style={styles.orderIdText}>Order #{orderId.slice(-6).toUpperCase()}</Text>
@@ -31,13 +32,13 @@ const RateOrderScreen = ({ route, navigation }: any) => {
       <Text style={styles.sectionLabel}>Taste & Quality</Text>
       <View style={styles.ratingRow}>
         {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity 
+          <BouncingButton 
             key={star} 
             onPress={() => setFoodRating(star)}
             style={styles.starBtn}
           >
             <Star size={24} color={foodRating >= star ? "#EAB308" : "#E5E7EB"} fill={foodRating >= star ? "#EAB308" : "none"} />
-          </TouchableOpacity>
+          </BouncingButton>
         ))}
       </View>
 
@@ -45,13 +46,13 @@ const RateOrderScreen = ({ route, navigation }: any) => {
       <Text style={styles.sectionLabel}>Delivery Speed & Care</Text>
       <View style={styles.ratingRow}>
         {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity 
+          <BouncingButton 
             key={star} 
             onPress={() => setDeliveryRating(star)}
             style={styles.starBtn}
           >
             <Star size={24} color={deliveryRating >= star ? "#EAB308" : "#E5E7EB"} fill={deliveryRating >= star ? "#EAB308" : "none"} />
-          </TouchableOpacity>
+          </BouncingButton>
         ))}
       </View>
 
@@ -66,7 +67,7 @@ const RateOrderScreen = ({ route, navigation }: any) => {
         textAlignVertical="top"
       />
 
-      <TouchableOpacity 
+      <BouncingButton 
         onPress={() => mutation.mutate({ foodRating, deliveryRating, comment })}
         disabled={foodRating === 0 || deliveryRating === 0 || mutation.isPending}
         style={[styles.submitBtn, (foodRating === 0 || deliveryRating === 0) ? styles.submitBtnDisabled : styles.submitBtnEnabled]}
@@ -76,7 +77,7 @@ const RateOrderScreen = ({ route, navigation }: any) => {
         ) : (
           <Text style={styles.submitBtnText}>Submit Feedback</Text>
         )}
-      </TouchableOpacity>
+      </BouncingButton>
     </View>
   );
 };
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f9fafb',
-    borderRadius: 12,
+    borderRadius: 20,
   },
   commentInput: {
     backgroundColor: '#f9fafb',
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 4,
   },

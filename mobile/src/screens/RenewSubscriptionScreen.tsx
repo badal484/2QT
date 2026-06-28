@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -70,12 +71,12 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <BouncingButton 
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
           <ArrowLeft size={24} color="#1A1A2E" />
-        </TouchableOpacity>
+        </BouncingButton>
         <Text style={styles.headerTitle}>Renew Membership</Text>
       </View>
 
@@ -99,7 +100,7 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
         <Text style={styles.sectionLabel}>Choose Renewal Plan</Text>
         
         {plans.map((plan: any) => (
-          <TouchableOpacity 
+          <BouncingButton 
             key={plan.id}
             activeOpacity={0.9}
             onPress={() => setSelectedPlan(plan.id)}
@@ -117,7 +118,7 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
                 </View>
               )}
             </View>
-          </TouchableOpacity>
+          </BouncingButton>
         ))}
 
         {/* Secure Note */}
@@ -134,7 +135,7 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
 
       {/* Action Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity 
+        <BouncingButton 
           activeOpacity={0.9}
           onPress={() => selectedPlan && renewMutation.mutate(selectedPlan)}
           disabled={!selectedPlan || renewMutation.isPending}
@@ -151,7 +152,7 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
               <ArrowRight size={24} color="white" />
             </View>
           )}
-        </TouchableOpacity>
+        </BouncingButton>
       </View>
     </View>
   );
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
     marginBottom: 48,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.08,
     shadowRadius: 30,
     elevation: 10,
   },
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -333,7 +334,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 8,
   },

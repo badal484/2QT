@@ -28,6 +28,32 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
         if (!addrInfo[0]) throw new Error('ADDRESS_NOT_FOUND');
         const { zone_id: zoneId, lat: custLat, lng: custLng } = addrInfo[0];
 
+        // 1.0 Kitchen hours check — block orders outside operating window (server-side safety net)
+        if (!dryRun) {
+            const { rows: zoneHours } = await query(
+                'SELECT opening_time, closing_time FROM zones WHERE id = $1',
+                [zoneId],
+            );
+            const zh = zoneHours[0];
+            if (zh?.opening_time && zh?.closing_time) {
+                const now = new Date();
+                const nowMins = now.getHours() * 60 + now.getMinutes();
+                const [oh, om] = (zh.opening_time as string).split(':').map(Number);
+                const [ch, cm] = (zh.closing_time as string).split(':').map(Number);
+                const openMins = oh * 60 + om;
+                const closeMins = ch * 60 + cm;
+                const crossesMidnight = closeMins < openMins;
+                const isOpen = crossesMidnight
+                    ? nowMins >= openMins || nowMins <= closeMins
+                    : nowMins >= openMins && nowMins <= closeMins;
+                if (!isOpen) {
+                    const h = oh > 12 ? oh - 12 : oh === 0 ? 12 : oh;
+                    const period = oh >= 12 ? 'PM' : 'AM';
+                    throw new Error(`KITCHEN_CLOSED: We're closed right now. We open at ${h}:${om === 0 ? '00' : String(om).padStart(2, '0')} ${period}`);
+                }
+            }
+        }
+
         // 1.1 Cross-Zone Validation: Ensure all cart items belong to the selected delivery zone
         const itemIds = items.map((i: any) => i.menuItemId);
         const { rows: itemZones } = await query('SELECT DISTINCT zone_id FROM menu_items WHERE id = ANY($1)', [itemIds]);

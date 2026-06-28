@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { isKitchenOpen, formatTime12h } from '../utils/kitchenHours';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Image,
   ActivityIndicator, Alert, StyleSheet,
@@ -44,11 +46,11 @@ const Toggle = ({ value, onValueChange, activeColor = ACCENT }: {
   }));
 
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={() => { triggerHaptic(); onValueChange(!value); }}>
+    <BouncingButton activeOpacity={0.8} onPress={() => { triggerHaptic(); onValueChange(!value); }}>
       <Animated.View style={[toggleStyles.track, trackStyle]}>
         <Animated.View style={[toggleStyles.thumb, thumbStyle]} />
       </Animated.View>
-    </TouchableOpacity>
+    </BouncingButton>
   );
 };
 
@@ -60,8 +62,8 @@ const toggleStyles = StyleSheet.create({
   thumb: {
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 }, elevation: 2,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16,
+    shadowOffset: { width: 0, height: 1 }, elevation: 4,
   },
 });
 
@@ -90,17 +92,7 @@ const CartScreen = ({ navigation }: any) => {
   });
   const hasActivePromos = (activePromosData?.promoCodes?.length ?? 0) > 0;
 
-  React.useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
-    const refresh = () => {
-      queryClient.invalidateQueries({ queryKey: ['your-order-pricing'] });
-    };
-    socket.on('menu_updated', refresh);
-    return () => {
-      socket.off('menu_updated', refresh);
-    };
-  }, [queryClient]);
+
 
   const { data: addressesData } = useQuery({
     queryKey: ['addresses'],
@@ -109,6 +101,15 @@ const CartScreen = ({ navigation }: any) => {
   });
   const selectedAddress = addressesData?.addresses?.find((a: any) => a.id === addressId);
   const isOutOfZone = !!addressId && !!selectedAddress && !selectedAddress.is_serviceable;
+
+  const handleAddressNavigation = () => {
+    triggerHaptic();
+    if (addressesData?.addresses?.length === 0) {
+      navigation.navigate('AddressBook');
+    } else {
+      navigation.navigate('Address');
+    }
+  };
 
   const { data: menuData } = useQuery({
     queryKey: ['menu', effectiveZoneId],
@@ -159,17 +160,19 @@ const CartScreen = ({ navigation }: any) => {
         </Animated.View>
         <Text style={styles.emptyTitle}>Your cart is empty</Text>
         <Text style={styles.emptySub}>Discover our delicious menu and add something tasty!</Text>
-        <TouchableOpacity
+        <BouncingButton
           style={styles.exploreBtn}
           onPress={() => { triggerHaptic(); navigation.reset({ index: 0, routes: [{ name: 'Home' }] }); }}
         >
           <Text style={styles.exploreBtnText}>Explore Menu</Text>
-        </TouchableOpacity>
+        </BouncingButton>
       </View>
     );
   }
 
   const busy = pricingFetching;
+  const kitchenOpen = isKitchenOpen(menuData?.openingTime, menuData?.closingTime);
+  const openLabel = menuData?.openingTime ? formatTime12h(menuData.openingTime) : '10:00 AM';
   const totalItemCount = items.reduce((s, i) => s + i.quantity, 0);
 
   return (
@@ -181,9 +184,9 @@ const CartScreen = ({ navigation }: any) => {
           <Text style={styles.headerTitle}>Order confirmation</Text>
           <Text style={styles.headerSub}>{totalItemCount} {totalItemCount === 1 ? 'item' : 'items'}</Text>
         </View>
-        <TouchableOpacity style={styles.clearCartBtn} onPress={() => { triggerHaptic(); dispatch(clearCart()); }}>
+        <BouncingButton style={styles.clearCartBtn} onPress={() => { triggerHaptic(); dispatch(clearCart()); }}>
           <Text style={styles.clearCartText}>Clear Cart</Text>
-        </TouchableOpacity>
+        </BouncingButton>
       </View>
 
       {/* Saved banner exactly like Screenshot 1 */}
@@ -232,19 +235,19 @@ const CartScreen = ({ navigation }: any) => {
                   <Text style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
                 </View>
                 <View style={styles.qtyRow}>
-                  <TouchableOpacity
+                  <BouncingButton
                     style={styles.qtyBtn}
                     onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
                   >
                     <Text style={styles.qtyBtnText}>−</Text>
-                  </TouchableOpacity>
+                  </BouncingButton>
                   <Text style={styles.qtyNum}>{item.quantity}</Text>
-                  <TouchableOpacity
+                  <BouncingButton
                     style={[styles.qtyBtn, styles.qtyBtnActive]}
                     onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
                   >
                     <Text style={[styles.qtyBtnText, styles.qtyBtnActiveText]}>+</Text>
-                  </TouchableOpacity>
+                  </BouncingButton>
                 </View>
               </View>
               {index < items.length - 1 && <View style={styles.cardDivider} />}
@@ -268,7 +271,7 @@ const CartScreen = ({ navigation }: any) => {
                         <ChefHat size={20} color={colors.inkFaint} />
                       </View>
                     )}
-                    <TouchableOpacity
+                    <BouncingButton
                       style={styles.recAddBtn}
                       activeOpacity={0.85}
                       onPress={() => {
@@ -287,7 +290,7 @@ const CartScreen = ({ navigation }: any) => {
                       }}
                     >
                       <Text style={styles.recAddText}>+</Text>
-                    </TouchableOpacity>
+                    </BouncingButton>
                     <View style={styles.recMeta}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
                         <View style={[styles.vegBadgeMini, { borderColor: vegColor, width: 6, height: 6 }]}>
@@ -334,7 +337,7 @@ const CartScreen = ({ navigation }: any) => {
                   returnKeyType="done"
                 />
               )}
-              <TouchableOpacity
+              <BouncingButton
                 style={[styles.applyBtn, !promoCode && !appliedPromoCode && styles.applyBtnDisabled]}
                 onPress={() => {
                   triggerHaptic();
@@ -349,17 +352,17 @@ const CartScreen = ({ navigation }: any) => {
                 <Text style={[styles.applyBtnText, !promoCode && !appliedPromoCode && styles.applyBtnTextDisabled]}>
                   {appliedPromoCode ? 'Remove' : 'Apply'}
                 </Text>
-              </TouchableOpacity>
+              </BouncingButton>
             </View>
           </Animated.View>
         )}
 
         {/* Delivery Address Card */}
         <Animated.View entering={FadeInDown.delay(90).duration(300)} style={styles.card}>
-          <TouchableOpacity
+          <BouncingButton
             style={styles.addressRow}
             activeOpacity={0.7}
-            onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
+            onPress={handleAddressNavigation}
           >
             <View style={styles.addressIconCircle}>
               <MapPin size={16} color={ACCENT} />
@@ -380,7 +383,7 @@ const CartScreen = ({ navigation }: any) => {
               )}
             </View>
             <Text style={styles.changeText}>Change</Text>
-          </TouchableOpacity>
+          </BouncingButton>
         </Animated.View>
 
         {/* Alternate Receiver Card */}
@@ -441,13 +444,13 @@ const CartScreen = ({ navigation }: any) => {
         {/* Tip the Rider */}
         <Animated.View entering={FadeInDown.delay(120).duration(300)} style={styles.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <Heart size={18} color="#D97B4F" style={{ marginRight: 8 }} />
+            <Heart size={18} color="#1B5E46" style={{ marginRight: 8 }} />
             <Text style={styles.cardTitle}>Tip your delivery partner</Text>
           </View>
           <Text style={styles.tipSub}>100% of your tip goes directly to your rider. Thank you!</Text>
           <View style={styles.tipOptionsRow}>
             {[20, 50, 100].map((amt) => (
-              <TouchableOpacity 
+              <BouncingButton 
                 key={amt}
                 style={[styles.tipChip, riderTip === amt && styles.tipChipActive]}
                 onPress={() => {
@@ -458,7 +461,7 @@ const CartScreen = ({ navigation }: any) => {
                 <Text style={[styles.tipChipText, riderTip === amt && styles.tipChipTextActive]}>
                   ₹{amt}
                 </Text>
-              </TouchableOpacity>
+              </BouncingButton>
             ))}
           </View>
         </Animated.View>
@@ -531,14 +534,14 @@ const CartScreen = ({ navigation }: any) => {
             <Text style={{ fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 }}>₹{grandTotal.toFixed(2)}</Text>
           </View>
           
-          <TouchableOpacity
-            style={[styles.footerCta, (busy || isOutOfZone) && styles.placeOrderBtnDisabled]}
-            disabled={busy || isOutOfZone}
+          <BouncingButton
+            style={[styles.footerCta, (busy || isOutOfZone || !kitchenOpen) && styles.placeOrderBtnDisabled]}
+            disabled={busy || isOutOfZone || !kitchenOpen}
             activeOpacity={0.88}
             onPress={() => {
               triggerHaptic();
               if (!addressId) {
-                Alert.alert('Address Required', 'Please select a delivery address.');
+                handleAddressNavigation();
                 return;
               }
               if (altReceiver) {
@@ -566,10 +569,14 @@ const CartScreen = ({ navigation }: any) => {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.footerCtaText}>
-                {addressId ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay') : 'Select Address'}
+                {!kitchenOpen
+                  ? `Opens at ${openLabel}`
+                  : addressId
+                    ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay')
+                    : 'Select Address'}
               </Text>
             )}
-          </TouchableOpacity>
+          </BouncingButton>
         </View>
       </Animated.View>
     </View>
@@ -579,25 +586,28 @@ const CartScreen = ({ navigation }: any) => {
 export default CartScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F8FA' }, // Off-white premium background
+  container: { flex: 1, backgroundColor: '#F3F4F6' }, // Light gray background for block separation
 
   // Header
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14,
-    backgroundColor: '#F7F8FA',
-    zIndex: 10,
-  },
-  headerTitle: { fontSize: 22, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
-  headerSub: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 },
-  clearCartBtn: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 14,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    zIndex: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F3F4F6',
+  },
+  headerTitle: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
+  headerSub: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 },
+  clearCartBtn: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E7EB',
   },
   clearCartText: {
-    fontSize: 12, fontFamily: fontFamily.bold, color: colors.inkMuted,
+    fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted,
   },
 
   savingsBanner: {
@@ -613,17 +623,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 150, gap: 16 },
+  scrollContent: { paddingBottom: 150 },
 
   // Estimate
   estimateCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
     padding: 16,
-    gap: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 3,
+    gap: 12,
+    marginBottom: 8,
   },
   estimateIconBox: {
     width: 40,
@@ -648,15 +657,11 @@ const styles = StyleSheet.create({
   // Card base
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 8,
   },
-  cardDivider: { height: 1, backgroundColor: '#E5E7EB', borderStyle: 'dashed', borderWidth: 1, borderRadius: 1, marginVertical: 16, borderColor: '#E5E7EB' },
+  cardDivider: { height: 1, backgroundColor: '#E5E7EB', borderStyle: 'solid', borderWidth: 1, borderRadius: 1, marginVertical: 12, borderColor: '#E5E7EB' },
   cardTitle: {
     fontSize: 16, fontFamily: fontFamily.black, color: colors.ink,
     marginBottom: 16, letterSpacing: -0.3,
@@ -671,7 +676,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 8,
   },
-  itemImgBox: { width: 56, height: 56, borderRadius: 12, overflow: 'hidden', marginRight: 14, backgroundColor: '#F7F8FA' },
+  itemImgBox: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', marginRight: 14, backgroundColor: '#F7F8FA' },
   itemImg: { width: '100%', height: '100%' },
   itemImgPlaceholder: { backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' },
   itemMeta: { flex: 1, marginRight: 12 },
@@ -691,18 +696,17 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // Qty stepper
-  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F7F8FA', borderRadius: 14, padding: 4 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F9FAFB', borderRadius: 16, padding: 2 },
   qtyBtn: {
-    width: 32, height: 32, borderRadius: 10,
+    width: 28, height: 28, borderRadius: 6,
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5E7EB',
   },
   qtyBtnActive: { backgroundColor: '#1B5E46' },
-  qtyBtnText: { fontSize: 18, color: colors.ink, fontFamily: fontFamily.black, lineHeight: 20 },
+  qtyBtnText: { fontSize: 16, color: colors.ink, fontFamily: fontFamily.black, lineHeight: 18 },
   qtyBtnActiveText: { color: '#FFFFFF' },
-  qtyNum: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink, minWidth: 20, textAlign: 'center' },
+  qtyNum: { fontSize: 13, fontFamily: fontFamily.black, color: colors.ink, minWidth: 20, textAlign: 'center' },
 
   // Address
   addressRow: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -720,7 +724,7 @@ const styles = StyleSheet.create({
   // Promo
   promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   promoIconBox: {
-    width: 42, height: 42, borderRadius: 12,
+    width: 42, height: 42, borderRadius: 20,
     backgroundColor: '#F7F8FA',
     alignItems: 'center', justifyContent: 'center',
   },
@@ -749,10 +753,10 @@ const styles = StyleSheet.create({
     width: 120,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    marginRight: 12,
-    paddingBottom: 10,
-    overflow: 'visible',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    marginRight: 10,
+    paddingBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   recImg: {
     width: '100%',
@@ -776,10 +780,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    elevation: 4,
     zIndex: 5,
   },
   recAddText: {
@@ -847,30 +851,23 @@ const styles = StyleSheet.create({
   },
   outOfZoneText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.dangerTint, textAlign: 'center', lineHeight: 20 },
 
-  // Footer
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20, paddingTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 16,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    paddingHorizontal: 16, paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   footerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   footerCta: {
-    height: 56,
+    height: 48,
     backgroundColor: '#1B5E46',
-    borderRadius: 16,
-    paddingHorizontal: 32,
+    borderRadius: 20,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1B5E46', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6,
   },
   footerCtaText: {
     fontSize: 16,
@@ -879,35 +876,32 @@ const styles = StyleSheet.create({
   },
   placeOrderBtnDisabled: { opacity: 0.55 },
 
-  // Empty state
   emptyContainer: {
-    flex: 1, backgroundColor: '#F7F8FA',
+    flex: 1, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center', padding: 40,
   },
   emptyIconBox: {
     width: 110, height: 110, borderRadius: 55,
-    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 28,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 3,
+    backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', marginBottom: 28,
   },
   emptyTitle: { fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 12, letterSpacing: -0.5 },
   emptySub: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', lineHeight: 24 },
   exploreBtn: {
     marginTop: 32, backgroundColor: '#1B5E46',
-    paddingHorizontal: 36, paddingVertical: 16, borderRadius: 16,
-    shadowColor: '#1B5E46', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6,
+    paddingHorizontal: 36, paddingVertical: 16, borderRadius: 20,
   },
   exploreBtnText: { fontSize: 15, fontFamily: fontFamily.black, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 },
 
   // New Styles for Added UI
   cardTitleInline: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2 },
   cardSubInline: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkFaint },
-  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, height: 48 },
+  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, paddingHorizontal: 12, height: 48 },
   inputText: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
-  textArea: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, minHeight: 80, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, textAlignVertical: 'top' },
+  textArea: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, padding: 12, minHeight: 80, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, textAlignVertical: 'top' },
   tipSub: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkFaint, marginBottom: 12, lineHeight: 18 },
   tipOptionsRow: { flexDirection: 'row', gap: 10 },
-  tipChip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', alignItems: 'center' },
-  tipChipActive: { borderColor: '#D97B4F', backgroundColor: '#FFF5F0' },
+  tipChip: { flex: 1, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', alignItems: 'center' },
+  tipChipActive: { borderColor: '#1B5E46', backgroundColor: '#E8F2EC' },
   tipChipText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
-  tipChipTextActive: { color: '#D97B4F' },
+  tipChipTextActive: { color: '#1B5E46' },
 });

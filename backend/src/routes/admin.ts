@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z, ZodSchema } from 'zod';
 import bcrypt from 'bcrypt';
 import { query, withTransaction } from '../db';
+import { ActivityLogService } from '../services/activity.service';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToAdmin, emitToKitchen } from '../socket';
@@ -78,6 +79,18 @@ const imagekit = new ImageKit({
 const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
+
+
+router.get('/activity-logs', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { limit, role, action } = req.query;
+        const logs = await ActivityLogService.getLogs(Number(limit) || 100, role as string, action as string);
+        res.json({ logs });
+    } catch (error) {
+        console.error('Error fetching activity logs:', error);
+        res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+});
 
 router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
@@ -805,6 +818,7 @@ router.post('/inventory', authenticate, requireRole('super_admin', 'admin'), asy
                 rows.push(r.rows[0]);
             }
         }
+        emitToAdmin('inventory_updated', { type: 'add', ingredient: rows[0] });
         res.json({ ingredient: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to add ingredient', details: err.message });
@@ -821,6 +835,7 @@ router.patch('/inventory/:id', authenticate, requireRole('super_admin', 'admin')
             // Fallback to id if it's an actual UUID
             await query('UPDATE ingredients SET current_stock_grams = $1 WHERE id = $2', [current_stock, idOrName]);
         }
+        emitToAdmin('inventory_updated', { type: 'update', id: idOrName, current_stock });
         res.json({ success: true });
     } catch (e) {
         console.error('PATCH /inventory error:', e);
@@ -1188,7 +1203,7 @@ router.get('/team/users', authenticate, requireRole('super_admin'), async (req: 
         const { rows } = await query(`
             SELECT id, name, phone, email, role, is_active, is_verified, created_at
             FROM users
-            WHERE role IN ('finance', 'super_admin', 'admin')
+            WHERE role IN ('finance', 'super_admin', 'admin', 'chef', 'rider', 'rider_captain')
             ORDER BY created_at DESC
         `);
         res.json({ users: rows });
@@ -1200,7 +1215,7 @@ router.get('/team/users', authenticate, requireRole('super_admin'), async (req: 
 router.post('/team/users', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
     const { phone, name, role } = req.body as { phone: string; name: string; role: string };
     if (!phone || !name || !role) return res.status(400).json({ error: 'phone, name, role required' });
-    if (!['finance', 'admin'].includes(role)) return res.status(400).json({ error: 'role must be finance or admin' });
+    if (!['finance', 'admin', 'chef', 'rider'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
 
     const cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length < 10) return res.status(400).json({ error: 'Invalid phone number' });

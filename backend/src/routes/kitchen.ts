@@ -323,4 +323,121 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
     }
 });
 
+// ─── Dispatch: live rider list with GPS + order status ───────────────────────
+router.get('/riders/live', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows: riders } = await query(`
+            SELECT u.id, u.name, u.phone, u.current_order_id, u.is_online,
+                   o.status      AS order_status,
+                   o.display_id  AS order_display_id,
+                   a.address_text AS delivery_address
+            FROM users u
+            LEFT JOIN orders o ON u.current_order_id = o.id
+            LEFT JOIN addresses a ON o.address_id = a.id
+            WHERE u.role IN ('rider','rider_captain') AND u.is_online = true
+            ORDER BY u.name
+        `);
+
+        // Attach GPS from Redis (non-blocking — missing is fine)
+        const ridersWithLocation = await Promise.all(
+            riders.map(async (r: any) => {
+                try {
+                    const raw = await redis.get(keys.riderLocation(r.id));
+                    return { ...r, location: raw ? JSON.parse(raw) : null };
+                } catch {
+                    return { ...r, location: null };
+                }
+            })
+        );
+
+        res.json({ riders: ridersWithLocation });
+    } catch (err: any) {
+        res.status(500).json({ error: 'FETCH_FAILED', message: err.message });
+    }
+});
+
+// ─── Dispatch: manually assign a specific rider to a ready order ──────────────
+router.post('/orders/:id/assign-rider', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { riderId } = req.body;
+    if (!riderId) return res.status(400).json({ error: 'MISSING_RIDER_ID' });
+
+    try {
+        // Verify rider is online and free
+        const { rows: riderRows } = await query(
+            'SELECT id, name, current_order_id, is_online FROM users WHERE id = $1',
+            [riderId]
+        );
+        const rider = riderRows[0];
+        if (!rider) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
+        if (!rider.is_online) return res.status(409).json({ error: 'RIDER_OFFLINE' });
+        if (rider.current_order_id) return res.status(409).json({ error: 'RIDER_BUSY' });
+
+        // Assign atomically
+        const { rows: orderRows } = await query(
+            `UPDATE orders SET rider_id = $1
+             WHERE id = $2 AND rider_id IS NULL AND status = 'ready_for_pickup'
+             RETURNING id, display_id, customer_id, kitchen_id, zone_id`,
+            [riderId, id]
+        );
+        if (!orderRows[0]) return res.status(409).json({ error: 'ORDER_UNAVAILABLE' });
+
+        await query('UPDATE users SET current_order_id = $1 WHERE id = $2', [id, riderId]);
+
+        const order = orderRows[0];
+
+        // Push to rider — they'll see accept/decline modal
+        emitToUser(riderId, 'order_assigned', {
+            orderId: id,
+            displayId: order.display_id,
+            assignedBy: 'kitchen',
+        });
+
+        // Notify customer that a rider was assigned
+        emitToUser(order.customer_id, 'order_status_update', {
+            orderId: id,
+            status: order.status,
+            riderAssigned: true,
+            riderName: rider.name,
+        });
+
+        emitToKitchen(order.kitchen_id, 'order_updated', { orderId: id });
+        emitToAdmin('order_status_update', { orderId: id, display_id: order.display_id });
+
+        res.json({ success: true, riderId, riderName: rider.name });
+    } catch (err: any) {
+        res.status(500).json({ error: 'ASSIGN_FAILED', message: err.message });
+    }
+});
+
+// ─── Dispatch: get unassigned ready orders for dispatch panel ─────────────────
+router.get('/orders/unassigned', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT o.id, o.display_id, o.status, o.created_at,
+                   u.name AS customer_name, u.phone AS customer_phone,
+                   a.address_text AS delivery_address, a.lat AS customer_lat, a.lng AS customer_lng,
+                   k.name AS kitchen_name
+            FROM orders o
+            JOIN users u ON o.customer_id = u.id
+            LEFT JOIN addresses a ON o.address_id = a.id
+            LEFT JOIN kitchens k ON o.kitchen_id = k.id
+            WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL
+            ORDER BY o.created_at ASC
+        `);
+
+        for (const order of rows) {
+            const { rows: items } = await query(
+                'SELECT menu_item_name, quantity FROM order_items WHERE order_id = $1',
+                [order.id]
+            );
+            order.items = items;
+        }
+
+        res.json({ orders: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: 'FETCH_FAILED', message: err.message });
+    }
+});
+
 export default router;

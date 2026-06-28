@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { ConfirmModal } from "../../components/ConfirmModal";
 
 const MapPolygonPicker = dynamic(() => import("../../components/MapPolygonPicker"), { ssr: false });
@@ -36,6 +37,8 @@ export function ZonesTab() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useSocketRefresh(["zone_updated"], load);
 
   const createZone = async () => {
     if (!addForm.name) {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Plus, X, Trash2, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
 import { api } from "../lib/api";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
 
@@ -41,6 +42,8 @@ export function KitchensTab() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useSocketRefresh(["kitchen_updated", "user_updated"], load);
 
   const save = async () => {
     try {

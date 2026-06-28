@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Dimensions } from 'react-native';
 import { ArrowLeft, Play, ShieldCheck, Thermometer, Info, ChevronRight, UserCircle, Droplets, Utensils, X } from 'lucide-react-native';
 import Animated, { FadeInDown, BounceIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
@@ -83,9 +84,9 @@ const LiveKitchenScreen = ({ navigation }: any) => {
             <View style={styles.videoOverlay}>
                 {/* Header inside video */}
                 <View style={[styles.videoHeader, { paddingTop: Math.max(insets.top + 10, 40) }]}>
-                    <TouchableOpacity style={styles.backButton} onPress={() => { triggerHaptic(); navigation.goBack(); }}>
+                    <BouncingButton style={styles.backButton} onPress={() => { triggerHaptic(); navigation.goBack(); }}>
                         <ArrowLeft size={24} color="#FFFFFF" />
-                    </TouchableOpacity>
+                    </BouncingButton>
                     
                     <View style={styles.liveBadgeContainer}>
                         <View style={styles.liveDotWrapper}>
@@ -114,14 +115,14 @@ const LiveKitchenScreen = ({ navigation }: any) => {
             <Text style={styles.sectionTitle}>Behind the Scenes</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
                 {STORIES.map((story) => (
-                    <TouchableOpacity key={story.id} style={styles.storyItem} onPress={() => handleStoryPress(story.video)} activeOpacity={0.7}>
+                    <BouncingButton key={story.id} style={styles.storyItem} onPress={() => handleStoryPress(story.video)} activeOpacity={0.7}>
                         <View style={styles.storyRing}>
                             <View style={[styles.storyImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }]}>
                                 <Text style={{ fontSize: 32 }}>{story.emoji}</Text>
                             </View>
                         </View>
                         <Text style={styles.storyTitle}>{story.title}</Text>
-                    </TouchableOpacity>
+                    </BouncingButton>
                 ))}
             </ScrollView>
         </Animated.View>
@@ -226,12 +227,12 @@ const LiveKitchenScreen = ({ navigation }: any) => {
                 </View>
 
                 {/* Close Button */}
-                <TouchableOpacity 
+                <BouncingButton 
                     style={styles.storyCloseButton} 
                     onPress={() => { triggerHaptic(); setActiveStoryVideo(null); }}
                 >
                     <X size={24} color="#FFFFFF" />
-                </TouchableOpacity>
+                </BouncingButton>
             </View>
         </View>
       </Modal>
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   
   // Player Styles
-  videoPlayerContainer: { width: '100%', height: 380, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 15, zIndex: 10, backgroundColor: '#1A1A2E' },
+  videoPlayerContainer: { width: '100%', height: 380, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 15, zIndex: 10, backgroundColor: '#1A1A2E' },
   videoBackground: { width: '100%', height: '100%' },
   videoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'space-between' },
   videoHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, backgroundColor: 'rgba(0,0,0,0.4)', paddingBottom: 16 },
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
   liveDot: { position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: '#EF4444' },
   liveDotCore: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
   liveBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 1, marginRight: 12 },
-  viewerBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  viewerBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16 },
   viewerText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', marginLeft: 6 },
   
   videoFooter: { padding: 24, paddingTop: 60, backgroundColor: 'rgba(0,0,0,0.6)' },
@@ -267,19 +268,19 @@ const styles = StyleSheet.create({
   storiesContainer: { marginTop: 32 },
   storiesScroll: { paddingHorizontal: 16, gap: 16 },
   storyItem: { alignItems: 'center', width: 76 },
-  storyRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 2, borderColor: '#10B981', padding: 4, marginBottom: 10, shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 },
+  storyRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 2, borderColor: '#10B981', padding: 4, marginBottom: 10, shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
   storyImage: { width: '100%', height: '100%', borderRadius: 32, overflow: 'hidden' },
   storyTitle: { fontSize: 12, fontWeight: '800', color: '#1A1A2E', textAlign: 'center' },
 
   // Dashboard Styles
   dashboardContainer: { marginTop: 40 },
   metricList: { paddingHorizontal: 16, gap: 12 },
-  metricRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  metricRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 16, elevation: 4 },
   metricIconWrapper: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   metricRowInfo: { flex: 1, marginLeft: 16 },
   metricValue: { fontSize: 16, fontWeight: '900', color: '#1A1A2E', letterSpacing: -0.3 },
   metricLabel: { fontSize: 12, fontWeight: '600', color: '#6B7280', marginTop: 2 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 },
   statusPillText: { fontSize: 9, fontWeight: '900', color: '#4B5563', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // Chef Styles

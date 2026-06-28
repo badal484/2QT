@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { DollarSign, Percent, Bike, MapPin } from "lucide-react";
 
 export function DeliveryPricingTab() {
@@ -22,6 +23,8 @@ export function DeliveryPricingTab() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useSocketRefresh(["zone_updated"], load);
 
   const startEdit = (zone: any) => {
     setEditing(zone.id);

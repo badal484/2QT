@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (paise: number | string) =>
   `₹${(parseInt(String(paise || 0)) / 100).toLocaleString("en-IN")}`;
@@ -216,6 +217,8 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useSocketRefresh(["menu_updated", "inventory_updated", "kitchen_metrics_updated", "kitchen_payout_updated", "new_order"], load);
 
   const kitchen = data?.kitchen;
   const commissionRate = parseFloat(kitchen?.commission_rate || "0.20");

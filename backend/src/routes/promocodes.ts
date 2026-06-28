@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../middleware/auth';
 import redis, { keys } from '../redis';
 
 const router = express.Router();
+import { emitToAdmin, emitToAll } from '../socket';
 
 const PROMO_TTL = 30; // 30-second cache — admin disable reflects within 30s
 
@@ -78,6 +79,8 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
             ]
         );
         await bustPromoCache();
+        emitToAdmin('promo_updated', { type: 'add' });
+        emitToAll('promo_updated', { type: 'add' });
         res.status(201).json({ promoCode: rows[0] });
     } catch (err: any) {
         console.error(err);
@@ -123,6 +126,8 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Promo code not found' });
         await bustPromoCache(); // instant bust — disabled codes vanish from app within seconds
+        emitToAdmin('promo_updated', { type: 'update' });
+        emitToAll('promo_updated', { type: 'update' });
         res.json({ promoCode: rows[0] });
     } catch (err: any) {
         console.error(err);
@@ -137,6 +142,8 @@ router.delete('/admin/:id', authenticate, requireRole('super_admin', 'admin'), a
         const { rowCount } = await query('DELETE FROM promo_codes WHERE id = $1', [id]);
         if (rowCount === 0) return res.status(404).json({ error: 'Promo code not found' });
         await bustPromoCache();
+        emitToAdmin('promo_updated', { type: 'delete' });
+        emitToAll('promo_updated', { type: 'delete' });
         res.json({ message: 'Promo code deleted successfully' });
     } catch (err: any) {
         console.error(err);
