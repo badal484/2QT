@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Search, RefreshCw, Phone, ChevronLeft, ChevronRight, Package, User, Bike, Clock, Banknote, Smartphone, AlertCircle } from "lucide-react";
 import { api } from "../lib/api";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: "text-amber-400 bg-amber-400/10 border-amber-400/20",
@@ -57,6 +58,8 @@ export function DispatchTab() {
   }, [search, status, date, page]);
 
   useEffect(() => { load(1); }, []);
+
+  useSocketRefresh(["new_order", "order_status_update"], () => load(page));
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

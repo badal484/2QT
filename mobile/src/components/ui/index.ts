@@ -6,3 +6,4 @@ export * from './EmptyState';
 export * from './Skeleton';
 export * from './ProgressBar';
 export * from './StatCard';
+export * from './BouncingButton';

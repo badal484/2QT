@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, ActivityIndicator, Dimensions
@@ -106,7 +107,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
     const isEven = index % 2 === 0;
 
     return (
-      <TouchableOpacity
+      <BouncingButton
         style={[styles.gridCard, { marginLeft: isEven ? 0 : 16 }]}
         activeOpacity={0.93}
         onPress={() => {
@@ -152,29 +153,29 @@ const CategoryScreen = ({ route, navigation }: any) => {
             <View style={styles.gridAddBtnFloat}>
               {cartItem ? (
                 <View style={styles.qtyControl}>
-                  <TouchableOpacity
+                  <BouncingButton
                     onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity - 1 })); }}
                     style={styles.qtyBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
                   >
                     <Text style={styles.qtyBtnText}>−</Text>
-                  </TouchableOpacity>
+                  </BouncingButton>
                   <Text style={styles.qtyValue}>{cartItem.quantity}</Text>
-                  <TouchableOpacity
+                  <BouncingButton
                     onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity + 1 })); }}
                     style={styles.qtyBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                   >
                     <Text style={styles.qtyBtnText}>+</Text>
-                  </TouchableOpacity>
+                  </BouncingButton>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.addBtn} onPress={() => handleAddToCart(item)} activeOpacity={0.85}>
+                <BouncingButton style={styles.addBtn} onPress={() => handleAddToCart(item)} activeOpacity={0.85}>
                   <Text style={styles.addBtnText}>ADD</Text>
                   <View style={styles.customiseBadge}>
                     <Text style={styles.customiseText}>Customise</Text>
                   </View>
-                </TouchableOpacity>
+                </BouncingButton>
               )}
             </View>
           )}
@@ -194,7 +195,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
             </View>
           )}
         </View>
-      </TouchableOpacity>
+      </BouncingButton>
     );
   }, [cartItems, menuData?.kitchenPaused, handleAddToCart, triggerHaptic, dispatch, navigation]);
 
@@ -216,20 +217,20 @@ const CategoryScreen = ({ route, navigation }: any) => {
       )}
 
       {/* Floating Back Button */}
-      <TouchableOpacity 
+      <BouncingButton 
         style={[styles.floatingBackBtn, { top: Math.max(insets.top, 16) }]} 
         onPress={() => { triggerHaptic(); navigation.goBack(); }}
       >
         <ChevronLeft size={24} color={colors.ink} />
-      </TouchableOpacity>
+      </BouncingButton>
 
       {/* Floating Search Button */}
-      <TouchableOpacity 
+      <BouncingButton 
         style={[styles.floatingSearchBtn, { top: Math.max(insets.top, 16) }]} 
         onPress={() => { triggerHaptic(); setIsSearching(!isSearching); }}
       >
         <Search size={22} color={colors.ink} />
-      </TouchableOpacity>
+      </BouncingButton>
 
       {/* Search Input (Expandable) */}
       {isSearching && (
@@ -245,9 +246,9 @@ const CategoryScreen = ({ route, navigation }: any) => {
               autoFocus
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <BouncingButton onPress={() => setSearchQuery('')}>
                 <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
-              </TouchableOpacity>
+              </BouncingButton>
             )}
           </View>
         </View>
@@ -257,9 +258,9 @@ const CategoryScreen = ({ route, navigation }: any) => {
       <View style={styles.dietaryRow}>
         {(['Veg', 'Non-Veg', 'Egg'] as const).map((type) => {
           const isActive = dietaryFilter === type;
-          let iconColor = type === 'Veg' ? '#22C55E' : type === 'Non-Veg' ? colors.danger : '#F59E0B';
+          let iconColor = type === 'Veg' ? '#22C55E' : type === 'Non-Veg' ? colors.danger : G.primary;
           return (
-            <TouchableOpacity
+            <BouncingButton
               key={type}
               style={[styles.dietaryPill, isActive && styles.dietaryPillActive]}
               onPress={() => { 
@@ -271,7 +272,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
                 <View style={[styles.dietaryIconInner, { backgroundColor: iconColor, borderRadius: type === 'Egg' ? 4 : 4 }]} />
               </View>
               <Text style={styles.dietaryText}>{type}</Text>
-            </TouchableOpacity>
+            </BouncingButton>
           );
         })}
       </View>
@@ -306,7 +307,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
       {/* Floating cart */}
       {totalCartQty > 0 && (
         <View style={[styles.floatingCart, { bottom: Math.max(insets.bottom, 16) + 8 }]}>
-          <TouchableOpacity
+          <BouncingButton
             style={styles.floatingCartBtn}
             onPress={() => { triggerHaptic(); navigation.navigate('Cart'); }}
             activeOpacity={0.9}
@@ -316,7 +317,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
               <Text style={styles.cartTotal}>  ₹{cartTotal / 100}</Text>
             </View>
             <Text style={styles.viewCartText}>View Cart</Text>
-          </TouchableOpacity>
+          </BouncingButton>
         </View>
       )}
     </View>
@@ -324,13 +325,13 @@ const CategoryScreen = ({ route, navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, marginTop: 40 },
   emptyTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 6 },
   emptySub: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted },
   
   // Hero Header
-  headerContainer: { backgroundColor: colors.background, paddingBottom: 16 },
+  headerContainer: { backgroundColor: '#FFFFFF', paddingBottom: 16 },
   heroImageContainer: { width: '100%', height: 260, position: 'relative' },
   heroImage: { width: '100%', height: '100%', borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
   heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, backgroundColor: 'transparent' }, // Placeholder for actual gradient if needed
@@ -339,12 +340,12 @@ const styles = StyleSheet.create({
   floatingBackBtn: {
     position: 'absolute', left: 16, width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4
   },
   floatingSearchBtn: {
     position: 'absolute', right: 16, width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4
   },
 
   // Search
@@ -364,68 +365,68 @@ const styles = StyleSheet.create({
 
   // Dietary Filters
   dietaryRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: 10, marginTop: 4, marginBottom: 16 },
-  dietaryPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 6 },
+  dietaryPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 6 },
   dietaryPillActive: { backgroundColor: 'rgba(34, 197, 94, 0.05)', borderColor: '#22C55E' },
   dietaryIcon: { width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   dietaryIconInner: { width: 6, height: 6, borderRadius: 3 },
   dietaryText: { fontSize: 12, fontFamily: fontFamily.bold, color: colors.ink },
 
   // 2-Column Grid
-  columnWrapper: { paddingHorizontal: spacing.lg, justifyContent: 'flex-start', marginBottom: 24 },
+  columnWrapper: { paddingHorizontal: 12, justifyContent: 'flex-start', marginBottom: 16 },
   gridCard: { width: COLUMN_WIDTH, backgroundColor: 'transparent' },
-  gridCardImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: colors.surfaceMuted, position: 'relative', marginBottom: 12 },
+  gridCardImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F9FAFB', position: 'relative', marginBottom: 8 },
   gridCardImage: { width: '100%', height: '100%' },
   cardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   
-  vegBadgeFloat: { position: 'absolute', top: 12, left: 12, width: 16, height: 16, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  vegBadgeFloat: { position: 'absolute', top: 8, left: 8, width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   vegDot: { width: 8, height: 8, borderRadius: 4 },
   
   gridCardInfo: { paddingHorizontal: 4 },
-  cardName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
-  cardDesc: { fontSize: 12, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 16, marginBottom: 6 },
-  cardPrice: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink },
+  cardName: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2, lineHeight: 18 },
+  cardDesc: { fontSize: 11, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 14, marginBottom: 4 },
+  cardPrice: { fontSize: 14, fontFamily: fontFamily.black, color: colors.ink },
   
-  gridAddBtnFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '80%', zIndex: 10 },
+  gridAddBtnFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
   qtyControl: {
-    flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 12,
-    alignItems: 'center', justifyContent: 'space-between', height: 40,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6
+    flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 16,
+    alignItems: 'center', justifyContent: 'space-between', height: 32,
+    shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4
   },
-  qtyBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
-  qtyBtnText: { color: colors.white, fontSize: 22, fontFamily: fontFamily.bold },
-  qtyValue: { color: colors.white, fontSize: 15, fontFamily: fontFamily.extrabold },
+  qtyBtn: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
+  qtyBtnText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
+  qtyValue: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
   addBtn: {
-    backgroundColor: '#24B059', borderRadius: 12, height: 40,
+    backgroundColor: '#24B059', borderRadius: 16, height: 32,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6,
+    shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4,
     position: 'relative'
   },
-  addBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 16, letterSpacing: 0.5 },
-  customiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' },
-  customiseText: { fontSize: 9, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
+  addBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
+  customiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F3F4F6' },
+  customiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
   
   soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
 
-  bestsellerOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
+  bestsellerOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   bestsellerOverlayText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
-  newOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
+  newOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   newOverlayText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
-  tagChip: { backgroundColor: colors.surfaceMuted, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: colors.border },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  tagChip: { backgroundColor: '#F9FAFB', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 0 },
   tagChipText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
 
   // Floating cart
   floatingCart: {
-    position: 'absolute', left: 16, right: 16, zIndex: 999,
+    position: 'absolute', left: 12, right: 12, zIndex: 999,
     backgroundColor: colors.primary, borderRadius: 16,
-    paddingVertical: 14, paddingHorizontal: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 20,
+    paddingVertical: 10, paddingHorizontal: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4,
   },
   floatingCartBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cartCount: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: fontFamily.extrabold, letterSpacing: 1, textTransform: 'uppercase' },
-  cartTotal: { color: colors.white, fontSize: 22, fontFamily: fontFamily.black, letterSpacing: -0.5 },
-  viewCartText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14 },
+  cartTotal: { color: colors.white, fontSize: 18, fontFamily: fontFamily.black, letterSpacing: -0.5 },
+  viewCartText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 13 },
 });
 
 export default CategoryScreen;

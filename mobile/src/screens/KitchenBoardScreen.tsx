@@ -20,7 +20,7 @@ const G = {
   green: '#00D084',
   greenBg: 'rgba(0,208,132,0.08)',
   greenBorder: 'rgba(0,208,132,0.18)',
-  amber: '#F59E0B',
+  amber: G.primary,
   amberBg: 'rgba(245,158,11,0.08)',
   amberBorder: 'rgba(245,158,11,0.18)',
   red: '#EF4444',
@@ -58,16 +58,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
 
-  useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
-    socket.on('new_order', () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }));
-    socket.on('order_updated', () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }));
-    return () => {
-      socket.off('new_order');
-      socket.off('order_updated');
-    };
-  }, [queryClient]);
+
 
   const { data: menuData } = useQuery({
     queryKey: ['kitchen-menu'],

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, Store, CheckCircle2, XCircle, Clock, Edit3, X, ChevronDown } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const pct = (r: number | string) => `${(parseFloat(String(r)) * 100).toFixed(0)}%`;
 const fmt = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
@@ -193,6 +194,8 @@ export function PartnersTab() {
   }, [view, appStatus]);
 
   useEffect(() => { load(); }, [load]);
+
+  useSocketRefresh(["partner_updated"], load);
 
   const handleReview = async (id: string, status: string, rejectionReason: string, notes: string) => {
     try {

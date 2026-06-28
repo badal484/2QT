@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "../lib/api";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
 import { ShieldCheck, Thermometer, Droplets, Utensils, RefreshCw, Save } from "lucide-react";
 
@@ -18,9 +19,8 @@ export function KitchenHealthTab() {
     });
   }, []);
 
-  useEffect(() => {
+  const loadMetrics = useCallback(() => {
     if (!selectedZone) return;
-    setLoading(true);
     api.get(`/admin/zones/${selectedZone}/metrics`).then((data: any) => {
       setMetrics(data.metrics || {
         fssai_status: 'FSSAI Certified',
@@ -35,6 +35,15 @@ export function KitchenHealthTab() {
       setLoading(false);
     });
   }, [selectedZone]);
+
+  useEffect(() => {
+    if (selectedZone) {
+      setLoading(true);
+      loadMetrics();
+    }
+  }, [selectedZone, loadMetrics]);
+
+  useSocketRefresh(["kitchen_metrics_updated"], loadMetrics);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

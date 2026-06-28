@@ -2,6 +2,7 @@ import {
   ArrowLeft, Home, Briefcase, MapPin, Navigation, Plus, Trash2, Search,
 } from 'lucide-react-native';
 import React, { useState } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -143,9 +144,9 @@ const AddressScreen = ({ navigation }: any) => {
 
         {/* Clean Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <BouncingButton style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
             <ArrowLeft size={22} color={colors.ink} />
-          </TouchableOpacity>
+          </BouncingButton>
           <Text style={styles.headerTitle}>Select a location</Text>
         </View>
 
@@ -156,10 +157,10 @@ const AddressScreen = ({ navigation }: any) => {
           contentContainerStyle={styles.scrollContent}
         >
           {/* Search bar matching Screenshot 3 */}
-          <TouchableOpacity style={styles.searchBar} onPress={() => setSearchVisible(true)} activeOpacity={0.9}>
+          <BouncingButton style={styles.searchBar} onPress={() => setSearchVisible(true)} activeOpacity={0.9}>
             <Search size={20} color={colors.primary} />
             <Text style={styles.searchPlaceholder}>Search location</Text>
-          </TouchableOpacity>
+          </BouncingButton>
 
           {/* Selected Address Display */}
           <View style={styles.selectedAddressSection}>
@@ -168,7 +169,7 @@ const AddressScreen = ({ navigation }: any) => {
               {currentAddressId === 'gps' ? 'Current GPS Location' : (selectedAddr?.address_text || "Choose a location below")}
             </Text>
             
-            <TouchableOpacity
+            <BouncingButton
               style={styles.useCurrentLocationBtn}
               onPress={handleUseCurrentLocation}
               disabled={gpsChecking}
@@ -180,7 +181,7 @@ const AddressScreen = ({ navigation }: any) => {
                 <Navigation size={18} color={colors.primary} style={{ marginRight: 8 }} />
               )}
               <Text style={styles.useCurrentLocationText}>Use current location</Text>
-            </TouchableOpacity>
+            </BouncingButton>
           </View>
 
           {/* Saved addresses */}
@@ -191,7 +192,7 @@ const AddressScreen = ({ navigation }: any) => {
               <Text style={styles.sectionLabel}>SAVED ADDRESSES</Text>
               {savedList.map((addr: any, i: number) => (
                 <Animated.View key={addr.id} entering={FadeInDown.delay(i * 40).duration(250)}>
-                  <TouchableOpacity
+                  <BouncingButton
                     style={[styles.addrCard, !addr.is_serviceable && styles.addrCardDisabled]}
                     onPress={() => selectAddress(addr)}
                     activeOpacity={0.85}
@@ -230,15 +231,15 @@ const AddressScreen = ({ navigation }: any) => {
                     {selectingId === addr.id ? (
                       <ActivityIndicator size="small" color={colors.primary} style={styles.deleteBtn} />
                     ) : (
-                      <TouchableOpacity
+                      <BouncingButton
                         onPress={() => confirmDelete(addr)}
                         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                         style={styles.deleteBtn}
                       >
                         <Trash2 size={18} color={colors.danger} />
-                      </TouchableOpacity>
+                      </BouncingButton>
                     )}
-                  </TouchableOpacity>
+                  </BouncingButton>
                 </Animated.View>
               ))}
             </View>
@@ -248,7 +249,7 @@ const AddressScreen = ({ navigation }: any) => {
 
         {/* Add new address button at bottom */}
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 24) }]}>
-          <TouchableOpacity
+          <BouncingButton
             style={styles.addBtn}
             onPress={() => { 
               triggerHaptic(); 
@@ -259,7 +260,7 @@ const AddressScreen = ({ navigation }: any) => {
           >
             <Plus size={20} color={colors.white} />
             <Text style={styles.addBtnText}>Add new address</Text>
-          </TouchableOpacity>
+          </BouncingButton>
         </View>
 
         <AddressSearchModal
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     gap: 12,
     backgroundColor: '#fff', 
-    borderRadius: 12,
+    borderRadius: 20,
     paddingHorizontal: 16, 
     paddingVertical: 14,
     borderWidth: 1, 
@@ -349,7 +350,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.primary + '40',
     backgroundColor: colors.white,
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
   addrIconBox: {
     width: 44, 
     height: 44, 
-    borderRadius: 12,
+    borderRadius: 20,
     alignItems: 'center', 
     justifyContent: 'center', 
     marginRight: 14,

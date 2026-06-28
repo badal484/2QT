@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, CheckCircle2, AlertCircle, Wallet, X, ChevronRight } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
 
@@ -103,6 +104,11 @@ export function CODTab() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (showHistory) loadHistory(); }, [showHistory]);
+
+  useSocketRefresh(["cod_updated", "order_status_update"], () => {
+    load();
+    if (showHistory) loadHistory();
+  });
 
   // Group orders by rider
   const byRider = orders.reduce((acc: any, o) => {

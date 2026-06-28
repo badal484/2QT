@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, CheckCircle2, Bike, X, ChevronDown, ChevronUp } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
 
@@ -114,6 +115,8 @@ export function RiderPayoutsTab() {
   }, [view]);
 
   useEffect(() => { load(); }, [load]);
+
+  useSocketRefresh(["rider_payout_updated", "order_status_update"], load);
 
   const handleMarkPaid = async (id: string, paymentReference: string, notes: string) => {
     try {

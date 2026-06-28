@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, StyleSheet, RefreshControl,
@@ -47,7 +48,7 @@ const TicketCard = ({ ticket, idx }: { ticket: any; idx: number }) => {
 
   return (
     <Animated.View entering={FadeInDown.delay(idx * 50).duration(220)} style={styles.ticketCard}>
-      <TouchableOpacity onPress={() => { haptic(); setExpanded(e => !e); }} activeOpacity={0.85}>
+      <BouncingButton onPress={() => { haptic(); setExpanded(e => !e); }} activeOpacity={0.85}>
         <View style={styles.ticketHeader}>
           <View style={styles.ticketLeft}>
             <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
@@ -66,7 +67,7 @@ const TicketCard = ({ ticket, idx }: { ticket: any; idx: number }) => {
 
         <Text style={styles.ticketSubject}>{ticket.subject}</Text>
         <Text style={styles.ticketPreview} numberOfLines={expanded ? 0 : 2}>{ticket.message}</Text>
-      </TouchableOpacity>
+      </BouncingButton>
 
       {expanded && ticket.admin_reply && (
         <Animated.View entering={FadeIn.duration(200)} style={styles.replyBox}>
@@ -115,7 +116,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
       <Text style={styles.fieldLabel}>Category</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
         {CATEGORIES.map(cat => (
-          <TouchableOpacity
+          <BouncingButton
             key={cat.key}
             style={[styles.catChip, category === cat.key && styles.catChipActive]}
             onPress={() => { haptic(); setCategory(cat.key); }}
@@ -125,7 +126,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
             <Text style={[styles.catLabel, category === cat.key && styles.catLabelActive]}>
               {cat.label}
             </Text>
-          </TouchableOpacity>
+          </BouncingButton>
         ))}
       </ScrollView>
 
@@ -166,7 +167,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
         </Text>
       </View>
 
-      <TouchableOpacity
+      <BouncingButton
         style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
         onPress={() => {
           if (!canSubmit) return;
@@ -180,7 +181,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
           ? <ActivityIndicator color={colors.white} size="small" />
           : <Text style={styles.submitBtnText}>Submit Ticket</Text>
         }
-      </TouchableOpacity>
+      </BouncingButton>
     </ScrollView>
   );
 };
@@ -241,31 +242,31 @@ const SupportScreen = ({ navigation }: any) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+        <BouncingButton style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <ArrowLeft size={20} color={colors.ink} />
-        </TouchableOpacity>
+        </BouncingButton>
         <Text style={styles.headerTitle}>Support</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {/* Tabs */}
       <View style={styles.tabRow}>
-        <TouchableOpacity
+        <BouncingButton
           style={[styles.tabBtn, tab === 'new' && styles.tabBtnActive]}
           onPress={() => { haptic(); setTab('new'); }}
           activeOpacity={0.8}
         >
           <Plus size={14} color={tab === 'new' ? colors.primary : colors.inkMuted} />
           <Text style={[styles.tabText, tab === 'new' && styles.tabTextActive]}>New Ticket</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
+        </BouncingButton>
+        <BouncingButton
           style={[styles.tabBtn, tab === 'mine' && styles.tabBtnActive]}
           onPress={() => { haptic(); setTab('mine'); queryClient.invalidateQueries({ queryKey: ['support-tickets'] }); }}
           activeOpacity={0.8}
         >
           <MessageSquare size={14} color={tab === 'mine' ? colors.primary : colors.inkMuted} />
           <Text style={[styles.tabText, tab === 'mine' && styles.tabTextActive]}>My Tickets</Text>
-        </TouchableOpacity>
+        </BouncingButton>
       </View>
 
       {tab === 'new'
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 12, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 8 },
   required: { color: colors.danger },
   input: {
-    backgroundColor: colors.white, borderRadius: 12,
+    backgroundColor: colors.white, borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 13,
     fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink,
     borderWidth: 1, borderColor: colors.border,
@@ -329,14 +330,14 @@ const styles = StyleSheet.create({
   catLabel: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted },
   catLabelActive: { color: colors.primary },
   tipBox: {
-    backgroundColor: '#FFFBEB', borderRadius: 12, borderWidth: 1,
+    backgroundColor: '#FFFBEB', borderRadius: 20, borderWidth: 1,
     borderColor: '#FDE68A', padding: 12, marginVertical: 16,
   },
   tipText: { fontSize: 12, fontFamily: fontFamily.regular, color: '#92400E', lineHeight: 18 },
   submitBtn: {
     backgroundColor: colors.primary, borderRadius: 14,
     paddingVertical: 16, alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary, shadowOpacity: 0.25, shadowRadius: 8,
+    shadowColor: colors.primary, shadowOpacity: 0.08, shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
   submitBtnDisabled: { backgroundColor: colors.border, shadowOpacity: 0 },
@@ -347,8 +348,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white, borderRadius: 16,
     padding: 16, marginBottom: 10,
     borderWidth: 1, borderColor: colors.border,
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 5,
-    shadowOffset: { width: 0, height: 1 }, elevation: 1,
+    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 16,
+    shadowOffset: { width: 0, height: 1 }, elevation: 4,
   },
   ticketHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   ticketLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
   ticketSubject: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4 },
   ticketPreview: { fontSize: 13, fontFamily: fontFamily.regular, color: colors.inkMuted, lineHeight: 18 },
   replyBox: {
-    backgroundColor: '#F0FDF4', borderRadius: 10, padding: 12,
+    backgroundColor: '#F0FDF4', borderRadius: 16, padding: 12,
     marginTop: 12, borderLeftWidth: 3, borderLeftColor: '#22C55E',
   },
   replyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
