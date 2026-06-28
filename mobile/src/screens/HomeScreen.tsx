@@ -416,24 +416,26 @@ const HomeScreen = ({ navigation }: any) => {
                       <View style={styles.catPreviewAddFloat}>
                         {ci ? (
                           <View style={styles.catPreviewQty}>
-                            <BouncingButton
+                            <TouchableOpacity
                               onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: ci.quantity - 1 })); }}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                              activeOpacity={0.7}
                             >
                               <Text style={styles.catPreviewQtyBtn}>−</Text>
-                            </BouncingButton>
+                            </TouchableOpacity>
                             <Text style={styles.catPreviewQtyVal}>{ci.quantity}</Text>
-                            <BouncingButton
+                            <TouchableOpacity
                               onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: ci.quantity + 1 })); }}
                               hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                              activeOpacity={0.7}
                             >
                               <Text style={styles.catPreviewQtyBtn}>+</Text>
-                            </BouncingButton>
+                            </TouchableOpacity>
                           </View>
                         ) : (
-                          <BouncingButton style={styles.catPreviewAddBtn} onPress={() => handleAddToCart(mi)} activeOpacity={0.8}>
+                          <TouchableOpacity style={styles.catPreviewAddBtn} onPress={() => handleAddToCart(mi)} activeOpacity={0.8}>
                             <Text style={styles.catPreviewAddText}>ADD</Text>
-                          </BouncingButton>
+                          </TouchableOpacity>
                         )}
                       </View>
                     )}
@@ -492,19 +494,19 @@ const HomeScreen = ({ navigation }: any) => {
               <View style={styles.homeGridAddFloat}>
                 {cartItem ? (
                   <View style={styles.homeGridQtyControl}>
-                    <BouncingButton onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
+                    <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} activeOpacity={0.7}>
                       <Text style={styles.homeGridQtyBtnText}>−</Text>
-                    </BouncingButton>
+                    </TouchableOpacity>
                     <Text style={styles.homeGridQtyValue}>{cartItem.quantity}</Text>
-                    <BouncingButton onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                    <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} activeOpacity={0.7}>
                       <Text style={styles.homeGridQtyBtnText}>+</Text>
-                    </BouncingButton>
+                    </TouchableOpacity>
                   </View>
                 ) : (
-                  <BouncingButton style={styles.homeGridAddBtn} onPress={() => handleAddToCart(menuItem)} activeOpacity={0.85}>
+                  <TouchableOpacity style={styles.homeGridAddBtn} onPress={() => handleAddToCart(menuItem)} activeOpacity={0.8}>
                     <Text style={styles.homeGridAddBtnText}>ADD</Text>
                     <View style={styles.homeGridCustomiseBadge}><Text style={styles.homeGridCustomiseText}>Customise</Text></View>
-                  </BouncingButton>
+                  </TouchableOpacity>
                 )}
               </View>
             )}
