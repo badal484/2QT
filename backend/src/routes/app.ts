@@ -17,4 +17,8 @@ router.get('/version', async (req, res) => {
     });
 });
 
+router.get('/config/maps-key', (req, res) => {
+    res.json({ key: process.env.GOOGLE_MAPS_API_KEY || '' });
+});
+
 export default router;
