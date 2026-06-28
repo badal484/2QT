@@ -6,6 +6,7 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToRiders, emitToAdmin, emitToOrder, emitToKitchen } from '../socket';
 import { invoicesQueue } from '../jobs/queues';
 import { NotificationService } from '../services/notification.service';
+import { scheduleTriggerSend, cancelTriggerJobs } from '../services/trigger.service';
 import { TWO_QT } from '../config/constants';
 import { pushService } from '../services/push.service';
 import Razorpay from 'razorpay';
@@ -282,6 +283,9 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     // 3. Queue delivery notification and invoice (fire-and-forget — Redis limit must not kill delivery)
     NotificationService.send('order_delivered', { userId: order.customer_id, orderId }).catch(() => {});
     invoicesQueue.add('generate_invoice', { orderId }).catch(e => console.error('[Queue] invoice failed:', e.message));
+
+    // 4. Schedule trigger rules (e.g. rating reminder fires 45 min after delivery)
+    scheduleTriggerSend('order_delivered', order.customer_id, { orderId }).catch(() => {});
 
     res.json({ success: true });
 });
