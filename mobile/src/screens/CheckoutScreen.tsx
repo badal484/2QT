@@ -111,7 +111,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
 
   const [useWallet, setUseWallet] = useState(false);
   const [useLoyalty, setUseLoyalty] = useState(false);
-  const [paymentSubMethod, setPaymentSubMethod] = useState<'gpay' | 'phonepe' | 'paytm' | 'other_upi' | 'cod'>('gpay');
+  const [paymentSubMethod, setPaymentSubMethod] = useState<'online' | 'cod'>('online');
   const [isVerifying, setIsVerifying] = useState(false);
 
   const promoCode = route.params?.promoCode || '';
@@ -211,13 +211,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         theme: { color: colors.primary }
       };
 
-      if (paymentSubMethod === 'gpay' || paymentSubMethod === 'phonepe' || paymentSubMethod === 'paytm') {
-        options.prefill.method = 'upi';
-        options['_[flow]'] = 'intent';
-        if (paymentSubMethod === 'gpay') options.upi_app_package_name = 'com.google.android.apps.nbu.paisa.user';
-        if (paymentSubMethod === 'phonepe') options.upi_app_package_name = 'com.phonepe.app';
-        if (paymentSubMethod === 'paytm') options.upi_app_package_name = 'net.one97.paytm';
-      }
+      // Cleaned up the intent flow as user wants standard Razorpay checkout
 
       if (RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
         RazorpayCheckout.open(options)
@@ -383,30 +377,11 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           <Text style={styles.sectionHeader}>PAYMENT OPTIONS</Text>
           
           <PaymentMethodCard
-            title="Google Pay"
-            subtitle="Fast & secure UPI payment"
-            icon={<Text style={{ fontFamily: fontFamily.black, fontSize: 18, color: '#EA4335', letterSpacing: -1 }}>G<Text style={{ color: '#4285F4' }}>P</Text><Text style={{ color: '#FBBC05' }}>a</Text><Text style={{ color: '#34A853' }}>y</Text></Text>}
-            isSelected={paymentSubMethod === 'gpay'}
-            onPress={() => setPaymentSubMethod('gpay')}
-          />
-          <PaymentMethodCard
-            title="PhonePe"
-            icon={<Text style={{ fontFamily: fontFamily.black, fontSize: 18, color: '#5F259F', letterSpacing: -0.5 }}>Pe</Text>}
-            isSelected={paymentSubMethod === 'phonepe'}
-            onPress={() => setPaymentSubMethod('phonepe')}
-          />
-          <PaymentMethodCard
-            title="Paytm"
-            icon={<Text style={{ fontFamily: fontFamily.black, fontSize: 18, color: '#00B9F1', letterSpacing: -0.5 }}>paytm</Text>}
-            isSelected={paymentSubMethod === 'paytm'}
-            onPress={() => setPaymentSubMethod('paytm')}
-          />
-          <PaymentMethodCard
-            title="Other UPI & Cards"
-            subtitle="Any UPI app, Credit/Debit cards, Netbanking"
+            title="Pay Online"
+            subtitle="Credit/Debit cards, UPI, Wallets, Netbanking via Razorpay"
             icon={<CreditCard size={20} color={colors.primary} />}
-            isSelected={paymentSubMethod === 'other_upi'}
-            onPress={() => setPaymentSubMethod('other_upi')}
+            isSelected={paymentSubMethod === 'online'}
+            onPress={() => setPaymentSubMethod('online')}
           />
           <PaymentMethodCard
             title="Cash on Delivery"
