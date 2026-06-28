@@ -5,7 +5,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
-import { getSocket } from '../socket/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -32,7 +31,6 @@ const HomeScreen = ({ navigation }: any) => {
   const { items: cartItems, zoneId, addressId } = useSelector((state: RootState) => state.cart);
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
-  const socket = getSocket();
   const { globalLocation: location, serviceabilityStatus, activeZoneId } = useSelector((state: RootState) => state.app);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -757,7 +755,7 @@ const HomeScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={32}
-        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 10, 20) + 16 + 52 + LOCATION_HEIGHT + 16 }]}
+        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 8, 12) + 116 + LOCATION_HEIGHT }]}
         windowSize={5}
         maxToRenderPerBatch={4}
         initialNumToRender={6}
@@ -841,7 +839,7 @@ const HomeScreen = ({ navigation }: any) => {
               </Animated.View>
             )}
             {infiniteBanners.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
-              <Animated.View entering={FadeInDown.delay(150).duration(400)} style={{ overflow: 'hidden', marginTop: spacing.xl }}>
+              <Animated.View entering={FadeInDown.delay(150).duration(400)} style={{ overflow: 'hidden', marginTop: spacing.sm }}>
                 <FlatList
                   ref={bannerListRef}
                   data={infiniteBanners}
@@ -2039,7 +2037,8 @@ const styles = StyleSheet.create({
   // ── Sticky category strip ──────────────────────────────────────────────────
   categoryStrip: {
     backgroundColor: colors.surface,
-    paddingVertical: 10,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
   categoryStripScroll: {
     paddingHorizontal: spacing.lg,
