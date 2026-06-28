@@ -45,14 +45,14 @@ const CustomerNavigator = () => {
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
-      <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
-      <Stack.Screen name="Cart" component={CartScreen} />
+      <Stack.Screen name="ItemDetail" component={ItemDetailScreen} options={{ animation: 'slide_from_bottom', animationDuration: 280, gestureDirection: 'vertical' }} />
+      <Stack.Screen name="Cart" component={CartScreen} options={{ animation: 'slide_from_bottom', animationDuration: 280, gestureDirection: 'vertical' }} />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       <Stack.Screen name="Address" component={AddressScreen} />
       <Stack.Screen name="AddressBook" component={AddressBookScreen} />
       <Stack.Screen name="OrderPlaced" component={OrderPlacedScreen} />
       <Stack.Screen name="OrderConfirmed" component={OrderConfirmedScreen} />
-      <Stack.Screen name="RateOrder" component={RateOrderScreen} />
+      <Stack.Screen name="RateOrder" component={RateOrderScreen} options={{ animation: 'slide_from_bottom', animationDuration: 280, gestureDirection: 'vertical' }} />
       <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
       <Stack.Screen name="OrdersTab" component={OrderHistoryScreen} />
       <Stack.Screen name="ScheduleOrder" component={ScheduleOrderScreen} />
