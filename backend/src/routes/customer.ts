@@ -3,6 +3,7 @@ import { query } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { TWO_QT } from '../config/constants';
 import { emitToAdmin } from '../socket';
+import { scheduleTriggerSend, cancelTriggerJobs } from '../services/trigger.service';
 import { redis, keys } from '../redis';
 
 const router = Router();
@@ -24,6 +25,16 @@ router.post('/cart/sync', authenticate, async (req: AuthRequest, res) => {
     const { items } = req.body;
     await redis.set(keys.customerCart(userId), JSON.stringify(items || []));
     res.json({ success: true });
+
+    // Schedule cart-abandoned trigger if cart is non-empty; cancel if emptied
+    if (Array.isArray(items) && items.length > 0) {
+        // Cancel any previous pending job first, then schedule fresh (avoids stacking)
+        cancelTriggerJobs('cart_abandoned', userId)
+            .then(() => scheduleTriggerSend('cart_abandoned', userId, { itemCount: String(items.length) }))
+            .catch(() => {});
+    } else {
+        cancelTriggerJobs('cart_abandoned', userId).catch(() => {});
+    }
 });
 
 router.patch('/profile', authenticate, async (req: AuthRequest, res) => {

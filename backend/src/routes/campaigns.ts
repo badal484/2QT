@@ -2,13 +2,60 @@ import express from 'express';
 import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import redis, { keys } from '../redis';
+import { sendNotification, NotifType } from '../services/notification.service';
 
 const router = express.Router();
 
-const CAMPAIGN_TTL = 30; // 30-second cache — disable reflects within 30s
+const CAMPAIGN_TTL = 30;
 
 async function bustCampaignCache() {
     try { await redis.del(keys.activeCampaigns()); } catch (_) {}
+}
+
+// Resolve audience for a campaign and send the configured notification template
+export async function fireCampaignNotification(campaign: any) {
+    if (!campaign.notif_template_type) return;
+
+    // Build user ID list based on audience
+    let userQuery = `SELECT id FROM users WHERE role IN ('customer','buyer') AND is_active = TRUE`;
+    const params: any[] = [];
+
+    if (campaign.audience_type === 'segment' && campaign.audience_segment) {
+        switch (campaign.audience_segment) {
+            case 'new_users':
+                userQuery += ` AND created_at >= NOW() - INTERVAL '7 days'`; break;
+            case 'active':
+                userQuery += ` AND id IN (SELECT customer_id FROM orders WHERE status='delivered' GROUP BY customer_id HAVING MAX(created_at) >= NOW() - INTERVAL '14 days')`; break;
+            case 'at_risk':
+                userQuery += ` AND id IN (SELECT customer_id FROM orders WHERE status='delivered' GROUP BY customer_id HAVING MAX(created_at) BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days')`; break;
+            case 'churned':
+                userQuery += ` AND id IN (SELECT customer_id FROM orders WHERE status='delivered' GROUP BY customer_id HAVING MAX(created_at) < NOW() - INTERVAL '30 days')`; break;
+            case 'loyal':
+                userQuery += ` AND id IN (SELECT customer_id FROM orders WHERE status='delivered' GROUP BY customer_id HAVING COUNT(*) >= 10)`; break;
+            case 'subscribers':
+                userQuery += ` AND id IN (SELECT user_id FROM subscriptions WHERE is_active=TRUE AND status='active')`; break;
+        }
+    }
+
+    const { rows: users } = await query(userQuery, params);
+    const BATCH = 50;
+    for (let i = 0; i < users.length; i += BATCH) {
+        await Promise.allSettled(
+            users.slice(i, i + BATCH).map(u =>
+                sendNotification(campaign.notif_template_type as NotifType, {
+                    userId: u.id,
+                    overrideChannels: ['push', 'whatsapp'],
+                    dedupeKey: `campaign:${campaign.id}:${u.id}`,
+                })
+            )
+        );
+    }
+
+    // Mark as sent + record reach
+    await query(
+        `UPDATE campaigns SET notif_sent_at = NOW(), reach_count = $1 WHERE id = $2`,
+        [users.length, campaign.id]
+    );
 }
 
 // ─── CUSTOMER-FACING ────────────────────────────────────────────────────────
@@ -103,12 +150,18 @@ router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req: 
 
 // PATCH /campaigns/:id — update campaign (including enable/disable toggle)
 // When is_active=false → cache busted immediately → users stop seeing it within seconds
-router.patch('/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+router.patch('/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const {
         name, is_active, discount_type, discount_percent, discount_flat_paise,
         max_discount_paise, min_order_paise, winback_days, flash_start, flash_end,
-        happy_hour_start, happy_hour_end, happy_hour_days, config
+        happy_hour_start, happy_hour_end, happy_hour_days, config,
+        // Audience
+        audience_type, audience_segment,
+        // Schedule
+        schedule_start, schedule_end,
+        // Notification
+        notif_template_type,
     } = req.body;
     try {
         const { rows } = await query(
@@ -127,20 +180,36 @@ router.patch('/:id', authenticate, requireRole('super_admin', 'admin'), async (r
                  happy_hour_end      = COALESCE($12, happy_hour_end),
                  happy_hour_days     = COALESCE($13, happy_hour_days),
                  config              = COALESCE($14, config),
+                 audience_type       = COALESCE($15, audience_type),
+                 audience_segment    = COALESCE($16, audience_segment),
+                 schedule_start      = COALESCE($17, schedule_start),
+                 schedule_end        = COALESCE($18, schedule_end),
+                 notif_template_type = COALESCE($19, notif_template_type),
                  updated_at          = NOW()
-             WHERE id = $15
+             WHERE id = $20
              RETURNING *`,
             [
-                name, is_active, discount_type, discount_percent, discount_flat_paise,
-                max_discount_paise, min_order_paise, winback_days, flash_start, flash_end,
-                happy_hour_start, happy_hour_end,
+                name ?? null, is_active ?? null, discount_type ?? null,
+                discount_percent ?? null, discount_flat_paise ?? null,
+                max_discount_paise ?? null, min_order_paise ?? null, winback_days ?? null,
+                flash_start ?? null, flash_end ?? null,
+                happy_hour_start ?? null, happy_hour_end ?? null,
                 happy_hour_days ? JSON.stringify(happy_hour_days) : null,
                 config ? JSON.stringify(config) : null,
+                audience_type ?? null, audience_segment ?? null,
+                schedule_start ?? null, schedule_end ?? null,
+                notif_template_type ?? null,
                 id
             ]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Campaign not found' });
-        await bustCampaignCache(); // immediately removes from user view if disabled
+        await bustCampaignCache();
+
+        // If campaign just turned active and has a notification template, send it
+        if (is_active === true && rows[0].notif_template_type && !rows[0].notif_sent_at) {
+            fireCampaignNotification(rows[0]).catch(() => {});
+        }
+
         res.json({ campaign: rows[0] });
     } catch (err: any) {
         console.error(err);
