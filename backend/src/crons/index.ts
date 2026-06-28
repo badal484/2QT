@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { query, withTransaction } from '../db';
+import { redis, keys } from '../redis';
 import { notificationsQueue } from '../jobs/queues';
 import { TWO_QT } from '../config/constants';
 import { emitToKitchen, emitToAdmin, emitToRiders } from '../socket';
@@ -427,8 +428,7 @@ export const initCrons = () => {
         }
 
         if (toActivate.length > 0 || toExpire.length > 0) {
-            const { default: redisClient } = await import('../redis');
-            await redisClient.del('active_campaigns').catch(() => {});
+            await redis.del(keys.activeCampaigns()).catch(() => {});
         }
     });
 
