@@ -363,15 +363,15 @@ const CheckoutScreen = ({ navigation, route }: any) => {
             )}
             {loyaltyPts > 0 && (
               <TouchableOpacity style={[styles.savingsRow, { marginTop: walletBal > 0 ? 16 : 0 }]} activeOpacity={0.8} onPress={() => { triggerHaptic(); setUseLoyalty(!useLoyalty); }}>
-                <View style={[styles.savingsIcon, useLoyalty && { backgroundColor: G.primary }]}>
-                  <Sparkles size={16} color={useLoyalty ? '#fff' : G.primary} />
+                <View style={[styles.savingsIcon, useLoyalty && { backgroundColor: '#1B5E46' }]}>
+                  <Sparkles size={16} color={useLoyalty ? '#fff' : '#1B5E46'} />
                 </View>
                 <View style={styles.savingsInfo}>
                   <Text style={styles.savingsTitle}>Loyalty Points</Text>
                   <Text style={styles.savingsSub}>{loyaltyPts} points available</Text>
                 </View>
-                <View style={[styles.customCheckbox, useLoyalty && { borderColor: G.primary }]}>
-                  {useLoyalty && <View style={[styles.customCheckboxInner, { backgroundColor: G.primary }]} />}
+                <View style={[styles.customCheckbox, useLoyalty && { borderColor: '#1B5E46' }]}>
+                  {useLoyalty && <View style={[styles.customCheckboxInner, { backgroundColor: '#1B5E46' }]} />}
                 </View>
               </TouchableOpacity>
             )}

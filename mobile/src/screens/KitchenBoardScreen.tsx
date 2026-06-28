@@ -20,7 +20,7 @@ const G = {
   green: '#00D084',
   greenBg: 'rgba(0,208,132,0.08)',
   greenBorder: 'rgba(0,208,132,0.18)',
-  amber: G.primary,
+  amber: '#F59E0B',
   amberBg: 'rgba(245,158,11,0.08)',
   amberBorder: 'rgba(245,158,11,0.18)',
   red: '#EF4444',
