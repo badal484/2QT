@@ -15,27 +15,64 @@ export const redisPub = createClient(redisConfig);
 export const redisSub = createClient(redisConfig);
 
 // --- SAFE WRAPPERS TO PREVENT UPSTASH RATE LIMIT CRASHES ---
+// In-memory fallback if Redis is down/rate-limited
+const fallbackCache = new Map<string, { value: string, expiresAt: number }>();
+setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of fallbackCache.entries()) {
+        if (v.expiresAt > 0 && v.expiresAt < now) fallbackCache.delete(k);
+    }
+}, 60000); // cleanup every 60s
+
+const withTimeout = <T>(promise: Promise<T>, ms = 200): Promise<T> => {
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Redis Timeout')), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+};
+
 const originalGet = redis.get.bind(redis);
 redis.get = (async (...args: any[]) => {
-    try { return await (originalGet as any)(...args); } 
-    catch (e: any) { console.error('[Redis Safe GET]', e.message); return null; }
+    const key = args[0];
+    try { 
+        const res = await withTimeout((originalGet as any)(...args)); 
+        if (res !== null) return res;
+    } catch (e: any) { 
+        console.error('[Redis Safe GET]', e.message); 
+    }
+    // Check fallback
+    const cached = fallbackCache.get(key);
+    if (cached && (cached.expiresAt === 0 || cached.expiresAt > Date.now())) return cached.value;
+    return null;
 }) as any;
 
 const originalSet = redis.set.bind(redis);
 redis.set = (async (...args: any[]) => {
-    try { return await (originalSet as any)(...args); } 
+    const [key, value, options] = args;
+    let ttl = 0;
+    if (options?.EX) ttl = options.EX * 1000;
+    else if (options?.PX) ttl = options.PX;
+    
+    fallbackCache.set(key, { value: String(value), expiresAt: ttl ? Date.now() + ttl : 0 });
+    
+    try { return await withTimeout((originalSet as any)(...args)); } 
     catch (e: any) { console.error('[Redis Safe SET]', e.message); return null; }
 }) as any;
 
 const originalDel = redis.del.bind(redis);
 redis.del = (async (...args: any[]) => {
-    try { return await (originalDel as any)(...args); } 
+    const key = args[0];
+    fallbackCache.delete(key);
+    try { return await withTimeout((originalDel as any)(...args)); } 
     catch (e: any) { console.error('[Redis Safe DEL]', e.message); return null; }
 }) as any;
 
 const originalSetEx = redis.setEx.bind(redis);
 redis.setEx = (async (...args: any[]) => {
-    try { return await (originalSetEx as any)(...args); } 
+    const [key, seconds, value] = args;
+    fallbackCache.set(key, { value: String(value), expiresAt: Date.now() + (Number(seconds) * 1000) });
+    try { return await withTimeout((originalSetEx as any)(...args)); } 
     catch (e: any) { console.error('[Redis Safe SETEX]', e.message); return null; }
 }) as any;
 // -------------------------------------------------------------
