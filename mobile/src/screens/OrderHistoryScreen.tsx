@@ -126,11 +126,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
         ) : (
           orders.map((order: any, index: number) => (
             <Animated.View key={order.id} entering={FadeInDown.delay(index * 80)}>
-              <BouncingButton
-                activeOpacity={0.9}
-                style={styles.orderCard}
-                onPress={() => ['delivered', 'cancelled'].includes(order.status) ? null : navigation.navigate('OrderConfirmed', { orderId: order.id })}
-              >
+              <View style={styles.orderCard}>
                 <View style={styles.orderCardHeader}>
                   <View>
                     <Text style={styles.orderIdText}>{order.display_id}</Text>
@@ -284,7 +280,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                       </View>
                     )}
                   </View>
-                </BouncingButton>
+                </View>
               </Animated.View>
             ))
           )}
