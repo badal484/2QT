@@ -1,5 +1,5 @@
 import React from 'react';
-import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
@@ -31,7 +31,7 @@ import LiveKitchenScreen from '../screens/LiveKitchenScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import CategoryScreen from '../screens/CategoryScreen';
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 const CustomerNavigator = () => {
   const user = useSelector((state: RootState) => state.auth.user);
@@ -39,34 +39,19 @@ const CustomerNavigator = () => {
 
   return (
     <Stack.Navigator
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
       initialRouteName={isNewUser ? 'Onboarding' : 'Home'}
-      detachInactiveScreens={false}
     >
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
-      <Stack.Screen
-        name="ItemDetail"
-        component={ItemDetailScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
       <Stack.Screen name="Cart" component={CartScreen} />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       <Stack.Screen name="Address" component={AddressScreen} />
       <Stack.Screen name="AddressBook" component={AddressBookScreen} />
       <Stack.Screen name="OrderPlaced" component={OrderPlacedScreen} />
-      <Stack.Screen
-        name="OrderConfirmed"
-        component={OrderConfirmedScreen}
-        options={{
-          ...TransitionPresets.SlideFromRightIOS,
-          transitionSpec: {
-            open:  { animation: 'timing', config: { duration: 280 } },
-            close: { animation: 'timing', config: { duration: 220 } },
-          },
-        }}
-      />
+      <Stack.Screen name="OrderConfirmed" component={OrderConfirmedScreen} />
       <Stack.Screen name="RateOrder" component={RateOrderScreen} />
       <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
       <Stack.Screen name="OrdersTab" component={OrderHistoryScreen} />
