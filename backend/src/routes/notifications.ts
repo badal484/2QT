@@ -130,6 +130,71 @@ router.patch('/admin/templates/:type', authenticate, requireRole('super_admin', 
     res.json({ success: true, template: rows[0] });
 });
 
+// ─── Admin: notification trigger rules ───────────────────────────────────────
+
+router.get('/admin/triggers', authenticate, requireRole('super_admin', 'admin'), async (_req, res: Response) => {
+    const { rows } = await query(
+        'SELECT * FROM notification_triggers ORDER BY created_at ASC'
+    );
+    res.json({ triggers: rows });
+});
+
+router.post('/admin/triggers', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res: Response) => {
+    const {
+        name, event_type, delay_minutes = 0,
+        template_type, channels = ['push', 'whatsapp'],
+        audience_type = 'all', segment, conditions = {},
+    } = req.body;
+
+    if (!name || !event_type || !template_type) {
+        return res.status(400).json({ error: 'name, event_type, and template_type are required' });
+    }
+
+    const { rows } = await query(
+        `INSERT INTO notification_triggers
+           (name, event_type, delay_minutes, template_type, channels,
+            audience_type, segment, conditions, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, FALSE)
+         RETURNING *`,
+        [name, event_type, delay_minutes, template_type,
+         channels, audience_type, segment ?? null, JSON.stringify(conditions)]
+    );
+    res.status(201).json({ trigger: rows[0] });
+});
+
+router.patch('/admin/triggers/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const {
+        name, delay_minutes, template_type, channels,
+        audience_type, segment, conditions, is_active,
+    } = req.body;
+
+    const { rows } = await query(
+        `UPDATE notification_triggers SET
+           name             = COALESCE($1, name),
+           delay_minutes    = COALESCE($2, delay_minutes),
+           template_type    = COALESCE($3, template_type),
+           channels         = COALESCE($4, channels),
+           audience_type    = COALESCE($5, audience_type),
+           segment          = COALESCE($6, segment),
+           conditions       = COALESCE($7, conditions),
+           is_active        = COALESCE($8, is_active),
+           updated_at       = NOW()
+         WHERE id = $9 RETURNING *`,
+        [name ?? null, delay_minutes ?? null, template_type ?? null,
+         channels ?? null, audience_type ?? null, segment ?? null,
+         conditions != null ? JSON.stringify(conditions) : null,
+         is_active ?? null, id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Trigger not found' });
+    res.json({ trigger: rows[0] });
+});
+
+router.delete('/admin/triggers/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res: Response) => {
+    await query('DELETE FROM notification_triggers WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+});
+
 // ─── Admin: notification log ──────────────────────────────────────────────────
 
 router.get('/admin/log', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res: Response) => {

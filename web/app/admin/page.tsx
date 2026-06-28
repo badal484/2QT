@@ -1300,86 +1300,127 @@ function AnalyticsTab() {
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
+const FEATURE_FLAGS = ["feature_online_payments","feature_cod","feature_wallet","feature_subscriptions","feature_referrals","feature_scheduling","feature_live_kitchen","maintenance_mode","force_update"];
+const BUSINESS_RULES = ["min_order_paise","platform_fee_percent","max_delivery_radius_km","surge_order_threshold","wallet_cashback_cap_paise","kitchen_auto_close_time","min_app_version","latest_app_version","support_contact"];
+
 function SettingsTab() {
-  const [settings, setSettings] = useState<any[]>([]);
+  const [settings, setSettings] = useState<Record<string,any>>({});
   const [loading, setLoading] = useState(true);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [newValue, setNewValue] = useState("");
+  const [editVal, setEditVal] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     try {
       const data = await api.get("/admin/settings");
-      setSettings(data.settings ?? []);
-    } finally {
-      setLoading(false);
-    }
+      const map: Record<string,any> = {};
+      (data.settings ?? []).forEach((s: any) => { map[s.key] = s; });
+      setSettings(map);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
-  const save = async (key: string) => {
-    await api.patch(`/admin/settings/${key}`, { value: newValue });
-    setEditingKey(null);
-    load();
-    toast.success("Setting updated");
+  const patch = async (key: string, value: string) => {
+    setSaving(true);
+    try {
+      await api.patch(`/admin/settings/${key}`, { value });
+      toast.success("Saved");
+      load();
+    } catch { toast.error("Save failed"); }
+    finally { setSaving(false); setEditingKey(null); }
   };
 
+  const toggleFlag = async (key: string) => {
+    const cur = settings[key]?.value === "true";
+    await patch(key, String(!cur));
+  };
+
+  const label = (key: string) => key.replace(/^feature_/, "").replace(/_/g, " ");
+
+  if (loading) return (
+    <div className="space-y-4">{[1,2,3,4,5].map(i => <div key={i} className="h-16 bg-white/[0.04] rounded-2xl animate-pulse" />)}</div>
+  );
+
   return (
-    <div>
-      <div className="mb-8">
-        <h2 className="text-4xl font-black tracking-tighter text-white text-white mb-2">Settings</h2>
-        <p className="text-zinc-400 text-sm font-medium">Platform configuration.</p>
+    <div className="max-w-2xl space-y-8">
+      <div>
+        <h2 className="text-4xl font-black tracking-tighter text-white mb-1">Settings</h2>
+        <p className="text-zinc-400 text-sm">Changes take effect instantly — no redeploy needed.</p>
       </div>
-      
-      {loading ? (
-        <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-20 bg-white/[0.04] backdrop-blur-xl rounded-2xl animate-pulse" />)}</div>
-      ) : (
-        <div className="max-w-xl space-y-4">
-          {settings.map((s, i) => (
-            <div key={i} className="flex items-center justify-between p-5 bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl shadow-black/40">
-              <div className="flex-1 mr-4">
-                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">{s.key.replace(/_/g, " ")}</div>
-                {editingKey === s.key ? (
-                  <input
-                    type="text"
-                    value={newValue}
-                    onChange={e => setNewValue(e.target.value)}
-                    autoFocus
-                    className="w-full bg-white/[0.02] backdrop-blur-lg border border-white/10 rounded-lg px-2 py-1 font-bold text-sm text-white"
-                  />
-                ) : (
-                  <div className="font-bold text-sm text-white">{s.value}</div>
-                )}
-                <div className="text-[9px] text-zinc-300 font-medium mt-1">{s.description}</div>
+
+      {/* Feature Flags */}
+      <div>
+        <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Feature Flags</p>
+        <div className="space-y-2">
+          {FEATURE_FLAGS.map(key => {
+            const s = settings[key];
+            const isOn = s?.value === "true";
+            return (
+              <div key={key} className="flex items-center justify-between px-5 py-4 bg-white/[0.03] border border-white/10 rounded-2xl">
+                <div>
+                  <p className="text-sm font-semibold text-white capitalize">{label(key)}</p>
+                  {s?.description && <p className="text-xs text-zinc-500 mt-0.5">{s.description}</p>}
+                </div>
+                <button onClick={() => toggleFlag(key)} className="flex items-center gap-2 text-sm">
+                  {isOn
+                    ? <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 text-green-400 text-xs font-semibold">● ON</span>
+                    : <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-800 text-zinc-500 text-xs font-semibold">○ OFF</span>}
+                </button>
               </div>
-              <div className="flex gap-2">
-                {editingKey === s.key ? (
-                  <>
-                    <button onClick={() => setEditingKey(null)} className="px-3 py-1.5 rounded-xl bg-white/[0.04] backdrop-blur-xl text-[9px] font-black uppercase tracking-widest hover:bg-zinc-700/80 text-white">Cancel</button>
-                    <button onClick={() => save(s.key)} className="px-3 py-1.5 rounded-xl bg-swish-green text-black text-[9px] font-black uppercase tracking-widest hover:bg-[#E55A2A] shadow-[0_0_15px_rgba(255,107,53,0.3)]">Save</button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => { setEditingKey(s.key); setNewValue(s.value); }}
-                    className="px-4 py-2 rounded-xl bg-white/[0.04] backdrop-blur-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700/80 transition-all text-white"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-          
-          {/* Static info */}
-          <div className="flex items-center justify-between p-5 bg-white/[0.02] backdrop-blur-lg/50 border border-white/10 rounded-2xl border-dashed">
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-zinc-300 mb-0.5">Backend Node</div>
-              <div className="font-bold text-sm text-zinc-400">{process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"}</div>
-            </div>
-            <span className="px-2 py-0.5 rounded-lg bg-swish-green/10 text-swish-green text-[8px] font-black uppercase tracking-widest">Connected</span>
-          </div>
+            );
+          })}
         </div>
-      )}
+      </div>
+
+      {/* Business Rules */}
+      <div>
+        <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Business Rules</p>
+        <div className="space-y-2">
+          {BUSINESS_RULES.map(key => {
+            const s = settings[key];
+            if (!s) return null;
+            return (
+              <div key={key} className="flex items-center justify-between px-5 py-4 bg-white/[0.03] border border-white/10 rounded-2xl">
+                <div className="flex-1 mr-4 min-w-0">
+                  <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-0.5">{label(key)}</p>
+                  {editingKey === key ? (
+                    <input
+                      autoFocus
+                      value={editVal}
+                      onChange={e => setEditVal(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") patch(key, editVal); if (e.key === "Escape") setEditingKey(null); }}
+                      className="w-full bg-white/[0.02] border border-white/10 rounded-lg px-2 py-1 font-bold text-sm text-white focus:outline-none focus:border-white/20"
+                    />
+                  ) : (
+                    <p className="font-bold text-sm text-white truncate">{s.value}</p>
+                  )}
+                  {s.description && <p className="text-[10px] text-zinc-600 mt-0.5">{s.description}</p>}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  {editingKey === key ? (
+                    <>
+                      <button onClick={() => setEditingKey(null)} className="px-3 py-1.5 rounded-xl bg-white/[0.04] text-xs font-bold text-zinc-400 hover:bg-zinc-700/80">Cancel</button>
+                      <button disabled={saving} onClick={() => patch(key, editVal)} className="px-3 py-1.5 rounded-xl bg-white text-black text-xs font-bold hover:bg-zinc-100 disabled:opacity-50">Save</button>
+                    </>
+                  ) : (
+                    <button onClick={() => { setEditingKey(key); setEditVal(s.value); }} className="px-4 py-2 rounded-xl bg-white/[0.04] text-xs font-black uppercase tracking-widest hover:bg-zinc-700/80 text-white">Edit</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Backend node info */}
+      <div className="flex items-center justify-between p-5 bg-white/[0.02] border border-white/10 rounded-2xl border-dashed">
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-0.5">Backend Node</div>
+          <div className="font-bold text-sm text-zinc-400">{process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"}</div>
+        </div>
+        <span className="px-2 py-0.5 rounded-lg bg-green-500/10 text-green-400 text-[8px] font-black uppercase tracking-widest">Connected</span>
+      </div>
     </div>
   );
 }

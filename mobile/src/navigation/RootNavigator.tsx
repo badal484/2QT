@@ -13,23 +13,32 @@ import AdminNavigator from './AdminNavigator';
 import ForceUpdateScreen from '../screens/ForceUpdateScreen';
 import MaintenanceScreen from '../screens/MaintenanceScreen';
 import { APP_VERSION, api } from '../api/client';
+import { navigationRef } from './navigationRef';
+import {
+  subscribeToNotificationTap,
+  handleInitialNotification,
+  setupBackgroundHandler,
+} from '../services/push';
 
 const { RoleModule } = NativeModules;
 const BUILD_ROLE = RoleModule?.BUILD_ROLE; // 'customer', 'rider', 'kitchen', 'admin' or undefined
 console.log('--- DETECTED BUILD ROLE:', BUILD_ROLE);
 
-// Defined outside component so the reference is stable across re-renders
+// Must be called at module load time (before any component mounts)
+setupBackgroundHandler();
+
 const linking = {
   prefixes: ['2qt://', 'https://2qt.app'],
   config: {
     screens: {
-      MainTabs: {
-        screens: {
-          MenuTab: { screens: { Home: 'home' } },
-          OrdersTab: { screens: { OrderHistory: 'history', OrderPlaced: 'placed/:orderId' } },
-          ProfileTab: { screens: { Profile: 'profile' } },
-        },
-      },
+      Home: 'home',
+      Cart: 'cart',
+      OrderPlaced: 'order/:orderId',
+      OrderHistory: 'orders',
+      RateOrder: 'rate/:orderId',
+      Wallet: 'wallet',
+      MyPlans: 'plans',
+      Notifications: 'notifications',
       RiderOnboarding: 'rider/onboarding',
       RiderHome: 'rider/home',
       AssignedOrder: 'mission/:orderId',
@@ -61,6 +70,13 @@ const RootNavigator = () => {
     checkSystemStatus();
   }, []);
 
+  // Wire notification tap handlers once after NavigationContainer is ready
+  React.useEffect(() => {
+    const unsubTap = subscribeToNotificationTap();
+    handleInitialNotification(); // handles killed-app launch via notification
+    return () => { unsubTap(); };
+  }, []);
+
   React.useEffect(() => {
     if (accessToken) {
       console.log('--- INITIALIZING SOCKET CONNECTION ---');
@@ -86,11 +102,10 @@ const RootNavigator = () => {
   if (isMaintenance) return <MaintenanceScreen />;
   if (forceUpdateRequired) return <ForceUpdateScreen />;
 
-  // If the app is hardcoded for a specific role, we use that
   const activeRole = BUILD_ROLE || user?.role;
 
   return (
-    <NavigationContainer linking={linking as any}>
+    <NavigationContainer ref={navigationRef} linking={linking as any}>
       {!user ? (
         <AuthNavigator />
       ) : (activeRole === 'customer' || activeRole === 'buyer') ? (

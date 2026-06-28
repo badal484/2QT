@@ -4,6 +4,7 @@ import { NotificationService } from './notification.service';
 import { emitToKitchen, emitToUser, emitToAdmin, emitToRiders } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { TWO_QT } from '../config/constants';
+import { cancelTriggerJobs } from './trigger.service';
 
 const getDeliveryOtpForOrder = () => {
     if (process.env.NODE_ENV === 'development') {
@@ -242,6 +243,9 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
             orderId: newOrder.id,
             minutes: '25',
         }).catch(() => {});
+
+        // Cancel any pending cart-abandoned trigger jobs now that order is placed
+        cancelTriggerJobs('cart_abandoned', newOrder.customer_id).catch(() => {});
 
         return { status: 'order_created', orderId: newOrder.id };
     } catch (err) {
