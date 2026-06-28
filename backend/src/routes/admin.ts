@@ -654,6 +654,9 @@ router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate
         res.json({ item: rows[0] });
     } catch (err: any) {
         console.error('Menu item creation failed:', err);
+        if (err.constraint === 'menu_items_zone_name_unique' || err.message.includes('menu_items_zone_name_unique')) {
+            return res.status(400).json({ error: 'A menu item with this name already exists in this zone. Please use a different name.' });
+        }
         res.status(500).json({ error: 'Failed to create menu item: ' + err.message, details: err.message });
     }
 });
@@ -736,6 +739,9 @@ router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), valid
         res.json({ item: rows[0] });
     } catch (err: any) {
         console.error('Menu item update failed:', err);
+        if (err.constraint === 'menu_items_zone_name_unique' || err.message.includes('menu_items_zone_name_unique')) {
+            return res.status(400).json({ error: 'A menu item with this name already exists in this zone. Please use a different name.' });
+        }
         res.status(500).json({ error: 'Failed to update menu item: ' + err.message, details: err.message });
     }
 });
