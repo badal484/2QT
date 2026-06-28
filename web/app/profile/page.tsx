@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation, Bell } from "lucide-react";
+import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation, Bell, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
@@ -129,6 +129,31 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
           </div>
         </div>
       </section>
+
+      {['super_admin', 'admin', 'finance', 'kitchen_manager', 'chef'].includes(user?.role) && (
+        <section className="rounded-3xl p-6 relative overflow-hidden shadow-sm border bg-zinc-900 border-zinc-800 mb-6">
+          <div className="flex items-center gap-4">
+             <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 bg-zinc-800 text-white">
+                <ShieldCheck className="w-7 h-7" />
+             </div>
+             <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold truncate text-white">
+                  Staff Portal
+                </h3>
+                <p className="text-sm font-medium mt-1 text-zinc-400">
+                  Access your assigned work dashboard.
+                </p>
+             </div>
+             <Link href={
+                ['super_admin', 'admin'].includes(user?.role) ? '/admin' :
+                user?.role === 'finance' ? '/finance' :
+                '/kitchen'
+             } className="px-6 py-3 bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-bold rounded-xl shadow-md transition-all shrink-0">
+               Open Dashboard
+             </Link>
+          </div>
+        </section>
+      )}
 
       {['rider', 'rider_captain', 'super_admin'].includes(user?.role) && (
         <section className="rounded-3xl p-6 relative overflow-hidden shadow-sm border bg-brand-primary/5 border-brand-primary/20">
