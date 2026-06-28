@@ -324,7 +324,7 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
 });
 
 // ─── Dispatch: live rider list with GPS + order status ───────────────────────
-router.get('/riders/live', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     try {
         const { rows: riders } = await query(`
             SELECT u.id, u.name, u.phone, u.current_order_id, u.is_online,
@@ -357,7 +357,7 @@ router.get('/riders/live', authenticate, requireRole('chef', 'super_admin'), asy
 });
 
 // ─── Dispatch: manually assign a specific rider to a ready order ──────────────
-router.post('/orders/:id/assign-rider', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { riderId } = req.body;
     if (!riderId) return res.status(400).json({ error: 'MISSING_RIDER_ID' });
@@ -411,7 +411,7 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('chef', 'super
 });
 
 // ─── Dispatch: get unassigned ready orders for dispatch panel ─────────────────
-router.get('/orders/unassigned', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     try {
         const { rows } = await query(`
             SELECT o.id, o.display_id, o.status, o.created_at,
