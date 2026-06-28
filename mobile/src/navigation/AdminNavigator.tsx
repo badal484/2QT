@@ -1,6 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text } from 'react-native';
 import DashboardScreen from '../screens/admin/DashboardScreen';
 import LiveOrdersScreen from '../screens/admin/LiveOrdersScreen';
@@ -20,11 +20,11 @@ import PromoCodesManagerScreen from '../screens/admin/PromoCodesManagerScreen';
 import { LayoutDashboard, ShoppingBag, Truck, IndianRupee, Headphones } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 const MainAdminStack = () => (
-  <Tab.Navigator 
-    screenOptions={{ 
+  <Tab.Navigator
+    screenOptions={{
       headerShown: false,
       tabBarStyle: {
         backgroundColor: '#fff',
@@ -42,29 +42,29 @@ const MainAdminStack = () => (
       }
     }}
   >
-    <Tab.Screen 
-      name="Dashboard" 
-      component={DashboardScreen} 
+    <Tab.Screen
+      name="Dashboard"
+      component={DashboardScreen}
       options={{ tabBarIcon: ({ color }) => <LayoutDashboard size={22} color={color} /> }}
     />
-    <Tab.Screen 
-      name="Orders" 
-      component={LiveOrdersScreen} 
+    <Tab.Screen
+      name="Orders"
+      component={LiveOrdersScreen}
       options={{ tabBarIcon: ({ color }) => <ShoppingBag size={22} color={color} /> }}
     />
-    <Tab.Screen 
-      name="Riders" 
-      component={RiderStatusScreen} 
+    <Tab.Screen
+      name="Riders"
+      component={RiderStatusScreen}
       options={{ tabBarIcon: ({ color }) => <Truck size={22} color={color} /> }}
     />
-    <Tab.Screen 
-      name="Payouts" 
-      component={AdminPayoutsScreen} 
+    <Tab.Screen
+      name="Payouts"
+      component={AdminPayoutsScreen}
       options={{ tabBarIcon: ({ color }) => <IndianRupee size={22} color={color} /> }}
     />
-    <Tab.Screen 
-      name="Support" 
-      component={TicketsScreen} 
+    <Tab.Screen
+      name="Support"
+      component={TicketsScreen}
       options={{ tabBarIcon: ({ color }) => <Headphones size={22} color={color} /> }}
     />
   </Tab.Navigator>
@@ -72,7 +72,7 @@ const MainAdminStack = () => (
 
 const AdminNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} detachInactiveScreens={false}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}>
       <Stack.Screen name="MainAdmin" component={MainAdminStack} />
       <Stack.Screen name="Broadcast" component={BroadcastScreen} />
       <Stack.Screen name="MenuManager" component={MenuManagerScreen} />
