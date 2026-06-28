@@ -8,8 +8,7 @@ export const ENV = {
   IMAGEKIT_URL_ENDPOINT: 'https://ik.imagekit.io/oellcbqek',
   IMAGEKIT_PUBLIC_KEY: 'public_PStmG2ipavrJoxTXsWmjsYk5T+Y=',
 
-  // Unrestricted key for server-side Google Geocoding HTTP API calls from mobile
-  GOOGLE_GEOCODING_KEY: 'YOUR_GOOGLE_GEOCODING_API_KEY_HERE',
+  GOOGLE_GEOCODING_KEY: 'AIzaSyCaLm5vOs9lw9QsF6v89HrNNbYiD5rqKg0',
 
   // Business UPI ID shown to customers at the door for UPI payment
   BUSINESS_UPI_ID: 'badal90603@oksbi',

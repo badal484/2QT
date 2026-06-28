@@ -2,7 +2,7 @@ import { ArrowLeft, MapPin, Navigation, Search } from 'lucide-react-native';
 import React, { useState, useEffect, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, TextInput,
+  View, Text, ActivityIndicator, TextInput,
   StyleSheet, Alert, ScrollView,
 } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -69,7 +69,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     if (!initialLat && !initialLng) fetchLocation();
   }, []);
 
-  // When GPS resolves, animate map to it — programmatic animation, no onPanDrag, no haptics
+  // When GPS resolves, animate map to it then run a fresh geocode for the full address
   useEffect(() => {
     if (location && !initialLat) {
       mapRef.current?.animateToRegion({
@@ -78,10 +78,11 @@ const AddressBookScreen = ({ navigation, route }: any) => {
         latitudeDelta: 0.005,
         longitudeDelta: 0.005,
       }, 800);
-      if (location.addressText && location.addressText !== 'Current Location') {
-        setAddressText(location.addressText);
-        setAddressFull(location.addressFull || '');
-      }
+      // Always run a fresh geocode so addressFull is populated from Google
+      reverseGeocodeDetailed(location.latitude, location.longitude).then(result => {
+        setAddressText(result.name);
+        setAddressFull(result.address);
+      }).catch(() => {});
     }
   }, [location]);
 
