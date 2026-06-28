@@ -1,6 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import KitchenBoardScreen from '../screens/KitchenBoardScreen';
 import StockScreen from '../screens/StockScreen';
 import FeedbackScreen from '../screens/FeedbackScreen';
@@ -8,7 +8,7 @@ import ShiftHandoverScreen from '../screens/ShiftHandoverScreen';
 import { ClipboardList, BarChart3, Star } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 const MainKitchenStack = () => (
   <Tab.Navigator
@@ -51,7 +51,7 @@ const MainKitchenStack = () => (
 );
 
 const KitchenNavigator = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }} detachInactiveScreens={false}>
+  <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}>
     <Stack.Screen name="MainKitchen" component={MainKitchenStack} />
     <Stack.Screen name="ShiftHandover" component={ShiftHandoverScreen} />
   </Stack.Navigator>

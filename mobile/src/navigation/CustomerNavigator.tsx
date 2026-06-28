@@ -39,7 +39,7 @@ const CustomerNavigator = () => {
 
   return (
     <Stack.Navigator
-      screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}
       initialRouteName={isNewUser ? 'Onboarding' : 'Home'}
     >
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
