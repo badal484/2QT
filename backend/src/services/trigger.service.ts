@@ -54,7 +54,7 @@ async function resolveSegment(segment: string, conditions: any): Promise<string[
                    GROUP BY customer_id HAVING COUNT(*) >= 10`;
             break;
         case 'subscribers':
-            sql = `SELECT user_id AS id FROM subscriptions WHERE is_active = TRUE AND status = 'active'`;
+            sql = `SELECT customer_id AS id FROM subscriptions WHERE is_active = TRUE`;
             break;
         default:
             return [];
@@ -89,10 +89,10 @@ async function resolveCustom(conditions: any): Promise<string[]> {
         params.push(conditions.max_balance_paise);
     }
     if (conditions.has_subscription === true) {
-        clauses.push(`EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = u.id AND s.is_active = TRUE)`);
+        clauses.push(`EXISTS (SELECT 1 FROM subscriptions s WHERE s.customer_id = u.id AND s.is_active = TRUE)`);
     }
     if (conditions.has_subscription === false) {
-        clauses.push(`NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = u.id AND s.is_active = TRUE)`);
+        clauses.push(`NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.customer_id = u.id AND s.is_active = TRUE)`);
     }
 
     const { rows } = await query(
@@ -208,8 +208,8 @@ export async function runDailyTriggers() {
         if (trigger.event_type === 'subscription_expiring') {
             const days = conds.expiry_days ?? 3;
             const { rows } = await query(
-                `SELECT user_id AS id FROM subscriptions
-                 WHERE is_active = TRUE AND status = 'active'
+                `SELECT customer_id AS id FROM subscriptions
+                 WHERE is_active = TRUE
                  AND end_date BETWEEN NOW() AND NOW() + ($1 || ' days')::INTERVAL`,
                 [String(days)]
             );
