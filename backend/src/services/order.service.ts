@@ -4,7 +4,7 @@ import { NotificationService } from './notification.service';
 import { emitToKitchen, emitToUser, emitToAdmin, emitToRiders } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { TWO_QT } from '../config/constants';
-import { cancelTriggerJobs } from './trigger.service';
+import { cancelTriggerJobs, checkWalletLowTrigger } from './trigger.service';
 
 const getDeliveryOtpForOrder = () => {
     if (process.env.NODE_ENV === 'development') {
@@ -164,14 +164,20 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
 
             // 5. Deduct Wallet
             if (order.wallet_deduction_paise > 0) {
-                await client.query(`
-                    UPDATE customer_wallet SET balance_paise = balance_paise - $1 WHERE customer_id = $2
+                const { rows: updatedWallet } = await client.query(`
+                    UPDATE customer_wallet SET balance_paise = balance_paise - $1
+                    WHERE customer_id = $2
+                    RETURNING balance_paise
                 `, [order.wallet_deduction_paise, order.customer_id]);
-                
+
                 await client.query(`
                     INSERT INTO wallet_transactions (customer_id, amount_paise, type, reference_id, description, balance_after_paise)
                     SELECT $1, -$2, 'debit', $3, 'Order payment', balance_paise FROM customer_wallet WHERE customer_id = $1
                 `, [order.customer_id, order.wallet_deduction_paise, order.id]);
+
+                // Fire wallet-low trigger if balance dropped below threshold
+                const newBalance = updatedWallet[0]?.balance_paise ?? 0;
+                checkWalletLowTrigger(order.customer_id, newBalance).catch(() => {});
             }
             
             // 6. Handle Subscription Deduction
