@@ -11,20 +11,21 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; icon
   finance:       { label: "Finance",       color: "text-emerald-400", bg: "bg-emerald-400/10", icon: IndianRupee },
   admin:         { label: "Admin",         color: "text-blue-400",    bg: "bg-blue-400/10",    icon: ShieldCheck },
   super_admin:   { label: "Super Admin",   color: "text-purple-400",  bg: "bg-purple-400/10",  icon: ShieldCheck },
-  chef:          { label: "Kitchen Staff", color: "text-orange-400",  bg: "bg-orange-400/10",  icon: ChefHat },
-  rider:         { label: "Rider",         color: "text-yellow-400",  bg: "bg-yellow-400/10",  icon: Bike },
-  rider_captain: { label: "Rider Captain", color: "text-amber-400",   bg: "bg-amber-400/10",   icon: Bike },
+  chef:            { label: "Chef",            color: "text-orange-400",  bg: "bg-orange-400/10",  icon: ChefHat },
+  kitchen_manager: { label: "Kitchen Manager", color: "text-rose-400",    bg: "bg-rose-400/10",    icon: ChefHat },
+  rider:           { label: "Rider",           color: "text-yellow-400",  bg: "bg-yellow-400/10",  icon: Bike },
+  rider_captain:   { label: "Rider Captain",   color: "text-amber-400",   bg: "bg-amber-400/10",   icon: Bike },
 };
 
 function AddUserModal({ open, onAdd, onClose }: any) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"finance" | "admin" | "chef" | "rider">("finance");
+  const [role, setRole] = useState<"finance" | "admin" | "chef" | "kitchen_manager" | "rider">("finance");
   const [loading, setLoading] = useState(false);
 
   const reset = () => { setName(""); setPhone(""); setRole("finance" as any); };
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim()) return toast.error("Name and phone are required");
     setLoading(true);
@@ -84,7 +85,7 @@ function AddUserModal({ open, onAdd, onClose }: any) {
           <div>
             <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Role</label>
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {(["finance", "admin", "chef", "rider"] as const).map(r => {
+              {(["finance", "admin", "chef", "kitchen_manager", "rider"] as const).map(r => {
                 const m = ROLE_META[r];
                 return (
                   <button
@@ -106,7 +107,8 @@ function AddUserModal({ open, onAdd, onClose }: any) {
             <p className="text-xs text-white/30 mt-1.5">
               {role === "finance" && "Accesses /finance dashboard only"}
               {role === "admin" && "Accesses admin panel"}
-              {role === "chef" && "Logs in at /kitchen — KDS + Dispatch access"}
+              {role === "chef" && "Logs in at /kitchen — KDS only (order flow)"}
+              {role === "kitchen_manager" && "Logs in at /kitchen — KDS + Dispatch (assign riders)"}
               {role === "rider" && "Logs in via the Rider mobile app"}
             </p>
           </div>
@@ -168,7 +170,7 @@ export function TeamTab() {
 
   const financeUsers = users.filter(u => u.role === "finance");
   const adminUsers = users.filter(u => ["admin", "super_admin"].includes(u.role));
-  const kitchenUsers = users.filter(u => u.role === "chef");
+  const kitchenUsers = users.filter(u => ["chef", "kitchen_manager"].includes(u.role));
   const riderUsers = users.filter(u => ["rider", "rider_captain"].includes(u.role));
 
   return (
