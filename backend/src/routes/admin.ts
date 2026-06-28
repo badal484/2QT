@@ -1214,7 +1214,7 @@ router.get('/team/users', authenticate, requireRole('super_admin', 'admin'), asy
         const { rows } = await query(`
             SELECT id, name, phone, email, role, is_active, created_at
             FROM users
-            WHERE role IN ('finance', 'super_admin', 'admin', 'chef', 'kitchen_manager', 'rider', 'rider_captain')
+            WHERE role::text IN ('finance', 'super_admin', 'admin', 'chef', 'kitchen_manager', 'rider', 'rider_captain')
             ORDER BY created_at DESC
         `);
         res.json({ users: rows });
@@ -1223,7 +1223,7 @@ router.get('/team/users', authenticate, requireRole('super_admin', 'admin'), asy
     }
 });
 
-router.post('/team/users', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
+router.post('/team/users', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { phone, name, role, kitchenId } = req.body as { phone: string; name: string; role: string; kitchenId?: string };
     if (!phone || !name || !role) return res.status(400).json({ error: 'phone, name, role required' });
     if (!['finance', 'admin', 'chef', 'kitchen_manager', 'rider'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
@@ -1248,7 +1248,7 @@ router.post('/team/users', authenticate, requireRole('super_admin'), async (req:
     }
 });
 
-router.patch('/team/users/:id/deactivate', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
+router.patch('/team/users/:id/deactivate', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     try {
         await query('UPDATE users SET is_active = false WHERE id = $1 AND role NOT IN (\'super_admin\')', [id]);
