@@ -33,7 +33,7 @@ export async function fireCampaignNotification(campaign: any) {
             case 'loyal':
                 userQuery += ` AND id IN (SELECT customer_id FROM orders WHERE status='delivered' GROUP BY customer_id HAVING COUNT(*) >= 10)`; break;
             case 'subscribers':
-                userQuery += ` AND id IN (SELECT user_id FROM subscriptions WHERE is_active=TRUE AND status='active')`; break;
+                userQuery += ` AND id IN (SELECT customer_id FROM subscriptions WHERE is_active=TRUE)`; break;
         }
     }
 
