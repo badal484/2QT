@@ -83,9 +83,9 @@ redisSub.on('error', (err) => console.error('Redis Sub Error', err));
 
 export const connectRedis = async () => {
     try {
-        if (!redis.isOpen) await redis.connect();
-        if (!redisPub.isOpen) await redisPub.connect();
-        if (!redisSub.isOpen) await redisSub.connect();
+        if (!redis.isOpen) await withTimeout(redis.connect(), 2000).catch(() => {});
+        if (!redisPub.isOpen) await withTimeout(redisPub.connect(), 2000).catch(() => {});
+        if (!redisSub.isOpen) await withTimeout(redisSub.connect(), 2000).catch(() => {});
     } catch (e) {
         console.error('--- REDIS: CONNECTION FAILED (NON-BLOCKING)', e);
     }
