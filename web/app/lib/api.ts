@@ -122,7 +122,7 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      throw new Error(data.message || data.error || 'Something went wrong');
+      throw new Error(data.details || data.message || data.error || 'Something went wrong');
     }
 
     return data;
