@@ -1212,7 +1212,7 @@ router.post('/jobs/clear-failed', authenticate, requireRole('super_admin', 'admi
 router.get('/team/users', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
         const { rows } = await query(`
-            SELECT id, name, phone, email, role, is_active, is_verified, created_at
+            SELECT id, name, phone, email, role, is_active, created_at
             FROM users
             WHERE role IN ('finance', 'super_admin', 'admin', 'chef', 'kitchen_manager', 'rider', 'rider_captain')
             ORDER BY created_at DESC
