@@ -1213,21 +1213,23 @@ router.get('/team/users', authenticate, requireRole('super_admin'), async (req: 
 });
 
 router.post('/team/users', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
-    const { phone, name, role } = req.body as { phone: string; name: string; role: string };
+    const { phone, name, role, kitchenId } = req.body as { phone: string; name: string; role: string; kitchenId?: string };
     if (!phone || !name || !role) return res.status(400).json({ error: 'phone, name, role required' });
     if (!['finance', 'admin', 'chef', 'kitchen_manager', 'rider'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+    if (['chef', 'kitchen_manager'].includes(role) && !kitchenId) return res.status(400).json({ error: 'kitchenId required for chef/kitchen_manager' });
 
     const cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length < 10) return res.status(400).json({ error: 'Invalid phone number' });
 
     try {
         const { rows } = await query(`
-            INSERT INTO users (phone, name, role, is_active, is_verified, onboarding_complete)
-            VALUES ($1, $2, $3, true, true, true)
+            INSERT INTO users (phone, name, role, kitchen_id, is_active, is_verified, onboarding_complete)
+            VALUES ($1, $2, $3, $4, true, true, true)
             ON CONFLICT (phone) DO UPDATE
-                SET name = EXCLUDED.name, role = EXCLUDED.role, is_active = true, is_verified = true
-            RETURNING id, name, phone, role, created_at
-        `, [cleanPhone, name.trim(), role]);
+                SET name = EXCLUDED.name, role = EXCLUDED.role, kitchen_id = EXCLUDED.kitchen_id,
+                    is_active = true, is_verified = true
+            RETURNING id, name, phone, role, kitchen_id, created_at
+        `, [cleanPhone, name.trim(), role, kitchenId || null]);
         res.json({ success: true, user: rows[0] });
     } catch (err: any) {
         console.error('[admin/team/users POST]', err);

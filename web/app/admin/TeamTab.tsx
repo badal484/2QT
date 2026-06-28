@@ -17,20 +17,24 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; icon
   rider_captain:   { label: "Rider Captain",   color: "text-amber-400",   bg: "bg-amber-400/10",   icon: Bike },
 };
 
-function AddUserModal({ open, onAdd, onClose }: any) {
+function AddUserModal({ open, onAdd, onClose, kitchens }: any) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<"finance" | "admin" | "chef" | "kitchen_manager" | "rider">("finance");
+  const [kitchenId, setKitchenId] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const reset = () => { setName(""); setPhone(""); setRole("finance" as any); };
+  const needsKitchen = ["chef", "kitchen_manager"].includes(role);
+
+  const reset = () => { setName(""); setPhone(""); setRole("finance" as any); setKitchenId(""); };
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim()) return toast.error("Name and phone are required");
+    if (needsKitchen && !kitchenId) return toast.error("Select a kitchen for this role");
     setLoading(true);
     try {
-      await onAdd(name, phone, role);
+      await onAdd(name, phone, role, needsKitchen ? kitchenId : undefined);
       reset();
       onClose();
     } finally {
@@ -112,9 +116,31 @@ function AddUserModal({ open, onAdd, onClose }: any) {
               {role === "rider" && "Logs in via the Rider mobile app"}
             </p>
           </div>
+
+          {/* Kitchen selector — only for chef / kitchen_manager */}
+          {needsKitchen && (
+            <div>
+              <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Assign to Kitchen</label>
+              <select
+                value={kitchenId}
+                onChange={e => setKitchenId(e.target.value)}
+                required
+                className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-orange-500/50 appearance-none cursor-pointer"
+              >
+                <option value="">Select kitchen…</option>
+                {kitchens.map((k: any) => (
+                  <option key={k.id} value={k.id}>{k.name}</option>
+                ))}
+              </select>
+              {kitchens.length === 0 && (
+                <p className="text-xs text-red-400 mt-1.5">No kitchens found. Create one in the Kitchens tab first.</p>
+              )}
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={loading || !name.trim() || !phone.trim()}
+            disabled={loading || !name.trim() || !phone.trim() || (needsKitchen && !kitchenId)}
             className="w-full py-3.5 rounded-xl bg-brand-primary text-white font-black text-sm hover:opacity-90 transition-opacity disabled:opacity-40"
           >
             {loading ? "Creating..." : "Create Team Member"}
@@ -127,14 +153,19 @@ function AddUserModal({ open, onAdd, onClose }: any) {
 
 export function TeamTab() {
   const [users, setUsers] = useState<any[]>([]);
+  const [kitchens, setKitchens] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get("/admin/team/users");
-      setUsers(res.users || []);
+      const [teamRes, kitchensRes] = await Promise.all([
+        api.get("/admin/team/users"),
+        api.get("/admin/kitchens"),
+      ]);
+      setUsers(teamRes.users || []);
+      setKitchens(kitchensRes.kitchens || []);
     } catch {
       toast.error("Failed to load team");
     } finally {
@@ -146,9 +177,9 @@ export function TeamTab() {
 
   useSocketRefresh(["new_user", "user_updated"], load);
 
-  const handleAdd = async (name: string, phone: string, role: string) => {
+  const handleAdd = async (name: string, phone: string, role: string, kitchenId?: string) => {
     try {
-      await api.post("/admin/team/users", { name, phone, role });
+      await api.post("/admin/team/users", { name, phone, role, kitchenId });
       toast.success(`${name} added as ${role}`);
       await load();
     } catch (e: any) {
@@ -296,7 +327,7 @@ export function TeamTab() {
 
       <AnimatePresence>
         {showAdd && (
-          <AddUserModal open={showAdd} onAdd={handleAdd} onClose={() => setShowAdd(false)} />
+          <AddUserModal open={showAdd} onAdd={handleAdd} onClose={() => setShowAdd(false)} kitchens={kitchens} />
         )}
       </AnimatePresence>
     </div>

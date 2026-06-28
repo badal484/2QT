@@ -10,7 +10,7 @@ import { api } from '../api/client';
 
 const G = {
   bg: '#07080A', surface: '#10141A', card: '#161C25',
-  amber: G.primary, amberDim: 'rgba(245,158,11,0.12)',
+  amber: '#F59E0B', amberDim: 'rgba(245,158,11,0.12)',
   green: '#10B981', greenDim: 'rgba(16,185,129,0.12)',
   white: '#FFFFFF', muted: '#6B7A8D', border: 'rgba(245,158,11,0.2)',
 };
