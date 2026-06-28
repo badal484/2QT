@@ -378,10 +378,10 @@ const HomeScreen = ({ navigation }: any) => {
               const vegColor = mi.is_egg ? '#EAB308' : (mi.is_veg ? '#22C55E' : colors.danger);
               const unavailable = !mi.available || menuData?.kitchenPaused;
               return (
-                <BouncingButton
+                <TouchableOpacity
                   key={mi.id}
                   style={styles.catPreviewCard}
-                  activeOpacity={0.93}
+                  activeOpacity={0.92}
                   onPress={() => { triggerHaptic(); navigation.navigate('ItemDetail', { item: mi }); }}
                 >
                   {/* ── Image block ── */}
@@ -449,7 +449,7 @@ const HomeScreen = ({ navigation }: any) => {
                     </View>
                     <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
                   </View>
-                </BouncingButton>
+                </TouchableOpacity>
               );
             })}
           </ScrollView>
@@ -476,7 +476,7 @@ const HomeScreen = ({ navigation }: any) => {
       const vegColor = menuItem.is_egg ? '#EAB308' : (menuItem.is_veg ? '#22C55E' : colors.danger);
       const unavailable = !menuItem.available || menuData?.kitchenPaused;
       return (
-        <BouncingButton key={menuItem.id} style={styles.homeGridCard} activeOpacity={0.93}
+        <TouchableOpacity key={menuItem.id} style={styles.homeGridCard} activeOpacity={0.92}
           onPress={() => { if (menuItem.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item: menuItem }); } }}>
           <View style={styles.homeGridImageContainer}>
             {menuItem.photo_url
@@ -521,7 +521,7 @@ const HomeScreen = ({ navigation }: any) => {
               </View>
             )}
           </View>
-        </BouncingButton>
+        </TouchableOpacity>
       );
     };
 
@@ -754,11 +754,15 @@ const HomeScreen = ({ navigation }: any) => {
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
-        scrollEventThrottle={16}
+        scrollEventThrottle={32}
         contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 10, 20) + 16 + 52 + LOCATION_HEIGHT + 16 }]}
         windowSize={5}
-        maxToRenderPerBatch={6}
-        initialNumToRender={8}
+        maxToRenderPerBatch={4}
+        initialNumToRender={6}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={true}
+        decelerationRate="fast"
+        overScrollMode="never"
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 

@@ -7,7 +7,7 @@ interface Props {
   fallbackText?: string;
 }
 
-export const NetworkImage: React.FC<Props> = ({ uri, style, fallbackText = 'V' }) => {
+export const NetworkImage: React.FC<Props> = React.memo(({ uri, style, fallbackText = 'V' }) => {
   const [error, setError] = useState(false);
 
   if (error || !uri) {
@@ -35,7 +35,7 @@ export const NetworkImage: React.FC<Props> = ({ uri, style, fallbackText = 'V' }
       }}
     />
   );
-};
+});
 
 const styles = StyleSheet.create({
   placeholder: {
