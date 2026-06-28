@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
 
@@ -27,10 +27,10 @@ export const BouncingButton = ({ onPress, style, children, disabled = false, hap
         }}
         onPressOut={() => { if (!disabled) scale.value = withSpring(1, { damping: 10, stiffness: 400 }); }}
         onPress={() => { if (!disabled && onPress) onPress(); }}
-        style={StyleSheet.absoluteFill}
         {...rest}
-      />
-      {children}
+      >
+        {children}
+      </TouchableOpacity>
     </Animated.View>
   );
 };
