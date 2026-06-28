@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from "@react-google-maps/api";
 import { Loader2 } from "lucide-react";
+import { api } from "../lib/api";
 
 interface Location {
   lat: number;
@@ -112,10 +113,10 @@ const mapOptions = {
   ],
 };
 
-export default function DispatchMap({ riders }: DispatchMapProps) {
+function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: string }) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: apiKey,
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -240,4 +241,27 @@ export default function DispatchMap({ riders }: DispatchMapProps) {
       </div>
     </div>
   );
+}
+
+export default function DispatchMap({ riders }: DispatchMapProps) {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get('/app/config/maps-key')
+      .then((data: any) => {
+        if (data.key) setApiKey(data.key);
+      })
+      .catch(console.error);
+  }, []);
+
+  if (!apiKey) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#17263c] rounded-2xl border border-white/5">
+        <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+        <p className="text-white/60 font-medium text-sm">Loading map configuration...</p>
+      </div>
+    );
+  }
+
+  return <DispatchMapInner riders={riders} apiKey={apiKey} />;
 }
