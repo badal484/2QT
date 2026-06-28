@@ -704,7 +704,7 @@ function SupportTab() {
 
   useEffect(() => { loadTickets(); }, []);
 
-  useSocketRefresh(['ticket_status_updated', 'user_updated'], load);
+  useSocketRefresh(['ticket_status_updated', 'user_updated'], loadTickets);
   useSocketRefresh(["ticket_updated"], loadTickets);
 
   const submit = async () => {

@@ -102,7 +102,7 @@ export default function KitchenPage() {
     if (authLoading) return;
     if (!user) {
       router.push("/login");
-    } else if (user.role !== "chef" && user.role !== "super_admin") {
+    } else if (!["chef", "kitchen_manager", "super_admin"].includes(user.role)) {
       router.push("/menu");
     }
   }, [user, authLoading, router]);
@@ -242,7 +242,7 @@ export default function KitchenPage() {
               2QT<span className="text-brand-primary">.</span>{" "}
               <span className="text-zinc-400 font-medium">Kitchen</span>
             </Link>
-            {/* ── View toggle ── */}
+            {/* ── View toggle (Dispatch only for manager/super_admin) ── */}
             <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10">
               <button
                 onClick={() => setView("kds")}
@@ -250,6 +250,7 @@ export default function KitchenPage() {
               >
                 KDS
               </button>
+              {["kitchen_manager", "super_admin"].includes(user?.role ?? "") && (
               <button
                 onClick={() => setView("dispatch")}
                 className={`px-5 py-2 rounded-lg text-sm font-black uppercase tracking-widest transition-all flex items-center gap-2 ${view === "dispatch" ? "bg-orange-500 text-black shadow-[0_0_16px_rgba(249,115,22,0.4)]" : "text-zinc-400 hover:text-white"}`}
@@ -261,6 +262,7 @@ export default function KitchenPage() {
                   </span>
                 )}
               </button>
+              )}
             </div>
           </div>
 
