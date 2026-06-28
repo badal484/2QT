@@ -26,6 +26,19 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../providers";
 import { socket } from "../lib/socket";
+import dynamic from "next/dynamic";
+
+const DispatchMap = dynamic(() => import("../components/DispatchMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full bg-[#0F1F18] rounded-2xl flex items-center justify-center border border-green-500/20">
+      <div className="text-green-500 flex flex-col items-center gap-3">
+        <RefreshCw className="w-6 h-6 animate-spin" />
+        <span className="font-bold tracking-widest uppercase text-xs">Loading Live Map...</span>
+      </div>
+    </div>
+  ),
+});
 
 interface OrderItem {
   name: string;
@@ -357,8 +370,13 @@ export default function KitchenPage() {
               ))}
             </div>
 
+            {/* Center — Live Map */}
+            <div className="flex-1 min-w-[300px] h-full pb-6">
+              <DispatchMap riders={riders} />
+            </div>
+
             {/* Right — Orders panel */}
-            <div className="flex-1 flex flex-col gap-4 overflow-y-auto pb-6 custom-scrollbar">
+            <div className="w-96 shrink-0 flex flex-col gap-4 overflow-y-auto pb-6 custom-scrollbar">
               <div className="sticky top-0 bg-[#050505] pb-2 z-10">
                 <h2 className="text-xl font-black uppercase tracking-widest text-red-400 flex items-center gap-2">
                   <AlertCircle className="w-5 h-5" />
