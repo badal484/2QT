@@ -1,5 +1,5 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import RiderHomeScreen from '../screens/RiderHomeScreen';
 import AssignedOrderScreen from '../screens/AssignedOrderScreen';
 import DeliveryOTPScreen from '../screens/DeliveryOTPScreen';
@@ -13,7 +13,7 @@ import VerificationPendingScreen from '../screens/VerificationPendingScreen';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 const RiderNavigator = () => {
   const user = useSelector((state: RootState) => state.auth.user);
@@ -21,7 +21,7 @@ const RiderNavigator = () => {
   const isVerified = user?.is_verified ?? false;
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} detachInactiveScreens={false}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}>
       {!onboardingComplete ? (
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       ) : !isVerified ? (
