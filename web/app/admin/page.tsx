@@ -1732,7 +1732,7 @@ export default function AdminPage() {
           {[
             { section: "Main", items: ["Overview", "Analytics", "Orders", "Scheduled", "Dispatch", "Fleet", "Customers", "Support"] },
             { section: "Operations", items: ["Menu", "Inventory", "Categories", "Zones", "Delivery Pricing", "Kitchens", "Partners", "Finance", "Applications"] },
-            { section: "System", items: ["Broadcast", "Marketing", "Promo Codes", "Systems", "Settings"] },
+            { section: "System", items: ["Team", "Broadcast", "Marketing", "Promo Codes", "Campaigns", "Complaints", "Notifications", "Systems", "Settings"] },
           ].map(group => (
             <div key={group.section}>
               <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-3 mb-2">{group.section}</div>

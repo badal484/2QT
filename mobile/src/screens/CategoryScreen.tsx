@@ -258,7 +258,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
       <View style={styles.dietaryRow}>
         {(['Veg', 'Non-Veg', 'Egg'] as const).map((type) => {
           const isActive = dietaryFilter === type;
-          let iconColor = type === 'Veg' ? '#22C55E' : type === 'Non-Veg' ? colors.danger : G.primary;
+          let iconColor = type === 'Veg' ? '#22C55E' : type === 'Non-Veg' ? colors.danger : '#EAB308';
           return (
             <BouncingButton
               key={type}

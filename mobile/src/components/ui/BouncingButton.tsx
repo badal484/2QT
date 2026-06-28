@@ -29,9 +29,8 @@ export const BouncingButton = ({ onPress, style, children, disabled = false, hap
         onPress={() => { if (!disabled && onPress) onPress(); }}
         style={StyleSheet.absoluteFill}
         {...rest}
-      >
-        {children}
-      </TouchableOpacity>
+      />
+      {children}
     </Animated.View>
   );
 };

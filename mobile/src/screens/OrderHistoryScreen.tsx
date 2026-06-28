@@ -175,7 +175,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                       </Text>
                       <Text style={[
                         styles.footerValue,
-                        order.payment_method === 'cod' && order.payment_status === 'cod_pending' && { color: G.primary }
+                        order.payment_method === 'cod' && order.payment_status === 'cod_pending' && { color: '#1B5E46' }
                       ]}>
                         ₹{(order.total_amount_paise / 100).toFixed(2)}
                       </Text>
