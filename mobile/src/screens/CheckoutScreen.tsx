@@ -36,7 +36,6 @@ const BouncingButton = ({ onPress, style, children, disabled = false }: any) => 
         }}
         onPressOut={() => { if (!disabled) scale.value = withSpring(1, { damping: 10, stiffness: 400 }); }}
         onPress={() => { if (!disabled) onPress(); }}
-        style={StyleSheet.absoluteFill}
       >
         {children}
       </TouchableOpacity>
