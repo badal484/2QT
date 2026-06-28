@@ -665,6 +665,8 @@ const HomeScreen = ({ navigation }: any) => {
                             key={phIndex}
                             entering={FadeInDown.duration(350)}
                             exiting={FadeOutUp.duration(350)}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
                             style={{
                               fontSize: 13,
                               fontFamily: fontFamily.medium,
@@ -755,7 +757,7 @@ const HomeScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={32}
-        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 8, 12) + 116 + LOCATION_HEIGHT }]}
+        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 8, 12) + 116 }]}
         windowSize={5}
         maxToRenderPerBatch={4}
         initialNumToRender={6}
