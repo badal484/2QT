@@ -641,7 +641,7 @@ router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate
         const kitchen_id = kitchenRows[0].kitchen_id;
 
         const { rows } = await query(
-            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, available, is_veg, is_egg, is_bestseller, is_new, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *',
+            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, available, is_veg, is_egg, is_bestseller, is_new, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::TEXT[]) RETURNING *',
             [zone_id, kitchen_id, name, description || null, price_paise, cost_price_paise, category, station || 'hot_section', photo_url || null, available ?? true, is_veg ?? false, is_egg ?? false, is_bestseller ?? false, is_new ?? false, tags ?? []]
         );
         
@@ -654,7 +654,7 @@ router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate
         res.json({ item: rows[0] });
     } catch (err: any) {
         console.error('Menu item creation failed:', err);
-        res.status(500).json({ error: 'Failed to create menu item', details: err.message });
+        res.status(500).json({ error: 'Failed to create menu item: ' + err.message, details: err.message });
     }
 });
 
@@ -736,7 +736,7 @@ router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), valid
         res.json({ item: rows[0] });
     } catch (err: any) {
         console.error('Menu item update failed:', err);
-        res.status(500).json({ error: 'Failed to update menu item', details: err.message });
+        res.status(500).json({ error: 'Failed to update menu item: ' + err.message, details: err.message });
     }
 });
 
