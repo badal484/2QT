@@ -22,7 +22,7 @@ const G = {
   primary: '#1B5E46',
   accent: '#10B981',
   accentDim: 'rgba(16,185,129,0.15)',
-  orange: G.primary,
+  orange: '#1B5E46',
   orangeDim: 'rgba(249,115,22,0.15)',
   danger: '#EF4444',
   white: '#FFFFFF',
@@ -37,6 +37,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const [currentLocation, setCurrentLocation] = useState({ latitude: 23.7, longitude: 85.1 });
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [countdown, setCountdown] = useState(15);
+  const [acceptingKA, setAcceptingKA] = useState(false);
   const [skippedIds, setSkippedIds] = useState<string[]>([]);
   const countdownRef = useRef<any>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -152,11 +153,16 @@ const RiderHomeScreen = ({ navigation }: any) => {
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
-    const handler = (data: { orderId: string; displayId: string; assignedBy: string }) => {
+    const handler = (data: { orderId: string; displayId: string; assignedBy: string; deliveryAddress?: string }) => {
       if (!isOnline) return;
-      // Show full-screen modal with 40s countdown; mark as kitchen-assigned
       showNotification(
-        { ...data, id: data.orderId, display_id: data.displayId, _kitchenAssigned: true },
+        {
+          ...data,
+          id: data.orderId,
+          display_id: data.displayId,
+          delivery_address_text: data.deliveryAddress || null,
+          _kitchenAssigned: true,
+        },
         40,
       );
     };
@@ -390,25 +396,35 @@ const RiderHomeScreen = ({ navigation }: any) => {
               <Text style={styles.skipBtnText}>Decline</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.acceptBtn, (claimMutation.isPending || unclaimMutation.isPending) && { opacity: 0.7 },
+              style={[styles.acceptBtn, (claimMutation.isPending || unclaimMutation.isPending || acceptingKA) && { opacity: 0.7 },
                 pendingOrder._kitchenAssigned && { backgroundColor: '#F97316' }]}
-              onPress={() => {
+              onPress={async () => {
                 if (pendingOrder._kitchenAssigned) {
                   clearTimer();
-                  setPendingOrder(null);
-                  queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-                  navigation.navigate('AssignedOrder', {
-                    order: { id: pendingOrder.orderId, display_id: pendingOrder.displayId },
-                  });
+                  setAcceptingKA(true);
+                  try {
+                    const data = await api.get('/riders/orders/active');
+                    hideNotification();
+                    if (data.order) {
+                      navigation.navigate('AssignedOrder', { order: data.order });
+                    }
+                  } catch {
+                    hideNotification();
+                    queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+                  } finally {
+                    setAcceptingKA(false);
+                  }
                 } else {
                   claimMutation.mutate(pendingOrder.id);
                 }
               }}
-              disabled={claimMutation.isPending || unclaimMutation.isPending}
+              disabled={claimMutation.isPending || unclaimMutation.isPending || acceptingKA}
               activeOpacity={0.9}
             >
-              <Check size={18} color={G.white} />
-              <Text style={styles.acceptBtnText}>Accept</Text>
+              {acceptingKA
+                ? <Text style={styles.acceptBtnText}>Loading…</Text>
+                : <><Check size={18} color={G.white} /><Text style={styles.acceptBtnText}>Accept</Text></>
+              }
             </TouchableOpacity>
           </View>
         </Animated.View>

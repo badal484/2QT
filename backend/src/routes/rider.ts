@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
-import { emitToUser, emitToRiders, emitToAdmin, emitToOrder } from '../socket';
+import { emitToUser, emitToRiders, emitToAdmin, emitToOrder, emitToKitchen } from '../socket';
 import { invoicesQueue } from '../jobs/queues';
 import { NotificationService } from '../services/notification.service';
 import { TWO_QT } from '../config/constants';
@@ -445,18 +445,34 @@ router.post('/orders/:id/unclaim', authenticate, requireRole('rider', 'rider_cap
     const riderId = req.user!.userId;
 
     try {
+        let kitchenId: string | null = null;
+        let customerId: string | null = null;
+
         await withTransaction(async (client) => {
-            // 1. Verify rider actually owns this order
+            // 1. Grab kitchen + customer before clearing so we can notify them
+            const { rows: orderRows } = await client.query(
+                'SELECT kitchen_id, customer_id FROM orders WHERE id = $1 AND rider_id = $2',
+                [id, riderId]
+            );
+            if (!orderRows[0]) throw new Error('CANNOT_UNCLAIM');
+            kitchenId = orderRows[0].kitchen_id;
+            customerId = orderRows[0].customer_id;
+
+            // 2. Clear rider from order
             const { rowCount } = await client.query(
                 "UPDATE orders SET rider_id = NULL WHERE id = $1 AND rider_id = $2 AND status IN ('ready_for_pickup', 'confirmed', 'preparing')",
                 [id, riderId]
             );
-            
             if (rowCount === 0) throw new Error('CANNOT_UNCLAIM');
 
-            // 2. Update rider state
+            // 3. Clear rider state
             await client.query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
         });
+
+        // Notify kitchen dispatch panel immediately so it reappears in unassigned list
+        if (kitchenId) emitToKitchen(kitchenId, 'order_updated', { orderId: id, riderDeclined: true });
+        // Notify customer that rider assignment was cleared
+        if (customerId) emitToUser(customerId, 'order_status_update', { orderId: id, riderAssigned: false });
 
         res.json({ success: true });
     } catch (err: any) {
