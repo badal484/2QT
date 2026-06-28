@@ -10,7 +10,7 @@ const G = {
   card: '#111111',
   border: 'rgba(255,255,255,0.07)',
   faint: 'rgba(255,255,255,0.05)',
-  amber: G.primary,
+  amber: '#F59E0B',
   white: '#FFFFFF',
   dim: 'rgba(255,255,255,0.55)',
   muted: 'rgba(255,255,255,0.2)',

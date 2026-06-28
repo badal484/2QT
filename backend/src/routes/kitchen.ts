@@ -325,7 +325,11 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
 
 // ─── Dispatch: live rider list with GPS + order status ───────────────────────
 router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+
     try {
+        // Show idle riders (available to all) + riders delivering THIS kitchen's orders
         const { rows: riders } = await query(`
             SELECT u.id, u.name, u.phone, u.current_order_id, u.is_online,
                    o.status      AS order_status,
@@ -335,8 +339,9 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
             LEFT JOIN orders o ON u.current_order_id = o.id
             LEFT JOIN addresses a ON o.address_id = a.id
             WHERE u.role IN ('rider','rider_captain') AND u.is_online = true
+              AND (u.current_order_id IS NULL OR o.kitchen_id = $1)
             ORDER BY u.name
-        `);
+        `, [kitchenId]);
 
         // Attach GPS from Redis (non-blocking — missing is fine)
         const ridersWithLocation = await Promise.all(
@@ -358,6 +363,9 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
 
 // ─── Dispatch: manually assign a specific rider to a ready order ──────────────
 router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+
     const { id } = req.params;
     const { riderId } = req.body;
     if (!riderId) return res.status(400).json({ error: 'MISSING_RIDER_ID' });
@@ -373,12 +381,12 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
         if (!rider.is_online) return res.status(409).json({ error: 'RIDER_OFFLINE' });
         if (rider.current_order_id) return res.status(409).json({ error: 'RIDER_BUSY' });
 
-        // Assign atomically
+        // Assign atomically — also guards that this order belongs to this kitchen
         const { rows: orderRows } = await query(
             `UPDATE orders SET rider_id = $1
-             WHERE id = $2 AND rider_id IS NULL AND status = 'ready_for_pickup'
-             RETURNING id, display_id, customer_id, kitchen_id, zone_id`,
-            [riderId, id]
+             WHERE id = $2 AND kitchen_id = $3 AND rider_id IS NULL AND status = 'ready_for_pickup'
+             RETURNING id, display_id, customer_id, kitchen_id, zone_id, address_id`,
+            [riderId, id, kitchenId]
         );
         if (!orderRows[0]) return res.status(409).json({ error: 'ORDER_UNAVAILABLE' });
 
@@ -386,11 +394,18 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
 
         const order = orderRows[0];
 
-        // Push to rider — they'll see accept/decline modal
+        // Fetch delivery address for the rider notification
+        const { rows: addrRows } = await query(
+            'SELECT address_text FROM addresses WHERE id = $1',
+            [order.address_id]
+        );
+
+        // Push to rider — they'll see accept/decline modal with full context
         emitToUser(riderId, 'order_assigned', {
             orderId: id,
             displayId: order.display_id,
             assignedBy: 'kitchen',
+            deliveryAddress: addrRows[0]?.address_text || null,
         });
 
         // Notify customer that a rider was assigned
@@ -412,6 +427,9 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
 
 // ─── Dispatch: get unassigned ready orders for dispatch panel ─────────────────
 router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+
     try {
         const { rows } = await query(`
             SELECT o.id, o.display_id, o.status, o.created_at,
@@ -422,9 +440,9 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
-            WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL
+            WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL AND o.kitchen_id = $1
             ORDER BY o.created_at ASC
-        `);
+        `, [kitchenId]);
 
         for (const order of rows) {
             const { rows: items } = await query(

@@ -461,14 +461,11 @@ export function MenuTab() {
                           try {
                             const fData = new FormData();
                             fData.append("image", e.target.files[0]);
-                            const token = typeof window !== "undefined" ? localStorage.getItem("2qt_token") : null;
-                            const res = await fetch("/api/proxy/admin/menu/upload", {
+                            const res = await api.request("/admin/menu/upload", {
                               method: "POST",
-                              headers: token ? { Authorization: `Bearer ${token}` } : {},
                               body: fData,
                             });
-                            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Upload failed");
-                            const data = await res.json();
+                            const data = res;
                             if (data.url) setImageUrl(data.url);
                             else throw new Error("No URL returned from server");
                           } catch (err: any) {
