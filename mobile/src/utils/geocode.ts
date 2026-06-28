@@ -98,11 +98,11 @@ async function nominatimReverse(lat: number, lng: number): Promise<GeocodeResult
   return null;
 }
 
-// ─── Chain: backend → Google → Nominatim direct ──────────────────────────────
+// ─── Chain: Google → backend Nominatim → direct Nominatim ────────────────────
 
 async function geocode(lat: number, lng: number): Promise<GeocodeResult | null> {
-  return (await backendReverse(lat, lng))
-      ?? (await googleReverse(lat, lng))
+  return (await googleReverse(lat, lng))
+      ?? (await backendReverse(lat, lng))
       ?? (await nominatimReverse(lat, lng));
 }
 
