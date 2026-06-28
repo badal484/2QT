@@ -8,7 +8,7 @@ import { api } from '../api/client';
 import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeInDown, FadeOutUp, SlideInDown, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../utils/kitchenHours';
 import { NetworkImage } from '../components/NetworkImage';
 import { EmptyState, SkeletonRow } from '../components/ui';
@@ -2220,37 +2220,40 @@ const ClosedBottomSheet = ({
   const minsLeft = minutesUntilOpen(openingTime);
   const opensVerySoon = minsLeft > 0 && minsLeft <= 30;
   const openLabel = openingTime ? formatTime12h(openingTime) : '10:00 AM';
+  const headerHeight = Math.max(insets.top + 8, 12) + 116;
 
   return (
-    <Animated.View entering={SlideInDown.springify().damping(18).stiffness(120)} style={closedSS.sheet}>
-      {/* Roller shutter illustration */}
-      <View style={closedSS.shutterBox}>
-        <View style={closedSS.rail} />
-        {Array.from({ length: SLAT_COUNT }).map((_, i) => (
-          <View key={i} style={closedSS.slat} />
-        ))}
-        <View style={closedSS.rail} />
-        <View style={closedSS.handle} />
+    <Animated.View entering={FadeIn.duration(300)} style={[closedSS.sheet, { paddingTop: headerHeight }]}>
+      <View style={closedSS.content}>
+        {/* Roller shutter illustration */}
+        <View style={closedSS.shutterBox}>
+          <View style={closedSS.rail} />
+          {Array.from({ length: SLAT_COUNT }).map((_, i) => (
+            <View key={i} style={closedSS.slat} />
+          ))}
+          <View style={closedSS.rail} />
+          <View style={closedSS.handle} />
+        </View>
+
+        <Text style={closedSS.title}>Closed for Now, Back Soon!</Text>
+
+        {opensVerySoon ? (
+          <Text style={closedSS.subtitle}>
+            Opening in <Text style={closedSS.highlight}>{minsLeft} min</Text>
+          </Text>
+        ) : (
+          <Text style={closedSS.subtitle}>
+            We open at <Text style={closedSS.highlight}>{openLabel}</Text>
+          </Text>
+        )}
+
+        <Text style={closedSS.body}>
+          We're closed for now, but we'll be back soon!{'\n'}Thank you for your patience.
+        </Text>
       </View>
 
-      <Text style={closedSS.title}>Closed for Now, Back Soon!</Text>
-
-      {opensVerySoon ? (
-        <Text style={closedSS.subtitle}>
-          Opening in <Text style={closedSS.highlight}>{minsLeft} min</Text>
-        </Text>
-      ) : (
-        <Text style={closedSS.subtitle}>
-          We open at <Text style={closedSS.highlight}>{openLabel}</Text>
-        </Text>
-      )}
-
-      <Text style={closedSS.body}>
-        We're closed for now, but we'll be back soon!{'\n'}Thank you for your patience.
-      </Text>
-
       <TouchableOpacity
-        style={[closedSS.btn, { marginBottom: Math.max(insets.bottom, 20) }]}
+        style={[closedSS.btn, { marginBottom: Math.max(insets.bottom, 20) + 100 }]}
         onPress={onDismiss}
         activeOpacity={0.85}
       >
@@ -2263,20 +2266,20 @@ const ClosedBottomSheet = ({
 const closedSS = StyleSheet.create({
   sheet: {
     position: 'absolute',
+    top: 0,
     bottom: 0,
     left: 0,
     right: 0,
+    zIndex: 50,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 28,
     paddingHorizontal: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 24,
+    justifyContent: 'space-between',
+  },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   shutterBox: {
     width: 170,
