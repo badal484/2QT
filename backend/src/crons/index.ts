@@ -8,6 +8,7 @@ import {
     firePayout, isAutoPayConfigured,
 } from '../services/razorpay-payout.service';
 import { processDueTriggerJobs, runDailyTriggers } from '../services/trigger.service';
+import { fireCampaignNotification } from '../routes/campaigns';
 
 export const initCrons = () => {
     // Daily limit reset at midnight
@@ -393,6 +394,42 @@ export const initCrons = () => {
     // Process due notification trigger jobs every minute
     cron.schedule('* * * * *', async () => {
         await processDueTriggerJobs();
+    });
+
+    // Campaign schedule: auto-start and auto-expire based on schedule_start / schedule_end
+    cron.schedule('* * * * *', async () => {
+        // Activate campaigns whose schedule_start has arrived
+        const { rows: toActivate } = await query(`
+            UPDATE campaigns
+            SET is_active = TRUE, updated_at = NOW()
+            WHERE is_active = FALSE
+              AND schedule_start IS NOT NULL AND schedule_start <= NOW()
+              AND (schedule_end IS NULL OR schedule_end > NOW())
+            RETURNING *
+        `);
+        for (const c of toActivate) {
+            console.log(`[CRON] Campaign "${c.name}" auto-activated`);
+            if (c.notif_template_type && !c.notif_sent_at) {
+                fireCampaignNotification(c).catch(() => {});
+            }
+        }
+
+        // Expire campaigns whose schedule_end has passed
+        const { rows: toExpire } = await query(`
+            UPDATE campaigns
+            SET is_active = FALSE, updated_at = NOW()
+            WHERE is_active = TRUE
+              AND schedule_end IS NOT NULL AND schedule_end <= NOW()
+            RETURNING id, name
+        `);
+        for (const c of toExpire) {
+            console.log(`[CRON] Campaign "${c.name}" auto-expired`);
+        }
+
+        if (toActivate.length > 0 || toExpire.length > 0) {
+            const { default: redisClient } = await import('../redis');
+            await redisClient.del('active_campaigns').catch(() => {});
+        }
     });
 
     // Run daily notification triggers (re-engagement, birthday, subscription expiry) at 10am IST
