@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StatusBar, Alert,
-  StyleSheet, Animated, Easing,
+  StyleSheet, Animated, Easing, Platform, PermissionsAndroid
 } from 'react-native';
 import { LeafletMap } from '../components/LeafletMap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +14,7 @@ import { getSocket } from '../socket/client';
 import { LogOut, ChevronRight, Check, X, Wallet, History } from 'lucide-react-native';
 import { registerDeviceToken, subscribeToTokenRefresh, subscribeToForegroundMessages } from '../services/push';
 import Geolocation from '@react-native-community/geolocation';
+import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
 
 const G = {
   bg: '#070F0C',
@@ -31,10 +32,10 @@ const G = {
 };
 
 const RiderHomeScreen = ({ navigation }: any) => {
-  const { user } = useSelector((state: RootState) => state.auth);
+  const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const insets = useSafeAreaInsets();
   const [isOnline, setIsOnline] = useState(user?.is_online || false);
-  const [currentLocation, setCurrentLocation] = useState({ latitude: 23.7, longitude: 85.1 });
+  const [currentLocation, setCurrentLocation] = useState({ latitude: 28.6139, longitude: 77.2090 });
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [countdown, setCountdown] = useState(15);
   const [acceptingKA, setAcceptingKA] = useState(false);
@@ -187,21 +188,80 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
 
   // ── GPS location heartbeat ─────────────────────────────────────────────────
+  const latestLocationRef = useRef(currentLocation);
   useEffect(() => {
-    const watchId = Geolocation.watchPosition(
-      pos => {
-        const { latitude, longitude } = pos.coords;
-        setCurrentLocation({ latitude, longitude });
+    latestLocationRef.current = currentLocation;
+  }, [currentLocation]);
+
+  useEffect(() => {
+    let watchId: number;
+    let interval: NodeJS.Timeout;
+
+    const startTracking = async () => {
+      // Basic runtime permission request for Android
+      if (Platform.OS === 'android') {
+        try {
+          await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+
+      if (isOnline) {
+        // Start Android Native Foreground Service to keep tracking when app is closed/minimized!
+        if (accessToken) startRiderLocationService(accessToken);
+
+        // 1. Immediately ping the server on mount
+        const socket = getSocket();
+        socket?.emit('update_location', { 
+          lat: latestLocationRef.current.latitude, 
+          lng: latestLocationRef.current.longitude 
+        });
+      } else {
+        stopRiderLocationService();
+      }
+
+      // 2. Start GPS tracker for UI movement
+      watchId = Geolocation.watchPosition(
+        pos => {
+          const { latitude, longitude } = pos.coords;
+          setCurrentLocation({ latitude, longitude });
+          if (isOnline) {
+            const socket = getSocket();
+            socket?.emit('update_location', { lat: latitude, lng: longitude });
+          }
+        },
+        (error) => { console.warn("GPS Error:", error); },
+        { 
+          enableHighAccuracy: false,
+          distanceFilter: 5, 
+          interval: 4000,
+          timeout: 15000,
+          maximumAge: 10000
+        },
+      );
+
+      // 3. Force ping every 60 seconds for idle stationary riders
+      interval = setInterval(() => {
         if (isOnline) {
           const socket = getSocket();
-          socket?.emit('update_location', { lat: latitude, lng: longitude });
+          socket?.emit('update_location', { 
+            lat: latestLocationRef.current.latitude, 
+            lng: latestLocationRef.current.longitude 
+          });
         }
-      },
-      () => {},
-      { enableHighAccuracy: true, distanceFilter: 5, interval: 4000 },
-    );
-    return () => Geolocation.clearWatch(watchId);
-  }, [isOnline]);
+      }, 60000);
+    };
+
+    startTracking();
+
+    return () => {
+      if (watchId !== undefined) Geolocation.clearWatch(watchId);
+      if (interval !== undefined) clearInterval(interval);
+      // Native Foreground Service stays alive purposely, do NOT stop it on component unmount
+      // It is only stopped when isOnline becomes false
+    };
+  }, [isOnline, accessToken]);
 
   // ── FCM device token registration ────────────────────────────────────────
   useEffect(() => {

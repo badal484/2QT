@@ -89,7 +89,9 @@ const AddressScreen = ({ navigation }: any) => {
       dispatch(setUnserviceable(addrLocation));
     } finally {
       setSelectingId(null);
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     }
   };
 
@@ -117,7 +119,9 @@ const AddressScreen = ({ navigation }: any) => {
             dispatch(setUnserviceable(location));
           }
           dispatch(setAddress('gps'));
-          navigation.goBack();
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          }
         } catch {
           Alert.alert('Error', 'Could not verify location.');
         } finally {
@@ -144,7 +148,7 @@ const AddressScreen = ({ navigation }: any) => {
 
         {/* Clean Header */}
         <View style={styles.header}>
-          <BouncingButton style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <BouncingButton style={styles.backBtn} onPress={() => { if (navigation.canGoBack()) navigation.goBack(); }} activeOpacity={0.7}>
             <ArrowLeft size={22} color={colors.ink} />
           </BouncingButton>
           <Text style={styles.headerTitle}>Select a location</Text>
