@@ -1,10 +1,9 @@
 import { api } from '../api/client';
+import { navigateFromNotification } from '../navigation/navigationRef';
 
 let messagingInstance: any = null;
 let initAttempted = false;
 
-// Returns the initialized messaging instance, or null if Firebase isn't available.
-// Calling the messaging factory (mod()) triggers firebase.app() — keep it inside try/catch.
 function getMessaging() {
     if (initAttempted) return messagingInstance;
     initAttempted = true;
@@ -12,7 +11,7 @@ function getMessaging() {
         const mod = require('@react-native-firebase/messaging').default;
         messagingInstance = mod();
     } catch {
-        // Firebase native module not available (New Architecture interop not wired)
+        // Firebase native module not available
     }
     return messagingInstance;
 }
@@ -22,9 +21,7 @@ export async function registerDeviceToken() {
     if (!msg) return;
     try {
         const authStatus = await msg.requestPermission();
-        // AUTHORIZED = 1, PROVISIONAL = 2
         if (authStatus < 1) return;
-
         const token = await msg.getToken();
         if (token) {
             await api.patch('/notifications/device-token', { token });
@@ -64,11 +61,45 @@ export function subscribeToForegroundMessages(
     }
 }
 
+// App was in background (not killed) — user tapped notification
+export function subscribeToNotificationTap() {
+    const msg = getMessaging();
+    if (!msg) return () => {};
+    try {
+        return msg.onNotificationOpenedApp((remoteMessage: any) => {
+            const data = remoteMessage?.data ?? {};
+            console.log('[PUSH] Notification tapped (background):', data.type);
+            navigateFromNotification(data);
+        });
+    } catch {
+        return () => {};
+    }
+}
+
+// App was killed — user tapped notification to launch app
+export async function handleInitialNotification() {
+    const msg = getMessaging();
+    if (!msg) return;
+    try {
+        const remoteMessage = await msg.getInitialNotification();
+        if (remoteMessage) {
+            const data = remoteMessage?.data ?? {};
+            console.log('[PUSH] App launched from notification:', data.type);
+            // Small delay so NavigationContainer is ready
+            setTimeout(() => navigateFromNotification(data), 500);
+        }
+    } catch {
+        // ignore
+    }
+}
+
 export function setupBackgroundHandler() {
     const msg = getMessaging();
     if (!msg) return;
     try {
-        msg.setBackgroundMessageHandler(async (_remoteMessage: any) => {});
+        msg.setBackgroundMessageHandler(async (_remoteMessage: any) => {
+            // Background data-only messages — nothing to do, OS shows the notification
+        });
     } catch {}
 }
 

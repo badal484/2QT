@@ -27,6 +27,16 @@ const COLOR_MAP: Record<string, string> = {
   indigo: "bg-indigo-100 text-indigo-700",
 };
 
+const SEGMENT_OPTIONS = [
+  { value: "", label: "All customers" },
+  { value: "new_users", label: "New users (joined <7d)" },
+  { value: "active", label: "Active (ordered in 14d)" },
+  { value: "at_risk", label: "At risk (7–14d inactive)" },
+  { value: "churned", label: "Churned (30d+ inactive)" },
+  { value: "loyal", label: "Loyal (10+ orders)" },
+  { value: "subscribers", label: "Subscribers" },
+];
+
 interface Campaign {
   id: string;
   name: string;
@@ -44,6 +54,18 @@ interface Campaign {
   happy_hour_end: string | null;
   happy_hour_days: string[] | null;
   config: any;
+  // Audience
+  audience_type: string | null;
+  audience_segment: string | null;
+  // Schedule
+  schedule_start: string | null;
+  schedule_end: string | null;
+  // Notification
+  notif_template_type: string | null;
+  notif_sent_at: string | null;
+  // Results
+  reach_count: number;
+  conversion_count: number;
 }
 
 function discountLabel(c: Campaign) {
@@ -69,6 +91,13 @@ function EditModal({ campaign, onClose, onSaved }: { campaign: Campaign; onClose
     flash_end: campaign.flash_end ? campaign.flash_end.slice(0,16) : "",
     happy_hour_start: campaign.happy_hour_start || "15:00",
     happy_hour_end: campaign.happy_hour_end || "18:00",
+    // Audience
+    audience_segment: campaign.audience_segment ?? "",
+    // Schedule
+    schedule_start: campaign.schedule_start ? campaign.schedule_start.slice(0,16) : "",
+    schedule_end: campaign.schedule_end ? campaign.schedule_end.slice(0,16) : "",
+    // Notification
+    notif_template_type: campaign.notif_template_type ?? "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -84,6 +113,11 @@ function EditModal({ campaign, onClose, onSaved }: { campaign: Campaign; onClose
         winback_days: Number(form.winback_days),
         flash_start: form.flash_start || null,
         flash_end: form.flash_end || null,
+        audience_type: form.audience_segment ? "segment" : "all",
+        audience_segment: form.audience_segment || null,
+        schedule_start: form.schedule_start || null,
+        schedule_end: form.schedule_end || null,
+        notif_template_type: form.notif_template_type || null,
       });
       toast.success("Campaign saved — users see updated offer within 30 seconds");
       onSaved();
@@ -146,6 +180,51 @@ function EditModal({ campaign, onClose, onSaved }: { campaign: Campaign; onClose
             {f("happy_hour_end", "End time", "time")}
           </div>
         )}
+
+        {/* ── Audience ── */}
+        <div className="border-t border-zinc-100 pt-4">
+          <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-2">Audience</p>
+          <div>
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Target segment</label>
+            <select
+              className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold"
+              value={form.audience_segment}
+              onChange={e => setForm(p => ({ ...p, audience_segment: e.target.value }))}
+            >
+              {SEGMENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* ── Schedule ── */}
+        <div className="border-t border-zinc-100 pt-4">
+          <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-2">Schedule (optional)</p>
+          <div className="grid grid-cols-2 gap-3">
+            {f("schedule_start", "Goes live at", "datetime-local")}
+            {f("schedule_end", "Expires at", "datetime-local")}
+          </div>
+          <p className="text-[11px] text-zinc-400 mt-1">Leave blank to manage manually via the ON/OFF toggle.</p>
+        </div>
+
+        {/* ── Notification ── */}
+        <div className="border-t border-zinc-100 pt-4">
+          <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-2">Notification (optional)</p>
+          <div>
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Send template when campaign goes live</label>
+            <input
+              type="text"
+              className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold"
+              placeholder="e.g. broadcast_message (leave blank to skip)"
+              value={form.notif_template_type}
+              onChange={e => setForm(p => ({ ...p, notif_template_type: e.target.value }))}
+            />
+            {campaign.notif_sent_at && (
+              <p className="text-[11px] text-green-600 mt-1">
+                ✓ Notification sent {new Date(campaign.notif_sent_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+              </p>
+            )}
+          </div>
+        </div>
 
         <p className="text-xs text-zinc-400 bg-zinc-50 rounded-xl p-3">
           Changes go live instantly. When you disable a campaign, users stop seeing it within <strong>30 seconds</strong>.
@@ -245,9 +324,36 @@ function CampaignCard({ campaign, onRefresh }: { campaign: Campaign; onRefresh: 
           )}
         </div>
 
+        {/* Results + audience + schedule chips */}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {campaign.audience_segment && (
+            <span className="bg-blue-50 text-blue-600 text-xs font-semibold px-2 py-0.5 rounded-lg">
+              {SEGMENT_OPTIONS.find(s => s.value === campaign.audience_segment)?.label ?? campaign.audience_segment}
+            </span>
+          )}
+          {campaign.schedule_start && (
+            <span className="bg-amber-50 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-lg">
+              From {new Date(campaign.schedule_start).toLocaleDateString("en-IN")}
+            </span>
+          )}
+          {campaign.schedule_end && (
+            <span className="bg-amber-50 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-lg">
+              Until {new Date(campaign.schedule_end).toLocaleDateString("en-IN")}
+            </span>
+          )}
+          {(campaign.reach_count > 0 || campaign.conversion_count > 0) && (
+            <span className="bg-zinc-50 text-zinc-600 text-xs font-semibold px-2 py-0.5 rounded-lg">
+              {campaign.reach_count} reached · {campaign.conversion_count} converted
+              {campaign.reach_count > 0 && (
+                <span className="text-green-600 ml-1">({Math.round((campaign.conversion_count / campaign.reach_count) * 100)}%)</span>
+              )}
+            </span>
+          )}
+        </div>
+
         <button
           onClick={() => setEditing(true)}
-          className="mt-4 flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-zinc-700 transition-colors"
+          className="mt-3 flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-zinc-700 transition-colors"
         >
           <Edit3 size={12}/> Edit settings
         </button>

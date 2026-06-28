@@ -7,6 +7,7 @@ import {
     ensureKitchenFundAccount, ensureRiderFundAccount,
     firePayout, isAutoPayConfigured,
 } from '../services/razorpay-payout.service';
+import { processDueTriggerJobs, runDailyTriggers } from '../services/trigger.service';
 
 export const initCrons = () => {
     // Daily limit reset at midnight
@@ -387,6 +388,17 @@ export const initCrons = () => {
         if (rowCount && rowCount > 0) {
             console.log(`[CRON] Updated ${rowCount} marketing campaigns to completed`);
         }
+    });
+
+    // Process due notification trigger jobs every minute
+    cron.schedule('* * * * *', async () => {
+        await processDueTriggerJobs();
+    });
+
+    // Run daily notification triggers (re-engagement, birthday, subscription expiry) at 10am IST
+    cron.schedule('0 10 * * *', async () => {
+        console.log('[CRON] Running daily notification triggers...');
+        await runDailyTriggers();
     });
 
     // Keep Render free-tier warm — ping own health endpoint every 10 minutes
