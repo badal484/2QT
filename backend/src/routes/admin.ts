@@ -14,7 +14,9 @@ import multer from 'multer';
 const validate = (schema: ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-        return res.status(400).json({ error: 'VALIDATION_ERROR', issues: result.error.flatten().fieldErrors });
+        const errors = result.error.flatten().fieldErrors;
+        const errorStrings = Object.entries(errors).map(([field, msgs]) => `${field}: ${msgs?.join(', ')}`);
+        return res.status(400).json({ error: 'VALIDATION_ERROR', details: errorStrings.join(' | ') });
     }
     req.body = result.data;
     next();
@@ -40,13 +42,13 @@ const MenuItemSchema = z.object({
 const KitchenSchema = z.object({
     name: z.string().min(1).max(120),
     zone_ids: z.array(z.string().uuid()).min(1, 'At least one zone is required'),
-    address: z.string().max(300).optional(),
-    fssai_license: z.string().max(20).optional(),
-    gstin: z.string().max(20).optional(),
-    lat: z.number().optional().default(12.9716),
-    lng: z.number().optional().default(77.5946),
-    is_paused: z.boolean().optional(),
-    pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits').optional(),
+    address: z.string().max(300).nullish(),
+    fssai_license: z.string().max(20).nullish(),
+    gstin: z.string().max(20).nullish(),
+    lat: z.number().nullish().default(12.9716),
+    lng: z.number().nullish().default(77.5946),
+    is_paused: z.boolean().nullish(),
+    pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits').nullish(),
 });
 
 const ZoneSchema = z.object({
@@ -1128,7 +1130,10 @@ router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin')
         await query('DELETE FROM kitchens WHERE id = $1', [id]);
         res.json({ success: true });
     } catch (err: any) {
-        res.status(500).json({ error: 'Cannot delete kitchen. It may be linked to orders or chefs.', details: err.message });
+        if (err.constraint === 'users_kitchen_id_fkey' || err.message.includes('users_kitchen_id_fkey')) {
+            return res.status(400).json({ error: 'Cannot delete kitchen because there are staff members assigned to it. Please remove the staff first.' });
+        }
+        res.status(500).json({ error: 'Failed to delete kitchen', details: err.message });
     }
 });
 
@@ -1204,7 +1209,7 @@ router.post('/jobs/clear-failed', authenticate, requireRole('super_admin', 'admi
 
 // ─── Team Management ──────────────────────────────────────────────────────────
 
-router.get('/team/users', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
+router.get('/team/users', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
         const { rows } = await query(`
             SELECT id, name, phone, email, role, is_active, is_verified, created_at
