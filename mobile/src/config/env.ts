@@ -9,7 +9,7 @@ export const ENV = {
   IMAGEKIT_PUBLIC_KEY: 'public_PStmG2ipavrJoxTXsWmjsYk5T+Y=',
 
   // Unrestricted key for server-side Google Geocoding HTTP API calls from mobile
-  GOOGLE_GEOCODING_KEY: 'AIzaSyCwvUrO91u81DGsCr4YoJZWzrIC9Pr5kaA',
+  GOOGLE_GEOCODING_KEY: 'YOUR_GOOGLE_GEOCODING_API_KEY_HERE',
 
   // Business UPI ID shown to customers at the door for UPI payment
   BUSINESS_UPI_ID: 'badal90603@oksbi',
