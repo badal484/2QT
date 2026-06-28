@@ -22,7 +22,7 @@
       
       <meta-data
         android:name="com.google.android.geo.API_KEY"
-        android:value="AIzaSyCaLm5vOs9lw9QsF6v89HrNNbYiD5rqKg0" />
+        android:value="AIzaSyCwvUrO91u81DGsCr4YoJZWzrIC9Pr5kaA" />
 
       <service
         android:name=".LocationForegroundService"
