@@ -275,6 +275,11 @@ export default function KitchenPage() {
     try {
       const data = await api.get("/kitchen/orders");
       setOrders(data.orders || []);
+      if (data.kitchen_name) {
+        setKitchenName(data.kitchen_name.toLowerCase());
+      } else if (data.orders && data.orders.length > 0 && data.orders[0].kitchen_name) {
+        setKitchenName(data.orders[0].kitchen_name.toLowerCase());
+      }
       setError(null);
     } catch {
       setError("Could not reach kitchen server.");
