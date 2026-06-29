@@ -487,9 +487,9 @@ export default function KitchenPage() {
       <header className="border-b border-white/[0.05] bg-[#050505]/90 backdrop-blur-xl sticky top-0 z-50 shrink-0">
         {/* Top row */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3">
-          <Link href="/" className="text-xl sm:text-2xl font-bold tracking-tight shrink-0">
-            2QT<span className="text-brand-primary">.</span>{" "}
-            <span className="text-zinc-400 font-medium hidden sm:inline">Kitchen</span>
+          <Link href="/" className="text-xl sm:text-2xl font-bold tracking-tight shrink-0 flex items-center gap-2">
+            2QT<span className="text-brand-primary -ml-1">.</span>{" "}
+            <span className="text-zinc-400 font-medium hidden sm:inline">{kitchenName ? kitchenName : "Kitchen"}</span>
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-4">

@@ -32,6 +32,16 @@ export async function registerDeviceToken() {
     }
 }
 
+export async function getCurrentDeviceToken(): Promise<string | null> {
+    const msg = getMessaging();
+    if (!msg) return null;
+    try {
+        const status = await msg.requestPermission();
+        if (status < 1) return null;
+        return await msg.getToken();
+    } catch { return null; }
+}
+
 export function subscribeToTokenRefresh() {
     const msg = getMessaging();
     if (!msg) return () => {};
