@@ -244,7 +244,7 @@ router.post('/validate-cart', async (req, res) => {
     // Single query for all cart items instead of N queries
     const ids = items.map((i: any) => i.menuItemId);
     const { rows } = await query(
-        'SELECT id, price_paise, available FROM menu_items WHERE id = ANY($1::uuid[])',
+        'SELECT id, price_paise, available, customization_groups FROM menu_items WHERE id = ANY($1::uuid[])',
         [ids]
     );
     const dbMap = new Map(rows.map((r: any) => [r.id, r]));
@@ -256,9 +256,23 @@ router.post('/validate-cart', async (req, res) => {
     for (const item of items) {
         const db = dbMap.get(item.menuItemId);
         if (!db || !db.available) { removedCount++; continue; }
-        if (db.price_paise !== item.pricePaise) {
-            priceChanges.push({ menuItemId: item.menuItemId, oldPrice: item.pricePaise, newPrice: db.price_paise });
-            item.pricePaise = db.price_paise;
+        
+        let expectedPrice = db.price_paise;
+        if (item.customizations && item.customizations.length > 0 && db.customization_groups) {
+            item.customizations.forEach((c: any) => {
+                const group = db.customization_groups.find((g: any) => g.name === c.group);
+                if (group) {
+                    const opt = group.options.find((o: any) => o.name === c.option);
+                    if (opt && opt.price_paise) {
+                        expectedPrice += opt.price_paise;
+                    }
+                }
+            });
+        }
+
+        if (expectedPrice !== item.pricePaise) {
+            priceChanges.push({ menuItemId: item.menuItemId, oldPrice: item.pricePaise, newPrice: expectedPrice });
+            item.pricePaise = expectedPrice;
         }
         validItems.push(item);
     }

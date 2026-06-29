@@ -257,6 +257,19 @@ const HomeScreen = ({ navigation }: any) => {
   }, []);
 
   const handleAddToCart = useCallback((item: any, customizations: any[] = [], instructions: string = '') => {
+    let customExtraPaise = 0;
+    if (customizations.length > 0 && item.customization_groups) {
+      customizations.forEach(c => {
+        const group = item.customization_groups.find((g: any) => g.name === c.group);
+        if (group) {
+          const opt = group.options.find((o: any) => o.name === c.option);
+          if (opt && opt.price_paise) {
+            customExtraPaise += opt.price_paise;
+          }
+        }
+      });
+    }
+
     if (cartItems.length > 0 && cartItems[0].kitchenId !== item.kitchen_id) {
       Alert.alert(
         'Clear Cart?',
@@ -272,7 +285,7 @@ const HomeScreen = ({ navigation }: any) => {
                 addItem({
                   menuItemId: item.id,
                   name: item.name,
-                  pricePaise: item.price_paise,
+                  pricePaise: item.price_paise + customExtraPaise,
                   quantity: 1,
                   photoUrl: item.photo_url,
                   isVeg: item.is_veg,
@@ -291,7 +304,7 @@ const HomeScreen = ({ navigation }: any) => {
         addItem({
           menuItemId: item.id,
           name: item.name,
-          pricePaise: item.price_paise,
+          pricePaise: item.price_paise + customExtraPaise,
           quantity: 1,
           photoUrl: item.photo_url,
           isVeg: item.is_veg,
