@@ -57,6 +57,7 @@ export const GlobalSocketListener: React.FC = () => {
     socket.on('order_updated', handleOrderUpdate);
     
     socket.on('menu_updated', handleMenuUpdate);
+    socket.on('kitchen_resumed', handleMenuUpdate);
     socket.on('inventory_updated', handleInventoryUpdate);
     socket.on('promo_updated', handlePromoUpdate);
 
@@ -74,6 +75,7 @@ export const GlobalSocketListener: React.FC = () => {
       socket.off('order_updated', handleOrderUpdate);
       
       socket.off('menu_updated', handleMenuUpdate);
+      socket.off('kitchen_resumed', handleMenuUpdate);
       socket.off('inventory_updated', handleInventoryUpdate);
       socket.off('promo_updated', handlePromoUpdate);
       
