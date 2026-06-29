@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Image } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 import { fontFamily } from '../../theme/typography';
@@ -94,6 +94,9 @@ export const CustomizationBottomSheet: React.FC<CustomizationBottomSheetProps> =
                         <View style={[styles.radio, isSelected && styles.radioActive]}>
                           {isSelected && <View style={styles.radioInner} />}
                         </View>
+                        {!!opt.photo_url && (
+                          <Image source={{ uri: opt.photo_url }} style={styles.optionImage} />
+                        )}
                         <Text style={[styles.optionName, isSelected && styles.optionNameSelected]}>
                           {opt.name}
                         </Text>
@@ -167,6 +170,7 @@ const styles = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   radioActive: { borderColor: '#22C55E' },
   radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22C55E' },
+  optionImage: { width: 32, height: 32, borderRadius: 8, marginRight: 12, backgroundColor: '#f1f1f1' },
   optionName: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
   optionNameSelected: { fontFamily: fontFamily.bold, color: '#166534' },
   optionPrice: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.inkMuted },

@@ -316,10 +316,17 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Items Ordered</Text>
               {items.map((item: any, i: number) => (
-                <View key={i} style={styles.itemRow}>
-                  <Text style={styles.itemQty}>{item.quantity}×</Text>
-                  <Text style={styles.itemName} numberOfLines={1}>{item.menu_item_name || item.name}</Text>
-                  <Text style={styles.itemPrice}>₹{((item.price_paise * item.quantity) / 100).toFixed(0)}</Text>
+                <View key={i} style={styles.itemRowWrapper}>
+                  <View style={styles.itemRow}>
+                    <Text style={styles.itemQty}>{item.quantity}×</Text>
+                    <Text style={styles.itemName} numberOfLines={1}>{item.menu_item_name || item.name}</Text>
+                    <Text style={styles.itemPrice}>₹{((item.price_paise * item.quantity) / 100).toFixed(0)}</Text>
+                  </View>
+                  {item.customizations && item.customizations.length > 0 && (
+                    <Text style={styles.itemCustomizations} numberOfLines={2}>
+                      + {item.customizations.map((c: any) => `${c.group}: ${c.option}`).join(', ')}
+                    </Text>
+                  )}
                 </View>
               ))}
             </View>
@@ -476,9 +483,11 @@ const styles = StyleSheet.create({
   labelPillText: { fontSize: 10, fontFamily: fontFamily.bold, color: colors.inkMuted },
 
   // Items
-  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  itemRowWrapper: { marginBottom: 12 },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start' },
   itemQty: { width: 30, fontSize: 13, fontFamily: fontFamily.bold, color: colors.accent },
   itemName: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
+  itemCustomizations: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 4, marginLeft: 30, marginBottom: 4 },
   itemPrice: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink },
 
   // Bill
