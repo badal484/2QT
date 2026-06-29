@@ -100,28 +100,28 @@ android {
         buyer {
             dimension "app"
             applicationIdSuffix ".buyer"
-            resValue "string", "app_name", "Velto"
+            resValue "string", "app_name", "2QT"
             versionNameSuffix "-buyer"
             buildConfigField "String", "BUILD_ROLE", "\"customer\""
         }
         rider {
             dimension "app"
             applicationIdSuffix ".rider"
-            resValue "string", "app_name", "Velto Captain"
+            resValue "string", "app_name", "2QT Captain"
             versionNameSuffix "-rider"
             buildConfigField "String", "BUILD_ROLE", "\"rider\""
         }
         kitchen {
             dimension "app"
             applicationIdSuffix ".kitchen"
-            resValue "string", "app_name", "Velto Partner"
+            resValue "string", "app_name", "2QT Partner"
             versionNameSuffix "-kitchen"
             buildConfigField "String", "BUILD_ROLE", "\"kitchen\""
         }
         admin {
             dimension "app"
             applicationIdSuffix ".admin"
-            resValue "string", "app_name", "Velto Admin"
+            resValue "string", "app_name", "2QT Admin"
             versionNameSuffix "-admin"
             buildConfigField "String", "BUILD_ROLE", "\"admin\""
         }

@@ -62,11 +62,11 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const { data: poolData } = useQuery({
     queryKey: ['rider-missions-pool'],
     queryFn: () => api.get('/riders/orders/pool'),
-    enabled: isOnline && !activeOrderData?.order,
+    enabled: isOnline && (!activeOrderData?.orders || activeOrderData.orders.length === 0),
     refetchInterval: 5000,
   });
 
-  const activeOrder = activeOrderData?.order;
+  const activeOrders = activeOrderData?.orders || [];
   const pool: any[] = (poolData?.orders || []).filter((o: any) => !skippedIds.includes(o.id));
 
   // ── Mutations ─────────────────────────────────────────────────────────────
@@ -142,13 +142,12 @@ const RiderHomeScreen = ({ navigation }: any) => {
     if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
   };
 
-  // Show notification only after active order query has resolved (avoids RIDER_BUSY on startup)
   useEffect(() => {
-    if (activeOrderFetched && !activeOrder && !pendingOrder && pool.length > 0) {
+    if (activeOrderFetched && activeOrders.length === 0 && !pendingOrder && pool.length > 0) {
       showNotification(pool[0]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poolData, activeOrder]);
+  }, [poolData, activeOrders]);
 
   // ── Kitchen push-assign listener ──────────────────────────────────────────
   useEffect(() => {
@@ -174,7 +173,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
   // ── Pulsing dot animation ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!isOnline || activeOrder) return;
+    if (!isOnline || activeOrders.length > 0) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.4, duration: 900, useNativeDriver: true }),
@@ -183,7 +182,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     );
     loop.start();
     return () => loop.stop();
-  }, [isOnline, activeOrder, pulseAnim]);
+  }, [isOnline, activeOrders, pulseAnim]);
 
 
 
@@ -195,7 +194,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     let watchId: number;
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     const startTracking = async () => {
       // Basic runtime permission request for Android
@@ -286,7 +285,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
   const todayEarnings = ((earnings?.totalPaise || 0) / 100).toFixed(0);
   const ordersToday = earnings?.deliveriesCount || 0;
-  const isGoingToKitchen = activeOrder && ['confirmed', 'preparing', 'ready_for_pickup'].includes(activeOrder.status);
 
   return (
     <View style={styles.root}>
@@ -301,14 +299,22 @@ const RiderHomeScreen = ({ navigation }: any) => {
           markers={[
             { id: 'rider', lat: currentLocation.latitude, lng: currentLocation.longitude,
               iconUrl: 'https://cdn-icons-png.flaticon.com/512/3198/3198336.png' },
-            ...(activeOrder && isGoingToKitchen && activeOrder.kitchen_lat ? [{
-              id: 'dest', lat: parseFloat(activeOrder.kitchen_lat), lng: parseFloat(activeOrder.kitchen_lng),
-              iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448609.png',
-            }] : []),
-            ...(activeOrder && !isGoingToKitchen && activeOrder.customer_lat ? [{
-              id: 'dest', lat: parseFloat(activeOrder.customer_lat), lng: parseFloat(activeOrder.customer_lng),
-              iconUrl: 'https://cdn-icons-png.flaticon.com/512/619/619034.png',
-            }] : []),
+            ...activeOrders.flatMap((order: any, idx: number) => {
+              const goingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(order.status);
+              if (goingToKitchen && order.kitchen_lat) {
+                return [{
+                  id: `dest-${order.id}`, lat: parseFloat(order.kitchen_lat), lng: parseFloat(order.kitchen_lng),
+                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448609.png',
+                }];
+              }
+              if (!goingToKitchen && order.customer_lat) {
+                return [{
+                  id: `dest-${order.id}`, lat: parseFloat(order.customer_lat), lng: parseFloat(order.customer_lng),
+                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/619/619034.png',
+                }];
+              }
+              return [];
+            }),
           ]}
           style={{ flex: 1 }}
         />
@@ -353,7 +359,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       </TouchableOpacity>
 
       {/* ── Waiting pulse (online, no order) ───────────────────────────────── */}
-      {isOnline && !activeOrder && !pendingOrder && (
+      {isOnline && activeOrders.length === 0 && !pendingOrder && (
         <View style={styles.waitingWrapper}>
           <Animated.View style={[styles.pulseDot, { transform: [{ scale: pulseAnim }] }]} />
           <View style={styles.waitingCard}>
@@ -378,27 +384,35 @@ const RiderHomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
-      {/* ── Active order pill ──────────────────────────────────────────────── */}
-      {activeOrder && !pendingOrder && (
-        <TouchableOpacity
-          style={[styles.activeOrderPill, { bottom: insets.bottom + 24 }]}
-          onPress={() => navigation.navigate('AssignedOrder', { order: activeOrder })}
-          activeOpacity={0.9}
-        >
-          <View style={styles.activeOrderLeft}>
-            <View style={styles.activeOrderDot} />
-            <View>
-              <Text style={styles.activeOrderLabel}>ACTIVE ORDER</Text>
-              <Text style={styles.activeOrderId}>{activeOrder.display_id}</Text>
-            </View>
-          </View>
-          <View style={styles.activeOrderRight}>
-            <Text style={styles.activeOrderNext} numberOfLines={1}>
-              {isGoingToKitchen ? `→ ${activeOrder.kitchen_name || 'Kitchen'}` : `→ ${activeOrder.customer_name || 'Customer'}`}
-            </Text>
-            <ChevronRight size={20} color={G.accent} />
-          </View>
-        </TouchableOpacity>
+      {/* ── Active order pills ──────────────────────────────────────────────── */}
+      {activeOrders.length > 0 && !pendingOrder && (
+        <View style={{ position: 'absolute', bottom: insets.bottom + 24, left: 16, right: 16, zIndex: 40, gap: 10 }}>
+          {activeOrders.map((order: any, idx: number) => {
+             const isGoingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(order.status);
+             return (
+              <TouchableOpacity
+                key={order.id}
+                style={[styles.activeOrderPill, { position: 'relative', left: 0, right: 0 }]}
+                onPress={() => navigation.navigate('AssignedOrder', { order })}
+                activeOpacity={0.9}
+              >
+                <View style={styles.activeOrderLeft}>
+                  <View style={styles.activeOrderDot} />
+                  <View>
+                    <Text style={styles.activeOrderLabel}>{activeOrders.length > 1 ? `ACTIVE ORDER ${idx + 1}` : 'ACTIVE ORDER'}</Text>
+                    <Text style={styles.activeOrderId}>{order.display_id}</Text>
+                  </View>
+                </View>
+                <View style={styles.activeOrderRight}>
+                  <Text style={styles.activeOrderNext} numberOfLines={1}>
+                    {isGoingToKitchen ? `→ ${order.kitchen_name || 'Kitchen'}` : `→ ${order.customer_name || 'Customer'}`}
+                  </Text>
+                  <ChevronRight size={20} color={G.accent} />
+                </View>
+              </TouchableOpacity>
+             );
+          })}
+        </View>
       )}
 
       {/* ── Incoming order notification card ──────────────────────────────── */}
@@ -465,9 +479,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
                   try {
                     const data = await api.get('/riders/orders/active');
                     hideNotification();
-                    if (data.order) {
-                      navigation.navigate('AssignedOrder', { order: data.order });
-                    }
+                    // We don't automatically navigate if there are multiple orders, we stay on home screen
                   } catch {
                     hideNotification();
                     queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });

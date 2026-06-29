@@ -331,15 +331,20 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
     try {
         // Show idle riders (available to all) + riders delivering THIS kitchen's orders
         const { rows: riders } = await query(`
-            SELECT u.id, u.name, u.phone, u.current_order_id, u.is_online,
-                   o.status      AS order_status,
-                   o.display_id  AS order_display_id,
-                   a.address_text AS delivery_address
+            SELECT u.id, u.name, u.phone, u.is_online,
+                   (
+                       SELECT json_agg(json_build_object(
+                           'id', o.id,
+                           'display_id', o.display_id,
+                           'status', o.status,
+                           'delivery_address', a.address_text
+                       ))
+                       FROM orders o
+                       LEFT JOIN addresses a ON o.address_id = a.id
+                       WHERE o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
+                   ) as active_orders
             FROM users u
-            LEFT JOIN orders o ON u.current_order_id = o.id
-            LEFT JOIN addresses a ON o.address_id = a.id
             WHERE u.role IN ('rider','rider_captain') AND u.is_online = true
-              AND (u.current_order_id IS NULL OR o.kitchen_id = $1)
             ORDER BY u.name
         `, [kitchenId]);
 
@@ -377,9 +382,13 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
             [riderId]
         );
         const rider = riderRows[0];
+        const { rows: activeOrders } = await query(
+            "SELECT id FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered', 'cancelled')",
+            [riderId]
+        );
         if (!rider) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
         if (!rider.is_online) return res.status(409).json({ error: 'RIDER_OFFLINE' });
-        if (rider.current_order_id) return res.status(409).json({ error: 'RIDER_BUSY' });
+        if (activeOrders.length >= 3) return res.status(409).json({ error: 'RIDER_BUSY', message: 'Rider cannot take more than 3 stacked orders.' });
 
         // Assign atomically — also guards that this order belongs to this kitchen
         const { rows: orderRows } = await query(
@@ -390,7 +399,8 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
         );
         if (!orderRows[0]) return res.status(409).json({ error: 'ORDER_UNAVAILABLE' });
 
-        await query('UPDATE users SET current_order_id = $1 WHERE id = $2', [id, riderId]);
+        // Legacy clear (no longer relied upon, but kept null for backwards compatibility)
+        await query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
 
         const order = orderRows[0];
 
