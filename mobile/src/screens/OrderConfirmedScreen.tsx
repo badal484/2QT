@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, Alert, Linking,
+  ActivityIndicator, Alert, Linking, Image
 } from 'react-native';
 import {
   ArrowLeft, MapPin, Package, ChefHat, Bike,
@@ -323,9 +323,18 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                     <Text style={styles.itemPrice}>₹{((item.price_paise * item.quantity) / 100).toFixed(0)}</Text>
                   </View>
                   {item.customizations && item.customizations.length > 0 && (
-                    <Text style={styles.itemCustomizations} numberOfLines={2}>
-                      + {item.customizations.map((c: any) => `${c.group}: ${c.option}`).join(', ')}
-                    </Text>
+                    <View style={{ marginTop: 4, marginBottom: 4, marginLeft: 30 }}>
+                      {item.customizations.map((c: any, idx: number) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                          {!!c.photo_url && (
+                            <Image source={{ uri: c.photo_url }} style={{ width: 14, height: 14, borderRadius: 3, marginRight: 4, backgroundColor: '#f1f1f1' }} />
+                          )}
+                          <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted }} numberOfLines={1}>
+                            + {c.group}: {c.option}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
                   )}
                 </View>
               ))}

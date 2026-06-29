@@ -239,9 +239,18 @@ const CartScreen = ({ navigation }: any) => {
                     <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                   </View>
                   {item.customizations && item.customizations.length > 0 && (
-                    <Text style={styles.itemCustomizations} numberOfLines={2}>
-                      + {item.customizations.map(c => `${c.group}: ${c.option}`).join(', ')}
-                    </Text>
+                    <View style={{ marginTop: 2, marginBottom: 4 }}>
+                      {item.customizations.map((c, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                          {!!c.photo_url && (
+                            <Image source={{ uri: c.photo_url }} style={{ width: 14, height: 14, borderRadius: 3, marginRight: 4, backgroundColor: '#f1f1f1' }} />
+                          )}
+                          <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted }} numberOfLines={1}>
+                            + {c.group}: {c.option}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
                   )}
                   <Text style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
                 </View>

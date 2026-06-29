@@ -47,10 +47,15 @@ export const CustomizationBottomSheet: React.FC<CustomizationBottomSheetProps> =
 
   const handleAdd = () => {
     ReactNativeHapticFeedback.trigger('impactHeavy', hapticOptions);
-    const customArray = Object.keys(selectedOptions).map(g => ({
-      group: g,
-      option: selectedOptions[g]
-    }));
+    const customArray = Object.keys(selectedOptions).map(g => {
+      const group = groups.find((gr: any) => gr.name === g);
+      const option = group?.options.find((o: any) => o.name === selectedOptions[g]);
+      return {
+        group: g,
+        option: selectedOptions[g],
+        photo_url: option?.photo_url || undefined
+      };
+    });
     onAddToCart(customArray, instructions);
     onClose();
   };
