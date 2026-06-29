@@ -176,26 +176,62 @@ router.get('/', async (req, res) => {
             [zoneId]
         ),
         query(
-            `SELECT k.name, k.is_paused, k.pause_reason
+            `SELECT k.id, k.name, k.is_paused, k.pause_reason, k.pause_until
              FROM kitchens k
-             JOIN kitchen_zones kz ON k.id = kz.kitchen_id
-             WHERE kz.zone_id = $1 LIMIT 1`,
+             LEFT JOIN kitchen_zones kz ON k.id = kz.kitchen_id
+             WHERE kz.zone_id = $1 OR k.zone_id = $1
+             ORDER BY (kz.zone_id IS NOT NULL) DESC LIMIT 1`,
             [zoneId]
         ),
     ]);
 
+    const k = kitchenResult.rows[0];
+
+    // Auto-resume: if timed pause has expired, clear it without blocking the response
+    let kitchenPaused = k?.is_paused || false;
+    let pauseUntil = k?.pause_until || null;
+    if (kitchenPaused && pauseUntil && new Date(pauseUntil) < new Date()) {
+        kitchenPaused = false;
+        pauseUntil = null;
+        // fire and forget — don't block
+        query(
+            `UPDATE kitchens SET is_paused = false, pause_until = NULL, pause_reason = NULL WHERE id = $1`,
+            [k.id]
+        ).then(() => {
+            redis.del(cacheKey).catch(() => {});
+            // import emit inline to avoid circular deps
+            const { emitToAll } = require('../socket');
+            emitToAll('kitchen_resumed', { kitchenId: k.id, zoneId });
+            emitToAll('menu_updated', { zoneId });
+            // notify waiting customers
+            redis.sMembers(`pause_notify:${k.id}`).then((tokens: string[]) => {
+                if (!tokens.length) return;
+                redis.del(`pause_notify:${k.id}`).catch(() => {});
+                const { sendFCM } = require('../services/fcm.service');
+                tokens.forEach((token: string) =>
+                    sendFCM(token, '🍽️ Kitchen is back open!', "Place your order now — we're ready to cook.", { type: 'kitchen_resumed' })
+                        .catch(() => {})
+                );
+            }).catch(() => {});
+        }).catch(() => {});
+    }
+
     const response = {
         items: itemsResult.rows,
         zoneName: zoneResult.rows[0]?.name || null,
-        kitchenName: kitchenResult.rows[0]?.name || null,
-        kitchenPaused: kitchenResult.rows[0]?.is_paused || false,
-        pauseReason: kitchenResult.rows[0]?.pause_reason || null,
+        kitchenId: k?.id || null,
+        kitchenName: k?.name || null,
+        kitchenPaused,
+        pauseReason: kitchenPaused ? (k?.pause_reason || null) : null,
+        pauseUntil: kitchenPaused ? pauseUntil : null,
         openingTime: zoneResult.rows[0]?.opening_time,
         closingTime: zoneResult.rows[0]?.closing_time,
     };
 
-    // Cache async — don't await, response goes out immediately
-    redis.set(cacheKey, JSON.stringify(response), { EX: 300 }).catch(() => {});
+    // Don't cache paused state — kitchen could resume any second
+    if (!kitchenPaused) {
+        redis.set(cacheKey, JSON.stringify(response), { EX: 300 }).catch(() => {});
+    }
 
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json({ ...response, fromCache: false });

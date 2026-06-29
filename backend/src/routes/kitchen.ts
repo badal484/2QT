@@ -5,6 +5,7 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToKitchen, emitToRiders, emitToAdmin, emitToOrder, emitToAll } from '../socket';
 import { NotificationService } from '../services/notification.service';
 import { redis, keys } from '../redis';
+import { sendFCM } from '../services/fcm.service';
 
 async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> {
     if (req.user!.kitchenId) return req.user!.kitchenId;
@@ -16,24 +17,74 @@ async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> 
     return null;
 }
 
+// Returns zone_id for a kitchen — tries kitchen_zones junction first, falls back to kitchens.zone_id
+async function getZoneId(kitchenId: string): Promise<string | null> {
+    const { rows } = await query(
+        `SELECT COALESCE(kz.zone_id, k.zone_id) AS zone_id
+         FROM kitchens k
+         LEFT JOIN kitchen_zones kz ON kz.kitchen_id = k.id
+         WHERE k.id = $1
+         LIMIT 1`,
+        [kitchenId]
+    );
+    return rows[0]?.zone_id ?? null;
+}
+
+// Auto-resume: if pause_until has passed, clear the pause and notify waiting customers
+async function autoResumeIfExpired(kitchenId: string): Promise<void> {
+    const { rows } = await query(
+        `UPDATE kitchens SET is_paused = false, pause_until = NULL, pause_reason = NULL
+         WHERE id = $1 AND is_paused = true AND pause_until IS NOT NULL AND pause_until < NOW()
+         RETURNING id`,
+        [kitchenId]
+    );
+    if (rows.length > 0) {
+        // Notify waiting customers and clear the list
+        await notifyPauseWaiters(kitchenId);
+        const zoneId = await getZoneId(kitchenId);
+        if (zoneId) {
+            await redis.del(keys.menu(zoneId));
+            emitToAll('kitchen_resumed', { kitchenId, zoneId });
+            emitToAll('menu_updated', { zoneId });
+        }
+    }
+}
+
+// Send FCM push to all registered "notify me" tokens for this kitchen
+async function notifyPauseWaiters(kitchenId: string): Promise<void> {
+    const redisKey = `pause_notify:${kitchenId}`;
+    const tokens = await redis.smembers(redisKey);
+    if (!tokens.length) return;
+    await redis.del(redisKey);
+    await Promise.allSettled(
+        tokens.map(token =>
+            sendFCM(token, '🍽️ Kitchen is back open!', 'Place your order now — we\'re ready to cook.', { type: 'kitchen_resumed' })
+        )
+    );
+}
+
 const router = Router();
 
 router.get('/menu', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
 
-    const { rows: zoneRows } = await query('SELECT zone_id FROM kitchen_zones WHERE kitchen_id = $1', [kitchenId]);
-    if (zoneRows.length === 0) return res.status(400).json({ error: 'KITCHEN_NOT_IN_ZONE' });
-    const zoneId = zoneRows[0].zone_id;
+    await autoResumeIfExpired(kitchenId);
 
-    const { rows } = await query('SELECT id, name, description, price_paise, category, station, available, is_veg, is_egg FROM menu_items WHERE zone_id = $1 ORDER BY name', [zoneId]);
-    
-    const { rows: kitchenInfo } = await query('SELECT is_paused, pause_reason FROM kitchens WHERE id = $1', [kitchenId]);
+    const zoneId = await getZoneId(kitchenId);
+    if (!zoneId) return res.status(400).json({ error: 'KITCHEN_NOT_IN_ZONE' });
 
-    res.json({ 
-        menu: rows,
-        kitchenPaused: kitchenInfo[0]?.is_paused || false,
-        pauseReason: kitchenInfo[0]?.pause_reason || null
+    const [{ rows: menuRows }, { rows: kitchenInfo }] = await Promise.all([
+        query('SELECT id, name, description, price_paise, category, station, available, is_veg, is_egg FROM menu_items WHERE zone_id = $1 ORDER BY name', [zoneId]),
+        query('SELECT is_paused, pause_reason, pause_until FROM kitchens WHERE id = $1', [kitchenId]),
+    ]);
+
+    const k = kitchenInfo[0];
+    res.json({
+        menu: menuRows,
+        kitchenPaused: k?.is_paused || false,
+        pauseReason: k?.pause_reason || null,
+        pauseUntil: k?.pause_until || null,
     });
 });
 
@@ -41,17 +92,33 @@ router.patch('/status', authenticate, requireRole('chef', 'kitchen_manager', 'su
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
 
-    const { paused, reason } = req.body;
-    await query('UPDATE kitchens SET is_paused = $1, pause_reason = $2 WHERE id = $3', [paused, reason, kitchenId]);
-    
-    // Clear cache for the zone
-    const { rows: zoneRows } = await query('SELECT zone_id FROM kitchen_zones WHERE kitchen_id = $1', [kitchenId]);
-    if (zoneRows.length > 0) {
-        await redis.del(keys.menu(zoneRows[0].zone_id));
-        emitToAll('menu_updated', { zoneId: zoneRows[0].zone_id });
+    const { paused, reason, duration_minutes } = req.body;
+
+    let pauseUntil: Date | null = null;
+    if (paused && duration_minutes && duration_minutes > 0) {
+        pauseUntil = new Date(Date.now() + duration_minutes * 60 * 1000);
     }
 
-    res.json({ success: true, isPaused: paused });
+    await query(
+        'UPDATE kitchens SET is_paused = $1, pause_reason = $2, pause_until = $3 WHERE id = $4',
+        [paused, paused ? (reason || null) : null, paused ? pauseUntil : null, kitchenId]
+    );
+
+    // If resuming manually, notify waiting customers
+    if (!paused) {
+        await notifyPauseWaiters(kitchenId);
+    }
+
+    const zoneId = await getZoneId(kitchenId);
+    if (zoneId) {
+        await redis.del(keys.menu(zoneId));
+        if (!paused) {
+            emitToAll('kitchen_resumed', { kitchenId, zoneId });
+        }
+        emitToAll('menu_updated', { zoneId });
+    }
+
+    res.json({ success: true, isPaused: paused, pauseUntil });
 });
 
 router.patch('/menu/:itemId/availability', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
@@ -479,6 +546,20 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
     } catch (err: any) {
         res.status(500).json({ error: 'FETCH_FAILED', message: err.message });
     }
+});
+
+// Customer registers their FCM token to be notified when the kitchen resumes
+// Called from the mobile "Notify me when open" button
+router.post('/pause-notify', authenticate, async (req: AuthRequest, res) => {
+    const { kitchenId, fcmToken } = req.body;
+    if (!kitchenId || !fcmToken) return res.status(400).json({ error: 'MISSING_FIELDS' });
+
+    // Verify kitchen is actually paused
+    const { rows } = await query('SELECT is_paused FROM kitchens WHERE id = $1', [kitchenId]);
+    if (!rows[0]?.is_paused) return res.json({ registered: false, reason: 'kitchen_not_paused' });
+
+    await redis.sadd(`pause_notify:${kitchenId}`, fcmToken);
+    res.json({ registered: true });
 });
 
 export default router;
