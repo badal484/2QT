@@ -13,7 +13,7 @@ import AdminNavigator from './AdminNavigator';
 import ForceUpdateScreen from '../screens/ForceUpdateScreen';
 import MaintenanceScreen from '../screens/MaintenanceScreen';
 import { APP_VERSION, api } from '../api/client';
-import { navigationRef } from './navigationRef';
+import { navigationRef, flushPendingNav } from './navigationRef';
 import {
   subscribeToNotificationTap,
   subscribeToForegroundMessages,
@@ -160,7 +160,7 @@ const RootNavigator = () => {
   const activeRole = BUILD_ROLE || user?.role;
 
   return (
-    <NavigationContainer ref={navigationRef} linking={linking as any}>
+    <NavigationContainer ref={navigationRef} linking={linking as any} onReady={flushPendingNav}>
       {!user ? (
         <AuthNavigator />
       ) : (activeRole === 'customer' || activeRole === 'buyer') ? (
