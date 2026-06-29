@@ -3,19 +3,41 @@ import { getMessaging } from 'firebase-admin/messaging';
 
 let app: App | null = null;
 
+function parseServiceAccount(): any | null {
+    // Prefer base64-encoded version — immune to newline/escaping issues in env var editors
+    const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
+    if (b64) {
+        try {
+            return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+        } catch (e) {
+            console.error('[FCM] Failed to decode FIREBASE_SERVICE_ACCOUNT_B64:', e);
+        }
+    }
+
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (!raw) return null;
+
+    try {
+        const sa = JSON.parse(raw);
+        // Fix newlines corrupted by env var editors (literal \n → real newline)
+        if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+        return sa;
+    } catch (e) {
+        console.error('[FCM] Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', e);
+        return null;
+    }
+}
+
 function getApp(): App | null {
     if (app) return app;
     if (getApps().length) { app = getApps()[0]; return app; }
 
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    if (!raw) {
-        console.warn('[FCM] FIREBASE_SERVICE_ACCOUNT_JSON not set — push disabled.');
+    const sa = parseServiceAccount();
+    if (!sa) {
+        console.warn('[FCM] No Firebase credentials — set FIREBASE_SERVICE_ACCOUNT_B64 or FIREBASE_SERVICE_ACCOUNT_JSON');
         return null;
     }
     try {
-        const sa = JSON.parse(raw);
-        // Render stores \n as literal two chars; ensure real newlines in PEM key
-        if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
         app = initializeApp({ credential: cert(sa) });
         console.log('[FCM] Firebase Admin initialized ✓');
     } catch (err) {
@@ -59,5 +81,5 @@ export async function sendFCM(
 }
 
 export function isFCMConfigured() {
-    return !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    return !!(process.env.FIREBASE_SERVICE_ACCOUNT_B64 || process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 }
