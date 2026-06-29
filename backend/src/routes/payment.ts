@@ -36,8 +36,10 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             );
             const zh = zoneHours[0];
             if (zh?.opening_time && zh?.closing_time) {
+                // Use IST timezone (UTC +5:30) for Indian restaurants
                 const now = new Date();
-                const nowMins = now.getHours() * 60 + now.getMinutes();
+                const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
+                const nowMins = (utcMins + 330) % 1440;
                 const [oh, om] = (zh.opening_time as string).split(':').map(Number);
                 const [ch, cm] = (zh.closing_time as string).split(':').map(Number);
                 const openMins = oh * 60 + om;
