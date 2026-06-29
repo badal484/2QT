@@ -21,6 +21,8 @@ import {
   PencilLine,
   Check,
   X,
+  Timer,
+  Bell,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -151,9 +153,6 @@ function KdsColumn({ col, orders, updatingId, updateStatus }: {
                   <div>
                     <div className="text-zinc-500 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Ticket</div>
                     <div className={`text-3xl sm:text-4xl font-black leading-none tracking-tighter ${col.textColor}`}>K-{displayId}</div>
-                    {order.kitchen_name && (
-                      <div className="text-zinc-600 text-[10px] mt-1">{order.kitchen_name}</div>
-                    )}
                   </div>
                   <div className="text-right">
                     <div className={`text-2xl sm:text-3xl font-black tabular-nums leading-none ${isUrgent ? "text-red-500 animate-pulse" : "text-white/90"}`}>
