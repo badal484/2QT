@@ -1,5 +1,5 @@
 import React from 'react';
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform, PermissionsAndroid } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
 import { getSocket, connectSocket, disconnectSocket } from '../socket/client';
@@ -19,6 +19,8 @@ import {
   subscribeToForegroundMessages,
   handleInitialNotification,
   setupBackgroundHandler,
+  registerDeviceToken,
+  subscribeToTokenRefresh,
 } from '../services/push';
 import {
   createNotificationChannels,
@@ -32,7 +34,7 @@ console.log('--- DETECTED BUILD ROLE:', BUILD_ROLE);
 
 // Must be called at module load time (before any component mounts)
 setupBackgroundHandler();
-setupNotifeeHandlers(); // notifee background tap handler (must be outside component)
+setupNotifeeHandlers();
 
 const linking = {
   prefixes: ['2qt://', 'https://2qt.app'],
@@ -54,12 +56,40 @@ const linking = {
   },
 };
 
+// Request POST_NOTIFICATIONS runtime permission (Android 13+) then register FCM token.
+// Must be called after the user is authenticated so the token can be saved server-side.
+async function requestPushPermissionAndRegister() {
+  try {
+    if (Platform.OS === 'android' && Platform.Version >= 33) {
+      const status = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        {
+          title: 'Allow Notifications',
+          message: 'Enable notifications to get live order updates, delivery alerts and offers.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Not now',
+        }
+      );
+      if (status !== PermissionsAndroid.RESULTS.GRANTED) {
+        console.warn('[PUSH] POST_NOTIFICATIONS permission denied');
+        return;
+      }
+    }
+    // Permission granted (or iOS / Android < 13) — register FCM token
+    await registerDeviceToken();
+    console.log('[PUSH] Device token registered successfully');
+  } catch (err) {
+    console.warn('[PUSH] Permission/token error:', err);
+  }
+}
+
 const RootNavigator = () => {
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch();
   const [forceUpdateRequired, setForceUpdateRequired] = React.useState(false);
   const [isMaintenance, setIsMaintenance] = React.useState(false);
 
+  // One-time setup: notification channels + system status
   React.useEffect(() => {
     const checkSystemStatus = async () => {
       try {
@@ -75,7 +105,6 @@ const RootNavigator = () => {
       }
     };
     checkSystemStatus();
-    // Create Android notification channels via notifee on startup
     createNotificationChannels().catch(() => {});
   }, []);
 
@@ -84,7 +113,7 @@ const RootNavigator = () => {
     const unsubTap = subscribeToNotificationTap();
     handleInitialNotification();
 
-    // Foreground: post a real system notification via notifee so it appears in the tray
+    // Foreground FCM → post real system notification via notifee (appears in tray)
     const unsubForeground = subscribeToForegroundMessages((title, body, data) => {
       displayLocalNotification(title, body, data).catch(() => {});
     });
@@ -92,6 +121,17 @@ const RootNavigator = () => {
     return () => { unsubTap(); unsubForeground(); };
   }, []);
 
+  // When user logs in: request POST_NOTIFICATIONS permission then register FCM token.
+  // Running this here (not in HomeScreen) means the permission dialog always appears
+  // right after login, regardless of which screen the user lands on.
+  React.useEffect(() => {
+    if (!accessToken) return;
+    requestPushPermissionAndRegister();
+    const unsubRefresh = subscribeToTokenRefresh();
+    return () => { unsubRefresh(); };
+  }, [accessToken]);
+
+  // Socket connection
   React.useEffect(() => {
     if (accessToken) {
       console.log('--- INITIALIZING SOCKET CONNECTION ---');
