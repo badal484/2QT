@@ -78,12 +78,13 @@ export interface SendOptions {
     userId?: string;
     phone?: string;
     vars?: Record<string, string>;
-    dedupeKey?: string;     // e.g. orderId — prevents duplicate sends
+    dedupeKey?: string;
     overrideChannels?: ('push' | 'whatsapp' | 'sms')[];
+    imageUrl?: string;
 }
 
 export async function sendNotification(type: NotifType, options: SendOptions): Promise<void> {
-    const { userId, phone, vars = {}, dedupeKey, overrideChannels } = options;
+    const { userId, phone, vars = {}, dedupeKey, overrideChannels, imageUrl } = options;
 
     // 1. Resolve user
     let user: { id: string; phone: string; device_token: string | null; name: string } | null = null;
@@ -147,7 +148,7 @@ export async function sendNotification(type: NotifType, options: SendOptions): P
         } else {
             console.log(`[NOTIF] Sending FCM type=${type} to user=${user.id} token=${(user.device_token as string).slice(0, 15)}…`);
             tasks.push(
-                sendFCM(user.device_token, title, body, { type, ...vars })
+                sendFCM(user.device_token, title, body, { type, ...vars }, imageUrl)
                     .then((result: any) => {
                         console.log(`[NOTIF] FCM result=${result} type=${type} user=${user!.id}`);
                         if (result === 'invalid_token') {
@@ -258,7 +259,7 @@ async function sendSMS(phone: string, message: string) {
 
 export class NotificationService {
     static async send(type: NotifType, data: any) {
-        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body } = data;
+        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl } = data;
         await sendNotification(type, {
             userId: userId || undefined,
             phone: phone || undefined,
@@ -276,6 +277,7 @@ export class NotificationService {
                 body:       String(body        ?? ''),
             },
             dedupeKey: displayId || undefined,
+            imageUrl:  imageUrl  || undefined,
         });
     }
 }

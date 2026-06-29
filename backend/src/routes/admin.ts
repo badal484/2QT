@@ -313,6 +313,7 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
                 phone: user.phone,
                 title,
                 body: message,
+                imageUrl: imageUrl || undefined,
             }).catch(() => {});
         }
 

@@ -161,6 +161,7 @@ function BroadcastPanel() {
   const [segment, setSegment] = useState<"all" | "zone" | "active_last_7">("all");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [sending, setSending] = useState(false);
   const [zones, setZones] = useState<{ id: string; name: string }[]>([]);
   const [zoneId, setZoneId] = useState("");
@@ -178,9 +179,10 @@ function BroadcastPanel() {
         zoneId: segment === "zone" ? zoneId : undefined,
         title,
         message,
+        imageUrl: imageUrl.trim() || undefined,
       });
       toast.success("Broadcast queued!");
-      setTitle(""); setMessage("");
+      setTitle(""); setMessage(""); setImageUrl("");
     } catch {
       toast.error("Broadcast failed");
     } finally {
@@ -233,6 +235,18 @@ function BroadcastPanel() {
           onChange={e => setMessage(e.target.value)}
         />
         <p className="text-xs text-zinc-600 mt-1">{message.length}/300 characters</p>
+      </div>
+      <div>
+        <label className="text-xs text-zinc-500 mb-1.5 block">Image URL <span className="text-zinc-600">(optional — shown as banner in notification)</span></label>
+        <input
+          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
+          placeholder="https://example.com/promo-banner.jpg"
+          value={imageUrl}
+          onChange={e => setImageUrl(e.target.value)}
+        />
+        {imageUrl.trim() && (
+          <img src={imageUrl} alt="preview" className="mt-2 rounded-lg w-full max-h-32 object-cover opacity-80" onError={e => (e.currentTarget.style.display = 'none')} />
+        )}
       </div>
       <button
         onClick={send}
