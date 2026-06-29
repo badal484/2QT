@@ -106,7 +106,7 @@ export async function handleInitialNotification() {
             const data = remoteMessage?.data ?? {};
             console.log('[PUSH] App launched from notification:', data.type);
             // Small delay so NavigationContainer is ready
-            setTimeout(() => navigateFromNotification(data), 500);
+            setTimeout(() => navigateFromNotification(data), 1500);
         }
     } catch {
         // ignore
