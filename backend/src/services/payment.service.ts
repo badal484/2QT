@@ -4,6 +4,7 @@ import { TWO_QT } from '../config/constants';
 export interface CartItem {
     menuItemId: string;
     quantity: number;
+    customizations?: { group: string; option: string }[];
 }
 
 export const calculatePricing = async ({
@@ -32,7 +33,7 @@ export const calculatePricing = async ({
     // 1. Fetch item prices
     const itemIds = cartItems.map(i => i.menuItemId);
     const { rows: items } = await query(
-        'SELECT id, price_paise, available, daily_limit, today_sold_count FROM menu_items WHERE id = ANY($1)',
+        'SELECT id, price_paise, available, daily_limit, today_sold_count, customization_groups FROM menu_items WHERE id = ANY($1)',
         [itemIds]
     );
 
@@ -44,7 +45,21 @@ export const calculatePricing = async ({
         if (!item || !item.available || (item.today_sold_count + cartItem.quantity > item.daily_limit)) {
             throw new Error(`ITEM_UNAVAILABLE_${cartItem.menuItemId}`);
         }
-        subtotalPaise += item.price_paise * cartItem.quantity;
+        
+        let itemPrice = item.price_paise;
+        if (cartItem.customizations && cartItem.customizations.length > 0 && item.customization_groups) {
+            cartItem.customizations.forEach((c: any) => {
+                const group = item.customization_groups.find((g: any) => g.name === c.group);
+                if (group) {
+                    const opt = group.options.find((o: any) => o.name === c.option);
+                    if (opt && opt.price_paise) {
+                        itemPrice += opt.price_paise;
+                    }
+                }
+            });
+        }
+        
+        subtotalPaise += itemPrice * cartItem.quantity;
     }
 
     let subscriptionDiscountPaise = 0;
