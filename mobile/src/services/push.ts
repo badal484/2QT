@@ -118,16 +118,27 @@ export function setupBackgroundHandler() {
     if (!msg) return;
     try {
         msg.setBackgroundMessageHandler(async (remoteMessage: any) => {
-            // Data-only messages (no notification field) need a local notification
-            if (!remoteMessage.notification) {
-                const { displayLocalNotification } = require('./localNotif');
-                await displayLocalNotification(
-                    remoteMessage.data?.title ?? 'VELTO',
-                    remoteMessage.data?.body  ?? '',
-                    remoteMessage.data ?? {}
-                );
-            }
-            // Notification messages are displayed automatically by the OS
+            // Notification messages are shown automatically by the OS — nothing to do
+            if (remoteMessage.notification) return;
+
+            // Data-only messages: build a meaningful title from the type field
+            const data = remoteMessage.data ?? {};
+            const TYPE_LABELS: Record<string, string> = {
+                order_confirmed:        'Order Confirmed! 🎉',
+                order_preparing:        'Your food is being prepared 👨‍🍳',
+                order_ready:            'Order Ready! 🛵',
+                order_out_for_delivery: 'Rider on the way! 🛵',
+                order_delivered:        'Order Delivered! 🎉',
+                order_cancelled:        'Order Cancelled',
+                rider_payout:           'Payment Sent! 💰',
+                broadcast_message:      data.title ?? '2QT',
+            };
+            const title = TYPE_LABELS[data.type] ?? data.title ?? '2QT';
+            const body  = data.body ?? '';
+            if (!title && !body) return; // nothing to show
+
+            const { displayLocalNotification } = require('./localNotif');
+            await displayLocalNotification(title, body, data);
         });
     } catch {}
 }
