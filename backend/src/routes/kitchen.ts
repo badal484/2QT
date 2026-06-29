@@ -111,7 +111,16 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
         order.items = items;
     }
 
-    res.json({ orders: rows });
+    let kitchenName = null;
+    if (req.user!.role !== 'super_admin') {
+        const kitchenId = await getKitchenId(req, res);
+        if (kitchenId) {
+            const knRows = await query('SELECT name FROM kitchens WHERE id = $1', [kitchenId]);
+            kitchenName = knRows.rows[0]?.name || null;
+        }
+    }
+
+    res.json({ orders: rows, kitchen_name: kitchenName });
 });
 
 router.post('/orders/:id/claim', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
