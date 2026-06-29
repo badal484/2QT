@@ -76,9 +76,10 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
     
     if (req.user!.role === 'super_admin') {
         const result = await query(
-            `SELECT o.*, u.name as customer_name
+            `SELECT o.*, u.name as customer_name, k.name as kitchen_name
              FROM orders o
              JOIN users u ON o.customer_id = u.id
+             JOIN kitchens k ON o.kitchen_id = k.id
              WHERE o.status IN ('confirmed', 'preparing', 'ready_for_pickup')
              ORDER BY o.created_at ASC`
         );
@@ -88,9 +89,10 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
         if (!kitchenId) return;
         
         const result = await query(
-            `SELECT o.*, u.name as customer_name
+            `SELECT o.*, u.name as customer_name, k.name as kitchen_name
              FROM orders o
              JOIN users u ON o.customer_id = u.id
+             JOIN kitchens k ON o.kitchen_id = k.id
              WHERE o.kitchen_id = $1 AND o.status IN ('confirmed', 'preparing', 'ready_for_pickup')
              ORDER BY o.created_at ASC`,
             [kitchenId]

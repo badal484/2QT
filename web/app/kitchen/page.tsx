@@ -52,6 +52,7 @@ interface Order {
   display_id: string;
   status: "confirmed" | "preparing" | "ready_for_pickup" | "out_for_delivery" | "delivered";
   customer_name: string;
+  kitchen_name?: string;
   items: OrderItem[];
   created_at: string;
 }
@@ -527,8 +528,8 @@ export default function KitchenPage() {
                           {/* Ticket Header */}
                           <div className={`p-5 pb-4 border-b border-white/5 flex justify-between items-start ${col.bgAccent}`}>
                             <div>
-                              <div className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] mb-1.5 flex items-center gap-1.5">
-                                Ticket
+                              <div className="text-zinc-500 text-[10px] font-bold tracking-[0.1em] mb-1.5 flex items-center gap-1.5">
+                                TICKET • {order.kitchen_name?.toLowerCase() || 'kitchen'}
                               </div>
                               <div className="text-2xl font-bold leading-none tracking-tight text-white">K-{displayId}</div>
                             </div>
