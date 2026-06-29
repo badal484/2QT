@@ -227,28 +227,32 @@ router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
 
     const { rows: userRows } = await query(
-        'SELECT id, name, phone, device_token FROM users WHERE id = $1',
-        [userId]
+        'SELECT id, name, phone, device_token FROM users WHERE id = $1', [userId]
     );
     const user = userRows[0];
 
-    const { rows: tmplRows } = await query(
+    const tmplCheck = await query(
         "SELECT type, is_active FROM notification_templates WHERE type = 'order_confirmed'"
-    );
+    ).then(r => r.rows[0] ?? 'NOT FOUND').catch(() => 'TABLE MISSING');
 
-    const { rows: prefRows } = await query(
-        'SELECT push_enabled FROM notification_preferences WHERE user_id = $1',
-        [userId]
-    );
+    const prefsCheck = await query(
+        'SELECT push_enabled FROM notification_preferences WHERE user_id = $1', [userId]
+    ).then(r => r.rows[0] ?? 'NO ROW').catch(() => 'TABLE MISSING');
+
+    const redisCheck = await redis.ping().then(() => 'OK').catch((e: any) => `FAIL: ${e.message}`);
+
+    const notifTableCheck = await query(
+        "SELECT 1 FROM notifications LIMIT 1"
+    ).then(() => 'OK').catch(() => 'TABLE MISSING');
 
     res.json({
         fcmConfigured: isFCMConfigured(),
-        deviceToken: user?.device_token
-            ? `${(user.device_token as string).slice(0, 20)}…` // truncated for security
-            : null,
         hasDeviceToken: !!user?.device_token,
-        orderConfirmedTemplate: tmplRows[0] ?? 'NOT FOUND — run migration 054',
-        pushEnabled: prefRows[0]?.push_enabled ?? true,
+        deviceTokenPreview: user?.device_token ? (user.device_token as string).slice(0, 20) + '…' : null,
+        redis: redisCheck,
+        orderConfirmedTemplate: tmplCheck,
+        notificationPreferences: prefsCheck,
+        notificationsTable: notifTableCheck,
     });
 });
 
