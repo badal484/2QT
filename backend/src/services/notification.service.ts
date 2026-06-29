@@ -117,15 +117,17 @@ export async function sendNotification(type: NotifType, options: SendOptions): P
         return;
     }
 
-    // 4. Check user preferences
-    const { rows: pRows } = await query(
-        'SELECT * FROM notification_preferences WHERE user_id = $1',
-        [user.id]
-    );
-    const prefs = pRows[0] ?? {
-        order_updates: true, promotions: true, payouts: true,
-        push_enabled: true, whatsapp_enabled: true,
-    };
+    // 4. Check user preferences (non-fatal — default to all enabled if table missing)
+    let prefs = { order_updates: true, promotions: true, payouts: true, push_enabled: true, whatsapp_enabled: true };
+    try {
+        const { rows: pRows } = await query(
+            'SELECT * FROM notification_preferences WHERE user_id = $1',
+            [user.id]
+        );
+        if (pRows[0]) prefs = pRows[0];
+    } catch {
+        // notification_preferences table may not exist yet — proceed with defaults
+    }
     if (PROMO_TYPES.has(type) && !prefs.promotions) return;
     if (PAYOUT_TYPES.has(type) && !prefs.payouts) return;
 
