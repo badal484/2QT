@@ -12,7 +12,6 @@ import { RootState } from '../store';
 import { logout, updateUser } from '../store/slices/authSlice';
 import { getSocket } from '../socket/client';
 import { LogOut, ChevronRight, Check, X, Wallet, History } from 'lucide-react-native';
-import { registerDeviceToken, subscribeToTokenRefresh } from '../services/push';
 import Geolocation from '@react-native-community/geolocation';
 import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
 
@@ -274,12 +273,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
     };
   }, [isOnline, accessToken]);
 
-  // ── FCM device token registration ────────────────────────────────────────
-  useEffect(() => {
-    registerDeviceToken();
-    const unsubRefresh = subscribeToTokenRefresh();
-    return () => { unsubRefresh(); };
-  }, []);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => () => clearTimer(), []);

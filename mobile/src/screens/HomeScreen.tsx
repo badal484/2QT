@@ -18,7 +18,7 @@ import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { radius, spacing } from '../theme/spacing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { registerDeviceToken, subscribeToTokenRefresh, getCurrentDeviceToken } from '../services/push';
+import { getCurrentDeviceToken } from '../services/push';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -75,11 +75,6 @@ const HomeScreen = ({ navigation }: any) => {
     pulseAnim.value = withRepeat(withTiming(1, { duration: 1000 }), -1, true);
   }, []);
 
-  useEffect(() => {
-    registerDeviceToken();
-    const unsub = subscribeToTokenRefresh();
-    return unsub;
-  }, []);
   const liveDotStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseAnim.value }],
     opacity: 1 - pulseAnim.value,
