@@ -26,6 +26,7 @@ export function MenuTab() {
   const [modalZoneId, setModalZoneId] = useState<string>("");
   const [modalCategories, setModalCategories] = useState<string[]>([]);
   const [customizationGroups, setCustomizationGroups] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (showAddModal) {
@@ -415,6 +416,7 @@ export function MenuTab() {
                       available: true
                     };
                     try {
+                      setIsSaving(true);
                       if (editingItem) {
                         await api.put(`/admin/menu/${editingItem.id}`, data);
                       } else {
@@ -426,6 +428,8 @@ export function MenuTab() {
                       toast.success(editingItem ? "Item updated!" : "Item published to menu!");
                     } catch (err: any) {
                       toast.error(`Failed to save: ${err.message || 'Unknown error'}`);
+                    } finally {
+                      setIsSaving(false);
                     }
                   }}
                   className="space-y-6"
@@ -699,8 +703,8 @@ export function MenuTab() {
                         className="py-4 px-5 rounded-2xl bg-red-500/10 text-red-400 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-500 hover:text-white transition-all"
                       >Delete</button>
                     )}
-                    <button type="submit" className="flex-1 py-4 rounded-2xl bg-swish-green/15 text-swish-green font-black text-[10px] uppercase tracking-[0.2em] hover:bg-swish-green hover:text-black transition-all shadow-xl shadow-swish-green/10">
-                      {editingItem ? "Save Changes" : "Publish to Menu"}
+                    <button disabled={isSaving} type="submit" className="flex-1 py-4 rounded-2xl bg-swish-green/15 text-swish-green font-black text-[10px] uppercase tracking-[0.2em] hover:bg-swish-green hover:text-black transition-all shadow-xl shadow-swish-green/10 disabled:opacity-50 disabled:cursor-not-allowed">
+                      {isSaving ? "Saving..." : (editingItem ? "Save Changes" : "Publish to Menu")}
                     </button>
                   </div>
                 </form>
