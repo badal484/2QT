@@ -1310,6 +1310,14 @@ router.patch('/partners/applications/:id', authenticate, requireRole('super_admi
                     app.phone || null, app.email || null, app.upi_id || null]);
                 kitchenId = kRows[0].id;
                 await query(`UPDATE kitchen_applications SET kitchen_id = $1 WHERE id = $2`, [kitchenId, id]);
+
+                // Auto-create partner_kitchen user account so they can log in immediately
+                await query(`
+                    INSERT INTO users (phone, name, role, kitchen_id, is_active, is_verified, onboarding_complete)
+                    VALUES ($1, $2, 'partner_kitchen', $3, TRUE, TRUE, TRUE)
+                    ON CONFLICT (phone) DO UPDATE
+                        SET role = 'partner_kitchen', kitchen_id = $3, is_active = TRUE
+                `, [app.phone, app.owner_name || app.restaurant_name, kitchenId]);
             }
         }
 
@@ -1357,7 +1365,10 @@ router.get('/partners/kitchens', authenticate, requireRole('super_admin', 'admin
 router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { name, commissionRate, upiId, zoneId, openingTime, closingTime,
-            contactPhone, contactEmail, isActive, partnerNotes } = req.body;
+            contactPhone, contactEmail, isActive, partnerNotes, partnerStatus } = req.body;
+    if (partnerStatus && !['approved', 'suspended', 'none'].includes(partnerStatus)) {
+        return res.status(400).json({ error: 'INVALID_PARTNER_STATUS' });
+    }
     try {
         await withTransaction(async (client) => {
             await client.query(`
@@ -1371,12 +1382,13 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
                     contact_email   = COALESCE($7, contact_email),
                     is_active       = COALESCE($8, is_active),
                     partner_notes   = COALESCE($9, partner_notes),
+                    partner_status  = COALESCE($10, partner_status),
                     updated_at      = NOW()
-                WHERE id = $10
+                WHERE id = $11
             `, [name ?? null, commissionRate ?? null, upiId ?? null,
                 openingTime ?? null, closingTime ?? null,
                 contactPhone ?? null, contactEmail ?? null,
-                isActive ?? null, partnerNotes ?? null, id]);
+                isActive ?? null, partnerNotes ?? null, partnerStatus ?? null, id]);
 
             // Zone assignment — replace with single zone (same kitchen_zones table as regular kitchens)
             if (zoneId) {

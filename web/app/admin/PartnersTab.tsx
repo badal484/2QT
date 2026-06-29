@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  RefreshCw, Store, X, Edit3, CheckCircle2, XCircle, Clock,
-  ChevronRight, MapPin, Power, Utensils,
+  RefreshCw, Store, X, Edit3,
+  ChevronRight, MapPin, Utensils,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -140,6 +140,7 @@ function SetupDrawer({ kitchen, zones, onSave, onClose }: {
   const [commission, setCommission]   = useState(String(Math.round(parseFloat(kitchen.commission_rate || "0.20") * 100)));
   const [upiId, setUpiId]             = useState(kitchen.upi_id || "");
   const [isActive, setIsActive]       = useState<boolean>(!!kitchen.is_active);
+  const [partnerStatus, setPartnerStatus] = useState<string>(kitchen.partner_status || 'approved');
   const [loading, setLoading]         = useState(false);
 
   const save = async () => {
@@ -154,7 +155,7 @@ function SetupDrawer({ kitchen, zones, onSave, onClose }: {
         zoneId, openingTime: openTime, closingTime: closeTime,
         contactPhone: contactPhone.trim() || undefined,
         contactEmail: contactEmail.trim() || undefined,
-        isActive,
+        isActive, partnerStatus,
       });
       toast.success(isActive ? "Kitchen is now LIVE!" : "Kitchen configured (not live yet)");
       onSave();
@@ -274,6 +275,32 @@ function SetupDrawer({ kitchen, zones, onSave, onClose }: {
               <button onClick={() => setIsActive(!isActive)}
                 className={`w-12 h-6 rounded-full transition-colors relative ${isActive ? "bg-emerald-500" : "bg-white/10"}`}>
                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isActive ? "left-7" : "left-1"}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Suspend / Unsuspend */}
+          <div className={`rounded-2xl p-4 border transition-colors ${partnerStatus === 'suspended' ? "bg-red-500/10 border-red-500/30" : "bg-white/5 border-white/10"}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className={`font-bold text-sm ${partnerStatus === 'suspended' ? "text-red-400" : "text-white/60"}`}>
+                  {partnerStatus === 'suspended' ? "🔴 Partner Suspended" : "✅ Partner Active"}
+                </div>
+                <div className="text-xs text-white/30 mt-0.5">
+                  {partnerStatus === 'suspended'
+                    ? "Orders blocked — kitchen cannot accept new orders"
+                    : "Partner can receive orders normally"}
+                </div>
+              </div>
+              <button
+                onClick={() => setPartnerStatus(s => s === 'suspended' ? 'approved' : 'suspended')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                  partnerStatus === 'suspended'
+                    ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                    : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                }`}
+              >
+                {partnerStatus === 'suspended' ? "Unsuspend" : "Suspend"}
               </button>
             </div>
           </div>

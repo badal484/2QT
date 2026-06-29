@@ -23,6 +23,10 @@ import {
   X,
   Timer,
   Bell,
+  TrendingUp,
+  BarChart3,
+  IndianRupee,
+  ShoppingBag,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -49,6 +53,8 @@ interface OrderItem {
   quantity: number;
   price_paise: number;
   station: string;
+  customizations?: { group: string; option: string }[];
+  special_instructions?: string;
 }
 
 interface Order {
@@ -88,6 +94,12 @@ interface MenuItem {
   available: boolean;
   is_veg: boolean;
   is_egg: boolean;
+  customization_groups?: {
+    name: string;
+    required: boolean;
+    multiple: boolean;
+    options: { name: string; price_paise: number }[];
+  }[];
 }
 
 interface InventoryItem {
@@ -170,11 +182,26 @@ function KdsColumn({ col, orders, updatingId, updateStatus }: {
                       <div className={`text-base sm:text-lg font-semibold px-2 py-0.5 rounded bg-white/5 border border-white/10 ${col.textColor} shrink-0`}>
                         {item.quantity}x
                       </div>
-                      <div className="pt-0.5">
+                      <div className="pt-0.5 w-full">
                         <div className="text-sm sm:text-base font-medium capitalize leading-tight text-white/90">{item.name}</div>
                         {item.station && (
                           <div className="text-zinc-400 text-[11px] font-medium tracking-wide mt-1 flex items-center gap-1">
                             <ChefHat className="w-3 h-3" /> {item.station}
+                          </div>
+                        )}
+                        {item.customizations && item.customizations.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {item.customizations.map((cust, i) => (
+                              <div key={i} className="text-amber-400/90 text-xs font-semibold flex items-start gap-1.5">
+                                <span className="text-amber-400/50 mt-0.5">↳</span> {cust.group}: {cust.option}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {item.special_instructions && (
+                          <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded-md p-2 text-amber-500 text-xs font-semibold leading-snug">
+                            <span className="font-bold uppercase tracking-widest text-[9px] block mb-0.5 opacity-70">Note</span>
+                            {item.special_instructions}
                           </div>
                         )}
                       </div>
@@ -232,7 +259,7 @@ export default function KitchenPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [kitchenName, setKitchenName] = useState<string | null>(null);
-  const [view, setView] = useState<"kds" | "dispatch" | "manage">("kds");
+  const [view, setView] = useState<"kds" | "dispatch" | "manage" | "analytics">("kds");
   const [mobileKdsCol, setMobileKdsCol] = useState<KdsColId>("confirmed");
 
   // Dispatch
@@ -258,6 +285,10 @@ export default function KitchenPage() {
   const [savingStockId, setSavingStockId] = useState<string | null>(null);
   // Live countdown tick
   const [, setCountdownTick] = useState(0);
+
+  // Analytics
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   const { user, logout, loading: authLoading } = useAuth()!;
   const router = useRouter();
@@ -394,6 +425,23 @@ export default function KitchenPage() {
   useEffect(() => {
     if (view === "manage") fetchManage();
   }, [view, fetchManage]);
+
+  // ── Analytics ──────────────────────────────────────────────────────────────
+  const fetchAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    try {
+      const data = await api.get("/kitchen/analytics");
+      setAnalytics(data);
+    } catch {
+      toast.error("Could not load analytics");
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (view === "analytics") fetchAnalytics();
+  }, [view, fetchAnalytics]);
 
   // Live countdown tick every 5s while paused
   useEffect(() => {
@@ -553,6 +601,15 @@ export default function KitchenPage() {
             <Settings className="w-3.5 h-3.5" /> Manage
             {kitchenPaused && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
           </button>
+
+          {["kitchen_manager", "super_admin"].includes(user?.role ?? "") && (
+            <button
+              onClick={() => setView("analytics")}
+              className={`px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black uppercase tracking-widest transition-all flex items-center gap-1.5 whitespace-nowrap ${view === "analytics" ? "bg-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.4)]" : "text-zinc-400 hover:text-white bg-white/5"}`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" /> Analytics
+            </button>
+          )}
         </div>
       </header>
 
@@ -1011,6 +1068,147 @@ export default function KitchenPage() {
               </div>
             </div>
           )
+        )}
+
+        {/* ══════════════════════ ANALYTICS VIEW ══════════════════════════════ */}
+        {view === "analytics" && (
+          <div className="space-y-6 max-w-5xl mx-auto">
+            {analyticsLoading || !analytics ? (
+              <div className="flex items-center justify-center py-24">
+                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <>
+                {/* ── Stat cards ── */}
+                {(() => {
+                  const fmt = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
+                  const cards = [
+                    { label: "Today",      gmv: analytics.today.gmv,     orders: analytics.today.orders,     color: "from-blue-500/20 to-blue-500/5",    border: "border-blue-500/30",    text: "text-blue-400" },
+                    { label: "This Week",  gmv: analytics.thisWeek.gmv,  orders: analytics.thisWeek.orders,  color: "from-violet-500/20 to-violet-500/5", border: "border-violet-500/30",  text: "text-violet-400" },
+                    { label: "This Month", gmv: analytics.thisMonth.gmv, orders: analytics.thisMonth.orders, color: "from-emerald-500/20 to-emerald-500/5",border: "border-emerald-500/30", text: "text-emerald-400" },
+                    { label: "All Time",   gmv: analytics.allTime.gmv,   orders: analytics.allTime.orders,   color: "from-amber-500/20 to-amber-500/5",   border: "border-amber-500/30",   text: "text-amber-400" },
+                  ];
+                  return (
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                      {cards.map(c => (
+                        <div key={c.label} className={`rounded-2xl border ${c.border} bg-gradient-to-b ${c.color} p-4 sm:p-5`}>
+                          <div className={`text-[10px] font-black uppercase tracking-widest ${c.text} mb-3`}>{c.label}</div>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <IndianRupee className={`w-4 h-4 ${c.text} shrink-0`} />
+                            <span className="text-xl sm:text-2xl font-black text-white tabular-nums">{fmt(c.gmv)}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-zinc-500 text-xs">
+                            <ShoppingBag className="w-3 h-3" />
+                            <span>{c.orders} orders</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  {/* Top items this month */}
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      <h3 className="text-sm font-black uppercase tracking-widest text-white">Top Items This Month</h3>
+                    </div>
+                    {analytics.topItems.length === 0 ? (
+                      <p className="text-zinc-600 text-sm text-center py-6">No data yet</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {analytics.topItems.map((item: any, i: number) => {
+                          const maxQty = analytics.topItems[0].qty_sold;
+                          const widthPct = Math.round((item.qty_sold / maxQty) * 100);
+                          return (
+                            <div key={item.name}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm text-white/80 truncate mr-2">{item.name}</span>
+                                <span className="text-xs text-zinc-400 shrink-0">{item.qty_sold} sold · ₹{(item.revenue_paise / 100).toLocaleString("en-IN")}</span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                                <div className={`h-full rounded-full ${i === 0 ? "bg-emerald-500" : i === 1 ? "bg-blue-500" : "bg-zinc-500"}`} style={{ width: `${widthPct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Peak hours bar chart */}
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <BarChart3 className="w-4 h-4 text-blue-400" />
+                      <h3 className="text-sm font-black uppercase tracking-widest text-white">Peak Hours</h3>
+                      <span className="text-zinc-600 text-xs ml-auto">last 30 days</span>
+                    </div>
+                    {analytics.peakHours.length === 0 ? (
+                      <p className="text-zinc-600 text-sm text-center py-6">No data yet</p>
+                    ) : (
+                      <>
+                        <div className="flex items-end gap-[2px] h-24">
+                          {Array.from({ length: 24 }, (_, h) => {
+                            const slot = analytics.peakHours.find((p: any) => p.hour === h);
+                            const count = slot?.orders ?? 0;
+                            const max = Math.max(...analytics.peakHours.map((p: any) => p.orders), 1);
+                            const heightPct = count > 0 ? Math.max(6, Math.round((count / max) * 100)) : 4;
+                            const isTop = count === max && count > 0;
+                            return (
+                              <div key={h} className="flex-1 flex flex-col items-center group relative">
+                                <div className={`w-full rounded-sm ${count > 0 ? (isTop ? "bg-blue-500" : "bg-blue-500/40") : "bg-white/5"}`} style={{ height: `${heightPct}%` }} />
+                                {count > 0 && (
+                                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex bg-zinc-900 border border-white/10 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-10">
+                                    {h}:00 · {count}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between text-zinc-600 text-[10px] mt-1.5 px-0.5">
+                          <span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Recent orders */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Recent Delivered Orders</h3>
+                    <button onClick={fetchAnalytics} className="text-zinc-500 hover:text-white transition-colors">
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {analytics.recentOrders.length === 0 ? (
+                    <p className="text-zinc-600 text-sm text-center py-6">No delivered orders yet</p>
+                  ) : (
+                    <div className="space-y-0">
+                      {analytics.recentOrders.map((o: any) => (
+                        <div key={o.display_id} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-mono text-zinc-400">{o.display_id}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${o.payment_method === "cod" ? "bg-amber-500/10 text-amber-400" : "bg-green-500/10 text-green-400"}`}>
+                              {o.payment_method === "cod" ? "COD" : "ONLINE"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-black text-white">₹{(o.total_amount_paise / 100).toFixed(0)}</span>
+                            <span className="text-xs text-zinc-600 hidden sm:block">
+                              {new Date(o.updated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {/* ════════════════════════ KDS VIEW ═══════════════════════════════════ */}

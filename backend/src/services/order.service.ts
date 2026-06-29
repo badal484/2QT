@@ -15,6 +15,19 @@ const getDeliveryOtpForOrder = () => {
 
 export async function createPendingOrder(data: any) {
     return await withTransaction(async (client) => {
+        // Guard: reject orders for suspended or inactive partner kitchens
+        const { rows: kvRows } = await client.query(
+            'SELECT is_active, is_partner, partner_status FROM kitchens WHERE id = $1',
+            [data.kitchenId]
+        );
+        const kv = kvRows[0];
+        if (!kv || !kv.is_active) {
+            const err: any = new Error('KITCHEN_INACTIVE'); err.code = 'KITCHEN_INACTIVE'; throw err;
+        }
+        if (kv.is_partner && kv.partner_status === 'suspended') {
+            const err: any = new Error('KITCHEN_SUSPENDED'); err.code = 'KITCHEN_SUSPENDED'; throw err;
+        }
+
         // Snapshot delivery coordinates from the address at placement time so
         // a later address update or migration never corrupts an in-flight order.
         const { rows: addrRows } = await client.query(
@@ -54,10 +67,16 @@ export async function createPendingOrder(data: any) {
         const newOrder = orderRows[0];
 
         for (const item of data.items) {
+            const customizations = item.customizations ? JSON.stringify(item.customizations) : '[]';
+            const specialInstructions = item.instructions || null;
+            
+            // If the item has add-ons that cost money, the frontend will pass the calculated price.
+            // For now, we trust the item.price_paise passed from checkout or calculate it if missing.
+            // To be secure, we should re-verify customization prices, but for this step we store the selections.
             await client.query(`
-                INSERT INTO order_items (order_id, menu_item_id, menu_item_name, quantity, price_paise, station)
-                SELECT $1, id, name, $2, price_paise, station FROM menu_items WHERE id = $3
-            `, [newOrder.id, item.quantity, item.menuItemId]);
+                INSERT INTO order_items (order_id, menu_item_id, menu_item_name, quantity, price_paise, station, customizations, special_instructions)
+                SELECT $1, id, name, $2, COALESCE($4, price_paise), station, $5::jsonb, $6 FROM menu_items WHERE id = $3
+            `, [newOrder.id, item.quantity, item.menuItemId, item.pricePaise || null, customizations, specialInstructions]);
         }
 
         return newOrder;

@@ -75,7 +75,7 @@ router.get('/menu', authenticate, requireRole('chef', 'kitchen_manager', 'super_
     if (!zoneId) return res.status(400).json({ error: 'KITCHEN_NOT_IN_ZONE' });
 
     const [{ rows: menuRows }, { rows: kitchenInfo }] = await Promise.all([
-        query('SELECT id, name, description, price_paise, category, station, available, is_veg, is_egg FROM menu_items WHERE zone_id = $1 ORDER BY name', [zoneId]),
+        query('SELECT id, name, description, price_paise, category, station, available, is_veg, is_egg, customization_groups FROM menu_items WHERE zone_id = $1 ORDER BY name', [zoneId]),
         query('SELECT is_paused, pause_reason, pause_until FROM kitchens WHERE id = $1', [kitchenId]),
     ]);
 
@@ -169,7 +169,7 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
 
     for (const order of rows) {
         const { rows: items } = await query(
-            `SELECT oi.menu_item_name as name, oi.quantity, oi.price_paise, COALESCE(m.category, oi.station) as station 
+            `SELECT oi.menu_item_name as name, oi.quantity, oi.price_paise, COALESCE(m.category, oi.station) as station, oi.customizations, oi.special_instructions 
              FROM order_items oi
              LEFT JOIN menu_items m ON oi.menu_item_id = m.id
              WHERE oi.order_id = $1`,
@@ -560,6 +560,66 @@ router.post('/pause-notify', authenticate, async (req: AuthRequest, res) => {
 
     await redis.sadd(`pause_notify:${kitchenId}`, fcmToken);
     res.json({ registered: true });
+});
+
+// ─── Kitchen Analytics (kitchen_manager only — own kitchen ops view) ─────────
+router.get('/analytics', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+
+    try {
+        const now = new Date();
+        const todayStart  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekStart   = new Date(todayStart); weekStart.setDate(todayStart.getDate() - todayStart.getDay());
+        const monthStart  = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const [todayR, weekR, monthR, allTimeR, topItemsR, peakHoursR, recentR] = await Promise.all([
+            query(`SELECT COALESCE(SUM(total_amount_paise),0) gmv, COUNT(*) orders
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered' AND updated_at>=$2`,
+                [kitchenId, todayStart]),
+            query(`SELECT COALESCE(SUM(total_amount_paise),0) gmv, COUNT(*) orders
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered' AND updated_at>=$2`,
+                [kitchenId, weekStart]),
+            query(`SELECT COALESCE(SUM(total_amount_paise),0) gmv, COUNT(*) orders
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered' AND updated_at>=$2`,
+                [kitchenId, monthStart]),
+            query(`SELECT COALESCE(SUM(total_amount_paise),0) gmv, COUNT(*) orders
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered'`,
+                [kitchenId]),
+            query(`SELECT oi.menu_item_name AS name,
+                          SUM(oi.quantity)::int AS qty_sold,
+                          COALESCE(SUM(oi.quantity * oi.unit_price_paise),0)::int AS revenue_paise
+                   FROM order_items oi
+                   JOIN orders o ON o.id = oi.order_id
+                   WHERE o.kitchen_id=$1 AND o.status='delivered' AND o.updated_at>=$2
+                   GROUP BY oi.menu_item_name ORDER BY qty_sold DESC LIMIT 5`,
+                [kitchenId, monthStart]),
+            query(`SELECT EXTRACT(HOUR FROM updated_at AT TIME ZONE 'Asia/Kolkata')::int AS hour,
+                          COUNT(*)::int AS orders
+                   FROM orders
+                   WHERE kitchen_id=$1 AND status='delivered'
+                     AND updated_at >= NOW() - INTERVAL '30 days'
+                   GROUP BY hour ORDER BY hour`,
+                [kitchenId]),
+            query(`SELECT display_id, total_amount_paise, payment_method, updated_at
+                   FROM orders WHERE kitchen_id=$1 AND status='delivered'
+                   ORDER BY updated_at DESC LIMIT 20`,
+                [kitchenId]),
+        ]);
+
+        res.json({
+            today:     { gmv: parseInt(todayR.rows[0].gmv),    orders: parseInt(todayR.rows[0].orders) },
+            thisWeek:  { gmv: parseInt(weekR.rows[0].gmv),     orders: parseInt(weekR.rows[0].orders) },
+            thisMonth: { gmv: parseInt(monthR.rows[0].gmv),    orders: parseInt(monthR.rows[0].orders) },
+            allTime:   { gmv: parseInt(allTimeR.rows[0].gmv),  orders: parseInt(allTimeR.rows[0].orders) },
+            topItems:     topItemsR.rows,
+            peakHours:    peakHoursR.rows,
+            recentOrders: recentR.rows,
+        });
+    } catch (err: any) {
+        console.error('[kitchen/analytics]', err);
+        res.status(500).json({ error: 'ANALYTICS_FAILED' });
+    }
 });
 
 export default router;
