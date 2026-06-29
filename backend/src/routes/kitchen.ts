@@ -71,7 +71,7 @@ router.patch('/menu/:itemId/availability', authenticate, requireRole('chef', 'su
     res.json({ success: true });
 });
 
-router.get('/orders', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     let rows: any[] = [];
     
     if (req.user!.role === 'super_admin') {
