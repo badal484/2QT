@@ -24,7 +24,8 @@ const validate = (schema: ZodSchema) => (req: Request, res: Response, next: Next
 
 const CustomizationOptionSchema = z.object({
     name: z.string().min(1).max(100),
-    price_paise: z.number().int().nonnegative().default(0)
+    price_paise: z.number().int().nonnegative().default(0),
+    photo_url: z.string().url().or(z.literal("")).optional().nullable()
 });
 
 const CustomizationGroupSchema = z.object({
