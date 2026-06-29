@@ -21,6 +21,7 @@ export function MenuTab() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingOptionImage, setUploadingOptionImage] = useState<{gIdx: number, oIdx: number} | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
   const [modalZoneId, setModalZoneId] = useState<string>("");
@@ -576,6 +577,7 @@ export function MenuTab() {
                       <div>
                         <h4 className="text-sm font-black text-white">Customization Groups</h4>
                         <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">Add-ons, Size, Spice Level, etc.</p>
+                        <p className="text-[9px] text-brand-primary uppercase tracking-widest mt-1">Recommended image size for options: 150x150 pixels</p>
                       </div>
                       <button
                         type="button"
@@ -636,6 +638,62 @@ export function MenuTab() {
                             <div className="space-y-2 pl-4 border-l-2 border-white/5">
                               {group.options.map((opt: any, oIdx: number) => (
                                 <div key={oIdx} className="flex items-center gap-3">
+                                  {/* Option Image Upload */}
+                                  <div className="relative w-12 h-12 rounded-lg bg-white/[0.03] border border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden group">
+                                    {opt.photo_url ? (
+                                      <>
+                                        <img src={opt.photo_url} alt="Option" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const next = [...customizationGroups];
+                                              next[gIdx].options[oIdx].photo_url = "";
+                                              setCustomizationGroups(next);
+                                            }}
+                                            className="text-red-400"
+                                          >
+                                            <XCircle className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-white/[0.05] transition-all">
+                                        {uploadingOptionImage?.gIdx === gIdx && uploadingOptionImage?.oIdx === oIdx ? (
+                                          <div className="w-4 h-4 rounded-full border-2 border-swish-green border-t-transparent animate-spin" />
+                                        ) : (
+                                          <Camera className="w-4 h-4 text-zinc-500" />
+                                        )}
+                                        <input
+                                          type="file"
+                                          className="hidden"
+                                          accept="image/*"
+                                          onChange={async (e) => {
+                                            if (!e.target.files?.[0]) return;
+                                            setUploadingOptionImage({ gIdx, oIdx });
+                                            try {
+                                              const fData = new FormData();
+                                              fData.append("image", e.target.files[0]);
+                                              const res = await api.request("/admin/menu/upload", {
+                                                method: "POST",
+                                                body: fData,
+                                              });
+                                              if (res.url) {
+                                                const next = [...customizationGroups];
+                                                next[gIdx].options[oIdx].photo_url = res.url;
+                                                setCustomizationGroups(next);
+                                              }
+                                            } catch (err: any) {
+                                              toast.error(`Upload error: ${err.message}`);
+                                            } finally {
+                                              setUploadingOptionImage(null);
+                                            }
+                                          }}
+                                        />
+                                      </label>
+                                    )}
+                                  </div>
+
                                   <input
                                     required
                                     value={opt.name}
