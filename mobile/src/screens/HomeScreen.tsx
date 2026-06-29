@@ -2208,24 +2208,52 @@ const styles = StyleSheet.create({
 
 const ClosedBottomSheet = ({
   openingTime,
+  paused,
+  pauseReason,
+  pauseUntil,
+  kitchenId,
   onDismiss,
 }: {
   openingTime?: string | null;
+  paused?: boolean;
+  pauseReason?: string | null;
+  pauseUntil?: string | null;
+  kitchenId?: string | null;
   onDismiss: () => void;
 }) => {
   const insets = useSafeAreaInsets();
   const [, setTick] = useState(0);
+  const [notifyRegistered, setNotifyRegistered] = useState(false);
+  const [notifyLoading, setNotifyLoading] = useState(false);
 
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 30000);
+    const interval = paused ? 5000 : 30000;
+    const id = setInterval(() => setTick(t => t + 1), interval);
     return () => clearInterval(id);
-  }, []);
+  }, [paused]);
 
   const minsLeft = minutesUntilOpen(openingTime);
   const opensVerySoon = minsLeft > 0 && minsLeft <= 30;
   const openLabel = openingTime ? formatTime12h(openingTime) : '10:00 AM';
 
-  // Sheet sits flush below the sticky header, above everything else
+  const pauseSecsLeft = pauseUntil
+    ? Math.max(0, Math.floor((new Date(pauseUntil).getTime() - Date.now()) / 1000))
+    : null;
+  const pauseMinsLeft = pauseSecsLeft !== null ? Math.floor(pauseSecsLeft / 60) : null;
+  const pauseSecsRem = pauseSecsLeft !== null ? pauseSecsLeft % 60 : null;
+
+  const handleNotifyMe = useCallback(async () => {
+    if (!kitchenId || notifyRegistered) return;
+    setNotifyLoading(true);
+    try {
+      const token = await getCurrentDeviceToken();
+      if (!token) { setNotifyLoading(false); return; }
+      await api.post('/kitchen/pause-notify', { kitchenId, fcmToken: token });
+      setNotifyRegistered(true);
+    } catch { /* silently fail */ }
+    setNotifyLoading(false);
+  }, [kitchenId, notifyRegistered]);
+
   const headerHeight = Math.max(insets.top + 8, 12) + 116;
   const sheetHeight = SCREEN_HEIGHT - headerHeight;
 
@@ -2274,32 +2302,66 @@ const ClosedBottomSheet = ({
       style={[closedSS.sheet, { top: headerHeight, height: sheetHeight, transform: [{ translateY }] }]}
       {...panResponder.panHandlers}
     >
-      {/* Drag handle */}
       <View style={closedSS.dragHandle} />
 
       <View style={closedSS.content}>
-        {/* Closed store image */}
         <Image
           source={require('../images/closed_store.png')}
           style={{ width: 250, height: 180, marginBottom: 24 }}
           resizeMode="contain"
         />
 
-        <Text style={closedSS.title}>Closed for Now, Back Soon!</Text>
+        {paused ? (
+          <>
+            <Text style={closedSS.title}>Kitchen Paused</Text>
 
-        {opensVerySoon ? (
-          <Text style={closedSS.subtitle}>
-            Opening in <Text style={closedSS.highlight}>{minsLeft} min</Text>
-          </Text>
+            {pauseReason ? (
+              <Text style={closedSS.subtitle}>"{pauseReason}"</Text>
+            ) : (
+              <Text style={closedSS.subtitle}>Taking a short break to catch up.</Text>
+            )}
+
+            {pauseSecsLeft !== null && pauseSecsLeft > 0 ? (
+              <View style={closedSS.countdownRow}>
+                <Text style={closedSS.countdownLabel}>Back in </Text>
+                <Text style={closedSS.countdown}>
+                  {pauseMinsLeft}:{String(pauseSecsRem).padStart(2, '0')}
+                </Text>
+              </View>
+            ) : (
+              <Text style={closedSS.body}>We'll reopen shortly — thank you for your patience.</Text>
+            )}
+
+            <TouchableOpacity
+              style={[closedSS.notifyBtn, notifyRegistered && closedSS.notifyBtnDone]}
+              onPress={handleNotifyMe}
+              activeOpacity={0.8}
+              disabled={notifyRegistered || notifyLoading}
+            >
+              <Text style={[closedSS.notifyBtnText, notifyRegistered && closedSS.notifyBtnTextDone]}>
+                {notifyRegistered ? '✓ We\'ll notify you' : notifyLoading ? 'Setting up…' : '🔔 Notify me when open'}
+              </Text>
+            </TouchableOpacity>
+          </>
         ) : (
-          <Text style={closedSS.subtitle}>
-            We open at <Text style={closedSS.highlight}>{openLabel}</Text>
-          </Text>
-        )}
+          <>
+            <Text style={closedSS.title}>Closed for Now, Back Soon!</Text>
 
-        <Text style={closedSS.body}>
-          We're closed for now, but we'll be back soon!{'\n'}Thank you for your patience.
-        </Text>
+            {opensVerySoon ? (
+              <Text style={closedSS.subtitle}>
+                Opening in <Text style={closedSS.highlight}>{minsLeft} min</Text>
+              </Text>
+            ) : (
+              <Text style={closedSS.subtitle}>
+                We open at <Text style={closedSS.highlight}>{openLabel}</Text>
+              </Text>
+            )}
+
+            <Text style={closedSS.body}>
+              We're closed for now, but we'll be back soon!{'\n'}Thank you for your patience.
+            </Text>
+          </>
+        )}
       </View>
 
       <TouchableOpacity
@@ -2371,6 +2433,43 @@ const closedSS = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
+  },
+  countdownRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  countdownLabel: {
+    fontSize: 15,
+    fontFamily: fontFamily.medium,
+    color: colors.inkMuted,
+  },
+  countdown: {
+    fontSize: 32,
+    fontFamily: fontFamily.black,
+    color: colors.primary,
+  },
+  notifyBtn: {
+    width: '100%',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  notifyBtnDone: {
+    borderColor: colors.success ?? '#22c55e',
+    backgroundColor: (colors.success ?? '#22c55e') + '1A',
+  },
+  notifyBtnText: {
+    fontSize: 15,
+    fontFamily: fontFamily.extrabold,
+    color: colors.primary,
+  },
+  notifyBtnTextDone: {
+    color: colors.success,
   },
   btn: {
     width: '100%',
