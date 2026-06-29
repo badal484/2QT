@@ -22,6 +22,17 @@ const validate = (schema: ZodSchema) => (req: Request, res: Response, next: Next
     next();
 };
 
+const CustomizationOptionSchema = z.object({
+    name: z.string().min(1).max(100),
+    price_paise: z.number().int().nonnegative().default(0)
+});
+
+const CustomizationGroupSchema = z.object({
+    name: z.string().min(1).max(100),
+    required: z.boolean().default(false),
+    options: z.array(CustomizationOptionSchema).min(1)
+});
+
 const MenuItemSchema = z.object({
     name: z.string().min(1).max(120),
     zone_id: z.string().uuid(),
@@ -37,6 +48,7 @@ const MenuItemSchema = z.object({
     is_bestseller: z.boolean().optional().default(false),
     is_new: z.boolean().optional().default(false),
     tags: z.array(z.string().max(40)).max(10).optional().default([]),
+    customization_groups: z.array(CustomizationGroupSchema).optional().default([]),
 });
 
 const KitchenSchema = z.object({
@@ -639,7 +651,7 @@ router.post('/payouts/:id/approve', authenticate, requireRole('super_admin', 'ad
 
 router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema), async (req: AuthRequest, res) => {
     try {
-        const { name, zone_id, description, price_paise, category, station, photo_url, available, is_veg, is_egg, is_bestseller, is_new, tags } = req.body;
+        const { name, zone_id, description, price_paise, category, station, photo_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups } = req.body;
 
         const cost_price_paise = req.body.cost_price_paise ?? Math.floor(price_paise * 0.7);
 
@@ -651,8 +663,8 @@ router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate
         const kitchen_id = kitchenRows[0].kitchen_id;
 
         const { rows } = await query(
-            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, available, is_veg, is_egg, is_bestseller, is_new, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::TEXT[]) RETURNING *',
-            [zone_id, kitchen_id, name, description || null, price_paise, cost_price_paise, category, station || 'hot_section', photo_url || null, available ?? true, is_veg ?? false, is_egg ?? false, is_bestseller ?? false, is_new ?? false, tags ?? []]
+            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::TEXT[], $16) RETURNING *',
+            [zone_id, kitchen_id, name, description || null, price_paise, cost_price_paise, category, station || 'hot_section', photo_url || null, available ?? true, is_veg ?? false, is_egg ?? false, is_bestseller ?? false, is_new ?? false, tags ?? [], JSON.stringify(customization_groups || [])]
         );
         
         // Clear menu cache for all zones
@@ -710,7 +722,7 @@ router.delete('/menu/:id', authenticate, requireRole('super_admin', 'admin'), as
 router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema.partial()), async (req: AuthRequest, res) => {
     try {
         const { id } = req.params;
-        const { zone_id, name, description, price_paise, category, station, photo_url, available, is_veg, is_egg, is_bestseller, is_new, tags } = req.body;
+        const { zone_id, name, description, price_paise, category, station, photo_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups } = req.body;
 
         let kitchen_id = undefined;
         if (zone_id) {
@@ -735,9 +747,10 @@ router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), valid
                 is_egg = COALESCE($11, is_egg),
                 is_bestseller = COALESCE($13, is_bestseller),
                 is_new = COALESCE($14, is_new),
-                tags = COALESCE($15, tags)
+                tags = COALESCE($15, tags),
+                customization_groups = COALESCE($16, customization_groups)
              WHERE id = $12 RETURNING *`,
-            [zone_id ?? null, kitchen_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null, station ?? null, photo_url ?? null, available ?? null, is_veg ?? null, is_egg ?? null, id, is_bestseller ?? null, is_new ?? null, tags ?? null]
+            [zone_id ?? null, kitchen_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null, station ?? null, photo_url ?? null, available ?? null, is_veg ?? null, is_egg ?? null, id, is_bestseller ?? null, is_new ?? null, tags ?? null, customization_groups ? JSON.stringify(customization_groups) : null]
         );
 
         // Clear menu cache for all zones

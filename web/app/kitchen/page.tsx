@@ -663,8 +663,8 @@ export default function KitchenPage() {
               </div>
             </div>
 
-            {/* Map — desktop only */}
-            <div className="hidden lg:block flex-1 min-h-[420px]">
+            {/* Map */}
+            <div className="w-full h-[300px] lg:h-auto lg:flex-1 lg:min-h-[420px] rounded-2xl overflow-hidden border border-white/10 shrink-0">
               <DispatchMap riders={riders} />
             </div>
 

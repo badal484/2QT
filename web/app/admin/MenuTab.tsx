@@ -25,12 +25,14 @@ export function MenuTab() {
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
   const [modalZoneId, setModalZoneId] = useState<string>("");
   const [modalCategories, setModalCategories] = useState<string[]>([]);
+  const [customizationGroups, setCustomizationGroups] = useState<any[]>([]);
 
   useEffect(() => {
     if (showAddModal) {
       setImageUrl(editingItem?.photo_url || "");
       const zoneId = editingItem?.zone_id || (selectedZone !== "All" ? selectedZone : zones[0]?.id || "");
       setModalZoneId(zoneId);
+      setCustomizationGroups(editingItem?.customization_groups || []);
     }
   }, [showAddModal, editingItem]);
 
@@ -409,6 +411,7 @@ export function MenuTab() {
                       is_bestseller: formData.get("is_bestseller") === "on",
                       is_new: formData.get("is_new") === "on",
                       tags: rawTags,
+                      customization_groups: customizationGroups,
                       available: true
                     };
                     try {
@@ -561,6 +564,130 @@ export function MenuTab() {
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Tags <span className="text-zinc-600 font-medium normal-case tracking-normal">(comma-separated, e.g. Serves 1, High Protein)</span></label>
                     <input name="tags" defaultValue={editingItem?.tags?.join(", ") || ""} placeholder="Serves 1, High Protein, 2 Pieces" className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white placeholder-zinc-600" />
+                  </div>
+
+                  {/* Customization Groups Editor */}
+                  <div className="border border-white/10 rounded-2xl p-5 bg-white/[0.01]">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="text-sm font-black text-white">Customization Groups</h4>
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">Add-ons, Size, Spice Level, etc.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCustomizationGroups([...customizationGroups, { name: "", required: false, options: [{ name: "", price_paise: 0 }] }])}
+                        className="px-3 py-1.5 rounded-xl bg-white/[0.05] text-white hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Add Group
+                      </button>
+                    </div>
+
+                    {customizationGroups.length === 0 ? (
+                      <div className="text-center py-6 text-zinc-600 text-xs font-bold border border-white/5 border-dashed rounded-xl">
+                        No customizations. Item will be added directly to cart.
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {customizationGroups.map((group, gIdx) => (
+                          <div key={gIdx} className="border border-white/10 rounded-xl p-4 bg-black/40">
+                            <div className="flex items-start gap-4 mb-4">
+                              <div className="flex-1">
+                                <label className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1.5 block">Group Name</label>
+                                <input
+                                  required
+                                  value={group.name}
+                                  onChange={e => {
+                                    const next = [...customizationGroups];
+                                    next[gIdx].name = e.target.value;
+                                    setCustomizationGroups(next);
+                                  }}
+                                  placeholder="e.g. Spice Level"
+                                  className="w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/10 font-bold text-sm text-white focus:outline-none focus:border-swish-green/50"
+                                />
+                              </div>
+                              <div className="flex items-center gap-3 pt-6">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={group.required}
+                                    onChange={e => {
+                                      const next = [...customizationGroups];
+                                      next[gIdx].required = e.target.checked;
+                                      setCustomizationGroups(next);
+                                    }}
+                                    className="w-4 h-4 accent-swish-green rounded"
+                                  />
+                                  <span className="text-xs font-bold text-zinc-300">Required</span>
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => setCustomizationGroups(customizationGroups.filter((_, i) => i !== gIdx))}
+                                  className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2 pl-4 border-l-2 border-white/5">
+                              {group.options.map((opt: any, oIdx: number) => (
+                                <div key={oIdx} className="flex items-center gap-3">
+                                  <input
+                                    required
+                                    value={opt.name}
+                                    onChange={e => {
+                                      const next = [...customizationGroups];
+                                      next[gIdx].options[oIdx].name = e.target.value;
+                                      setCustomizationGroups(next);
+                                    }}
+                                    placeholder="Option name (e.g. Mild)"
+                                    className="flex-1 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-sm font-medium text-white focus:outline-none focus:border-swish-green/50"
+                                  />
+                                  <div className="relative w-28">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">₹</span>
+                                    <input
+                                      required
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={opt.price_paise ? opt.price_paise / 100 : 0}
+                                      onChange={e => {
+                                        const next = [...customizationGroups];
+                                        next[gIdx].options[oIdx].price_paise = Math.round(parseFloat(e.target.value || "0") * 100);
+                                        setCustomizationGroups(next);
+                                      }}
+                                      className="w-full pl-7 pr-3 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-sm font-medium text-white focus:outline-none focus:border-swish-green/50"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = [...customizationGroups];
+                                      next[gIdx].options = next[gIdx].options.filter((_: any, i: number) => i !== oIdx);
+                                      setCustomizationGroups(next);
+                                    }}
+                                    className="p-1.5 text-zinc-500 hover:text-red-400 transition-all"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = [...customizationGroups];
+                                  next[gIdx].options.push({ name: "", price_paise: 0 });
+                                  setCustomizationGroups(next);
+                                }}
+                                className="text-[10px] font-black uppercase tracking-widest text-swish-green hover:text-swish-green/80 flex items-center gap-1 pt-2"
+                              >
+                                <Plus className="w-3 h-3" /> Add Option
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Action buttons */}
