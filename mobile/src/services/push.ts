@@ -107,8 +107,17 @@ export function setupBackgroundHandler() {
     const msg = getMessaging();
     if (!msg) return;
     try {
-        msg.setBackgroundMessageHandler(async (_remoteMessage: any) => {
-            // Background data-only messages — nothing to do, OS shows the notification
+        msg.setBackgroundMessageHandler(async (remoteMessage: any) => {
+            // Data-only messages (no notification field) need a local notification
+            if (!remoteMessage.notification) {
+                const { displayLocalNotification } = require('./localNotif');
+                await displayLocalNotification(
+                    remoteMessage.data?.title ?? 'VELTO',
+                    remoteMessage.data?.body  ?? '',
+                    remoteMessage.data ?? {}
+                );
+            }
+            // Notification messages are displayed automatically by the OS
         });
     } catch {}
 }

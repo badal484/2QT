@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, NativeModules } from 'react-native';
+import { NativeModules } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
 import { getSocket, connectSocket, disconnectSocket } from '../socket/client';
@@ -13,20 +13,26 @@ import AdminNavigator from './AdminNavigator';
 import ForceUpdateScreen from '../screens/ForceUpdateScreen';
 import MaintenanceScreen from '../screens/MaintenanceScreen';
 import { APP_VERSION, api } from '../api/client';
-import { navigationRef, navigateFromNotification } from './navigationRef';
+import { navigationRef } from './navigationRef';
 import {
   subscribeToNotificationTap,
   subscribeToForegroundMessages,
   handleInitialNotification,
   setupBackgroundHandler,
 } from '../services/push';
+import {
+  createNotificationChannels,
+  displayLocalNotification,
+  setupNotifeeHandlers,
+} from '../services/localNotif';
 
 const { RoleModule } = NativeModules;
-const BUILD_ROLE = RoleModule?.BUILD_ROLE; // 'customer', 'rider', 'kitchen', 'admin' or undefined
+const BUILD_ROLE = RoleModule?.BUILD_ROLE;
 console.log('--- DETECTED BUILD ROLE:', BUILD_ROLE);
 
 // Must be called at module load time (before any component mounts)
 setupBackgroundHandler();
+setupNotifeeHandlers(); // notifee background tap handler (must be outside component)
 
 const linking = {
   prefixes: ['2qt://', 'https://2qt.app'],
@@ -69,19 +75,18 @@ const RootNavigator = () => {
       }
     };
     checkSystemStatus();
+    // Create Android notification channels via notifee on startup
+    createNotificationChannels().catch(() => {});
   }, []);
 
-  // Wire notification handlers once after NavigationContainer is ready
+  // Wire FCM tap and foreground message handlers
   React.useEffect(() => {
     const unsubTap = subscribeToNotificationTap();
-    handleInitialNotification(); // handles killed-app launch via notification
+    handleInitialNotification();
 
-    // Foreground: system won't show the notification — display an alert and navigate on "View"
+    // Foreground: post a real system notification via notifee so it appears in the tray
     const unsubForeground = subscribeToForegroundMessages((title, body, data) => {
-      Alert.alert(title, body, [
-        { text: 'Dismiss', style: 'cancel' },
-        { text: 'View', onPress: () => navigateFromNotification(data) },
-      ]);
+      displayLocalNotification(title, body, data).catch(() => {});
     });
 
     return () => { unsubTap(); unsubForeground(); };
