@@ -17,11 +17,11 @@ export async function createPendingOrder(data: any) {
     return await withTransaction(async (client) => {
         // Guard: reject orders for suspended or inactive partner kitchens
         const { rows: kvRows } = await client.query(
-            'SELECT is_active, is_partner, partner_status FROM kitchens WHERE id = $1',
+            'SELECT is_partner, partner_status, is_paused FROM kitchens WHERE id = $1',
             [data.kitchenId]
         );
         const kv = kvRows[0];
-        if (!kv || !kv.is_active) {
+        if (!kv || kv.is_paused) {
             const err: any = new Error('KITCHEN_INACTIVE'); err.code = 'KITCHEN_INACTIVE'; throw err;
         }
         if (kv.is_partner && kv.partner_status === 'suspended') {
