@@ -238,6 +238,11 @@ const CartScreen = ({ navigation }: any) => {
                     </View>
                     <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                   </View>
+                  {item.customizations && item.customizations.length > 0 && (
+                    <Text style={styles.itemCustomizations} numberOfLines={2}>
+                      + {item.customizations.map(c => `${c.group}: ${c.option}`).join(', ')}
+                    </Text>
+                  )}
                   <Text style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
                 </View>
                 <View style={styles.qtyRow}>
@@ -695,6 +700,7 @@ const styles = StyleSheet.create({
   itemImgPlaceholder: { backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' },
   itemMeta: { flex: 1, marginRight: 12 },
   itemName: { fontSize: 14, fontFamily: fontFamily.black, color: colors.ink, lineHeight: 20, letterSpacing: -0.2 },
+  itemCustomizations: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2, marginBottom: 2 },
   itemPrice: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 },
   vegBadgeMini: {
     width: 10,
