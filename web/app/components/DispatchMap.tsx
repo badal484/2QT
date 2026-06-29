@@ -11,8 +11,7 @@ interface Rider {
   id: string;
   name: string;
   phone: string;
-  current_order_id?: string | null;
-  order_display_id?: string | null;
+  active_orders?: { id: string; display_id: string; status: string; delivery_address: string }[] | null;
   location?: Location | null;
 }
 
@@ -197,7 +196,7 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
         {riders.map((rider) => {
           if (!rider.location) return null;
           
-          const isBusy = !!rider.current_order_id;
+          const isBusy = rider.active_orders && rider.active_orders.length > 0;
           
           return (
             <MarkerF
@@ -217,11 +216,14 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
             <div className="p-1 font-sans text-black">
               <div className="font-bold text-sm">{selectedRider.name}</div>
               <div className="text-xs text-gray-500 mb-1">{selectedRider.phone}</div>
-              <div className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full inline-block ${
-                selectedRider.current_order_id ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
+              <div className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full inline-block mb-1 ${
+                (selectedRider.active_orders?.length || 0) > 0 ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
               }`}>
-                {selectedRider.current_order_id ? `Delivering #${selectedRider.order_display_id}` : 'Idle'}
+                {(selectedRider.active_orders?.length || 0) > 0 ? `Delivering ${selectedRider.active_orders?.length} orders` : 'Idle'}
               </div>
+              {(selectedRider.active_orders || []).map(o => (
+                <div key={o.id} className="text-xs text-gray-700">#{o.display_id}</div>
+              ))}
             </div>
           </InfoWindowF>
         )}
@@ -242,7 +244,7 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
   );
 }
 
-const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? 'AIzaSyCwvUrO91u81DGsCr4YoJZWzrIC9Pr5kaA';
 
 export default function DispatchMap({ riders }: DispatchMapProps) {
   if (!MAPS_KEY) {
