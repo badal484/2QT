@@ -1,7 +1,7 @@
 import React from 'react';
+import { Alert, NativeModules } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
-import { NativeModules } from 'react-native';
 import { getSocket, connectSocket, disconnectSocket } from '../socket/client';
 import { RootState } from '../store';
 import { updateUser } from '../store/slices/authSlice';
@@ -13,9 +13,10 @@ import AdminNavigator from './AdminNavigator';
 import ForceUpdateScreen from '../screens/ForceUpdateScreen';
 import MaintenanceScreen from '../screens/MaintenanceScreen';
 import { APP_VERSION, api } from '../api/client';
-import { navigationRef } from './navigationRef';
+import { navigationRef, navigateFromNotification } from './navigationRef';
 import {
   subscribeToNotificationTap,
+  subscribeToForegroundMessages,
   handleInitialNotification,
   setupBackgroundHandler,
 } from '../services/push';
@@ -70,11 +71,20 @@ const RootNavigator = () => {
     checkSystemStatus();
   }, []);
 
-  // Wire notification tap handlers once after NavigationContainer is ready
+  // Wire notification handlers once after NavigationContainer is ready
   React.useEffect(() => {
     const unsubTap = subscribeToNotificationTap();
     handleInitialNotification(); // handles killed-app launch via notification
-    return () => { unsubTap(); };
+
+    // Foreground: system won't show the notification — display an alert and navigate on "View"
+    const unsubForeground = subscribeToForegroundMessages((title, body, data) => {
+      Alert.alert(title, body, [
+        { text: 'Dismiss', style: 'cancel' },
+        { text: 'View', onPress: () => navigateFromNotification(data) },
+      ]);
+    });
+
+    return () => { unsubTap(); unsubForeground(); };
   }, []);
 
   React.useEffect(() => {
