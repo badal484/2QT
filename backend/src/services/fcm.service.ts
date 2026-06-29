@@ -50,7 +50,8 @@ export async function sendFCM(
     token: string,
     title: string,
     body: string,
-    data: Record<string, string> = {}
+    data: Record<string, string> = {},
+    imageUrl?: string
 ): Promise<'ok' | 'invalid_token' | 'skipped'> {
     const a = getApp();
     if (!a) return 'skipped';
@@ -58,14 +59,15 @@ export async function sendFCM(
     try {
         await getMessaging(a).send({
             token,
-            notification: { title, body },
+            notification: { title, body, imageUrl: imageUrl || undefined },
             data,
             android: {
                 priority: 'high',
-                notification: { sound: 'default', channelId: 'order_updates' },
+                notification: { sound: 'default', channelId: 'order_updates', imageUrl: imageUrl || undefined },
             },
             apns: {
                 payload: { aps: { alert: { title, body }, sound: 'default', badge: 1 } },
+                fcmOptions: { imageUrl: imageUrl || undefined },
             },
         });
         return 'ok';
