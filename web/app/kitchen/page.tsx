@@ -479,6 +479,15 @@ export default function KitchenPage() {
           <div className="w-full flex items-center justify-center">
             <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : error ? (
+          <div className="w-full flex flex-col items-center justify-center gap-4">
+            <AlertCircle className="w-16 h-16 text-red-500" />
+            <h3 className="text-2xl font-black text-red-400">CANNOT REACH SERVER</h3>
+            <p className="text-zinc-500 text-sm">{error}</p>
+            <button onClick={fetchOrders} className="mt-2 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-sm uppercase tracking-widest transition-all flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" /> Retry
+            </button>
+          </div>
         ) : orders.length === 0 ? (
           <div className="w-full flex flex-col items-center justify-center">
             <ChefHat className="w-24 h-24 text-zinc-800 mb-6" />
