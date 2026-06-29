@@ -111,9 +111,9 @@ function formatTime(minutes: number) {
 }
 
 const KDS_COLUMNS = [
-  { id: "confirmed", title: "New Orders", borderColor: "border-green-500/30", indicatorColor: "bg-green-500", textColor: "text-green-500", buttonColor: "bg-green-600 text-white hover:bg-green-500" },
-  { id: "preparing", title: "Preparing", borderColor: "border-amber-500/30", indicatorColor: "bg-amber-500", textColor: "text-amber-500", buttonColor: "bg-amber-500 text-black hover:bg-amber-400" },
-  { id: "ready_for_pickup", title: "Ready", borderColor: "border-white/20", indicatorColor: "bg-white", textColor: "text-white", buttonColor: "bg-white text-black hover:bg-zinc-200" },
+  { id: "confirmed", title: "New Orders", borderColor: "border-white/10", indicatorColor: "bg-blue-500", textColor: "text-white", buttonColor: "bg-white text-black hover:bg-zinc-200 font-semibold" },
+  { id: "preparing", title: "Preparing", borderColor: "border-white/10", indicatorColor: "bg-amber-500", textColor: "text-white", buttonColor: "bg-white text-black hover:bg-zinc-200 font-semibold" },
+  { id: "ready_for_pickup", title: "Ready", borderColor: "border-white/10", indicatorColor: "bg-emerald-500", textColor: "text-white", buttonColor: "bg-zinc-800 text-white hover:bg-zinc-700 font-semibold" },
 ];
 
 type KdsColId = "confirmed" | "preparing" | "ready_for_pickup";
@@ -129,7 +129,7 @@ function KdsColumn({ col, orders, updatingId, updateStatus }: {
     <div className="flex-1 flex flex-col min-w-0">
       <div className="mb-3 flex items-center gap-2">
         <span className={`w-2.5 h-2.5 rounded-full ${col.indicatorColor}`} />
-        <h2 className={`text-xl sm:text-2xl font-black tracking-tight ${col.textColor}`}>{col.title}</h2>
+        <h2 className={`text-xl sm:text-lg font-semibold tracking-tight ${col.textColor}`}>{col.title}</h2>
         <span className="text-zinc-500 text-sm font-semibold ml-1">{colOrders.length}</span>
       </div>
 
@@ -151,15 +151,15 @@ function KdsColumn({ col, orders, updatingId, updateStatus }: {
               >
                 <div className="p-4 sm:p-5 pb-3 border-b border-white/[0.05] flex justify-between items-start">
                   <div>
-                    <div className="text-zinc-500 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Ticket</div>
-                    <div className={`text-3xl sm:text-4xl font-black leading-none tracking-tighter ${col.textColor}`}>K-{displayId}</div>
+                    <div className="text-zinc-500 text-[10px] font-semibold uppercase tracking-[0.1em] mb-0.5">Ticket</div>
+                    <div className={`text-2xl sm:text-3xl font-bold leading-none tracking-tight ${col.textColor}`}>K-{displayId}</div>
                   </div>
                   <div className="text-right">
-                    <div className={`text-2xl sm:text-3xl font-black tabular-nums leading-none ${isUrgent ? "text-red-500 animate-pulse" : "text-white/90"}`}>
+                    <div className={`text-xl sm:text-2xl font-semibold tabular-nums leading-none ${isUrgent ? "text-red-500" : "text-white/80"}`}>
                       {formatTime(elapsed)}
                     </div>
                     {isUrgent && (
-                      <div className="bg-red-500/20 text-red-500 text-[9px] px-2 py-0.5 rounded-sm font-black uppercase tracking-widest mt-1.5 border border-red-500/30">URGENT</div>
+                      <div className="bg-red-500/10 text-red-500 text-[10px] px-2 py-0.5 rounded-md font-semibold uppercase tracking-wider mt-1.5 border border-red-500/20">URGENT</div>
                     )}
                   </div>
                 </div>
@@ -167,13 +167,13 @@ function KdsColumn({ col, orders, updatingId, updateStatus }: {
                 <div className="p-4 sm:p-5 flex flex-col gap-3 sm:gap-4">
                   {order.items.map((item, idx) => (
                     <div key={idx} className="flex items-start gap-3">
-                      <div className={`text-lg sm:text-xl font-black px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 ${col.textColor} shrink-0`}>
+                      <div className={`text-base sm:text-lg font-semibold px-2 py-0.5 rounded bg-white/5 border border-white/10 ${col.textColor} shrink-0`}>
                         {item.quantity}x
                       </div>
                       <div className="pt-0.5">
-                        <div className="text-base sm:text-lg font-bold uppercase leading-tight text-white/90">{item.name}</div>
+                        <div className="text-sm sm:text-base font-medium capitalize leading-tight text-white/90">{item.name}</div>
                         {item.station && (
-                          <div className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mt-1 flex items-center gap-1">
+                          <div className="text-zinc-400 text-[11px] font-medium tracking-wide mt-1 flex items-center gap-1">
                             <ChefHat className="w-3 h-3" /> {item.station}
                           </div>
                         )}
@@ -183,11 +183,11 @@ function KdsColumn({ col, orders, updatingId, updateStatus }: {
                 </div>
 
                 {order.status === "confirmed" && (
-                  <div className="p-3 sm:p-4 pt-0">
+                  <div className="p-4 sm:p-5 pt-3">
                     <button
-                      disabled={updatingId === order.id}
                       onClick={() => updateStatus(order.id, "preparing")}
-                      className={`w-full py-3 sm:py-4 rounded-xl text-base sm:text-lg font-black uppercase tracking-widest ${col.buttonColor} transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
+                      disabled={updatingId === order.id}
+                      className={`w-full py-2.5 sm:py-3 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${col.buttonColor}`}
                     >
                       {updatingId === order.id ? <Loader2 className="w-5 h-5 animate-spin" /> : "START PREP"}
                     </button>
@@ -195,11 +195,11 @@ function KdsColumn({ col, orders, updatingId, updateStatus }: {
                 )}
 
                 {order.status === "preparing" && (
-                  <div className="p-3 sm:p-4 pt-0">
+                  <div className="p-4 sm:p-5 pt-3">
                     <button
-                      disabled={updatingId === order.id}
                       onClick={() => updateStatus(order.id, "ready_for_pickup")}
-                      className={`w-full py-3 sm:py-4 rounded-xl text-base sm:text-lg font-black uppercase tracking-widest ${col.buttonColor} transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
+                      disabled={updatingId === order.id}
+                      className={`w-full py-2.5 sm:py-3 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${col.buttonColor}`}
                     >
                       {updatingId === order.id ? <Loader2 className="w-5 h-5 animate-spin" /> : "MARK READY"}
                     </button>
@@ -247,12 +247,17 @@ export default function KitchenPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [kitchenPaused, setKitchenPaused] = useState(false);
   const [pauseReason, setPauseReason] = useState("");
+  const [pauseUntil, setPauseUntil] = useState<string | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<number | null>(30); // minutes; null = indefinite
+  const [customMinutes, setCustomMinutes] = useState("");
   const [manageLoading, setManageLoading] = useState(false);
   const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
   const [pausingKitchen, setPausingKitchen] = useState(false);
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [stockDraft, setStockDraft] = useState("");
   const [savingStockId, setSavingStockId] = useState<string | null>(null);
+  // Live countdown tick
+  const [, setCountdownTick] = useState(0);
 
   const { user, logout, loading: authLoading } = useAuth()!;
   const router = useRouter();
@@ -378,6 +383,7 @@ export default function KitchenPage() {
       setInventory(inventoryData.inventory || []);
       setKitchenPaused(menuData.kitchenPaused || false);
       setPauseReason(menuData.pauseReason || "");
+      setPauseUntil(menuData.pauseUntil || null);
     } catch {
       toast.error("Could not load kitchen data");
     } finally {
@@ -389,16 +395,44 @@ export default function KitchenPage() {
     if (view === "manage") fetchManage();
   }, [view, fetchManage]);
 
-  const toggleKitchen = async () => {
-    const newPaused = !kitchenPaused;
+  // Live countdown tick every 5s while paused
+  useEffect(() => {
+    if (!kitchenPaused || !pauseUntil) return;
+    const id = setInterval(() => setCountdownTick(t => t + 1), 5000);
+    return () => clearInterval(id);
+  }, [kitchenPaused, pauseUntil]);
+
+  const pauseKitchen = async () => {
+    const durationMinutes = selectedDuration === -1
+      ? parseInt(customMinutes, 10) || null
+      : selectedDuration;
     setPausingKitchen(true);
     try {
-      await api.patch("/kitchen/status", { paused: newPaused, reason: newPaused ? pauseReason : null });
-      setKitchenPaused(newPaused);
-      if (!newPaused) setPauseReason("");
-      toast.success(newPaused ? "Kitchen paused — orders will stop coming in" : "Kitchen is open again");
+      const res = await api.patch("/kitchen/status", {
+        paused: true,
+        reason: pauseReason || null,
+        duration_minutes: durationMinutes,
+      });
+      setKitchenPaused(true);
+      setPauseUntil(res.pauseUntil || null);
+      toast.success(durationMinutes ? `Kitchen paused for ${durationMinutes} min` : "Kitchen paused indefinitely");
     } catch {
-      toast.error("Failed to update kitchen status");
+      toast.error("Failed to pause kitchen");
+    } finally {
+      setPausingKitchen(false);
+    }
+  };
+
+  const openKitchen = async () => {
+    setPausingKitchen(true);
+    try {
+      await api.patch("/kitchen/status", { paused: false });
+      setKitchenPaused(false);
+      setPauseUntil(null);
+      setPauseReason("");
+      toast.success("Kitchen is open again — customers notified");
+    } catch {
+      toast.error("Failed to open kitchen");
     } finally {
       setPausingKitchen(false);
     }
@@ -673,48 +707,114 @@ export default function KitchenPage() {
 
               {/* Kitchen Status */}
               <div className={`rounded-2xl border p-5 sm:p-6 ${kitchenPaused ? "bg-red-950/20 border-red-500/30" : "bg-[#0a1f0a] border-green-500/20"}`}>
-                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1.5">
-                      <Power className={`w-5 h-5 ${kitchenPaused ? "text-red-400" : "text-green-400"}`} />
-                      <h2 className="text-base font-black uppercase tracking-wider">Kitchen Status</h2>
-                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${kitchenPaused ? "bg-red-500/10 text-red-400 border-red-500/30" : "bg-green-500/10 text-green-400 border-green-500/30"}`}>
-                        {kitchenPaused ? "PAUSED" : "OPEN"}
-                      </span>
+                {kitchenPaused ? (
+                  /* ── PAUSED STATE ── */
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Power className="w-5 h-5 text-red-400 animate-pulse" />
+                        <h2 className="text-base font-black uppercase tracking-wider">Kitchen Status</h2>
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border bg-red-500/10 text-red-400 border-red-500/30">PAUSED</span>
+                      </div>
+                      {pauseReason && <p className="text-zinc-300 text-sm mb-1">"{pauseReason}"</p>}
+                      {pauseUntil ? (() => {
+                        const secsLeft = Math.max(0, Math.floor((new Date(pauseUntil).getTime() - Date.now()) / 1000));
+                        const minsLeft = Math.floor(secsLeft / 60);
+                        const secsRem = secsLeft % 60;
+                        const autoResume = secsLeft > 0;
+                        return autoResume ? (
+                          <div className="flex items-center gap-2 mt-2">
+                            <Timer className="w-4 h-4 text-amber-400 shrink-0" />
+                            <span className="text-amber-400 font-black text-lg tabular-nums">
+                              {minsLeft}:{secsRem.toString().padStart(2, "0")}
+                            </span>
+                            <span className="text-zinc-500 text-sm">until auto-resume</span>
+                          </div>
+                        ) : (
+                          <p className="text-zinc-500 text-sm mt-1">Paused indefinitely — open manually when ready.</p>
+                        );
+                      })() : (
+                        <p className="text-zinc-500 text-sm mt-1">Paused indefinitely — open manually when ready.</p>
+                      )}
                     </div>
-                    <p className="text-zinc-400 text-sm">
-                      {kitchenPaused
-                        ? `Reason: ${pauseReason || "No reason given"}`
-                        : "Kitchen is accepting orders."}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:items-end sm:min-w-[220px]">
-                    <input
-                      type="text"
-                      placeholder={kitchenPaused ? "Pause reason…" : "Pause reason (optional)…"}
-                      value={pauseReason}
-                      onChange={e => setPauseReason(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
-                    />
                     <button
-                      onClick={toggleKitchen}
+                      onClick={openKitchen}
                       disabled={pausingKitchen}
-                      className={`w-full px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
-                        kitchenPaused
-                          ? "bg-green-500 text-black hover:bg-green-400"
-                          : "bg-red-500 text-white hover:bg-red-400"
-                      }`}
+                      className="shrink-0 px-6 py-3 rounded-xl font-black uppercase tracking-widest text-sm bg-green-500 text-black hover:bg-green-400 transition-all flex items-center gap-2 disabled:opacity-50 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
                     >
-                      {pausingKitchen
-                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : kitchenPaused
-                          ? <><Power className="w-4 h-4" /> Open Kitchen</>
-                          : <><Power className="w-4 h-4" /> Pause Kitchen</>
-                      }
+                      {pausingKitchen ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Power className="w-4 h-4" /> Open Now</>}
                     </button>
                   </div>
-                </div>
+                ) : (
+                  /* ── OPEN STATE — show duration picker ── */
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Power className="w-5 h-5 text-green-400" />
+                      <h2 className="text-base font-black uppercase tracking-wider">Kitchen Status</h2>
+                      <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border bg-green-500/10 text-green-400 border-green-500/30">OPEN</span>
+                      <span className="text-zinc-500 text-sm ml-1">Accepting orders normally.</span>
+                    </div>
+
+                    {/* Duration picker */}
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Pause duration</div>
+                      <div className="flex flex-wrap gap-2">
+                        {[15, 30, 60].map(d => (
+                          <button
+                            key={d}
+                            onClick={() => setSelectedDuration(d)}
+                            className={`px-4 py-2 rounded-xl text-sm font-black border transition-all ${selectedDuration === d ? "bg-red-500/20 border-red-500/50 text-red-300" : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"}`}
+                          >
+                            {d} min
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setSelectedDuration(-1)}
+                          className={`px-4 py-2 rounded-xl text-sm font-black border transition-all flex items-center gap-1.5 ${selectedDuration === -1 ? "bg-red-500/20 border-red-500/50 text-red-300" : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"}`}
+                        >
+                          <Timer className="w-3.5 h-3.5" /> Custom
+                        </button>
+                        <button
+                          onClick={() => setSelectedDuration(null)}
+                          className={`px-4 py-2 rounded-xl text-sm font-black border transition-all ${selectedDuration === null ? "bg-red-500/20 border-red-500/50 text-red-300" : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"}`}
+                        >
+                          Indefinite
+                        </button>
+                      </div>
+
+                      {selectedDuration === -1 && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <input
+                            type="number"
+                            min={1} max={480}
+                            placeholder="Minutes…"
+                            value={customMinutes}
+                            onChange={e => setCustomMinutes(e.target.value)}
+                            className="w-28 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+                          />
+                          <span className="text-zinc-500 text-sm">minutes</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        placeholder="Reason (customers will see this)…"
+                        value={pauseReason}
+                        onChange={e => setPauseReason(e.target.value)}
+                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+                      />
+                      <button
+                        onClick={pauseKitchen}
+                        disabled={pausingKitchen || (selectedDuration === -1 && !parseInt(customMinutes, 10))}
+                        className="shrink-0 px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-sm bg-red-500 text-white hover:bg-red-400 transition-all flex items-center justify-center gap-2 disabled:opacity-40"
+                      >
+                        {pausingKitchen ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Power className="w-4 h-4" /> Pause Kitchen</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Low stock alert */}
