@@ -16,21 +16,50 @@ const PROMO_TYPES   = new Set(['broadcast_message', 'winback', 'birthday', 'flas
 const PAYOUT_TYPES  = new Set(['rider_payout', 'kitchen_payout', 'rider_guarantee_payout']);
 const TEMPLATE_CACHE_TTL = 300; // 5 min
 
+// ─── Hardcoded fallback templates (used when DB table is empty / migration not run) ──
+
+const FALLBACK_TEMPLATES: Record<string, { title_template: string; body_template: string; channels: string[] }> = {
+    order_confirmed:        { title_template: 'Order Confirmed! 🎉', body_template: 'Your order #{{displayId}} is confirmed — ~{{minutes}} mins.', channels: ['push', 'whatsapp'] },
+    order_preparing:        { title_template: 'Chefs are cooking! 👨‍🍳', body_template: 'Your meal is being freshly prepared right now.', channels: ['push'] },
+    order_ready:            { title_template: 'Order Ready! 🛵', body_template: 'Your order is packed and a rider is on the way.', channels: ['push', 'whatsapp'] },
+    order_out_for_delivery: { title_template: '{{riderName}} is heading to you! 🛵', body_template: 'Your rider is on the way. OTP: {{otp}} — share only at door.', channels: ['push', 'whatsapp'] },
+    order_delivered:        { title_template: 'Delivered! 🎉', body_template: 'Your order has been delivered. Rate your experience!', channels: ['push', 'whatsapp'] },
+    order_cancelled:        { title_template: 'Order Cancelled', body_template: 'Order #{{displayId}} cancelled. ₹{{amount}} refunded to your wallet.', channels: ['push', 'whatsapp'] },
+    rider_payout:           { title_template: 'Payment Sent! 💰', body_template: '₹{{amount}} sent to {{upiId}} — great work today!', channels: ['push', 'whatsapp'] },
+    kitchen_payout:         { title_template: 'Settlement Done! 💰', body_template: '₹{{amount}} transferred to {{upiId}} for today\'s orders.', channels: ['push', 'whatsapp'] },
+    low_subscription_meals: { title_template: 'Low Meal Balance ⚠️', body_template: 'Only {{count}} meals left in your plan. Renew soon!', channels: ['push'] },
+    rider_verified:         { title_template: 'You\'re Approved! 🏍️', body_template: 'Your rider account is live. Go online and start earning!', channels: ['push', 'whatsapp'] },
+    broadcast_message:      { title_template: '{{title}}', body_template: '{{body}}', channels: ['push', 'whatsapp'] },
+    cash_submitted:         { title_template: 'Cash Submission', body_template: 'Rider {{riderName}} submitted ₹{{amount}} cash for Order #{{displayId}}.', channels: ['push'] },
+};
+
 // ─── Template cache ───────────────────────────────────────────────────────────
 
 async function loadTemplate(type: NotifType) {
     const key = `notif_tmpl:${type}`;
-    const cached = await redis.get(key);
+    const cached = await redis.get(key).catch(() => null);
     if (cached) return JSON.parse(cached);
 
-    const { rows } = await query(
-        'SELECT * FROM notification_templates WHERE type = $1 AND is_active = TRUE',
-        [type]
-    );
-    if (!rows.length) return null;
+    try {
+        const { rows } = await query(
+            'SELECT * FROM notification_templates WHERE type = $1 AND is_active = TRUE',
+            [type]
+        );
+        if (rows.length) {
+            await redis.setEx(key, TEMPLATE_CACHE_TTL, JSON.stringify(rows[0])).catch(() => {});
+            return rows[0];
+        }
+    } catch {
+        // notification_templates table might not exist yet (migration not run)
+    }
 
-    await redis.setEx(key, TEMPLATE_CACHE_TTL, JSON.stringify(rows[0]));
-    return rows[0];
+    // Fallback to hardcoded templates
+    const fallback = FALLBACK_TEMPLATES[type];
+    if (fallback) {
+        console.warn(`[NOTIF] Using fallback template for type=${type} — run migration 054 to use DB templates`);
+        return { ...fallback, whatsapp_template: fallback.body_template };
+    }
+    return null;
 }
 
 export async function bustTemplateCache(type: string) {
@@ -106,16 +135,23 @@ export async function sendNotification(type: NotifType, options: SendOptions): P
     const tasks: Promise<any>[] = [];
 
     // FCM mobile push
-    if (channels.includes('push') && prefs.push_enabled && user.device_token) {
-        tasks.push(
-            sendFCM(user.device_token, title, body, { type, ...vars })
-                .then((result: any) => {
-                    if (result === 'invalid_token') {
-                        return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
-                    }
-                })
-                .catch((err: any) => console.error('[NOTIF_FCM_ERR]', err.message))
-        );
+    if (channels.includes('push') && prefs.push_enabled) {
+        if (!user.device_token) {
+            console.warn(`[NOTIF] No device_token for user ${user.id} (${user.phone}) — skipping FCM push for type=${type}`);
+        } else {
+            console.log(`[NOTIF] Sending FCM type=${type} to user=${user.id} token=${(user.device_token as string).slice(0, 15)}…`);
+            tasks.push(
+                sendFCM(user.device_token, title, body, { type, ...vars })
+                    .then((result: any) => {
+                        console.log(`[NOTIF] FCM result=${result} type=${type} user=${user!.id}`);
+                        if (result === 'invalid_token') {
+                            console.warn(`[NOTIF] Stale token cleared for user=${user!.id}`);
+                            return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
+                        }
+                    })
+                    .catch((err: any) => console.error('[NOTIF_FCM_ERR]', err.message))
+            );
+        }
     }
 
     // Web-push (VAPID) — for browser customers
