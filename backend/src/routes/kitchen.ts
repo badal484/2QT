@@ -53,7 +53,7 @@ async function autoResumeIfExpired(kitchenId: string): Promise<void> {
 // Send FCM push to all registered "notify me" tokens for this kitchen
 async function notifyPauseWaiters(kitchenId: string): Promise<void> {
     const redisKey = `pause_notify:${kitchenId}`;
-    const tokens = await redis.smembers(redisKey);
+    const tokens = await redis.sMembers(redisKey);
     if (!tokens.length) return;
     await redis.del(redisKey);
     await Promise.allSettled(
@@ -558,7 +558,7 @@ router.post('/pause-notify', authenticate, async (req: AuthRequest, res) => {
     const { rows } = await query('SELECT is_paused FROM kitchens WHERE id = $1', [kitchenId]);
     if (!rows[0]?.is_paused) return res.json({ registered: false, reason: 'kitchen_not_paused' });
 
-    await redis.sadd(`pause_notify:${kitchenId}`, fcmToken);
+    await redis.sAdd(`pause_notify:${kitchenId}`, fcmToken);
     res.json({ registered: true });
 });
 
@@ -588,7 +588,7 @@ router.get('/analytics', authenticate, requireRole('kitchen_manager', 'super_adm
                 [kitchenId]),
             query(`SELECT oi.menu_item_name AS name,
                           SUM(oi.quantity)::int AS qty_sold,
-                          COALESCE(SUM(oi.quantity * oi.unit_price_paise),0)::int AS revenue_paise
+                          COALESCE(SUM(oi.quantity * oi.price_paise),0)::int AS revenue_paise
                    FROM order_items oi
                    JOIN orders o ON o.id = oi.order_id
                    WHERE o.kitchen_id=$1 AND o.status='delivered' AND o.updated_at>=$2
