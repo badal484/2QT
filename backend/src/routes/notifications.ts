@@ -3,6 +3,7 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { query } from '../db';
 import { redis } from '../redis';
 import { bustTemplateCache } from '../services/notification.service';
+import { sendFCM, isFCMConfigured } from '../services/fcm.service';
 import { z } from 'zod';
 import db from '../db';
 
@@ -218,6 +219,64 @@ router.get('/admin/log', authenticate, requireRole('super_admin', 'admin'), asyn
         params
     );
     res.json({ notifications: rows });
+});
+
+// ─── Debug: check notification pipeline for current user ─────────────────────
+
+router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+
+    const { rows: userRows } = await query(
+        'SELECT id, name, phone, device_token FROM users WHERE id = $1',
+        [userId]
+    );
+    const user = userRows[0];
+
+    const { rows: tmplRows } = await query(
+        "SELECT type, is_active FROM notification_templates WHERE type = 'order_confirmed'"
+    );
+
+    const { rows: prefRows } = await query(
+        'SELECT push_enabled FROM notification_preferences WHERE user_id = $1',
+        [userId]
+    );
+
+    res.json({
+        fcmConfigured: isFCMConfigured(),
+        deviceToken: user?.device_token
+            ? `${(user.device_token as string).slice(0, 20)}…` // truncated for security
+            : null,
+        hasDeviceToken: !!user?.device_token,
+        orderConfirmedTemplate: tmplRows[0] ?? 'NOT FOUND — run migration 054',
+        pushEnabled: prefRows[0]?.push_enabled ?? true,
+    });
+});
+
+// ─── Test: send a real FCM push to the current user ──────────────────────────
+
+router.post('/test-push', authenticate, async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { rows } = await query('SELECT device_token FROM users WHERE id = $1', [userId]);
+    const token = rows[0]?.device_token;
+
+    if (!token) {
+        return res.status(400).json({
+            error: 'NO_DEVICE_TOKEN',
+            message: 'No FCM token saved for this user. Open the app and allow notifications, then try again.',
+        });
+    }
+    if (!isFCMConfigured()) {
+        return res.status(500).json({ error: 'FCM_NOT_CONFIGURED', message: 'FIREBASE_SERVICE_ACCOUNT_JSON not set.' });
+    }
+
+    const result = await sendFCM(
+        token,
+        '🔔 Test Notification',
+        'FCM is working! You will now receive order updates.',
+        { type: 'broadcast_message' }
+    );
+
+    res.json({ result }); // 'ok' | 'invalid_token' | 'skipped'
 });
 
 export default router;
