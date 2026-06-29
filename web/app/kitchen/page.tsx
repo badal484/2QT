@@ -281,9 +281,9 @@ export default function KitchenPage() {
       const data = await api.get("/kitchen/orders");
       setOrders(data.orders || []);
       if (data.kitchen_name) {
-        setKitchenName(data.kitchen_name.toLowerCase());
+        setKitchenName(data.kitchen_name);
       } else if (data.orders && data.orders.length > 0 && data.orders[0].kitchen_name) {
-        setKitchenName(data.orders[0].kitchen_name.toLowerCase());
+        setKitchenName(data.orders[0].kitchen_name);
       }
       setError(null);
     } catch {

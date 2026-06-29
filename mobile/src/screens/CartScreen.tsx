@@ -172,6 +172,7 @@ const CartScreen = ({ navigation }: any) => {
 
   const busy = pricingFetching;
   const kitchenOpen = isKitchenOpen(menuData?.openingTime, menuData?.closingTime);
+  const kitchenPaused = !!menuData?.kitchenPaused;
   const openLabel = menuData?.openingTime ? formatTime12h(menuData.openingTime) : '10:00 AM';
   const totalItemCount = items.reduce((s, i) => s + i.quantity, 0);
 
@@ -546,8 +547,8 @@ const CartScreen = ({ navigation }: any) => {
           </View>
           
           <BouncingButton
-            style={[styles.footerCta, (busy || isOutOfZone || !kitchenOpen) && styles.placeOrderBtnDisabled]}
-            disabled={busy || isOutOfZone || !kitchenOpen}
+            style={[styles.footerCta, (busy || isOutOfZone || !kitchenOpen || kitchenPaused) && styles.placeOrderBtnDisabled]}
+            disabled={busy || isOutOfZone || !kitchenOpen || kitchenPaused}
             activeOpacity={0.88}
             onPress={() => {
               triggerHaptic();
@@ -580,11 +581,13 @@ const CartScreen = ({ navigation }: any) => {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.footerCtaText}>
-                {!kitchenOpen
-                  ? `Opens at ${openLabel}`
-                  : addressId
-                    ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay')
-                    : 'Select Address'}
+                {kitchenPaused
+                  ? 'Kitchen Paused'
+                  : !kitchenOpen
+                    ? `Opens at ${openLabel}`
+                    : addressId
+                      ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay')
+                      : 'Select Address'}
               </Text>
             )}
           </BouncingButton>
