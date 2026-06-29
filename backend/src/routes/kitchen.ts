@@ -346,7 +346,7 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
             FROM users u
             WHERE u.role IN ('rider','rider_captain') AND u.is_online = true
             ORDER BY u.name
-        `, [kitchenId]);
+        `);
 
         // Attach GPS from Redis (non-blocking — missing is fine)
         const ridersWithLocation = await Promise.all(
