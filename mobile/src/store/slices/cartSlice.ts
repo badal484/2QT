@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 
 // ... CartItem and CartState interfaces ...
 interface CartItem {
+  cartItemId?: string; // To uniquely identify identical items with different customizations
   menuItemId: string;
   name: string;
   pricePaise: number;
@@ -10,6 +11,8 @@ interface CartItem {
   photoUrl: string | null;
   isVeg: boolean;
   kitchenId: string;
+  customizations?: { group: string; option: string }[];
+  instructions?: string;
 }
 
 interface CartState {
@@ -65,26 +68,44 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
       addItem: (state, action: PayloadAction<CartItem>) => {
-        if (state.items.length > 0 && state.items[0].kitchenId !== action.payload.kitchenId) {
-          state.items = [action.payload];
+        const newItem = action.payload;
+        if (!newItem.cartItemId) {
+            newItem.cartItemId = `${newItem.menuItemId}-${Date.now()}`;
+        }
+        
+        if (state.items.length > 0 && state.items[0].kitchenId !== newItem.kitchenId) {
+          state.items = [newItem];
         } else {
-          const existing = state.items.find(i => i.menuItemId === action.payload.menuItemId);
+          // Find matching item by BOTH menuItemId and identical customizations/instructions
+          const existing = state.items.find(i => 
+            i.menuItemId === newItem.menuItemId && 
+            JSON.stringify(i.customizations || []) === JSON.stringify(newItem.customizations || []) &&
+            (i.instructions || '') === (newItem.instructions || '')
+          );
+          
           if (existing) {
-            existing.quantity += action.payload.quantity;
+            existing.quantity += newItem.quantity;
           } else {
-            state.items.push(action.payload);
+            state.items.push(newItem);
           }
         }
       },
       removeItem: (state, action: PayloadAction<string>) => {
-        state.items = state.items.filter(i => i.menuItemId !== action.payload);
+        // Now using cartItemId to remove
+        state.items = state.items.filter(i => (i.cartItemId || i.menuItemId) !== action.payload);
       },
-      setQuantity: (state, action: PayloadAction<{ menuItemId: string; quantity: number }>) => {
-        const item = state.items.find(i => i.menuItemId === action.payload.menuItemId);
+      setQuantity: (state, action: PayloadAction<{ cartItemId?: string; menuItemId?: string; quantity: number }>) => {
+        const item = state.items.find(i => 
+          (action.payload.cartItemId && (i.cartItemId || i.menuItemId) === action.payload.cartItemId) ||
+          (!action.payload.cartItemId && action.payload.menuItemId && i.menuItemId === action.payload.menuItemId)
+        );
         if (item) {
           item.quantity = action.payload.quantity;
           if (item.quantity <= 0) {
-            state.items = state.items.filter(i => i.menuItemId !== action.payload.menuItemId);
+            state.items = state.items.filter(i => 
+              !(action.payload.cartItemId && (i.cartItemId || i.menuItemId) === action.payload.cartItemId) &&
+              !(!action.payload.cartItemId && action.payload.menuItemId && i.menuItemId === action.payload.menuItemId)
+            );
           }
         }
       },
