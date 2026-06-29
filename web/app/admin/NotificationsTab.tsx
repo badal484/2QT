@@ -162,6 +162,7 @@ function BroadcastPanel() {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
   const [zones, setZones] = useState<{ id: string; name: string }[]>([]);
   const [zoneId, setZoneId] = useState("");
@@ -169,6 +170,21 @@ function BroadcastPanel() {
   useEffect(() => {
     api.get("/admin/zones").then((d: any) => setZones(d.zones ?? [])).catch(() => {});
   }, []);
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { url } = await api.uploadImage(file);
+      setImageUrl(url);
+    } catch {
+      toast.error("Image upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
 
   async function send() {
     if (!title.trim() || !message.trim()) return toast.error("Title and message required");
@@ -237,15 +253,17 @@ function BroadcastPanel() {
         <p className="text-xs text-zinc-600 mt-1">{message.length}/300 characters</p>
       </div>
       <div>
-        <label className="text-xs text-zinc-500 mb-1.5 block">Image URL <span className="text-zinc-600">(optional — shown as banner in notification)</span></label>
-        <input
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
-          placeholder="https://example.com/promo-banner.jpg"
-          value={imageUrl}
-          onChange={e => setImageUrl(e.target.value)}
-        />
-        {imageUrl.trim() && (
-          <img src={imageUrl} alt="preview" className="mt-2 rounded-lg w-full max-h-32 object-cover opacity-80" onError={e => (e.currentTarget.style.display = 'none')} />
+        <label className="text-xs text-zinc-500 mb-1.5 block">Image <span className="text-zinc-600">(optional — shown as banner in notification)</span></label>
+        <label className={`flex items-center gap-2 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-zinc-700 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+          {uploading ? <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" /> : <span className="text-zinc-400">📎</span>}
+          <span className="text-zinc-400">{uploading ? "Uploading…" : imageUrl ? "Change image" : "Upload image"}</span>
+          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+        </label>
+        {imageUrl && (
+          <div className="mt-2 relative">
+            <img src={imageUrl} alt="preview" className="rounded-lg w-full max-h-40 object-cover" />
+            <button onClick={() => setImageUrl("")} className="absolute top-1 right-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded-md hover:bg-black/80">Remove</button>
+          </div>
         )}
       </div>
       <button
