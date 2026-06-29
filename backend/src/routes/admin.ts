@@ -1377,7 +1377,7 @@ router.get('/partners/kitchens', authenticate, requireRole('super_admin', 'admin
 
 router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { name, commissionRate, upiId, zoneId, openingTime, closingTime,
+    const { name, commissionRate, upiId, zoneId,
             contactPhone, contactEmail, isActive, partnerNotes, partnerStatus } = req.body;
     if (partnerStatus && !['approved', 'suspended', 'none'].includes(partnerStatus)) {
         return res.status(400).json({ error: 'INVALID_PARTNER_STATUS' });
@@ -1389,17 +1389,14 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
                     name            = COALESCE($1, name),
                     commission_rate = COALESCE($2, commission_rate),
                     upi_id          = COALESCE($3, upi_id),
-                    opening_time    = COALESCE($4, opening_time),
-                    closing_time    = COALESCE($5, closing_time),
-                    contact_phone   = COALESCE($6, contact_phone),
-                    contact_email   = COALESCE($7, contact_email),
-                    is_active       = COALESCE($8, is_active),
-                    partner_notes   = COALESCE($9, partner_notes),
-                    partner_status  = COALESCE($10, partner_status),
+                    contact_phone   = COALESCE($4, contact_phone),
+                    contact_email   = COALESCE($5, contact_email),
+                    is_active       = COALESCE($6, is_active),
+                    partner_notes   = COALESCE($7, partner_notes),
+                    partner_status  = COALESCE($8, partner_status),
                     updated_at      = NOW()
-                WHERE id = $11
+                WHERE id = $9
             `, [name ?? null, commissionRate ?? null, upiId ?? null,
-                openingTime ?? null, closingTime ?? null,
                 contactPhone ?? null, contactEmail ?? null,
                 isActive ?? null, partnerNotes ?? null, partnerStatus ?? null, id]);
 
@@ -1420,9 +1417,9 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
 
         const { rows } = await query(`
             SELECT k.id, k.name, k.commission_rate, k.upi_id, k.is_active, k.is_partner,
-                   k.opening_time, k.closing_time, k.contact_phone, k.contact_email, k.address,
+                   k.partner_status, k.partner_notes, k.contact_phone, k.contact_email, k.address,
                    COALESCE(
-                     (SELECT json_build_object('id', z.id, 'name', z.name)
+                     (SELECT json_build_object('id', z.id, 'name', z.name, 'opening_time', z.opening_time, 'closing_time', z.closing_time)
                       FROM kitchen_zones kz JOIN zones z ON z.id = kz.zone_id
                       WHERE kz.kitchen_id = k.id LIMIT 1), NULL
                    ) AS zone

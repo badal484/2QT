@@ -93,7 +93,7 @@ export const initCrons = () => {
             try {
                 await withTransaction(async (client) => {
                     // 1. Find a suitable kitchen in the zone (for now, pick first one or based on load)
-                    const { rows: kitchens } = await client.query('SELECT id FROM kitchens WHERE zone_id = $1 AND is_active = true LIMIT 1', [s.zone_id]);
+                    const { rows: kitchens } = await client.query('SELECT id FROM kitchens WHERE zone_id = $1 AND is_active = true AND is_paused = false LIMIT 1', [s.zone_id]);
                     const kitchenId = kitchens[0]?.id;
                     if (!kitchenId) throw new Error('NO_KITCHEN_IN_ZONE');
 
