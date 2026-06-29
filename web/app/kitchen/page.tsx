@@ -401,7 +401,7 @@ export default function KitchenPage() {
                 {unassigned.map(order => {
                   const waited = minutesSince(order.created_at);
                   const isUrgent = waited > 10;
-                  const availableRiders = riders.filter(r => !r.active_orders || r.active_orders.length < 3);
+                  const availableRiders = riders;
 
                   return (
                     <motion.div
