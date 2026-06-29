@@ -96,6 +96,7 @@ export default function KitchenPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [kitchenName, setKitchenName] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [view, setView] = useState<"kds" | "dispatch">("kds");
 
@@ -128,6 +129,7 @@ export default function KitchenPage() {
     try {
       const data = await api.get("/kitchen/orders");
       setOrders(data.orders || []);
+      if (data.kitchen_name) setKitchenName(data.kitchen_name.toLowerCase());
       setError(null);
     } catch (err: any) {
       setError("Could not reach kitchen server.");
@@ -249,9 +251,9 @@ export default function KitchenPage() {
       <header className="border-b border-white/[0.05] bg-[#050505]/80 backdrop-blur-xl px-6 py-4 sticky top-0 z-50 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <Link href="/" className="text-3xl font-bold tracking-tight">
-              2QT<span className="text-brand-primary">.</span>{" "}
-              <span className="text-zinc-400 font-medium">Kitchen</span>
+            <Link href="/" className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              2QT<span className="text-brand-primary -ml-1">.</span>{" "}
+              <span className="text-zinc-400 font-medium">{kitchenName ? kitchenName : "Kitchen"}</span>
             </Link>
             {/* ── View toggle (Dispatch only for manager/super_admin) ── */}
             <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10">
@@ -529,7 +531,7 @@ export default function KitchenPage() {
                           <div className={`p-5 pb-4 border-b border-white/5 flex justify-between items-start ${col.bgAccent}`}>
                             <div>
                               <div className="text-zinc-500 text-[10px] font-bold tracking-[0.1em] mb-1.5 flex items-center gap-1.5">
-                                TICKET • {order.kitchen_name?.toLowerCase() || 'kitchen'}
+                                TICKET
                               </div>
                               <div className="text-2xl font-bold leading-none tracking-tight text-white">K-{displayId}</div>
                             </div>
