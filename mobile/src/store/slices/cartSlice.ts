@@ -11,7 +11,7 @@ interface CartItem {
   photoUrl: string | null;
   isVeg: boolean;
   kitchenId: string;
-  customizations?: { group: string; option: string }[];
+  customizations?: { group: string; option: string; photo_url?: string }[];
   instructions?: string;
 }
 
