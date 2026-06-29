@@ -13,8 +13,11 @@ function getApp(): App | null {
         return null;
     }
     try {
-        app = initializeApp({ credential: cert(JSON.parse(raw)) });
-        console.log('[FCM] Firebase Admin initialized');
+        const sa = JSON.parse(raw);
+        // Render stores \n as literal two chars; ensure real newlines in PEM key
+        if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+        app = initializeApp({ credential: cert(sa) });
+        console.log('[FCM] Firebase Admin initialized ✓');
     } catch (err) {
         console.error('[FCM] Init failed:', err);
     }
