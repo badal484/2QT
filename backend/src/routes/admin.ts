@@ -260,78 +260,68 @@ router.patch('/menu/:id/availability', authenticate, requireRole('super_admin', 
 });
 
 router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const { title, message, target, zoneId, segment, imageUrl, scheduledFor } = req.body;
-    
-    // 1. Fetch target users
-    let queryStr = 'SELECT DISTINCT phone FROM users WHERE is_active = true';
-    let baseWhere = 'u.is_active = true';
-    const params: any[] = [];
-    
-    // Build Segmentation
-    let segmentCondition = '';
-    if (segment === 'inactive_30_days') {
-        segmentCondition = " AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id AND o.created_at > NOW() - INTERVAL '30 days')";
-    } else if (segment === 'high_rollers') {
-        segmentCondition = " AND (SELECT COALESCE(SUM(total_amount_paise), 0) FROM orders o WHERE o.customer_id = u.id AND o.status = 'delivered') > 500000";
-    }
+    try {
+        const { title, message, target, zoneId, segment, imageUrl, scheduledFor } = req.body;
+        if (!title?.trim() || !message?.trim()) return res.status(400).json({ error: 'title and message required' });
 
-    if (target === 'riders') {
-        queryStr = 'SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = $1';
-        params.push('rider');
-        if (zoneId) {
-            queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
-        }
-    } else if (target === 'customers') {
-        if (zoneId) {
-            queryStr = `SELECT DISTINCT u.phone FROM users u JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = $1 AND a.zone_id = $2${segmentCondition}`;
-            params.push('customer', zoneId);
+        // Frontend sends segment as audience type ("all","zone","active_last_7")
+        // Backend legacy uses target ("customers","riders") + segment (behavioral filter)
+        // Normalise: treat segment as audience selector when target is absent
+        const audience = target || segment || 'all';
+        const params: any[] = [];
+        let queryStr = '';
+
+        if (audience === 'active_last_7' || audience === 'active') {
+            queryStr = `SELECT DISTINCT u.phone FROM users u
+                        WHERE u.is_active = true AND u.role = 'customer'
+                        AND EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id AND o.created_at > NOW() - INTERVAL '7 days')`;
+        } else if (audience === 'riders') {
+            queryStr = 'SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = $1';
+            params.push('rider');
+            if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
+        } else if (audience === 'customers') {
+            if (zoneId) {
+                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = $1 AND (u.zone_id = $2 OR a.zone_id = $2)`;
+                params.push('customer', zoneId);
+            } else {
+                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = $1`;
+                params.push('customer');
+            }
         } else {
-            queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = $1${segmentCondition}`;
-            params.push('customer');
+            // "all" or "zone"
+            if (zoneId) {
+                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                params.push(zoneId);
+            } else {
+                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true`;
+            }
         }
-    } else {
-        // all
-        if (zoneId) {
-            queryStr = `
-                SELECT DISTINCT u.phone FROM users u 
-                LEFT JOIN addresses a ON u.id = a.customer_id 
-                WHERE u.is_active = true 
-                AND (u.zone_id = $1 OR a.zone_id = $1)${segmentCondition}
-            `;
-            params.push(zoneId);
-        } else {
-            queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true${segmentCondition}`;
+
+        const { rows } = await query(queryStr, params);
+
+        // Track campaign (target_audience NOT NULL — use resolved audience label)
+        const status = scheduledFor && new Date(scheduledFor).getTime() > Date.now() ? 'scheduled' : 'completed';
+        await query(
+            `INSERT INTO marketing_campaigns (title, message, image_url, target_audience, zone_id, segment, scheduled_for, queued_count, status)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+            [title, message, imageUrl || null, audience, zoneId || null, segment || null, scheduledFor || null, rows.length, status]
+        );
+
+        // Fire notifications (fire-and-forget per user)
+        for (const user of rows) {
+            NotificationService.send('broadcast_message', {
+                phone: user.phone,
+                title,
+                body: message,
+            }).catch(() => {});
         }
+
+        console.log(`[ADMIN] Broadcast sent to ${rows.length} users (audience=${audience} zone=${zoneId}): ${title}`);
+        res.json({ success: true, count: rows.length });
+    } catch (err: any) {
+        console.error('[ADMIN] Broadcast error:', err.message);
+        res.status(500).json({ error: err.message });
     }
-
-    const { rows } = await query(queryStr, params);
-
-    // Track Campaign in DB
-    const status = scheduledFor && new Date(scheduledFor).getTime() > Date.now() ? 'scheduled' : 'completed';
-    await query(
-        `INSERT INTO marketing_campaigns (title, message, image_url, target_audience, zone_id, segment, scheduled_for, queued_count, status) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [title, message, imageUrl || null, target, zoneId || null, segment || null, scheduledFor || null, rows.length, status]
-    );
-
-    // Calculate delay if scheduled
-    let delay = 0;
-    if (scheduledFor) {
-        const ms = new Date(scheduledFor).getTime() - Date.now();
-        if (ms > 0) delay = ms;
-    }
-
-    // 2. Send notifications directly (no queue dependency)
-    for (const user of rows) {
-        NotificationService.send('broadcast_message', {
-            phone: user.phone,
-            title,
-            body: message,
-        }).catch(() => {});
-    }
-
-    console.log(`[ADMIN] Broadcast queued for ${rows.length} users (target: ${target}, segment: ${segment}): ${title}`);
-    res.json({ success: true, count: rows.length });
 });
 
 router.get('/broadcasts', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
@@ -751,7 +741,7 @@ router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), valid
                 tags = COALESCE($15, tags),
                 customization_groups = COALESCE($16::jsonb, customization_groups)
              WHERE id = $12 RETURNING *`,
-            [zone_id ?? null, kitchen_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null, station ?? null, photo_url ?? null, available ?? null, is_veg ?? null, is_egg ?? null, id, is_bestseller ?? null, is_new ?? null, tags ?? null, customization_groups ? JSON.stringify(customization_groups) : null]
+            [zone_id ?? null, kitchen_id ?? null, name ?? null, description ?? null, price_paise ?? null, category ?? null, station ?? null, photo_url ?? null, available ?? null, is_veg ?? null, is_egg ?? null, id, is_bestseller ?? null, is_new ?? null, tags ?? null, customization_groups ? (() => { console.log('SAVING CUST GROUPS:', JSON.stringify(customization_groups, null, 2)); return JSON.stringify(customization_groups); })() : null]
         );
 
         // Clear menu cache for all zones
