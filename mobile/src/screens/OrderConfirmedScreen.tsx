@@ -323,14 +323,18 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                     <Text style={styles.itemPrice}>₹{((item.price_paise * item.quantity) / 100).toFixed(0)}</Text>
                   </View>
                   {item.customizations && item.customizations.length > 0 && (
-                    <View style={{ marginTop: 4, marginBottom: 4, marginLeft: 30 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6, marginBottom: 6, marginLeft: 30 }}>
                       {item.customizations.map((c: any, idx: number) => (
-                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                        <View key={idx} style={{ 
+                          flexDirection: 'row', alignItems: 'center', 
+                          backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', 
+                          borderRadius: 8, padding: 4, paddingRight: 8 
+                        }}>
                           {!!c.photo_url && (
-                            <Image source={{ uri: c.photo_url }} style={{ width: 14, height: 14, borderRadius: 3, marginRight: 4, backgroundColor: '#f1f1f1' }} />
+                            <Image source={{ uri: c.photo_url }} style={{ width: 18, height: 18, borderRadius: 4, marginRight: 6, backgroundColor: '#f1f1f1' }} />
                           )}
-                          <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted }} numberOfLines={1}>
-                            + {c.group}: {c.option}
+                          <Text style={{ fontSize: 10, fontFamily: fontFamily.medium, color: colors.inkMuted }} numberOfLines={1}>
+                            {c.group}: <Text style={{ fontFamily: fontFamily.bold, color: colors.ink }}>{c.option}</Text>
                           </Text>
                         </View>
                       ))}
