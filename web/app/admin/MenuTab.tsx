@@ -705,17 +705,23 @@ export function MenuTab() {
                                     placeholder="Option name (e.g. Mild)"
                                     className="flex-1 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-sm font-medium text-white focus:outline-none focus:border-swish-green/50"
                                   />
-                                  <div className="relative w-28">
+                                  <div className="relative w-28 flex-shrink-0">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">₹</span>
                                     <input
                                       required
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      value={opt.price_paise ? opt.price_paise / 100 : 0}
+                                      value={opt._rawPrice !== undefined ? opt._rawPrice : (opt.price_paise ? opt.price_paise / 100 : "")}
                                       onChange={e => {
                                         const next = [...customizationGroups];
+                                        next[gIdx].options[oIdx]._rawPrice = e.target.value;
                                         next[gIdx].options[oIdx].price_paise = Math.round(parseFloat(e.target.value || "0") * 100);
+                                        setCustomizationGroups(next);
+                                      }}
+                                      onBlur={() => {
+                                        const next = [...customizationGroups];
+                                        delete next[gIdx].options[oIdx]._rawPrice;
                                         setCustomizationGroups(next);
                                       }}
                                       className="w-full pl-7 pr-3 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-sm font-medium text-white focus:outline-none focus:border-swish-green/50"
