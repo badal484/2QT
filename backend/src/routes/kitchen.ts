@@ -18,7 +18,7 @@ async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> 
 
 const router = Router();
 
-router.get('/menu', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/menu', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
 
@@ -37,7 +37,7 @@ router.get('/menu', authenticate, requireRole('chef', 'super_admin'), async (req
     });
 });
 
-router.patch('/status', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.patch('/status', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
 
@@ -54,7 +54,7 @@ router.patch('/status', authenticate, requireRole('chef', 'super_admin'), async 
     res.json({ success: true, isPaused: paused });
 });
 
-router.patch('/menu/:itemId/availability', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.patch('/menu/:itemId/availability', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const { itemId } = req.params;
     const { available } = req.body;
     
@@ -102,7 +102,10 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
 
     for (const order of rows) {
         const { rows: items } = await query(
-            'SELECT menu_item_name as name, quantity, price_paise, station FROM order_items WHERE order_id = $1',
+            `SELECT oi.menu_item_name as name, oi.quantity, oi.price_paise, COALESCE(m.category, oi.station) as station 
+             FROM order_items oi
+             LEFT JOIN menu_items m ON oi.menu_item_id = m.id
+             WHERE oi.order_id = $1`,
             [order.id]
         );
         order.items = items;
@@ -131,7 +134,7 @@ router.post('/orders/:id/claim', authenticate, requireRole('chef', 'super_admin'
     res.json({ success: true });
 });
 
-router.patch('/orders/:id/status', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
@@ -170,7 +173,7 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'super_admi
     }
 });
 
-router.get('/inventory', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/inventory', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
     const { rows } = await query(
@@ -181,7 +184,7 @@ router.get('/inventory', authenticate, requireRole('chef', 'super_admin'), async
     res.json({ inventory: rows });
 });
 
-router.patch('/inventory/:id', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.patch('/inventory/:id', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { current_stock } = req.body;
     const kitchenId = await getKitchenId(req, res);
