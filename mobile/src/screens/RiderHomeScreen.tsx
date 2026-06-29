@@ -83,11 +83,13 @@ const RiderHomeScreen = ({ navigation }: any) => {
     mutationFn: (orderId: string) => api.post(`/riders/orders/${orderId}/claim`, {}),
     onSuccess: () => {
       clearTimer();
+      import('react-native').then(({ Vibration }) => Vibration.cancel());
       setPendingOrder(null);
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
     },
     onError: (err: any) => {
+      import('react-native').then(({ Vibration }) => Vibration.cancel());
       setPendingOrder(null);
       if (err.message === 'RIDER_BUSY') {
         queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
@@ -106,21 +108,30 @@ const RiderHomeScreen = ({ navigation }: any) => {
   });
 
   // ── Incoming order notification slide ─────────────────────────────────────
-  const showNotification = (order: any, timeoutSeconds = 15) => {
+  const showNotification = (order: any, timeoutSeconds = 60) => {
     setPendingOrder(order);
     setCountdown(timeoutSeconds);
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 80 }).start();
+    
+    // Start continuous vibration alert (vibrate 1s, pause 1s)
+    import('react-native').then(({ Vibration }) => {
+      Vibration.vibrate([1000, 1000], true);
+    });
+
     startTimer(order._kitchenAssigned ? order.orderId : order.id, timeoutSeconds, order._kitchenAssigned);
   };
 
   const hideNotification = () => {
+    import('react-native').then(({ Vibration }) => {
+      Vibration.cancel();
+    });
     Animated.timing(slideAnim, { toValue: 400, useNativeDriver: true, duration: 250, easing: Easing.in(Easing.quad) }).start(() => {
       setPendingOrder(null);
     });
     clearTimer();
   };
 
-  const startTimer = (orderId: string, seconds = 15, kitchenAssigned = false) => {
+  const startTimer = (orderId: string, seconds = 60, kitchenAssigned = false) => {
     clearTimer();
     let count = seconds;
     countdownRef.current = setInterval(() => {
@@ -128,6 +139,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       setCountdown(count);
       if (count <= 0) {
         clearTimer();
+        import('react-native').then(({ Vibration }) => Vibration.cancel());
         if (kitchenAssigned) {
           unclaimMutation.mutate(orderId);
         } else {
