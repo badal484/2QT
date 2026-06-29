@@ -33,7 +33,7 @@ export function navigateFromNotification(data: Record<string, string>) {
     case 'order_out_for_delivery':
     case 'order_delivered':
     case 'order_cancelled':
-      if (orderId) navigateTo('OrderPlaced', { orderId });
+      if (orderId) navigateTo('OrderConfirmed', { orderId });
       break;
     case 'rating_reminder':
       if (orderId) navigateTo('RateOrder', { orderId });
