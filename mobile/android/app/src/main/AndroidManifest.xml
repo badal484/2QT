@@ -24,6 +24,14 @@
         android:name="com.google.android.geo.API_KEY"
         android:value="AIzaSyCwvUrO91u81DGsCr4YoJZWzrIC9Pr5kaA" />
 
+      <!-- FCM background notification defaults -->
+      <meta-data
+        android:name="com.google.firebase.messaging.default_notification_channel_id"
+        android:value="order_updates" />
+      <meta-data
+        android:name="com.google.firebase.messaging.default_notification_color"
+        android:resource="@color/notification_color" />
+
       <service
         android:name=".LocationForegroundService"
         android:foregroundServiceType="location"
