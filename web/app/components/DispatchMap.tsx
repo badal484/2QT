@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from "@react-google-maps/api";
 import { Loader2 } from "lucide-react";
-import { api } from "../lib/api";
 
 interface Location {
   lat: number;
@@ -243,25 +242,16 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
   );
 }
 
+const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+
 export default function DispatchMap({ riders }: DispatchMapProps) {
-  const [apiKey, setApiKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.get('/app/config/maps-key')
-      .then((data: any) => {
-        if (data.key) setApiKey(data.key);
-      })
-      .catch(console.error);
-  }, []);
-
-  if (!apiKey) {
+  if (!MAPS_KEY) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#17263c] rounded-2xl border border-white/5">
-        <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
-        <p className="text-white/60 font-medium text-sm">Loading map configuration...</p>
+        <p className="text-white/60 font-medium text-sm">Maps API key not configured</p>
       </div>
     );
   }
 
-  return <DispatchMapInner riders={riders} apiKey={apiKey} />;
+  return <DispatchMapInner riders={riders} apiKey={MAPS_KEY} />;
 }
