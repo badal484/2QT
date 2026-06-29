@@ -143,8 +143,8 @@ const CartScreen = ({ navigation }: any) => {
     gstPaise: 0,
     cgstPaise: 0,
     sgstPaise: 0,
-    totalAmountPaise: fallbackSubtotal,
-    gatewayAmountPaise: fallbackSubtotal,
+    totalAmountPaise: fallbackSubtotal + (riderTip * 100),
+    gatewayAmountPaise: fallbackSubtotal + (riderTip * 100),
     discountPaise: 0,
   };
   const subtotal = p.subtotalPaise / 100;
@@ -202,12 +202,17 @@ const CartScreen = ({ navigation }: any) => {
       >
         {/* Delivery Estimate */}
         <Animated.View entering={FadeInDown.duration(300)} style={styles.estimateCard}>
-          <View style={styles.estimateIconBox}>
-            <Star size={16} color={colors.success} fill={colors.success} />
+          <View style={[
+            styles.estimateIconBox, 
+            { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12 }
+          ]}>
+            <Text style={{ fontSize: 13, fontFamily: fontFamily.black, color: '#000', letterSpacing: -0.5 }}>
+              2QT<Text style={{ color: '#F97316' }}>.</Text>
+            </Text>
           </View>
-          <View>
-            <Text style={styles.estimateTitle}>15 minutes</Text>
-            <Text style={styles.estimateSub}>From our neighbourhood kitchens</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.estimateTitle}>2QT Promise</Text>
+            <Text style={styles.estimateSub}>Fresh food, delivered fast to your door.</Text>
           </View>
         </Animated.View>
 
@@ -443,9 +448,9 @@ const CartScreen = ({ navigation }: any) => {
 
         {/* Tip the Rider */}
         <Animated.View entering={FadeInDown.delay(120).duration(300)} style={styles.card}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
             <Heart size={18} color="#1B5E46" style={{ marginRight: 8 }} />
-            <Text style={styles.cardTitle}>Tip your delivery partner</Text>
+            <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Tip your delivery partner</Text>
           </View>
           <Text style={styles.tipSub}>100% of your tip goes directly to your rider. Thank you!</Text>
           <View style={styles.tipOptionsRow}>
@@ -500,6 +505,12 @@ const CartScreen = ({ navigation }: any) => {
             <View style={styles.billRow}>
               <Text style={[styles.billLabel, { color: '#22C55E' }]}>Discount ({appliedPromoCode})</Text>
               <Text style={[styles.billValue, { color: '#22C55E' }]}>−₹{p.discountPaise / 100}</Text>
+            </View>
+          )}
+          {riderTip > 0 && (
+            <View style={styles.billRow}>
+              <Text style={styles.billLabel}>Delivery Partner Tip</Text>
+              <Text style={styles.billValue}>₹{riderTip}</Text>
             </View>
           )}
 

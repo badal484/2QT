@@ -705,7 +705,7 @@ function FleetTab() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {onlineRiders.map(r => {
-                const onDelivery = !!r.current_order_id;
+                const onDelivery = r.active_orders && r.active_orders.length > 0;
                 return (
                 <div key={r.id} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[24px] p-6 shadow-2xl shadow-black/40 hover:shadow-2xl hover:shadow-black/60 transition-all relative overflow-hidden">
                   {onDelivery && (
@@ -730,7 +730,10 @@ function FleetTab() {
                     <div className="bg-white/[0.02] backdrop-blur-lg rounded-xl p-4 border border-white/10">
                       <div className="flex items-center justify-between">
                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Current Order</span>
-                         <span className="font-black text-sm text-white">{r.active_order_display_id || r.current_order_id?.slice(0, 8)}</span>
+                       <span className="font-black text-sm text-white">
+                         {onDelivery ? `(${r.active_orders.length})` : ''}
+                         {r.active_orders?.[0]?.display_id || ''}
+                       </span>
                       </div>
                     </div>
                   ) : (

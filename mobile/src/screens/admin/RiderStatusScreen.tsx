@@ -81,13 +81,13 @@ const RiderStatusScreen = ({ navigation }: any) => {
                 <View>
                   <Text style={styles.missionLabel}>Operational Load</Text>
                   <View style={styles.missionStatus}>
-                     <Navigation size={12} color={rider.current_order_id ? "#1A1A2E" : "#D1D5DB"} />
-                     <Text style={[styles.missionText, { color: rider.current_order_id ? '#1A1A2E' : '#D1D5DB' }]}>
-                        {rider.current_order_id ? `Active Job: ${rider.active_order_display_id}` : 'Holding Position'}
+                     <Navigation size={12} color={(rider.active_orders && rider.active_orders.length > 0) ? "#1A1A2E" : "#D1D5DB"} />
+                     <Text style={[styles.missionText, { color: (rider.active_orders && rider.active_orders.length > 0) ? '#1A1A2E' : '#D1D5DB' }]}>
+                        {(rider.active_orders && rider.active_orders.length > 0) ? `Active Jobs: ${rider.active_orders.length}` : 'Holding Position'}
                      </Text>
                   </View>
                 </View>
-                {rider.current_order_id && (
+                {(rider.active_orders && rider.active_orders.length > 0) && (
                   <View style={styles.transitBadge}>
                     <Text style={styles.transitText}>In Transit</Text>
                   </View>

@@ -2200,7 +2200,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const SLAT_COUNT = 6;
+
 
 const ClosedBottomSheet = ({
   openingTime,
@@ -2246,19 +2246,20 @@ const ClosedBottomSheet = ({
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 8 && Math.abs(dy) > Math.abs(dx),
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 0 && Math.abs(dy) > Math.abs(dx),
       onPanResponderMove: (_, { dy }) => {
         if (dy > 0) translateY.setValue(dy);
       },
       onPanResponderRelease: (_, { dy, vy }) => {
-        if (dy > 80 || vy > 0.5) {
+        if (dy > 50 || vy > 0.3) {
           RNAnimated.timing(translateY, {
             toValue: sheetHeight,
-            duration: 220,
+            duration: 150,
             useNativeDriver: true,
           }).start(() => onDismiss());
         } else {
-          RNAnimated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+          RNAnimated.spring(translateY, { toValue: 0, tension: 100, friction: 12, useNativeDriver: true }).start();
         }
       },
     })
@@ -2273,15 +2274,12 @@ const ClosedBottomSheet = ({
       <View style={closedSS.dragHandle} />
 
       <View style={closedSS.content}>
-        {/* Roller shutter illustration */}
-        <View style={closedSS.shutterBox}>
-          <View style={closedSS.rail} />
-          {Array.from({ length: SLAT_COUNT }).map((_, i) => (
-            <View key={i} style={closedSS.slat} />
-          ))}
-          <View style={closedSS.rail} />
-          <View style={closedSS.shutterHandle} />
-        </View>
+        {/* Closed store image */}
+        <Image
+          source={require('../images/closed_store.png')}
+          style={{ width: 250, height: 180, marginBottom: 24 }}
+          resizeMode="contain"
+        />
 
         <Text style={closedSS.title}>Closed for Now, Back Soon!</Text>
 
@@ -2343,18 +2341,7 @@ const closedSS = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shutterBox: {
-    width: 170,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    marginBottom: 20,
-  },
-  rail: { height: 9, backgroundColor: '#9CA3AF' },
-  slat: { height: 15, backgroundColor: '#E5E7EB', borderBottomWidth: 1, borderBottomColor: '#9CA3AF' },
-  shutterHandle: { alignSelf: 'center', width: 44, height: 7, backgroundColor: '#6B7280', borderRadius: 4, marginVertical: 5 },
+
   title: {
     fontSize: 22,
     fontFamily: fontFamily.black,

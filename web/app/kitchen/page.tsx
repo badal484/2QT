@@ -60,10 +60,7 @@ interface LiveRider {
   id: string;
   name: string;
   phone: string;
-  current_order_id: string | null;
-  order_status: string | null;
-  order_display_id: string | null;
-  delivery_address: string | null;
+  active_orders: { id: string; display_id: string; status: string; delivery_address: string }[] | null;
   location: { lat: number; lng: number; updatedAt: string } | null;
 }
 
@@ -238,8 +235,8 @@ export default function KitchenPage() {
     }
   };
 
-  const idleRiders = riders.filter(r => !r.current_order_id);
-  const busyRiders = riders.filter(r => !!r.current_order_id);
+  const idleRiders = riders.filter(r => !r.active_orders || r.active_orders.length === 0);
+  const busyRiders = riders.filter(r => r.active_orders && r.active_orders.length > 0);
 
   const activeCount = orders.filter(o => ["confirmed", "preparing"].includes(o.status)).length;
   const currentTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -353,19 +350,24 @@ export default function KitchenPage() {
                   <div className="flex items-center gap-3 mb-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
                     <span className="font-black text-white">{rider.name}</span>
-                    <span className="ml-auto text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">DELIVERING</span>
+                    <span className="ml-auto text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                      DELIVERING ({rider.active_orders?.length || 0})
+                    </span>
                   </div>
                   <p className="text-zinc-500 text-xs">{rider.phone}</p>
-                  {rider.order_display_id && (
-                    <p className="text-amber-400/70 text-xs mt-2 font-bold">
-                      Order #{rider.order_display_id}
-                    </p>
-                  )}
-                  {rider.delivery_address && (
-                    <p className="text-zinc-600 text-xs mt-1 flex items-center gap-1 line-clamp-2">
-                      <MapPin className="w-3 h-3 shrink-0" />{rider.delivery_address}
-                    </p>
-                  )}
+                  
+                  {rider.active_orders?.map((order, idx) => (
+                    <div key={order.id} className="mt-3 border-t border-amber-500/10 pt-2">
+                      <p className="text-amber-400/70 text-xs font-bold">
+                        Order #{order.display_id} <span className="text-zinc-500 text-[10px] ml-1 uppercase">{order.status.replace(/_/g, ' ')}</span>
+                      </p>
+                      {order.delivery_address && (
+                        <p className="text-zinc-600 text-xs mt-1 flex items-start gap-1 line-clamp-2">
+                          <MapPin className="w-3 h-3 shrink-0 mt-0.5" />{order.delivery_address}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -399,7 +401,7 @@ export default function KitchenPage() {
                 {unassigned.map(order => {
                   const waited = minutesSince(order.created_at);
                   const isUrgent = waited > 10;
-                  const availableRiders = idleRiders;
+                  const availableRiders = riders.filter(r => !r.active_orders || r.active_orders.length < 3);
 
                   return (
                     <motion.div

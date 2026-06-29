@@ -53,10 +53,10 @@ router.post('/location', authenticate, requireRole('rider', 'rider_captain', 'su
     const riderId = req.user!.userId;
     const zoneId = req.user!.zoneId;
 
-    // 1. Emit to customer order room immediately (non-blocking)
-    const { rows } = await query('SELECT current_order_id FROM users WHERE id = $1', [riderId]);
-    if (rows[0]?.current_order_id) {
-        emitToOrder(rows[0].current_order_id, 'rider_location', { lat, lng });
+    // 1. Emit to customer order rooms immediately (non-blocking)
+    const { rows } = await query("SELECT id FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered', 'cancelled')", [riderId]);
+    for (const row of rows) {
+        emitToOrder(row.id, 'rider_location', { lat, lng });
     }
 
     // 2. Persist location to Redis (fire-and-forget, 5 min TTL)
@@ -136,20 +136,15 @@ router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain',
         LEFT JOIN addresses a ON o.address_id = a.id
         LEFT JOIN kitchens k ON o.kitchen_id = k.id
         WHERE o.rider_id = $1 AND o.status NOT IN ('delivered', 'cancelled')
-        LIMIT 1
+        ORDER BY o.created_at ASC
     `, [riderId]);
 
-    if (rows[0]) {
-        const { rows: items } = await query('SELECT * FROM order_items WHERE order_id = $1', [rows[0].id]);
-        rows[0].items = items;
-        // Keep current_order_id in sync
-        await query('UPDATE users SET current_order_id = $1 WHERE id = $2 AND (current_order_id IS DISTINCT FROM $1)', [rows[0].id, riderId]);
-    } else {
-        // Auto-recover: no active order found — clear any stale current_order_id
-        await query('UPDATE users SET current_order_id = NULL WHERE id = $1 AND current_order_id IS NOT NULL', [riderId]);
+    for (const order of rows) {
+        const { rows: items } = await query('SELECT * FROM order_items WHERE order_id = $1', [order.id]);
+        order.items = items;
     }
 
-    res.json({ order: rows[0] || null });
+    res.json({ orders: rows });
 });
 
 router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
@@ -227,6 +222,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         if (updateRes.rowCount === 0) {
             throw new Error('ALREADY_DELIVERED');
         }
+        // Legacy compatibility
         await client.query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
         
         const isCOD = order.payment_method === 'cod';
@@ -407,10 +403,11 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
     try {
         await withTransaction(async (client) => {
             // 1. Check if rider is verified and already busy (with FOR UPDATE lock to prevent claim race conditions)
-            const { rows: rider } = await client.query('SELECT current_order_id, is_verified FROM users WHERE id = $1 FOR UPDATE', [riderId]);
+            const { rows: activeOrders } = await client.query("SELECT id FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered', 'cancelled')", [riderId]);
+            const { rows: rider } = await client.query('SELECT is_verified FROM users WHERE id = $1 FOR UPDATE', [riderId]);
             // In dev, skip verification check
             if (process.env.NODE_ENV !== 'development' && !rider[0]?.is_verified) throw new Error('RIDER_NOT_VERIFIED');
-            if (rider[0]?.current_order_id) throw new Error('RIDER_BUSY');
+            if (activeOrders.length >= 3) throw new Error('RIDER_BUSY');
 
             const { rowCount } = await client.query(
                 "UPDATE orders SET rider_id = $1 WHERE id = $2 AND rider_id IS NULL AND status = 'ready_for_pickup'",
@@ -418,8 +415,8 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
             );
             if (rowCount === 0) throw new Error('ORDER_UNAVAILABLE');
 
-            // 3. Update rider
-            await client.query('UPDATE users SET current_order_id = $1 WHERE id = $2', [id, riderId]);
+            // Legacy compatibility
+            await client.query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
         });
 
         // Notify customer — include rider info so buyer app updates immediately without waiting for next poll
@@ -469,7 +466,7 @@ router.post('/orders/:id/unclaim', authenticate, requireRole('rider', 'rider_cap
             );
             if (rowCount === 0) throw new Error('CANNOT_UNCLAIM');
 
-            // 3. Clear rider state
+            // Legacy compatibility
             await client.query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
         });
 

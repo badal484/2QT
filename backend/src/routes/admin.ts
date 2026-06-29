@@ -420,9 +420,17 @@ router.post('/rider-applications/:id/:action', authenticate, requireRole('super_
 
 router.get('/riders', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows: riders } = await query(`
-        SELECT u.id, u.name, u.phone, u.is_online, u.is_verified, u.current_order_id, o.display_id as active_order_display_id
+        SELECT u.id, u.name, u.phone, u.is_online, u.is_verified,
+               (
+                   SELECT json_agg(json_build_object(
+                       'id', o.id,
+                       'display_id', o.display_id,
+                       'status', o.status
+                   ))
+                   FROM orders o
+                   WHERE o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
+               ) as active_orders
         FROM users u
-        LEFT JOIN orders o ON u.current_order_id = o.id
         WHERE u.role IN ('rider', 'rider_captain')
     `);
 

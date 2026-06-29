@@ -52,7 +52,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
 
   if (__DEV__) console.log(`[API] ${fetchOptions.method} ${path}`);
   
-  const fetchWithTimeout = async (url: string, opts: any, timeout = options.timeout ?? 10000) => {
+  const fetchWithTimeout = async (url: string, opts: any, timeout = options.timeout ?? 30000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
