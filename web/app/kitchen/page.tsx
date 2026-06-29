@@ -232,6 +232,7 @@ export default function KitchenPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [kitchenName, setKitchenName] = useState<string | null>(null);
   const [view, setView] = useState<"kds" | "dispatch" | "manage">("kds");
   const [mobileKdsCol, setMobileKdsCol] = useState<KdsColId>("confirmed");
 
