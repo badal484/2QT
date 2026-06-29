@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Utensils, Plus, CheckCircle2, Camera, Edit3, XCircle } from "lucide-react";
+import { Search, Utensils, Plus, CheckCircle2, Camera, Edit3, XCircle, ImagePlus } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -639,7 +639,7 @@ export function MenuTab() {
                               {group.options.map((opt: any, oIdx: number) => (
                                 <div key={oIdx} className="flex items-center gap-3">
                                   {/* Option Image Upload */}
-                                  <div className="relative w-12 h-12 rounded-lg bg-white/[0.03] border border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden group">
+                                  <div className="relative w-11 h-11 rounded-lg bg-white/[0.02] border-2 border-dashed border-white/20 hover:border-swish-green/50 hover:bg-swish-green/5 flex-shrink-0 flex items-center justify-center overflow-hidden group transition-all">
                                     {opt.photo_url ? (
                                       <>
                                         <img src={opt.photo_url} alt="Option" className="w-full h-full object-cover" />
@@ -662,7 +662,7 @@ export function MenuTab() {
                                         {uploadingOptionImage?.gIdx === gIdx && uploadingOptionImage?.oIdx === oIdx ? (
                                           <div className="w-4 h-4 rounded-full border-2 border-swish-green border-t-transparent animate-spin" />
                                         ) : (
-                                          <Camera className="w-4 h-4 text-zinc-500" />
+                                          <ImagePlus className="w-4 h-4 text-zinc-500 group-hover:text-swish-green transition-colors" />
                                         )}
                                         <input
                                           type="file"
@@ -705,7 +705,7 @@ export function MenuTab() {
                                     placeholder="Option name (e.g. Mild)"
                                     className="flex-1 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-sm font-medium text-white focus:outline-none focus:border-swish-green/50"
                                   />
-                                  <div className="relative w-28 flex-shrink-0">
+                                  <div className="relative w-24 flex-shrink-0">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">₹</span>
                                     <input
                                       required
