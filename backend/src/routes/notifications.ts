@@ -269,14 +269,19 @@ router.post('/test-push', authenticate, async (req: AuthRequest, res: Response) 
         return res.status(500).json({ error: 'FCM_NOT_CONFIGURED', message: 'FIREBASE_SERVICE_ACCOUNT_JSON not set.' });
     }
 
-    const result = await sendFCM(
-        token,
-        '🔔 Test Notification',
-        'FCM is working! You will now receive order updates.',
-        { type: 'broadcast_message' }
-    );
-
-    res.json({ result }); // 'ok' | 'invalid_token' | 'skipped'
+    try {
+        const result = await sendFCM(
+            token,
+            '🔔 Test Notification',
+            'FCM is working! You will now receive order updates.',
+            { type: 'broadcast_message' }
+        );
+        console.log(`[TEST_PUSH] result=${result} userId=${userId} token=${(token as string).slice(0,15)}…`);
+        res.json({ result }); // 'ok' | 'invalid_token' | 'skipped'
+    } catch (err: any) {
+        console.error('[TEST_PUSH] FCM error:', err.message);
+        res.status(500).json({ error: 'FCM_SEND_FAILED', message: err.message });
+    }
 });
 
 export default router;

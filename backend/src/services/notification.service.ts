@@ -99,11 +99,15 @@ export async function sendNotification(type: NotifType, options: SendOptions): P
         return;
     }
 
-    // 2. Deduplicate within 60 s
+    // 2. Deduplicate within 60 s (non-fatal — skip dedup if Redis is down)
     if (dedupeKey) {
-        const dk = `notif:${user.id}:${type}:${dedupeKey}`;
-        if (await redis.get(dk)) return; // already sent
-        await redis.setEx(dk, 60, '1');
+        try {
+            const dk = `notif:${user.id}:${type}:${dedupeKey}`;
+            if (await redis.get(dk)) return; // already sent
+            await redis.setEx(dk, 60, '1');
+        } catch (e) {
+            console.warn('[NOTIF] Redis dedup failed (proceeding anyway):', (e as Error).message);
+        }
     }
 
     // 3. Load template
