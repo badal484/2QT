@@ -1,70 +1,89 @@
-import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { navigateFromNotification } from '../navigation/navigationRef';
 
-// ── Channel IDs (must match MainActivity.kt) ──────────────────────────────────
-export const CHANNELS = {
-  ORDER:    { id: 'order_updates',  name: 'Order Updates',  importance: AndroidImportance.HIGH },
-  PROMO:    { id: 'promotions',     name: 'Promotions',     importance: AndroidImportance.DEFAULT },
-  ACCOUNT:  { id: 'account',        name: 'Account',        importance: AndroidImportance.HIGH },
-} as const;
+// Lazy-load notifee so the app doesn't crash if native module isn't linked yet
+// (requires `npx react-native run-android` after installing @notifee/react-native)
+let _notifee: any = null;
+let _EventType: any = null;
+let _AndroidImportance: any = null;
+let _notifeeAvailable = false;
 
-// Pick the right channel based on notification type
+function loadNotifee() {
+  if (_notifeeAvailable || _notifee !== null) return _notifeeAvailable;
+  try {
+    const mod = require('@notifee/react-native');
+    _notifee = mod.default;
+    _EventType = mod.EventType;
+    _AndroidImportance = mod.AndroidImportance;
+    // Try calling a benign method to confirm native module is linked
+    _notifee.getBadgeCount();
+    _notifeeAvailable = true;
+  } catch {
+    console.warn('[Notifee] Native module not available — rebuild with npx react-native run-android');
+    _notifeeAvailable = false;
+  }
+  return _notifeeAvailable;
+}
+
 function channelForType(type: string): string {
-  if (type.startsWith('order_') || type === 'low_subscription_meals') return CHANNELS.ORDER.id;
-  if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet')) return CHANNELS.ACCOUNT.id;
-  return CHANNELS.PROMO.id;
+  if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates';
+  if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet')) return 'account';
+  return 'promotions';
 }
 
-// Create all Android channels — call once on app start
 export async function createNotificationChannels() {
-  await notifee.createChannel(CHANNELS.ORDER);
-  await notifee.createChannel(CHANNELS.PROMO);
-  await notifee.createChannel(CHANNELS.ACCOUNT);
+  if (!loadNotifee()) return;
+  try {
+    await _notifee.createChannel({ id: 'order_updates', name: 'Order Updates',   importance: _AndroidImportance.HIGH });
+    await _notifee.createChannel({ id: 'promotions',   name: 'Promotions',       importance: _AndroidImportance.DEFAULT });
+    await _notifee.createChannel({ id: 'account',      name: 'Account',          importance: _AndroidImportance.HIGH });
+  } catch (e) {
+    console.warn('[Notifee] createChannels failed:', e);
+  }
 }
 
-// Post a real system notification in the tray (foreground use)
 export async function displayLocalNotification(
   title: string,
   body: string,
   data: Record<string, string> = {}
 ) {
-  await notifee.displayNotification({
-    title,
-    body,
-    data,
-    android: {
-      channelId: channelForType(data.type ?? ''),
-      pressAction: { id: 'default' },
-      importance: AndroidImportance.HIGH,
-    },
-    ios: {
-      sound: 'default',
-      foregroundPresentationOptions: {
-        alert: true,
-        badge: true,
-        sound: true,
-        banner: true,
-        list: true,
+  if (!loadNotifee()) return;
+  try {
+    await _notifee.displayNotification({
+      title,
+      body,
+      data,
+      android: {
+        channelId: channelForType(data.type ?? ''),
+        pressAction: { id: 'default' },
+        importance: _AndroidImportance.HIGH,
       },
-    },
-  });
+      ios: {
+        sound: 'default',
+        foregroundPresentationOptions: { alert: true, badge: true, sound: true, banner: true, list: true },
+      },
+    });
+  } catch (e) {
+    console.warn('[Notifee] displayNotification failed:', e);
+  }
 }
 
-// Handle taps on notifee-posted notifications (foreground + background)
 export function setupNotifeeHandlers() {
-  // Foreground taps
-  notifee.onForegroundEvent(({ type, detail }) => {
-    if (type === EventType.PRESS) {
-      const data = (detail.notification?.data ?? {}) as Record<string, string>;
-      navigateFromNotification(data);
-    }
-  });
+  if (!loadNotifee()) return;
+  try {
+    _notifee.onForegroundEvent(({ type, detail }: any) => {
+      if (type === _EventType.PRESS) {
+        const data = (detail.notification?.data ?? {}) as Record<string, string>;
+        navigateFromNotification(data);
+      }
+    });
 
-  // Background / killed taps (must be called outside component)
-  notifee.onBackgroundEvent(async ({ type, detail }) => {
-    if (type === EventType.PRESS) {
-      const data = (detail.notification?.data ?? {}) as Record<string, string>;
-      navigateFromNotification(data);
-    }
-  });
+    _notifee.onBackgroundEvent(async ({ type, detail }: any) => {
+      if (type === _EventType.PRESS) {
+        const data = (detail.notification?.data ?? {}) as Record<string, string>;
+        navigateFromNotification(data);
+      }
+    });
+  } catch (e) {
+    console.warn('[Notifee] setupHandlers failed:', e);
+  }
 }
