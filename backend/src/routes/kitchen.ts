@@ -388,7 +388,6 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
         );
         if (!rider) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
         if (!rider.is_online) return res.status(409).json({ error: 'RIDER_OFFLINE' });
-        if (activeOrders.length >= 3) return res.status(409).json({ error: 'RIDER_BUSY', message: 'Rider cannot take more than 3 stacked orders.' });
 
         // Assign atomically — also guards that this order belongs to this kitchen
         const { rows: orderRows } = await query(
