@@ -11,6 +11,7 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../utils/kitchenHours';
 import { NetworkImage } from '../components/NetworkImage';
+import { CustomizationBottomSheet } from '../components/ui/CustomizationBottomSheet';
 import { EmptyState, SkeletonRow } from '../components/ui';
 
 import { colors } from '../theme/colors';
@@ -39,6 +40,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const [phIndex, setPhIndex] = useState(0);
   const [closedSheetDismissed, setClosedSheetDismissed] = useState(false);
+  const [activeCustomizationItem, setActiveCustomizationItem] = useState<any>(null);
 
   // If address has a zone use it; if address exists but has no zone, fall back to GPS zone
   const effectiveZoneId = zoneId || activeZoneId;
@@ -251,7 +253,15 @@ const HomeScreen = ({ navigation }: any) => {
     [],
   );
 
-  const handleAddToCart = useCallback((item: any) => {
+  const handleAddToCartWithCheck = useCallback((item: any) => {
+    if (item.customization_groups?.length > 0) {
+      setActiveCustomizationItem(item);
+    } else {
+      handleAddToCart(item, [], '');
+    }
+  }, []);
+
+  const handleAddToCart = useCallback((item: any, customizations: any[] = [], instructions: string = '') => {
     if (cartItems.length > 0 && cartItems[0].kitchenId !== item.kitchen_id) {
       Alert.alert(
         'Clear Cart?',
@@ -272,6 +282,8 @@ const HomeScreen = ({ navigation }: any) => {
                   photoUrl: item.photo_url,
                   isVeg: item.is_veg,
                   kitchenId: item.kitchen_id,
+                  customizations: customizations.length > 0 ? customizations : undefined,
+                  instructions: instructions || undefined,
                 }),
               );
             },
@@ -289,6 +301,8 @@ const HomeScreen = ({ navigation }: any) => {
           photoUrl: item.photo_url,
           isVeg: item.is_veg,
           kitchenId: item.kitchen_id,
+          customizations: customizations.length > 0 ? customizations : undefined,
+          instructions: instructions || undefined,
         }),
       );
     }
@@ -431,7 +445,7 @@ const HomeScreen = ({ navigation }: any) => {
                             </TouchableOpacity>
                           </View>
                         ) : (
-                          <TouchableOpacity style={styles.catPreviewAddBtn} onPress={() => handleAddToCart(mi)} activeOpacity={0.8}>
+                          <TouchableOpacity style={styles.catPreviewAddBtn} onPress={() => handleAddToCartWithCheck(mi)} activeOpacity={0.8}>
                             <Text style={styles.catPreviewAddText}>ADD</Text>
                           </TouchableOpacity>
                         )}
@@ -501,7 +515,7 @@ const HomeScreen = ({ navigation }: any) => {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <TouchableOpacity style={styles.homeGridAddBtn} onPress={() => handleAddToCart(menuItem)} activeOpacity={0.8}>
+                  <TouchableOpacity style={styles.homeGridAddBtn} onPress={() => handleAddToCartWithCheck(menuItem)} activeOpacity={0.8}>
                     <Text style={styles.homeGridAddBtnText}>ADD</Text>
                     <View style={styles.homeGridCustomiseBadge}><Text style={styles.homeGridCustomiseText}>Customise</Text></View>
                   </TouchableOpacity>
@@ -1169,6 +1183,17 @@ const HomeScreen = ({ navigation }: any) => {
           onDismiss={() => setClosedSheetDismissed(true)}
         />
       )}
+      
+      <CustomizationBottomSheet 
+        visible={!!activeCustomizationItem}
+        onClose={() => setActiveCustomizationItem(null)}
+        item={activeCustomizationItem}
+        onAddToCart={(customizations, instructions) => {
+          if (activeCustomizationItem) {
+            handleAddToCart(activeCustomizationItem, customizations, instructions);
+          }
+        }}
+      />
     </View>
   );
 };
@@ -1202,6 +1227,7 @@ const ExploreMenuBanner = React.memo(() => (
       <Text style={ebS.diamond}>◆</Text>
       <View style={ebS.ruleLine} />
     </View>
+    <View style={{ height: 24 }} />
   </View>
 ));
 

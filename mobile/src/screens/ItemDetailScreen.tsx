@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { NetworkImage } from '../components/NetworkImage';
+import { CustomizationBottomSheet } from '../components/ui/CustomizationBottomSheet';
 import { RootState } from '../store';
 import { addItem, setQuantity, clearCart } from '../store/slices/cartSlice';
 import { api } from '../api/client';
@@ -53,6 +54,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   const zoneId = useSelector((state: RootState) => state.cart.zoneId);
 
   const [showDetails, setShowDetails] = useState(false);
+  const [activeCustomizationItem, setActiveCustomizationItem] = useState<any>(null);
 
   const menuData = queryClient.getQueryData<any>(['menu', zoneId]);
   const relatedItems: any[] = (menuData?.items ?? [])
@@ -77,20 +79,30 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
     /serves|ml|g\b|kg/i.test(t),
   ) ?? item.tags?.[0];
 
-  const handleAdd = () => {
+  const handleAddWithCheck = (itemToAdd: any) => {
+    if (itemToAdd.customization_groups?.length > 0) {
+      setActiveCustomizationItem(itemToAdd);
+    } else {
+      handleAdd(itemToAdd, [], '');
+    }
+  };
+
+  const handleAdd = (itemToAdd: any, customizations: any[] = [], instructions: string = '') => {
     const doAdd = () =>
       dispatch(
         addItem({
-          menuItemId: item.id,
-          name: item.name,
-          pricePaise: item.price_paise,
+          menuItemId: itemToAdd.id,
+          name: itemToAdd.name,
+          pricePaise: itemToAdd.price_paise,
           quantity: 1,
-          photoUrl: item.photo_url,
-          isVeg: item.is_veg,
-          kitchenId: item.kitchen_id,
+          photoUrl: itemToAdd.photo_url,
+          isVeg: itemToAdd.is_veg,
+          kitchenId: itemToAdd.kitchen_id,
+          customizations: customizations.length > 0 ? customizations : undefined,
+          instructions: instructions || undefined,
         }),
       );
-    if (cartItems.length > 0 && cartItems[0].kitchenId !== item.kitchen_id) {
+    if (cartItems.length > 0 && cartItems[0].kitchenId !== itemToAdd.kitchen_id) {
       Alert.alert('Replace cart?', 'Your cart has items from a different kitchen.', [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -225,12 +237,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                           style={s.relatedAddBtn}
                           onPress={() => {
                             haptic();
-                            dispatch(addItem({
-                              menuItemId: ri.id, name: ri.name,
-                              pricePaise: ri.price_paise, quantity: 1,
-                              photoUrl: ri.photo_url, isVeg: ri.is_veg,
-                              kitchenId: ri.kitchen_id,
-                            }));
+                            handleAddWithCheck(ri);
                           }}
                           activeOpacity={0.85}
                         >
@@ -380,7 +387,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                 ) : (
                   <BouncingButton
                     style={s.addBtn}
-                    onPress={() => { haptic(); handleAdd(); }}
+                    onPress={() => { haptic(); handleAddWithCheck(item); }}
                     activeOpacity={0.88}
                   >
                     <Text style={s.addBtnText}>Add</Text>
@@ -391,6 +398,17 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
           </View>
         </View>
       </View>
+      
+      <CustomizationBottomSheet 
+        visible={!!activeCustomizationItem}
+        onClose={() => setActiveCustomizationItem(null)}
+        item={activeCustomizationItem}
+        onAddToCart={(customizations, instructions) => {
+          if (activeCustomizationItem) {
+            handleAdd(activeCustomizationItem, customizations, instructions);
+          }
+        }}
+      />
     </View>
   );
 };
