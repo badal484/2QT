@@ -32,7 +32,7 @@ const AdminOrderDetailScreen = ({ route, navigation }: any) => {
     enabled: !!orderId,
   });
 
-  const onlineRiders = ridersData?.riders?.filter((r: any) => r.is_online && !r.current_order_id) || [];
+  const onlineRiders = ridersData?.riders?.filter((r: any) => r.is_online && (!r.active_orders || r.active_orders.length === 0)) || [];
 
   const cancelMutation = useMutation({
     mutationFn: () => api.post(`/orders/${orderId}/cancel`, {}),

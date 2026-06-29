@@ -88,13 +88,13 @@ export const initSocket = (server: any) => {
                 //    blocked by Redis writes. DB query is cheap and non-failing.
                 try {
                     const { rows } = await query(
-                        'SELECT current_order_id FROM users WHERE id = $1',
+                        'SELECT id FROM orders WHERE rider_id = $1 AND status NOT IN (\'delivered\', \'cancelled\')',
                         [riderId]
                     );
-                    if (rows[0]?.current_order_id) {
-                        io.to(`order:${rows[0].current_order_id}`).emit('rider_location', {
+                    for (const row of rows) {
+                        io.to(`order:${row.id}`).emit('rider_location', {
                             lat: data.lat,
-                            lng: data.lng,
+                            lng: data.lng
                         });
                     }
                 } catch (_) {}
