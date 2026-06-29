@@ -326,14 +326,14 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6, marginBottom: 6, marginLeft: 30 }}>
                       {item.customizations.map((c: any, idx: number) => (
                         <View key={idx} style={{ 
-                          flexDirection: 'row', alignItems: 'center', 
+                          flexDirection: 'row', alignItems: 'center', flexShrink: 1,
                           backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', 
                           borderRadius: 8, padding: 4, paddingRight: 8 
                         }}>
                           {!!c.photo_url && (
                             <Image source={{ uri: c.photo_url }} style={{ width: 18, height: 18, borderRadius: 4, marginRight: 6, backgroundColor: '#f1f1f1' }} />
                           )}
-                          <Text style={{ fontSize: 10, fontFamily: fontFamily.medium, color: colors.inkMuted }} numberOfLines={1}>
+                          <Text style={{ fontSize: 10, fontFamily: fontFamily.medium, color: colors.inkMuted, flexShrink: 1 }} numberOfLines={1}>
                             {c.group}: <Text style={{ fontFamily: fontFamily.bold, color: colors.ink }}>{c.option}</Text>
                           </Text>
                         </View>
