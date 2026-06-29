@@ -12,7 +12,7 @@ import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, inte
 import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../utils/kitchenHours';
 import { NetworkImage } from '../components/NetworkImage';
 import { CustomizationBottomSheet } from '../components/ui/CustomizationBottomSheet';
-import { EmptyState, SkeletonRow } from '../components/ui';
+import { EmptyState, SkeletonRow, ActiveOrdersBottomSheet } from '../components/ui';
 
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
@@ -41,6 +41,7 @@ const HomeScreen = ({ navigation }: any) => {
   const [phIndex, setPhIndex] = useState(0);
   const [closedSheetDismissed, setClosedSheetDismissed] = useState(false);
   const [activeCustomizationItem, setActiveCustomizationItem] = useState<any>(null);
+  const [showActiveOrdersModal, setShowActiveOrdersModal] = useState(false);
 
   // If address has a zone use it; if address exists but has no zone, fall back to GPS zone
   const effectiveZoneId = zoneId || activeZoneId;
@@ -1149,7 +1150,11 @@ const HomeScreen = ({ navigation }: any) => {
             activeOpacity={0.8}
             onPress={() => {
               triggerHaptic();
-              navigation.navigate('OrderConfirmed', { orderId: primaryActiveOrder.id });
+              if (activeOrders.length > 1) {
+                setShowActiveOrdersModal(true);
+              } else {
+                navigation.navigate('OrderConfirmed', { orderId: primaryActiveOrder.id });
+              }
             }}
             style={styles.activeOrderPill}
           >
@@ -1157,7 +1162,9 @@ const HomeScreen = ({ navigation }: any) => {
               <View style={styles.activeOrderDotBase}>
                 <Animated.View style={[styles.activeOrderDotPulse, liveDotStyle]} />
               </View>
-              {primaryActiveOrder.status === 'out_for_delivery' ? (
+              {activeOrders.length > 1 ? (
+                <ShoppingBag size={16} color="#34D399" style={{ marginLeft: 6 }} />
+              ) : primaryActiveOrder.status === 'out_for_delivery' ? (
                 <Bike size={16} color="#34D399" style={{ marginLeft: 6 }} />
               ) : (
                 <ChefHat size={16} color="#FBBF24" style={{ marginLeft: 6 }} />
@@ -1165,19 +1172,33 @@ const HomeScreen = ({ navigation }: any) => {
             </View>
             <View style={styles.activeOrderTextContainer}>
               <Text style={styles.activeOrderTitle}>
-                {primaryActiveOrder.status === 'placed' ? 'Order Placed' :
+                {activeOrders.length > 1 ? `${activeOrders.length} Active Orders` :
+                 primaryActiveOrder.status === 'placed' ? 'Order Placed' :
                  primaryActiveOrder.status === 'accepted' ? 'Preparing food' :
                  primaryActiveOrder.status === 'preparing' ? 'Preparing food' :
                  primaryActiveOrder.status === 'ready' ? 'Ready for pickup' :
                  primaryActiveOrder.status === 'out_for_delivery' ? 'Arriving soon' : 'Active Order'}
               </Text>
-              <Text style={styles.activeOrderSubtitle}>View live tracking</Text>
+              <Text style={styles.activeOrderSubtitle}>
+                {activeOrders.length > 1 ? 'View all orders' : 'View live tracking'}
+              </Text>
             </View>
             <View style={styles.activeOrderArrow}>
               <ArrowRight size={16} color="#9CA3AF" />
             </View>
           </BouncingButton>
         </Animated.View>
+      )}
+
+      {activeOrders.length > 1 && (
+        <ActiveOrdersBottomSheet
+          visible={showActiveOrdersModal}
+          orders={activeOrders}
+          onClose={() => setShowActiveOrdersModal(false)}
+          onSelectOrder={(orderId) => {
+            navigation.navigate('OrderConfirmed', { orderId });
+          }}
+        />
       )}
 
       {!!effectiveZoneId && !isLoading && !!menuData && !closedSheetDismissed &&
