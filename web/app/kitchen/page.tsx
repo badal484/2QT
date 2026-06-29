@@ -78,9 +78,9 @@ function minutesSince(ts: string) {
 }
 
 const KDS_COLUMNS = [
-  { id: "confirmed", title: "NEW ORDERS", theme: "green", glowColor: "rgba(34,197,94,0.5)", borderColor: "border-green-500/20", textColor: "text-green-400", bgAccent: "bg-gradient-to-br from-green-500/10 to-transparent", buttonColor: "bg-green-500 text-black hover:bg-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)]" },
-  { id: "preparing", title: "PREPARING", theme: "amber", glowColor: "rgba(245,158,11,0.5)", borderColor: "border-amber-500/20", textColor: "text-amber-400", bgAccent: "bg-gradient-to-br from-amber-500/10 to-transparent", buttonColor: "bg-amber-500 text-black hover:bg-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]" },
-  { id: "ready_for_pickup", title: "READY", theme: "zinc", glowColor: "rgba(161,161,170,0.3)", borderColor: "border-white/10", textColor: "text-white", bgAccent: "bg-gradient-to-br from-white/5 to-transparent", buttonColor: "bg-zinc-700 text-white hover:bg-zinc-600" },
+  { id: "confirmed", title: "New Orders", borderColor: "border-green-500/30", indicatorColor: "bg-green-500", textColor: "text-green-500", bgAccent: "bg-[#141414]", buttonColor: "bg-green-600 text-white hover:bg-green-500" },
+  { id: "preparing", title: "Preparing", borderColor: "border-amber-500/30", indicatorColor: "bg-amber-500", textColor: "text-amber-500", bgAccent: "bg-[#141414]", buttonColor: "bg-amber-500 text-black hover:bg-amber-400" },
+  { id: "ready_for_pickup", title: "Ready", borderColor: "border-white/20", indicatorColor: "bg-white", textColor: "text-white", bgAccent: "bg-[#141414]", buttonColor: "bg-white text-black hover:bg-zinc-200" },
 ];
 
 function formatTime(minutes: number) {
@@ -498,10 +498,12 @@ export default function KitchenPage() {
             const colOrders = orders.filter(o => o.status === col.id);
             return (
               <div key={col.id} className="flex-1 flex flex-col min-w-0 max-w-[33%]">
-                {/* Column Header */}
-                <div className="mb-4">
-                  <h2 className={`text-3xl font-black tracking-tight ${col.textColor} mb-1`}>{col.title}</h2>
-                  <div className="text-zinc-500 font-semibold">{colOrders.length} tickets</div>
+                <div className="mb-5 px-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className={`w-2.5 h-2.5 rounded-full ${col.indicatorColor}`}></span>
+                    <h2 className="text-xl font-bold tracking-tight text-white">{col.title}</h2>
+                  </div>
+                  <div className="text-zinc-500 text-sm font-medium">{colOrders.length} tickets</div>
                 </div>
 
                 {/* Tickets Container */}
@@ -520,37 +522,33 @@ export default function KitchenPage() {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.9, y: -20 }}
                           key={order.id}
-                          className={`bg-[#111]/90 backdrop-blur-md rounded-2xl border ${col.borderColor} flex flex-col overflow-hidden relative shadow-2xl group transition-all hover:border-white/20`}
+                          className={`bg-[#0A0A0A] rounded-xl border border-white/10 flex flex-col overflow-hidden relative transition-all hover:border-white/20`}
                         >
-                          {/* Glowing Top Accent */}
-                          <div className={`absolute top-0 left-0 w-full h-1`} style={{ backgroundColor: col.textColor.replace('text-', '').split('-')[0], boxShadow: `0 0 15px ${col.glowColor}` }} />
-
                           {/* Ticket Header */}
-                          <div className={`p-5 pb-4 border-b border-white/[0.05] flex justify-between items-start ${col.bgAccent}`}>
+                          <div className={`p-5 pb-4 border-b border-white/5 flex justify-between items-start ${col.bgAccent}`}>
                             <div>
-                              <div className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1.5 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: col.glowColor.replace(/,\d+\.\d+\)/, ',1)') }}></span>
+                              <div className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] mb-1.5 flex items-center gap-1.5">
                                 Ticket
                               </div>
-                              <div className="text-4xl lg:text-5xl font-black leading-none tracking-tighter text-white drop-shadow-sm">K-{displayId}</div>
+                              <div className="text-2xl font-bold leading-none tracking-tight text-white">K-{displayId}</div>
                             </div>
                             <div className="text-right flex flex-col items-end pt-1">
-                              <div className={`text-3xl font-black tabular-nums leading-none tracking-tight ${isUrgent ? 'text-red-500 animate-pulse' : 'text-white/90'}`}>
+                              <div className={`text-xl font-bold tabular-nums leading-none tracking-tight ${isUrgent ? 'text-red-500' : 'text-zinc-300'}`}>
                                 {formatTime(elapsed)}
                               </div>
-                              {isUrgent && <div className="bg-red-500/20 text-red-500 text-[10px] px-2 py-0.5 rounded-sm font-black uppercase tracking-widest mt-2 border border-red-500/30">URGENT</div>}
+                              {isUrgent && <div className="bg-red-500/10 text-red-500 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest mt-2 border border-red-500/20">URGENT</div>}
                             </div>
                           </div>
 
                           {/* Ticket Items */}
-                          <div className="p-5 flex-1 flex flex-col gap-5">
+                          <div className="p-5 flex-1 flex flex-col gap-4">
                             {order.items.map((item, idx) => (
                               <div key={idx} className="flex items-start gap-4">
-                                <div className={`text-2xl font-black px-3 py-1 rounded-lg bg-white/5 border border-white/10 ${col.textColor}`}>
+                                <div className={`text-lg font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 ${col.textColor}`}>
                                   {item.quantity}x
                                 </div>
-                                <div className="pt-1">
-                                  <div className="text-2xl font-bold uppercase leading-tight tracking-tight text-white/90">{item.name}</div>
+                                <div className="pt-0.5">
+                                  <div className="text-lg font-semibold uppercase leading-tight tracking-tight text-zinc-100">{item.name}</div>
                                   {item.station && (
                                     <div className="text-zinc-500 text-[11px] font-black uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
                                       <ChefHat className="w-3.5 h-3.5" /> {item.station}
@@ -567,9 +565,9 @@ export default function KitchenPage() {
                               <button
                                 disabled={updatingId === order.id}
                                 onClick={() => updateStatus(order.id, "preparing")}
-                                className={`w-full py-4 rounded-xl text-xl font-black uppercase tracking-widest ${KDS_COLUMNS[0].buttonColor} transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3`}
+                                className={`w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider ${KDS_COLUMNS[0].buttonColor} transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
                               >
-                                {updatingId === order.id ? <div className="w-6 h-6 border-4 border-black border-t-transparent rounded-full animate-spin" /> : "START PREP"}
+                                {updatingId === order.id ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : "Start Prep"}
                               </button>
                             </div>
                           )}
@@ -579,16 +577,16 @@ export default function KitchenPage() {
                               <button
                                 disabled={updatingId === order.id}
                                 onClick={() => updateStatus(order.id, "ready_for_pickup")}
-                                className={`w-full py-4 rounded-xl text-xl font-black uppercase tracking-widest ${KDS_COLUMNS[1].buttonColor} transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3`}
+                                className={`w-full py-3 rounded-lg text-sm font-bold uppercase tracking-wider ${KDS_COLUMNS[1].buttonColor} transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
                               >
-                                {updatingId === order.id ? <div className="w-6 h-6 border-4 border-black border-t-transparent rounded-full animate-spin" /> : "MARK READY"}
+                                {updatingId === order.id ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : "Mark Ready"}
                               </button>
                             </div>
                           )}
                           
                           {order.status === "ready_for_pickup" && (
-                            <div className="m-4 mt-0 py-4 rounded-xl border border-white/10 bg-white/5 text-zinc-400 text-lg font-black uppercase tracking-widest text-center shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
-                              AWAITING RIDER
+                            <div className="m-4 mt-0 py-3 rounded-lg border border-white/5 bg-[#141414] text-zinc-400 text-sm font-bold uppercase tracking-wider text-center">
+                              Awaiting Rider
                             </div>
                           )}
                         </motion.div>
