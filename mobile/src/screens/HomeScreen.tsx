@@ -17,7 +17,7 @@ import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { radius, spacing } from '../theme/spacing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { registerDeviceToken, subscribeToTokenRefresh } from '../services/push';
+import { registerDeviceToken, subscribeToTokenRefresh, getCurrentDeviceToken } from '../services/push';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -1158,10 +1158,14 @@ const HomeScreen = ({ navigation }: any) => {
         </Animated.View>
       )}
 
-      {!isKitchenOpen(menuData?.openingTime, menuData?.closingTime) &&
-        !!effectiveZoneId && !isLoading && !!menuData && !closedSheetDismissed && (
+      {!!effectiveZoneId && !isLoading && !!menuData && !closedSheetDismissed &&
+        (!isKitchenOpen(menuData?.openingTime, menuData?.closingTime) || menuData?.kitchenPaused) && (
         <ClosedBottomSheet
           openingTime={menuData.openingTime}
+          paused={menuData.kitchenPaused}
+          pauseReason={menuData.pauseReason}
+          pauseUntil={menuData.pauseUntil}
+          kitchenId={menuData.kitchenId}
           onDismiss={() => setClosedSheetDismissed(true)}
         />
       )}
