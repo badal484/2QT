@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, Dimensions, ActivityIndicator, Image, RefreshControl, Animated as RNAnimated, PanResponder } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
@@ -624,22 +625,31 @@ const HomeScreen = ({ navigation }: any) => {
         {/* ROW 2: Search Bar with VEG toggle */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {/* Gradient border wrapper */}
+            <LinearGradient
+              colors={['#22C55E', '#16A34A', '#15803D']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                flex: 1,
+                borderRadius: 10,
+                padding: 1.5,
+                shadowColor: '#22C55E',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.18,
+                shadowRadius: 8,
+                elevation: 3,
+              }}
+            >
             <View style={{
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
               backgroundColor: colors.surface,
-              borderRadius: 20,
+              borderRadius: 9,
               paddingLeft: 10,
               paddingRight: 6,
-              height: 42,
-              shadowColor: colors.ink,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.04,
-              shadowRadius: 16,
-              elevation: 4,
-              borderWidth: 1,
-              borderColor: colors.border,
+              height: 44,
             }}>
               <Search size={16} color={colors.inkMuted} style={{ marginRight: 6, flexShrink: 0 }} />
               <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
@@ -757,6 +767,7 @@ const HomeScreen = ({ navigation }: any) => {
                 </View>
               )}
             </View>
+            </LinearGradient>
 
             {/* 2QT brand mark */}
             <View style={{ alignItems: 'center', justifyContent: 'center', paddingRight: 2, flexShrink: 0 }}>
