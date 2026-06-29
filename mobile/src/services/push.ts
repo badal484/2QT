@@ -18,14 +18,24 @@ function getMessaging() {
 
 export async function registerDeviceToken() {
     const msg = getMessaging();
-    if (!msg) return;
+    if (!msg) {
+        console.warn('[PUSH] Firebase messaging module not available');
+        return;
+    }
     try {
         const authStatus = await msg.requestPermission();
-        if (authStatus < 1) return;
+        console.log('[PUSH] Permission status:', authStatus);
+        if (authStatus < 1) {
+            console.warn('[PUSH] Notification permission not granted (status=' + authStatus + ')');
+            return;
+        }
         const token = await msg.getToken();
+        console.log('[PUSH] Got FCM token:', token ? token.slice(0, 20) + '…' : 'null');
         if (token) {
             await api.patch('/notifications/device-token', { token });
-            console.log('[PUSH] Device token registered');
+            console.log('[PUSH] Device token saved to backend ✓');
+        } else {
+            console.warn('[PUSH] FCM getToken() returned null — check Google Play Services');
         }
     } catch (err) {
         console.warn('[PUSH] Token registration failed:', err);
