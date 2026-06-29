@@ -116,7 +116,6 @@ export function MenuTab() {
       {filtered.map(item => (
         <motion.div
           key={item.id}
-          layout
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className={`group relative rounded-[24px] overflow-hidden cursor-pointer border transition-all shadow-2xl shadow-black/40 ${
