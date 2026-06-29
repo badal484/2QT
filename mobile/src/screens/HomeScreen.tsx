@@ -2221,9 +2221,9 @@ const ClosedBottomSheet = ({
   const opensVerySoon = minsLeft > 0 && minsLeft <= 30;
   const openLabel = openingTime ? formatTime12h(openingTime) : '10:00 AM';
 
-  // Sheet sits just below the sticky header
+  // Sheet sits flush below the sticky header, above everything else
   const headerHeight = Math.max(insets.top + 8, 12) + 116;
-  const sheetHeight = SCREEN_HEIGHT - headerHeight - 12;
+  const sheetHeight = SCREEN_HEIGHT - headerHeight;
 
   const translateY = useRef(new RNAnimated.Value(sheetHeight)).current;
 
@@ -2266,7 +2266,7 @@ const ClosedBottomSheet = ({
 
   return (
     <RNAnimated.View
-      style={[closedSS.sheet, { height: sheetHeight, transform: [{ translateY }] }]}
+      style={[closedSS.sheet, { top: headerHeight, height: sheetHeight, transform: [{ translateY }] }]}
       {...panResponder.panHandlers}
     >
       {/* Drag handle */}
@@ -2314,13 +2314,12 @@ const ClosedBottomSheet = ({
 const closedSS = StyleSheet.create({
   sheet: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    zIndex: 50,
+    zIndex: 1100,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingHorizontal: 24,
     paddingTop: 12,
     alignItems: 'center',
