@@ -141,6 +141,9 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
     hasStartedRef.current = true;
 
     const boot = async () => {
+      // Enforce minimum splash screen duration to allow premium animations to play
+      const minimumSplashTime = new Promise((resolve) => setTimeout(resolve, 3000));
+
       // Wake Render free-tier backend immediately in background — doesn't block boot
       fetch('https://twoqt.onrender.com/api/v1/menu/zones').catch(() => {});
 
@@ -184,6 +187,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
           // Check: if serviceabilityStatus is still 'checking' after GPS attempt, something failed.
           // We dispatch network_error here as a safe fallback.
         }
+        await minimumSplashTime;
         setIsBooted(true);
         return;
       }
@@ -194,6 +198,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
       try {
         await runGpsZoneCheck(/* isSilent= */ false);
       } finally {
+        await minimumSplashTime;
         setIsBooted(true);
       }
     };
