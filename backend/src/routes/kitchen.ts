@@ -395,6 +395,16 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
                    ORDER BY date ASC`, [kitchenId]),
         ]);
 
+        // Pad the 7-day trend array so the chart always renders
+        const trendData = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(todayStart);
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const found = trendRows.rows.find((r: any) => new Date(r.date).toISOString().split('T')[0] === dateStr);
+            trendData.push({ date: dateStr, net: found ? parseInt(found.net) : 0 });
+        }
+
         res.json({
             kitchen: kitchen.rows[0],
             today: todayRows.rows[0],
@@ -403,7 +413,7 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
             allTime: allRows.rows[0],
             payouts: payoutRows.rows,
             recentOrders: recentOrders.rows,
-            trend: trendRows.rows,
+            trend: trendData,
         });
     } catch (err) {
         console.error('[kitchen/my-earnings]', err);
