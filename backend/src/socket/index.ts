@@ -47,7 +47,7 @@ export const initSocket = (server: any) => {
         // Join rooms
         socket.join(`user:${user.userId}`);
         
-        if (user.role === 'chef' || user.role === 'super_admin' || user.role === 'partner_kitchen') {
+        if (user.role === 'chef' || user.role === 'super_admin' || user.role === 'partner_kitchen' || user.role === 'kitchen_manager') {
             if (user.kitchenId) socket.join(`kitchen:${user.kitchenId}`);
         }
 

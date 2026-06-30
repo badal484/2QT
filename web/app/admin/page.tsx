@@ -98,7 +98,17 @@ function OverviewTab() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { 
+    load(); 
+    socket.on("new_order", load);
+    socket.on("order_status_update", load);
+    socket.on("order_cancelled", load);
+    return () => {
+      socket.off("new_order", load);
+      socket.off("order_status_update", load);
+      socket.off("order_cancelled", load);
+    };
+  }, [load]);
 
   const rev = (stats?.todayRevenuePaise ?? 0) / 100;
   const revData = [45, 60, 40, 80, 55, 90, rev > 0 ? 100 : 30]; // 7 days data
@@ -296,7 +306,17 @@ function OrdersTab() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    load(); 
+    socket.on("new_order", load);
+    socket.on("order_status_update", load);
+    socket.on("order_cancelled", load);
+    return () => {
+      socket.off("new_order", load);
+      socket.off("order_status_update", load);
+      socket.off("order_cancelled", load);
+    };
+  }, []);
 
   const handleCancelClick = (id: string) => {
     setConfirmDialog({ isOpen: true, id });
@@ -364,7 +384,7 @@ function OrdersTab() {
             <div key={order.id} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[28px] p-6 shadow-2xl shadow-black/40 hover:border-white/10 transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white/[0.02] backdrop-blur-lg border border-white/10 flex items-center justify-center font-black text-base text-white">
+                  <div className="px-4 h-12 shrink-0 whitespace-nowrap rounded-2xl bg-white/[0.02] backdrop-blur-lg border border-white/10 flex items-center justify-center font-black text-base text-white">
                     #{order.display_id}
                   </div>
                   <div>

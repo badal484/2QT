@@ -21,6 +21,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState("");
   const [loading, setLoading] = useState(false);
 
   const sendOTP = async (e: React.FormEvent) => {
@@ -29,9 +30,13 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
     if (digits.length < 10) return toast.error("Enter a valid phone number");
     setLoading(true);
     try {
-      await api.sendOtp(digits);
+      const data = await api.sendOtp(digits);
       setStep("otp");
       toast.success("OTP sent");
+      if (data?.devOtp) {
+        setOtp(data.devOtp);
+        setDevOtp(data.devOtp);
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to send OTP");
     } finally { setLoading(false); }
@@ -96,11 +101,17 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
                   <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="• • • • • •"
                     className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[#F97316]/50 placeholder:text-white/20 tracking-[0.4em] text-center font-mono text-lg" />
                 </div>
+                {devOtp && (
+                  <div className="px-4 py-3 rounded-xl bg-[#F97316]/10 border border-[#F97316]/20 text-center">
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Dev Mode OTP</p>
+                    <p className="text-xl font-mono text-[#F97316] tracking-widest">{devOtp}</p>
+                  </div>
+                )}
                 <button type="submit" disabled={loading || otp.length < 4}
                   className="w-full py-3.5 rounded-xl bg-[#F97316] text-white font-black text-sm hover:bg-[#ea6c08] transition-colors disabled:opacity-40">
                   {loading ? "Verifying..." : "Verify & Sign In"}
                 </button>
-                <button type="button" onClick={() => { setStep("phone"); setOtp(""); }} className="w-full text-xs text-white/30 hover:text-white/60 transition-colors">
+                <button type="button" onClick={() => { setStep("phone"); setOtp(""); setDevOtp(""); }} className="w-full text-xs text-white/30 hover:text-white/60 transition-colors">
                   ← Change number
                 </button>
               </motion.form>
