@@ -58,6 +58,9 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
       
       if (data && data.length > 0) {
         toast.info(`Found: ${data[0].display_name}. Please drop points manually.`);
+        if (data[0].lat && data[0].lng && mapInstance) {
+          mapInstance.flyTo([Number(data[0].lat), Number(data[0].lng)], 14, { animate: true, duration: 1.5 });
+        }
       } else {
         toast.error("Location not found. Try a different search.");
       }

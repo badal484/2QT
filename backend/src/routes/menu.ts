@@ -21,7 +21,7 @@ router.get('/geocode/search', async (req, res) => {
         // Use Google Places when key is available, otherwise fall back to Nominatim
         if (apiKey) {
             try {
-                const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&components=country:in&key=${apiKey}`;
+                const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(q)}&components=country:in&key=${apiKey}`;
                 const response = await fetch(url, { 
                     headers: { 'Referer': req.headers.origin || req.headers.referer || 'https://2-qt.vercel.app/' },
                     signal: AbortSignal.timeout(3000) 
@@ -30,9 +30,11 @@ router.get('/geocode/search', async (req, res) => {
                 
                 if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
                     res.set('Cache-Control', 'public, max-age=60');
-                    return res.json((data.predictions || []).map((p: any) => ({
+                    return res.json((data.results || []).map((p: any) => ({
                         place_id: p.place_id,
-                        display_name: p.description,
+                        display_name: p.formatted_address,
+                        lat: p.geometry?.location?.lat,
+                        lng: p.geometry?.location?.lng,
                     })));
                 }
                 // If REQUEST_DENIED or other error, fall through to Nominatim
