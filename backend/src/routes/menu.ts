@@ -22,7 +22,10 @@ router.get('/geocode/search', async (req, res) => {
         if (apiKey) {
             try {
                 const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&components=country:in&key=${apiKey}`;
-                const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+                const response = await fetch(url, { 
+                    headers: { 'Referer': req.headers.origin || req.headers.referer || 'https://2-qt.vercel.app/' },
+                    signal: AbortSignal.timeout(3000) 
+                });
                 const data = await response.json();
                 
                 if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
@@ -64,7 +67,10 @@ router.get('/geocode/reverse', async (req, res) => {
     if (apiKey) {
         try {
             const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
-            const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+            const response = await fetch(url, { 
+                headers: { 'Referer': req.headers.origin || req.headers.referer || 'https://2-qt.vercel.app/' },
+                signal: AbortSignal.timeout(4000) 
+            });
             const data = await response.json();
             if (data.results && data.results.length > 0 && data.status !== 'REQUEST_DENIED') {
                 const components: any[] = data.results[0].address_components || [];
