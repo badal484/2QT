@@ -584,7 +584,6 @@ const HomeScreen = ({ navigation }: any) => {
 
   const LOCATION_HEIGHT = 50;
   const LOCATION_MARGIN = 16;
-  const BASE_PADDING = Math.max(insets.top + 8, 12) + 116;
 
   // Snap: when finger lifts mid-collapse, jump to fully open or fully closed
   const snapHeader = useCallback((offsetY: number) => {
@@ -598,12 +597,6 @@ const HomeScreen = ({ navigation }: any) => {
     const opacity = interpolate(scrollY.value, [0, LOCATION_HEIGHT / 2], [1, 0], 'clamp');
     const marginBottom = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [LOCATION_MARGIN, 0], 'clamp');
     return { height, opacity, marginBottom, overflow: 'hidden' };
-  });
-
-  // Animated paddingTop shrinks with the header so no blank gap appears mid-collapse
-  const listPaddingStyle = useAnimatedStyle(() => {
-    const collapsedAmount = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [0, LOCATION_HEIGHT + LOCATION_MARGIN], 'clamp');
-    return { paddingTop: BASE_PADDING - collapsedAmount };
   });
 
 
@@ -826,7 +819,7 @@ const HomeScreen = ({ navigation }: any) => {
         scrollEventThrottle={16}
         onScrollEndDrag={(e) => snapHeader(e.nativeEvent.contentOffset.y)}
         onMomentumScrollEnd={(e) => snapHeader(e.nativeEvent.contentOffset.y)}
-        contentContainerStyle={[styles.listContent, listPaddingStyle]}
+        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 8, 12) + 116 }]}
         windowSize={5}
         maxToRenderPerBatch={4}
         initialNumToRender={6}
