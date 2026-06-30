@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Ticket, X, ToggleLeft, ToggleRight, Tag, Shield, User } from "lucide-react";
+import { Plus, Trash2, Ticket, X, ToggleLeft, ToggleRight, Shield } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -21,6 +21,7 @@ const EMPTY_FORM = {
   description: "",
   expires_at: "",
   max_uses: "" as string | number,
+  zone_id: "" as string,
 };
 
 function discountLabel(promo: any) {
@@ -42,6 +43,7 @@ const cls = "w-full bg-white/[0.03] text-white border border-white/10 rounded-xl
 
 export function PromoCodesTab() {
   const [promos, setPromos] = useState<any[]>([]);
+  const [zones, setZones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -53,8 +55,12 @@ export function PromoCodesTab() {
   const fetchPromos = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/promocodes/admin');
-      setPromos(res.promoCodes || []);
+      const [promoRes, zoneRes] = await Promise.all([
+        api.get('/promocodes/admin'),
+        api.get('/admin/zones'),
+      ]);
+      setPromos(promoRes.promoCodes || []);
+      setZones(zoneRes.zones || []);
     } catch (e: any) {
       toast.error(e.message || "Failed to load promo codes");
     } finally {
@@ -74,6 +80,7 @@ export function PromoCodesTab() {
         per_user_limit: form.per_user_limit ? Number(form.per_user_limit) : null,
         max_uses: form.max_uses ? Number(form.max_uses) : null,
         expires_at: form.expires_at || null,
+        zone_id: form.zone_id || null,
       });
       toast.success("Promo code created — cache busted, live immediately");
       setIsCreating(false);
@@ -175,6 +182,12 @@ export function PromoCodesTab() {
             <Inp label="Description (shown to customer)">
               <input value={form.description} onChange={e => f('description', e.target.value)} className={cls} placeholder="Get 30% off this Diwali!"/>
             </Inp>
+            <Inp label="Zone (blank = all zones)">
+              <select value={form.zone_id} onChange={e => f('zone_id', e.target.value)} className={cls}>
+                <option value="">All Zones</option>
+                {zones.map(z => <option key={z.id} value={z.id}>{z.name} — {z.city}</option>)}
+              </select>
+            </Inp>
           </div>
 
           {/* Targeting toggles */}
@@ -254,6 +267,13 @@ export function PromoCodesTab() {
               )}
               {promo.new_user_only && (
                 <span className="bg-purple-500/10 text-purple-400 text-[10px] font-bold px-2 py-0.5 rounded-full">New users</span>
+              )}
+              {promo.zone_id ? (
+                <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  {zones.find(z => z.id === promo.zone_id)?.name ?? 'Zone'}
+                </span>
+              ) : (
+                <span className="bg-white/[0.04] text-zinc-500 text-[10px] font-bold px-2 py-0.5 rounded-full">All zones</span>
               )}
             </div>
 
