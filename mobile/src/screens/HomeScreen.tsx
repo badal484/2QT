@@ -574,6 +574,7 @@ const HomeScreen = ({ navigation }: any) => {
 
   const totalCartQty = cartItems.reduce((acc, i) => acc + i.quantity, 0);
 
+  const flatListRef = useRef<any>(null);
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -582,11 +583,27 @@ const HomeScreen = ({ navigation }: any) => {
   });
 
   const LOCATION_HEIGHT = 50;
+  const LOCATION_MARGIN = 16;
+  const BASE_PADDING = Math.max(insets.top + 8, 12) + 116;
+
+  // Snap: when finger lifts mid-collapse, jump to fully open or fully closed
+  const snapHeader = useCallback((offsetY: number) => {
+    if (offsetY <= 0 || offsetY >= LOCATION_HEIGHT) return;
+    const snapTo = offsetY < LOCATION_HEIGHT / 2 ? 0 : LOCATION_HEIGHT;
+    flatListRef.current?.scrollToOffset({ offset: snapTo, animated: true });
+  }, []);
+
   const locationRowStyle = useAnimatedStyle(() => {
     const height = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [LOCATION_HEIGHT, 0], 'clamp');
     const opacity = interpolate(scrollY.value, [0, LOCATION_HEIGHT / 2], [1, 0], 'clamp');
-    const marginBottom = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [16, 0], 'clamp');
+    const marginBottom = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [LOCATION_MARGIN, 0], 'clamp');
     return { height, opacity, marginBottom, overflow: 'hidden' };
+  });
+
+  // Animated paddingTop shrinks with the header so no blank gap appears mid-collapse
+  const listPaddingStyle = useAnimatedStyle(() => {
+    const collapsedAmount = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [0, LOCATION_HEIGHT + LOCATION_MARGIN], 'clamp');
+    return { paddingTop: BASE_PADDING - collapsedAmount };
   });
 
 
@@ -795,6 +812,7 @@ const HomeScreen = ({ navigation }: any) => {
       </Animated.View>
 
       <Animated.FlatList
+        ref={flatListRef}
         style={{ flex: 1 }}
         data={
           isServiceabilityChecking || unserviceableLocation || showNoLocation || showNetworkError
@@ -805,8 +823,10 @@ const HomeScreen = ({ navigation }: any) => {
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
-        scrollEventThrottle={32}
-        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 8, 12) + 116 }]}
+        scrollEventThrottle={16}
+        onScrollEndDrag={(e) => snapHeader(e.nativeEvent.contentOffset.y)}
+        onMomentumScrollEnd={(e) => snapHeader(e.nativeEvent.contentOffset.y)}
+        contentContainerStyle={[styles.listContent, listPaddingStyle]}
         windowSize={5}
         maxToRenderPerBatch={4}
         initialNumToRender={6}
