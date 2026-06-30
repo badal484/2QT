@@ -152,6 +152,13 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
         // Google places autocomplete doesn't return lat/lon directly in predictions, 
         // but for this quick fix let's assume we can notify the user to drop the pin near their city
         toast.info(`Found: ${data[0].display_name}. Please drag the pin manually.`);
+        if (data[0].lat && data[0].lng && mapInstance) {
+          const lat = Number(data[0].lat);
+          const lng = Number(data[0].lng);
+          mapInstance.flyTo([lat, lng], 15, { animate: true, duration: 1.5 });
+          setPosition([lat, lng]);
+          reverseGeocode(lat, lng);
+        }
       } else {
         toast.error("Location not found. Try a different search.");
       }
