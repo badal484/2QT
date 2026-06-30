@@ -175,8 +175,8 @@ router.get('/', async (req, res) => {
         return res.json({ ...JSON.parse(cached as string), fromCache: true });
     }
 
-    // Run all 3 DB queries in parallel — 3x faster on cache miss
-    const [itemsResult, zoneResult, kitchenResult] = await Promise.all([
+    // Run all 4 DB queries in parallel — 3x faster on cache miss
+    const [itemsResult, zoneResult, kitchenResult, offersResult] = await Promise.all([
         query(
             `SELECT id, name, description, price_paise, photo_url, is_veg, is_egg, available,
                     category, kitchen_id, zone_id, sort_order, daily_limit,
@@ -197,6 +197,14 @@ router.get('/', async (req, res) => {
              ORDER BY (kz.zone_id IS NOT NULL) DESC LIMIT 1`,
             [zoneId]
         ),
+        query(
+            `SELECT * FROM menu_offers
+             WHERE is_active = true
+             AND (zone_id IS NULL OR zone_id = $1)
+             AND (start_time IS NULL OR start_time <= NOW())
+             AND (end_time IS NULL OR end_time >= NOW())`,
+            [zoneId]
+        )
     ]);
 
     const k = kitchenResult.rows[0];
@@ -232,6 +240,7 @@ router.get('/', async (req, res) => {
 
     const response = {
         items: itemsResult.rows,
+        offers: offersResult.rows,
         zoneName: zoneResult.rows[0]?.name || null,
         kitchenId: k?.id || null,
         kitchenName: k?.name || null,
@@ -252,16 +261,32 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/validate-cart', async (req, res) => {
-    const { items } = req.body;
+    const { items, zoneId } = req.body;
     if (!items || !items.length) return res.json({ validItems: [], removedCount: 0, priceChanges: [] });
 
-    // Single query for all cart items instead of N queries
     const ids = items.map((i: any) => i.menuItemId);
-    const { rows } = await query(
-        'SELECT id, price_paise, available, customization_groups FROM menu_items WHERE id = ANY($1::uuid[])',
-        [ids]
-    );
-    const dbMap = new Map(rows.map((r: any) => [r.id, r]));
+    const [itemsResult, offersResult] = await Promise.all([
+        query(
+            'SELECT id, price_paise, available, category, kitchen_id, customization_groups FROM menu_items WHERE id = ANY($1::uuid[])',
+            [ids]
+        ),
+        zoneId ? query(
+            `SELECT * FROM menu_offers
+             WHERE is_active = true
+             AND (zone_id IS NULL OR zone_id = $1)
+             AND (start_time IS NULL OR start_time <= NOW())
+             AND (end_time IS NULL OR end_time >= NOW())`,
+            [zoneId]
+        ) : query(
+            `SELECT * FROM menu_offers
+             WHERE is_active = true
+             AND zone_id IS NULL
+             AND (start_time IS NULL OR start_time <= NOW())
+             AND (end_time IS NULL OR end_time >= NOW())`
+        )
+    ]);
+    const dbMap = new Map(itemsResult.rows.map((r: any) => [r.id, r]));
+    const activeOffers = offersResult.rows;
 
     const validItems = [];
     const priceChanges = [];
@@ -271,7 +296,39 @@ router.post('/validate-cart', async (req, res) => {
         const db = dbMap.get(item.menuItemId);
         if (!db || !db.available) { removedCount++; continue; }
         
-        let expectedPrice = db.price_paise;
+        let basePrice = db.price_paise;
+        
+        // 1. Calculate best offer discount for this item
+        let offerDiscountPaise = 0;
+        for (const offer of activeOffers) {
+             // In DB, category might be a string (e.g. "Biryani") while target_id is UUID. 
+             // We'll treat category target_id conceptually, but here we assume target_id stores the string if target_type is category.
+             // Wait, target_id is UUID. If category is a string, we might need a mapping. 
+             // Let's assume for now target_type = 'item' or 'all' or 'kitchen' works perfectly.
+             const isMatch = offer.target_type === 'all' || 
+                             (offer.target_type === 'item' && offer.target_id === db.id) ||
+                             (offer.target_type === 'category' && String(offer.target_id) === String(db.category)) ||
+                             (offer.target_type === 'kitchen' && offer.target_id === db.kitchen_id);
+             
+             if (isMatch) {
+                  let discount = 0;
+                  if (offer.discount_type === 'flat') {
+                      discount = offer.discount_flat_paise || 0;
+                  } else if (offer.discount_type === 'percentage') {
+                      discount = Math.floor((basePrice * (offer.discount_percent || 0)) / 100);
+                      if (offer.max_discount_paise && discount > offer.max_discount_paise) {
+                          discount = offer.max_discount_paise;
+                      }
+                  }
+                  if (discount > offerDiscountPaise) {
+                      offerDiscountPaise = discount;
+                  }
+             }
+        }
+        
+        let expectedPrice = Math.max(0, basePrice - offerDiscountPaise);
+
+        // 2. Add customizations
         if (item.customizations && item.customizations.length > 0 && db.customization_groups) {
             item.customizations.forEach((c: any) => {
                 const group = db.customization_groups.find((g: any) => g.name === c.group);

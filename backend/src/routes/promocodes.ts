@@ -13,7 +13,7 @@ async function bustPromoCache() {
 }
 
 // GET all promo codes (admin only)
-router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
         const { rows } = await query('SELECT * FROM promo_codes ORDER BY created_at DESC');
         res.json({ promoCodes: rows });
@@ -23,10 +23,12 @@ router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (r
     }
 });
 
-// GET active promo codes (customer-facing) — Redis cached 30s
+// GET active promo codes (customer-facing) — Redis cached 30s per zone
 router.get('/active', authenticate, async (req, res) => {
     try {
-        const cached = await redis.get(keys.activePromos());
+        const zoneId = req.query.zoneId as string | undefined;
+        const cacheKey = zoneId ? `${keys.activePromos()}:${zoneId}` : keys.activePromos();
+        const cached = await redis.get(cacheKey);
         if (cached) return res.json(JSON.parse(cached));
 
         const { rows } = await query(`
@@ -36,10 +38,12 @@ router.get('/active', authenticate, async (req, res) => {
             FROM promo_codes
             WHERE is_active = true
             AND (expires_at IS NULL OR expires_at > NOW())
+            AND (max_uses IS NULL OR times_used < max_uses)
+            AND (zone_id IS NULL OR zone_id = $1)
             ORDER BY created_at DESC
-        `);
+        `, [zoneId || null]);
         const payload = { promoCodes: rows };
-        await redis.setEx(keys.activePromos(), PROMO_TTL, JSON.stringify(payload));
+        await redis.setEx(cacheKey, PROMO_TTL, JSON.stringify(payload));
         res.json(payload);
     } catch (err: any) {
         console.error(err);

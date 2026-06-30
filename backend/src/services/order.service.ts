@@ -224,6 +224,19 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
                 `, [order.customer_id, pointsToAward, order.id]);
             }
 
+            // 8. Track promo code usage — enforces max_uses cap and per_user_limit
+            if (order.promo_code_id) {
+                await client.query(
+                    `INSERT INTO customer_promo_uses (customer_id, promo_code_id, order_id)
+                     VALUES ($1, $2, $3)`,
+                    [order.customer_id, order.promo_code_id, order.id]
+                );
+                await client.query(
+                    `UPDATE promo_codes SET times_used = times_used + 1 WHERE id = $1`,
+                    [order.promo_code_id]
+                );
+            }
+
             // 8. Emit All Balance Updates (Systematic Reactivity)
             if (order.wallet_deduction_paise > 0) {
                 emitToUser(order.customer_id, 'wallet_updated', { balancePaise: (walletRows[0]?.balance_paise || 0) - order.wallet_deduction_paise });
