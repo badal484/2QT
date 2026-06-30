@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Loader2, LocateFixed, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '../app/lib/api';
 
 // Fix for default marker icon in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -47,8 +48,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
-      const data = await res.json();
+      const data = await api.get(`/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
 
       if (data && data.display_name) {
         // Our backend now returns a formatted Google Maps address as display_name
@@ -146,8 +146,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
 
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/menu/geocode/search?q=${encodeURIComponent(searchQuery)}`);
-      const data = await res.json();
+      const data = await api.get(`/menu/geocode/search?q=${encodeURIComponent(searchQuery)}`);
 
       if (data && data.length > 0) {
         // Google places autocomplete doesn't return lat/lon directly in predictions, 
