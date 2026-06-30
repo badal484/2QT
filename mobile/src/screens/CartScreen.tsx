@@ -12,7 +12,7 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { setQuantity, clearCart, setPromoCode as setPromoCodeAction, addItem as addItemAction } from '../store/slices/cartSlice';
 import { getSocket } from '../socket/client';
-import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock } from 'lucide-react-native';
+import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock, Zap } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
@@ -158,6 +158,8 @@ const CartScreen = ({ navigation }: any) => {
   const smallOrderFee = (p.smallOrderFeePaise || 0) / 100;
   const totalSaved = ((p.menuOfferDiscountPaise || 0) + (p.discountPaise || 0)) / 100;
 
+  const plusOnlyOffers: any[] = (menuData?.offers || []).filter((o: any) => o.audience === 'plus_subscribers');
+
   if (items.length === 0) {
     return (
       <View style={[styles.emptyContainer, { paddingTop: insets.top }]}>
@@ -201,6 +203,28 @@ const CartScreen = ({ navigation }: any) => {
         <View style={styles.savingsBanner}>
           <Text style={styles.savingsBannerText}>You saved ₹{totalSaved.toFixed(2)} on this order 🎉</Text>
         </View>
+      )}
+
+      {/* Plus upsell — shown when zone has Plus-exclusive offers */}
+      {plusOnlyOffers.length > 0 && (
+        <BouncingButton
+          activeOpacity={0.88}
+          onPress={() => { triggerHaptic(); navigation.navigate('MyPlans'); }}
+          style={styles.plusBanner}
+        >
+          <View style={styles.plusBannerIcon}>
+            <Zap size={16} color="#7C3AED" fill="#7C3AED" />
+          </View>
+          <View style={styles.plusBannerText}>
+            <Text style={styles.plusBannerTitle}>
+              {plusOnlyOffers[0].discount_type === 'flat'
+                ? `₹${(plusOnlyOffers[0].discount_flat_paise || 0) / 100} off`
+                : `${plusOnlyOffers[0].discount_percent || 0}% off`}{' '}
+              unlocked with 2QT Plus
+            </Text>
+            <Text style={styles.plusBannerSub}>Tap to explore Plus membership →</Text>
+          </View>
+        </BouncingButton>
       )}
 
       <ScrollView
@@ -985,4 +1009,19 @@ const styles = StyleSheet.create({
   promoChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#D1FAE5', backgroundColor: '#F0FDF4' },
   promoChipCode: { fontSize: 12, fontFamily: fontFamily.black, color: '#1B5E46', letterSpacing: 0.5 },
   promoChipDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: '#059669', maxWidth: 100 },
+
+  plusBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginBottom: 6,
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: '#F5F3FF', borderRadius: 16,
+    borderWidth: 1, borderColor: '#DDD6FE',
+  },
+  plusBannerIcon: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center',
+  },
+  plusBannerText: { flex: 1 },
+  plusBannerTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: '#4C1D95', lineHeight: 18 },
+  plusBannerSub: { fontSize: 11, fontFamily: fontFamily.medium, color: '#7C3AED', marginTop: 2 },
 });
