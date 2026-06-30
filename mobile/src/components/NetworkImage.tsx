@@ -5,9 +5,20 @@ interface Props {
   uri: string;
   style?: StyleProp<ImageStyle>;
   fallbackText?: string;
+  width?: number;
+  height?: number;
 }
 
-export const NetworkImage: React.FC<Props> = React.memo(({ uri, style, fallbackText = 'V' }) => {
+const buildImageKitUrl = (uri: string, width?: number, height?: number): string => {
+  if (!uri.includes('ik.imagekit.io') || uri.includes('tr=')) return uri;
+  const transforms = ['f-auto', 'q-80', 'pr-true'];
+  if (width)  transforms.push(`w-${Math.round(width)}`);
+  if (height) transforms.push(`h-${Math.round(height)}`);
+  const tr = transforms.join(',');
+  return uri.includes('?') ? `${uri}&tr=${tr}` : `${uri}?tr=${tr}`;
+};
+
+export const NetworkImage: React.FC<Props> = React.memo(({ uri, style, fallbackText = 'V', width, height }) => {
   const [error, setError] = useState(false);
 
   if (error || !uri) {
@@ -18,22 +29,14 @@ export const NetworkImage: React.FC<Props> = React.memo(({ uri, style, fallbackT
     );
   }
 
+  const optimizedUri = buildImageKitUrl(uri, width, height);
+
   return (
-    <Image 
-      source={{ 
-        uri,
-        // Using headers to spoof browser UA just in case ImageKit blocks React Native default UA
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-        cache: 'force-cache',
-      }} 
+    <Image
+      source={{ uri: optimizedUri, cache: 'force-cache' }}
       style={style}
       resizeMode="cover"
-      onError={(e) => {
-        console.warn('NetworkImage failed to load:', uri, e.nativeEvent.error);
-        setError(true);
-      }}
+      onError={() => setError(true)}
     />
   );
 });

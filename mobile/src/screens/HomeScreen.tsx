@@ -36,6 +36,7 @@ const HomeScreen = ({ navigation }: any) => {
   const { globalLocation: location, serviceabilityStatus, activeZoneId } = useSelector((state: RootState) => state.app);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -95,7 +96,12 @@ const HomeScreen = ({ navigation }: any) => {
   const { data: activeOrdersData } = useQuery({
     queryKey: ['activeOrders'],
     queryFn: () => api.get('/orders/active'),
-    refetchInterval: 15000,
+    staleTime: 10000,
+    // Poll every 15s only when an active order exists — saves battery + requests when idle
+    refetchInterval: (query) => {
+      const orders = (query.state.data as any)?.activeOrders;
+      return Array.isArray(orders) && orders.length > 0 ? 15000 : false;
+    },
   });
   const activeOrders = activeOrdersData?.activeOrders?.filter((o: any) => !['cancelled_by_restaurant', 'refunded', 'pending_payment', 'payment_failed'].includes(o.status)) || [];
   const primaryActiveOrder = activeOrders[0];
@@ -122,11 +128,13 @@ const HomeScreen = ({ navigation }: any) => {
   const adminCategories: { id: string; name: string; slug: string; image_url: string; banner_url?: string }[] =
     menuCategoriesData?.categories ?? [];
 
+  // 3 copies is enough for infinite-scroll feel while keeping the array tiny (was 500 copies = ~2500 items)
+  const BANNER_COPIES = 3;
   const infiniteBanners = useMemo(() => {
     if (!mainBanners || mainBanners.length === 0) return [];
     if (mainBanners.length === 1) return mainBanners;
     const repeated = [];
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < BANNER_COPIES; i++) {
       for (let j = 0; j < mainBanners.length; j++) {
         repeated.push({ ...mainBanners[j], uniqueId: `${mainBanners[j].id}-${i}` });
       }
@@ -135,7 +143,8 @@ const HomeScreen = ({ navigation }: any) => {
   }, [mainBanners]);
 
   const bannerListRef = useRef<FlatList>(null);
-  const bannerIndexRef = useRef(banners.length > 1 ? banners.length * 250 : 0);
+  // Start at the middle copy so user can scroll both directions
+  const bannerIndexRef = useRef(mainBanners.length > 1 ? mainBanners.length : 0);
   const hasInitializedBanner = useRef(false);
 
   useEffect(() => {
@@ -187,6 +196,12 @@ const HomeScreen = ({ navigation }: any) => {
     }, 2500);
     return () => clearInterval(id);
   }, [placeholderNames.length]);
+
+  // Debounce search — filter runs 300ms after user stops typing, not on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const { data: zonesData } = useQuery({
     queryKey: ['zones'],
@@ -324,8 +339,8 @@ const HomeScreen = ({ navigation }: any) => {
     let items = menuData.items;
     
     if (isVegOnly) items = items.filter((item: any) => item.is_veg);
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
       items = items.filter((item: any) => item.name.toLowerCase().includes(q));
     }
 
@@ -357,7 +372,7 @@ const HomeScreen = ({ navigation }: any) => {
         return a.localeCompare(b);
       })
       .map(key => ({ title: key, data: grouped[key] }));
-  }, [menuData?.items, selectedCategory, isVegOnly, searchQuery, adminCategories]);
+  }, [menuData?.items, selectedCategory, isVegOnly, debouncedSearch, adminCategories]);
 
   const cartTotal = useMemo(
     () => cartItems.reduce((acc, item) => acc + item.quantity * item.pricePaise, 0),
