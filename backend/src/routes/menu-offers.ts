@@ -4,6 +4,27 @@ import { authenticate, requireRole } from '../middleware/auth';
 
 const router = express.Router();
 
+// ── Customer: active offers for zone (cached, no auth required) ───────────────
+router.get('/active', async (req, res) => {
+    const zoneId = req.query.zoneId as string | undefined;
+    try {
+        const { rows } = await query(`
+            SELECT id, title, description, target_type, target_id,
+                   discount_type, discount_percent, discount_flat_paise, max_discount_paise,
+                   audience, zone_id, start_time, end_time
+            FROM menu_offers
+            WHERE is_active = true
+            AND (zone_id IS NULL OR zone_id = $1)
+            AND (start_time IS NULL OR start_time <= NOW())
+            AND (end_time IS NULL OR end_time >= NOW())
+            ORDER BY discount_percent DESC NULLS LAST, discount_flat_paise DESC NULLS LAST
+        `, [zoneId || null]);
+        res.json({ offers: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to fetch offers' });
+    }
+});
+
 // ── Admin: list all offers ────────────────────────────────────────────────────
 router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {

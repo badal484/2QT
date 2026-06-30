@@ -10,12 +10,32 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 const hapticOpts = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
 const OrderPlacedScreen = ({ route, navigation }: any) => {
-  const { orderId, displayId } = route.params || {};
+  const {
+    orderId,
+    displayId,
+    menuOfferDiscountPaise = 0,
+    promoDiscountPaise = 0,
+    loyaltyDiscountPaise = 0,
+    walletDeductionPaise = 0,
+    subtotalPaise = 0,
+    promoCode,
+  } = route.params || {};
   const insets = useSafeAreaInsets();
+
+  const totalSavedPaise = menuOfferDiscountPaise + promoDiscountPaise + loyaltyDiscountPaise;
 
   const handleTrack = () => {
     ReactNativeHapticFeedback.trigger('impactLight', hapticOpts);
-    navigation.replace('OrderConfirmed', { orderId });
+    if (totalSavedPaise > 0) {
+      navigation.replace('OrderSavings', {
+        orderId, displayId,
+        menuOfferDiscountPaise, promoDiscountPaise,
+        loyaltyDiscountPaise, walletDeductionPaise,
+        subtotalPaise, promoCode,
+      });
+    } else {
+      navigation.replace('OrderConfirmed', { orderId });
+    }
   };
 
   const handleHome = () => {

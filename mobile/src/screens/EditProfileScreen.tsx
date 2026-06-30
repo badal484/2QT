@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, StyleSheet, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
@@ -40,6 +40,10 @@ const EditProfileScreen = ({ navigation }: any) => {
       Alert.alert('Validation', 'Name is required');
       return;
     }
+    if (!email.trim() || !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
+      Alert.alert('Validation', 'Please enter a valid email address');
+      return;
+    }
     updateMutation.mutate({ name, email, photo_url: photoUrl });
   };
 
@@ -75,87 +79,96 @@ const EditProfileScreen = ({ navigation }: any) => {
         <Text style={styles.headerTitle}>Edit Persona</Text>
       </View>
 
-      <View style={styles.content}>
-        {/* Avatar Section */}
-        <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarWrapper}>
-              {isUploading ? (
-                <ActivityIndicator color="#FF6B35" />
-              ) : photoUrl ? (
-                <Image source={{ uri: photoUrl }} style={styles.avatarImage} />
-              ) : (
-                <User size={48} color="#D1D5DB" />
-              )}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Avatar Section */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatarWrapper}>
+                {isUploading ? (
+                  <ActivityIndicator color="#FF6B35" />
+                ) : photoUrl ? (
+                  <Image source={{ uri: photoUrl }} style={styles.avatarImage} />
+                ) : (
+                  <User size={48} color="#D1D5DB" />
+                )}
+              </View>
+              <TouchableOpacity 
+                style={styles.cameraButton}
+                onPress={handlePickImage}
+                disabled={isUploading}
+              >
+                <Camera size={18} color="white" />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={styles.cameraButton}
-              onPress={handlePickImage}
-              disabled={isUploading}
-            >
-              <Camera size={18} color="white" />
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.avatarHint}>Tap to change avatar</Text>
-        </View>
-
-        {/* Form */}
-        <View style={styles.formContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
-            <View style={styles.inputWrapper}>
-              <User size={20} color="#9CA3AF" style={{ marginRight: 16 }} />
-              <TextInput 
-                style={styles.textInput}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter your name"
-                placeholderTextColor="#A0A0A0"
-              />
-            </View>
+            <Text style={styles.avatarHint}>Tap to change avatar</Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <View style={styles.inputWrapper}>
-              <Mail size={20} color="#9CA3AF" style={{ marginRight: 16 }} />
-              <TextInput 
-                style={styles.textInput}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="email@example.com"
-                placeholderTextColor="#A0A0A0"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+          {/* Form */}
+          <View style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <View style={styles.inputWrapper}>
+                <User size={20} color="#9CA3AF" style={{ marginRight: 16 }} />
+                <TextInput 
+                  style={styles.textInput}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Enter your name"
+                  placeholderTextColor="#A0A0A0"
+                />
+              </View>
             </View>
-          </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mobile Number</Text>
-            <View style={[styles.inputWrapper, styles.inputDisabled]}>
-              <ShieldCheck size={20} color="#9CA3AF" style={{ marginRight: 16 }} />
-              <Text style={styles.phoneText}>+{user?.phone}</Text>
-              <View style={styles.verifiedBadge}>
-                <Text style={styles.verifiedText}>Verified</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email Address</Text>
+              <View style={styles.inputWrapper}>
+                <Mail size={20} color="#9CA3AF" style={{ marginRight: 16 }} />
+                <TextInput 
+                  style={styles.textInput}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="email@example.com"
+                  placeholderTextColor="#A0A0A0"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Mobile Number</Text>
+              <View style={[styles.inputWrapper, styles.inputDisabled]}>
+                <ShieldCheck size={20} color="#9CA3AF" style={{ marginRight: 16 }} />
+                <Text style={styles.phoneText}>+{user?.phone}</Text>
+                <View style={styles.verifiedBadge}>
+                  <Text style={styles.verifiedText}>Verified</Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
 
-        <TouchableOpacity 
-          activeOpacity={0.9}
-          onPress={handleSave}
-          disabled={updateMutation.isPending}
-          style={styles.saveBtn}
-        >
-          {updateMutation.isPending ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.saveBtnText}>Update Persona</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity 
+            activeOpacity={0.9}
+            onPress={handleSave}
+            disabled={updateMutation.isPending}
+            style={styles.saveBtn}
+          >
+            {updateMutation.isPending ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.saveBtnText}>Update Persona</Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };

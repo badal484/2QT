@@ -30,6 +30,7 @@ import ScheduleOrderScreen from '../screens/ScheduleOrderScreen';
 import LiveKitchenScreen from '../screens/LiveKitchenScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import CategoryScreen from '../screens/CategoryScreen';
+import OrderSavingsScreen from '../screens/OrderSavingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -51,6 +52,7 @@ const CustomerNavigator = () => {
       <Stack.Screen name="Address" component={AddressScreen} />
       <Stack.Screen name="AddressBook" component={AddressBookScreen} />
       <Stack.Screen name="OrderPlaced" component={OrderPlacedScreen} />
+      <Stack.Screen name="OrderSavings" component={OrderSavingsScreen} options={{ animation: 'slide_from_bottom', animationDuration: 320, gestureDirection: 'vertical' }} />
       <Stack.Screen name="OrderConfirmed" component={OrderConfirmedScreen} />
       <Stack.Screen name="RateOrder" component={RateOrderScreen} options={{ animation: 'slide_from_bottom', animationDuration: 280, gestureDirection: 'vertical' }} />
       <Stack.Screen name="OrderHistory" component={OrderHistoryScreen} />
