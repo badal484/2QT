@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Trash2, MousePointerClick, Search, LocateFixed, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '../app/lib/api';
 
 // Fix for default marker icon in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -53,8 +54,7 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
     
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/menu/geocode/search?q=${encodeURIComponent(searchQuery)}`);
-      const data = await res.json();
+      const data = await api.get(`/menu/geocode/search?q=${encodeURIComponent(searchQuery)}`);
       
       if (data && data.length > 0) {
         toast.info(`Found: ${data[0].display_name}. Please drop points manually.`);
