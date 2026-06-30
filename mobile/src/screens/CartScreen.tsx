@@ -86,11 +86,12 @@ const CartScreen = ({ navigation }: any) => {
   const [altPhone, setAltPhone] = useState('');
 
   const { data: activePromosData } = useQuery({
-    queryKey: ['active-promos'],
-    queryFn: () => api.get('/promocodes/active'),
+    queryKey: ['active-promos', effectiveZoneId],
+    queryFn: () => api.get(`/promocodes/active${effectiveZoneId ? `?zoneId=${effectiveZoneId}` : ''}`),
     staleTime: 30 * 1000,
   });
-  const hasActivePromos = (activePromosData?.promoCodes?.length ?? 0) > 0;
+  const activePromos: any[] = activePromosData?.promoCodes ?? [];
+  const hasActivePromos = activePromos.length > 0;
 
 
 
@@ -146,11 +147,16 @@ const CartScreen = ({ navigation }: any) => {
     totalAmountPaise: fallbackSubtotal + (riderTip * 100),
     gatewayAmountPaise: fallbackSubtotal + (riderTip * 100),
     discountPaise: 0,
+    menuOfferDiscountPaise: 0,
+    smallOrderFeePaise: 0,
   };
   const subtotal = p.subtotalPaise / 100;
   const deliveryFee = p.deliveryFeePaise / 100;
   const tax = ((p.gstPaise || 0) + (p.cgstPaise || 0) + (p.sgstPaise || 0)) / 100;
   const grandTotal = (p.gatewayAmountPaise || p.totalAmountPaise) / 100;
+  const menuOfferDiscount = (p.menuOfferDiscountPaise || 0) / 100;
+  const smallOrderFee = (p.smallOrderFeePaise || 0) / 100;
+  const totalSaved = ((p.menuOfferDiscountPaise || 0) + (p.discountPaise || 0)) / 100;
 
   if (items.length === 0) {
     return (
@@ -190,10 +196,10 @@ const CartScreen = ({ navigation }: any) => {
         </BouncingButton>
       </View>
 
-      {/* Saved banner exactly like Screenshot 1 */}
-      {p.discountPaise > 0 && (
+      {/* Savings banner — shows total saved across menu offers + promo */}
+      {totalSaved > 0 && (
         <View style={styles.savingsBanner}>
-          <Text style={styles.savingsBannerText}>You saved ₹{p.discountPaise / 100} on this order</Text>
+          <Text style={styles.savingsBannerText}>You saved ₹{totalSaved.toFixed(2)} on this order 🎉</Text>
         </View>
       )}
 
@@ -336,6 +342,33 @@ const CartScreen = ({ navigation }: any) => {
         {hasActivePromos && (
           <Animated.View entering={FadeInDown.delay(70).duration(300)} style={styles.card}>
             <Text style={styles.cardTitle}>Offers & Coupons</Text>
+
+            {/* Quick-apply chips for available promos */}
+            {!appliedPromoCode && activePromos.length > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                {activePromos.slice(0, 4).map((promo: any) => (
+                  <BouncingButton
+                    key={promo.id}
+                    onPress={() => {
+                      triggerHaptic();
+                      setPromoCode(promo.code);
+                      setAppliedPromoCode(promo.code);
+                    }}
+                    style={styles.promoChip}
+                  >
+                    <Tag size={11} color={colors.success} />
+                    <Text style={styles.promoChipCode}>{promo.code}</Text>
+                    <Text style={styles.promoChipDesc} numberOfLines={1}>
+                      {promo.discount_type === 'percentage'
+                        ? `${promo.discount_percent}% off`
+                        : `₹${(promo.discount_flat_paise || 0) / 100} off`}
+                      {promo.min_order_paise ? ` on ₹${promo.min_order_paise / 100}+` : ''}
+                    </Text>
+                  </BouncingButton>
+                ))}
+              </View>
+            )}
+
             <View style={styles.promoRow}>
               <View style={styles.promoIconBox}>
                 <Tag size={15} color={colors.success} />
@@ -346,7 +379,7 @@ const CartScreen = ({ navigation }: any) => {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.promoAppliedText}>{appliedPromoCode}</Text>
                     {p.discountPaise > 0 && (
-                      <Text style={styles.promoSavingText}>50% upto ₹150 Off</Text>
+                      <Text style={styles.promoSavingText}>−₹{(p.discountPaise / 100).toFixed(2)} saved</Text>
                     )}
                   </View>
                 </View>
@@ -520,10 +553,22 @@ const CartScreen = ({ navigation }: any) => {
               <Text style={styles.billValue}>₹{tax.toFixed(2)}</Text>
             </View>
           )}
+          {menuOfferDiscount > 0 && (
+            <View style={styles.billRow}>
+              <Text style={[styles.billLabel, { color: '#22C55E' }]}>Item Offers</Text>
+              <Text style={[styles.billValue, { color: '#22C55E' }]}>−₹{menuOfferDiscount.toFixed(2)}</Text>
+            </View>
+          )}
           {p.discountPaise > 0 && (
             <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: '#22C55E' }]}>Discount ({appliedPromoCode})</Text>
-              <Text style={[styles.billValue, { color: '#22C55E' }]}>−₹{p.discountPaise / 100}</Text>
+              <Text style={[styles.billLabel, { color: '#22C55E' }]}>Promo ({appliedPromoCode})</Text>
+              <Text style={[styles.billValue, { color: '#22C55E' }]}>−₹{(p.discountPaise / 100).toFixed(2)}</Text>
+            </View>
+          )}
+          {smallOrderFee > 0 && (
+            <View style={styles.billRow}>
+              <Text style={[styles.billLabel, { color: colors.inkMuted }]}>Small Order Fee</Text>
+              <Text style={styles.billValue}>₹{smallOrderFee.toFixed(2)}</Text>
             </View>
           )}
           {riderTip > 0 && (
@@ -539,9 +584,9 @@ const CartScreen = ({ navigation }: any) => {
             <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
           </View>
 
-          {p.discountPaise > 0 && (
+          {totalSaved > 0 && (
             <View style={styles.billTotalSavedBanner}>
-              <Text style={styles.billTotalSavedText}>Total saved on this order: ₹{p.discountPaise / 100}</Text>
+              <Text style={styles.billTotalSavedText}>Total saved on this order: ₹{totalSaved.toFixed(2)}</Text>
             </View>
           )}
         </Animated.View>
@@ -937,4 +982,7 @@ const styles = StyleSheet.create({
   tipChipActive: { borderColor: '#1B5E46', backgroundColor: '#E8F2EC' },
   tipChipText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
   tipChipTextActive: { color: '#1B5E46' },
+  promoChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#D1FAE5', backgroundColor: '#F0FDF4' },
+  promoChipCode: { fontSize: 12, fontFamily: fontFamily.black, color: '#1B5E46', letterSpacing: 0.5 },
+  promoChipDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: '#059669', maxWidth: 100 },
 });

@@ -909,7 +909,9 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
         opening_time, closing_time, max_orders_per_hour, is_active,
         realistic_delivery_minutes, surge_enabled, polygon_points,
         kitchen_lat, kitchen_lng,
-        delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise, base_distance_km, free_delivery_above_paise, surge_multiplier
+        delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise, base_distance_km,
+        free_delivery_above_paise, surge_multiplier,
+        min_order_paise, small_order_fee_paise
     } = req.body;
 
     // Auto-compute zone center from polygon centroid when polygon changes
@@ -942,6 +944,8 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
                 base_distance_km = COALESCE($18, base_distance_km),
                 free_delivery_above_paise = COALESCE($19, free_delivery_above_paise),
                 surge_multiplier = COALESCE($20, surge_multiplier),
+                min_order_paise = COALESCE($21, min_order_paise),
+                small_order_fee_paise = COALESCE($22, small_order_fee_paise),
                 updated_at = NOW()
             WHERE id = $12
             RETURNING *
@@ -951,7 +955,8 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
             polygon_points ? JSON.stringify(polygon_points) : null, id,
             computedKitchenLat ?? null, computedKitchenLng ?? null,
             delivery_fee_type ?? null, base_delivery_fee_paise ?? null, per_km_fee_paise ?? null,
-            base_distance_km ?? null, free_delivery_above_paise ?? null, surge_multiplier ?? null]);
+            base_distance_km ?? null, free_delivery_above_paise ?? null, surge_multiplier ?? null,
+            min_order_paise ?? null, small_order_fee_paise ?? null]);
         if (rows.length === 0) return res.status(404).json({ error: 'ZONE_NOT_FOUND' });
 
         // Sync kitchen lat/lng to the new zone center so maps show the correct spot
@@ -977,6 +982,50 @@ router.delete('/zones/:id', authenticate, requireRole('super_admin', 'admin'), a
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: 'Cannot delete zone. It may be linked to existing orders or users.', details: err.message });
+    }
+});
+
+// ─── Delivery Fee Tiers ───────────────────────────────────────────────────────
+
+router.get('/zones/:id/delivery-tiers', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(
+            'SELECT * FROM delivery_fee_tiers WHERE zone_id = $1 ORDER BY from_paise ASC',
+            [req.params.id]
+        );
+        res.json({ tiers: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to fetch tiers' });
+    }
+});
+
+router.post('/zones/:id/delivery-tiers', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { from_paise, to_paise, fee_paise } = req.body;
+    if (from_paise == null || fee_paise == null) {
+        return res.status(400).json({ error: 'from_paise and fee_paise are required' });
+    }
+    try {
+        const { rows } = await query(
+            `INSERT INTO delivery_fee_tiers (zone_id, from_paise, to_paise, fee_paise)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [req.params.id, from_paise, to_paise ?? null, fee_paise]
+        );
+        res.status(201).json({ tier: rows[0] });
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to create tier', details: err.message });
+    }
+});
+
+router.delete('/zones/:id/delivery-tiers/:tierId', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rowCount } = await query(
+            'DELETE FROM delivery_fee_tiers WHERE id = $1 AND zone_id = $2',
+            [req.params.tierId, req.params.id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'Tier not found' });
+        res.json({ message: 'Tier deleted' });
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to delete tier' });
     }
 });
 
