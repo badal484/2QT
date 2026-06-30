@@ -141,7 +141,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
     hasStartedRef.current = true;
 
     const boot = async () => {
-      // Wake Render free-tier backend
+      // Wake Render free-tier backend immediately in background — doesn't block boot
       fetch('https://twoqt.onrender.com/api/v1/menu/zones').catch(() => {});
 
       // Clear stale persisted zone — will be resolved fresh via GPS or address selection
@@ -154,8 +154,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (currentAddressIdRef.current || globalLocation) {
-        // Fast boot: show the app immediately (no splash screen wait)
-        setIsBooted(true);
+        // Fast boot path: we still wait for minimum splash duration
 
         // Zone was cleared above — need to re-resolve it.
         // Signal HomeScreen to show skeleton while GPS resolves.
@@ -185,6 +184,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
           // Check: if serviceabilityStatus is still 'checking' after GPS attempt, something failed.
           // We dispatch network_error here as a safe fallback.
         }
+        setIsBooted(true);
         return;
       }
 

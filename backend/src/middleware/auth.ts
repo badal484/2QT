@@ -14,6 +14,13 @@ export interface AuthRequest extends Request {
     };
 }
 
+// Cache TTL: 60 seconds. On role-change / deactivation, invalidate via invalidateUserCache().
+const USER_CACHE_TTL = 60;
+const userCacheKey = (userId: string) => `2qt:user_meta:${userId}`;
+
+export const invalidateUserCache = (userId: string) =>
+    redis.del(userCacheKey(userId)).catch(() => {});
+
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
@@ -23,32 +30,43 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     const token = authHeader.split(' ')[1];
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
-        
-        // Check if token is revoked with 1s safety timeout
-        let isRevoked = null;
-        try {
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('REDIS_TIMEOUT')), 1000));
-            isRevoked = await Promise.race([redis.get(keys.revokedToken(decoded.jti)), timeoutPromise]);
-        } catch (e) {
-            console.warn('--- AUTH: REVOCATION CHECK TIMED OUT', e);
-        }
-        
+
+        // Check revocation + user meta in parallel; both have 100ms timeout to never block fast path
+        const timeout = <T>(p: Promise<T>): Promise<T | null> =>
+            Promise.race([p, new Promise<null>((_, rej) => setTimeout(() => rej(new Error('REDIS_TIMEOUT')), 100))])
+                .catch(() => null);
+
+        const [isRevoked, cachedUser] = await Promise.all([
+            timeout(redis.get(keys.revokedToken(decoded.jti))),
+            timeout(redis.get(userCacheKey(decoded.userId))),
+        ]);
+
         if (isRevoked) {
             return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token revoked' });
         }
 
-        // Always verify user status from DB (Redis cache removed — saves 2 Redis cmds/request)
-        let userData = null;
-        try {
-            const { query } = require('../db');
-            const { rows } = await query('SELECT role, kitchen_id, zone_id, is_active FROM users WHERE id = $1', [decoded.userId]);
-            if (rows[0]) userData = rows[0];
-        } catch (e) {
-            console.error('--- AUTH: STATUS CHECK FAILURE', e);
+        let userData: { role: string; kitchen_id: string | null; zone_id: string | null; is_active: boolean } | null = null;
+
+        if (cachedUser) {
+            userData = JSON.parse(cachedUser);
+        } else {
+            try {
+                const { query } = require('../db');
+                const { rows } = await query(
+                    'SELECT role, kitchen_id, zone_id, is_active FROM users WHERE id = $1',
+                    [decoded.userId]
+                );
+                if (rows[0]) {
+                    userData = rows[0];
+                    // Cache for 60s — invalidated on deactivation or role change
+                    redis.setEx(userCacheKey(decoded.userId), USER_CACHE_TTL, JSON.stringify(userData)).catch(() => {});
+                }
+            } catch (e) {
+                console.error('[AUTH] Status check failure:', e);
+            }
         }
 
         if (!userData || !userData.is_active) {
-            console.log(`[AUTH] Rejected userId=${decoded.userId} — userData=${JSON.stringify(userData)}`);
             return res.status(401).json({ error: 'UNAUTHORIZED', message: 'User deactivated or not found' });
         }
 
@@ -57,11 +75,10 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             role: userData.role,
             kitchenId: userData.kitchen_id,
             zoneId: userData.zone_id,
-            jti: decoded.jti
+            jti: decoded.jti,
         };
         next();
     } catch (err: any) {
-        console.log(`[AUTH] Token verify failed: ${err.message}`);
         return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Invalid token' });
     }
 };
