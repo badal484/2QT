@@ -6,6 +6,7 @@ import {
   TrendingUp, Wallet, IndianRupee, LogOut, RefreshCw,
   Utensils, Clock, CheckCircle2, BarChart3, ChevronRight, X
 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -128,9 +129,9 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
 
 function StatCard({ label, netPaise, grossPaise, commissionPaise, orders, accent = false }: any) {
   return (
-    <div className={`rounded-2xl p-5 border space-y-3 ${accent
-      ? "bg-[#F97316]/10 border-[#F97316]/20"
-      : "bg-[#0d0d1a] border-white/[0.07]"
+    <div className={`rounded-2xl p-5 border backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-xl space-y-3 ${accent
+      ? "bg-[#F97316]/10 border-[#F97316]/30 shadow-[#F97316]/10"
+      : "bg-white/[0.02] border-white/[0.08]"
     }`}>
       <div className={`text-xs font-bold uppercase tracking-widest ${accent ? "text-[#F97316]" : "text-white/40"}`}>{label}</div>
       <div className={`text-3xl font-black tracking-tight ${accent ? "text-[#F97316]" : "text-white"}`}>
@@ -331,12 +332,64 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
 
                 {/* Next payout estimate */}
                 {data?.thisWeek?.net > 0 && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md rounded-2xl p-4 flex items-center justify-between">
                     <div>
                       <div className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Next Payout Estimate</div>
                       <div className="text-xs text-white/40 mt-0.5">Based on this week's completed orders</div>
                     </div>
                     <div className="text-2xl font-black text-emerald-400">{fmt(data?.thisWeek?.net)}</div>
+                  </div>
+                )}
+                
+                {/* Sales Trend Chart */}
+                {data?.trend && data.trend.length > 0 && (
+                  <div className="bg-white/[0.02] border border-white/[0.08] backdrop-blur-xl rounded-2xl p-5 mt-6">
+                    <div className="text-sm font-bold text-white mb-6 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-[#F97316]" /> 7-Day Sales Trend
+                    </div>
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={data.trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#F97316" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#F97316" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="rgba(255,255,255,0.2)" 
+                            fontSize={10} 
+                            tickFormatter={(tick) => new Date(tick).toLocaleDateString('en-IN', { weekday: 'short' })}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis 
+                            stroke="rgba(255,255,255,0.2)" 
+                            fontSize={10}
+                            tickFormatter={(tick) => `₹${tick/100}`}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#0d0d1a', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }}
+                            itemStyle={{ color: '#F97316', fontWeight: 'bold' }}
+                            formatter={(value: number) => [fmt(value), 'Earnings']}
+                            labelFormatter={(label) => new Date(label).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="net" 
+                            stroke="#F97316" 
+                            strokeWidth={3}
+                            dot={{ r: 4, fill: '#0d0d1a', stroke: '#F97316', strokeWidth: 2 }}
+                            activeDot={{ r: 6, fill: '#F97316', stroke: '#fff', strokeWidth: 2 }}
+                            animationDuration={1500}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 )}
               </motion.div>
