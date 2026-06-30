@@ -67,36 +67,22 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
         }
 
         const { rows: kitchens } = await query(`
-            SELECT k.id, k.lat, k.lng 
+            SELECT k.id, k.lat, k.lng,
+                   (6371 * acos(cos(radians($2)) * cos(radians(k.lat)) * cos(radians(k.lng) - radians($3)) + sin(radians($2)) * sin(radians(k.lat)))) AS distance
             FROM kitchens k
             JOIN kitchen_zones kz ON k.id = kz.kitchen_id
             WHERE kz.zone_id = $1 AND k.is_active = true AND k.is_paused = false
-        `, [zoneId]);
+            ORDER BY distance ASC
+            LIMIT 1
+        `, [zoneId, custLat, custLng]);
         
         if (kitchens.length === 0) throw new Error('NO_KITCHENS_AVAILABLE_FOR_ZONE');
         
-        let kitchenId = kitchens[0].id;
-        let minDistance = Infinity;
-        let closestKitchenLat = kitchens[0].lat;
-        let closestKitchenLng = kitchens[0].lng;
-        
-        const toRad = (val: number) => val * Math.PI / 180;
-        
-        kitchens.forEach(k => {
-            const R = 6371;
-            const dLat = toRad(k.lat - custLat);
-            const dLng = toRad(k.lng - custLng);
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(toRad(custLat)) * Math.cos(toRad(k.lat)) *
-                      Math.sin(dLng/2) * Math.sin(dLng/2);
-            const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            if (dist < minDistance) {
-                minDistance = dist;
-                kitchenId = k.id;
-                closestKitchenLat = k.lat;
-                closestKitchenLng = k.lng;
-            }
-        });
+        const closestKitchen = kitchens[0];
+        let kitchenId = closestKitchen.id;
+        let closestKitchenLat = closestKitchen.lat;
+        let closestKitchenLng = closestKitchen.lng;
+        let minDistance = closestKitchen.distance;
 
         // Use Google Maps for exact driving distance if available, else keep Haversine
         let finalDistanceKm = minDistance;
