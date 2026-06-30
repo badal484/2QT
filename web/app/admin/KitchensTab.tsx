@@ -131,9 +131,9 @@ export function KitchensTab() {
   const fallbackLat = selectedZone?.kitchen_lat ?? zones[0]?.kitchen_lat;
   const fallbackLng = selectedZone?.kitchen_lng ?? zones[0]?.kitchen_lng;
   const mapCenter: [number, number] | undefined =
-    form.lat && form.lng
+    form.lat && form.lng && (Number(form.lat) !== 0 || Number(form.lng) !== 0)
       ? [Number(form.lat), Number(form.lng)]
-      : fallbackLat && fallbackLng
+      : fallbackLat && fallbackLng && (Number(fallbackLat) !== 0 || Number(fallbackLng) !== 0)
       ? [Number(fallbackLat), Number(fallbackLng)]
       : undefined;
 
@@ -203,7 +203,7 @@ export function KitchensTab() {
                 </span>
               )}
             </div>
-            <div className="h-56 rounded-xl overflow-hidden">
+            <div className="h-[400px] rounded-xl overflow-hidden">
               {/* key forces remount with correct center when switching between edit/create */}
               <MapPicker
                 key={`${editing || "new"}-${mapCenter?.join(",") ?? "gps"}`}
