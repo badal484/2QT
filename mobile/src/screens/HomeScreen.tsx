@@ -6,7 +6,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
-import { addItem, setQuantity, setZone, setAddress } from '../store/slices/cartSlice';
+import { addItem, setQuantity, setZone, setAddress, clearCart } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
@@ -291,10 +291,9 @@ const HomeScreen = ({ navigation }: any) => {
       await api.post('/service-requests', {
         area_name: reqForm.area_name,
         pincode: reqForm.pincode,
-        contact_number: user.phone || reqForm.contact_number
+        contact_number: user.phone,
       });
-      setReqSuccess(true);
-      setTimeout(() => { setReqSuccess(false); setUnserviceableSheetDismissed(true); }, 3000);
+      setRequestStep('done');
     } catch (err) {
       setReqError('Failed to submit request. Please try again later.');
     } finally {
@@ -306,14 +305,6 @@ const HomeScreen = ({ navigation }: any) => {
     () => ReactNativeHapticFeedback.trigger('impactLight', hapticOptions),
     [],
   );
-
-  const handleAddToCartWithCheck = useCallback((item: any) => {
-    if (item.customization_groups?.length > 0) {
-      setActiveCustomizationItem(item);
-    } else {
-      handleAddToCart(item, [], 0, '');
-    }
-  }, [handleAddToCart]);
 
   const handleAddToCart = useCallback((item: any, customizations: any[], customExtraPaise: number, instructions: string) => {
     if (cartItems.length > 0 && cartItems[0].kitchenId !== item.kitchen_id) {
@@ -362,6 +353,14 @@ const HomeScreen = ({ navigation }: any) => {
       );
     }
   }, [cartItems, dispatch, triggerHaptic]);
+
+  const handleAddToCartWithCheck = useCallback((item: any) => {
+    if (item.customization_groups?.length > 0) {
+      setActiveCustomizationItem(item);
+    } else {
+      handleAddToCart(item, [], 0, '');
+    }
+  }, [handleAddToCart]);
 
 
   const sections = useMemo(() => {
@@ -1351,7 +1350,7 @@ const HomeScreen = ({ navigation }: any) => {
         item={activeCustomizationItem}
         onAddToCart={(customizations, instructions) => {
           if (activeCustomizationItem) {
-            handleAddToCart(activeCustomizationItem, customizations, instructions);
+            handleAddToCart(activeCustomizationItem, customizations, 0, instructions);
           }
         }}
       />

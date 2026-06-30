@@ -129,10 +129,11 @@ const CartScreen = ({ navigation }: any) => {
 
   const fallbackSubtotal = items.reduce((s, i) => s + i.quantity * i.pricePaise, 0);
   const { data: pricingData, isFetching: pricingFetching } = useQuery({
-    queryKey: ['your-order-pricing', items, addressId, appliedPromoCode],
+    queryKey: ['your-order-pricing', items, addressId, appliedPromoCode, effectiveZoneId],
     queryFn: () =>
       api.post('/payment/create-order', {
-        items, addressId, promoCode: appliedPromoCode, riderTipPaise: riderTip * 100, dryRun: true,
+        items, addressId, promoCode: appliedPromoCode, riderTipPaise: riderTip * 100,
+        zoneId: effectiveZoneId, dryRun: true,
       }),
     enabled: items.length > 0 && !!addressId && !isOutOfZone,
     placeholderData: keepPreviousData,
