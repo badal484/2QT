@@ -128,8 +128,11 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   const selectedAddress = addresses?.addresses?.find((a: any) => a.id === route.params?.addressId);
   const isOutOfZone = !!selectedAddress && !selectedAddress.is_serviceable;
 
+  const activeZoneId = useSelector((state: any) => state.app.activeZoneId);
+  const zoneId = cart.zoneId || activeZoneId;
+
   const { data: pricing, isPending: loadingPricing, isFetching } = useQuery({
-    queryKey: ['pricing', cart.items, useWallet, useLoyalty, promoCode, riderTip],
+    queryKey: ['pricing', cart.items, useWallet, useLoyalty, promoCode, riderTip, zoneId],
     queryFn: () => api.post('/payment/create-order', {
       items: cart.items,
       addressId: route.params?.addressId,
@@ -139,6 +142,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
       riderTipPaise: riderTip * 100,
       instructions: deliveryInstructions,
       scheduledAt: route.params?.scheduledAt,
+      zoneId,
       dryRun: true
     }),
     enabled: !loadingAddresses && !isOutOfZone,
@@ -173,7 +177,16 @@ const CheckoutScreen = ({ navigation, route }: any) => {
             index: 1,
             routes: [
               { name: 'Home' },
-              { name: 'OrderPlaced', params: { orderId, displayId: res.order?.display_id } },
+              { name: 'OrderPlaced', params: {
+                orderId,
+                displayId: res.order?.display_id,
+                menuOfferDiscountPaise: pricing?.menuOfferDiscountPaise || 0,
+                promoDiscountPaise: pricing?.discountPaise || 0,
+                loyaltyDiscountPaise: pricing?.loyaltyDiscountPaise || 0,
+                walletDeductionPaise: pricing?.walletDeductionPaise || 0,
+                subtotalPaise: pricing?.subtotalPaise || 0,
+                promoCode,
+              }},
             ],
           });
           return;
@@ -200,7 +213,16 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           index: 1,
           routes: [
             { name: 'Home' },
-            { name: 'OrderPlaced', params: { orderId: res.orderId, displayId: res.displayId } },
+            { name: 'OrderPlaced', params: {
+              orderId: res.orderId,
+              displayId: res.displayId,
+              menuOfferDiscountPaise: pricing?.menuOfferDiscountPaise || 0,
+              promoDiscountPaise: pricing?.discountPaise || 0,
+              loyaltyDiscountPaise: pricing?.loyaltyDiscountPaise || 0,
+              walletDeductionPaise: pricing?.walletDeductionPaise || 0,
+              subtotalPaise: pricing?.subtotalPaise || 0,
+              promoCode,
+            }},
           ],
         });
         return;

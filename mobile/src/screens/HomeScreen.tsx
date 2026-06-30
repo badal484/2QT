@@ -183,11 +183,53 @@ const HomeScreen = ({ navigation }: any) => {
     return () => clearInterval(interval);
   }, [infiniteBanners.length]);
 
+  const enrichedItems = useMemo(() => {
+    if (!menuData?.items) return [];
+    const items = menuData.items;
+    const offers = menuData.offers || [];
+
+    return items.map((item: any) => {
+        let basePrice = item.price_paise;
+        let offerDiscountPaise = 0;
+        let appliedOffer = null;
+        
+        for (const offer of offers) {
+             const isMatch = offer.target_type === 'all' || 
+                             (offer.target_type === 'item' && offer.target_id === item.id) ||
+                             (offer.target_type === 'category' && String(offer.target_id) === String(item.category)) ||
+                             (offer.target_type === 'kitchen' && offer.target_id === item.kitchen_id);
+             
+             if (isMatch) {
+                  let discount = 0;
+                  if (offer.discount_type === 'flat') {
+                      discount = offer.discount_flat_paise || 0;
+                  } else if (offer.discount_type === 'percent' || offer.discount_type === 'percentage') {
+                      discount = Math.floor((basePrice * (offer.discount_percent || 0)) / 100);
+                      if (offer.max_discount_paise && discount > offer.max_discount_paise) {
+                          discount = offer.max_discount_paise;
+                      }
+                  }
+                  if (discount > offerDiscountPaise) {
+                      offerDiscountPaise = discount;
+                      appliedOffer = offer;
+                  }
+             }
+        }
+        
+        return {
+           ...item,
+           original_price_paise: basePrice,
+           price_paise: Math.max(0, basePrice - offerDiscountPaise),
+           applied_offer: appliedOffer
+        };
+    });
+  }, [menuData?.items, menuData?.offers]);
+
   // Animated search placeholder — cycles through menu item names
   const placeholderNames = useMemo(() => {
-    const items: any[] = menuData?.items ?? [];
+    const items: any[] = enrichedItems ?? [];
     return items.filter((i: any) => i.available).map((i: any) => i.name as string).slice(0, 12);
-  }, [menuData?.items]);
+  }, [enrichedItems]);
 
   useEffect(() => {
     if (placeholderNames.length < 2) return;
@@ -249,12 +291,12 @@ const HomeScreen = ({ navigation }: any) => {
       await api.post('/service-requests', {
         area_name: reqForm.area_name,
         pincode: reqForm.pincode,
-        lat: location?.latitude || 0,
-        lng: location?.longitude || 0,
+        contact_number: user.phone || reqForm.contact_number
       });
-      setRequestStep('done');
-    } catch (err: any) {
-      setReqError(err.message || 'Something went wrong.');
+      setReqSuccess(true);
+      setTimeout(() => { setReqSuccess(false); setUnserviceableSheetDismissed(true); }, 3000);
+    } catch (err) {
+      setReqError('Failed to submit request. Please try again later.');
     } finally {
       setReqLoading(false);
     }
@@ -269,34 +311,22 @@ const HomeScreen = ({ navigation }: any) => {
     if (item.customization_groups?.length > 0) {
       setActiveCustomizationItem(item);
     } else {
-      handleAddToCart(item, [], '');
+      handleAddToCart(item, [], 0, '');
     }
-  }, []);
+  }, [handleAddToCart]);
 
-  const handleAddToCart = useCallback((item: any, customizations: any[] = [], instructions: string = '') => {
-    let customExtraPaise = 0;
-    if (customizations.length > 0 && item.customization_groups) {
-      customizations.forEach(c => {
-        const group = item.customization_groups.find((g: any) => g.name === c.group);
-        if (group) {
-          const opt = group.options.find((o: any) => o.name === c.option);
-          if (opt && opt.price_paise) {
-            customExtraPaise += opt.price_paise;
-          }
-        }
-      });
-    }
-
+  const handleAddToCart = useCallback((item: any, customizations: any[], customExtraPaise: number, instructions: string) => {
     if (cartItems.length > 0 && cartItems[0].kitchenId !== item.kitchen_id) {
       Alert.alert(
-        'Clear Cart?',
-        'Your cart contains items from a different kitchen. Would you like to clear your cart and add this item instead?',
+        'Different Kitchen',
+        'Your cart contains items from another kitchen. Do you want to clear the cart and add this item?',
         [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Clear & Add',
             style: 'destructive',
             onPress: () => {
+              dispatch(clearCart());
               triggerHaptic();
               dispatch(
                 addItem({
@@ -335,8 +365,8 @@ const HomeScreen = ({ navigation }: any) => {
 
 
   const sections = useMemo(() => {
-    if (!menuData?.items) return [];
-    let items = menuData.items;
+    if (!enrichedItems || enrichedItems.length === 0) return [];
+    let items = enrichedItems;
     
     if (isVegOnly) items = items.filter((item: any) => item.is_veg);
     if (debouncedSearch) {
@@ -364,15 +394,15 @@ const HomeScreen = ({ navigation }: any) => {
     return Object.keys(grouped)
       .sort((a, b) => {
         if (hasAdminCategories) {
-          const aIdx = adminCategories.findIndex(c => c.slug.toLowerCase() === a.toLowerCase());
-          const bIdx = adminCategories.findIndex(c => c.slug.toLowerCase() === b.toLowerCase());
-          // Configured categories come first (sorted by sort_order); unconfigured go to end
-          return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+           const aIdx = adminCategories.findIndex(c => c.slug.toLowerCase() === a.toLowerCase());
+           const bIdx = adminCategories.findIndex(c => c.slug.toLowerCase() === b.toLowerCase());
+           // Configured categories come first (sorted by sort_order); unconfigured go to end
+           return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
         }
         return a.localeCompare(b);
       })
       .map(key => ({ title: key, data: grouped[key] }));
-  }, [menuData?.items, selectedCategory, isVegOnly, debouncedSearch, adminCategories]);
+  }, [enrichedItems, selectedCategory, isVegOnly, debouncedSearch, adminCategories]);
 
   const cartTotal = useMemo(
     () => cartItems.reduce((acc, item) => acc + item.quantity * item.pricePaise, 0),
@@ -448,6 +478,15 @@ const HomeScreen = ({ navigation }: any) => {
                       </View>
                     )}
 
+                    {/* Offer badge */}
+                    {mi.applied_offer && (
+                      <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: '#34D399', paddingHorizontal: 6, paddingVertical: 2, borderBottomLeftRadius: 12, borderTopRightRadius: 16 }}>
+                        <Text style={{ color: 'white', fontSize: 10, fontFamily: fontFamily.bold }}>
+                          {mi.applied_offer.name}
+                        </Text>
+                      </View>
+                    )}
+
                     {/* ADD / qty — floats at bottom-right of image */}
                     {!unavailable && (
                       <View style={styles.catPreviewAddFloat}>
@@ -486,7 +525,14 @@ const HomeScreen = ({ navigation }: any) => {
                       </View>
                       <Text style={styles.catPreviewName} numberOfLines={2}>{mi.name}</Text>
                     </View>
-                    <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
+                      {mi.original_price_paise > mi.price_paise && (
+                        <Text style={{ fontSize: 12, color: colors.inkFaint, textDecorationLine: 'line-through', marginLeft: 6 }}>
+                          ₹{mi.original_price_paise / 100}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 </TouchableOpacity>
               );
@@ -527,6 +573,13 @@ const HomeScreen = ({ navigation }: any) => {
             {menuItem.is_bestseller && <View style={styles.homeGridBestsellerBadge}><Text style={styles.homeGridBestsellerText}>★ Bestseller</Text></View>}
             {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text style={styles.homeGridNewText}>+ New</Text></View>}
             {unavailable && <View style={styles.homeGridSoldOut}><Text style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
+            {menuItem.applied_offer && (
+              <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: '#34D399', paddingHorizontal: 8, paddingVertical: 4, borderBottomLeftRadius: 12, borderTopRightRadius: 16 }}>
+                <Text style={{ color: 'white', fontSize: 11, fontFamily: fontFamily.bold }}>
+                  {menuItem.applied_offer.name}
+                </Text>
+              </View>
+            )}
             {!unavailable && (
               <View style={styles.homeGridAddFloat}>
                 {cartItem ? (
@@ -551,7 +604,14 @@ const HomeScreen = ({ navigation }: any) => {
           <View style={styles.homeGridInfo}>
             <Text style={styles.homeGridName} numberOfLines={2}>{menuItem.name}</Text>
             {menuItem.description ? <Text style={styles.homeGridDesc} numberOfLines={2}>{menuItem.description}</Text> : null}
-            <Text style={styles.homeGridPrice}>₹{menuItem.price_paise / 100}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={styles.homeGridPrice}>₹{menuItem.price_paise / 100}</Text>
+              {menuItem.original_price_paise > menuItem.price_paise && (
+                <Text style={{ fontSize: 13, color: colors.inkFaint, textDecorationLine: 'line-through', marginLeft: 6 }}>
+                  ₹{menuItem.original_price_paise / 100}
+                </Text>
+              )}
+            </View>
             {menuItem.tags?.length > 0 && (
               <View style={styles.homeGridTagRow}>
                 {menuItem.tags.slice(0, 2).map((tag: string) => (
@@ -584,6 +644,7 @@ const HomeScreen = ({ navigation }: any) => {
 
   const LOCATION_HEIGHT = 50;
   const LOCATION_MARGIN = 16;
+  const BASE_PADDING = Math.max(insets.top + 8, 12) + 116;
 
   // Snap: when finger lifts mid-collapse, jump to fully open or fully closed
   const snapHeader = useCallback((offsetY: number) => {
@@ -599,7 +660,20 @@ const HomeScreen = ({ navigation }: any) => {
     return { height, opacity, marginBottom, overflow: 'hidden' };
   });
 
+  const listPaddingStyle = useAnimatedStyle(() => {
+    const collapsedAmount = interpolate(scrollY.value, [0, LOCATION_HEIGHT], [0, LOCATION_HEIGHT + LOCATION_MARGIN], 'clamp');
+    return { paddingTop: BASE_PADDING - collapsedAmount };
+  });
 
+  const headerGlassStyle = useAnimatedStyle(() => {
+    const alpha = interpolate(scrollY.value, [0, 50], [1, 0.96], 'clamp');
+    const borderAlpha = interpolate(scrollY.value, [0, 50], [0, 0.08], 'clamp');
+    return {
+      backgroundColor: `rgba(255, 255, 255, ${alpha})`,
+      borderBottomWidth: 1,
+      borderBottomColor: `rgba(0, 0, 0, ${borderAlpha})`,
+    };
+  });
 
   return (
     <View style={styles.container}>
@@ -608,27 +682,31 @@ const HomeScreen = ({ navigation }: any) => {
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
           paddingTop: Math.max(insets.top + 8, 12), 
           paddingBottom: 8,
-          backgroundColor: colors.surface, 
           paddingHorizontal: 12
-        }
+        },
+        headerGlassStyle
       ]}>
         {/* ROW 1: Address and Profile (Animated) */}
         <Animated.View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, locationRowStyle]}>
           <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <MapPin size={28} color={colors.primary} fill={colors.primaryTint} style={{ marginRight: 8 }} />
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+              <MapPin size={22} color={colors.primary} fill={colors.primaryTint} />
+            </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink }}>
-                {user?.name ? `Hey ${user.name.split(' ')[0]} 👋` : 'Hello'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Delivering to
+                </Text>
+                <ChevronDown size={14} color={colors.primary} style={{ marginLeft: 2 }} />
+              </View>
               <BouncingButton
                 style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}
                 onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
                 activeOpacity={0.7}
               >
-                <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted }} numberOfLines={1}>
+                <Text style={{ fontSize: 16, fontFamily: fontFamily.extrabold, color: colors.ink }} numberOfLines={1}>
                   {location?.addressText || selectedAddress?.address_text || 'Set location'}
                 </Text>
-                <ChevronDown size={14} color={colors.inkMuted} style={{ marginLeft: 3 }} />
               </BouncingButton>
             </View>
           </View>
@@ -650,31 +728,16 @@ const HomeScreen = ({ navigation }: any) => {
         {/* ROW 2: Search Bar with VEG toggle */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {/* Gradient border wrapper */}
-            <LinearGradient
-              colors={['#22C55E', '#16A34A', '#15803D']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                flex: 1,
-                borderRadius: 10,
-                padding: 1.5,
-                shadowColor: '#22C55E',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.18,
-                shadowRadius: 8,
-                elevation: 3,
-              }}
-            >
+            {/* Flat, premium search bar */}
             <View style={{
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: colors.surface,
-              borderRadius: 9,
-              paddingLeft: 10,
+              backgroundColor: '#F1F5F9', // Light flat grey
+              borderRadius: 12,
+              paddingLeft: 12,
               paddingRight: 6,
-              height: 44,
+              height: 46,
             }}>
               <Search size={16} color={colors.inkMuted} style={{ marginRight: 6, flexShrink: 0 }} />
               <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
@@ -791,14 +854,6 @@ const HomeScreen = ({ navigation }: any) => {
                   />
                 </View>
               )}
-            </View>
-            </LinearGradient>
-
-            {/* 2QT brand mark */}
-            <View style={{ alignItems: 'center', justifyContent: 'center', paddingRight: 2, flexShrink: 0 }}>
-              <Text style={{ fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -1 }}>
-                2QT<Text style={{ color: colors.primary, fontSize: 20 }}>.</Text>
-              </Text>
             </View>
           </View>
         )}
@@ -965,6 +1020,39 @@ const HomeScreen = ({ navigation }: any) => {
                     </View>
                   </BouncingButton>
                 ))}
+              </View>
+            )}
+
+            {/* ── Deals For You — active menu offers strip ── */}
+            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError &&
+              menuData?.offers && menuData.offers.length > 0 && (
+              <View style={styles.dealsSection}>
+                <Text style={styles.dealsSectionTitle}>Deals For You</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dealsScroll}>
+                  {menuData.offers.map((offer: any) => {
+                    const isFlatOff = offer.discount_type === 'flat';
+                    const discLabel = isFlatOff
+                      ? `₹${(offer.discount_flat_paise || 0) / 100} OFF`
+                      : `${offer.discount_percent || 0}% OFF${offer.max_discount_paise ? ` upto ₹${offer.max_discount_paise / 100}` : ''}`;
+                    return (
+                      <View key={offer.id} style={styles.dealCard}>
+                        <View style={styles.dealIconBox}>
+                          <Text style={styles.dealIconText}>🏷️</Text>
+                        </View>
+                        <Text style={styles.dealDiscount}>{discLabel}</Text>
+                        <Text style={styles.dealTitle} numberOfLines={2}>{offer.title}</Text>
+                        {offer.description ? (
+                          <Text style={styles.dealDesc} numberOfLines={2}>{offer.description}</Text>
+                        ) : null}
+                        {offer.end_time ? (
+                          <Text style={styles.dealExpiry}>
+                            Ends {new Date(offer.end_time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          </Text>
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
               </View>
             )}
 
@@ -1702,6 +1790,25 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     marginTop: 2,
   },
+
+  // ── Deals For You ──────────────────────────────────────────────────────────
+  dealsSection: { marginTop: spacing.md, paddingHorizontal: spacing.lg },
+  dealsSectionTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 12, letterSpacing: -0.4 },
+  dealsScroll: { gap: 12, paddingRight: spacing.lg },
+  dealCard: {
+    width: 160,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  dealIconBox: { marginBottom: 8 },
+  dealIconText: { fontSize: 22 },
+  dealDiscount: { fontSize: 16, fontFamily: fontFamily.black, color: '#92400E', letterSpacing: -0.3, marginBottom: 4 },
+  dealTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, lineHeight: 18, marginBottom: 4 },
+  dealDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 15, marginBottom: 6 },
+  dealExpiry: { fontSize: 10, fontFamily: fontFamily.semibold, color: '#D97706', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   itemsContainer: { paddingHorizontal: 12, marginTop: 16, paddingBottom: 60 },
   modernItemsList: { width: '100%' },
