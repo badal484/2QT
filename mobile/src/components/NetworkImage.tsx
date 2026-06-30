@@ -25,7 +25,8 @@ export const NetworkImage: React.FC<Props> = React.memo(({ uri, style, fallbackT
         // Using headers to spoof browser UA just in case ImageKit blocks React Native default UA
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        },
+        cache: 'force-cache',
       }} 
       style={style}
       resizeMode="cover"
