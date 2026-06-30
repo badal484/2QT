@@ -11,22 +11,21 @@ const router = Router();
 router.get('/mine', authenticate, async (req: AuthRequest, res) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = parseInt(req.query.offset as string) || 0;
+    // Single JOIN+aggregation replaces the N+1 correlated subquery per order
     const { rows } = await query(
         `SELECT o.*, a.address_text as delivery_address_text,
-                COALESCE(
-                    (
-                        SELECT json_agg(json_build_object(
-                            'menu_item_name', oi.menu_item_name,
-                            'quantity', oi.quantity,
-                            'price_paise', oi.price_paise,
-                            'menu_item_id', oi.menu_item_id
-                        ))
-                        FROM order_items oi
-                        WHERE oi.order_id = o.id
-                    ), '[]'::json
-                ) as items
+                COALESCE(agg.items, '[]'::json) as items
          FROM orders o
          LEFT JOIN addresses a ON o.address_id = a.id
+         LEFT JOIN LATERAL (
+             SELECT json_agg(json_build_object(
+                 'menu_item_name', oi.menu_item_name,
+                 'quantity', oi.quantity,
+                 'price_paise', oi.price_paise,
+                 'menu_item_id', oi.menu_item_id
+             )) as items
+             FROM order_items oi WHERE oi.order_id = o.id
+         ) agg ON true
          WHERE o.customer_id = $1
          ORDER BY o.created_at DESC
          LIMIT $2 OFFSET $3`,
@@ -36,18 +35,21 @@ router.get('/mine', authenticate, async (req: AuthRequest, res) => {
 });
 
 router.get('/active', authenticate, async (req: AuthRequest, res) => {
+    // Single JOIN+aggregation; partial index idx_orders_customer_active covers this exactly
     const { rows } = await query(
         `SELECT o.*, a.address_text as delivery_address_text,
-                COALESCE(
-                    (SELECT json_agg(json_build_object(
-                        'menu_item_name', oi.menu_item_name,
-                        'quantity', oi.quantity,
-                        'price_paise', oi.price_paise,
-                        'menu_item_id', oi.menu_item_id
-                    )) FROM order_items oi WHERE oi.order_id = o.id), '[]'::json
-                ) as items
+                COALESCE(agg.items, '[]'::json) as items
          FROM orders o
          LEFT JOIN addresses a ON o.address_id = a.id
+         LEFT JOIN LATERAL (
+             SELECT json_agg(json_build_object(
+                 'menu_item_name', oi.menu_item_name,
+                 'quantity', oi.quantity,
+                 'price_paise', oi.price_paise,
+                 'menu_item_id', oi.menu_item_id
+             )) as items
+             FROM order_items oi WHERE oi.order_id = o.id
+         ) agg ON true
          WHERE o.customer_id = $1 AND o.status NOT IN ('delivered', 'cancelled')`,
         [req.user!.userId]
     );
@@ -55,6 +57,8 @@ router.get('/active', authenticate, async (req: AuthRequest, res) => {
 });
 
 router.get('/:id', authenticate, async (req: AuthRequest, res) => {
+    const orderId = String(req.params.id);
+    // Single query: items joined via LATERAL, no second round-trip
     const { rows } = await query(
         `SELECT o.*,
                 r.name as rider_name,
@@ -81,37 +85,39 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
                 END as customer_lng,
                 k.lat as kitchen_lat,
                 k.lng as kitchen_lng,
-                k.name as kitchen_name
+                k.name as kitchen_name,
+                COALESCE(agg.items, '[]'::json) as items
          FROM orders o
          LEFT JOIN users r ON o.rider_id = r.id
          LEFT JOIN addresses a ON o.address_id = a.id
          LEFT JOIN kitchens k ON o.kitchen_id = k.id
+         LEFT JOIN LATERAL (
+             SELECT json_agg(json_build_object(
+                 'menu_item_name', oi.menu_item_name,
+                 'quantity', oi.quantity,
+                 'price_paise', oi.price_paise,
+                 'customizations', oi.customizations
+             )) as items
+             FROM order_items oi WHERE oi.order_id = o.id
+         ) agg ON true
          WHERE o.id = $1`,
-        [req.params.id]
+        [orderId]
     );
+
     const order = rows[0];
     if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
 
     if (req.user!.role === 'customer' && order.customer_id !== req.user!.userId) {
-        console.log('FORBIDDEN MISMATCH:', { orderCustomerId: order.customer_id, reqUserId: req.user!.userId, type1: typeof order.customer_id, type2: typeof req.user!.userId });
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
 
-    const { rows: items } = await query(
-        'SELECT menu_item_name, quantity, price_paise FROM order_items WHERE order_id = $1',
-        [req.params.id]
-    );
-    order.items = items;
-    
-    let riderLocation = null;
     if (order.rider_id) {
-        const loc = await redis.get(keys.riderLocation(order.rider_id)).catch(() => null);
-        if (loc) riderLocation = JSON.parse(loc);
-    }
-    
-    if (riderLocation) {
-        order.rider_lat = riderLocation.lat;
-        order.rider_lng = riderLocation.lng;
+        const loc = await redis.get(keys.riderLocation(String(order.rider_id))).catch(() => null);
+        if (loc) {
+            const riderLocation = JSON.parse(loc);
+            order.rider_lat = riderLocation.lat;
+            order.rider_lng = riderLocation.lng;
+        }
     }
 
     res.json({ order });
