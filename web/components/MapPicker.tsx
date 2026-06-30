@@ -50,12 +50,20 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
     try {
       const data = await api.get(`/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
 
-      if (data && data.display_name) {
-        // Our backend now returns a formatted Google Maps address as display_name
-        const area = data.display_name.split(',').slice(0, 2).join(', ');
+      if (data && (data.address || data.name || data.display_name)) {
+        const rawAddress = data.address || data.display_name || data.name;
+        const area = rawAddress.split(',').slice(0, 2).join(', ');
         
         onLocationSelect({
           area,
+          landmark: '',
+          lat,
+          lng
+        });
+      } else {
+        // Always call onLocationSelect even if reverse geocoding fails, so coordinates are saved
+        onLocationSelect({
+          area: 'Selected Location',
           landmark: '',
           lat,
           lng
