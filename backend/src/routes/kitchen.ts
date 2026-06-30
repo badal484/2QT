@@ -366,7 +366,7 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        const [kitchen, todayRows, weekRows, monthRows, allRows, payoutRows, recentOrders] = await Promise.all([
+        const [kitchen, todayRows, weekRows, monthRows, allRows, payoutRows, recentOrders, trendRows] = await Promise.all([
             query('SELECT id, name, commission_rate, upi_id, partner_status FROM kitchens WHERE id = $1', [kitchenId]),
             query(`SELECT COALESCE(SUM(kitchen_payout_paise),0) net, COALESCE(SUM(commission_paise),0) commission,
                           COALESCE(SUM(total_amount_paise - delivery_fee_paise),0) gross, COUNT(*) orders
@@ -387,6 +387,12 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
                           o.status, o.payment_method, o.updated_at
                    FROM orders o WHERE o.kitchen_id=$1 AND o.status='delivered'
                    ORDER BY o.updated_at DESC LIMIT 20`, [kitchenId]),
+            query(`SELECT DATE(updated_at AT TIME ZONE 'Asia/Kolkata') as date, 
+                          COALESCE(SUM(kitchen_payout_paise), 0) as net 
+                   FROM orders 
+                   WHERE kitchen_id=$1 AND status='delivered' AND updated_at >= NOW() - INTERVAL '7 days' 
+                   GROUP BY DATE(updated_at AT TIME ZONE 'Asia/Kolkata') 
+                   ORDER BY date ASC`, [kitchenId]),
         ]);
 
         res.json({
@@ -397,6 +403,7 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
             allTime: allRows.rows[0],
             payouts: payoutRows.rows,
             recentOrders: recentOrders.rows,
+            trend: trendRows.rows,
         });
     } catch (err) {
         console.error('[kitchen/my-earnings]', err);
