@@ -161,13 +161,16 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
   const kitchenLocation = o?.kitchen_lat && o?.kitchen_lng
     ? { lat: parseFloat(o.kitchen_lat), lng: parseFloat(o.kitchen_lng) } : null;
 
-  const subtotal = o ? o.subtotal_paise / 100 : 0;
-  const delivery = o ? (o.delivery_fee_paise + (o.surge_paise || 0)) / 100 : 0;
-  const tax      = o ? ((o.cgst_paise || 0) + (o.sgst_paise || 0)) / 100 : 0;
-  const discount = o ? (o.discount_paise || 0) / 100 : 0;
-  const loyalty  = o ? (o.loyalty_discount_paise || 0) / 100 : 0;
-  const wallet   = o ? (o.wallet_deduction_paise || 0) / 100 : 0;
-  const total    = o ? o.total_amount_paise / 100 : 0;
+  const subtotal       = o ? o.subtotal_paise / 100 : 0;
+  const delivery       = o ? (o.delivery_fee_paise + (o.surge_paise || 0)) / 100 : 0;
+  const tax            = o ? ((o.cgst_paise || 0) + (o.sgst_paise || 0)) / 100 : 0;
+  const menuOfferDisc  = o ? (o.menu_offer_discount_paise || 0) / 100 : 0;
+  const discount       = o ? (o.discount_paise || 0) / 100 : 0;
+  const loyalty        = o ? (o.loyalty_discount_paise || 0) / 100 : 0;
+  const wallet         = o ? (o.wallet_deduction_paise || 0) / 100 : 0;
+  const smallOrderFee  = o ? (o.small_order_fee_paise || 0) / 100 : 0;
+  const riderTip       = o ? (o.rider_tip_paise || 0) / 100 : 0;
+  const total          = o ? o.total_amount_paise / 100 : 0;
 
   const estTime = status === 'delivered' ? 'Delivered'
     : etaMins != null ? `${etaMins} min${etaMins === 1 ? '' : 's'}`
@@ -351,6 +354,9 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               <View style={styles.billRow}><Text style={styles.billLabel}>Subtotal</Text><Text style={styles.billValue}>₹{subtotal.toFixed(0)}</Text></View>
               {delivery > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Delivery & Surge</Text><Text style={styles.billValue}>₹{delivery.toFixed(0)}</Text></View>}
               {tax > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Taxes (GST)</Text><Text style={styles.billValue}>₹{tax.toFixed(2)}</Text></View>}
+              {smallOrderFee > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Small Order Fee</Text><Text style={styles.billValue}>₹{smallOrderFee.toFixed(0)}</Text></View>}
+              {riderTip > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Rider Tip</Text><Text style={styles.billValue}>₹{riderTip.toFixed(0)}</Text></View>}
+              {menuOfferDisc > 0 && <View style={styles.billRow}><Text style={[styles.billLabel, { color: colors.success }]}>Item Offers</Text><Text style={[styles.billValue, { color: colors.success }]}>−₹{menuOfferDisc.toFixed(0)}</Text></View>}
               {discount > 0 && <View style={styles.billRow}><Text style={[styles.billLabel, { color: colors.success }]}>Promo Discount</Text><Text style={[styles.billValue, { color: colors.success }]}>−₹{discount.toFixed(0)}</Text></View>}
               {loyalty > 0 && <View style={styles.billRow}><Text style={[styles.billLabel, { color: colors.success }]}>Loyalty Points</Text><Text style={[styles.billValue, { color: colors.success }]}>−₹{loyalty.toFixed(0)}</Text></View>}
               {wallet > 0 && <View style={styles.billRow}><Text style={[styles.billLabel, { color: colors.primary }]}>Wallet</Text><Text style={[styles.billValue, { color: colors.primary }]}>−₹{wallet.toFixed(2)}</Text></View>}
