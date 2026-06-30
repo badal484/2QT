@@ -8,6 +8,8 @@ const pool = new Pool({
     max: 20, // High-performance pool for Bengaluru pilot
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
+    allowExitOnIdle: true,
+    maxUses: 7500, // Staff Optimization: Recycle connections to prevent memory leaks over time
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
