@@ -1035,11 +1035,16 @@ const HomeScreen = ({ navigation }: any) => {
                       ? `₹${(offer.discount_flat_paise || 0) / 100} OFF`
                       : `${offer.discount_percent || 0}% OFF${offer.max_discount_paise ? ` upto ₹${offer.max_discount_paise / 100}` : ''}`;
                     return (
-                      <View key={offer.id} style={styles.dealCard}>
+                      <View key={offer.id} style={[styles.dealCard, offer.audience === 'plus_subscribers' && styles.dealCardPlus]}>
                         <View style={styles.dealIconBox}>
-                          <Text style={styles.dealIconText}>🏷️</Text>
+                          <Text style={styles.dealIconText}>{offer.audience === 'plus_subscribers' ? '⚡' : '🏷️'}</Text>
                         </View>
-                        <Text style={styles.dealDiscount}>{discLabel}</Text>
+                        {offer.audience === 'plus_subscribers' && (
+                          <View style={styles.dealPlusBadge}>
+                            <Text style={styles.dealPlusBadgeText}>PLUS</Text>
+                          </View>
+                        )}
+                        <Text style={[styles.dealDiscount, offer.audience === 'plus_subscribers' && { color: '#4C1D95' }]}>{discLabel}</Text>
                         <Text style={styles.dealTitle} numberOfLines={2}>{offer.title}</Text>
                         {offer.description ? (
                           <Text style={styles.dealDesc} numberOfLines={2}>{offer.description}</Text>
@@ -1809,6 +1814,9 @@ const styles = StyleSheet.create({
   dealTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, lineHeight: 18, marginBottom: 4 },
   dealDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 15, marginBottom: 6 },
   dealExpiry: { fontSize: 10, fontFamily: fontFamily.semibold, color: '#D97706', textTransform: 'uppercase', letterSpacing: 0.5 },
+  dealCardPlus: { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' },
+  dealPlusBadge: { alignSelf: 'flex-start', backgroundColor: '#7C3AED', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 4 },
+  dealPlusBadgeText: { fontSize: 9, fontFamily: fontFamily.black, color: '#fff', letterSpacing: 1 },
 
   itemsContainer: { paddingHorizontal: 12, marginTop: 16, paddingBottom: 60 },
   modernItemsList: { width: '100%' },

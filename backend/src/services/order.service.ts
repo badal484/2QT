@@ -45,8 +45,9 @@ export async function createPendingOrder(data: any) {
                 payment_method, payment_status, promo_code_id,
                 is_subscription_order, special_instructions,
                 delivery_location_lat, delivery_location_lng,
-                delivery_contact_name, delivery_contact_phone
-            ) VALUES ('2QT-' || LPAD(nextval('order_display_id_seq')::TEXT, 6, '0'), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22)
+                delivery_contact_name, delivery_contact_phone,
+                menu_offer_discount_paise, small_order_fee_paise, rider_tip_paise
+            ) VALUES ('2QT-' || LPAD(nextval('order_display_id_seq')::TEXT, 6, '0'), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
             RETURNING id, display_id
         `, [
             data.customerId, data.kitchenId, data.zoneId, data.addressId,
@@ -62,6 +63,9 @@ export async function createPendingOrder(data: any) {
             deliveryLat, deliveryLng,
             data.deliveryContactName || null,
             data.deliveryContactPhone || null,
+            data.pricing.menuOfferDiscountPaise || 0,
+            data.pricing.smallOrderFeePaise || 0,
+            data.pricing.riderTipPaise || 0,
         ]);
 
         const newOrder = orderRows[0];
