@@ -22,6 +22,7 @@ import campaignsRoutes from './campaigns';
 import complaintsRoutes from './complaints';
 import homeRoutes from './home';
 import collectionsRoutes from './collections';
+import menuOffersRoutes from './menu-offers';
 // ... other routes
 
 const router = Router();
@@ -52,6 +53,7 @@ router.use('/promocodes', promocodesRoutes);
 router.use('/finance', financeRoutes);
 router.use('/campaigns', campaignsRoutes);
 router.use('/complaints', complaintsRoutes);
+router.use('/menu-offers', menuOffersRoutes);
 // ...
 
 export default router;

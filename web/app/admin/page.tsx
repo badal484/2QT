@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -32,6 +32,7 @@ const ComplaintsTab = dynamic(() => import("./ComplaintsTab").then(m => ({ defau
 const PartnersTab = dynamic(() => import("./PartnersTab").then(m => ({ default: m.PartnersTab })), { ssr: false });
 const NotificationsTab = dynamic(() => import("./NotificationsTab").then(m => ({ default: m.NotificationsTab })), { ssr: false });
 const DispatchTab = dynamic(() => import("./DispatchTab").then(m => ({ default: m.DispatchTab })), { ssr: false });
+const MenuOffersTab = dynamic(() => import("./MenuOffersTab").then(m => ({ default: m.MenuOffersTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1715,6 +1716,7 @@ const TABS = [
   { name: "Zones", icon: MapPin, component: ZonesTab },
   { name: "Categories", icon: LayoutGrid, component: CategoriesTab },
   { name: "Delivery Pricing", icon: Receipt, component: DeliveryPricingTab },
+  { name: "Menu Offers", icon: Tag, component: MenuOffersTab },
   { name: "Kitchens", icon: Store, component: KitchensTab },
   { name: "Partners", icon: Store, component: PartnersTab },
   { name: "Team", icon: Users, component: TeamTab },
@@ -1795,7 +1797,7 @@ export default function AdminPage() {
         <div className="flex-1 px-3 overflow-y-auto pb-4 space-y-6">
           {[
             { section: "Main", items: ["Overview", "Analytics", "Orders", "Scheduled", "Dispatch", "Fleet", "Customers", "Support"] },
-            { section: "Operations", items: ["Menu", "Inventory", "Categories", "Zones", "Delivery Pricing", "Kitchens", "Partners", "Finance", "Applications"] },
+            { section: "Operations", items: ["Menu", "Inventory", "Categories", "Zones", "Delivery Pricing", "Menu Offers", "Kitchens", "Partners", "Finance", "Applications"] },
             { section: "System", items: ["Team", "Broadcast", "Marketing", "Promo Codes", "Campaigns", "Complaints", "Notifications", "Systems", "Settings"] },
           ].map(group => (
             <div key={group.section}>
