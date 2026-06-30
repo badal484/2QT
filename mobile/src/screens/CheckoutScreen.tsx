@@ -169,7 +169,13 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           queryClient.invalidateQueries({ queryKey: ['wallet'] });
           queryClient.invalidateQueries({ queryKey: ['loyalty'] });
           queryClient.invalidateQueries({ queryKey: ['order-history'] });
-          navigation.navigate('OrderPlaced', { orderId, displayId: res.order?.display_id });
+          navigation.reset({
+            index: 1,
+            routes: [
+              { name: 'Home' },
+              { name: 'OrderPlaced', params: { orderId, displayId: res.order?.display_id } },
+            ],
+          });
           return;
         }
       } catch (e) { console.log('Verification polling error:', e); }
@@ -190,7 +196,13 @@ const CheckoutScreen = ({ navigation, route }: any) => {
       if (res.status === 'confirmed') {
         triggerHaptic('notificationSuccess');
         dispatch(clearCart());
-        navigation.navigate('OrderPlaced', { orderId: res.orderId, displayId: res.displayId });
+        navigation.reset({
+          index: 1,
+          routes: [
+            { name: 'Home' },
+            { name: 'OrderPlaced', params: { orderId: res.orderId, displayId: res.displayId } },
+          ],
+        });
         return;
       }
       if (!res.keyId) {

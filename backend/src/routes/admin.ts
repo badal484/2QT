@@ -1366,11 +1366,10 @@ router.get('/partners/kitchens', authenticate, requireRole('super_admin', 'admin
         res.status(500).json({ error: 'Failed to fetch partner kitchens' });
     }
 });
-
 router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { name, commissionRate, upiId, zoneId,
-            contactPhone, contactEmail, isActive, partnerNotes, partnerStatus } = req.body;
+            contactPhone, contactEmail, isActive, partnerNotes, partnerStatus, openingTime, closingTime } = req.body;
     if (partnerStatus && !['approved', 'suspended', 'none'].includes(partnerStatus)) {
         return res.status(400).json({ error: 'INVALID_PARTNER_STATUS' });
     }
@@ -1386,11 +1385,14 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
                     is_active       = COALESCE($6, is_active),
                     partner_notes   = COALESCE($7, partner_notes),
                     partner_status  = COALESCE($8, partner_status),
+                    opening_time    = COALESCE($9, opening_time),
+                    closing_time    = COALESCE($10, closing_time),
                     updated_at      = NOW()
-                WHERE id = $9
+                WHERE id = $11
             `, [name ?? null, commissionRate ?? null, upiId ?? null,
                 contactPhone ?? null, contactEmail ?? null,
-                isActive ?? null, partnerNotes ?? null, partnerStatus ?? null, id]);
+                isActive ?? null, partnerNotes ?? null, partnerStatus ?? null, 
+                openingTime ?? null, closingTime ?? null, id]);
 
             // Zone assignment — replace with single zone (same kitchen_zones table as regular kitchens)
             if (zoneId) {
