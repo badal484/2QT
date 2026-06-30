@@ -375,7 +375,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
                           <Tooltip 
                             contentStyle={{ backgroundColor: '#0d0d1a', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }}
                             itemStyle={{ color: '#F97316', fontWeight: 'bold' }}
-                            formatter={(value: number) => [fmt(value), 'Earnings']}
+                            formatter={(value: any) => [fmt(value || 0), 'Earnings']}
                             labelFormatter={(label) => new Date(label).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                           />
                           <Line 
