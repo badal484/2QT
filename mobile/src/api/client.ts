@@ -30,12 +30,18 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
   const state = store.getState();
   const token = state?.auth?.accessToken;
 
+  const isFormData = options.body instanceof FormData;
+
   const headers: any = {
-    'Content-Type': 'application/json',
     'Accept-Encoding': 'gzip, deflate',
     'X-App-Version': APP_VERSION,
     'Bypass-Tunnel-Reminder': 'true',
   };
+
+  // Don't set Content-Type for FormData — let fetch set it with the multipart boundary
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -47,7 +53,7 @@ const request = async (path: string, options: RequestOptions = {}): Promise<any>
   };
 
   if (options.body) {
-    fetchOptions.body = JSON.stringify(options.body);
+    fetchOptions.body = isFormData ? options.body : JSON.stringify(options.body);
   }
 
   if (__DEV__) console.log(`[API] ${fetchOptions.method} ${path}`);

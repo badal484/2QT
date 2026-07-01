@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, AppState, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, AppState } from 'react-native';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearCart } from '../store/slices/cartSlice';
 import RazorpayCheckout from 'react-native-razorpay';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import Animated, { FadeInDown, SlideInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring, interpolateColor } from 'react-native-reanimated';
-import { ArrowLeft, MapPin, Sparkles, ChevronRight, CheckCircle2, ShieldCheck, Wallet, Banknote, CreditCard, Lock } from 'lucide-react-native';
+import Animated, { FadeInDown, SlideInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring } from 'react-native-reanimated';
+import { ArrowLeft, MapPin, Sparkles, ChevronRight, ShieldCheck, Wallet, Banknote, CreditCard, Lock } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,7 +64,7 @@ const PulseLoader = () => {
   );
 };
 
-const PaymentMethodCard = ({ title, subtitle, icon, isSelected, onPress, isCod = false }: any) => {
+const PaymentMethodCard = ({ title, subtitle, icon, isSelected, onPress }: any) => {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -182,6 +182,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
                 displayId: res.order?.display_id,
                 menuOfferDiscountPaise: pricing?.menuOfferDiscountPaise || 0,
                 promoDiscountPaise: pricing?.discountPaise || 0,
+                campaignDiscountPaise: pricing?.campaignDiscountPaise || 0,
                 loyaltyDiscountPaise: pricing?.loyaltyDiscountPaise || 0,
                 walletDeductionPaise: pricing?.walletDeductionPaise || 0,
                 subtotalPaise: pricing?.subtotalPaise || 0,
@@ -218,6 +219,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
               displayId: res.displayId,
               menuOfferDiscountPaise: pricing?.menuOfferDiscountPaise || 0,
               promoDiscountPaise: pricing?.discountPaise || 0,
+              campaignDiscountPaise: pricing?.campaignDiscountPaise || 0,
               loyaltyDiscountPaise: pricing?.loyaltyDiscountPaise || 0,
               walletDeductionPaise: pricing?.walletDeductionPaise || 0,
               subtotalPaise: pricing?.subtotalPaise || 0,
