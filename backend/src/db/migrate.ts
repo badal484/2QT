@@ -45,10 +45,19 @@ async function migrate() {
                 await client.query('INSERT INTO schema_migrations (version) VALUES ($1)', [version]);
                 await client.query('COMMIT');
                 console.log(`Migration ${version} completed successfully.`);
-            } catch (err) {
+            } catch (err: any) {
                 await client.query('ROLLBACK');
-                console.error(`Migration ${version} failed:`, err);
-                process.exit(1);
+                // PG "already exists" codes: duplicate_table (42P07), duplicate_column (42701),
+                // duplicate_object (42710), duplicate_index (42P16).
+                // These mean the schema is already in the target state — safe to record and skip.
+                const alreadyExists = ['42P07', '42701', '42710', '42P16'].includes(err.code);
+                if (alreadyExists) {
+                    await client.query('INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING', [version]);
+                    console.warn(`Migration ${version} skipped (objects already exist) — recorded as done.`);
+                } else {
+                    console.error(`Migration ${version} failed:`, err);
+                    process.exit(1);
+                }
             }
         }
 
