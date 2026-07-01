@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Zap, Clock, Gift, RotateCcw, Cake, TrendingUp, Star, ToggleLeft, ToggleRight, Edit3, X, Check, Loader2 } from "lucide-react";
+import { Zap, Clock, Gift, RotateCcw, Cake, TrendingUp, Star, ToggleLeft, ToggleRight, Edit3, X, Check, Loader2, Plus } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -362,9 +362,147 @@ function CampaignCard({ campaign, onRefresh }: { campaign: Campaign; onRefresh: 
   );
 }
 
+const EMPTY_CAMPAIGN = {
+  name: "",
+  type: "flash_sale",
+  discount_type: "percentage",
+  discount_percent: "0",
+  discount_flat_paise: "0",
+  max_discount_paise: "",
+  min_order_paise: "0",
+  winback_days: "7",
+  flash_start: "",
+  flash_end: "",
+  happy_hour_start: "",
+  happy_hour_end: "",
+  happy_hour_days: "mon,tue,wed,thu,fri,sat,sun",
+  zone_id: "",
+  audience_segment: "",
+  schedule_start: "",
+  schedule_end: "",
+};
+
+function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [form, setForm] = useState({ ...EMPTY_CAMPAIGN });
+  const [saving, setSaving] = useState(false);
+  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  const save = async () => {
+    if (!form.name.trim()) { toast.error("Name is required"); return; }
+    setSaving(true);
+    try {
+      await api.post("/campaigns", {
+        ...form,
+        discount_percent: Number(form.discount_percent),
+        discount_flat_paise: Number(form.discount_flat_paise),
+        max_discount_paise: Number(form.max_discount_paise) || null,
+        min_order_paise: Number(form.min_order_paise),
+        winback_days: Number(form.winback_days),
+        flash_start: form.flash_start || null,
+        flash_end: form.flash_end || null,
+        happy_hour_start: form.happy_hour_start || null,
+        happy_hour_end: form.happy_hour_end || null,
+        happy_hour_days: form.happy_hour_days ? form.happy_hour_days.split(",").map(d => d.trim()) : null,
+        zone_id: form.zone_id || null,
+        audience_type: form.audience_segment ? "segment" : "all",
+        audience_segment: form.audience_segment || null,
+        schedule_start: form.schedule_start || null,
+        schedule_end: form.schedule_end || null,
+        is_active: false,
+      });
+      toast.success("Campaign created — toggle it on when ready");
+      onCreated();
+      onClose();
+    } catch { toast.error("Failed to create campaign"); }
+    setSaving(false);
+  };
+
+  const inp = (label: string, key: string, type = "text", placeholder = "") => (
+    <div>
+      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">{label}</label>
+      <input
+        type={type}
+        className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold"
+        value={(form as any)[key]}
+        placeholder={placeholder}
+        onChange={e => set(key, e.target.value)}
+      />
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-black">New Campaign</h3>
+          <button onClick={onClose}><X size={18} className="text-zinc-400"/></button>
+        </div>
+
+        {inp("Campaign name *", "name", "text", "e.g. Weekend Flash Sale")}
+
+        <div>
+          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Type</label>
+          <select className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold"
+            value={form.type} onChange={e => set("type", e.target.value)}>
+            {Object.entries(TYPE_META).map(([v, m]) => <option key={v} value={v}>{m.label} — {m.desc}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Discount type</label>
+          <select className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold"
+            value={form.discount_type} onChange={e => set("discount_type", e.target.value)}>
+            <option value="percentage">Percentage off subtotal</option>
+            <option value="flat">Flat amount off</option>
+            <option value="free_delivery">Free delivery</option>
+          </select>
+        </div>
+
+        {form.discount_type === "percentage" && inp("Discount %", "discount_percent", "number", "10")}
+        {form.discount_type === "flat" && inp("Flat discount (paise)", "discount_flat_paise", "number", "2000")}
+        {inp("Max discount (paise, blank = no cap)", "max_discount_paise", "number", "5000")}
+        {inp("Min order (paise)", "min_order_paise", "number", "0")}
+
+        {form.type === "flash_sale" && <>
+          {inp("Flash start", "flash_start", "datetime-local")}
+          {inp("Flash end", "flash_end", "datetime-local")}
+        </>}
+
+        {form.type === "happy_hour" && <>
+          {inp("Start time", "happy_hour_start", "time")}
+          {inp("End time", "happy_hour_end", "time")}
+          {inp("Days (comma-sep: mon,tue,...)", "happy_hour_days", "text", "mon,tue,wed,thu,fri,sat,sun")}
+        </>}
+
+        {form.type === "winback" && inp("Inactive days threshold", "winback_days", "number", "7")}
+
+        {inp("Zone ID (blank = all zones)", "zone_id", "text")}
+
+        <div>
+          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Audience</label>
+          <select className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold"
+            value={form.audience_segment} onChange={e => set("audience_segment", e.target.value)}>
+            {SEGMENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-zinc-200 text-sm font-bold text-zinc-500 hover:bg-zinc-50">Cancel</button>
+          <button onClick={save} disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-black text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+            {saving ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>}
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CampaignsTab() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -381,11 +519,21 @@ export function CampaignsTab() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-black">Campaigns & Offers</h2>
-        <p className="text-sm text-zinc-500 mt-1">
-          Toggle any offer on or off. <strong>Users stop seeing disabled offers within 30 seconds</strong> — no cache stale issues.
-        </p>
+      {showCreate && <CreateCampaignModal onClose={() => setShowCreate(false)} onCreated={load}/>}
+
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-black">Campaigns & Offers</h2>
+          <p className="text-sm text-zinc-500 mt-1">
+            Toggle any offer on or off. <strong>Users stop seeing disabled offers within 30 seconds</strong> — no cache stale issues.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 bg-black text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-zinc-800 transition-colors"
+        >
+          <Plus size={15}/> New Campaign
+        </button>
       </div>
 
       {/* Status bar */}
@@ -415,7 +563,7 @@ export function CampaignsTab() {
         <div className="text-center py-16 text-zinc-400">
           <Zap size={32} className="mx-auto mb-3 opacity-30"/>
           <p className="font-semibold">No campaigns yet.</p>
-          <p className="text-sm mt-1">Run migration 049 in Supabase to seed the default campaigns.</p>
+          <p className="text-sm mt-1">Click "New Campaign" to create your first one.</p>
         </div>
       )}
     </div>

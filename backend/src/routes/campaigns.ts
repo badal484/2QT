@@ -116,7 +116,8 @@ router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req: 
     const {
         name, type, is_active, discount_type, discount_percent, discount_flat_paise,
         max_discount_paise, min_order_paise, winback_days, flash_start, flash_end,
-        happy_hour_start, happy_hour_end, happy_hour_days, config
+        happy_hour_start, happy_hour_end, happy_hour_days, config,
+        zone_id, audience_type, audience_segment, schedule_start, schedule_end,
     } = req.body;
     const userId = req.user?.userId;
     try {
@@ -124,11 +125,12 @@ router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req: 
             `INSERT INTO campaigns
              (name, type, is_active, discount_type, discount_percent, discount_flat_paise,
               max_discount_paise, min_order_paise, winback_days, flash_start, flash_end,
-              happy_hour_start, happy_hour_end, happy_hour_days, config, created_by)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+              happy_hour_start, happy_hour_end, happy_hour_days, config, created_by,
+              zone_id, audience_type, audience_segment, schedule_start, schedule_end)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
              RETURNING *`,
             [
-                name, type, is_active ?? true,
+                name, type, is_active ?? false,
                 discount_type || 'percentage',
                 discount_percent || 0, discount_flat_paise || 0,
                 max_discount_paise || null, min_order_paise || 0,
@@ -137,7 +139,12 @@ router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req: 
                 happy_hour_start || null, happy_hour_end || null,
                 happy_hour_days || ['mon','tue','wed','thu','fri','sat','sun'],
                 config ? JSON.stringify(config) : '{}',
-                userId || null
+                userId || null,
+                zone_id || null,
+                audience_type || 'all',
+                audience_segment || null,
+                schedule_start || null,
+                schedule_end || null,
             ]
         );
         await bustCampaignCache();
