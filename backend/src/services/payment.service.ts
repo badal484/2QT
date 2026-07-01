@@ -209,6 +209,7 @@ export const calculatePricing = async ({
 
     // ── 7. Campaign discounts (flash sale / happy hour / winback) ─────────────
     let campaignDiscountPaise = 0;
+    let campaignFreeDelivery = false;
 
     {
         const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -245,10 +246,16 @@ export const calculatePricing = async ({
                 if (recentOrders.length > 0) continue;
             }
 
+            if (campaign.discount_type === 'free_delivery') {
+                campaignFreeDelivery = true;
+                continue;
+            }
+
             let disc = 0;
             if (campaign.discount_type === 'flat') {
                 disc = campaign.discount_flat_paise || 0;
             } else {
+                // covers 'percentage' and any other value
                 disc = Math.floor((effectiveSubtotal * parseFloat(campaign.discount_percent || '0')) / 100);
                 if (campaign.max_discount_paise) disc = Math.min(disc, campaign.max_discount_paise);
             }
@@ -310,6 +317,9 @@ export const calculatePricing = async ({
                 deliveryFeePaise = 0;
             }
         }
+
+        // Campaign free-delivery override
+        if (campaignFreeDelivery) deliveryFeePaise = 0;
 
         // Surge on top of whatever delivery fee was set
         if (zone.surge_multiplier && parseFloat(zone.surge_multiplier) > 1.0) {
