@@ -43,6 +43,7 @@ interface SavingsParams {
   displayId: string;
   menuOfferDiscountPaise?: number;
   promoDiscountPaise?: number;
+  campaignDiscountPaise?: number;
   loyaltyDiscountPaise?: number;
   walletDeductionPaise?: number;
   subtotalPaise?: number;
@@ -56,13 +57,14 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
     displayId,
     menuOfferDiscountPaise = 0,
     promoDiscountPaise = 0,
+    campaignDiscountPaise = 0,
     loyaltyDiscountPaise = 0,
     walletDeductionPaise = 0,
     subtotalPaise = 0,
     promoCode,
   }: SavingsParams = route.params || {};
 
-  const totalSavedPaise = menuOfferDiscountPaise + promoDiscountPaise + loyaltyDiscountPaise;
+  const totalSavedPaise = menuOfferDiscountPaise + promoDiscountPaise + campaignDiscountPaise + loyaltyDiscountPaise;
   const totalSaved = totalSavedPaise / 100;
   const subtotal = subtotalPaise / 100;
 
@@ -94,6 +96,13 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
       icon: <Gift size={18} color="#7C3AED" />,
       label: promoCode ? `Promo: ${promoCode}` : 'Promo Code',
       amount: promoDiscountPaise / 100,
+      color: '#7C3AED',
+      bg: '#F5F3FF',
+    },
+    campaignDiscountPaise > 0 && {
+      icon: <Zap size={18} color="#7C3AED" />,
+      label: 'Campaign Deal',
+      amount: campaignDiscountPaise / 100,
       color: '#7C3AED',
       bg: '#F5F3FF',
     },
