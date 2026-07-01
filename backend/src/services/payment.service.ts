@@ -207,7 +207,56 @@ export const calculatePricing = async ({
         }
     }
 
-    // ── 7. Loyalty points ──────────────────────────────────────────────────────
+    // ── 7. Campaign discounts (flash sale / happy hour / winback) ─────────────
+    let campaignDiscountPaise = 0;
+
+    {
+        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const nowTs = new Date();
+        const todayDay = dayNames[nowTs.getDay()];
+        const timeNow = `${nowTs.getHours().toString().padStart(2, '0')}:${nowTs.getMinutes().toString().padStart(2, '0')}`;
+
+        const { rows: campaigns } = await query(
+            `SELECT id, type, discount_type, discount_percent, discount_flat_paise,
+                    max_discount_paise, min_order_paise, winback_days, audience_type
+             FROM campaigns
+             WHERE is_active = true
+             AND (zone_id IS NULL OR zone_id = $1)
+             AND (
+                 (type = 'flash_sale' AND flash_start <= NOW() AND flash_end >= NOW())
+                 OR (type = 'happy_hour'
+                     AND happy_hour_start::time <= $2::time
+                     AND happy_hour_end::time >= $2::time
+                     AND $3 = ANY(happy_hour_days))
+                 OR (type NOT IN ('flash_sale', 'happy_hour'))
+             )`,
+            [zoneId, timeNow, todayDay]
+        );
+
+        for (const campaign of campaigns) {
+            if (campaign.min_order_paise > 0 && effectiveSubtotal < campaign.min_order_paise) continue;
+
+            if (campaign.type === 'winback') {
+                const { rows: recentOrders } = await query(
+                    `SELECT 1 FROM orders WHERE customer_id = $1 AND status = 'delivered'
+                     AND created_at > NOW() - ($2 * INTERVAL '1 day') LIMIT 1`,
+                    [customerId, campaign.winback_days || 7]
+                );
+                if (recentOrders.length > 0) continue;
+            }
+
+            let disc = 0;
+            if (campaign.discount_type === 'flat') {
+                disc = campaign.discount_flat_paise || 0;
+            } else {
+                disc = Math.floor((effectiveSubtotal * parseFloat(campaign.discount_percent || '0')) / 100);
+                if (campaign.max_discount_paise) disc = Math.min(disc, campaign.max_discount_paise);
+            }
+            if (disc > campaignDiscountPaise) campaignDiscountPaise = disc;
+        }
+    }
+
+    // ── 8. Loyalty points ──────────────────────────────────────────────────────
     let loyaltyDiscountPaise = 0;
     if (useLoyalty) {
         const { rows: loyaltyRes } = await query(
@@ -275,8 +324,8 @@ export const calculatePricing = async ({
         }
     }
 
-    // ── 9. GST ─────────────────────────────────────────────────────────────────
-    const totalDiscount = menuOfferDiscountPaise + subscriptionDiscountPaise + discountPaise + loyaltyDiscountPaise;
+    // ── 10. GST ────────────────────────────────────────────────────────────────
+    const totalDiscount = menuOfferDiscountPaise + subscriptionDiscountPaise + discountPaise + loyaltyDiscountPaise + campaignDiscountPaise;
     const taxableAmount = Math.max(0, subtotalPaise - totalDiscount);
     const gstPaise  = Math.round(taxableAmount * (TWO_QT.GST.RATE_PERCENT / 100));
     const cgstPaise = Math.round(gstPaise / 2);
@@ -285,7 +334,7 @@ export const calculatePricing = async ({
     const totalAmountPaise =
         taxableAmount + deliveryFeePaise + surgePaise + smallOrderFeePaise + gstPaise + riderTipPaise;
 
-    // ── 10. Wallet ─────────────────────────────────────────────────────────────
+    // ── 11. Wallet ─────────────────────────────────────────────────────────────
     const { rows: wallet } = await query(
         'SELECT balance_paise FROM customer_wallet WHERE customer_id = $1',
         [customerId]
@@ -297,6 +346,7 @@ export const calculatePricing = async ({
     return {
         subtotalPaise,
         menuOfferDiscountPaise,
+        campaignDiscountPaise,
         subscriptionDiscountPaise,
         discountPaise,
         loyaltyDiscountPaise,

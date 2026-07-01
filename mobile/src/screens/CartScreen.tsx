@@ -149,6 +149,7 @@ const CartScreen = ({ navigation }: any) => {
     gatewayAmountPaise: fallbackSubtotal + (riderTip * 100),
     discountPaise: 0,
     menuOfferDiscountPaise: 0,
+    campaignDiscountPaise: 0,
     smallOrderFeePaise: 0,
   };
   const subtotal = p.subtotalPaise / 100;
@@ -156,8 +157,9 @@ const CartScreen = ({ navigation }: any) => {
   const tax = ((p.gstPaise || 0) + (p.cgstPaise || 0) + (p.sgstPaise || 0)) / 100;
   const grandTotal = (p.gatewayAmountPaise || p.totalAmountPaise) / 100;
   const menuOfferDiscount = (p.menuOfferDiscountPaise || 0) / 100;
+  const campaignDiscount = (p.campaignDiscountPaise || 0) / 100;
   const smallOrderFee = (p.smallOrderFeePaise || 0) / 100;
-  const totalSaved = ((p.menuOfferDiscountPaise || 0) + (p.discountPaise || 0)) / 100;
+  const totalSaved = ((p.menuOfferDiscountPaise || 0) + (p.discountPaise || 0) + (p.campaignDiscountPaise || 0)) / 100;
 
   const plusOnlyOffers: any[] = (menuData?.offers || []).filter((o: any) => o.audience === 'plus_subscribers');
 
@@ -588,6 +590,12 @@ const CartScreen = ({ navigation }: any) => {
             <View style={styles.billRow}>
               <Text style={[styles.billLabel, { color: '#22C55E' }]}>Promo ({appliedPromoCode})</Text>
               <Text style={[styles.billValue, { color: '#22C55E' }]}>−₹{(p.discountPaise / 100).toFixed(2)}</Text>
+            </View>
+          )}
+          {campaignDiscount > 0 && (
+            <View style={styles.billRow}>
+              <Text style={[styles.billLabel, { color: '#7C3AED' }]}>🎯 Campaign Deal</Text>
+              <Text style={[styles.billValue, { color: '#7C3AED' }]}>−₹{campaignDiscount.toFixed(2)}</Text>
             </View>
           )}
           {smallOrderFee > 0 && (

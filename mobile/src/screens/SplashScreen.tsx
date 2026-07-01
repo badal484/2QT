@@ -105,7 +105,7 @@ const SplashScreen = () => {
       <Animated.View style={[StyleSheet.absoluteFill, glowStyle]}>
         <LinearGradient
           colors={['#FFFFFF', '#FFFFFF', '#F0FDF4']}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
       </Animated.View>
 

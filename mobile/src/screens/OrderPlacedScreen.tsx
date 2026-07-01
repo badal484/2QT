@@ -15,6 +15,7 @@ const OrderPlacedScreen = ({ route, navigation }: any) => {
     displayId,
     menuOfferDiscountPaise = 0,
     promoDiscountPaise = 0,
+    campaignDiscountPaise = 0,
     loyaltyDiscountPaise = 0,
     walletDeductionPaise = 0,
     subtotalPaise = 0,
@@ -22,7 +23,7 @@ const OrderPlacedScreen = ({ route, navigation }: any) => {
   } = route.params || {};
   const insets = useSafeAreaInsets();
 
-  const totalSavedPaise = menuOfferDiscountPaise + promoDiscountPaise + loyaltyDiscountPaise;
+  const totalSavedPaise = menuOfferDiscountPaise + promoDiscountPaise + campaignDiscountPaise + loyaltyDiscountPaise;
 
   const handleTrack = () => {
     ReactNativeHapticFeedback.trigger('impactLight', hapticOpts);
@@ -30,6 +31,7 @@ const OrderPlacedScreen = ({ route, navigation }: any) => {
       navigation.replace('OrderSavings', {
         orderId, displayId,
         menuOfferDiscountPaise, promoDiscountPaise,
+        campaignDiscountPaise,
         loyaltyDiscountPaise, walletDeductionPaise,
         subtotalPaise, promoCode,
       });

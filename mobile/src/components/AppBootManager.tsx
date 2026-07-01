@@ -142,7 +142,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
 
     const boot = async () => {
       // Enforce minimum splash screen duration to allow premium animations to play
-      const minimumSplashTime = new Promise((resolve) => setTimeout(resolve, 3000));
+      const minimumSplashTime = new Promise<void>((resolve) => setTimeout(resolve, 3000));
 
       // Wake Render free-tier backend immediately in background — doesn't block boot
       fetch('https://twoqt.onrender.com/api/v1/menu/zones').catch(() => {});
