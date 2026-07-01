@@ -1,9 +1,132 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { Tag, Plus, Trash2, ToggleLeft, ToggleRight, X, Edit3, Globe, MapPin } from "lucide-react";
+import { Tag, Plus, Trash2, ToggleLeft, ToggleRight, X, Edit3, Globe, MapPin, Search, ChevronDown } from "lucide-react";
+
+interface TargetResult { id: string; name: string; sub?: string }
+
+function TargetSearch({
+  targetType,
+  value,
+  label: selectedLabel,
+  onChange,
+}: {
+  targetType: string;
+  value: string;
+  label: string;
+  onChange: (id: string, name: string) => void;
+}) {
+  const [query, setQuery] = useState(selectedLabel || "");
+  const [results, setResults] = useState<TargetResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Sync label when editing an existing offer
+  useEffect(() => { if (selectedLabel) setQuery(selectedLabel); }, [selectedLabel]);
+
+  const search = useCallback(async (q: string) => {
+    setLoading(true);
+    try {
+      const data = await api.get(`/admin/offer-targets?type=${targetType}&q=${encodeURIComponent(q)}`);
+      setResults(data.results ?? []);
+      setOpen(true);
+    } catch { setResults([]); }
+    setLoading(false);
+  }, [targetType]);
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setQuery(val);
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => search(val), 280);
+    if (!val) { onChange("", ""); setResults([]); setOpen(false); }
+  };
+
+  const handleFocus = () => { if (!results.length) search(query); };
+
+  const select = (r: TargetResult) => {
+    setQuery(r.name);
+    onChange(r.id, r.name);
+    setOpen(false);
+  };
+
+  const typeLabel: Record<string, string> = { item: "item", kitchen: "kitchen", category: "category" };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">
+        Target {typeLabel[targetType] ?? targetType}
+      </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+        <input
+          value={query}
+          onChange={handleInput}
+          onFocus={handleFocus}
+          placeholder={`Search ${typeLabel[targetType] ?? "target"} by name…`}
+          className="w-full bg-white/[0.05] border border-white/10 rounded-xl pl-8 pr-8 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50 placeholder:text-zinc-600"
+        />
+        {value && (
+          <button
+            onClick={() => { setQuery(""); onChange("", ""); setResults([]); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {loading && !value && (
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 animate-spin" />
+        )}
+      </div>
+
+      {/* Selected badge */}
+      {value && (
+        <div className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 bg-brand-primary/10 border border-brand-primary/20 rounded-lg w-fit">
+          <div className="w-1.5 h-1.5 rounded-full bg-brand-primary" />
+          <span className="text-[10px] font-black text-brand-primary truncate max-w-[220px]">{query}</span>
+          <span className="text-[9px] text-zinc-500 font-mono">{value.slice(0, 8)}…</span>
+        </div>
+      )}
+
+      {/* Dropdown */}
+      {open && results.length > 0 && (
+        <div className="absolute z-50 top-full mt-1 w-full bg-zinc-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          {results.map(r => (
+            <button
+              key={r.id}
+              onClick={() => select(r)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.06] text-left transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-white truncate">{r.name}</div>
+                {r.sub && <div className="text-[10px] text-zinc-500 truncate">{r.sub}</div>}
+              </div>
+              <div className="text-[9px] text-zinc-600 font-mono shrink-0">{r.id.slice(0, 8)}…</div>
+            </button>
+          ))}
+        </div>
+      )}
+      {open && !loading && results.length === 0 && query.length > 0 && (
+        <div className="absolute z-50 top-full mt-1 w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-500">
+          No {typeLabel[targetType]}s found for "{query}"
+        </div>
+      )}
+    </div>
+  );
+}
 
 const EMPTY_FORM = {
   title: "",
@@ -28,6 +151,7 @@ export function MenuOffersTab() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<any>(EMPTY_FORM);
+  const [targetLabel, setTargetLabel] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -48,11 +172,13 @@ export function MenuOffersTab() {
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setTargetLabel("");
     setShowModal(true);
   };
 
   const openEdit = (offer: any) => {
     setEditing(offer);
+    setTargetLabel(offer.target_name ?? "");
     setForm({
       title: offer.title,
       description: offer.description ?? "",
@@ -257,15 +383,34 @@ export function MenuOffersTab() {
                 <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-3">Targeting</div>
               </div>
 
-              {sel("Applies To", "target_type", [
-                { value: "all", label: "All Items in Zone" },
-                { value: "kitchen", label: "Specific Kitchen" },
-                { value: "category", label: "Specific Category" },
-                { value: "item", label: "Specific Item" },
-              ])}
-              {form.target_type !== "all"
-                ? f("Target ID (UUID)", "target_id", "text", "Paste the kitchen/category/item UUID")
-                : <div />}
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Applies To</div>
+                <select
+                  value={form.target_type}
+                  onChange={e => {
+                    setForm({ ...form, target_type: e.target.value, target_id: "" });
+                    setTargetLabel("");
+                  }}
+                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50"
+                >
+                  <option value="all">All Items in Zone</option>
+                  <option value="kitchen">Specific Kitchen</option>
+                  <option value="category">Specific Category</option>
+                  <option value="item">Specific Item</option>
+                </select>
+              </div>
+
+              {form.target_type !== "all" ? (
+                <TargetSearch
+                  targetType={form.target_type}
+                  value={form.target_id}
+                  label={targetLabel}
+                  onChange={(id, name) => {
+                    setForm((p: any) => ({ ...p, target_id: id }));
+                    setTargetLabel(name);
+                  }}
+                />
+              ) : <div />}
 
               {sel("Zone", "zone_id", [
                 { value: "", label: "All Zones (Global)" },

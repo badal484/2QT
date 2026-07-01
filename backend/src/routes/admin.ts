@@ -866,6 +866,46 @@ router.patch('/inventory/:id', authenticate, requireRole('super_admin', 'admin')
 
 // ─── Zone Management ─────────────────────────────────────────────────────────
 
+// ── Offer target search: items / kitchens / categories ────────────────────────
+router.get('/offer-targets', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const type = req.query.type as string;
+    const q = ((req.query.q as string) || '').toLowerCase().trim();
+
+    try {
+        if (type === 'kitchen') {
+            const { rows } = await query(
+                `SELECT id, name FROM kitchens
+                 WHERE ($1 = '' OR LOWER(name) LIKE '%' || $1 || '%')
+                 ORDER BY name LIMIT 20`,
+                [q]
+            );
+            return res.json({ results: rows.map(r => ({ id: r.id, name: r.name })) });
+        }
+        if (type === 'category') {
+            const { rows } = await query(
+                `SELECT id, name FROM menu_categories
+                 WHERE ($1 = '' OR LOWER(name) LIKE '%' || $1 || '%')
+                 ORDER BY name LIMIT 20`,
+                [q]
+            );
+            return res.json({ results: rows.map(r => ({ id: r.id, name: r.name })) });
+        }
+        if (type === 'item') {
+            const { rows } = await query(
+                `SELECT id, name, category FROM menu_items
+                 WHERE ($1 = '' OR LOWER(name) LIKE '%' || $1 || '%')
+                 ORDER BY name LIMIT 20`,
+                [q]
+            );
+            return res.json({ results: rows.map(r => ({ id: r.id, name: r.name, sub: r.category })) });
+        }
+        return res.status(400).json({ error: 'type must be kitchen | category | item' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Search failed' });
+    }
+});
+
 router.get('/zones', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows } = await query('SELECT * FROM zones ORDER BY name');
     res.json({ zones: rows });
