@@ -161,7 +161,7 @@ export function MarketingTab() {
 
   useEffect(() => { fetchBanners(); }, []);
 
-  useSocketRefresh(["promo_updated", "campaign_updated"], fetchBanners);
+  useSocketRefresh(["promo_updated", "campaign_updated", "banner_updated"], fetchBanners);
 
   const makeUploader = (
     setter: (fn: (b: any) => any) => void,

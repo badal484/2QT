@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
+import { emitToAll } from '../socket';
 
 const router = express.Router();
 
@@ -88,6 +89,7 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
             zone_id || null, start_time || null, end_time || null,
             is_active ?? true,
         ]);
+        emitToAll('offer_updated', { action: 'create', offerId: rows[0].id });
         res.status(201).json({ offer: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to create menu offer', details: err.message });
@@ -141,6 +143,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
             is_active ?? null, id,
         ]);
         if (rows.length === 0) return res.status(404).json({ error: 'Offer not found' });
+        emitToAll('offer_updated', { action: 'update', offerId: id });
         res.json({ offer: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to update menu offer', details: err.message });
@@ -153,6 +156,7 @@ router.delete('/admin/:id', authenticate, requireRole('super_admin', 'admin'), a
     try {
         const { rowCount } = await query('DELETE FROM menu_offers WHERE id = $1', [id]);
         if (rowCount === 0) return res.status(404).json({ error: 'Offer not found' });
+        emitToAll('offer_updated', { action: 'delete', offerId: id });
         res.json({ message: 'Offer deleted' });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to delete menu offer' });

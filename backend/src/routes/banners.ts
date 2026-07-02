@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { emitToAll } from '../socket';
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
             RETURNING *`,
             [title, subtitle, tag_text, image_url, action_type || 'NONE', action_payload || '', is_active ?? true, display_order ?? 0, banner_type || 'MAIN']
         );
+        emitToAll('banner_updated', { action: 'create', bannerId: rows[0].id });
         res.status(201).json({ banner: rows[0] });
     } catch (err: any) {
         console.error(err);
@@ -71,6 +73,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
             [title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type, id]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Banner not found' });
+        emitToAll('banner_updated', { action: 'update', bannerId: id });
         res.json({ banner: rows[0] });
     } catch (err: any) {
         console.error(err);
@@ -84,6 +87,7 @@ router.delete('/admin/:id', authenticate, requireRole('super_admin', 'admin'), a
     try {
         const { rowCount } = await query('DELETE FROM promotional_banners WHERE id = $1', [id]);
         if (rowCount === 0) return res.status(404).json({ error: 'Banner not found' });
+        emitToAll('banner_updated', { action: 'delete', bannerId: id });
         res.json({ message: 'Banner deleted successfully' });
     } catch (err: any) {
         console.error(err);

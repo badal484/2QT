@@ -3,6 +3,7 @@ import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import redis, { keys } from '../redis';
 import { sendNotification, NotifType } from '../services/notification.service';
+import { emitToAll } from '../socket';
 
 const router = express.Router();
 
@@ -148,6 +149,7 @@ router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req: 
             ]
         );
         await bustCampaignCache();
+        emitToAll('campaign_updated', { action: 'create', campaignId: rows[0].id });
         res.status(201).json({ campaign: rows[0] });
     } catch (err: any) {
         console.error(err);
@@ -217,6 +219,7 @@ router.patch('/:id', authenticate, requireRole('super_admin', 'admin'), async (r
             fireCampaignNotification(rows[0]).catch(() => {});
         }
 
+        emitToAll('campaign_updated', { action: 'update', campaignId: id, isActive: rows[0].is_active });
         res.json({ campaign: rows[0] });
     } catch (err: any) {
         console.error(err);
@@ -231,6 +234,7 @@ router.delete('/:id', authenticate, requireRole('super_admin', 'admin'), async (
         const { rowCount } = await query('DELETE FROM campaigns WHERE id = $1', [id]);
         if (rowCount === 0) return res.status(404).json({ error: 'Campaign not found' });
         await bustCampaignCache();
+        emitToAll('campaign_updated', { action: 'delete', campaignId: id });
         res.json({ message: 'Campaign deleted' });
     } catch (err: any) {
         console.error(err);

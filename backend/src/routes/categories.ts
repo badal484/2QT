@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { emitToAll } from '../socket';
 
 const router = express.Router();
 
@@ -88,6 +89,7 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
              RETURNING *`,
             [zone_id, name, slug.trim(), image_url || '', banner_url || '', sort_order ?? 0, is_active ?? true]
         );
+        emitToAll('menu_updated', { type: 'category', action: 'create', zoneId: zone_id });
         res.status(201).json({ category: rows[0] });
     } catch (err: any) {
         if (err.code === '23505') {
@@ -117,6 +119,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
             [name, slug, image_url, banner_url, sort_order, is_active, id]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Category not found' });
+        emitToAll('menu_updated', { type: 'category', action: 'update', id });
         res.json({ category: rows[0] });
     } catch (err: any) {
         if (err.code === '23505') {
@@ -138,6 +141,7 @@ router.patch('/admin/reorder', authenticate, requireRole('super_admin', 'admin')
                 query('UPDATE menu_categories SET sort_order = $1, updated_at = NOW() WHERE id = $2', [sort_order, id])
             )
         );
+        emitToAll('menu_updated', { type: 'category', action: 'reorder' });
         res.json({ message: 'Reordered successfully' });
     } catch (err: any) {
         console.error('[CATEGORIES_REORDER]', err.message);
@@ -151,6 +155,7 @@ router.delete('/admin/:id', authenticate, requireRole('super_admin', 'admin'), a
     try {
         const { rowCount } = await query('DELETE FROM menu_categories WHERE id = $1', [id]);
         if (rowCount === 0) return res.status(404).json({ error: 'Category not found' });
+        emitToAll('menu_updated', { type: 'category', action: 'delete', id });
         res.json({ message: 'Category deleted' });
     } catch (err: any) {
         console.error('[CATEGORIES_DELETE]', err.message);
