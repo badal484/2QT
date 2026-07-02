@@ -24,9 +24,9 @@ export interface RefundParams {
 // finance approving wallet refund, COD wallet-portion reversal.
 
 export async function processWalletRefund(
-    params: RefundParams & { refundRecordId?: string }
+    params: RefundParams & { refundRecordId?: string; approvedBy?: string }
 ): Promise<{ newWalletBalance: number }> {
-    const { orderId, customerId, amountPaise, reason, initiatedBy, refundRecordId } = params;
+    const { orderId, customerId, amountPaise, reason, initiatedBy, refundRecordId, approvedBy } = params;
     let newWalletBalance = 0;
 
     await withTransaction(async (client) => {
@@ -70,7 +70,7 @@ export async function processWalletRefund(
                 UPDATE refunds
                 SET status = 'processed', refund_type = 'wallet', approved_by = $1, processed_at = NOW()
                 WHERE id = $2
-            `, [initiatedBy || null, refundRecordId]);
+            `, [approvedBy || initiatedBy || null, refundRecordId]);
         } else {
             await client.query(`
                 INSERT INTO refunds
