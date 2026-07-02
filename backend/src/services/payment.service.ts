@@ -72,15 +72,25 @@ export const calculatePricing = async ({
         // Find best offer discount for this item
         let bestOfferDiscount = 0;
         for (const offer of menuOffers) {
+            // target_ids (multi-select array) takes priority over single target_id
+            const itemTargetIds: string[] = Array.isArray(offer.target_ids) ? offer.target_ids : [];
             const matches =
                 offer.target_type === 'all' ||
-                (offer.target_type === 'item'     && offer.target_id === item.id) ||
-                (offer.target_type === 'category' && String(offer.target_id) === String(item.category)) ||
-                (offer.target_type === 'kitchen'  && offer.target_id === item.kitchen_id);
+                (offer.target_type === 'item' && (
+                    itemTargetIds.includes(item.id) || offer.target_id === item.id
+                )) ||
+                (offer.target_type === 'category' && (
+                    itemTargetIds.some(tid => String(tid) === String(item.category)) ||
+                    String(offer.target_id) === String(item.category)
+                )) ||
+                (offer.target_type === 'kitchen' && (
+                    itemTargetIds.includes(item.kitchen_id) || offer.target_id === item.kitchen_id
+                ));
 
             if (!matches) continue;
 
             // Audience check
+            const cfg = offer.audience_config || {};
             if (offer.audience === 'plus_subscribers') {
                 const { rows: plusRows } = await query(
                     `SELECT 1 FROM plus_subscriptions
@@ -95,6 +105,41 @@ export const calculatePricing = async ({
                     [customerId]
                 );
                 if (orderRows.length > 0) continue;
+            }
+            if (offer.audience === 'loyal') {
+                const minOrders = cfg.min_orders || 5;
+                const { rows: loyalRows } = await query(
+                    `SELECT COUNT(*) as cnt FROM orders WHERE customer_id = $1 AND status = 'delivered'`,
+                    [customerId]
+                );
+                if (parseInt(loyalRows[0]?.cnt || '0') < minOrders) continue;
+            }
+            if (offer.audience === 'at_risk') {
+                const days = cfg.inactive_days || 7;
+                const { rows: recentRows } = await query(
+                    `SELECT 1 FROM orders WHERE customer_id = $1 AND status = 'delivered'
+                     AND created_at > NOW() - ($2 * INTERVAL '1 day') LIMIT 1`,
+                    [customerId, days]
+                );
+                if (recentRows.length > 0) continue; // has ordered recently → not at-risk
+            }
+            if (offer.audience === 'churned') {
+                const days = cfg.inactive_days || 30;
+                const { rows: recentRows } = await query(
+                    `SELECT 1 FROM orders WHERE customer_id = $1 AND status = 'delivered'
+                     AND created_at > NOW() - ($2 * INTERVAL '1 day') LIMIT 1`,
+                    [customerId, days]
+                );
+                if (recentRows.length > 0) continue;
+            }
+            if (offer.audience === 'high_spenders') {
+                const minSpend = cfg.min_spend_paise || 100000;
+                const { rows: spendRows } = await query(
+                    `SELECT COALESCE(SUM(total_amount_paise),0) as total FROM orders
+                     WHERE customer_id = $1 AND status = 'delivered'`,
+                    [customerId]
+                );
+                if (parseInt(spendRows[0]?.total || '0') < minSpend) continue;
             }
 
             let discount = 0;
