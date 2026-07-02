@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { withTransaction, query } from '../db';
 import { redis, keys } from '../redis';
-import { emitToKitchen, emitToUser, emitToOrder, emitToAll } from '../socket';
+import { emitToKitchen, emitToUser, emitToOrder, emitToAll, emitToAdmin } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { finalizeOrder } from '../services/order.service';
 import { NotificationService } from '../services/notification.service';
@@ -136,6 +136,83 @@ router.post('/razorpay', async (req, res) => {
             }
         } catch (err) {
             console.error('[webhook refund.failed]', err);
+        }
+        return res.json({ status: 'ok' });
+    }
+
+    // ── RazorpayX payout confirmed by bank ───────────────────────────────────
+    if (event === 'payout.processed') {
+        const rzpPayoutId = payload.payout.entity.id as string;
+        const utr         = payload.payout.entity.utr as string | null;
+        try {
+            // Update UTR in whichever table holds this payout (rider or kitchen)
+            await query(
+                'UPDATE weekly_payouts  SET utr_number = COALESCE(utr_number, $2) WHERE razorpay_payout_id = $1',
+                [rzpPayoutId, utr]
+            );
+            await query(
+                'UPDATE kitchen_payouts SET utr_number = COALESCE(utr_number, $2) WHERE razorpay_payout_id = $1',
+                [rzpPayoutId, utr]
+            );
+        } catch (err) {
+            console.error('[webhook payout.processed]', err);
+        }
+        return res.json({ status: 'ok' });
+    }
+
+    // ── RazorpayX payout rejected / bounced ──────────────────────────────────
+    if (event === 'payout.failed' || event === 'payout.reversed') {
+        const rzpPayoutId   = payload.payout.entity.id as string;
+        const failureReason = (payload.payout.entity.error?.description || `Payout ${event}`) as string;
+        try {
+            // Check rider payout first
+            const { rows: riderRows } = await query(`
+                UPDATE weekly_payouts
+                SET status = 'failed', failure_reason = $2, updated_at = NOW()
+                WHERE razorpay_payout_id = $1 AND status IN ('paid','processing')
+                RETURNING rider_id, net_amount_paise
+            `, [rzpPayoutId, failureReason]);
+
+            if (riderRows[0]) {
+                const { rider_id, net_amount_paise } = riderRows[0];
+                emitToUser(rider_id, 'payout_failed', { amountPaise: net_amount_paise, reason: failureReason });
+                emitToAdmin('payout_failed', {
+                    type: 'rider',
+                    riderId: rider_id,
+                    amountPaise: net_amount_paise,
+                    reason: failureReason,
+                    rzpPayoutId,
+                });
+                console.error(`[webhook ${event}] rider=${rider_id} pout=${rzpPayoutId} reason=${failureReason}`);
+                return res.json({ status: 'ok' });
+            }
+
+            // Check kitchen payout
+            const { rows: kitchenRows } = await query(`
+                UPDATE kitchen_payouts
+                SET status = 'failed', failure_reason = $2, updated_at = NOW()
+                WHERE razorpay_payout_id = $1 AND status IN ('paid','processing')
+                RETURNING kitchen_id, net_payout_paise
+            `, [rzpPayoutId, failureReason]);
+
+            if (kitchenRows[0]) {
+                const { kitchen_id, net_payout_paise } = kitchenRows[0];
+                emitToKitchen(kitchen_id, 'kitchen_payout_updated', {
+                    status: 'failed',
+                    amountPaise: net_payout_paise,
+                    reason: failureReason,
+                });
+                emitToAdmin('payout_failed', {
+                    type: 'kitchen',
+                    kitchenId: kitchen_id,
+                    amountPaise: net_payout_paise,
+                    reason: failureReason,
+                    rzpPayoutId,
+                });
+                console.error(`[webhook ${event}] kitchen=${kitchen_id} pout=${rzpPayoutId} reason=${failureReason}`);
+            }
+        } catch (err) {
+            console.error(`[webhook ${event}]`, err);
         }
         return res.json({ status: 'ok' });
     }
