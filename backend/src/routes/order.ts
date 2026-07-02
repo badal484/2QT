@@ -217,14 +217,26 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
     if (order.payment_status === 'paid' && gatewayPortion > 0) {
         const canBankRefund = refundType === 'bank' && !!order.gateway_payment_id;
         if (canBankRefund) {
-            await processBankRefund({
-                orderId: id,
-                customerId: order.customer_id,
-                amountPaise: gatewayPortion,
-                reason: 'User cancelled order',
-                initiatedBy: order.customer_id,
-                razorpayPaymentId: order.gateway_payment_id,
-            });
+            try {
+                await processBankRefund({
+                    orderId: id,
+                    customerId: order.customer_id,
+                    amountPaise: gatewayPortion,
+                    reason: 'User cancelled order',
+                    initiatedBy: order.customer_id,
+                    razorpayPaymentId: order.gateway_payment_id,
+                });
+            } catch (rzpErr: any) {
+                // Razorpay unavailable — fall back to instant wallet credit
+                console.error('[cancel/bank-refund-fallback]', rzpErr.message);
+                await processWalletRefund({
+                    orderId: id,
+                    customerId: order.customer_id,
+                    amountPaise: gatewayPortion,
+                    reason: 'User cancelled order (bank refund fallback)',
+                    initiatedBy: order.customer_id,
+                });
+            }
         } else {
             await processWalletRefund({
                 orderId: id,
@@ -235,6 +247,14 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
             });
         }
     }
+
+    // Fix Bug: mixed wallet+gateway or COD+wallet cancel can leave payment_status='partially_refunded'
+    // because each refund call compares its own slice to total_amount_paise and sees a partial.
+    // A self-cancel is always a full refund of what was actually paid, so override here.
+    await query(
+        "UPDATE orders SET payment_status = 'refunded' WHERE id = $1 AND payment_status IN ('paid', 'cod_pending', 'partially_refunded', 'refund_pending')",
+        [id]
+    );
 
     emitToUser(order.customer_id, 'order_status_update', { orderId: id, status: 'cancelled' });
     emitToKitchen(order.kitchen_id, 'order_cancelled', { orderId: id });
