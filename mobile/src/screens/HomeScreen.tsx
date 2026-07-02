@@ -194,10 +194,14 @@ const HomeScreen = ({ navigation }: any) => {
         let appliedOffer = null;
         
         for (const offer of offers) {
-             const isMatch = offer.target_type === 'all' || 
-                             (offer.target_type === 'item' && offer.target_id === item.id) ||
-                             (offer.target_type === 'category' && String(offer.target_id) === String(item.category)) ||
-                             (offer.target_type === 'kitchen' && offer.target_id === item.kitchen_id);
+             const tIds: string[] = Array.isArray(offer.target_ids) ? offer.target_ids : [];
+             const isMatch = offer.target_type === 'all' ||
+                             (offer.target_type === 'item' && (tIds.includes(item.id) || offer.target_id === item.id)) ||
+                             (offer.target_type === 'category' && (
+                                 tIds.some((t: string) => String(t) === String(item.category)) ||
+                                 String(offer.target_id) === String(item.category)
+                             )) ||
+                             (offer.target_type === 'kitchen' && (tIds.includes(item.kitchen_id) || offer.target_id === item.kitchen_id));
              
              if (isMatch) {
                   let discount = 0;
@@ -479,9 +483,11 @@ const HomeScreen = ({ navigation }: any) => {
 
                     {/* Offer badge */}
                     {mi.applied_offer && (
-                      <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: '#34D399', paddingHorizontal: 6, paddingVertical: 2, borderBottomLeftRadius: 12, borderTopRightRadius: 16 }}>
-                        <Text style={{ color: 'white', fontSize: 10, fontFamily: fontFamily.bold }}>
-                          {mi.applied_offer.name}
+                      <View style={styles.itemOfferBadge}>
+                        <Text style={styles.itemOfferBadgeText}>
+                          {mi.applied_offer.discount_type === 'flat'
+                            ? `₹${(mi.applied_offer.discount_flat_paise || 0) / 100} OFF`
+                            : `${mi.applied_offer.discount_percent || 0}% OFF`}
                         </Text>
                       </View>
                     )}
@@ -573,9 +579,11 @@ const HomeScreen = ({ navigation }: any) => {
             {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text style={styles.homeGridNewText}>+ New</Text></View>}
             {unavailable && <View style={styles.homeGridSoldOut}><Text style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
             {menuItem.applied_offer && (
-              <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: '#34D399', paddingHorizontal: 8, paddingVertical: 4, borderBottomLeftRadius: 12, borderTopRightRadius: 16 }}>
-                <Text style={{ color: 'white', fontSize: 11, fontFamily: fontFamily.bold }}>
-                  {menuItem.applied_offer.name}
+              <View style={styles.itemOfferBadge}>
+                <Text style={styles.itemOfferBadgeText}>
+                  {menuItem.applied_offer.discount_type === 'flat'
+                    ? `₹${(menuItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
+                    : `${menuItem.applied_offer.discount_percent || 0}% OFF`}
                 </Text>
               </View>
             )}
@@ -1022,37 +1030,68 @@ const HomeScreen = ({ navigation }: any) => {
               </View>
             )}
 
-            {/* ── Deals For You — active menu offers strip ── */}
+            {/* ── Deals For You ── */}
             {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError &&
               menuData?.offers && menuData.offers.length > 0 && (
               <View style={styles.dealsSection}>
-                <Text style={styles.dealsSectionTitle}>Deals For You</Text>
+                <View style={styles.dealsSectionHeader}>
+                  <Text style={styles.dealsSectionTitle}>Deals For You</Text>
+                  <Text style={styles.dealsSectionSub}>{menuData.offers.length} offer{menuData.offers.length > 1 ? 's' : ''} active</Text>
+                </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dealsScroll}>
-                  {menuData.offers.map((offer: any) => {
+                  {menuData.offers.map((offer: any, idx: number) => {
                     const isFlatOff = offer.discount_type === 'flat';
-                    const discLabel = isFlatOff
-                      ? `₹${(offer.discount_flat_paise || 0) / 100} OFF`
-                      : `${offer.discount_percent || 0}% OFF${offer.max_discount_paise ? ` upto ₹${offer.max_discount_paise / 100}` : ''}`;
+                    const discountNum = isFlatOff
+                      ? `₹${(offer.discount_flat_paise || 0) / 100}`
+                      : `${parseFloat(offer.discount_percent || '0').toFixed(0)}%`;
+                    const discountSuffix = isFlatOff ? 'OFF' : 'OFF';
+                    const capText = !isFlatOff && offer.max_discount_paise
+                      ? `Upto ₹${offer.max_discount_paise / 100}` : null;
+                    const isPlus = offer.audience === 'plus_subscribers';
+                    const gradients = [
+                      ['#1B5E46', '#2D7A5E'],
+                      ['#7C3AED', '#9F67FA'],
+                      ['#B45309', '#D97706'],
+                      ['#1D4ED8', '#3B82F6'],
+                      ['#BE185D', '#EC4899'],
+                    ];
+                    const [gradFrom, gradTo] = gradients[idx % gradients.length];
+                    const daysLeft = offer.end_time
+                      ? Math.ceil((new Date(offer.end_time).getTime() - Date.now()) / 86400000) : null;
                     return (
-                      <View key={offer.id} style={[styles.dealCard, offer.audience === 'plus_subscribers' && styles.dealCardPlus]}>
-                        <View style={styles.dealIconBox}>
-                          <Text style={styles.dealIconText}>{offer.audience === 'plus_subscribers' ? '⚡' : '🏷️'}</Text>
-                        </View>
-                        {offer.audience === 'plus_subscribers' && (
+                      <View key={offer.id} style={[styles.dealCard, { backgroundColor: gradFrom }]}>
+                        {/* Decorative circle */}
+                        <View style={[styles.dealCircle, { backgroundColor: gradTo }]} />
+                        {isPlus && (
                           <View style={styles.dealPlusBadge}>
-                            <Text style={styles.dealPlusBadgeText}>PLUS</Text>
+                            <Text style={styles.dealPlusBadgeText}>⚡ PLUS</Text>
                           </View>
                         )}
-                        <Text style={[styles.dealDiscount, offer.audience === 'plus_subscribers' && { color: '#4C1D95' }]}>{discLabel}</Text>
+                        {/* Discount number */}
+                        <View style={styles.dealDiscountRow}>
+                          <Text style={styles.dealDiscountNum}>{discountNum}</Text>
+                          <Text style={styles.dealDiscountOff}>{discountSuffix}</Text>
+                        </View>
+                        {capText && <Text style={styles.dealCap}>{capText}</Text>}
+                        {/* Title */}
                         <Text style={styles.dealTitle} numberOfLines={2}>{offer.title}</Text>
                         {offer.description ? (
-                          <Text style={styles.dealDesc} numberOfLines={2}>{offer.description}</Text>
+                          <Text style={styles.dealDesc} numberOfLines={1}>{offer.description}</Text>
                         ) : null}
-                        {offer.end_time ? (
-                          <Text style={styles.dealExpiry}>
-                            Ends {new Date(offer.end_time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                          </Text>
-                        ) : null}
+                        {/* Footer */}
+                        <View style={styles.dealFooter}>
+                          {daysLeft !== null ? (
+                            <View style={styles.dealExpiryPill}>
+                              <Text style={styles.dealExpiryText}>
+                                {daysLeft <= 0 ? 'Ends today' : daysLeft === 1 ? 'Ends tomorrow' : `${daysLeft}d left`}
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={styles.dealExpiryPill}>
+                              <Text style={styles.dealExpiryText}>Always on</Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
                     );
                   })}
@@ -1796,26 +1835,76 @@ const styles = StyleSheet.create({
   },
 
   // ── Deals For You ──────────────────────────────────────────────────────────
-  dealsSection: { marginTop: spacing.md, paddingHorizontal: spacing.lg },
-  dealsSectionTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 12, letterSpacing: -0.4 },
+  dealsSection: { marginTop: spacing.md + 4, paddingHorizontal: spacing.lg },
+  dealsSectionHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 },
+  dealsSectionTitle: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
+  dealsSectionSub: { fontSize: 12, fontFamily: fontFamily.semibold, color: colors.inkMuted },
   dealsScroll: { gap: 12, paddingRight: spacing.lg },
   dealCard: {
-    width: 160,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
+    width: 168,
+    borderRadius: 20,
+    padding: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    minHeight: 160,
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  dealIconBox: { marginBottom: 8 },
-  dealIconText: { fontSize: 22 },
-  dealDiscount: { fontSize: 16, fontFamily: fontFamily.black, color: '#92400E', letterSpacing: -0.3, marginBottom: 4 },
-  dealTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, lineHeight: 18, marginBottom: 4 },
-  dealDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 15, marginBottom: 6 },
-  dealExpiry: { fontSize: 10, fontFamily: fontFamily.semibold, color: '#D97706', textTransform: 'uppercase', letterSpacing: 0.5 },
-  dealCardPlus: { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' },
-  dealPlusBadge: { alignSelf: 'flex-start', backgroundColor: '#7C3AED', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 4 },
-  dealPlusBadgeText: { fontSize: 9, fontFamily: fontFamily.black, color: '#fff', letterSpacing: 1 },
+  dealCircle: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    top: -30,
+    right: -30,
+    opacity: 0.5,
+  },
+  dealDiscountRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginTop: 8 },
+  dealDiscountNum: { fontSize: 36, fontFamily: fontFamily.black, color: '#fff', letterSpacing: -1.5, lineHeight: 40 },
+  dealDiscountOff: { fontSize: 15, fontFamily: fontFamily.black, color: 'rgba(255,255,255,0.85)', marginBottom: 4 },
+  dealCap: { fontSize: 11, fontFamily: fontFamily.semibold, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  dealTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: '#fff', lineHeight: 17, marginTop: 8 },
+  dealDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: 'rgba(255,255,255,0.75)', lineHeight: 15, marginTop: 3 },
+  dealFooter: { marginTop: 10 },
+  dealExpiryPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  dealExpiryText: { fontSize: 10, fontFamily: fontFamily.bold, color: '#fff', letterSpacing: 0.3 },
+  dealPlusBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    marginBottom: 2,
+  },
+  dealPlusBadgeText: { fontSize: 10, fontFamily: fontFamily.black, color: '#fff', letterSpacing: 0.8 },
+
+  // ── Item offer badge ────────────────────────────────────────────────────────
+  itemOfferBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: '#16A34A',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    zIndex: 10,
+  },
+  itemOfferBadgeText: {
+    fontSize: 10,
+    fontFamily: fontFamily.black,
+    color: '#fff',
+    letterSpacing: 0.3,
+  },
 
   itemsContainer: { paddingHorizontal: 12, marginTop: 16, paddingBottom: 60 },
   modernItemsList: { width: '100%' },
