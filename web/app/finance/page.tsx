@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Wallet, Bike, Utensils, Receipt,
-  BarChart3, LogOut, IndianRupee, Menu, X, Store
+  BarChart3, LogOut, IndianRupee, Menu, X, Store, RotateCcw
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -19,14 +19,17 @@ const KitchenPayoutsTab = dynamic(() => import("./KitchenPayoutsTab").then(m => 
 const TransactionsTab = dynamic(() => import("./TransactionsTab").then(m => ({ default: m.TransactionsTab })), { ssr: false });
 const ProductsTab = dynamic(() => import("./ProductsTab").then(m => ({ default: m.ProductsTab })), { ssr: false });
 const PartnersTab = dynamic(() => import("./PartnersTab").then(m => ({ default: m.PartnersTab })), { ssr: false });
+const RefundsTab = dynamic(() => import("./RefundsTab").then(m => ({ default: m.RefundsTab })), { ssr: false });
+
 const TABS = [
-  { name: "Overview", icon: LayoutDashboard, component: OverviewTab, section: "Main" },
-  { name: "COD Cash", icon: Wallet, component: CODTab, section: "Main" },
-  { name: "Rider Payouts", icon: Bike, component: RiderPayoutsTab, section: "Payouts" },
-  { name: "Kitchen Payouts", icon: Utensils, component: KitchenPayoutsTab, section: "Payouts" },
-  { name: "Partners", icon: Store, component: PartnersTab, section: "Payouts" },
-  { name: "Transactions", icon: Receipt, component: TransactionsTab, section: "Reports" },
-  { name: "Products", icon: BarChart3, component: ProductsTab, section: "Reports" },
+  { name: "Overview",        icon: LayoutDashboard, component: OverviewTab,       section: "Main" },
+  { name: "COD Cash",        icon: Wallet,           component: CODTab,            section: "Main" },
+  { name: "Refunds",         icon: RotateCcw,        component: RefundsTab,        section: "Main" },
+  { name: "Rider Payouts",   icon: Bike,             component: RiderPayoutsTab,   section: "Payouts" },
+  { name: "Kitchen Payouts", icon: Utensils,         component: KitchenPayoutsTab, section: "Payouts" },
+  { name: "Partners",        icon: Store,            component: PartnersTab,       section: "Payouts" },
+  { name: "Transactions",    icon: Receipt,          component: TransactionsTab,   section: "Reports" },
+  { name: "Products",        icon: BarChart3,        component: ProductsTab,       section: "Reports" },
 ];
 
 const SECTIONS = ["Main", "Payouts", "Reports"];
