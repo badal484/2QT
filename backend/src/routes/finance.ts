@@ -3,6 +3,7 @@ import { query } from '../db';
 import pool from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
+import { emitToAll, emitToUser, emitToKitchen } from '../socket';
 import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
 
 const router = Router();
@@ -161,6 +162,7 @@ router.post('/cod/mark-collected', financeAccess, financeRole, async (req: AuthR
     }
 
     await client.query('COMMIT');
+    emitToAll('cod_updated', { action: 'collected', riderIds: [riderId], count: updatedOrders.length });
     res.json({ success: true, collectedCount: updatedOrders.length, totalPaise });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -290,6 +292,8 @@ router.post('/rider-payouts/:id/mark-paid', financeAccess, financeRole, async (r
       WHERE id = $1 RETURNING *
     `, [id, req.user!.userId, rzpPayoutId, notes || null, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual']);
 
+    emitToUser(payout.rider_id, 'earnings_updated', { payoutId: id, amountPaise: payout.net_amount_paise, status: 'paid' });
+    emitToAll('rider_payout_updated', { action: 'paid', payoutId: id });
     res.json({ success: true, payout: rows[0], autoTransferred: autoMode });
   } catch (err) {
     console.error('[finance/rider-payouts/mark-paid]', err);
@@ -417,6 +421,8 @@ router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async 
       WHERE id = $1 RETURNING *
     `, [id, req.user!.userId, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual', notes || null, bankReference || null]);
 
+    emitToKitchen(kp.kitchen_id, 'kitchen_payout_updated', { payoutId: id, amountPaise: kp.net_payout_paise, status: 'paid' });
+    emitToAll('kitchen_payout_updated', { action: 'paid', payoutId: id, kitchenId: kp.kitchen_id });
     res.json({ success: true, payout: rows[0], autoTransferred: autoMode });
   } catch (err) {
     console.error('[finance/kitchen-payouts/mark-paid]', err);
