@@ -1036,59 +1036,64 @@ const HomeScreen = ({ navigation }: any) => {
                   <Text style={styles.dealsSectionTitle}>Deals For You</Text>
                   <Text style={styles.dealsSectionSub}>{menuData.offers.length} offer{menuData.offers.length > 1 ? 's' : ''} active</Text>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dealsScroll}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.dealsScroll}
+                  decelerationRate="fast"
+                  snapToInterval={SCREEN_WIDTH - 48 + 12}
+                  snapToAlignment="start"
+                >
                   {menuData.offers.map((offer: any, idx: number) => {
                     const isFlatOff = offer.discount_type === 'flat';
                     const discountNum = isFlatOff
                       ? `₹${(offer.discount_flat_paise || 0) / 100}`
-                      : `${parseFloat(offer.discount_percent || '0').toFixed(0)}%`;
-                    const discountSuffix = isFlatOff ? 'OFF' : 'OFF';
+                      : `${Math.round(parseFloat(offer.discount_percent || '0'))}%`;
                     const capText = !isFlatOff && offer.max_discount_paise
                       ? `Upto ₹${offer.max_discount_paise / 100}` : null;
                     const isPlus = offer.audience === 'plus_subscribers';
-                    const gradients = [
-                      ['#1B5E46', '#2D7A5E'],
-                      ['#7C3AED', '#9F67FA'],
-                      ['#B45309', '#D97706'],
-                      ['#1D4ED8', '#3B82F6'],
-                      ['#BE185D', '#EC4899'],
+                    const palette = [
+                      { bg: '#1B5E46', left: '#155236', tag: '#4ADE80' },
+                      { bg: '#6D28D9', left: '#5B21B6', tag: '#C4B5FD' },
+                      { bg: '#B45309', left: '#92400E', tag: '#FCD34D' },
+                      { bg: '#1D4ED8', left: '#1E40AF', tag: '#93C5FD' },
+                      { bg: '#9D174D', left: '#831843', tag: '#F9A8D4' },
                     ];
-                    const [gradFrom, gradTo] = gradients[idx % gradients.length];
+                    const { bg, left: leftBg, tag: tagColor } = palette[idx % palette.length];
                     const daysLeft = offer.end_time
                       ? Math.ceil((new Date(offer.end_time).getTime() - Date.now()) / 86400000) : null;
+                    const expiryLabel = daysLeft === null ? 'Always on'
+                      : daysLeft <= 0 ? 'Ends today'
+                      : daysLeft === 1 ? 'Ends tomorrow'
+                      : `${daysLeft}d left`;
                     return (
-                      <View key={offer.id} style={[styles.dealCard, { backgroundColor: gradFrom }]}>
-                        {/* Decorative circle */}
-                        <View style={[styles.dealCircle, { backgroundColor: gradTo }]} />
-                        {isPlus && (
-                          <View style={styles.dealPlusBadge}>
-                            <Text style={styles.dealPlusBadgeText}>⚡ PLUS</Text>
-                          </View>
-                        )}
-                        {/* Discount number */}
-                        <View style={styles.dealDiscountRow}>
+                      <View key={offer.id} style={[styles.dealCard, { backgroundColor: bg }]}>
+                        {/* Left: accent panel with discount number */}
+                        <View style={[styles.dealLeft, { backgroundColor: leftBg }]}>
                           <Text style={styles.dealDiscountNum}>{discountNum}</Text>
-                          <Text style={styles.dealDiscountOff}>{discountSuffix}</Text>
+                          <Text style={styles.dealDiscountOff}>OFF</Text>
+                          {capText && <Text style={styles.dealCap}>{capText}</Text>}
                         </View>
-                        {capText && <Text style={styles.dealCap}>{capText}</Text>}
-                        {/* Title */}
-                        <Text style={styles.dealTitle} numberOfLines={2}>{offer.title}</Text>
-                        {offer.description ? (
-                          <Text style={styles.dealDesc} numberOfLines={1}>{offer.description}</Text>
-                        ) : null}
-                        {/* Footer */}
-                        <View style={styles.dealFooter}>
-                          {daysLeft !== null ? (
-                            <View style={styles.dealExpiryPill}>
-                              <Text style={styles.dealExpiryText}>
-                                {daysLeft <= 0 ? 'Ends today' : daysLeft === 1 ? 'Ends tomorrow' : `${daysLeft}d left`}
-                              </Text>
-                            </View>
-                          ) : (
-                            <View style={styles.dealExpiryPill}>
-                              <Text style={styles.dealExpiryText}>Always on</Text>
+
+                        {/* Dashed separator */}
+                        <View style={styles.dealSep} />
+
+                        {/* Right: title + meta */}
+                        <View style={styles.dealRight}>
+                          {isPlus && (
+                            <View style={[styles.dealPlusBadge, { backgroundColor: tagColor + '33' }]}>
+                              <Text style={[styles.dealPlusBadgeText, { color: tagColor }]}>⚡ PLUS</Text>
                             </View>
                           )}
+                          <Text style={styles.dealTitle} numberOfLines={2}>{offer.title}</Text>
+                          {offer.description ? (
+                            <Text style={styles.dealDesc} numberOfLines={1}>{offer.description}</Text>
+                          ) : null}
+                          <View style={styles.dealFooter}>
+                            <Text style={styles.dealAutoApply}>✓ Auto-applied</Text>
+                            <View style={styles.dealFooterDot} />
+                            <Text style={[styles.dealExpiryText, { color: tagColor }]}>{expiryLabel}</Text>
+                          </View>
                         </View>
                       </View>
                     );
@@ -1839,52 +1844,53 @@ const styles = StyleSheet.create({
   dealsSectionSub: { fontSize: 12, fontFamily: fontFamily.semibold, color: colors.inkMuted },
   dealsScroll: { gap: 12, paddingRight: spacing.lg },
   dealCard: {
-    width: 168,
-    borderRadius: 20,
-    padding: 16,
+    width: SCREEN_WIDTH - 48,
+    height: 116,
+    flexDirection: 'row',
+    borderRadius: 18,
     overflow: 'hidden',
-    position: 'relative',
-    minHeight: 160,
-    justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 8,
   },
-  dealCircle: {
-    position: 'absolute',
+  dealLeft: {
     width: 110,
-    height: 110,
-    borderRadius: 55,
-    top: -30,
-    right: -30,
-    opacity: 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
   },
-  dealDiscountRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginTop: 8 },
-  dealDiscountNum: { fontSize: 36, fontFamily: fontFamily.black, color: '#fff', letterSpacing: -1.5, lineHeight: 40 },
-  dealDiscountOff: { fontSize: 15, fontFamily: fontFamily.black, color: 'rgba(255,255,255,0.85)', marginBottom: 4 },
-  dealCap: { fontSize: 11, fontFamily: fontFamily.semibold, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  dealTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: '#fff', lineHeight: 17, marginTop: 8 },
-  dealDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: 'rgba(255,255,255,0.75)', lineHeight: 15, marginTop: 3 },
-  dealFooter: { marginTop: 10 },
-  dealExpiryPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  dealSep: {
+    width: 1,
+    height: '70%',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderStyle: 'dashed',
   },
-  dealExpiryText: { fontSize: 10, fontFamily: fontFamily.bold, color: '#fff', letterSpacing: 0.3 },
+  dealRight: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+  },
+  dealDiscountNum: { fontSize: 42, fontFamily: fontFamily.black, color: '#fff', letterSpacing: -2, lineHeight: 46 },
+  dealDiscountOff: { fontSize: 12, fontFamily: fontFamily.black, color: 'rgba(255,255,255,0.8)', letterSpacing: 1, marginTop: -2 },
+  dealCap: { fontSize: 10, fontFamily: fontFamily.semibold, color: 'rgba(255,255,255,0.65)', marginTop: 3 },
+  dealTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: '#fff', lineHeight: 19, marginBottom: 3 },
+  dealDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: 'rgba(255,255,255,0.7)', lineHeight: 15, marginBottom: 8 },
+  dealFooter: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  dealAutoApply: { fontSize: 10, fontFamily: fontFamily.semibold, color: 'rgba(255,255,255,0.75)' },
+  dealFooterDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.4)' },
+  dealExpiryText: { fontSize: 10, fontFamily: fontFamily.bold, letterSpacing: 0.2 },
   dealPlusBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 8,
+    borderRadius: 6,
     paddingHorizontal: 7,
-    paddingVertical: 3,
-    marginBottom: 2,
+    paddingVertical: 2,
+    marginBottom: 5,
   },
-  dealPlusBadgeText: { fontSize: 10, fontFamily: fontFamily.black, color: '#fff', letterSpacing: 0.8 },
+  dealPlusBadgeText: { fontSize: 10, fontFamily: fontFamily.black, letterSpacing: 0.5 },
 
   // ── Item offer tag (in price row, no image overlap) ────────────────────────
   itemOfferTag: {
