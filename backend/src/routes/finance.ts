@@ -3,7 +3,7 @@ import { query } from '../db';
 import pool from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
-import { emitToAll, emitToUser, emitToKitchen } from '../socket';
+import { emitToAll, emitToUser, emitToKitchen, emitToAdmin } from '../socket';
 import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
 
 const router = Router();
@@ -363,6 +363,7 @@ router.post('/kitchen-payouts/generate', financeAccess, financeRole, async (req:
     `, [kitchenId, periodStart, periodEnd, grossSalesPaise, commissionPaise, netPayoutPaise, parseInt(stats.orders_count)]);
 
     await client.query('COMMIT');
+    emitToAll('kitchen_payout_updated', { action: 'generate', kitchenId, payoutId: inserted[0].id });
     res.json({ success: true, payout: { ...inserted[0], kitchen_name: kitchen.name } });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -646,6 +647,7 @@ router.patch('/partners/applications/:id', financeAccess, financeRole, async (re
       WHERE id = $1
       RETURNING *
     `, [id, status, rejectionReason || null, notes || null, req.user!.userId]);
+    emitToAdmin('partner_updated', { action: 'application', applicationId: id, status });
     res.json({ success: true, application: rows[0] });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update application' });
@@ -696,6 +698,7 @@ router.patch('/partners/kitchens/:id', financeAccess, financeRole, async (req: A
         isPartner ?? null, partnerStatus ?? null, partnerNotes ?? null]);
 
     if (!rows.length) return res.status(404).json({ error: 'Kitchen not found' });
+    emitToAdmin('partner_updated', { action: 'kitchen', kitchenId: id });
     res.json({ success: true, kitchen: rows[0] });
   } catch (err) {
     console.error('[finance/partners/kitchens PATCH]', err);

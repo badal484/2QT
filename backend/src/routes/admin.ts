@@ -453,7 +453,12 @@ router.post('/orders/:id/assign', authenticate, requireRole('super_admin', 'admi
     const { id } = req.params;
     const { riderId } = req.body;
     if (!riderId) return res.status(400).json({ error: 'MISSING_RIDER_ID' });
-    await query('UPDATE orders SET rider_id = $1, status = \'out_for_delivery\' WHERE id = $2', [riderId, id]);
+    const { rows: oRows } = await query('UPDATE orders SET rider_id = $1, status = \'out_for_delivery\' WHERE id = $2 RETURNING customer_id', [riderId, id]);
+    if (oRows[0]) {
+        emitToUser(oRows[0].customer_id, 'order_status_update', { orderId: id, status: 'out_for_delivery' });
+        emitToUser(riderId, 'order_assigned', { orderId: id });
+    }
+    emitToAdmin('order_status_update', { orderId: id, status: 'out_for_delivery' });
     res.json({ success: true });
 });
 
@@ -1057,6 +1062,7 @@ router.post('/zones/:id/delivery-tiers', authenticate, requireRole('super_admin'
              VALUES ($1, $2, $3, $4) RETURNING *`,
             [req.params.id, from_paise, to_paise ?? null, fee_paise]
         );
+        emitToAll('zone_updated', { action: 'tier_create', zoneId: req.params.id });
         res.status(201).json({ tier: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to create tier', details: err.message });
@@ -1070,6 +1076,7 @@ router.delete('/zones/:id/delivery-tiers/:tierId', authenticate, requireRole('su
             [req.params.tierId, req.params.id]
         );
         if (rowCount === 0) return res.status(404).json({ error: 'Tier not found' });
+        emitToAll('zone_updated', { action: 'tier_delete', zoneId: req.params.id });
         res.json({ message: 'Tier deleted' });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to delete tier' });
@@ -1266,12 +1273,14 @@ router.post('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'adm
         const { rows: existing } = await query('SELECT id FROM users WHERE phone = $1', [phone]);
         if (existing.length > 0) {
             await query('UPDATE users SET role = $1, kitchen_id = $2, is_active = true WHERE phone = $3', ['chef', id, phone]);
+            emitToAll('kitchen_updated', { action: 'staff_add', kitchenId: id });
             res.json({ success: true, message: 'Existing user promoted to chef' });
         } else {
             await query(`
                 INSERT INTO users (name, phone, role, kitchen_id, is_active, onboarding_complete)
                 VALUES ($1, $2, 'chef', $3, true, true)
             `, [name || 'Chef', phone, id]);
+            emitToAll('kitchen_updated', { action: 'staff_add', kitchenId: id });
             res.json({ success: true, message: 'New chef account created' });
         }
     } catch (err: any) {
@@ -1284,6 +1293,7 @@ router.delete('/kitchens/:id/staff/:staffId', authenticate, requireRole('super_a
     try {
         // Demote chef back to customer or remove kitchen_id
         await query('UPDATE users SET role = $1, kitchen_id = NULL WHERE id = $2', ['customer', staffId]);
+        emitToAll('kitchen_updated', { action: 'staff_remove', kitchenId: req.params.id });
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to remove staff', details: err.message });
@@ -1354,6 +1364,7 @@ router.post('/team/users', authenticate, requireRole('super_admin', 'admin'), as
                     is_active = true, is_verified = true
             RETURNING id, name, phone, role, kitchen_id, created_at
         `, [cleanPhone, name.trim(), role, kitchenId || null]);
+        emitToAdmin('new_user', { user: rows[0] });
         res.json({ success: true, user: rows[0] });
     } catch (err: any) {
         console.error('[admin/team/users POST]', err);
@@ -1365,6 +1376,8 @@ router.patch('/team/users/:id/deactivate', authenticate, requireRole('super_admi
     const { id } = req.params;
     try {
         await query('UPDATE users SET is_active = false WHERE id = $1 AND role NOT IN (\'super_admin\')', [id]);
+        emitToAdmin('user_updated', { userId: id, is_active: false });
+        emitToUser(id as string, 'user_updated', { is_active: false });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Failed to deactivate user' });
@@ -1436,6 +1449,7 @@ router.patch('/partners/applications/:id', authenticate, requireRole('super_admi
             RETURNING *
         `, [status ?? null, rejectionReason ?? null, notes ?? null, id]);
 
+        emitToAdmin('partner_updated', { action: 'application', applicationId: id, status });
         res.json({ success: true, application: rows[0], kitchen_id: kitchenId });
     } catch (err) {
         console.error('[admin/partners/applications/patch]', err);
@@ -1520,6 +1534,7 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
             FROM kitchens k WHERE k.id = $1
         `, [id]);
 
+        emitToAdmin('partner_updated', { action: 'kitchen', kitchenId: id });
         res.json({ success: true, kitchen: rows[0] });
     } catch (err) {
         console.error('[admin/partners/kitchens/patch]', err);
