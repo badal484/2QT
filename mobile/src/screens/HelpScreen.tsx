@@ -70,19 +70,6 @@ const FAQS = [
     ],
   },
   {
-    category: 'Subscription & Plans',
-    items: [
-      {
-        q: 'How do subscription meal plans work?',
-        a: 'Purchase a bundle of 20 or 30 meals at a discounted rate. Each order deducts one meal credit. Unused credits roll over up to 2 per month. Plans don\'t expire but must be renewed when credits run out.',
-      },
-      {
-        q: 'Can I pause or cancel my subscription?',
-        a: 'You can pause your plan anytime from Profile → My Plans → tap your plan → Pause. Credits pause with you. You cannot get a refund on unused credits but they never expire.',
-      },
-    ],
-  },
-  {
     category: 'Account & App',
     items: [
       {
