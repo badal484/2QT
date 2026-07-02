@@ -290,7 +290,7 @@ router.post('/verify-payment', authenticate, async (req: AuthRequest, res) => {
 
     try {
         if (type === 'wallet') {
-            const { amountPaise } = req.body; // Amount should be passed or fetched from RZP
+            const { amountPaise } = req.body;
             await finalizeWalletRecharge(razorpay_payment_id, amountPaise, customerId);
             return res.json({ success: true, message: 'Wallet recharged' });
         } else if (type === 'subscription') {
@@ -299,6 +299,14 @@ router.post('/verify-payment', authenticate, async (req: AuthRequest, res) => {
             return res.json({ success: true, subscriptionId: subId });
         } else {
             const result = await finalizeOrder(razorpay_order_id, 'online');
+            // Save Razorpay payment ID so the refund service can reverse it later.
+            // The webhook does the same, but verify-payment fires first on mobile.
+            if (razorpay_payment_id) {
+                await query(
+                    'UPDATE orders SET gateway_payment_id = $1 WHERE gateway_order_id = $2 AND gateway_payment_id IS NULL',
+                    [razorpay_payment_id, razorpay_order_id]
+                ).catch(() => {});
+            }
             return res.json(result);
         }
     } catch (err: any) {

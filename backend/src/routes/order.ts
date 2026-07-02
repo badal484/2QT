@@ -5,6 +5,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToKitchen, emitToAdmin } from '../socket';
 import { NotificationService } from '../services/notification.service';
 import { redis, keys } from '../redis';
+import { processWalletRefund, processBankRefund } from '../services/refund.service';
 
 const router = Router();
 
@@ -143,7 +144,12 @@ router.get('/:id/invoice', authenticate, async (req: AuthRequest, res) => {
 });
 
 router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
+    // refundType: 'wallet' (instant in-app credit) | 'bank' (Razorpay reversal, 5–7 days)
+    // Only relevant when order was paid online and has a gateway_payment_id.
+    // COD and wallet-only orders always get wallet credit regardless of this param.
+    const { refundType = 'wallet' } = req.body as { refundType?: 'wallet' | 'bank' };
+
     const { rows } = await query('SELECT * FROM orders WHERE id = $1', [id]);
     const order = rows[0];
 
@@ -154,74 +160,83 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
     if (!['pending_payment', 'confirmed'].includes(order.status)) {
         return res.status(400).json({ error: 'CANNOT_CANCEL', message: 'Order cannot be cancelled once the kitchen has started preparing' });
     }
-    // Bug 1 fix: double-refund protection
-    if (order.payment_status === 'refunded') {
+    if (['refunded', 'refund_pending'].includes(order.payment_status)) {
         return res.status(400).json({ error: 'ALREADY_REFUNDED' });
     }
 
-    let newWalletBalance: number | null = null;
-
+    // ── Cancel the order + reverse all side-effects in one transaction ────────
     await withTransaction(async (client) => {
         await client.query(
-            "UPDATE orders SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = $1 WHERE id = $2",
-            ['User cancelled', id]
-        );
-
-        // Bug 1+3 fix: refund with correct balance emit
-        if (order.payment_status === 'paid') {
-            const amountPaise = order.total_amount_paise;
-            await client.query(`
-                INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, $2)
-                ON CONFLICT (customer_id) DO UPDATE SET balance_paise = customer_wallet.balance_paise + $2
-            `, [order.customer_id, amountPaise]);
-            await client.query(`
-                INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
-                SELECT $1, $2, 'credit', 'Refund for cancelled order #' || $3, balance_paise
-                FROM customer_wallet WHERE customer_id = $1
-            `, [order.customer_id, amountPaise, order.display_id]);
-            await client.query("UPDATE orders SET payment_status = 'refunded' WHERE id = $1", [id]);
-            // Read actual new balance to emit (not just the refund amount)
-            const { rows: wb } = await client.query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [order.customer_id]);
-            newWalletBalance = wb[0]?.balance_paise ?? amountPaise;
-        }
-
-        // Bug 4 fix: reverse loyalty points earned on this order
-        const { rows: earnedPts } = await client.query(
-            "SELECT points FROM loyalty_transactions WHERE order_id = $1 AND type = 'earn' LIMIT 1",
+            "UPDATE orders SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = 'User cancelled' WHERE id = $1",
             [id]
         );
-        if (earnedPts.length > 0 && earnedPts[0].points > 0) {
-            await client.query(`
-                INSERT INTO loyalty_transactions (customer_id, points, type, order_id)
-                VALUES ($1, $2, 'redeem', $3)
-            `, [order.customer_id, earnedPts[0].points, id]);
+
+        // Reverse loyalty points
+        const { rows: earnedPts } = await client.query(
+            "SELECT points FROM loyalty_transactions WHERE order_id = $1 AND type = 'earn' LIMIT 1", [id]
+        );
+        if (earnedPts[0]?.points > 0) {
+            await client.query(
+                "INSERT INTO loyalty_transactions (customer_id, points, type, order_id) VALUES ($1, $2, 'redeem', $3)",
+                [order.customer_id, earnedPts[0].points, id]
+            );
         }
 
-        // Bug 5 fix: reverse promo usage count
+        // Reverse promo usage
         if (order.promo_code_id) {
-            await client.query(
-                'UPDATE promo_codes SET times_used = GREATEST(0, times_used - 1) WHERE id = $1',
-                [order.promo_code_id]
-            );
+            await client.query('UPDATE promo_codes SET times_used = GREATEST(0, times_used - 1) WHERE id = $1', [order.promo_code_id]);
             await redis.del(keys.activePromos()).catch(() => null);
         }
 
-        // Bug 8 fix: restore subscription meal credit
+        // Restore subscription credit
         if (order.is_subscription_order) {
             await client.query(`
-                UPDATE subscriptions
-                SET remaining_meals = remaining_meals + 1,
-                    current_day_credits = current_day_credits + 1
+                UPDATE subscriptions SET remaining_meals = remaining_meals + 1, current_day_credits = current_day_credits + 1
                 WHERE customer_id = $1 AND status = 'active'
             `, [order.customer_id]);
         }
     });
 
-    // Bug 3 fix: emit correct wallet balance (not refund amount)
-    emitToUser(order.customer_id, 'order_status_update', { orderId: id, status: 'cancelled' });
-    if (newWalletBalance !== null) {
-        emitToUser(order.customer_id, 'wallet_updated', { balancePaise: newWalletBalance });
+    // ── Refund logic (after cancel transaction completes) ─────────────────────
+
+    // Always refund the wallet portion — even for COD orders where the
+    // gateway amount hasn't been paid yet, the wallet deduction already happened.
+    const walletPortion = order.wallet_deduction_paise || 0;
+    if (walletPortion > 0) {
+        await processWalletRefund({
+            orderId: id,
+            customerId: order.customer_id,
+            amountPaise: walletPortion,
+            reason: 'User cancelled order',
+            initiatedBy: order.customer_id,
+        });
     }
+
+    // Refund the gateway (Razorpay) portion if payment was captured
+    const gatewayPortion = order.gateway_amount_paise || 0;
+    if (order.payment_status === 'paid' && gatewayPortion > 0) {
+        const canBankRefund = refundType === 'bank' && !!order.gateway_payment_id;
+        if (canBankRefund) {
+            await processBankRefund({
+                orderId: id,
+                customerId: order.customer_id,
+                amountPaise: gatewayPortion,
+                reason: 'User cancelled order',
+                initiatedBy: order.customer_id,
+                razorpayPaymentId: order.gateway_payment_id,
+            });
+        } else {
+            await processWalletRefund({
+                orderId: id,
+                customerId: order.customer_id,
+                amountPaise: gatewayPortion,
+                reason: 'User cancelled order',
+                initiatedBy: order.customer_id,
+            });
+        }
+    }
+
+    emitToUser(order.customer_id, 'order_status_update', { orderId: id, status: 'cancelled' });
     emitToKitchen(order.kitchen_id, 'order_cancelled', { orderId: id });
 
     NotificationService.send('order_cancelled', {
@@ -231,7 +246,7 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
         amount: String(order.total_amount_paise / 100),
     }).catch(() => {});
 
-    res.json({ success: true, message: 'Order cancelled and refunded to wallet' });
+    res.json({ success: true, message: 'Order cancelled' });
 });
 
 const feedbackSchema = z.object({

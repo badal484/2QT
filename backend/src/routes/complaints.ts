@@ -4,6 +4,7 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser } from '../socket';
 import { NotificationService } from '../services/notification.service';
 import { logSystemEvent } from '../utils/logger';
+import { createPendingRefund } from '../services/refund.service';
 
 const router = express.Router();
 
@@ -110,7 +111,7 @@ router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (r
 
 // POST /complaints/:id/resolve — admin approves refund (full or partial)
 router.post('/:id/resolve', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { refund_scope, refund_amount_paise, admin_note } = req.body;
     const adminId = req.user!.userId;
 
@@ -123,12 +124,13 @@ router.post('/:id/resolve', authenticate, requireRole('super_admin', 'admin'), a
     }
 
     try {
-        let finalWalletBalance = 0;
+        let complaintData: any = null;
+        let refundPaise = 0;
 
         await withTransaction(async (client) => {
             const { rows: complaints } = await client.query(
                 `SELECT c.*, o.total_amount_paise, o.customer_id, o.display_id,
-                        o.payment_method, o.cod_cash_collected, o.rider_id
+                        o.payment_method, o.cod_cash_collected, o.rider_id, o.gateway_payment_id
                  FROM order_complaints c
                  JOIN orders o ON o.id = c.order_id
                  WHERE c.id = $1 FOR UPDATE`,
@@ -137,97 +139,65 @@ router.post('/:id/resolve', authenticate, requireRole('super_admin', 'admin'), a
             if (!complaints[0]) throw new Error('COMPLAINT_NOT_FOUND');
             const complaint = complaints[0];
             if (complaint.status !== 'open') throw new Error('COMPLAINT_ALREADY_RESOLVED');
+            complaintData = complaint;
 
-            const refundPaise = refund_scope === 'full'
+            refundPaise = refund_scope === 'full'
                 ? complaint.total_amount_paise
-                : refund_scope === 'partial'
-                    ? refund_amount_paise
-                    : 0;
+                : refund_scope === 'partial' ? refund_amount_paise : 0;
 
-            // Credit wallet if refunding
-            if (refundPaise > 0) {
-                await client.query(`
-                    INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, $2)
-                    ON CONFLICT (customer_id) DO UPDATE SET balance_paise = customer_wallet.balance_paise + $2
-                `, [complaint.customer_id, refundPaise]);
-
-                await client.query(`
-                    INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
-                    SELECT $1, $2, 'credit', 'Complaint refund for order #' || $3, balance_paise
-                    FROM customer_wallet WHERE customer_id = $1
-                `, [complaint.customer_id, refundPaise, complaint.display_id]);
-
-                // Read actual new balance for socket emit
-                const { rows: wb } = await client.query(
-                    'SELECT balance_paise FROM customer_wallet WHERE customer_id = $1',
-                    [complaint.customer_id]
-                );
-                finalWalletBalance = wb[0]?.balance_paise ?? refundPaise;
-
-                // Update order payment_status
-                const newPayStatus = refundPaise >= complaint.total_amount_paise ? 'refunded' : 'partially_refunded';
+            // COD cash recovery: deduct from rider's next payout regardless of refund path
+            if (refundPaise > 0 && complaint.is_cod_cash_order && complaint.rider_id) {
                 await client.query(
-                    'UPDATE orders SET payment_status = $1 WHERE id = $2',
-                    [newPayStatus, complaint.order_id]
+                    'UPDATE order_complaints SET cod_cash_deduction_pending = true WHERE id = $1', [id]
                 );
-
-                // COD cash recovery: flag for rider deduction at next payout
-                // Cash is physically with the rider — need to deduct from their next payout
-                if (complaint.is_cod_cash_order && complaint.rider_id) {
-                    await client.query(`
-                        UPDATE order_complaints
-                        SET cod_cash_deduction_pending = true
-                        WHERE id = $1
-                    `, [id]);
-
-                    // Add to rider's pending deduction in their upcoming payout
-                    await client.query(`
-                        UPDATE weekly_payouts
-                        SET cod_deductions_paise = cod_deductions_paise + $1,
-                            net_amount_paise = net_amount_paise - $1,
-                            deduction_notes = COALESCE(deduction_notes, '') || 'Complaint refund ₹' || ($1/100) || ' for order #' || $2 || '; '
-                        WHERE id = (
-                            SELECT id FROM weekly_payouts
-                            WHERE rider_id = $3 AND status = 'pending'
-                            ORDER BY created_at DESC LIMIT 1
-                        )
-                    `, [refundPaise, complaint.display_id, complaint.rider_id]);
-                }
+                await client.query(`
+                    UPDATE weekly_payouts
+                    SET cod_deductions_paise = cod_deductions_paise + $1,
+                        net_amount_paise     = net_amount_paise - $1,
+                        deduction_notes      = COALESCE(deduction_notes, '') || 'Complaint refund ₹' || ($1/100) || ' for order #' || $2 || '; '
+                    WHERE id = (
+                        SELECT id FROM weekly_payouts
+                        WHERE rider_id = $3 AND status = 'pending'
+                        ORDER BY created_at DESC LIMIT 1
+                    )
+                `, [refundPaise, complaint.display_id, complaint.rider_id]);
             }
 
-            // Resolve complaint
+            // Resolve complaint record
             await client.query(
                 `UPDATE order_complaints
                  SET status = 'resolved', refund_scope = $1, refund_amount_paise = $2,
-                     admin_note = $3, resolved_by = $4, resolved_at = NOW(),
-                     cod_cash_deduction_pending = CASE WHEN $5 AND $2 > 0 THEN true ELSE cod_cash_deduction_pending END
-                 WHERE id = $6`,
-                [refund_scope, refundPaise, admin_note || null, adminId, complaint.is_cod_cash_order, id]
+                     admin_note = $3, resolved_by = $4, resolved_at = NOW()
+                 WHERE id = $5`,
+                [refund_scope, refundPaise, admin_note || null, adminId, id]
             );
 
             logSystemEvent('COMPLAINT_RESOLVED',
-                `Admin resolved complaint ${id}: ${refund_scope} refund ₹${refundPaise/100}`,
+                `Admin resolved complaint ${id}: ${refund_scope} refund ₹${refundPaise / 100}`,
                 'info', { complaintId: id, adminId, refundPaise }
             );
-
-            // Notify customer
-            const { rows: userRows } = await client.query('SELECT phone FROM users WHERE id = $1', [complaint.customer_id]);
-            if (userRows[0]?.phone && refundPaise > 0) {
-                NotificationService.send('broadcast_message', {
-                    phone: userRows[0].phone,
-                    title: 'Complaint Resolved',
-                    body: `2QT: Your complaint for Order #${complaint.display_id} has been resolved. ₹${refundPaise/100} refunded to your wallet. Sorry for the trouble!`,
-                }).catch(() => {});
-            }
         });
 
-        // Emit new wallet balance
-        const { rows: co } = await query('SELECT customer_id FROM order_complaints WHERE id = $1', [id]);
-        if (co[0] && finalWalletBalance > 0) {
-            emitToUser(co[0].customer_id, 'wallet_updated', { balancePaise: finalWalletBalance });
+        // Queue refund for finance team to process (wallet or bank)
+        if (refundPaise > 0 && complaintData) {
+            await createPendingRefund({
+                orderId: complaintData.order_id,
+                customerId: complaintData.customer_id,
+                amountPaise: refundPaise,
+                reason: `Complaint resolved: ${admin_note || refund_scope}`,
+                initiatedBy: adminId,
+                complaintId: id,
+                razorpayPaymentId: complaintData.gateway_payment_id || undefined,
+            });
+
+            NotificationService.send('broadcast_message', {
+                userId: complaintData.customer_id,
+                title: 'Complaint Resolved',
+                body: `Your complaint for Order #${complaintData.display_id} has been resolved. ₹${refundPaise / 100} refund is being processed by our finance team.`,
+            }).catch(() => {});
         }
 
-        res.json({ success: true, message: 'Complaint resolved' });
+        res.json({ success: true, message: 'Complaint resolved. Refund queued for finance approval.' });
     } catch (err: any) {
         const code = err.message === 'COMPLAINT_NOT_FOUND' ? 404 : err.message === 'COMPLAINT_ALREADY_RESOLVED' ? 409 : 500;
         res.status(code).json({ error: err.message });

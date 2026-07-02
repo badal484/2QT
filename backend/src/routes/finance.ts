@@ -4,6 +4,7 @@ import pool from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
 import { emitToAll, emitToUser, emitToKitchen, emitToAdmin } from '../socket';
+import { processWalletRefund, processBankRefund } from '../services/refund.service';
 import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
 
 const router = Router();
@@ -703,6 +704,118 @@ router.patch('/partners/kitchens/:id', financeAccess, financeRole, async (req: A
   } catch (err) {
     console.error('[finance/partners/kitchens PATCH]', err);
     res.status(500).json({ error: 'Failed to update kitchen' });
+  }
+});
+
+// ─── Refund Queue ─────────────────────────────────────────────────────────────
+
+router.get('/refunds', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  try {
+    const { status, limit = '50', offset = '0' } = req.query as Record<string, string>;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (status) { conditions.push(`r.status = $${params.length + 1}`); params.push(status); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const [data, counts] = await Promise.all([
+      query(`
+        SELECT
+          r.*,
+          o.display_id AS order_display_id,
+          o.payment_method,
+          cu.name  AS customer_name,
+          cu.phone AS customer_phone,
+          ib.name  AS initiated_by_name,
+          ab.name  AS approved_by_name,
+          comp.type AS complaint_type
+        FROM refunds r
+        JOIN orders o   ON o.id = r.order_id
+        JOIN users cu   ON cu.id = r.customer_id
+        LEFT JOIN users ib   ON ib.id = r.initiated_by
+        LEFT JOIN users ab   ON ab.id = r.approved_by
+        LEFT JOIN order_complaints comp ON comp.id = r.complaint_id
+        ${where}
+        ORDER BY r.created_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `, [...params, parseInt(limit), parseInt(offset)]),
+      query(`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'pending')    AS pending,
+          COUNT(*) FILTER (WHERE status = 'processing') AS processing,
+          COUNT(*) FILTER (WHERE status = 'processed')  AS processed,
+          COUNT(*) FILTER (WHERE status = 'failed')     AS failed,
+          COALESCE(SUM(amount_paise) FILTER (WHERE status = 'pending'), 0)   AS pending_paise,
+          COALESCE(SUM(amount_paise) FILTER (WHERE status = 'processed'), 0) AS processed_paise
+        FROM refunds
+      `, []),
+    ]);
+
+    res.json({
+      refunds: data.rows,
+      counts: counts.rows[0],
+      total: data.rows.length,
+    });
+  } catch (err) {
+    console.error('[finance/refunds GET]', err);
+    res.status(500).json({ error: 'Failed to fetch refunds' });
+  }
+});
+
+router.post('/refunds/:id/process', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+  const { refundType } = req.body as { refundType: 'wallet' | 'bank' };
+  const approvedBy = req.user!.userId;
+
+  if (!['wallet', 'bank'].includes(refundType)) {
+    return res.status(400).json({ error: 'refundType must be wallet or bank' });
+  }
+
+  try {
+    const { rows } = await query(`
+      SELECT r.*, o.gateway_payment_id
+      FROM refunds r
+      JOIN orders o ON o.id = r.order_id
+      WHERE r.id = $1
+    `, [id]);
+
+    if (!rows[0]) return res.status(404).json({ error: 'Refund not found' });
+    const refund = rows[0];
+
+    if (refund.status !== 'pending' && refund.status !== 'failed') {
+      return res.status(409).json({ error: 'Refund is not in a processable state', status: refund.status });
+    }
+
+    if (refundType === 'bank') {
+      const paymentId = refund.razorpay_payment_id || refund.gateway_payment_id;
+      if (!paymentId) {
+        return res.status(400).json({ error: 'No Razorpay payment ID on record — use wallet refund instead' });
+      }
+      const result = await processBankRefund({
+        orderId: refund.order_id,
+        customerId: refund.customer_id,
+        amountPaise: refund.amount_paise,
+        reason: refund.reason || 'Finance approved refund',
+        initiatedBy: refund.initiated_by,
+        razorpayPaymentId: paymentId,
+        refundRecordId: id,
+        approvedBy,
+      });
+      return res.json({ success: true, ...result });
+    } else {
+      const result = await processWalletRefund({
+        orderId: refund.order_id,
+        customerId: refund.customer_id,
+        amountPaise: refund.amount_paise,
+        reason: refund.reason || 'Finance approved refund',
+        initiatedBy: refund.initiated_by,
+        refundRecordId: id,
+      });
+      return res.json({ success: true, ...result });
+    }
+  } catch (err: any) {
+    console.error('[finance/refunds/process]', err);
+    res.status(500).json({ error: 'Failed to process refund', message: err.message });
   }
 });
 
