@@ -162,44 +162,6 @@ export const initCrons = () => {
         }
     });
 
-    // Weekly payout generator at 6am Monday
-    cron.schedule('0 6 * * 1', async () => {
-        console.log('[CRON] Generating weekly payouts...');
-        const { rows: riders } = await query("SELECT id FROM users WHERE role = 'rider'");
-        
-        for (const rider of riders) {
-            await withTransaction(async (client) => {
-                // Calculate previous week's earnings (Mon-Sun)
-                const { rows: earnings } = await client.query(`
-                    SELECT COALESCE(SUM(deliveries_count), 0) as deliveries_count,
-                           COALESCE(SUM(base_earnings_paise), 0) as base,
-                           COALESCE(SUM(bonus_earnings_paise + COALESCE(rain_bonus_paise, 0) + COALESCE(guarantee_topup_paise, 0)), 0) as bonus,
-                           COALESCE(SUM(cash_collected_paise), 0) as cash
-                    FROM rider_daily_earnings 
-                    WHERE rider_id = $1 
-                    AND date >= CURRENT_DATE - INTERVAL '7 days'
-                    AND date < CURRENT_DATE
-                `, [rider.id]);
-
-                const base = parseInt(earnings[0].base);
-                const bonus = parseInt(earnings[0].bonus);
-                const deductions = parseInt(earnings[0].cash);
-                const deliveries = parseInt(earnings[0].deliveries_count);
-                const net = Math.max(0, base + bonus - deductions);
-
-                if (net > 0) {
-                    await client.query(`
-                        INSERT INTO weekly_payouts (
-                            rider_id, week_start, week_end, 
-                            base_amount_paise, bonus_amount_paise, deductions_paise, total_deliveries,
-                            net_amount_paise, status
-                        ) VALUES ($1, CURRENT_DATE - INTERVAL '7 days', CURRENT_DATE - INTERVAL '1 day', $2, $3, $4, $5, $6, 'pending')
-                    `, [rider.id, base, bonus, deductions, deliveries, net]);
-                }
-            });
-        }
-    });
-
     // ── Daily kitchen auto-payout at 11:00 PM ────────────────────────────────
     cron.schedule('0 23 * * *', async () => {
         console.log('[CRON] Running daily kitchen auto-payouts...');
@@ -272,10 +234,21 @@ export const initCrons = () => {
                             razorpay_payout_id = $1, utr_number = $2
                         WHERE id = $3
                     `, [result.payoutId, result.utr, payoutRowId]);
+                    emitToKitchen(kitchen.id, 'kitchen_payout_updated', {
+                        payoutId: payoutRowId,
+                        amountPaise: netPaise,
+                        status: 'paid',
+                        utr: result.utr,
+                    });
                     console.log(`[CRON] Kitchen ${kitchen.name}: ₹${netPaise / 100} paid (${result.payoutId})`);
                 } else {
                     // Razorpay not configured — leave pending for manual payment
                     await query(`UPDATE kitchen_payouts SET status = 'pending' WHERE id = $1`, [payoutRowId]);
+                    emitToKitchen(kitchen.id, 'kitchen_payout_updated', {
+                        payoutId: payoutRowId,
+                        amountPaise: netPaise,
+                        status: 'pending',
+                    });
                     console.log(`[CRON] Kitchen ${kitchen.name}: ₹${netPaise / 100} queued (no Razorpay account configured)`);
                 }
             } catch (err: any) {

@@ -340,21 +340,23 @@ router.post('/kitchen-payouts/generate', financeAccess, financeRole, async (req:
     }
     const kitchen = kitchenRows[0];
 
+    // Use delivery date (updated_at) and pre-stored commission values — same as daily auto cron
     const { rows: orderStats } = await client.query(`
       SELECT
         COUNT(*) AS orders_count,
-        COALESCE(SUM(subtotal_paise), 0) AS gross_sales_paise
+        COALESCE(SUM(subtotal_paise), 0)        AS gross_sales_paise,
+        COALESCE(SUM(commission_paise), 0)      AS commission_paise,
+        COALESCE(SUM(kitchen_payout_paise), 0)  AS net_payout_paise
       FROM orders
       WHERE kitchen_id = $1
         AND status = 'delivered'
-        AND created_at >= $2 AND created_at <= $3
-    `, [kitchenId, new Date(`${periodStart}T00:00:00+05:30`).toISOString(), new Date(`${periodEnd}T23:59:59.999+05:30`).toISOString()]);
+        AND DATE(updated_at AT TIME ZONE 'Asia/Kolkata') BETWEEN $2 AND $3
+    `, [kitchenId, periodStart, periodEnd]);
 
     const stats = orderStats[0];
     const grossSalesPaise = parseInt(stats.gross_sales_paise);
-    const commissionRate = parseFloat(kitchen.commission_rate);
-    const commissionPaise = Math.round(grossSalesPaise * commissionRate);
-    const netPayoutPaise = grossSalesPaise - commissionPaise;
+    const commissionPaise = parseInt(stats.commission_paise);
+    const netPayoutPaise  = parseInt(stats.net_payout_paise);
 
     const { rows: inserted } = await client.query(`
       INSERT INTO kitchen_payouts
