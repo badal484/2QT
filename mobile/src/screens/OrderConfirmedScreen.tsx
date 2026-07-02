@@ -138,20 +138,52 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
   }, [socket, orderId]);
 
   const cancelMutation = useMutation({
-    mutationFn: () => api.post(`/orders/${orderId}/cancel`),
-    onSuccess: () => {
+    mutationFn: (refundType: 'wallet' | 'bank') => api.post(`/orders/${orderId}/cancel`, { refundType }),
+    onSuccess: (_data, refundType) => {
       queryClient.invalidateQueries({ queryKey: ['order-confirmed', orderId] });
       queryClient.invalidateQueries({ queryKey: ['order-history'] });
-      Alert.alert('Cancelled', 'Your order has been cancelled. Refund will be added to your wallet.');
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      const msg = refundType === 'bank'
+        ? 'Order cancelled. Your refund will reach your bank account in 5–7 business days.'
+        : 'Order cancelled. Refund has been added to your 2QT wallet instantly.';
+      Alert.alert('Cancelled', msg);
     },
     onError: () => Alert.alert('Error', 'Could not cancel the order at this time.'),
   });
 
   const handleCancel = () => {
-    Alert.alert('Cancel Order', 'Are you sure? Refund will go to your wallet.', [
-      { text: 'No', style: 'cancel' },
-      { text: 'Yes, Cancel', style: 'destructive', onPress: () => cancelMutation.mutate() },
-    ]);
+    // Offer bank refund only when order was paid online and gateway_payment_id exists
+    const canBankRefund = o?.payment_method !== 'cod' && o?.payment_status === 'paid' && !!o?.gateway_payment_id;
+
+    if (canBankRefund) {
+      Alert.alert(
+        'Cancel Order',
+        'Where would you like your refund?',
+        [
+          { text: 'No, keep order', style: 'cancel' },
+          {
+            text: 'Wallet (instant)',
+            onPress: () => cancelMutation.mutate('wallet'),
+          },
+          {
+            text: 'Bank account (5–7 days)',
+            style: 'destructive',
+            onPress: () => cancelMutation.mutate('bank'),
+          },
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Cancel Order',
+        o?.payment_status === 'paid'
+          ? 'Your order will be cancelled and the refund will be added to your wallet instantly.'
+          : 'Are you sure you want to cancel this order?',
+        [
+          { text: 'No', style: 'cancel' },
+          { text: 'Yes, Cancel', style: 'destructive', onPress: () => cancelMutation.mutate('wallet') },
+        ]
+      );
+    }
   };
 
   const canCancel = !!o && ['pending_payment', 'confirmed'].includes(status);
