@@ -810,6 +810,7 @@ router.post('/refunds/:id/process', financeAccess, financeRole, async (req: Auth
         reason: refund.reason || 'Finance approved refund',
         initiatedBy: refund.initiated_by,
         refundRecordId: id,
+        approvedBy,
       });
       return res.json({ success: true, ...result });
     }
