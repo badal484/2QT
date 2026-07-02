@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
+import { emitToAll } from '../socket';
 
 const router = Router();
 
@@ -54,6 +55,7 @@ router.post('/', authenticate, requireRole('super_admin', 'admin'), async (req, 
             }
         }
         
+        emitToAll('menu_updated', { type: 'collection', action: 'create', collectionId: collection.id });
         res.json({ success: true, collection });
     } catch (err) {
         console.error('Create collection error:', err);
@@ -83,6 +85,7 @@ router.put('/:id', authenticate, requireRole('super_admin', 'admin'), async (req
             }
         }
         
+        emitToAll('menu_updated', { type: 'collection', action: 'update', collectionId: id });
         res.json({ success: true });
     } catch (err) {
         console.error('Update collection error:', err);
@@ -95,6 +98,7 @@ router.delete('/:id', authenticate, requireRole('super_admin', 'admin'), async (
     try {
         const { id } = req.params;
         await query('DELETE FROM collections WHERE id = $1', [id]);
+        emitToAll('menu_updated', { type: 'collection', action: 'delete', collectionId: id });
         res.json({ success: true });
     } catch (err) {
         console.error('Delete collection error:', err);

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { TWO_QT } from '../config/constants';
-import { emitToAdmin } from '../socket';
+import { emitToAdmin, emitToUser } from '../socket';
 import { scheduleTriggerSend, cancelTriggerJobs } from '../services/trigger.service';
 import { redis, keys } from '../redis';
 
@@ -46,6 +46,7 @@ router.patch('/profile', authenticate, async (req: AuthRequest, res) => {
         [name, email, photo_url, userId]
     );
 
+    emitToUser(userId, 'user_updated', { field: 'profile' });
     res.json({ user: rows[0] });
 });
 
@@ -58,6 +59,7 @@ router.patch('/me', authenticate, async (req: AuthRequest, res) => {
         [name, email, photo_url, userId]
     );
 
+    emitToUser(userId, 'user_updated', { field: 'profile' });
     res.json({ user: rows[0] });
 });
 
