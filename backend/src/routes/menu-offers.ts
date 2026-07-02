@@ -4,12 +4,14 @@ import { authenticate, requireRole } from '../middleware/auth';
 
 const router = express.Router();
 
-// ── Customer: active offers for zone (cached, no auth required) ───────────────
+const VALID_AUDIENCES = ['all','new_users','plus_subscribers','loyal','at_risk','churned','high_spenders'];
+
+// ── Customer: active offers for zone ──────────────────────────────────────────
 router.get('/active', async (req, res) => {
     const zoneId = req.query.zoneId as string | undefined;
     try {
         const { rows } = await query(`
-            SELECT id, title, description, target_type, target_id,
+            SELECT id, title, description, target_type, target_id, target_ids,
                    discount_type, discount_percent, discount_flat_paise, max_discount_paise,
                    audience, zone_id, start_time, end_time
             FROM menu_offers
@@ -25,7 +27,7 @@ router.get('/active', async (req, res) => {
     }
 });
 
-// ── Admin: list all offers ────────────────────────────────────────────────────
+// ── Admin: list ────────────────────────────────────────────────────────────────
 router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
         const { rows } = await query(`
@@ -40,12 +42,12 @@ router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (_
     }
 });
 
-// ── Admin: create offer ───────────────────────────────────────────────────────
+// ── Admin: create ──────────────────────────────────────────────────────────────
 router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const {
-        title, description, target_type, target_id,
+        title, description, target_type, target_id, target_ids,
         discount_type, discount_percent, discount_flat_paise, max_discount_paise,
-        audience, zone_id, start_time, end_time, is_active
+        audience, audience_config, zone_id, start_time, end_time, is_active
     } = req.body;
 
     if (!title || !target_type || !discount_type) {
@@ -54,24 +56,33 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
     if (!['all', 'kitchen', 'category', 'item'].includes(target_type)) {
         return res.status(400).json({ error: 'target_type must be all | kitchen | category | item' });
     }
-    if (!['flat', 'percent'].includes(discount_type)) {
+    if (!['flat', 'percent', 'percentage'].includes(discount_type)) {
         return res.status(400).json({ error: 'discount_type must be flat | percent' });
     }
+    if (audience && !VALID_AUDIENCES.includes(audience)) {
+        return res.status(400).json({ error: `audience must be one of: ${VALID_AUDIENCES.join(', ')}` });
+    }
+
+    // Normalise: if multi-select array provided, derive single target_id from first element
+    const resolvedTargetId = target_id || (Array.isArray(target_ids) && target_ids[0]) || null;
+    const resolvedTargetIds = Array.isArray(target_ids) && target_ids.length > 0 ? target_ids : null;
 
     try {
         const { rows } = await query(`
             INSERT INTO menu_offers
-                (title, description, target_type, target_id,
+                (title, description, target_type, target_id, target_ids,
                  discount_type, discount_percent, discount_flat_paise, max_discount_paise,
-                 audience, zone_id, start_time, end_time, is_active)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                 audience, audience_config, zone_id, start_time, end_time, is_active)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
             RETURNING *
         `, [
-            title, description || null, target_type, target_id || null,
+            title, description || null, target_type,
+            resolvedTargetId, resolvedTargetIds,
             discount_type, discount_percent || 0, discount_flat_paise || 0,
             max_discount_paise || null,
-            audience || 'all', zone_id || null,
-            start_time || null, end_time || null,
+            audience || 'all',
+            audience_config ? JSON.stringify(audience_config) : '{}',
+            zone_id || null, start_time || null, end_time || null,
             is_active ?? true,
         ]);
         res.status(201).json({ offer: rows[0] });
@@ -80,14 +91,18 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
     }
 });
 
-// ── Admin: update offer ───────────────────────────────────────────────────────
+// ── Admin: update ──────────────────────────────────────────────────────────────
 router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { id } = req.params;
     const {
-        title, description, target_type, target_id,
+        title, description, target_type, target_id, target_ids,
         discount_type, discount_percent, discount_flat_paise, max_discount_paise,
-        audience, zone_id, start_time, end_time, is_active
+        audience, audience_config, zone_id, start_time, end_time, is_active
     } = req.body;
+
+    const resolvedTargetId = target_id !== undefined ? target_id
+        : (Array.isArray(target_ids) && target_ids[0]) || undefined;
+    const resolvedTargetIds = Array.isArray(target_ids) && target_ids.length > 0 ? target_ids : null;
 
     try {
         const { rows } = await query(`
@@ -96,22 +111,30 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
                 description         = COALESCE($2,  description),
                 target_type         = COALESCE($3,  target_type),
                 target_id           = COALESCE($4,  target_id),
-                discount_type       = COALESCE($5,  discount_type),
-                discount_percent    = COALESCE($6,  discount_percent),
-                discount_flat_paise = COALESCE($7,  discount_flat_paise),
-                max_discount_paise  = COALESCE($8,  max_discount_paise),
-                audience            = COALESCE($9,  audience),
-                zone_id             = COALESCE($10, zone_id),
-                start_time          = COALESCE($11, start_time),
-                end_time            = COALESCE($12, end_time),
-                is_active           = COALESCE($13, is_active),
+                target_ids          = COALESCE($5,  target_ids),
+                discount_type       = COALESCE($6,  discount_type),
+                discount_percent    = COALESCE($7,  discount_percent),
+                discount_flat_paise = COALESCE($8,  discount_flat_paise),
+                max_discount_paise  = COALESCE($9,  max_discount_paise),
+                audience            = COALESCE($10, audience),
+                audience_config     = COALESCE($11, audience_config),
+                zone_id             = COALESCE($12, zone_id),
+                start_time          = COALESCE($13, start_time),
+                end_time            = COALESCE($14, end_time),
+                is_active           = COALESCE($15, is_active),
                 updated_at          = NOW()
-            WHERE id = $14
+            WHERE id = $16
             RETURNING *
         `, [
-            title, description, target_type, target_id,
-            discount_type, discount_percent, discount_flat_paise, max_discount_paise,
-            audience, zone_id, start_time, end_time, is_active, id
+            title ?? null, description ?? null, target_type ?? null,
+            resolvedTargetId ?? null,
+            resolvedTargetIds,
+            discount_type ?? null, discount_percent ?? null, discount_flat_paise ?? null,
+            max_discount_paise ?? null,
+            audience ?? null,
+            audience_config ? JSON.stringify(audience_config) : null,
+            zone_id ?? null, start_time ?? null, end_time ?? null,
+            is_active ?? null, id,
         ]);
         if (rows.length === 0) return res.status(404).json({ error: 'Offer not found' });
         res.json({ offer: rows[0] });
@@ -120,7 +143,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
     }
 });
 
-// ── Admin: delete offer ───────────────────────────────────────────────────────
+// ── Admin: delete ──────────────────────────────────────────────────────────────
 router.delete('/admin/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { id } = req.params;
     try {
