@@ -20,7 +20,6 @@ const CATEGORIES = [
   { key: 'payment',        label: 'Payment',          icon: '💳' },
   { key: 'delivery',       label: 'Delivery',         icon: '🚴' },
   { key: 'account',        label: 'My Account',       icon: '👤' },
-  { key: 'subscription',   label: 'Subscription',     icon: '📅' },
   { key: 'other',          label: 'Other',            icon: '💬' },
 ];
 

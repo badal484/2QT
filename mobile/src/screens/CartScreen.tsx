@@ -161,8 +161,6 @@ const CartScreen = ({ navigation }: any) => {
   const smallOrderFee = (p.smallOrderFeePaise || 0) / 100;
   const totalSaved = ((p.menuOfferDiscountPaise || 0) + (p.discountPaise || 0) + (p.campaignDiscountPaise || 0)) / 100;
 
-  const plusOnlyOffers: any[] = (menuData?.offers || []).filter((o: any) => o.audience === 'plus_subscribers');
-
   if (items.length === 0) {
     return (
       <View style={[styles.emptyContainer, { paddingTop: insets.top }]}>
@@ -206,28 +204,6 @@ const CartScreen = ({ navigation }: any) => {
         <View style={styles.savingsBanner}>
           <Text style={styles.savingsBannerText}>You saved ₹{totalSaved.toFixed(2)} on this order 🎉</Text>
         </View>
-      )}
-
-      {/* Plus upsell — shown when zone has Plus-exclusive offers */}
-      {plusOnlyOffers.length > 0 && (
-        <BouncingButton
-          activeOpacity={0.88}
-          onPress={() => { triggerHaptic(); navigation.navigate('MyPlans'); }}
-          style={styles.plusBanner}
-        >
-          <View style={styles.plusBannerIcon}>
-            <Zap size={16} color="#7C3AED" fill="#7C3AED" />
-          </View>
-          <View style={styles.plusBannerText}>
-            <Text style={styles.plusBannerTitle}>
-              {plusOnlyOffers[0].discount_type === 'flat'
-                ? `₹${(plusOnlyOffers[0].discount_flat_paise || 0) / 100} off`
-                : `${plusOnlyOffers[0].discount_percent || 0}% off`}{' '}
-              unlocked with 2QT Plus
-            </Text>
-            <Text style={styles.plusBannerSub}>Tap to explore Plus membership →</Text>
-          </View>
-        </BouncingButton>
       )}
 
       <ScrollView
