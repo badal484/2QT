@@ -5,7 +5,7 @@ import { query, withTransaction } from '../db';
 import { ActivityLogService } from '../services/activity.service';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
-import { emitToUser, emitToAdmin, emitToKitchen } from '../socket';
+import { emitToUser, emitToAdmin, emitToKitchen, emitToAll } from '../socket';
 import { NotificationService } from '../services/notification.service';
 import { logSystemEvent } from '../utils/logger';
 import ImageKit from '@imagekit/nodejs';
@@ -256,6 +256,7 @@ router.patch('/menu/:id/availability', authenticate, requireRole('super_admin', 
     for (const zone of zones) {
         await redis.del(keys.menu(zone.id));
     }
+    emitToAll('menu_updated', { action: 'availability', id, available });
     res.json({ success: true });
 });
 
@@ -665,6 +666,7 @@ router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate
             await redis.del(keys.menu(zone.id));
         }
 
+        emitToAll('menu_updated', { action: 'create', zoneId: rows[0].zone_id });
         res.json({ item: rows[0] });
     } catch (err: any) {
         console.error('Menu item creation failed:', err);
@@ -705,6 +707,7 @@ router.delete('/menu/:id', authenticate, requireRole('super_admin', 'admin'), as
         for (const zone of zones) {
             await redis.del(keys.menu(zone.id));
         }
+        emitToAll('menu_updated', { action: 'delete', id });
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to delete menu item', details: err.message });
@@ -751,6 +754,7 @@ router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), valid
             await redis.del(keys.menu(zone.id));
         }
 
+        emitToAll('menu_updated', { action: 'update', zoneId: rows[0]?.zone_id });
         res.json({ item: rows[0] });
     } catch (err: any) {
         console.error('Menu item update failed:', err);
@@ -936,6 +940,7 @@ router.post('/zones', authenticate, requireRole('super_admin', 'admin'), validat
             base_distance_km ?? 0,
             free_delivery_above_paise ?? null,
             surge_multiplier ?? 1.0]);
+        emitToAll('zone_updated', { action: 'create', zoneId: rows[0].id });
         res.status(201).json({ zone: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to create zone', details: err.message });
@@ -1008,6 +1013,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
         }
 
         await redis.del(keys.menu(id));
+        emitToAll('zone_updated', { action: 'update', zoneId: id });
         res.json({ zone: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to update zone', details: err.message });
@@ -1019,6 +1025,7 @@ router.delete('/zones/:id', authenticate, requireRole('super_admin', 'admin'), a
     try {
         await query('DELETE FROM zones WHERE id = $1', [id]);
         await redis.del(keys.menu(id));
+        emitToAll('zone_updated', { action: 'delete', zoneId: id });
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: 'Cannot delete zone. It may be linked to existing orders or users.', details: err.message });
@@ -1171,6 +1178,7 @@ router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), vali
     `, [kitchenId]);
 
     const { pin_hash, ...kitchenOut } = updated[0];
+    emitToAll('kitchen_updated', { action: 'create', kitchenId });
     res.status(201).json({ kitchen: { ...kitchenOut, has_pin: !!pin_hash } });
 });
 
@@ -1223,6 +1231,7 @@ router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'),
     `, [id]);
 
     const { pin_hash, ...kitchenOut } = updated[0];
+    emitToAll('kitchen_updated', { action: 'update', kitchenId: id });
     res.json({ kitchen: { ...kitchenOut, has_pin: !!pin_hash } });
 });
 
@@ -1230,6 +1239,7 @@ router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin')
     const { id } = req.params;
     try {
         await query('DELETE FROM kitchens WHERE id = $1', [id]);
+        emitToAll('kitchen_updated', { action: 'delete', kitchenId: id });
         res.json({ success: true });
     } catch (err: any) {
         if (err.constraint === 'users_kitchen_id_fkey' || err.message.includes('users_kitchen_id_fkey')) {
@@ -1289,6 +1299,7 @@ router.patch('/settings/:key', authenticate, requireRole('super_admin', 'admin')
     const { key } = req.params;
     const { value } = req.body;
     await query('UPDATE app_settings SET value = $1 WHERE key = $2', [value, key]);
+    emitToAll('settings_updated', { key, value });
     res.json({ success: true });
 });
 

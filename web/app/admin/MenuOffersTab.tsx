@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Tag, Plus, Trash2, ToggleLeft, ToggleRight, X, Edit3, Globe, MapPin, Search } from "lucide-react";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 // ── Target search + multi-select ──────────────────────────────────────────────
 interface TargetResult { id: string; name: string; sub?: string }
@@ -190,6 +191,7 @@ export function MenuOffersTab() {
     } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+  useSocketRefresh(['offer_updated'], load);
 
   const openCreate = () => {
     setEditing(null);
