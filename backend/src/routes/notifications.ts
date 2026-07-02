@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { query } from '../db';
 import { redis } from '../redis';
+import { emitToAdmin } from '../socket';
 import { bustTemplateCache } from '../services/notification.service';
 import { sendFCM, isFCMConfigured } from '../services/fcm.service';
 import { z } from 'zod';
@@ -128,6 +129,7 @@ router.patch('/admin/templates/:type', authenticate, requireRole('super_admin', 
     );
     if (!rows.length) return res.status(404).json({ error: 'Template not found' });
     await bustTemplateCache(String(type));
+    emitToAdmin('notification_updated', { type: 'template', templateType: type });
     res.json({ success: true, template: rows[0] });
 });
 
@@ -160,6 +162,7 @@ router.post('/admin/triggers', authenticate, requireRole('super_admin', 'admin')
         [name, event_type, delay_minutes, template_type,
          channels, audience_type, segment ?? null, JSON.stringify(conditions)]
     );
+    emitToAdmin('notification_updated', { type: 'trigger', action: 'create', triggerId: rows[0].id });
     res.status(201).json({ trigger: rows[0] });
 });
 
@@ -188,11 +191,13 @@ router.patch('/admin/triggers/:id', authenticate, requireRole('super_admin', 'ad
          is_active ?? null, id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Trigger not found' });
+    emitToAdmin('notification_updated', { type: 'trigger', action: 'update', triggerId: id });
     res.json({ trigger: rows[0] });
 });
 
 router.delete('/admin/triggers/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res: Response) => {
     await query('DELETE FROM notification_triggers WHERE id = $1', [req.params.id]);
+    emitToAdmin('notification_updated', { type: 'trigger', action: 'delete', triggerId: req.params.id });
     res.json({ success: true });
 });
 

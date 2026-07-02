@@ -1,129 +1,121 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, Dimensions, Platform } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withTiming,
-  withSequence,
   withDelay,
-  withSpring,
+  withSequence,
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
-import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 
 const { width, height } = Dimensions.get('window');
 
+const PARTICLES_COUNT = 20;
+
 const SplashScreen = () => {
-  // Shared values for high-end micro-animations
+  // Shared values for the high-end animations
   const logoOpacity = useSharedValue(0);
-  const logoTranslateY = useSharedValue(30);
-  const dotOpacity = useSharedValue(0);
-  const dotScale = useSharedValue(0);
-  const loadingProgress = useSharedValue(0);
-  const backgroundGlowOpacity = useSharedValue(0);
+  const logoScale = useSharedValue(0.95);
+  const sweepProgress = useSharedValue(0);
+  const particlesOpacity = useSharedValue(0);
 
   useEffect(() => {
-    // 1. Background subtle glow fades in
-    backgroundGlowOpacity.value = withTiming(1, { duration: 1500, easing: Easing.out(Easing.ease) });
+    // 1. Logo elegant fade in and scale
+    logoOpacity.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) });
+    logoScale.value = withTiming(1, { duration: 1800, easing: Easing.out(Easing.cubic) });
 
-    // 2. Elegant spring entrance for the main logo text
-    logoOpacity.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) });
-    logoTranslateY.value = withSpring(0, {
-      damping: 12,
-      stiffness: 90,
-      mass: 1,
-    });
-
-    // 3. The signature green dot pops in
-    dotOpacity.value = withDelay(400, withTiming(1, { duration: 400 }));
-    dotScale.value = withDelay(
-      400,
-      withSpring(1, { damping: 8, stiffness: 150 })
+    // 2. Vibrant green accent light sweep across the logo
+    sweepProgress.value = withDelay(
+      300,
+      withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) })
     );
 
-    // 4. Premium infinite loading sweep at the bottom
-    loadingProgress.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1800, easing: Easing.bezier(0.4, 0.0, 0.2, 1) }),
-        withTiming(0, { duration: 1800, easing: Easing.bezier(0.4, 0.0, 0.2, 1) })
-      ),
-      -1,
-      true
+    // 3. Soft ambient particles fade in quickly, then gently dissolve
+    particlesOpacity.value = withSequence(
+      withTiming(0.6, { duration: 600, easing: Easing.out(Easing.ease) }),
+      withDelay(400, withTiming(0, { duration: 1000, easing: Easing.in(Easing.ease) }))
     );
   }, []);
 
   // --- Animated Styles ---
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: backgroundGlowOpacity.value,
-  }));
-
-  const logoStyle = useAnimatedStyle(() => ({
+  const logoContainerStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
-    transform: [{ translateY: logoTranslateY.value }],
+    transform: [{ scale: logoScale.value }],
   }));
 
-  const dotStyle = useAnimatedStyle(() => ({
-    opacity: dotOpacity.value,
-    transform: [{ scale: dotScale.value }],
-  }));
-
-  const loadingStyle = useAnimatedStyle(() => ({
+  const sweepStyle = useAnimatedStyle(() => ({
     transform: [
       {
         translateX: interpolate(
-          loadingProgress.value,
+          sweepProgress.value,
           [0, 1],
-          [-width * 0.4, width * 0.4],
-          Extrapolation.CLAMP
-        ),
-      },
-      {
-        scaleX: interpolate(
-          loadingProgress.value,
-          [0, 0.5, 1],
-          [0.1, 1, 0.1],
+          [-width * 0.8, width * 0.8],
           Extrapolation.CLAMP
         ),
       },
     ],
     opacity: interpolate(
-      loadingProgress.value,
-      [0, 0.5, 1],
-      [0.2, 1, 0.2],
+      sweepProgress.value,
+      [0, 0.2, 0.8, 1],
+      [0, 0.8, 0.8, 0], // fades out at edges
       Extrapolation.CLAMP
     ),
   }));
 
+  const particlesStyle = useAnimatedStyle(() => ({
+    opacity: particlesOpacity.value,
+  }));
+
+  // Generate random stable particles
+  const particles = useMemo(() => {
+    return Array.from({ length: PARTICLES_COUNT }).map((_, i) => ({
+      id: i,
+      size: Math.random() * 4 + 1,
+      x: Math.random() * width,
+      y: Math.random() * height * 0.4 + height * 0.3, // concentrated around the center
+      opacity: Math.random() * 0.5 + 0.2,
+    }));
+  }, []);
+
   return (
     <View style={styles.container}>
-      {/* Ultra subtle gradient background for depth */}
-      <Animated.View style={[StyleSheet.absoluteFill, glowStyle]}>
-        <LinearGradient
-          colors={['#FFFFFF', '#FFFFFF', '#F0FDF4']}
-          style={StyleSheet.absoluteFill}
-        />
+      {/* Soft ambient particles */}
+      <Animated.View style={[StyleSheet.absoluteFill, particlesStyle]}>
+        {particles.map((p) => (
+          <View
+            key={p.id}
+            style={{
+              position: 'absolute',
+              left: p.x,
+              top: p.y,
+              width: p.size,
+              height: p.size,
+              borderRadius: p.size / 2,
+              backgroundColor: '#00C853',
+              opacity: p.opacity,
+            }}
+          />
+        ))}
       </Animated.View>
 
       {/* Main Brand Centered */}
-      <Animated.View style={[styles.brandContainer, logoStyle]}>
-        <Text style={styles.logoText}>2QT</Text>
-        <Animated.View style={[styles.dotContainer, dotStyle]}>
-          <View style={styles.dot} />
-          {/* Subtle glow behind the dot */}
-          <View style={styles.dotGlow} />
+      <Animated.View style={[styles.logoContainer, logoContainerStyle]}>
+        {/* Subtle light sweep under the text */}
+        <Animated.View style={[styles.sweepContainer, sweepStyle]}>
+          <LinearGradient
+            colors={['rgba(0, 200, 83, 0)', 'rgba(0, 200, 83, 0.6)', 'rgba(0, 200, 83, 0)']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
         </Animated.View>
+        <Text style={styles.logoText}>2QT</Text>
       </Animated.View>
-
-      {/* Bottom Loading Indicator */}
-      <View style={styles.loadingTrack}>
-        <Animated.View style={[styles.loadingThumb, loadingStyle]} />
-      </View>
-      <Text style={styles.subText}>Premium Delivery</Text>
     </View>
   );
 };
@@ -131,81 +123,41 @@ const SplashScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  logoContainer: {
     justifyContent: 'center',
-    // Slight offset to perfectly optical center since the dot adds width
-    transform: [{ translateX: -8 }],
+    alignItems: 'center',
   },
   logoText: {
     fontFamily: fontFamily.black,
-    fontSize: 72,
-    color: '#0F172A', // Deep slate for high contrast and premium feel
-    letterSpacing: -4,
+    fontSize: 82,
+    color: '#FFFFFF',
+    letterSpacing: -5,
     includeFontPadding: false,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
+        shadowColor: '#00C853',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
       },
       android: {
-        elevation: 2,
+        elevation: 10,
+        textShadowColor: 'rgba(0, 200, 83, 0.2)',
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 20,
       },
     }),
   },
-  dotContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 6,
-  },
-  dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#22C55E', // Primary premium green
-    zIndex: 2,
-  },
-  dotGlow: {
+  sweepContainer: {
     position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#4ADE80',
-    opacity: 0.4,
-    zIndex: 1,
-  },
-  loadingTrack: {
-    position: 'absolute',
-    bottom: height * 0.12,
-    width: width * 0.4,
-    height: 3,
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingThumb: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#22C55E',
-    borderRadius: 2,
-  },
-  subText: {
-    position: 'absolute',
-    bottom: height * 0.12 - 28,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    width: width * 0.6,
+    height: 180,
+    zIndex: -1,
+    transform: [{ rotate: '20deg' }],
   },
 });
 
