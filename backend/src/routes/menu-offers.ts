@@ -63,6 +63,9 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
         return res.status(400).json({ error: `audience must be one of: ${VALID_AUDIENCES.join(', ')}` });
     }
 
+    // Normalise discount_type to match DB constraint ('percent' → 'percentage')
+    const normalizedDiscountType = discount_type === 'percent' ? 'percentage' : discount_type;
+
     // Normalise: if multi-select array provided, derive single target_id from first element
     const resolvedTargetId = target_id || (Array.isArray(target_ids) && target_ids[0]) || null;
     const resolvedTargetIds = Array.isArray(target_ids) && target_ids.length > 0 ? target_ids : null;
@@ -78,7 +81,7 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
         `, [
             title, description || null, target_type,
             resolvedTargetId, resolvedTargetIds,
-            discount_type, discount_percent || 0, discount_flat_paise || 0,
+            normalizedDiscountType, discount_percent || 0, discount_flat_paise || 0,
             max_discount_paise || null,
             audience || 'all',
             audience_config ? JSON.stringify(audience_config) : '{}',
@@ -103,6 +106,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
     const resolvedTargetId = target_id !== undefined ? target_id
         : (Array.isArray(target_ids) && target_ids[0]) || undefined;
     const resolvedTargetIds = Array.isArray(target_ids) && target_ids.length > 0 ? target_ids : null;
+    const normalizedDiscountType = discount_type === 'percent' ? 'percentage' : (discount_type ?? null);
 
     try {
         const { rows } = await query(`
@@ -129,7 +133,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
             title ?? null, description ?? null, target_type ?? null,
             resolvedTargetId ?? null,
             resolvedTargetIds,
-            discount_type ?? null, discount_percent ?? null, discount_flat_paise ?? null,
+            normalizedDiscountType, discount_percent ?? null, discount_flat_paise ?? null,
             max_discount_paise ?? null,
             audience ?? null,
             audience_config ? JSON.stringify(audience_config) : null,
