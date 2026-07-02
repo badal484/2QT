@@ -481,17 +481,6 @@ const HomeScreen = ({ navigation }: any) => {
                       </View>
                     )}
 
-                    {/* Offer badge */}
-                    {mi.applied_offer && (
-                      <View style={styles.itemOfferBadge}>
-                        <Text style={styles.itemOfferBadgeText}>
-                          {mi.applied_offer.discount_type === 'flat'
-                            ? `₹${(mi.applied_offer.discount_flat_paise || 0) / 100} OFF`
-                            : `${mi.applied_offer.discount_percent || 0}% OFF`}
-                        </Text>
-                      </View>
-                    )}
-
                     {/* ADD / qty — floats at bottom-right of image */}
                     {!unavailable && (
                       <View style={styles.catPreviewAddFloat}>
@@ -530,6 +519,15 @@ const HomeScreen = ({ navigation }: any) => {
                       </View>
                       <Text style={styles.catPreviewName} numberOfLines={2}>{mi.name}</Text>
                     </View>
+                    {mi.applied_offer && (
+                      <View style={styles.itemOfferTag}>
+                        <Text style={styles.itemOfferTagText}>
+                          {mi.applied_offer.discount_type === 'flat'
+                            ? `₹${(mi.applied_offer.discount_flat_paise || 0) / 100} OFF`
+                            : `${Math.round(parseFloat(mi.applied_offer.discount_percent || '0'))}% OFF`}
+                        </Text>
+                      </View>
+                    )}
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
                       {mi.original_price_paise > mi.price_paise && (
@@ -578,15 +576,6 @@ const HomeScreen = ({ navigation }: any) => {
             {menuItem.is_bestseller && <View style={styles.homeGridBestsellerBadge}><Text style={styles.homeGridBestsellerText}>★ Bestseller</Text></View>}
             {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text style={styles.homeGridNewText}>+ New</Text></View>}
             {unavailable && <View style={styles.homeGridSoldOut}><Text style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
-            {menuItem.applied_offer && (
-              <View style={styles.itemOfferBadge}>
-                <Text style={styles.itemOfferBadgeText}>
-                  {menuItem.applied_offer.discount_type === 'flat'
-                    ? `₹${(menuItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
-                    : `${menuItem.applied_offer.discount_percent || 0}% OFF`}
-                </Text>
-              </View>
-            )}
             {!unavailable && (
               <View style={styles.homeGridAddFloat}>
                 {cartItem ? (
@@ -611,6 +600,15 @@ const HomeScreen = ({ navigation }: any) => {
           <View style={styles.homeGridInfo}>
             <Text style={styles.homeGridName} numberOfLines={2}>{menuItem.name}</Text>
             {menuItem.description ? <Text style={styles.homeGridDesc} numberOfLines={2}>{menuItem.description}</Text> : null}
+            {menuItem.applied_offer && (
+              <View style={styles.itemOfferBadge}>
+                <Text style={styles.itemOfferBadgeText}>
+                  {menuItem.applied_offer.discount_type === 'flat'
+                    ? `₹${(menuItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
+                    : `${Math.round(parseFloat(menuItem.applied_offer.discount_percent || '0'))}% OFF`}
+                </Text>
+              </View>
+            )}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <Text style={styles.homeGridPrice}>₹{menuItem.price_paise / 100}</Text>
               {menuItem.original_price_paise > menuItem.price_paise && (
@@ -1888,22 +1886,34 @@ const styles = StyleSheet.create({
   },
   dealPlusBadgeText: { fontSize: 10, fontFamily: fontFamily.black, color: '#fff', letterSpacing: 0.8 },
 
-  // ── Item offer badge ────────────────────────────────────────────────────────
-  itemOfferBadge: {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-    backgroundColor: '#16A34A',
-    borderRadius: 8,
+  // ── Item offer tag (in price row, no image overlap) ────────────────────────
+  itemOfferTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#DCFCE7',
+    borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    zIndex: 10,
+    marginBottom: 4,
+  },
+  itemOfferTagText: {
+    fontSize: 10,
+    fontFamily: fontFamily.black,
+    color: '#15803D',
+    letterSpacing: 0.2,
+  },
+  itemOfferBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#DCFCE7',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 4,
   },
   itemOfferBadgeText: {
     fontSize: 10,
     fontFamily: fontFamily.black,
-    color: '#fff',
-    letterSpacing: 0.3,
+    color: '#15803D',
+    letterSpacing: 0.2,
   },
 
   itemsContainer: { paddingHorizontal: 12, marginTop: 16, paddingBottom: 60 },
