@@ -31,6 +31,11 @@ import LiveKitchenScreen from '../screens/LiveKitchenScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import CategoryScreen from '../screens/CategoryScreen';
 import OrderSavingsScreen from '../screens/OrderSavingsScreen';
+import RestaurantDetailScreen from '../screens/RestaurantDetailScreen';
+import TableBookingScreen from '../screens/TableBookingScreen';
+import TableBookingConfirmedScreen from '../screens/TableBookingConfirmedScreen';
+import MyTableBookingsScreen from '../screens/MyTableBookingsScreen';
+import TableBookingDetailScreen from '../screens/TableBookingDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -72,6 +77,11 @@ const CustomerNavigator = () => {
       <Stack.Screen name="LiveKitchen" component={LiveKitchenScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Category" component={CategoryScreen} />
+      <Stack.Screen name="RestaurantDetail" component={RestaurantDetailScreen} />
+      <Stack.Screen name="TableBooking" component={TableBookingScreen} />
+      <Stack.Screen name="TableBookingConfirmed" component={TableBookingConfirmedScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="MyTableBookings" component={MyTableBookingsScreen} />
+      <Stack.Screen name="TableBookingDetail" component={TableBookingDetailScreen} />
     </Stack.Navigator>
   );
 };

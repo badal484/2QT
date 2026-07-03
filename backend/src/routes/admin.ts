@@ -1508,4 +1508,236 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
     }
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// RESTAURANT (TABLE BOOKING) MANAGEMENT
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── GET /admin/restaurants ────────────────────────────────────────────────────
+router.get('/restaurants', requireRole('super_admin', 'admin', 'finance'), async (_req, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT
+                rc.id, rc.name, rc.zone_id, rc.cuisine_type, rc.address,
+                rc.is_active, rc.commission_percent, rc.gst_percent,
+                rc.slot_duration_minutes, rc.deposit_paise, rc.created_at,
+                CASE WHEN rc.partner_id IS NULL THEN 'own' ELSE 'partner' END AS restaurant_type,
+                z.name AS zone_name,
+                u.name AS partner_name, u.phone AS partner_phone,
+                (SELECT COUNT(*) FROM restaurant_tables rt WHERE rt.restaurant_id = rc.id AND rt.is_active = true) AS active_tables,
+                (SELECT COUNT(*) FROM table_bookings tb
+                 WHERE tb.restaurant_id = rc.id
+                   AND tb.status NOT IN ('cancelled','no_show')
+                   AND DATE(tb.slot_start AT TIME ZONE 'Asia/Kolkata') = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE
+                ) AS bookings_today,
+                (SELECT COALESCE(SUM(tb.total_paid_paise),0) FROM table_bookings tb
+                 WHERE tb.restaurant_id = rc.id AND tb.status = 'completed'
+                   AND tb.completed_at >= NOW() - INTERVAL '30 days'
+                ) AS revenue_30d_paise
+            FROM restaurant_config rc
+            JOIN zones z ON z.id = rc.zone_id
+            LEFT JOIN users u ON u.id = rc.partner_id
+            ORDER BY rc.created_at DESC
+        `);
+        res.json({ restaurants: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /admin/restaurants ────────────────────────────────────────────────────
+router.post('/restaurants', requireRole('super_admin', 'admin'), async (req, res) => {
+    const {
+        zoneId, name, description, cuisineType, address, lat, lng, photos,
+        operatingHours, slotDurationMinutes, advanceBookingDays,
+        cancellationWindowMinutes, depositPaise, maxPartySize,
+        gstPercent, commissionPercent, partnerId, upiId,
+    } = req.body;
+
+    if (!zoneId || !name) return res.status(400).json({ error: 'zoneId and name are required' });
+
+    try {
+        const { rows } = await query(`
+            INSERT INTO restaurant_config
+                (zone_id, name, description, cuisine_type, address, lat, lng, photos,
+                 operating_hours, slot_duration_minutes, advance_booking_days,
+                 cancellation_window_minutes, deposit_paise, max_party_size,
+                 gst_percent, commission_percent, partner_id, upi_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+            RETURNING id, name, created_at
+        `, [
+            zoneId, name, description || null, cuisineType || null, address || null,
+            lat || null, lng || null, photos || [], operatingHours || {},
+            slotDurationMinutes || 90, advanceBookingDays || 7,
+            cancellationWindowMinutes || 120, depositPaise || 0, maxPartySize || 10,
+            gstPercent || 5.00, commissionPercent || 15.00,
+            partnerId || null, upiId || null,
+        ]);
+
+        emitToAdmin('restaurant_created', { restaurantId: rows[0].id, name: rows[0].name });
+        res.status(201).json({ restaurant: rows[0] });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── PUT /admin/restaurants/:id ────────────────────────────────────────────────
+router.put('/restaurants/:id', requireRole('super_admin', 'admin'), async (req, res) => {
+    const { id } = req.params;
+    const {
+        name, description, cuisineType, address, lat, lng, photos, operatingHours,
+        slotDurationMinutes, advanceBookingDays, cancellationWindowMinutes,
+        depositPaise, maxPartySize, gstPercent, commissionPercent, upiId, isActive,
+    } = req.body;
+
+    try {
+        const { rows } = await query(`
+            UPDATE restaurant_config SET
+                name                        = COALESCE($2, name),
+                description                 = COALESCE($3, description),
+                cuisine_type                = COALESCE($4, cuisine_type),
+                address                     = COALESCE($5, address),
+                lat                         = COALESCE($6, lat),
+                lng                         = COALESCE($7, lng),
+                photos                      = COALESCE($8, photos),
+                operating_hours             = COALESCE($9, operating_hours),
+                slot_duration_minutes       = COALESCE($10, slot_duration_minutes),
+                advance_booking_days        = COALESCE($11, advance_booking_days),
+                cancellation_window_minutes = COALESCE($12, cancellation_window_minutes),
+                deposit_paise               = COALESCE($13, deposit_paise),
+                max_party_size              = COALESCE($14, max_party_size),
+                gst_percent                 = COALESCE($15, gst_percent),
+                commission_percent          = COALESCE($16, commission_percent),
+                upi_id                      = COALESCE($17, upi_id),
+                is_active                   = COALESCE($18, is_active),
+                updated_at                  = NOW()
+            WHERE id = $1
+            RETURNING id, name, is_active
+        `, [id, name, description, cuisineType, address, lat, lng, photos, operatingHours,
+            slotDurationMinutes, advanceBookingDays, cancellationWindowMinutes,
+            depositPaise, maxPartySize, gstPercent, commissionPercent, upiId, isActive]);
+
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        res.json({ restaurant: rows[0] });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── GET /admin/restaurants/:id/tables ─────────────────────────────────────────
+router.get('/restaurants/:id/tables', requireRole('super_admin', 'admin'), async (req, res) => {
+    try {
+        const { rows } = await query(
+            'SELECT * FROM restaurant_tables WHERE restaurant_id = $1 ORDER BY table_number',
+            [req.params.id]
+        );
+        res.json({ tables: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /admin/restaurants/:id/tables ────────────────────────────────────────
+router.post('/restaurants/:id/tables', requireRole('super_admin', 'admin'), async (req, res) => {
+    const { tableNumber, capacity } = req.body;
+    if (!tableNumber || !capacity) return res.status(400).json({ error: 'tableNumber and capacity required' });
+
+    try {
+        const { rows } = await query(`
+            INSERT INTO restaurant_tables (restaurant_id, table_number, capacity)
+            VALUES ($1,$2,$3) RETURNING *
+        `, [req.params.id, tableNumber, capacity]);
+        res.status(201).json({ table: rows[0] });
+    } catch (err: any) {
+        if (err.code === '23505') return res.status(409).json({ error: 'TABLE_NUMBER_EXISTS' });
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── PUT /admin/restaurants/:id/tables/:tableId ────────────────────────────────
+router.put('/restaurants/:id/tables/:tableId', requireRole('super_admin', 'admin'), async (req, res) => {
+    const { tableId } = req.params;
+    const { tableNumber, capacity, isActive } = req.body;
+    try {
+        const { rows } = await query(`
+            UPDATE restaurant_tables SET
+                table_number = COALESCE($3, table_number),
+                capacity     = COALESCE($4, capacity),
+                is_active    = COALESCE($5, is_active)
+            WHERE id = $1 AND restaurant_id = $2
+            RETURNING *
+        `, [tableId, req.params.id, tableNumber, capacity, isActive]);
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        res.json({ table: rows[0] });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── GET /admin/restaurants/:id/menu ───────────────────────────────────────────
+router.get('/restaurants/:id/menu', requireRole('super_admin', 'admin'), async (req, res) => {
+    try {
+        const { rows } = await query(
+            'SELECT * FROM restaurant_menu_items WHERE restaurant_id = $1 ORDER BY category, sort_order, name',
+            [req.params.id]
+        );
+        res.json({ items: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /admin/restaurants/:id/menu ──────────────────────────────────────────
+router.post('/restaurants/:id/menu', requireRole('super_admin', 'admin'), async (req, res) => {
+    const { name, description, pricePaise, category, imageUrl, isVeg, sortOrder } = req.body;
+    if (!name || !pricePaise) return res.status(400).json({ error: 'name and pricePaise required' });
+    try {
+        const { rows } = await query(`
+            INSERT INTO restaurant_menu_items
+                (restaurant_id, name, description, price_paise, category, image_url, is_veg, sort_order)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
+        `, [req.params.id, name, description || null, pricePaise, category || null, imageUrl || null, isVeg !== false, sortOrder || 0]);
+        res.status(201).json({ item: rows[0] });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── GET /admin/restaurants/:id/bookings ───────────────────────────────────────
+router.get('/restaurants/:id/bookings', requireRole('super_admin', 'admin', 'finance'), async (req, res) => {
+    const { date, status } = req.query as { date?: string; status?: string };
+    try {
+        const params: any[] = [req.params.id];
+        let dateFilter = '';
+        let statusFilter = '';
+        if (date) { params.push(date); dateFilter = `AND DATE(tb.slot_start AT TIME ZONE 'Asia/Kolkata') = $${params.length}`; }
+        if (status) { params.push(status); statusFilter = `AND tb.status = $${params.length}`; }
+
+        const { rows } = await query(`
+            SELECT tb.id, tb.display_id, tb.status, tb.party_size,
+                   tb.slot_start, tb.slot_end, tb.occasion, tb.special_requests,
+                   tb.pre_order_amount_paise, tb.post_order_amount_paise,
+                   tb.gst_amount_paise, tb.total_paid_paise, tb.final_payment_method,
+                   tb.seated_at, tb.completed_at, tb.cancelled_at,
+                   u.name AS customer_name, u.phone AS customer_phone,
+                   rt.table_number,
+                   COALESCE(items.list, '[]') AS items
+            FROM table_bookings tb
+            JOIN users u ON u.id = tb.customer_id
+            LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
+            LEFT JOIN LATERAL (
+                SELECT json_agg(json_build_object(
+                    'name', tbi.menu_item_name, 'quantity', tbi.quantity,
+                    'type', tbi.type, 'status', tbi.status
+                ) ORDER BY tbi.ordered_at) AS list
+                FROM table_booking_items tbi WHERE tbi.booking_id = tb.id
+            ) items ON true
+            WHERE tb.restaurant_id = $1 ${dateFilter} ${statusFilter}
+            ORDER BY tb.slot_start DESC LIMIT 200
+        `, params);
+        res.json({ bookings: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;

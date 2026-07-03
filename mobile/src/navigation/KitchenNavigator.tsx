@@ -5,7 +5,8 @@ import KitchenBoardScreen from '../screens/KitchenBoardScreen';
 import StockScreen from '../screens/StockScreen';
 import FeedbackScreen from '../screens/FeedbackScreen';
 import ShiftHandoverScreen from '../screens/ShiftHandoverScreen';
-import { ClipboardList, BarChart3, Star } from 'lucide-react-native';
+import KitchenDineInScreen from '../screens/KitchenDineInScreen';
+import { ClipboardList, BarChart3, Star, UtensilsCrossed } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -46,6 +47,11 @@ const MainKitchenStack = () => (
       name="Ratings"
       component={FeedbackScreen}
       options={{ tabBarIcon: ({ color }) => <Star size={22} color={color} /> }}
+    />
+    <Tab.Screen
+      name="Dine-in"
+      component={KitchenDineInScreen}
+      options={{ tabBarIcon: ({ color }) => <UtensilsCrossed size={22} color={color} /> }}
     />
   </Tab.Navigator>
 );

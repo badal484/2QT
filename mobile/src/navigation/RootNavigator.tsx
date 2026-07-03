@@ -10,6 +10,7 @@ import CustomerNavigator from './CustomerNavigator';
 import RiderNavigator from './RiderNavigator';
 import KitchenNavigator from './KitchenNavigator';
 import AdminNavigator from './AdminNavigator';
+import PartnerNavigator from './PartnerNavigator';
 import ForceUpdateScreen from '../screens/ForceUpdateScreen';
 import MaintenanceScreen from '../screens/MaintenanceScreen';
 import { APP_VERSION, api } from '../api/client';
@@ -169,6 +170,8 @@ const RootNavigator = () => {
         <RiderNavigator />
       ) : (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen'].includes(activeRole)) ? (
         <KitchenNavigator />
+      ) : (activeRole === 'partner') ? (
+        <PartnerNavigator />
       ) : (
         <AdminNavigator />
       )}

@@ -55,6 +55,10 @@ export const initSocket = (server: any) => {
             socket.join('admin');
         }
 
+        if (user.role === 'partner') {
+            socket.join(`partner:${user.userId}`);
+        }
+
         if (user.role === 'rider' || user.role === 'rider_captain' || user.role === 'super_admin') {
             socket.join('riders');
             if (user.zoneId) socket.join(`riders:${user.zoneId}`);
@@ -156,4 +160,8 @@ export const emitToRiders = (event: string, data: any, zoneId?: string) => {
 
 export const emitToAll = (event: string, data: any) => {
     if (io) io.emit(event, data);
+};
+
+export const emitToPartner = (partnerId: string, event: string, data: any) => {
+    if (io) io.to(`partner:${partnerId}`).emit(event, data);
 };

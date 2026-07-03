@@ -23,6 +23,9 @@ import complaintsRoutes from './complaints';
 import homeRoutes from './home';
 import collectionsRoutes from './collections';
 import menuOffersRoutes from './menu-offers';
+import restaurantsRoutes from './restaurants';
+import tableBookingsRoutes from './table-bookings';
+import partnerRoutes from './partner';
 // ... other routes
 
 const router = Router();
@@ -54,6 +57,9 @@ router.use('/finance', financeRoutes);
 router.use('/campaigns', campaignsRoutes);
 router.use('/complaints', complaintsRoutes);
 router.use('/menu-offers', menuOffersRoutes);
+router.use('/restaurants', restaurantsRoutes);
+router.use('/table-bookings', tableBookingsRoutes);
+router.use('/partner', partnerRoutes);
 // ...
 
 export default router;
