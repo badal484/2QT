@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { withTransaction, query } from '../db';
 import { redis, keys } from '../redis';
-import { emitToKitchen, emitToUser, emitToOrder, emitToAll, emitToAdmin } from '../socket';
+import { emitToKitchen, emitToUser, emitToOrder, emitToAll, emitToAdmin, emitToPartner } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { finalizeOrder } from '../services/order.service';
 import { NotificationService } from '../services/notification.service';
@@ -34,13 +34,87 @@ router.post('/razorpay', async (req, res) => {
     // ── Order paid (online / UPI / card) ─────────────────────────────────────
     if (event === 'order.paid') {
         const rzpOrderId    = payload.order.entity.id;
-        const rzpPaymentId  = payload.payment.entity.id as string;   // pay_xxx — needed for refunds
-        const internalOrderId = payload.order.entity.notes?.orderId;
+        const rzpPaymentId  = payload.payment.entity.id as string;
+        const notes         = payload.order.entity.notes || {};
+
+        // ── Table booking final-settlement payment ────────────────────────────
+        if (notes.type === 'table_booking_final') {
+            const bookingId = notes.bookingId as string;
+            try {
+                const { rows } = await query(`
+                    UPDATE table_bookings
+                    SET gateway_payment_id = COALESCE(gateway_payment_id, $2),
+                        final_payment_method = 'app_upi',
+                        status = 'completed', completed_at = NOW(), updated_at = NOW(),
+                        total_paid_paise = pre_order_amount_paise + post_order_amount_paise + gst_amount_paise
+                    WHERE id = $1 AND status = 'seated'
+                    RETURNING customer_id,
+                              pre_order_amount_paise + post_order_amount_paise + gst_amount_paise AS grand_total_paise
+                `, [bookingId, rzpPaymentId]);
+
+                if (rows[0]) {
+                    const b = rows[0];
+                    await query(`
+                        INSERT INTO table_booking_payments
+                            (booking_id, amount_paise, payment_method, payment_type, gateway_payment_id)
+                        SELECT $1,
+                               (pre_order_amount_paise + post_order_amount_paise + gst_amount_paise) - total_paid_paise + (pre_order_amount_paise + post_order_amount_paise + gst_amount_paise),
+                               'gateway','final_settlement',$2
+                        FROM table_bookings WHERE id=$1
+                    `, [bookingId, rzpPaymentId]).catch(() => {});
+
+                    const pts = Math.floor(b.grand_total_paise / 1000);
+                    if (pts > 0) {
+                        await query(
+                            "INSERT INTO loyalty_transactions (customer_id, points, type) VALUES ($1,$2,'earn')",
+                            [b.customer_id, pts]
+                        ).catch(() => {});
+                    }
+                    emitToUser(b.customer_id, 'table_booking_updated', { bookingId, status: 'completed' });
+                }
+            } catch (err) {
+                console.error('[webhook table_booking_final]', err);
+            }
+            return res.json({ status: 'ok' });
+        }
+
+        // ── Table booking pre-order payment ───────────────────────────────────
+        if (notes.type === 'table_booking') {
+            const bookingId = notes.bookingId as string;
+            try {
+                const { rows } = await query(`
+                    UPDATE table_bookings
+                    SET status = 'confirmed',
+                        gateway_payment_id = COALESCE(gateway_payment_id, $2),
+                        total_paid_paise = pre_order_amount_paise + deposit_amount_paise
+                    WHERE id = $1 AND status = 'pending_payment'
+                    RETURNING customer_id, pre_order_amount_paise, deposit_amount_paise,
+                              display_id, slot_start, party_size, occasion, restaurant_id
+                `, [bookingId, rzpPaymentId]);
+
+                if (rows[0]) {
+                    const b = rows[0];
+                    if (b.pre_order_amount_paise > 0) {
+                        await query(`
+                            INSERT INTO table_booking_payments
+                                (booking_id, amount_paise, payment_method, payment_type, gateway_payment_id)
+                            VALUES ($1,$2,'gateway','pre_order',$3)
+                        `, [bookingId, b.pre_order_amount_paise, rzpPaymentId]).catch(() => {});
+                    }
+                    emitToUser(b.customer_id, 'table_booking_updated', { bookingId, status: 'confirmed' });
+                }
+            } catch (err) {
+                console.error('[webhook table_booking pre-order]', err);
+            }
+            return res.json({ status: 'ok' });
+        }
+
+        // ── Standard food delivery order ──────────────────────────────────────
+        const internalOrderId = notes.orderId;
         const paymentMethod = payload.payment.entity.method;
 
         const result = await finalizeOrder(rzpOrderId, paymentMethod, internalOrderId);
 
-        // Save the Razorpay payment ID so the refund service can reverse it later
         if (rzpPaymentId) {
             const targetId = internalOrderId || null;
             if (targetId) {
@@ -145,15 +219,28 @@ router.post('/razorpay', async (req, res) => {
         const rzpPayoutId = payload.payout.entity.id as string;
         const utr         = payload.payout.entity.utr as string | null;
         try {
-            // Update UTR in whichever table holds this payout (rider or kitchen)
+            // Update UTR for rider payouts
             await query(
                 'UPDATE weekly_payouts  SET utr_number = COALESCE(utr_number, $2) WHERE razorpay_payout_id = $1',
                 [rzpPayoutId, utr]
             );
+            // Update UTR for kitchen payouts
             await query(
                 'UPDATE kitchen_payouts SET utr_number = COALESCE(utr_number, $2) WHERE razorpay_payout_id = $1',
                 [rzpPayoutId, utr]
             );
+            // Update partner restaurant payout + notify partner
+            const { rows: partnerRows } = await query(`
+                UPDATE partner_restaurant_payouts
+                SET utr_number = COALESCE(utr_number, $2), status = 'paid', paid_at = NOW()
+                WHERE razorpay_payout_id = $1 AND status IN ('processing','pending')
+                RETURNING partner_id, net_payout_paise
+            `, [rzpPayoutId, utr]);
+            if (partnerRows[0]) {
+                emitToPartner(partnerRows[0].partner_id, 'partner_payout_updated', {
+                    status: 'paid', amountPaise: partnerRows[0].net_payout_paise, utr,
+                });
+            }
         } catch (err) {
             console.error('[webhook payout.processed]', err);
         }

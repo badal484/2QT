@@ -189,6 +189,7 @@ const ProfileScreen = ({ navigation }: any) => {
           ) : (
             <>
               <MinimalListItem icon={<Package size={22} color="#6B7280" strokeWidth={1.5} />} title="Your Orders" onPress={() => navigation.navigate('OrdersTab')} />
+              <MinimalListItem icon={<Calendar size={22} color="#6B7280" strokeWidth={1.5} />} title="My Table Bookings" onPress={() => navigation.navigate('MyTableBookings')} />
               <MinimalListItem icon={<MapPin size={22} color="#6B7280" strokeWidth={1.5} />} title="Saved Addresses" onPress={() => navigation.navigate('AddressBook')} />
             </>
           )}

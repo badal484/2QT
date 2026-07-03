@@ -3,7 +3,7 @@ import { query } from '../db';
 import pool from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
-import { emitToAll, emitToUser, emitToKitchen, emitToAdmin } from '../socket';
+import { emitToAll, emitToUser, emitToKitchen, emitToAdmin, emitToPartner } from '../socket';
 import { processWalletRefund, processBankRefund } from '../services/refund.service';
 import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
 
@@ -831,6 +831,238 @@ router.get('/me', financeAccess, financeRole, async (req: AuthRequest, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed' });
   }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTNER RESTAURANT PAYOUTS
+// Commission is only on platform-sourced bookings (every row in table_bookings).
+// Walk-in customers never enter this system.
+// net_payout = gross_revenue - commission - cash_partner_already_collected
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── GET /finance/partner-payouts ─────────────────────────────────────────────
+router.get('/partner-payouts', authenticate, requireRole('super_admin', 'admin', 'finance'), async (_req, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT
+                prp.id, prp.period_start, prp.period_end, prp.status,
+                prp.gross_revenue_paise, prp.app_payments_paise,
+                prp.cash_collected_paise, prp.commission_paise, prp.net_payout_paise,
+                prp.razorpay_payout_id, prp.utr_number, prp.failure_reason,
+                prp.created_at, prp.paid_at,
+                rc.name AS restaurant_name, rc.commission_percent,
+                u.name AS partner_name, u.phone AS partner_phone,
+                rc.upi_id AS partner_upi
+            FROM partner_restaurant_payouts prp
+            JOIN restaurant_config rc ON rc.id = prp.restaurant_id
+            JOIN users u ON u.id = prp.partner_id
+            ORDER BY prp.created_at DESC
+            LIMIT 100
+        `);
+        res.json({ payouts: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /finance/partner-payouts/:restaurantId/generate ─────────────────────
+// Compute and create a payout record for a given date range.
+// Finance team triggers this; the cron also calls the same logic automatically.
+router.post('/partner-payouts/:restaurantId/generate', authenticate, requireRole('super_admin', 'admin', 'finance'), async (req, res) => {
+    const { restaurantId } = req.params;
+    const { periodStart, periodEnd } = req.body as { periodStart: string; periodEnd: string };
+
+    if (!periodStart || !periodEnd) {
+        return res.status(400).json({ error: 'periodStart and periodEnd (YYYY-MM-DD) required' });
+    }
+
+    try {
+        const { rows: configs } = await query(
+            'SELECT id, partner_id, commission_percent, name FROM restaurant_config WHERE id=$1 AND partner_id IS NOT NULL',
+            [restaurantId]
+        );
+        if (!configs[0]) return res.status(404).json({ error: 'PARTNER_RESTAURANT_NOT_FOUND' });
+        const rc = configs[0];
+
+        // Check no duplicate for this period
+        const { rows: existing } = await query(
+            'SELECT id FROM partner_restaurant_payouts WHERE restaurant_id=$1 AND period_start=$2 AND period_end=$3',
+            [restaurantId, periodStart, periodEnd]
+        );
+        if (existing[0]) return res.status(409).json({ error: 'PAYOUT_ALREADY_EXISTS', payoutId: existing[0].id });
+
+        // Gross = total bill of all completed bookings in the period
+        const { rows: revenueRows } = await query(`
+            SELECT
+                COALESCE(SUM(tb.total_paid_paise), 0) AS gross_revenue_paise,
+                COALESCE(SUM(tbp.cash_total), 0)      AS cash_collected_paise,
+                COALESCE(SUM(tb.total_paid_paise) - SUM(COALESCE(tbp.cash_total, 0)), 0) AS app_payments_paise
+            FROM table_bookings tb
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(SUM(p.amount_paise), 0) AS cash_total
+                FROM table_booking_payments p
+                WHERE p.booking_id = tb.id
+                  AND p.payment_method IN ('cash', 'card_pos')
+                  AND p.payment_type = 'final_settlement'
+            ) tbp ON true
+            WHERE tb.restaurant_id = $1
+              AND tb.status = 'completed'
+              AND DATE(tb.completed_at AT TIME ZONE 'Asia/Kolkata') BETWEEN $2 AND $3
+        `, [restaurantId, periodStart, periodEnd]);
+
+        const rev = revenueRows[0];
+        const grossPaise = Number(rev.gross_revenue_paise);
+        const cashPaise = Number(rev.cash_collected_paise);
+        const appPaise = Number(rev.app_payments_paise);
+        const commissionPaise = Math.round(grossPaise * (rc.commission_percent / 100));
+        // Partner's share of app payments = app_payments - commission
+        // Cash they already collected is already in their pocket; VELTO just deducts commission on it from the payout
+        const netPayoutPaise = grossPaise - commissionPaise - cashPaise;
+
+        const { rows: payoutRows } = await query(`
+            INSERT INTO partner_restaurant_payouts
+                (partner_id, restaurant_id, period_start, period_end,
+                 gross_revenue_paise, app_payments_paise, cash_collected_paise,
+                 commission_paise, net_payout_paise)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+            RETURNING id
+        `, [rc.partner_id, restaurantId, periodStart, periodEnd,
+            grossPaise, appPaise, cashPaise, commissionPaise, Math.max(0, netPayoutPaise)]);
+
+        emitToAdmin('partner_payout_generated', { payoutId: payoutRows[0].id, restaurantName: rc.name, netPayoutPaise });
+        res.status(201).json({
+            payoutId: payoutRows[0].id,
+            grossRevenuePaise: grossPaise,
+            commissionPaise,
+            cashCollectedPaise: cashPaise,
+            netPayoutPaise: Math.max(0, netPayoutPaise),
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /finance/partner-payouts/:id/process ─────────────────────────────────
+// Initiate the actual bank transfer to the partner via RazorpayX.
+router.post('/partner-payouts/:id/process', authenticate, requireRole('super_admin', 'admin', 'finance'), async (req, res) => {
+    const id = req.params.id as string;
+
+    try {
+        const { rows } = await query(`
+            SELECT prp.*, rc.name AS restaurant_name, rc.upi_id,
+                   rc.razorpay_contact_id, rc.razorpay_fund_account_id,
+                   u.name AS partner_name, u.phone AS partner_phone
+            FROM partner_restaurant_payouts prp
+            JOIN restaurant_config rc ON rc.id = prp.restaurant_id
+            JOIN users u ON u.id = prp.partner_id
+            WHERE prp.id = $1
+        `, [id]);
+        if (!rows[0]) return res.status(404).json({ error: 'PAYOUT_NOT_FOUND' });
+        const payout = rows[0];
+
+        if (payout.status !== 'pending') {
+            return res.status(400).json({ error: 'PAYOUT_NOT_PENDING', status: payout.status });
+        }
+        if (payout.net_payout_paise <= 0) {
+            return res.status(400).json({ error: 'NET_PAYOUT_ZERO', message: 'Nothing to pay out — partner already collected everything in cash' });
+        }
+
+        // Mark as processing immediately so double-clicks don't fire twice
+        await query("UPDATE partner_restaurant_payouts SET status='processing' WHERE id=$1", [id]);
+
+        try {
+            // Ensure partner has a RazorpayX fund account
+            const { ensureRiderFundAccount, firePayout, isAutoPayConfigured } = await import('../services/razorpay-payout.service');
+
+            if (!isAutoPayConfigured()) {
+                // No RazorpayX configured — leave as pending for manual bank transfer
+                await query("UPDATE partner_restaurant_payouts SET status='pending', notes='RazorpayX not configured' WHERE id=$1", [id]);
+                return res.json({ success: false, message: 'RazorpayX not configured — process manually' });
+            }
+
+            let fundAccountId = payout.razorpay_fund_account_id;
+            if (!fundAccountId) {
+                if (!payout.upi_id) {
+                    await query("UPDATE partner_restaurant_payouts SET status='failed', failure_reason='No UPI ID configured for this partner' WHERE id=$1", [id]);
+                    return res.status(400).json({ error: 'NO_UPI_ID' });
+                }
+                // ensureRiderFundAccount works for any person, not just riders
+                fundAccountId = await ensureRiderFundAccount({
+                    id: payout.partner_id,
+                    name: payout.partner_name,
+                    phone: payout.partner_phone || '0000000000',
+                    upi_id: payout.upi_id,
+                    razorpay_contact_id: payout.razorpay_contact_id,
+                    razorpay_fund_account_id: payout.razorpay_fund_account_id,
+                });
+                // Cache fund account on restaurant_config
+                await query(
+                    'UPDATE restaurant_config SET razorpay_fund_account_id=$1 WHERE id=$2',
+                    [fundAccountId, payout.restaurant_id]
+                );
+            }
+
+            const narration = `VELTO ${payout.restaurant_name} ${payout.period_start}`;
+            const result = await firePayout(fundAccountId, payout.net_payout_paise, narration, id);
+
+            await query(`
+                UPDATE partner_restaurant_payouts
+                SET status='paid', razorpay_payout_id=$2, utr_number=$3, paid_at=NOW()
+                WHERE id=$1
+            `, [id, result.payoutId, result.utr]);
+
+            emitToPartner(payout.partner_id, 'partner_payout_updated', {
+                payoutId: id, status: 'paid', amountPaise: payout.net_payout_paise, utr: result.utr,
+            });
+            emitToAdmin('partner_payout_updated', { payoutId: id, status: 'paid' });
+
+            res.json({ success: true, razorpayPayoutId: result.payoutId, utr: result.utr });
+        } catch (payoutErr: any) {
+            await query(
+                "UPDATE partner_restaurant_payouts SET status='failed', failure_reason=$2 WHERE id=$1",
+                [id, payoutErr.message]
+            );
+            emitToPartner(payout.partner_id, 'partner_payout_updated', {
+                payoutId: id, status: 'failed', reason: payoutErr.message,
+            });
+            emitToAdmin('partner_payout_failed', { payoutId: id, reason: payoutErr.message });
+            res.status(500).json({ error: 'PAYOUT_FAILED', message: payoutErr.message });
+        }
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── GET /finance/partner-payouts/:id ─────────────────────────────────────────
+// Detailed breakdown of a single payout.
+router.get('/partner-payouts/:id', authenticate, requireRole('super_admin', 'admin', 'finance'), async (req, res) => {
+    const id = req.params.id as string;
+    try {
+        const { rows: payouts } = await query(`
+            SELECT prp.*, rc.name AS restaurant_name, rc.commission_percent,
+                   u.name AS partner_name, u.phone AS partner_phone
+            FROM partner_restaurant_payouts prp
+            JOIN restaurant_config rc ON rc.id = prp.restaurant_id
+            JOIN users u ON u.id = prp.partner_id
+            WHERE prp.id = $1
+        `, [id]);
+        if (!payouts[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+
+        // Individual booking breakdown
+        const { rows: bookings } = await query(`
+            SELECT tb.display_id, tb.slot_start, tb.party_size, tb.status,
+                   tb.total_paid_paise, tb.final_payment_method, tb.completed_at
+            FROM table_bookings tb
+            WHERE tb.restaurant_id = $1
+              AND tb.status = 'completed'
+              AND DATE(tb.completed_at AT TIME ZONE 'Asia/Kolkata') BETWEEN $2 AND $3
+            ORDER BY tb.completed_at ASC
+        `, [payouts[0].restaurant_id, payouts[0].period_start, payouts[0].period_end]);
+
+        res.json({ payout: payouts[0], bookings });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 export default router;

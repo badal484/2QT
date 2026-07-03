@@ -639,4 +639,108 @@ router.get('/analytics', authenticate, requireRole('kitchen_manager', 'super_adm
     }
 });
 
+// ── Dine-in: today's reservations for own restaurant ─────────────────────────
+router.get('/dine-in/today', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    try {
+        const kitchenId = await getKitchenId(req, res);
+        if (!kitchenId) return;
+        const zoneId = await getZoneId(kitchenId);
+
+        const { rows } = await query(`
+            SELECT tb.id, tb.display_id, tb.status,
+                   tb.slot_start, tb.slot_end, tb.party_size,
+                   tb.pre_order_amount_paise, tb.post_order_amount_paise,
+                   tb.gst_amount_paise, tb.total_paid_paise,
+                   tb.occasion,
+                   u.name AS customer_name,
+                   rt.table_number
+            FROM table_bookings tb
+            JOIN restaurant_config rc ON rc.id = tb.restaurant_id
+            LEFT JOIN users u ON u.id = tb.customer_id
+            LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
+            WHERE rc.partner_id IS NULL
+              AND ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+              AND tb.slot_start::date = CURRENT_DATE
+              AND tb.status NOT IN ('cancelled','no_show')
+            ORDER BY tb.slot_start
+        `, [zoneId]);
+        res.json(rows);
+    } catch (err: any) {
+        console.error('[kitchen/dine-in/today]', err);
+        res.status(500).json({ error: 'FAILED' });
+    }
+});
+
+// ── Dine-in: pending tickets (pre-order / post-order items to prepare) ────────
+router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    try {
+        const kitchenId = await getKitchenId(req, res);
+        if (!kitchenId) return;
+        const zoneId = await getZoneId(kitchenId);
+        const type = (req.query.type as string) === 'post' ? 'post_order' : 'pre_order';
+
+        const { rows } = await query(`
+            SELECT tb.id AS booking_id, tb.display_id, rt.table_number,
+                   json_agg(json_build_object(
+                       'id', tbi.id,
+                       'name', rmi.name,
+                       'quantity', tbi.quantity,
+                       'status', tbi.status,
+                       'special_note', tbi.customizations->>'note'
+                   ) ORDER BY tbi.created_at) AS items,
+                   $2 AS type
+            FROM table_booking_items tbi
+            JOIN table_bookings tb ON tb.id = tbi.booking_id
+            JOIN restaurant_config rc ON rc.id = tb.restaurant_id
+            JOIN restaurant_menu_items rmi ON rmi.id = tbi.menu_item_id
+            LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
+            WHERE rc.partner_id IS NULL
+              AND ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+              AND tbi.type = $2
+              AND tbi.status != 'served'
+              AND tb.status = 'seated'
+            GROUP BY tb.id, tb.display_id, rt.table_number
+            ORDER BY tb.slot_start
+        `, [zoneId, type]);
+        res.json(rows);
+    } catch (err: any) {
+        console.error('[kitchen/dine-in/tickets]', err);
+        res.status(500).json({ error: 'FAILED' });
+    }
+});
+
+// ── Dine-in: seated bookings with outstanding balance ─────────────────────────
+router.get('/dine-in/bill', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    try {
+        const kitchenId = await getKitchenId(req, res);
+        if (!kitchenId) return;
+        const zoneId = await getZoneId(kitchenId);
+
+        // Compute GST on the fly if not yet stored
+        const { rows } = await query(`
+            SELECT tb.id, tb.display_id, tb.party_size,
+                   tb.pre_order_amount_paise, tb.post_order_amount_paise,
+                   COALESCE(tb.gst_amount_paise,
+                       ROUND((tb.pre_order_amount_paise + tb.post_order_amount_paise) * rc.gst_percent / 100.0)
+                   ) AS gst_amount_paise,
+                   tb.total_paid_paise,
+                   rt.table_number,
+                   u.name AS customer_name
+            FROM table_bookings tb
+            JOIN restaurant_config rc ON rc.id = tb.restaurant_id
+            LEFT JOIN users u ON u.id = tb.customer_id
+            LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
+            WHERE rc.partner_id IS NULL
+              AND ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+              AND tb.status = 'seated'
+              AND (tb.pre_order_amount_paise + tb.post_order_amount_paise) > tb.total_paid_paise
+            ORDER BY tb.slot_start
+        `, [zoneId]);
+        res.json(rows);
+    } catch (err: any) {
+        console.error('[kitchen/dine-in/bill]', err);
+        res.status(500).json({ error: 'FAILED' });
+    }
+});
+
 export default router;

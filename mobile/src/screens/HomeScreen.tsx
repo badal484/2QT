@@ -128,6 +128,14 @@ const HomeScreen = ({ navigation }: any) => {
   const adminCategories: { id: string; name: string; slug: string; image_url: string; banner_url?: string }[] =
     menuCategoriesData?.categories ?? [];
 
+  const { data: restaurantsData } = useQuery({
+    queryKey: ['restaurants', effectiveZoneId],
+    queryFn: () => api.get(`/restaurants${effectiveZoneId ? `?zoneId=${effectiveZoneId}` : ''}`).then((r: any) => r.restaurants as any[]),
+    enabled: !unserviceableLocation && !showNoLocation && !showNetworkError,
+    staleTime: 5 * 60 * 1000,
+  });
+  const restaurants: any[] = restaurantsData || [];
+
   // 3 copies is enough for infinite-scroll feel while keeping the array tiny (was 500 copies = ~2500 items)
   const BANNER_COPIES = 3;
   const infiniteBanners = useMemo(() => {
@@ -1028,6 +1036,47 @@ const HomeScreen = ({ navigation }: any) => {
               </View>
             )}
 
+
+            {/* ── Book a Table ── */}
+            {restaurants.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && (
+              <View style={{ marginTop: spacing.md }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, marginBottom: 10 }}>
+                  <Text style={{ fontSize: 17, fontFamily: fontFamily.bold, color: colors.ink }}>Book a Table</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('MyTableBookings')}>
+                    <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.primary }}>My Bookings</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 12 }}>
+                  {restaurants.map((rest: any) => (
+                    <TouchableOpacity
+                      key={rest.id}
+                      style={{ width: 200, borderRadius: 16, backgroundColor: '#fff', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 2 }}
+                      activeOpacity={0.85}
+                      onPress={() => navigation.navigate('RestaurantDetail', { restaurantId: rest.id })}
+                    >
+                      {rest.image_url ? (
+                        <NetworkImage uri={rest.image_url} style={{ width: '100%', height: 110 }} />
+                      ) : (
+                        <View style={{ width: '100%', height: 110, backgroundColor: '#1B5E4620', justifyContent: 'center', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 32 }}>🍽️</Text>
+                        </View>
+                      )}
+                      <View style={{ padding: 10 }}>
+                        <Text style={{ fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink }} numberOfLines={1}>{rest.name}</Text>
+                        {rest.cuisine_type && <Text style={{ fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular, marginTop: 1 }} numberOfLines={1}>{rest.cuisine_type}</Text>}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 6 }}>
+                          <View style={{ backgroundColor: (rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3) ? '#10B98120' : '#F3F4F6', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, fontFamily: fontFamily.medium, color: (rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3) ? '#10B981' : colors.inkMuted }}>
+                              {(rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3) ? 'Slots available' : 'Check slots'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             {!unserviceableLocation && !showNoLocation && !showNetworkError && <View style={styles.headerSpacer} />}
           </View>

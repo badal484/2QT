@@ -3,7 +3,7 @@ import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { notificationsQueue } from '../jobs/queues';
 import { TWO_QT } from '../config/constants';
-import { emitToKitchen, emitToAdmin, emitToRiders } from '../socket';
+import { emitToKitchen, emitToAdmin, emitToRiders, emitToPartner } from '../socket';
 import {
     ensureKitchenFundAccount, ensureRiderFundAccount,
     firePayout, isAutoPayConfigured,
@@ -422,6 +422,154 @@ export const initCrons = () => {
                 res.resume();
             }).on('error', () => {});
         } catch {}
+    });
+
+    // ── Weekly partner restaurant payouts — every Monday 9 AM IST ────────────
+    // Computes last Mon–Sun revenue for each active partner restaurant,
+    // creates a payout record, and fires RazorpayX transfer if configured.
+    // Commission is on platform bookings only (every row in table_bookings).
+    cron.schedule('30 3 * * 1', async () => {  // 3:30 UTC = 9:00 AM IST
+        console.log('[CRON] Running weekly partner restaurant payouts...');
+
+        const today = new Date();
+        // Last Monday → last Sunday
+        const lastMonday = new Date(today);
+        lastMonday.setDate(today.getDate() - today.getDay() - 6); // last Mon
+        const lastSunday = new Date(lastMonday);
+        lastSunday.setDate(lastMonday.getDate() + 6);
+
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        const periodStart = fmt(lastMonday);
+        const periodEnd   = fmt(lastSunday);
+
+        try {
+            const { rows: partners } = await query(`
+                SELECT rc.id AS restaurant_id, rc.name, rc.partner_id,
+                       rc.commission_percent, rc.upi_id,
+                       rc.razorpay_contact_id, rc.razorpay_fund_account_id,
+                       u.name AS partner_name, u.phone AS partner_phone
+                FROM restaurant_config rc
+                JOIN users u ON u.id = rc.partner_id
+                WHERE rc.partner_id IS NOT NULL AND rc.is_active = true
+            `);
+
+            for (const rc of partners) {
+                try {
+                    // Skip if payout already exists for this period
+                    const { rows: existing } = await query(
+                        'SELECT id FROM partner_restaurant_payouts WHERE restaurant_id=$1 AND period_start=$2',
+                        [rc.restaurant_id, periodStart]
+                    );
+                    if (existing[0]) continue;
+
+                    // Compute revenue
+                    const { rows: revRows } = await query(`
+                        SELECT
+                            COALESCE(SUM(tb.total_paid_paise), 0) AS gross_revenue_paise,
+                            COALESCE(SUM(cash.cash_total), 0)      AS cash_collected_paise
+                        FROM table_bookings tb
+                        LEFT JOIN LATERAL (
+                            SELECT COALESCE(SUM(p.amount_paise), 0) AS cash_total
+                            FROM table_booking_payments p
+                            WHERE p.booking_id = tb.id
+                              AND p.payment_method IN ('cash','card_pos')
+                              AND p.payment_type = 'final_settlement'
+                        ) cash ON true
+                        WHERE tb.restaurant_id = $1
+                          AND tb.status = 'completed'
+                          AND DATE(tb.completed_at AT TIME ZONE 'Asia/Kolkata') BETWEEN $2 AND $3
+                    `, [rc.restaurant_id, periodStart, periodEnd]);
+
+                    const grossPaise = Number(revRows[0].gross_revenue_paise);
+                    const cashPaise  = Number(revRows[0].cash_collected_paise);
+                    const appPaise   = grossPaise - cashPaise;
+                    const commissionPaise = Math.round(grossPaise * (rc.commission_percent / 100));
+                    const netPayoutPaise  = Math.max(0, grossPaise - commissionPaise - cashPaise);
+
+                    if (grossPaise === 0) {
+                        console.log(`[CRON] partner=${rc.name} — no revenue this week, skipping`);
+                        continue;
+                    }
+
+                    const { rows: payoutRows } = await query(`
+                        INSERT INTO partner_restaurant_payouts
+                            (partner_id, restaurant_id, period_start, period_end,
+                             gross_revenue_paise, app_payments_paise, cash_collected_paise,
+                             commission_paise, net_payout_paise)
+                        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                        RETURNING id
+                    `, [rc.partner_id, rc.restaurant_id, periodStart, periodEnd,
+                        grossPaise, appPaise, cashPaise, commissionPaise, netPayoutPaise]);
+
+                    const payoutId = payoutRows[0].id;
+                    console.log(`[CRON] partner=${rc.name} gross=₹${grossPaise/100} net=₹${netPayoutPaise/100}`);
+
+                    if (netPayoutPaise <= 0) {
+                        emitToPartner(rc.partner_id, 'partner_payout_updated', {
+                            payoutId, status: 'pending', amountPaise: 0,
+                            message: 'No transfer needed — you already collected the full amount in cash.',
+                        });
+                        await query(
+                            "UPDATE partner_restaurant_payouts SET status='paid', notes='Cash-only week, no transfer needed', paid_at=NOW() WHERE id=$1",
+                            [payoutId]
+                        );
+                        continue;
+                    }
+
+                    if (!isAutoPayConfigured() || !rc.upi_id) {
+                        emitToAdmin('partner_payout_generated', { payoutId, restaurantName: rc.name, netPayoutPaise });
+                        emitToPartner(rc.partner_id, 'partner_payout_updated', {
+                            payoutId, status: 'pending', amountPaise: netPayoutPaise,
+                        });
+                        continue;
+                    }
+
+                    // Fire RazorpayX payout
+                    try {
+                        let fundAccountId = rc.razorpay_fund_account_id;
+                        if (!fundAccountId) {
+                            fundAccountId = await ensureRiderFundAccount({
+                                id: rc.partner_id, name: rc.partner_name,
+                                phone: (rc.partner_phone || '').replace(/\D/g, '') || '0000000000',
+                                upi_id: rc.upi_id,
+                                razorpay_contact_id: rc.razorpay_contact_id,
+                                razorpay_fund_account_id: rc.razorpay_fund_account_id,
+                            });
+                            await query(
+                                'UPDATE restaurant_config SET razorpay_fund_account_id=$1 WHERE id=$2',
+                                [fundAccountId, rc.restaurant_id]
+                            );
+                        }
+
+                        const narration = `VELTO ${rc.name} ${periodStart}`;
+                        const result = await firePayout(fundAccountId, netPayoutPaise, narration, payoutId);
+
+                        await query(`
+                            UPDATE partner_restaurant_payouts
+                            SET status='paid', razorpay_payout_id=$2, utr_number=$3, paid_at=NOW()
+                            WHERE id=$1
+                        `, [payoutId, result.payoutId, result.utr]);
+
+                        emitToPartner(rc.partner_id, 'partner_payout_updated', {
+                            payoutId, status: 'paid', amountPaise: netPayoutPaise, utr: result.utr,
+                        });
+                        emitToAdmin('partner_payout_updated', { payoutId, status: 'paid', restaurantName: rc.name });
+                        console.log(`[CRON] partner=${rc.name} payout fired rzp=${result.payoutId}`);
+                    } catch (rzpErr: any) {
+                        await query(
+                            "UPDATE partner_restaurant_payouts SET status='failed', failure_reason=$2 WHERE id=$1",
+                            [payoutId, rzpErr.message]
+                        );
+                        emitToAdmin('partner_payout_failed', { payoutId, restaurantName: rc.name, reason: rzpErr.message });
+                        console.error(`[CRON] partner=${rc.name} payout FAILED`, rzpErr.message);
+                    }
+                } catch (partnerErr: any) {
+                    console.error(`[CRON] Error processing partner ${rc.name}:`, partnerErr.message);
+                }
+            }
+        } catch (err: any) {
+            console.error('[CRON] Weekly partner payout error:', err.message);
+        }
     });
 
     console.log('Crons initialized.');
