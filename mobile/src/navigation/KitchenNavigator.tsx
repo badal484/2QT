@@ -60,11 +60,13 @@ const MainKitchenTabs = () => {
           options={{ tabBarIcon: ({ color }) => <Star size={22} color={color} /> }}
         />
       )}
-      <Tab.Screen
-        name="Dine-in"
-        component={KitchenDineInScreen}
-        options={{ tabBarIcon: ({ color }) => <UtensilsCrossed size={22} color={color} /> }}
-      />
+      {isDineInStaff && (
+        <Tab.Screen
+          name="Dine-in"
+          component={KitchenDineInScreen}
+          options={{ tabBarIcon: ({ color }) => <UtensilsCrossed size={22} color={color} /> }}
+        />
+      )}
     </Tab.Navigator>
   );
 };
