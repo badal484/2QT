@@ -108,18 +108,23 @@ router.get('/:id/menu', async (req, res) => {
         let items = restItems;
         console.log(`[restaurant-menu] restaurantId=${id} restItems=${restItems.length}`);
 
-        // Fall back to the zone's kitchen menu if no restaurant-specific items
+        // Fall back to the zone's kitchen menu (same query the home screen uses)
         if (items.length === 0) {
-            const { rows: zoneItems } = await query(`
-                SELECT m.id, m.name, m.description, m.price_paise, m.category,
-                       m.photo_url, m.is_veg, m.sort_order
-                FROM menu_items m
-                JOIN restaurant_config rc ON rc.zone_id = m.zone_id
-                WHERE rc.id = $1 AND m.available = true
-                ORDER BY m.category ASC, m.sort_order ASC, m.name ASC
-            `, [id]);
-            console.log(`[restaurant-menu] restaurantId=${id} zoneItems=${zoneItems.length}`);
-            items = zoneItems;
+            const { rows: rcRows } = await query('SELECT zone_id FROM restaurant_config WHERE id = $1', [id]);
+            if (rcRows[0]?.zone_id) {
+                const zoneId = rcRows[0].zone_id;
+                const { rows: zoneItems } = await query(`
+                    SELECT id, name, description, price_paise, category,
+                           photo_url, is_veg, sort_order
+                    FROM menu_items
+                    WHERE zone_id = $1 AND available = true
+                    ORDER BY category ASC, sort_order ASC, name ASC
+                `, [zoneId]);
+                console.log(`[restaurant-menu] restaurantId=${id} zoneId=${zoneId} zoneItems=${zoneItems.length}`);
+                items = zoneItems;
+            } else {
+                console.warn(`[restaurant-menu] restaurantId=${id} has no zone_id`);
+            }
         }
 
         const grouped: Record<string, any[]> = {};
