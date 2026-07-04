@@ -485,7 +485,7 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
 function RestaurantDetailDrawer({ restaurant, onClose, onUpdated }: {
   restaurant: any; onClose: () => void; onUpdated: () => void;
 }) {
-  const [tab, setTab] = useState<"info" | "tables" | "menu" | "bookings">("info");
+  const [tab, setTab] = useState<"info" | "tables" | "menu" | "bookings" | "hours">("info");
   const [tables, setTables] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -503,6 +503,31 @@ function RestaurantDetailDrawer({ restaurant, onClose, onUpdated }: {
   const [addingItem, setAddingItem] = useState(false);
 
   const [bookingDate, setBookingDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  // Operating hours edit
+  const [editHours, setEditHours] = useState<Record<string, { open: string; close: string; closed: boolean }>>(
+    () => {
+      const base = { ...DEFAULT_HOURS };
+      const existing = restaurant.operating_hours || {};
+      for (const d of DAYS) {
+        if (existing[d]) base[d] = existing[d];
+      }
+      return base;
+    }
+  );
+  const [savingHours, setSavingHours] = useState(false);
+
+  const saveHours = async () => {
+    setSavingHours(true);
+    try {
+      await api.put(`/admin/restaurants/${restaurant.id}`, { operatingHours: editHours });
+      toast.success("Operating hours saved");
+    } catch {
+      toast.error("Failed to save hours");
+    } finally {
+      setSavingHours(false);
+    }
+  };
 
   const fetchTables = useCallback(async () => {
     setLoadingTables(true);
@@ -614,7 +639,7 @@ function RestaurantDetailDrawer({ restaurant, onClose, onUpdated }: {
     no_show: "text-white/30",
   };
 
-  const tabBtn = (id: typeof tab, label: string) => (
+  const tabBtn = (id: "info" | "tables" | "menu" | "bookings" | "hours", label: string) => (
     <button
       onClick={() => setTab(id)}
       className={`px-3 py-1.5 rounded-lg text-xs transition ${tab === id ? "bg-purple-500/20 text-purple-300" : "text-white/40 hover:text-white/70"}`}
@@ -666,6 +691,7 @@ function RestaurantDetailDrawer({ restaurant, onClose, onUpdated }: {
         {/* Tabs */}
         <div className="px-6 py-3 border-b border-white/5 flex gap-1 flex-shrink-0">
           {tabBtn("info", "Info")}
+          {tabBtn("hours", "Hours")}
           {tabBtn("tables", "Tables")}
           {tabBtn("menu", "Menu")}
           {tabBtn("bookings", "Bookings")}
@@ -843,6 +869,22 @@ function RestaurantDetailDrawer({ restaurant, onClose, onUpdated }: {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {tab === "hours" && (
+            <div className="space-y-4">
+              <div className="text-xs text-white/40">
+                Configure when this restaurant accepts bookings. Slots are generated from open to close time.
+              </div>
+              <OperatingHoursEditor value={editHours} onChange={setEditHours} />
+              <button
+                onClick={saveHours}
+                disabled={savingHours}
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition disabled:opacity-50"
+              >
+                {savingHours ? "Saving…" : "Save Operating Hours"}
+              </button>
             </div>
           )}
         </div>
