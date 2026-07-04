@@ -608,24 +608,48 @@ router.post('/:id/post-order', authenticate, async (req: AuthRequest, res) => {
         let addedAmountPaise = 0;
         const ticketItems: { name: string; quantity: number }[] = [];
 
+        // Resolve zone_id once for fallback lookups
+        const { rows: rcRows } = await query(
+            'SELECT zone_id FROM restaurant_config WHERE id = $1', [b.restaurant_id]
+        );
+        const zoneId = rcRows[0]?.zone_id ?? null;
+
         await withTransaction(async (client) => {
             for (const item of items) {
-                const { rows: menuRows } = await client.query(
+                // Try restaurant-specific menu first
+                let { rows: menuRows } = await client.query(
                     'SELECT id, name, price_paise FROM restaurant_menu_items WHERE id = $1 AND restaurant_id = $2 AND is_available = true',
                     [item.menuItemId, b.restaurant_id]
                 );
+                let isRestaurantItem = !!menuRows[0];
+
+                // Fall back to zone kitchen menu_items (same as pre-order resolution)
+                if (!menuRows[0] && zoneId) {
+                    ({ rows: menuRows } = await client.query(
+                        'SELECT id, name, price_paise FROM menu_items WHERE id = $1 AND zone_id = $2',
+                        [item.menuItemId, zoneId]
+                    ));
+                    if (!menuRows[0]) {
+                        ({ rows: menuRows } = await client.query(
+                            'SELECT id, name, price_paise FROM menu_items WHERE id = $1',
+                            [item.menuItemId]
+                        ));
+                    }
+                }
+
                 if (!menuRows[0]) throw new Error(`ITEM_NOT_FOUND:${item.menuItemId}`);
 
                 const linePaise = menuRows[0].price_paise * item.quantity;
                 addedAmountPaise += linePaise;
 
                 const itemStatus = canSkipKitchen ? 'served' : 'pending';
+                const resolvedMenuItemId = isRestaurantItem ? item.menuItemId : null;
                 await client.query(`
                     INSERT INTO table_booking_items
                         (booking_id, menu_item_id, menu_item_name, price_paise, quantity,
                          customizations, type, status, added_by)
                     VALUES ($1,$2,$3,$4,$5,$6,'post_order',$7,$8)
-                `, [id, item.menuItemId, menuRows[0].name, menuRows[0].price_paise,
+                `, [id, resolvedMenuItemId, menuRows[0].name, menuRows[0].price_paise,
                     item.quantity, item.customizations ?? null, itemStatus, req.user!.userId]);
 
                 ticketItems.push({ name: menuRows[0].name, quantity: item.quantity });
