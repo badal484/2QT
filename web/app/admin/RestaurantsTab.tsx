@@ -482,8 +482,8 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
 }
 
 // ─── Restaurant Detail Drawer ──────────────────────────────────────────────────
-function RestaurantDetailDrawer({ restaurant: initialRestaurant, onClose, onUpdated }: {
-  restaurant: any; onClose: () => void; onUpdated: () => void;
+function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onClose, onUpdated }: {
+  restaurant: any; zones?: any[]; onClose: () => void; onUpdated: () => void;
 }) {
   const [restaurant, setRestaurant] = useState(initialRestaurant);
   const [tab, setTab] = useState<"info" | "tables" | "menu" | "bookings" | "hours">("info");
@@ -509,6 +509,7 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, onClose, onUpda
   const [editingInfo, setEditingInfo] = useState(false);
   const [editInfo, setEditInfo] = useState({
     name: initialRestaurant.name || "",
+    zoneId: initialRestaurant.zone_id || "",
     cuisineType: initialRestaurant.cuisine_type || "",
     address: initialRestaurant.address || "",
     commissionPercent: String(initialRestaurant.commission_percent ?? 15),
@@ -527,6 +528,7 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, onClose, onUpda
     try {
       await api.put(`/admin/restaurants/${restaurant.id}`, {
         name: editInfo.name.trim() || undefined,
+        zoneId: editInfo.zoneId || undefined,
         cuisineType: editInfo.cuisineType.trim() || undefined,
         address: editInfo.address.trim() || undefined,
         commissionPercent: parseFloat(editInfo.commissionPercent) || undefined,
@@ -790,6 +792,7 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, onClose, onUpda
                     onClick={() => {
                       setEditInfo({
                         name: restaurant.name || "",
+                        zoneId: restaurant.zone_id || "",
                         cuisineType: restaurant.cuisine_type || "",
                         address: restaurant.address || "",
                         commissionPercent: String(restaurant.commission_percent ?? 15),
@@ -812,6 +815,13 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, onClose, onUpda
 
               {editingInfo ? (
                 <div className="space-y-3">
+                  <div>
+                    <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Zone</div>
+                    <Select value={editInfo.zoneId} onChange={v => setEditInfo(f => ({ ...f, zoneId: v }))}>
+                      <option value="">Select zone…</option>
+                      {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                    </Select>
+                  </div>
                   {[
                     { label: "Restaurant Name", key: "name", type: "text" },
                     { label: "Cuisine Type", key: "cuisineType", type: "text" },
@@ -1236,6 +1246,7 @@ export function RestaurantsTab() {
         {selected && (
           <RestaurantDetailDrawer
             restaurant={selected}
+            zones={zones}
             onClose={() => setSelected(null)}
             onUpdated={() => { load(); setSelected(null); }}
           />

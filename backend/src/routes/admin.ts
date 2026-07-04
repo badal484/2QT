@@ -1694,7 +1694,7 @@ router.post('/restaurants', authenticate, requireRole('super_admin', 'admin'), a
 router.put('/restaurants/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { id } = req.params;
     const {
-        name, description, cuisineType, address, lat, lng, photos, operatingHours,
+        zoneId, name, description, cuisineType, address, lat, lng, photos, operatingHours,
         slotDurationMinutes, advanceBookingDays, cancellationWindowMinutes,
         depositPaise, maxPartySize, gstPercent, commissionPercent, upiId, isActive,
     } = req.body;
@@ -1702,27 +1702,28 @@ router.put('/restaurants/:id', authenticate, requireRole('super_admin', 'admin')
     try {
         const { rows } = await query(`
             UPDATE restaurant_config SET
-                name                        = COALESCE($2, name),
-                description                 = COALESCE($3, description),
-                cuisine_type                = COALESCE($4, cuisine_type),
-                address                     = COALESCE($5, address),
-                lat                         = COALESCE($6, lat),
-                lng                         = COALESCE($7, lng),
-                photos                      = COALESCE($8, photos),
-                operating_hours             = COALESCE($9, operating_hours),
-                slot_duration_minutes       = COALESCE($10, slot_duration_minutes),
-                advance_booking_days        = COALESCE($11, advance_booking_days),
-                cancellation_window_minutes = COALESCE($12, cancellation_window_minutes),
-                deposit_paise               = COALESCE($13, deposit_paise),
-                max_party_size              = COALESCE($14, max_party_size),
-                gst_percent                 = COALESCE($15, gst_percent),
-                commission_percent          = COALESCE($16, commission_percent),
-                upi_id                      = COALESCE($17, upi_id),
-                is_active                   = COALESCE($18, is_active),
+                zone_id                     = COALESCE($2, zone_id),
+                name                        = COALESCE($3, name),
+                description                 = COALESCE($4, description),
+                cuisine_type                = COALESCE($5, cuisine_type),
+                address                     = COALESCE($6, address),
+                lat                         = COALESCE($7, lat),
+                lng                         = COALESCE($8, lng),
+                photos                      = COALESCE($9, photos),
+                operating_hours             = COALESCE($10, operating_hours),
+                slot_duration_minutes       = COALESCE($11, slot_duration_minutes),
+                advance_booking_days        = COALESCE($12, advance_booking_days),
+                cancellation_window_minutes = COALESCE($13, cancellation_window_minutes),
+                deposit_paise               = COALESCE($14, deposit_paise),
+                max_party_size              = COALESCE($15, max_party_size),
+                gst_percent                 = COALESCE($16, gst_percent),
+                commission_percent          = COALESCE($17, commission_percent),
+                upi_id                      = COALESCE($18, upi_id),
+                is_active                   = COALESCE($19, is_active),
                 updated_at                  = NOW()
             WHERE id = $1
             RETURNING id, name, is_active
-        `, [id, name, description, cuisineType, address, lat, lng, photos, operatingHours,
+        `, [id, zoneId, name, description, cuisineType, address, lat, lng, photos, operatingHours,
             slotDurationMinutes, advanceBookingDays, cancellationWindowMinutes,
             depositPaise, maxPartySize, gstPercent, commissionPercent, upiId, isActive]);
 
