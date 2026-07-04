@@ -505,6 +505,52 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, onClose, onUpda
 
   const [bookingDate, setBookingDate] = useState(() => new Date().toISOString().slice(0, 10));
 
+  // Info edit mode
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editInfo, setEditInfo] = useState({
+    name: initialRestaurant.name || "",
+    cuisineType: initialRestaurant.cuisine_type || "",
+    address: initialRestaurant.address || "",
+    commissionPercent: String(initialRestaurant.commission_percent ?? 15),
+    gstPercent: String(initialRestaurant.gst_percent ?? 5),
+    depositPaise: String((initialRestaurant.deposit_paise ?? 0) / 100),
+    slotDurationMinutes: String(initialRestaurant.slot_duration_minutes ?? 90),
+    advanceBookingDays: String(initialRestaurant.advance_booking_days ?? 7),
+    cancellationWindowMinutes: String(initialRestaurant.cancellation_window_minutes ?? 120),
+    maxPartySize: String(initialRestaurant.max_party_size ?? 10),
+    upiId: initialRestaurant.upi_id || "",
+  });
+  const [savingInfo, setSavingInfo] = useState(false);
+
+  const saveInfo = async () => {
+    setSavingInfo(true);
+    try {
+      await api.put(`/admin/restaurants/${restaurant.id}`, {
+        name: editInfo.name.trim() || undefined,
+        cuisineType: editInfo.cuisineType.trim() || undefined,
+        address: editInfo.address.trim() || undefined,
+        commissionPercent: parseFloat(editInfo.commissionPercent) || undefined,
+        gstPercent: parseFloat(editInfo.gstPercent) || undefined,
+        depositPaise: Math.round(parseFloat(editInfo.depositPaise || "0") * 100),
+        slotDurationMinutes: parseInt(editInfo.slotDurationMinutes) || undefined,
+        advanceBookingDays: parseInt(editInfo.advanceBookingDays) || undefined,
+        cancellationWindowMinutes: parseInt(editInfo.cancellationWindowMinutes) || undefined,
+        maxPartySize: parseInt(editInfo.maxPartySize) || undefined,
+        upiId: editInfo.upiId.trim() || undefined,
+      });
+      // Refresh restaurant data
+      const r = await api.get(`/admin/restaurants/${restaurant.id}`) as any;
+      if (r.restaurant) setRestaurant(r.restaurant);
+      setEditingInfo(false);
+      toast.success("Restaurant updated");
+      onUpdated();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save");
+    } finally {
+      setSavingInfo(false);
+    }
+  };
+
   // Fetch fresh restaurant data (includes operating_hours) on mount
   useEffect(() => {
     api.get(`/admin/restaurants/${initialRestaurant.id}`)
@@ -721,30 +767,110 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, onClose, onUpda
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {tab === "info" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Commission", value: `${restaurant.commission_percent}%` },
-                  { label: "GST", value: `${restaurant.gst_percent}%` },
-                  { label: "Deposit", value: fmt(restaurant.deposit_paise || 0) },
-                  { label: "Slot Duration", value: `${restaurant.slot_duration_minutes} min` },
-                  { label: "Active Tables", value: restaurant.active_tables },
-                  { label: "Bookings Today", value: restaurant.bookings_today },
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-white/5 rounded-xl p-3">
-                    <div className="text-xs text-white/40 mb-1">{label}</div>
-                    <div className="text-white font-semibold">{value}</div>
+              {/* Edit / Save toggle */}
+              <div className="flex justify-end">
+                {editingInfo ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditingInfo(false)}
+                      className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white/50 hover:text-white border border-white/10 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveInfo}
+                      disabled={savingInfo}
+                      className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50"
+                    >
+                      {savingInfo ? "Saving…" : "Save Changes"}
+                    </button>
                   </div>
-                ))}
+                ) : (
+                  <button
+                    onClick={() => {
+                      setEditInfo({
+                        name: restaurant.name || "",
+                        cuisineType: restaurant.cuisine_type || "",
+                        address: restaurant.address || "",
+                        commissionPercent: String(restaurant.commission_percent ?? 15),
+                        gstPercent: String(restaurant.gst_percent ?? 5),
+                        depositPaise: String((restaurant.deposit_paise ?? 0) / 100),
+                        slotDurationMinutes: String(restaurant.slot_duration_minutes ?? 90),
+                        advanceBookingDays: String(restaurant.advance_booking_days ?? 7),
+                        cancellationWindowMinutes: String(restaurant.cancellation_window_minutes ?? 120),
+                        maxPartySize: String(restaurant.max_party_size ?? 10),
+                        upiId: restaurant.upi_id || "",
+                      });
+                      setEditingInfo(true);
+                    }}
+                    className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition"
+                  >
+                    ✏ Edit
+                  </button>
+                )}
               </div>
-              <div className="bg-white/5 rounded-xl p-3">
-                <div className="text-xs text-white/40 mb-1">Revenue (30d)</div>
-                <div className="text-white font-semibold">{fmt(restaurant.revenue_30d_paise || 0)}</div>
-              </div>
-              {restaurant.address && (
-                <div className="flex items-start gap-2 text-sm text-white/50">
-                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>{restaurant.address}</span>
+
+              {editingInfo ? (
+                <div className="space-y-3">
+                  {[
+                    { label: "Restaurant Name", key: "name", type: "text" },
+                    { label: "Cuisine Type", key: "cuisineType", type: "text" },
+                    { label: "Address", key: "address", type: "text" },
+                    { label: "Commission %", key: "commissionPercent", type: "number" },
+                    { label: "GST %", key: "gstPercent", type: "number" },
+                    { label: "Deposit (₹)", key: "depositPaise", type: "number" },
+                    { label: "Slot Duration (min)", key: "slotDurationMinutes", type: "number" },
+                    { label: "Advance Booking Days", key: "advanceBookingDays", type: "number" },
+                    { label: "Cancellation Window (min)", key: "cancellationWindowMinutes", type: "number" },
+                    { label: "Max Party Size", key: "maxPartySize", type: "number" },
+                    { label: "UPI ID (for payouts)", key: "upiId", type: "text" },
+                  ].map(({ label, key, type }) => (
+                    <div key={key}>
+                      <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{label}</div>
+                      <Input
+                        type={type}
+                        value={editInfo[key as keyof typeof editInfo]}
+                        onChange={e => setEditInfo(f => ({ ...f, [key]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Commission", value: `${restaurant.commission_percent}%` },
+                      { label: "GST", value: `${restaurant.gst_percent}%` },
+                      { label: "Deposit", value: fmt(restaurant.deposit_paise || 0) },
+                      { label: "Slot Duration", value: `${restaurant.slot_duration_minutes} min` },
+                      { label: "Max Party Size", value: restaurant.max_party_size },
+                      { label: "Advance Booking", value: `${restaurant.advance_booking_days}d` },
+                      { label: "Active Tables", value: restaurant.active_tables },
+                      { label: "Bookings Today", value: restaurant.bookings_today },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="bg-white/5 rounded-xl p-3">
+                        <div className="text-xs text-white/40 mb-1">{label}</div>
+                        <div className="text-white font-semibold">{value ?? "—"}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-3">
+                    <div className="text-xs text-white/40 mb-1">Revenue (30d)</div>
+                    <div className="text-white font-semibold">{fmt(restaurant.revenue_30d_paise || 0)}</div>
+                  </div>
+                  {restaurant.address && (
+                    <div className="flex items-start gap-2 text-sm text-white/50">
+                      <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>{restaurant.address}</span>
+                    </div>
+                  )}
+                  {restaurant.upi_id && (
+                    <div className="bg-white/5 rounded-xl p-3">
+                      <div className="text-xs text-white/40 mb-1">UPI ID</div>
+                      <div className="text-white font-semibold">{restaurant.upi_id}</div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
