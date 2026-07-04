@@ -482,9 +482,10 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
 }
 
 // ─── Restaurant Detail Drawer ──────────────────────────────────────────────────
-function RestaurantDetailDrawer({ restaurant, onClose, onUpdated }: {
+function RestaurantDetailDrawer({ restaurant: initialRestaurant, onClose, onUpdated }: {
   restaurant: any; onClose: () => void; onUpdated: () => void;
 }) {
+  const [restaurant, setRestaurant] = useState(initialRestaurant);
   const [tab, setTab] = useState<"info" | "tables" | "menu" | "bookings" | "hours">("info");
   const [tables, setTables] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
@@ -504,17 +505,36 @@ function RestaurantDetailDrawer({ restaurant, onClose, onUpdated }: {
 
   const [bookingDate, setBookingDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  // Operating hours edit
+  // Fetch fresh restaurant data (includes operating_hours) on mount
+  useEffect(() => {
+    api.get(`/admin/restaurants/${initialRestaurant.id}`)
+      .then((r: any) => {
+        if (r.restaurant) setRestaurant(r.restaurant);
+      })
+      .catch(() => {}); // silently fall back to list data
+  }, [initialRestaurant.id]);
+
+  // Operating hours edit — re-initialise when fresh data arrives
   const [editHours, setEditHours] = useState<Record<string, { open: string; close: string; closed: boolean }>>(
     () => {
       const base = { ...DEFAULT_HOURS };
-      const existing = restaurant.operating_hours || {};
+      const existing = initialRestaurant.operating_hours || {};
       for (const d of DAYS) {
         if (existing[d]) base[d] = existing[d];
       }
       return base;
     }
   );
+
+  useEffect(() => {
+    const existing = restaurant.operating_hours || {};
+    if (Object.keys(existing).length === 0) return;
+    const base = { ...DEFAULT_HOURS };
+    for (const d of DAYS) {
+      if (existing[d]) base[d] = existing[d];
+    }
+    setEditHours(base);
+  }, [restaurant.operating_hours]);
   const [savingHours, setSavingHours] = useState(false);
 
   const saveHours = async () => {
