@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal,
-  ActivityIndicator, Alert, Dimensions,
+  ActivityIndicator, Alert, Dimensions, Image, TextInput, FlatList,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,6 +56,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
   const [showQR, setShowQR] = useState(false);
   const [showOrderMore, setShowOrderMore] = useState(false);
   const [addItems, setAddItems] = useState<Record<string, number>>({});
+  const [menuSearch, setMenuSearch] = useState('');
 
   const { data: booking, isLoading, refetch } = useQuery({
     queryKey: ['table-booking', bookingId],
@@ -75,6 +76,13 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
     enabled: showOrderMore && !!booking?.restaurant_id,
   });
   const allMenuItems: any[] = menuItems || [];
+  const filteredMenuItems = useMemo(() => {
+    if (!menuSearch.trim()) return allMenuItems;
+    const q = menuSearch.trim().toLowerCase();
+    return allMenuItems.filter((i: any) =>
+      i.name?.toLowerCase().includes(q) || i.category?.toLowerCase().includes(q)
+    );
+  }, [allMenuItems, menuSearch]);
 
   const cancelMutation = useMutation({
     mutationFn: () => api.post(`/table-bookings/${bookingId}/cancel`),
@@ -333,59 +341,103 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
       </Modal>
 
       {/* Order More Modal */}
-      <Modal visible={showOrderMore} animationType="slide" transparent>
-        <View style={styles.orderMoreOverlay}>
-          <View style={[styles.orderMoreSheet, { paddingBottom: insets.bottom + 16 }]}>
-            <View style={styles.orderMoreHeader}>
-              <Text style={styles.orderMoreTitle}>Order More</Text>
-              <TouchableOpacity onPress={() => { setShowOrderMore(false); setAddItems({}); }}>
-                <X size={22} color={colors.ink} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
-              {allMenuItems.map((item: any) => {
-                const qty = addItems[item.id] || 0;
-                return (
-                  <View key={item.id} style={styles.addItemRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.addItemName}>{item.name}</Text>
-                      <Text style={styles.addItemPrice}>₹{(item.price_paise / 100).toFixed(0)}</Text>
+      <Modal
+        visible={showOrderMore}
+        animationType="slide"
+        onRequestClose={() => { setShowOrderMore(false); setAddItems({}); setMenuSearch(''); }}
+      >
+        <View style={[styles.orderMoreFull, { paddingTop: insets.top }]}>
+          {/* Header */}
+          <View style={styles.orderMoreHeader}>
+            <TouchableOpacity onPress={() => { setShowOrderMore(false); setAddItems({}); setMenuSearch(''); }} style={styles.omCloseBtn}>
+              <X size={22} color={colors.ink} />
+            </TouchableOpacity>
+            <Text style={styles.orderMoreTitle}>Order More</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* Search */}
+          <View style={styles.omSearchWrap}>
+            <TextInput
+              style={styles.omSearchInput}
+              placeholder="Search dishes…"
+              placeholderTextColor="#9CA3AF"
+              value={menuSearch}
+              onChangeText={setMenuSearch}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+          </View>
+
+          {/* Items list */}
+          <FlatList
+            data={filteredMenuItems}
+            keyExtractor={(item: any) => item.id}
+            contentContainerStyle={styles.omListContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.omEmpty}>
+                <Text style={styles.omEmptyText}>{menuSearch ? 'No items match your search' : 'No items available'}</Text>
+              </View>
+            }
+            renderItem={({ item }: any) => {
+              const qty = addItems[item.id] || 0;
+              return (
+                <View style={styles.omItemCard}>
+                  {/* Image */}
+                  {item.photo_url ? (
+                    <Image source={{ uri: item.photo_url }} style={styles.omItemImage} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.omItemImage, styles.omItemImageFallback]}>
+                      <Text style={styles.omItemImageEmoji}>🍽️</Text>
                     </View>
-                    <View style={styles.addItemControls}>
-                      {qty > 0 ? (
-                        <>
-                          <TouchableOpacity style={styles.addItemBtn} onPress={() => setAddItems(p => ({ ...p, [item.id]: Math.max(0, qty - 1) }))}>
-                            <Minus size={14} color={colors.primary} />
-                          </TouchableOpacity>
-                          <Text style={styles.addItemQty}>{qty}</Text>
-                          <TouchableOpacity style={styles.addItemBtn} onPress={() => setAddItems(p => ({ ...p, [item.id]: qty + 1 }))}>
-                            <Plus size={14} color={colors.primary} />
-                          </TouchableOpacity>
-                        </>
-                      ) : (
-                        <TouchableOpacity style={styles.addItemAddBtn} onPress={() => setAddItems(p => ({ ...p, [item.id]: 1 }))}>
-                          <Text style={styles.addItemAddText}>Add</Text>
-                        </TouchableOpacity>
-                      )}
+                  )}
+
+                  {/* Info */}
+                  <View style={styles.omItemInfo}>
+                    <View style={styles.omItemTopRow}>
+                      <View style={[styles.vegDot, { backgroundColor: item.is_veg ? '#16A34A' : '#DC2626' }]} />
+                      <Text style={styles.omItemName} numberOfLines={2}>{item.name}</Text>
                     </View>
+                    {item.category ? <Text style={styles.omItemCategory}>{item.category}</Text> : null}
+                    <Text style={styles.omItemPrice}>₹{(item.price_paise / 100).toFixed(0)}</Text>
                   </View>
-                );
-              })}
-            </ScrollView>
-            {addOrderTotal > 0 && (
-              <BouncingButton
-                style={styles.placeOrderBtn}
-                onPress={handlePostOrder}
-                disabled={postOrderMutation.isPending}
-              >
+
+                  {/* Controls */}
+                  <View style={styles.omItemControls}>
+                    {qty > 0 ? (
+                      <View style={styles.omQtyRow}>
+                        <TouchableOpacity style={styles.omQtyBtn} onPress={() => setAddItems(p => ({ ...p, [item.id]: Math.max(0, qty - 1) }))}>
+                          <Minus size={14} color={colors.primary} />
+                        </TouchableOpacity>
+                        <Text style={styles.omQtyText}>{qty}</Text>
+                        <TouchableOpacity style={styles.omQtyBtn} onPress={() => setAddItems(p => ({ ...p, [item.id]: qty + 1 }))}>
+                          <Plus size={14} color={colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={styles.omAddBtn} onPress={() => setAddItems(p => ({ ...p, [item.id]: 1 }))}>
+                        <Text style={styles.omAddBtnText}>Add</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            }}
+          />
+
+          {/* Place order footer */}
+          {addOrderTotal > 0 && (
+            <View style={[styles.omFooter, { paddingBottom: insets.bottom + 12 }]}>
+              <BouncingButton style={styles.placeOrderBtn} onPress={handlePostOrder} disabled={postOrderMutation.isPending}>
                 {postOrderMutation.isPending ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.placeOrderText}>Place Order · ₹{(addOrderTotal / 100).toFixed(0)}</Text>
                 )}
               </BouncingButton>
-            )}
-          </View>
+            </View>
+          )}
         </View>
       </Modal>
     </View>
@@ -457,20 +509,34 @@ const styles = StyleSheet.create({
   qrModalRef: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, marginBottom: 20 },
   qrModalCode: { padding: 16, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 16 },
   qrModalHint: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular },
-  // Order More sheet
-  orderMoreOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  orderMoreSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
-  orderMoreHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  // Order More — full screen
+  orderMoreFull: { flex: 1, backgroundColor: '#F9FAFB' },
+  orderMoreHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB' },
+  omCloseBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
   orderMoreTitle: { fontSize: 17, fontFamily: fontFamily.bold, color: colors.ink },
-  addItemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F3F4F6' },
-  addItemName: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, marginBottom: 2 },
-  addItemPrice: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular },
-  addItemControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  addItemBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary + '15', justifyContent: 'center', alignItems: 'center' },
-  addItemQty: { fontSize: 15, fontFamily: fontFamily.semibold, color: colors.ink, minWidth: 20, textAlign: 'center' },
-  addItemAddBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5, borderColor: colors.primary },
-  addItemAddText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
-  placeOrderBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
+  omSearchWrap: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB' },
+  omSearchInput: { backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink },
+  omListContent: { padding: 12, gap: 10, paddingBottom: 120 },
+  omItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 12, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  omItemImage: { width: 80, height: 80, borderRadius: 12 },
+  omItemImageFallback: { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  omItemImageEmoji: { fontSize: 28 },
+  omItemInfo: { flex: 1, gap: 3 },
+  omItemTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  vegDot: { width: 10, height: 10, borderRadius: 5, marginTop: 3, flexShrink: 0 },
+  omItemName: { flex: 1, fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, lineHeight: 19 },
+  omItemCategory: { fontSize: 11, fontFamily: fontFamily.regular, color: colors.inkMuted },
+  omItemPrice: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.primary },
+  omItemControls: { alignItems: 'center', justifyContent: 'center', minWidth: 80 },
+  omQtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 4 },
+  omQtyBtn: { width: 26, height: 26, justifyContent: 'center', alignItems: 'center' },
+  omQtyText: { fontSize: 15, fontFamily: fontFamily.semibold, color: colors.ink, minWidth: 18, textAlign: 'center' },
+  omAddBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: colors.primary },
+  omAddBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
+  omEmpty: { paddingTop: 60, alignItems: 'center' },
+  omEmptyText: { fontSize: 14, color: colors.inkMuted, fontFamily: fontFamily.regular },
+  omFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB' },
+  placeOrderBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   placeOrderText: { fontSize: 15, fontFamily: fontFamily.semibold, color: '#fff' },
 });
 
