@@ -887,15 +887,20 @@ export function RestaurantsTab() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "partner" | "own">("all");
 
+  const loadZones = useCallback(async () => {
+    try {
+      const zData = await api.get("/admin/zones") as any;
+      setZones(zData.zones || []);
+    } catch {
+      // zones failing shouldn't block the page
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [rData, zData] = await Promise.all([
-        api.get("/admin/restaurants") as Promise<{ restaurants: any[] }>,
-        api.get("/admin/zones") as Promise<{ zones: any[] }>,
-      ]);
+      const rData = await api.get("/admin/restaurants") as any;
       setRestaurants(rData.restaurants || []);
-      setZones(zData.zones || []);
     } catch {
       toast.error("Failed to load restaurants");
     } finally {
@@ -903,7 +908,10 @@ export function RestaurantsTab() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    loadZones();
+    load();
+  }, [load, loadZones]);
 
   const handleOnboardSuccess = (result: any) => {
     setShowOnboard(false);
