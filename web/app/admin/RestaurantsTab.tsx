@@ -233,7 +233,7 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
       restaurantName: "", cuisineType: "", address: "",
       lat: z?.kitchen_lat != null ? String(z.kitchen_lat) : "",
       lng: z?.kitchen_lng != null ? String(z.kitchen_lng) : "",
-      commissionPercent: "15", depositPaise: "200", gstPercent: "5",
+      commissionPercent: "15", depositPaise: "0", gstPercent: "5",
       slotDurationMinutes: "90", advanceBookingDays: "7",
       cancellationWindowMinutes: "120", maxPartySize: "10",
       upiId: "",

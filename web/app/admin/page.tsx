@@ -566,6 +566,10 @@ function ScheduledTab() {
 function CustomersTab() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creditPhone, setCreditPhone] = useState('');
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditNote, setCreditNote] = useState('');
+  const [crediting, setCrediting] = useState(false);
 
   const load = async () => {
     try {
@@ -586,11 +590,64 @@ function CustomersTab() {
     toast.success("User status updated");
   };
 
+  const creditWallet = async () => {
+    if (!creditPhone || !creditAmount) return;
+    setCrediting(true);
+    try {
+      const d = await api.post('/admin/wallet/credit', {
+        phone: creditPhone.trim(),
+        amountRupees: parseFloat(creditAmount),
+        note: creditNote.trim() || undefined,
+      });
+      toast.success(`✓ Credited ₹${creditAmount} — new balance ₹${((d.newBalancePaise ?? 0) / 100).toFixed(2)}`);
+      setCreditPhone(''); setCreditAmount(''); setCreditNote('');
+    } catch (e: any) {
+      toast.error(e.message || 'Credit failed');
+    } finally {
+      setCrediting(false);
+    }
+  };
+
   return (
     <div>
       <div className="mb-8">
         <h2 className="text-4xl font-black tracking-tighter text-white text-white mb-2">Customers</h2>
         <p className="text-zinc-400 text-sm font-medium">Platform user database.</p>
+      </div>
+
+      {/* Wallet Credit Panel */}
+      <div className="mb-8 bg-white/[0.03] border border-white/10 rounded-2xl p-6">
+        <h3 className="text-white font-bold mb-1">Credit Wallet Balance</h3>
+        <p className="text-zinc-500 text-xs mb-4">Add funds to a customer&apos;s in-app wallet (for refunds, compensation, or testing).</p>
+        <div className="flex flex-wrap gap-3">
+          <input
+            className="flex-1 min-w-[140px] bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+            placeholder="Customer phone"
+            value={creditPhone}
+            onChange={e => setCreditPhone(e.target.value)}
+          />
+          <input
+            type="number"
+            min={1}
+            className="w-32 bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+            placeholder="₹ amount"
+            value={creditAmount}
+            onChange={e => setCreditAmount(e.target.value)}
+          />
+          <input
+            className="flex-1 min-w-[140px] bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+            placeholder="Note (optional)"
+            value={creditNote}
+            onChange={e => setCreditNote(e.target.value)}
+          />
+          <button
+            onClick={creditWallet}
+            disabled={crediting || !creditPhone || !creditAmount}
+            className="px-6 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm font-bold transition-all"
+          >
+            {crediting ? 'Crediting…' : 'Credit'}
+          </button>
+        </div>
       </div>
 
       {loading ? (
