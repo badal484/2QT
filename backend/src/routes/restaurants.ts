@@ -90,16 +90,23 @@ router.get('/:id', async (req, res) => {
 router.get('/:id/menu', async (req, res) => {
     const { id } = req.params;
     try {
-        // Try restaurant-specific menu first
-        const { rows: restItems } = await query(`
-            SELECT id, name, description, price_paise, category,
-                   image_url AS photo_url, is_veg, sort_order
-            FROM restaurant_menu_items
-            WHERE restaurant_id = $1 AND is_available = true
-            ORDER BY category ASC, sort_order ASC, name ASC
-        `, [id]);
+        // Try restaurant-specific menu first (table may not exist if migration 078 not applied)
+        let restItems: any[] = [];
+        try {
+            const { rows } = await query(`
+                SELECT id, name, description, price_paise, category,
+                       image_url AS photo_url, is_veg, sort_order
+                FROM restaurant_menu_items
+                WHERE restaurant_id = $1 AND is_available = true
+                ORDER BY category ASC, sort_order ASC, name ASC
+            `, [id]);
+            restItems = rows;
+        } catch (tableErr: any) {
+            console.warn(`[restaurant-menu] restaurant_menu_items query failed: ${tableErr.message}`);
+        }
 
         let items = restItems;
+        console.log(`[restaurant-menu] restaurantId=${id} restItems=${restItems.length}`);
 
         // Fall back to the zone's kitchen menu if no restaurant-specific items
         if (items.length === 0) {
@@ -111,6 +118,7 @@ router.get('/:id/menu', async (req, res) => {
                 WHERE rc.id = $1 AND m.available = true
                 ORDER BY m.category ASC, m.sort_order ASC, m.name ASC
             `, [id]);
+            console.log(`[restaurant-menu] restaurantId=${id} zoneItems=${zoneItems.length}`);
             items = zoneItems;
         }
 

@@ -73,10 +73,11 @@ const TableBookingScreen = ({ navigation, route }: any) => {
   const depositPaise: number = restaurantConfig?.deposit_paise || 0;
 
   // Fetch menu for pre-order
-  const { data: menuData, isLoading: menuLoading } = useQuery({
+  const { data: menuData, isLoading: menuLoading, error: menuError, refetch: refetchMenu } = useQuery({
     queryKey: ['restaurant-menu', restaurantId],
     queryFn: () => api.get(`/restaurants/${restaurantId}/menu`).then((r: any) => r.items as any[]),
     enabled: step === 2,
+    retry: 1,
   });
 
   const allMenuItems: any[] = Array.isArray(menuData) ? menuData : [];
@@ -346,8 +347,17 @@ const TableBookingScreen = ({ navigation, route }: any) => {
 
             {menuLoading ? (
               <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+            ) : menuError ? (
+              <View style={{ alignItems: 'center', marginTop: 40, paddingHorizontal: 24 }}>
+                <Text style={[styles.emptyText, { marginBottom: 12 }]}>
+                  {(menuError as any)?.message || 'Failed to load menu.'}
+                </Text>
+                <TouchableOpacity onPress={() => refetchMenu()} style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 }}>
+                  <Text style={{ color: '#fff', fontFamily: fontFamily.semibold, fontSize: 13 }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
             ) : filteredMenuItems.length === 0 ? (
-              <Text style={styles.emptyText}>{allMenuItems.length === 0 ? 'No menu items available.' : 'No results.'}</Text>
+              <Text style={styles.emptyText}>{allMenuItems.length === 0 ? 'No menu items available for this restaurant.' : 'No results.'}</Text>
             ) : (
               <View style={styles.menuGrid}>
                 {filteredMenuItems.map((item: any, idx: number) => {
