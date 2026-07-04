@@ -1120,6 +1120,43 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
               <input ref={vidInputRef} type="file" accept="video/*" className="hidden"
                 onChange={e => handlePickMedia("video", e.target.files).then(() => { if (vidInputRef.current) vidInputRef.current.value = ""; })} />
 
+              {/* Cover photo — separate prominent upload */}
+              <div>
+                <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">Cover Photo <span className="text-purple-400 normal-case font-semibold">(home card + hero)</span></div>
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-white/5 border border-white/10 group cursor-pointer"
+                  onClick={() => {
+                    const inp = document.createElement("input");
+                    inp.type = "file"; inp.accept = "image/*";
+                    inp.onchange = async (ev) => {
+                      const file = (ev.target as HTMLInputElement).files?.[0];
+                      if (!file) return;
+                      setUploadingMedia(true);
+                      try {
+                        const r = await api.uploadImage(file);
+                        const newItem: MediaItem = { url: r.url, type: "image" };
+                        setMediaItems(prev => [newItem, ...prev.filter(p => p !== prev[0] || prev.length === 0 || prev[0].url !== newItem.url)]);
+                        toast.success("Cover photo updated");
+                      } catch (e: any) { toast.error(e.message || "Upload failed"); }
+                      finally { setUploadingMedia(false); }
+                    };
+                    inp.click();
+                  }}
+                >
+                  {mediaItems[0] && mediaItems[0].type === "image" ? (
+                    <img src={mediaItems[0].url} alt="cover" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/20">
+                      <Image className="w-8 h-8" />
+                      <span className="text-xs">Click to upload cover photo</span>
+                      <span className="text-[10px]">Recommended: 1200 × 800 px</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white text-xs font-semibold">
+                    <Upload className="w-4 h-4" /> Replace Cover
+                  </div>
+                </div>
+              </div>
+
               {/* Upload buttons */}
               <div className="flex gap-2">
                 <button
