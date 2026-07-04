@@ -140,19 +140,21 @@ router.get('/:id/availability', async (req, res) => {
             return res.status(400).json({ error: 'PARTY_TOO_LARGE', max: cfg.max_party_size });
         }
 
-        // Validate date is within advance_booking_days
-        const requestedDate = new Date(date + 'T00:00:00+05:30');
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const maxDate = new Date(today);
-        maxDate.setDate(maxDate.getDate() + cfg.advance_booking_days);
-        if (requestedDate < today || requestedDate > maxDate) {
+        // All date comparisons done in IST (UTC+5:30) to avoid server-timezone bugs.
+        const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+        const todayStr = nowIST.toISOString().slice(0, 10); // 'YYYY-MM-DD' in IST
+        const maxDt = new Date(nowIST);
+        maxDt.setUTCDate(maxDt.getUTCDate() + cfg.advance_booking_days);
+        const maxStr = maxDt.toISOString().slice(0, 10);
+        if (date < todayStr || date > maxStr) {
             return res.status(400).json({ error: 'DATE_OUT_OF_RANGE' });
         }
 
-        // Get operating hours for the day of week
+        // Day-of-week: parse date parts directly — getDay() on local-midnight Date is
+        // timezone-safe for calendar dates (July 4 is Saturday everywhere).
+        const [yyyy, mm, dd] = date.split('-').map(Number);
         const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-        const dayKey = dayNames[requestedDate.getDay()];
+        const dayKey = dayNames[new Date(yyyy, mm - 1, dd).getDay()];
         const dayHours = cfg.operating_hours[dayKey];
 
         if (!dayHours || dayHours.closed) {
