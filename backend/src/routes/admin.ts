@@ -1513,7 +1513,7 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── GET /admin/restaurants ────────────────────────────────────────────────────
-router.get('/restaurants', requireRole('super_admin', 'admin', 'finance'), async (_req, res) => {
+router.get('/restaurants', authenticate, requireRole('super_admin', 'admin', 'finance'), async (_req, res) => {
     try {
         const { rows } = await query(`
             SELECT
@@ -1549,7 +1549,7 @@ router.get('/restaurants', requireRole('super_admin', 'admin', 'finance'), async
 // Body: { partnerPhone, partnerName, zoneId, restaurantName, cuisineType, address,
 //         commissionPercent, depositPaise, gstPercent, slotDurationMinutes,
 //         operatingHours, tables: [{tableNumber, capacity}] }
-router.post('/restaurants/onboard', requireRole('super_admin', 'admin'), async (req, res) => {
+router.post('/restaurants/onboard', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const {
         partnerPhone, partnerName,
         zoneId, restaurantName, cuisineType, address, lat, lng,
@@ -1623,7 +1623,7 @@ router.post('/restaurants/onboard', requireRole('super_admin', 'admin'), async (
 });
 
 // ── POST /admin/restaurants ────────────────────────────────────────────────────
-router.post('/restaurants', requireRole('super_admin', 'admin'), async (req, res) => {
+router.post('/restaurants', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const {
         zoneId, name, description, cuisineType, address, lat, lng, photos,
         operatingHours, slotDurationMinutes, advanceBookingDays,
@@ -1659,7 +1659,7 @@ router.post('/restaurants', requireRole('super_admin', 'admin'), async (req, res
 });
 
 // ── PUT /admin/restaurants/:id ────────────────────────────────────────────────
-router.put('/restaurants/:id', requireRole('super_admin', 'admin'), async (req, res) => {
+router.put('/restaurants/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { id } = req.params;
     const {
         name, description, cuisineType, address, lat, lng, photos, operatingHours,
@@ -1702,7 +1702,7 @@ router.put('/restaurants/:id', requireRole('super_admin', 'admin'), async (req, 
 });
 
 // ── GET /admin/restaurants/:id/tables ─────────────────────────────────────────
-router.get('/restaurants/:id/tables', requireRole('super_admin', 'admin'), async (req, res) => {
+router.get('/restaurants/:id/tables', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     try {
         const { rows } = await query(
             'SELECT * FROM restaurant_tables WHERE restaurant_id = $1 ORDER BY table_number',
@@ -1715,7 +1715,7 @@ router.get('/restaurants/:id/tables', requireRole('super_admin', 'admin'), async
 });
 
 // ── POST /admin/restaurants/:id/tables ────────────────────────────────────────
-router.post('/restaurants/:id/tables', requireRole('super_admin', 'admin'), async (req, res) => {
+router.post('/restaurants/:id/tables', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { tableNumber, capacity } = req.body;
     if (!tableNumber || !capacity) return res.status(400).json({ error: 'tableNumber and capacity required' });
 
@@ -1732,7 +1732,7 @@ router.post('/restaurants/:id/tables', requireRole('super_admin', 'admin'), asyn
 });
 
 // ── PUT /admin/restaurants/:id/tables/:tableId ────────────────────────────────
-router.put('/restaurants/:id/tables/:tableId', requireRole('super_admin', 'admin'), async (req, res) => {
+router.put('/restaurants/:id/tables/:tableId', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { tableId } = req.params;
     const { tableNumber, capacity, isActive } = req.body;
     try {
@@ -1752,7 +1752,7 @@ router.put('/restaurants/:id/tables/:tableId', requireRole('super_admin', 'admin
 });
 
 // ── GET /admin/restaurants/:id/menu ───────────────────────────────────────────
-router.get('/restaurants/:id/menu', requireRole('super_admin', 'admin'), async (req, res) => {
+router.get('/restaurants/:id/menu', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     try {
         const { rows } = await query(
             'SELECT * FROM restaurant_menu_items WHERE restaurant_id = $1 ORDER BY category, sort_order, name',
@@ -1765,7 +1765,7 @@ router.get('/restaurants/:id/menu', requireRole('super_admin', 'admin'), async (
 });
 
 // ── POST /admin/restaurants/:id/menu ──────────────────────────────────────────
-router.post('/restaurants/:id/menu', requireRole('super_admin', 'admin'), async (req, res) => {
+router.post('/restaurants/:id/menu', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { name, description, pricePaise, category, imageUrl, isVeg, sortOrder } = req.body;
     if (!name || !pricePaise) return res.status(400).json({ error: 'name and pricePaise required' });
     try {
@@ -1781,7 +1781,7 @@ router.post('/restaurants/:id/menu', requireRole('super_admin', 'admin'), async 
 });
 
 // ── GET /admin/restaurants/:id/bookings ───────────────────────────────────────
-router.get('/restaurants/:id/bookings', requireRole('super_admin', 'admin', 'finance'), async (req, res) => {
+router.get('/restaurants/:id/bookings', authenticate, requireRole('super_admin', 'admin', 'finance'), async (req, res) => {
     const { date, status } = req.query as { date?: string; status?: string };
     try {
         const params: any[] = [req.params.id];
