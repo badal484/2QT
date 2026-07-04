@@ -69,7 +69,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     enabled: step === 2,
   });
 
-  const allMenuItems: any[] = menuData || [];
+  const allMenuItems: any[] = Array.isArray(menuData) ? menuData : [];
 
   const preOrderTotal = allMenuItems.reduce((sum, item) => {
     const qty = preOrderItems[item.id] || 0;
