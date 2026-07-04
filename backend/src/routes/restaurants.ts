@@ -108,11 +108,11 @@ router.get('/:id/menu', async (req, res) => {
         let items = restItems;
         console.log(`[restaurant-menu] restaurantId=${id} restItems=${restItems.length}`);
 
-        // Fall back to the zone's kitchen menu (same query the home screen uses)
+        // Fallback 1: zone's kitchen menu — available items only
         if (items.length === 0) {
             const { rows: rcRows } = await query('SELECT zone_id FROM restaurant_config WHERE id = $1', [id]);
-            if (rcRows[0]?.zone_id) {
-                const zoneId = rcRows[0].zone_id;
+            const zoneId = rcRows[0]?.zone_id;
+            if (zoneId) {
                 const { rows: zoneItems } = await query(`
                     SELECT id, name, description, price_paise, category,
                            photo_url, is_veg, sort_order
@@ -120,11 +120,37 @@ router.get('/:id/menu', async (req, res) => {
                     WHERE zone_id = $1 AND available = true
                     ORDER BY category ASC, sort_order ASC, name ASC
                 `, [zoneId]);
-                console.log(`[restaurant-menu] restaurantId=${id} zoneId=${zoneId} zoneItems=${zoneItems.length}`);
+                console.log(`[restaurant-menu] fallback1 zoneId=${zoneId} items=${zoneItems.length}`);
                 items = zoneItems;
+
+                // Fallback 2: same zone, ignore available flag (kitchen may have paused)
+                if (items.length === 0) {
+                    const { rows: zoneAll } = await query(`
+                        SELECT id, name, description, price_paise, category,
+                               photo_url, is_veg, sort_order
+                        FROM menu_items
+                        WHERE zone_id = $1
+                        ORDER BY category ASC, sort_order ASC, name ASC
+                    `, [zoneId]);
+                    console.log(`[restaurant-menu] fallback2 (ignore available) zoneId=${zoneId} items=${zoneAll.length}`);
+                    items = zoneAll;
+                }
             } else {
                 console.warn(`[restaurant-menu] restaurantId=${id} has no zone_id`);
             }
+        }
+
+        // Fallback 3: all menu items across all zones (last resort — single-zone setups)
+        if (items.length === 0) {
+            const { rows: allItems } = await query(`
+                SELECT id, name, description, price_paise, category,
+                       photo_url, is_veg, sort_order
+                FROM menu_items
+                ORDER BY category ASC, sort_order ASC, name ASC
+                LIMIT 100
+            `);
+            console.log(`[restaurant-menu] fallback3 (all zones) items=${allItems.length}`);
+            items = allItems;
         }
 
         const grouped: Record<string, any[]> = {};
