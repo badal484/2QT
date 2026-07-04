@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   ActivityIndicator, Alert, Platform,
@@ -8,13 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import {
   ChevronLeft, ChevronRight, Calendar, Clock, Users,
-  ShoppingBag, CheckCircle, Minus, Plus, MessageSquare,
+  ShoppingBag, CheckCircle, Minus, Plus, MessageSquare, Search, ChefHat,
 } from 'lucide-react-native';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { spacing, radius } from '../theme/spacing';
 import { BouncingButton } from '../components/ui/BouncingButton';
+import { NetworkImage } from '../components/NetworkImage';
 
 let RazorpayCheckout: any = null;
 try { RazorpayCheckout = require('react-native-razorpay').default; } catch (_) {}
@@ -43,6 +44,8 @@ const TableBookingScreen = ({ navigation, route }: any) => {
   const [preOrderItems, setPreOrderItems] = useState<Record<string, number>>({}); // itemId → qty
   const [specialRequests, setSpecialRequests] = useState('');
   const [occasion, setOccasion] = useState('');
+  const [menuSearch, setMenuSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
 
   // Build 7 date options from today
   const dateOptions = Array.from({ length: 14 }, (_, i) => {
@@ -70,6 +73,20 @@ const TableBookingScreen = ({ navigation, route }: any) => {
   });
 
   const allMenuItems: any[] = Array.isArray(menuData) ? menuData : [];
+
+  const menuCategories = useMemo(() => {
+    const cats = Array.from(new Set(allMenuItems.map(i => i.category || 'Other')));
+    return ['All', ...cats];
+  }, [allMenuItems]);
+
+  const filteredMenuItems = useMemo(() => {
+    const q = menuSearch.trim().toLowerCase();
+    return allMenuItems.filter(item => {
+      const matchCat = activeCategory === 'All' || (item.category || 'Other') === activeCategory;
+      const matchQ = !q || item.name.toLowerCase().includes(q) || (item.description || '').toLowerCase().includes(q);
+      return matchCat && matchQ;
+    });
+  }, [allMenuItems, menuSearch, activeCategory]);
 
   const preOrderTotal = allMenuItems.reduce((sum, item) => {
     const qty = preOrderItems[item.id] || 0;
@@ -281,52 +298,88 @@ const TableBookingScreen = ({ navigation, route }: any) => {
           <Animated.View entering={FadeInRight.duration(280)}>
             <Text style={styles.sectionTitle}>Pre-Order Food (Optional)</Text>
             <Text style={styles.sectionSub}>Items will be ready when you arrive.</Text>
+
+            {/* Search bar */}
+            <View style={styles.menuSearchBar}>
+              <Search size={15} color={colors.inkMuted} />
+              <TextInput
+                style={styles.menuSearchInput}
+                placeholder="Search dishes…"
+                placeholderTextColor={colors.inkFaint}
+                value={menuSearch}
+                onChangeText={setMenuSearch}
+                returnKeyType="search"
+              />
+            </View>
+
+            {/* Category pills */}
+            {menuCategories.length > 1 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catPillsRow} contentContainerStyle={{ paddingRight: 16 }}>
+                {menuCategories.map(cat => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.catPill, activeCategory === cat && styles.catPillActive]}
+                    onPress={() => setActiveCategory(cat)}
+                  >
+                    <Text style={[styles.catPillText, activeCategory === cat && styles.catPillTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
             {menuLoading ? (
               <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
-            ) : allMenuItems.length === 0 ? (
-              <Text style={styles.emptyText}>No menu items available for pre-order.</Text>
+            ) : filteredMenuItems.length === 0 ? (
+              <Text style={styles.emptyText}>{allMenuItems.length === 0 ? 'No menu items available.' : 'No results.'}</Text>
             ) : (
-              allMenuItems.map((item: any) => {
-                const qty = preOrderItems[item.id] || 0;
-                return (
-                  <View key={item.id} style={styles.preOrderRow}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.vegIndicator}>
-                        <View style={[styles.vegDot, { backgroundColor: item.is_veg ? '#10B981' : '#EF4444' }]} />
-                        <Text style={styles.preOrderName}>{item.name}</Text>
+              <View style={styles.menuGrid}>
+                {filteredMenuItems.map((item: any, idx: number) => {
+                  const qty = preOrderItems[item.id] || 0;
+                  const isLeft = idx % 2 === 0;
+                  return (
+                    <View key={item.id} style={[styles.menuGridCard, isLeft ? { marginRight: 6 } : { marginLeft: 6 }]}>
+                      {/* Image */}
+                      <View style={styles.menuGridImgWrap}>
+                        {item.photo_url
+                          ? <NetworkImage uri={item.photo_url} style={styles.menuGridImg} />
+                          : <View style={[styles.menuGridImg, styles.menuGridImgFallback]}><ChefHat size={28} color={colors.inkFaint} /></View>}
+                        {/* Veg badge */}
+                        <View style={[styles.menuGridVegBadge, { borderColor: item.is_veg ? '#10B981' : '#EF4444' }]}>
+                          <View style={[styles.menuGridVegDot, { backgroundColor: item.is_veg ? '#10B981' : '#EF4444' }]} />
+                        </View>
+                        {/* Add / Qty float */}
+                        <View style={styles.menuGridAddFloat}>
+                          {qty > 0 ? (
+                            <View style={styles.menuGridQtyRow}>
+                              <TouchableOpacity style={styles.menuGridQtyBtn} onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: Math.max(0, qty - 1) }))}>
+                                <Text style={styles.menuGridQtyBtnText}>−</Text>
+                              </TouchableOpacity>
+                              <Text style={styles.menuGridQtyVal}>{qty}</Text>
+                              <TouchableOpacity style={styles.menuGridQtyBtn} onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: qty + 1 }))}>
+                                <Text style={styles.menuGridQtyBtnText}>+</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <TouchableOpacity style={styles.menuGridAddBtn} onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: 1 }))}>
+                              <Text style={styles.menuGridAddBtnText}>ADD</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       </View>
-                      <Text style={styles.preOrderPrice}>₹{(item.price_paise / 100).toFixed(0)}</Text>
+                      {/* Info */}
+                      <View style={styles.menuGridInfo}>
+                        <Text style={styles.menuGridName} numberOfLines={2}>{item.name}</Text>
+                        {item.description ? <Text style={styles.menuGridDesc} numberOfLines={1}>{item.description}</Text> : null}
+                        <Text style={styles.menuGridPrice}>₹{(item.price_paise / 100).toFixed(0)}</Text>
+                      </View>
                     </View>
-                    <View style={styles.qtyControls}>
-                      {qty > 0 ? (
-                        <>
-                          <TouchableOpacity
-                            style={styles.qtyBtn}
-                            onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: Math.max(0, qty - 1) }))}
-                          >
-                            <Minus size={14} color={colors.primary} />
-                          </TouchableOpacity>
-                          <Text style={styles.qtyNum}>{qty}</Text>
-                          <TouchableOpacity
-                            style={styles.qtyBtn}
-                            onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: qty + 1 }))}
-                          >
-                            <Plus size={14} color={colors.primary} />
-                          </TouchableOpacity>
-                        </>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.addBtn}
-                          onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: 1 }))}
-                        >
-                          <Text style={styles.addBtnText}>Add</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                );
-              })
+                  );
+                })}
+                {/* odd spacer */}
+                {filteredMenuItems.length % 2 !== 0 && <View style={[styles.menuGridCard, { marginLeft: 6, backgroundColor: 'transparent', elevation: 0, shadowOpacity: 0 }]} />}
+              </View>
             )}
+
             {preOrderTotal > 0 && (
               <View style={styles.preOrderTotalRow}>
                 <ShoppingBag size={16} color={colors.primary} />
@@ -515,6 +568,32 @@ const styles = StyleSheet.create({
   addBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
   preOrderTotalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, padding: 12, backgroundColor: colors.primary + '10', borderRadius: 10 },
   preOrderTotal: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.primary },
+  // Menu search + grid
+  menuSearchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10 },
+  menuSearchInput: { flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink, padding: 0 },
+  catPillsRow: { marginBottom: 12 },
+  catPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#F3F4F6', marginRight: 8, borderWidth: 1.5, borderColor: 'transparent' },
+  catPillActive: { backgroundColor: colors.primary + '18', borderColor: colors.primary },
+  catPillText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted },
+  catPillTextActive: { color: colors.primary },
+  menuGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
+  menuGridCard: { flex: 1, backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
+  menuGridImgWrap: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F9FAFB', position: 'relative', marginBottom: 8 },
+  menuGridImg: { width: '100%', height: '100%' },
+  menuGridImgFallback: { alignItems: 'center', justifyContent: 'center' },
+  menuGridVegBadge: { position: 'absolute', top: 8, left: 8, width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  menuGridVegDot: { width: 8, height: 8, borderRadius: 4 },
+  menuGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
+  menuGridAddBtn: { backgroundColor: colors.primary, borderRadius: 16, height: 32, alignItems: 'center', justifyContent: 'center', elevation: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  menuGridAddBtnText: { color: '#fff', fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
+  menuGridQtyRow: { flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 16, alignItems: 'center', justifyContent: 'space-between', height: 32 },
+  menuGridQtyBtn: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
+  menuGridQtyBtnText: { color: '#fff', fontSize: 18, fontFamily: fontFamily.bold },
+  menuGridQtyVal: { color: '#fff', fontSize: 13, fontFamily: fontFamily.extrabold, flex: 1, textAlign: 'center' },
+  menuGridInfo: { paddingHorizontal: 8, paddingBottom: 10 },
+  menuGridName: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2, lineHeight: 17 },
+  menuGridDesc: { fontSize: 10, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 13, marginBottom: 3 },
+  menuGridPrice: { fontSize: 13, fontFamily: fontFamily.black, color: colors.ink },
   // Requests
   fieldLabel: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.ink, marginBottom: 8, marginTop: 16 },
   occasionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
