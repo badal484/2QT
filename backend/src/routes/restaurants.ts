@@ -57,28 +57,29 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const { rows } = await query(`
-            SELECT
-                rc.*,
-                CASE WHEN rc.partner_id IS NULL THEN 'own' ELSE 'partner' END AS restaurant_type,
-                (
-                    SELECT COALESCE(AVG(tbf.rating), 0)
-                    FROM table_booking_feedback tbf
-                    JOIN table_bookings tb ON tb.id = tbf.booking_id
-                    WHERE tb.restaurant_id = rc.id
-                ) AS avg_rating,
-                (
-                    SELECT COUNT(*) FROM table_booking_feedback tbf
-                    JOIN table_bookings tb ON tb.id = tbf.booking_id
-                    WHERE tb.restaurant_id = rc.id
-                ) AS review_count
+            SELECT rc.*,
+                   CASE WHEN rc.partner_id IS NULL THEN 'own' ELSE 'partner' END AS restaurant_type
             FROM restaurant_config rc
             WHERE rc.id = $1 AND rc.is_active = true
         `, [id]);
 
         if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
-        // Don't expose partner finance fields to customers
+
+        // Ratings — table may not exist yet in all environments
+        let avg_rating = 0, review_count = 0;
+        try {
+            const { rows: fbRows } = await query(`
+                SELECT COALESCE(AVG(tbf.rating), 0) AS avg_rating, COUNT(*) AS review_count
+                FROM table_booking_feedback tbf
+                JOIN table_bookings tb ON tb.id = tbf.booking_id
+                WHERE tb.restaurant_id = $1
+            `, [id]);
+            avg_rating = parseFloat(fbRows[0]?.avg_rating) || 0;
+            review_count = parseInt(fbRows[0]?.review_count) || 0;
+        } catch { /* table_booking_feedback not yet created */ }
+
         const { commission_percent, razorpay_contact_id, razorpay_fund_account_id, upi_id, partner_id, ...safe } = rows[0];
-        res.json({ restaurant: safe });
+        res.json({ restaurant: { ...safe, avg_rating, review_count } });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
