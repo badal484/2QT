@@ -369,7 +369,11 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
               <Field label="Zone *">
                 <Select value={form.zoneId} onChange={setZone}>
                   <option value="">Select a zone…</option>
-                  {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                  {zones.map(z => (
+                    <option key={z.id} value={z.id}>
+                      {z.name}{z.menu_item_count > 0 ? ` (${z.menu_item_count} items ✓)` : " (no items)"}
+                    </option>
+                  ))}
                 </Select>
               </Field>
               <Field label="Cuisine Type">
@@ -819,7 +823,11 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
                     <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Zone</div>
                     <Select value={editInfo.zoneId} onChange={v => setEditInfo(f => ({ ...f, zoneId: v }))}>
                       <option value="">Select zone…</option>
-                      {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                      {zones.map(z => (
+                        <option key={z.id} value={z.id}>
+                          {z.name}{z.menu_item_count > 0 ? ` (${z.menu_item_count} items ✓)` : " (no items)"}
+                        </option>
+                      ))}
                     </Select>
                   </div>
                   {[
