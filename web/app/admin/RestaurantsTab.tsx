@@ -1096,8 +1096,22 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
 
           {tab === "media" && (
             <div className="space-y-4">
-              <div className="text-xs text-white/40">
-                Photos and videos shown to customers on the restaurant page. First item is the cover. Supports JPG, PNG, WebP and MP4.
+              <div className="space-y-1.5 text-xs text-white/40">
+                <div>Photos and videos shown to customers on the restaurant page. <span className="text-purple-400 font-semibold">First item = cover photo</span> (shown on home screen card).</div>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {[
+                    { label: "Cover / Hero photo", size: "1200 × 800 px", tip: "Landscape 3:2, restaurant interior or food spread" },
+                    { label: "Square photos", size: "800 × 800 px", tip: "Food shots, ambience, team" },
+                    { label: "Home card thumbnail", size: "400 × 300 px", tip: "Auto-cropped from cover — keep subject centred" },
+                    { label: "Video", size: "1080p MP4 ≤ 60s", tip: "Reels-style vertical or 16:9 landscape" },
+                  ].map(({ label, size, tip }) => (
+                    <div key={label} className="bg-white/5 rounded-lg p-2">
+                      <div className="text-white/70 font-semibold text-[10px] mb-0.5">{label}</div>
+                      <div className="text-purple-300 font-mono text-[10px]">{size}</div>
+                      <div className="text-white/30 text-[9px] mt-0.5">{tip}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Hidden file inputs */}
