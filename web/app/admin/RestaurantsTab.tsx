@@ -810,13 +810,15 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
         </div>
 
         {/* Tabs */}
-        <div className="px-6 py-3 border-b border-white/5 flex gap-1 flex-shrink-0">
-          {tabBtn("info", "Info")}
-          {tabBtn("media", "Media")}
-          {tabBtn("hours", "Hours")}
-          {tabBtn("tables", "Tables")}
-          {tabBtn("menu", "Menu")}
-          {tabBtn("bookings", "Bookings")}
+        <div className="px-4 py-3 border-b border-white/5 flex-shrink-0 overflow-x-auto">
+          <div className="flex gap-1 w-max">
+            {tabBtn("info", "Info")}
+            {tabBtn("media", "Media")}
+            {tabBtn("hours", "Hours")}
+            {tabBtn("tables", "Tables")}
+            {tabBtn("menu", "Menu")}
+            {tabBtn("bookings", "Bookings")}
+          </div>
         </div>
 
         {/* Content */}
