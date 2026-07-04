@@ -4,9 +4,12 @@ import {
   ActivityIndicator, RefreshControl, ScrollView, Alert, Modal,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSelector, useDispatch } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Clock, Users, CheckCircle, ChefHat, Receipt, QrCode, X } from 'lucide-react-native';
+import { Clock, Users, CheckCircle, ChefHat, Receipt, QrCode, X, LogOut } from 'lucide-react-native';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
+import { RootState } from '../store';
+import { logout } from '../store/slices/authSlice';
 import { api } from '../api/client';
 import { fontFamily } from '../theme/typography';
 import { spacing } from '../theme/spacing';
@@ -55,6 +58,9 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const KitchenDineInScreen = () => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const dispatch = useDispatch();
+  const userRole = useSelector((state: RootState) => state.auth.user?.role);
+  const isDineInStaff = userRole === 'dine_in_staff';
   const [activeTab, setActiveTab] = useState<KTab>('Today');
   const [refreshing, setRefreshing] = useState(false);
   const [scannerVisible, setScannerVisible] = useState(false);
@@ -205,10 +211,25 @@ const KitchenDineInScreen = () => {
       <View style={styles.header}>
         <ChefHat size={20} color={G.green} />
         <Text style={styles.headerTitle}>Dine-In</Text>
-        <TouchableOpacity style={styles.scanQrBtn} onPress={() => setScannerVisible(true)}>
-          <QrCode size={18} color={G.green} />
-          <Text style={styles.scanQrText}>Scan QR</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.scanQrBtn} onPress={() => setScannerVisible(true)}>
+            <QrCode size={18} color={G.green} />
+            <Text style={styles.scanQrText}>Scan QR</Text>
+          </TouchableOpacity>
+          {isDineInStaff && (
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={() =>
+                Alert.alert('Log Out', 'Are you sure you want to log out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Log Out', style: 'destructive', onPress: () => dispatch(logout()) },
+                ])
+              }
+            >
+              <LogOut size={18} color={G.red} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Tabs */}
@@ -456,6 +477,8 @@ const BillLine = ({ label, value, bold, color }: { label: string; value: string;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: G.bg },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingVertical: 14 },
+  headerRight: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoutBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: G.red + '18', borderWidth: 1, borderColor: G.red + '40', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 20, fontFamily: fontFamily.bold, color: G.ink },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: G.border, marginBottom: 4 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
@@ -515,7 +538,7 @@ const styles = StyleSheet.create({
   cashBtn: { flex: 1, backgroundColor: G.green + '22', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: G.green },
   cashBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: G.green },
   // Header scan button
-  scanQrBtn: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: G.green + '22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: G.green },
+  scanQrBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: G.green + '22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: G.green },
   scanQrText: { fontSize: 13, fontFamily: fontFamily.semibold, color: G.green },
   // Scanner modal
   scannerModal: { flex: 1, backgroundColor: G.bg, alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: 60 },
