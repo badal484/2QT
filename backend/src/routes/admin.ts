@@ -1703,6 +1703,11 @@ router.put('/restaurants/:id', authenticate, requireRole('super_admin', 'admin')
         depositPaise, maxPartySize, gstPercent, commissionPercent, upiId, isActive,
     } = req.body;
 
+    // photos column is text[] — serialize each object to a JSON string so it round-trips cleanly
+    const photosParam = photos
+        ? (photos as any[]).map((p: any) => typeof p === 'string' ? p : JSON.stringify(p))
+        : undefined;
+
     try {
         const { rows } = await query(`
             UPDATE restaurant_config SET
@@ -1727,7 +1732,7 @@ router.put('/restaurants/:id', authenticate, requireRole('super_admin', 'admin')
                 updated_at                  = NOW()
             WHERE id = $1
             RETURNING id, name, is_active
-        `, [id, zoneId, name, description, cuisineType, address, lat, lng, photos, operatingHours,
+        `, [id, zoneId, name, description, cuisineType, address, lat, lng, photosParam, operatingHours,
             slotDurationMinutes, advanceBookingDays, cancellationWindowMinutes,
             depositPaise, maxPartySize, gstPercent, commissionPercent, upiId, isActive]);
 

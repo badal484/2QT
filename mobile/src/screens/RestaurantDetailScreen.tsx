@@ -25,7 +25,13 @@ const parsePhotos = (photos: any): MediaItem[] => {
   if (!photos || !Array.isArray(photos) || photos.length === 0) return [];
   return photos
     .map((p: any) => {
-      if (typeof p === 'string') return { url: p, type: 'image' as const };
+      if (typeof p === 'string') {
+        try {
+          const obj = JSON.parse(p);
+          if (obj && obj.url) return { url: obj.url, type: obj.type ?? 'image', thumbnail_url: obj.thumbnail_url } as MediaItem;
+        } catch {}
+        return { url: p, type: 'image' as const };
+      }
       return { url: p.url, type: p.type ?? 'image', thumbnail_url: p.thumbnail_url } as MediaItem;
     })
     .filter(p => p.url);
