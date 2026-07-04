@@ -120,11 +120,28 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
             if (!menuRows[0]) {
                 // Item may be from the zone's kitchen menu_items — look up zone_id directly
                 const { rows: rcRows } = await query('SELECT zone_id FROM restaurant_config WHERE id = $1', [restaurantId]);
-                if (rcRows[0]?.zone_id) {
-                    const { rows: kitchenRows } = await query(
+                const zoneId = rcRows[0]?.zone_id;
+                if (zoneId) {
+                    // Try with available=true first, then without (kitchen may have paused)
+                    let { rows: kitchenRows } = await query(
                         'SELECT id, name, price_paise FROM menu_items WHERE id = $1 AND zone_id = $2 AND available = true',
-                        [item.menuItemId, rcRows[0].zone_id]
+                        [item.menuItemId, zoneId]
                     );
+                    if (!kitchenRows[0]) {
+                        const { rows: kitchenAny } = await query(
+                            'SELECT id, name, price_paise FROM menu_items WHERE id = $1 AND zone_id = $2',
+                            [item.menuItemId, zoneId]
+                        );
+                        kitchenRows = kitchenAny;
+                    }
+                    if (!kitchenRows[0]) {
+                        // Last resort: match by item ID across all zones
+                        const { rows: anyZone } = await query(
+                            'SELECT id, name, price_paise FROM menu_items WHERE id = $1',
+                            [item.menuItemId]
+                        );
+                        kitchenRows = anyZone;
+                    }
                     menuRows = kitchenRows;
                 }
             }
