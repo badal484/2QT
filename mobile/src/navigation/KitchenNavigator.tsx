@@ -13,18 +13,16 @@ import { ClipboardList, BarChart3, Star, UtensilsCrossed } from 'lucide-react-na
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const TAB_BAR_STYLE = {
-  backgroundColor: '#000',
-  borderTopWidth: 1,
-  borderTopColor: 'rgba(255,255,255,0.05)',
-  height: 70,
-  paddingBottom: 12,
-  paddingTop: 12,
-};
-
 const TAB_OPTIONS = {
   headerShown: false,
-  tabBarStyle: TAB_BAR_STYLE,
+  tabBarStyle: {
+    backgroundColor: '#000',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+    height: 70,
+    paddingBottom: 12,
+    paddingTop: 12,
+  },
   tabBarActiveTintColor: '#00D084',
   tabBarInactiveTintColor: 'rgba(255,255,255,0.3)',
   tabBarLabelStyle: {
@@ -35,54 +33,47 @@ const TAB_OPTIONS = {
   },
 };
 
-const DineInOnlyStack = () => (
-  <Tab.Navigator screenOptions={TAB_OPTIONS}>
-    <Tab.Screen
-      name="Dine-in"
-      component={KitchenDineInScreen}
-      options={{ tabBarIcon: ({ color }) => <UtensilsCrossed size={22} color={color} /> }}
-    />
-  </Tab.Navigator>
-);
-
-const MainKitchenStack = () => (
-  <Tab.Navigator screenOptions={TAB_OPTIONS}>
-    <Tab.Screen
-      name="Board"
-      component={KitchenBoardScreen}
-      options={{ tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} /> }}
-    />
-    <Tab.Screen
-      name="Stock"
-      component={StockScreen}
-      options={{ tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} /> }}
-    />
-    <Tab.Screen
-      name="Ratings"
-      component={FeedbackScreen}
-      options={{ tabBarIcon: ({ color }) => <Star size={22} color={color} /> }}
-    />
-    <Tab.Screen
-      name="Dine-in"
-      component={KitchenDineInScreen}
-      options={{ tabBarIcon: ({ color }) => <UtensilsCrossed size={22} color={color} /> }}
-    />
-  </Tab.Navigator>
-);
-
-const KitchenNavigator = () => {
+const MainKitchenTabs = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const isDineInStaff = user?.role === 'dine_in_staff';
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}>
-      <Stack.Screen
-        name="MainKitchen"
-        component={isDineInStaff ? DineInOnlyStack : MainKitchenStack}
+    <Tab.Navigator screenOptions={TAB_OPTIONS}>
+      {!isDineInStaff && (
+        <Tab.Screen
+          name="Board"
+          component={KitchenBoardScreen}
+          options={{ tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} /> }}
+        />
+      )}
+      {!isDineInStaff && (
+        <Tab.Screen
+          name="Stock"
+          component={StockScreen}
+          options={{ tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} /> }}
+        />
+      )}
+      {!isDineInStaff && (
+        <Tab.Screen
+          name="Ratings"
+          component={FeedbackScreen}
+          options={{ tabBarIcon: ({ color }) => <Star size={22} color={color} /> }}
+        />
+      )}
+      <Tab.Screen
+        name="Dine-in"
+        component={KitchenDineInScreen}
+        options={{ tabBarIcon: ({ color }) => <UtensilsCrossed size={22} color={color} /> }}
       />
-      <Stack.Screen name="ShiftHandover" component={ShiftHandoverScreen} />
-    </Stack.Navigator>
+    </Tab.Navigator>
   );
 };
+
+const KitchenNavigator = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}>
+    <Stack.Screen name="MainKitchen" component={MainKitchenTabs} />
+    <Stack.Screen name="ShiftHandover" component={ShiftHandoverScreen} />
+  </Stack.Navigator>
+);
 
 export default KitchenNavigator;
