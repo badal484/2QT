@@ -10,6 +10,7 @@ export interface AuthRequest extends Request {
         role: string;
         kitchenId: string | null;
         zoneId: string | null;
+        restaurantId: string | null;
         jti: string;
     };
 }
@@ -45,7 +46,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token revoked' });
         }
 
-        let userData: { role: string; kitchen_id: string | null; zone_id: string | null; is_active: boolean } | null = null;
+        let userData: { role: string; kitchen_id: string | null; zone_id: string | null; dine_in_restaurant_id: string | null; is_active: boolean } | null = null;
 
         if (cachedUser) {
             userData = JSON.parse(cachedUser);
@@ -53,7 +54,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             try {
                 const { query } = require('../db');
                 const { rows } = await query(
-                    'SELECT role, kitchen_id, zone_id, is_active FROM users WHERE id = $1',
+                    'SELECT role, kitchen_id, zone_id, dine_in_restaurant_id, is_active FROM users WHERE id = $1',
                     [decoded.userId]
                 );
                 if (rows[0]) {
@@ -75,6 +76,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             role: userData.role,
             kitchenId: userData.kitchen_id,
             zoneId: userData.zone_id,
+            restaurantId: userData.dine_in_restaurant_id ?? null,
             jti: decoded.jti,
         };
         next();

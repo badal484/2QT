@@ -640,11 +640,22 @@ router.get('/analytics', authenticate, requireRole('kitchen_manager', 'super_adm
 });
 
 // ── Dine-in: today's reservations for own restaurant ─────────────────────────
-router.get('/dine-in/today', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/dine-in/today', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin', 'dine_in_staff'), async (req: AuthRequest, res) => {
     try {
-        const kitchenId = await getKitchenId(req, res);
-        if (!kitchenId) return;
-        const zoneId = await getZoneId(kitchenId);
+        let whereClause: string;
+        let params: any[];
+
+        if (req.user!.role === 'dine_in_staff') {
+            // dine_in_staff sees only their assigned restaurant
+            whereClause = 'tb.restaurant_id = $1';
+            params = [req.user!.restaurantId];
+        } else {
+            const kitchenId = await getKitchenId(req, res);
+            if (!kitchenId) return;
+            const zoneId = await getZoneId(kitchenId);
+            whereClause = '($1::uuid IS NULL OR rc.zone_id = $1::uuid)';
+            params = [zoneId];
+        }
 
         const { rows } = await query(`
             SELECT tb.id, tb.display_id, tb.status,
@@ -658,11 +669,11 @@ router.get('/dine-in/today', authenticate, requireRole('chef', 'kitchen_manager'
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
             LEFT JOIN users u ON u.id = tb.customer_id
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
-            WHERE ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+            WHERE ${whereClause}
               AND tb.slot_start::date = CURRENT_DATE
               AND tb.status NOT IN ('cancelled','no_show')
             ORDER BY tb.slot_start
-        `, [zoneId]);
+        `, params);
         res.json(rows);
     } catch (err: any) {
         console.error('[kitchen/dine-in/today]', err);
@@ -671,12 +682,22 @@ router.get('/dine-in/today', authenticate, requireRole('chef', 'kitchen_manager'
 });
 
 // ── Dine-in: pending tickets (pre-order / post-order items to prepare) ────────
-router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin', 'dine_in_staff'), async (req: AuthRequest, res) => {
     try {
-        const kitchenId = await getKitchenId(req, res);
-        if (!kitchenId) return;
-        const zoneId = await getZoneId(kitchenId);
         const type = (req.query.type as string) === 'post' ? 'post_order' : 'pre_order';
+        let whereClause: string;
+        let params: any[];
+
+        if (req.user!.role === 'dine_in_staff') {
+            whereClause = 'tb.restaurant_id = $1';
+            params = [req.user!.restaurantId, type];
+        } else {
+            const kitchenId = await getKitchenId(req, res);
+            if (!kitchenId) return;
+            const zoneId = await getZoneId(kitchenId);
+            whereClause = '($1::uuid IS NULL OR rc.zone_id = $1::uuid)';
+            params = [zoneId, type];
+        }
 
         const { rows } = await query(`
             SELECT tb.id AS booking_id, tb.display_id, rt.table_number,
@@ -693,13 +714,13 @@ router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manage
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
             JOIN restaurant_menu_items rmi ON rmi.id = tbi.menu_item_id
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
-            WHERE ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+            WHERE ${whereClause}
               AND tbi.type = $2
               AND tbi.status != 'served'
               AND tb.status = 'seated'
             GROUP BY tb.id, tb.display_id, rt.table_number
             ORDER BY tb.slot_start
-        `, [zoneId, type]);
+        `, params);
         res.json(rows);
     } catch (err: any) {
         console.error('[kitchen/dine-in/tickets]', err);
@@ -708,13 +729,22 @@ router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manage
 });
 
 // ── Dine-in: seated bookings with outstanding balance ─────────────────────────
-router.get('/dine-in/bill', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/dine-in/bill', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin', 'dine_in_staff'), async (req: AuthRequest, res) => {
     try {
-        const kitchenId = await getKitchenId(req, res);
-        if (!kitchenId) return;
-        const zoneId = await getZoneId(kitchenId);
+        let whereClause: string;
+        let params: any[];
 
-        // Compute GST on the fly if not yet stored
+        if (req.user!.role === 'dine_in_staff') {
+            whereClause = 'tb.restaurant_id = $1';
+            params = [req.user!.restaurantId];
+        } else {
+            const kitchenId = await getKitchenId(req, res);
+            if (!kitchenId) return;
+            const zoneId = await getZoneId(kitchenId);
+            whereClause = '($1::uuid IS NULL OR rc.zone_id = $1::uuid)';
+            params = [zoneId];
+        }
+
         const { rows } = await query(`
             SELECT tb.id, tb.display_id, tb.party_size,
                    tb.pre_order_amount_paise, tb.post_order_amount_paise,
@@ -728,11 +758,11 @@ router.get('/dine-in/bill', authenticate, requireRole('chef', 'kitchen_manager',
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
             LEFT JOIN users u ON u.id = tb.customer_id
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
-            WHERE ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+            WHERE ${whereClause}
               AND tb.status = 'seated'
               AND (tb.pre_order_amount_paise + tb.post_order_amount_paise) > tb.total_paid_paise
             ORDER BY tb.slot_start
-        `, [zoneId]);
+        `, params);
         res.json(rows);
     } catch (err: any) {
         console.error('[kitchen/dine-in/bill]', err);

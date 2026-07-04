@@ -1878,4 +1878,67 @@ router.get('/restaurants/:id/bookings', authenticate, requireRole('super_admin',
     }
 });
 
+// ── GET /admin/restaurants/:id/staff ─────────────────────────────────────────
+// List all dine-in staff assigned to a restaurant.
+router.get('/restaurants/:id/staff', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT id, name, phone, role, created_at
+            FROM users
+            WHERE dine_in_restaurant_id = $1 AND role = 'dine_in_staff'
+            ORDER BY name ASC
+        `, [req.params.id]);
+        res.json({ staff: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /admin/restaurants/:id/staff ────────────────────────────────────────
+// Add a dine-in staff member by phone number.
+// Creates the user if they don't exist, then assigns them to this restaurant.
+router.post('/restaurants/:id/staff', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+    const { phone, name } = req.body as { phone: string; name: string };
+    if (!phone || !/^\d{10}$/.test(phone.replace(/\s/g, ''))) {
+        return res.status(400).json({ error: 'Valid 10-digit phone number required' });
+    }
+    const cleanPhone = phone.replace(/\s/g, '');
+    try {
+        // Upsert user — create if not found, then assign role + restaurant
+        const { rows } = await query(`
+            INSERT INTO users (phone, name, role, dine_in_restaurant_id, is_active)
+            VALUES ($1, $2, 'dine_in_staff', $3, true)
+            ON CONFLICT (phone) DO UPDATE
+              SET role = 'dine_in_staff',
+                  dine_in_restaurant_id = $3,
+                  name = COALESCE(NULLIF($2, ''), users.name),
+                  is_active = true
+            RETURNING id, name, phone, role
+        `, [cleanPhone, name || '', req.params.id]);
+        // Invalidate auth cache so the new role takes effect immediately
+        const { invalidateUserCache } = require('../middleware/auth');
+        invalidateUserCache(rows[0].id);
+        res.json({ staff: rows[0] });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── DELETE /admin/restaurants/:id/staff/:userId ───────────────────────────────
+// Remove a dine-in staff member from the restaurant (reverts to customer role).
+router.delete('/restaurants/:id/staff/:userId', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+    try {
+        await query(`
+            UPDATE users
+            SET role = 'customer', dine_in_restaurant_id = NULL
+            WHERE id = $1 AND dine_in_restaurant_id = $2 AND role = 'dine_in_staff'
+        `, [req.params.userId, req.params.id]);
+        const { invalidateUserCache } = require('../middleware/auth');
+        invalidateUserCache(req.params.userId);
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;

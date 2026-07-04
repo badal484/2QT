@@ -508,7 +508,7 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
   restaurant: any; zones?: any[]; onClose: () => void; onUpdated: () => void;
 }) {
   const [restaurant, setRestaurant] = useState(initialRestaurant);
-  const [tab, setTab] = useState<"info" | "tables" | "menu" | "bookings" | "hours" | "media">("info");
+  const [tab, setTab] = useState<"info" | "tables" | "menu" | "bookings" | "hours" | "media" | "staff">("info");
   const [mediaItems, setMediaItems] = useState<MediaItem[]>(() => parsePhotos(initialRestaurant.photos));
   const [savingMedia, setSavingMedia] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -757,6 +757,57 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
     }
   };
 
+  // Staff management
+  const [staff, setStaff] = useState<any[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [newStaffPhone, setNewStaffPhone] = useState("");
+  const [newStaffName, setNewStaffName] = useState("");
+  const [addingStaff, setAddingStaff] = useState(false);
+
+  const fetchStaff = useCallback(async () => {
+    setLoadingStaff(true);
+    try {
+      const r = await api.get(`/admin/restaurants/${restaurant.id}/staff`) as any;
+      setStaff(r.staff || []);
+    } finally {
+      setLoadingStaff(false);
+    }
+  }, [restaurant.id]);
+
+  const addStaff = async () => {
+    const phone = newStaffPhone.trim();
+    if (!phone) return;
+    setAddingStaff(true);
+    try {
+      const r = await api.post(`/admin/restaurants/${restaurant.id}/staff`, {
+        phone,
+        name: newStaffName.trim(),
+      }) as any;
+      toast.success(`${r.staff?.name || phone} added as dine-in staff`);
+      setNewStaffPhone("");
+      setNewStaffName("");
+      fetchStaff();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add staff");
+    } finally {
+      setAddingStaff(false);
+    }
+  };
+
+  const removeStaff = async (userId: string) => {
+    try {
+      await api.delete(`/admin/restaurants/${restaurant.id}/staff/${userId}`);
+      toast.success("Staff removed");
+      setStaff(prev => prev.filter(s => s.id !== userId));
+    } catch {
+      toast.error("Failed to remove staff");
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "staff") fetchStaff();
+  }, [tab, fetchStaff]);
+
   const STATUS_COLOR: Record<string, string> = {
     pending: "text-yellow-400",
     confirmed: "text-blue-400",
@@ -766,7 +817,7 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
     no_show: "text-white/30",
   };
 
-  const tabBtn = (id: "info" | "media" | "tables" | "menu" | "bookings" | "hours", label: string) => (
+  const tabBtn = (id: "info" | "media" | "tables" | "menu" | "bookings" | "hours" | "staff", label: string) => (
     <button
       onClick={() => setTab(id)}
       className={`px-3 py-1.5 rounded-lg text-xs transition ${tab === id ? "bg-purple-500/20 text-purple-300" : "text-white/40 hover:text-white/70"}`}
@@ -824,6 +875,7 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
             {tabBtn("tables", "Tables")}
             {tabBtn("menu", "Menu")}
             {tabBtn("bookings", "Bookings")}
+            {tabBtn("staff", "Staff")}
           </div>
         </div>
 
@@ -1087,6 +1139,65 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
                       {b.total_paid_paise > 0 && (
                         <div className="text-xs text-emerald-400">Paid: {fmt(b.total_paid_paise)}</div>
                       )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === "staff" && (
+            <div className="space-y-5">
+              <div className="text-[10px] font-black text-white/40 uppercase tracking-widest">Dine-In Staff</div>
+              <p className="text-xs text-white/30 -mt-3">
+                Staff added here can log in to the Partner app with their phone number and manage dine-in guests only.
+              </p>
+
+              {/* Add staff form */}
+              <div className="bg-white/5 rounded-xl p-4 space-y-3">
+                <div className="text-xs font-semibold text-white/60">Add Staff Member</div>
+                <input
+                  type="tel"
+                  placeholder="Phone number (e.g. 9876543210)"
+                  value={newStaffPhone}
+                  onChange={e => setNewStaffPhone(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-purple-500/50"
+                />
+                <input
+                  type="text"
+                  placeholder="Name (optional)"
+                  value={newStaffName}
+                  onChange={e => setNewStaffName(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-purple-500/50"
+                />
+                <button
+                  onClick={addStaff}
+                  disabled={addingStaff || !newStaffPhone.trim()}
+                  className="w-full py-2 rounded-lg text-sm font-semibold bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-40"
+                >
+                  {addingStaff ? "Adding…" : "Add Staff"}
+                </button>
+              </div>
+
+              {/* Staff list */}
+              {loadingStaff ? (
+                <div className="text-center text-white/30 py-8">Loading…</div>
+              ) : staff.length === 0 ? (
+                <div className="text-center text-white/30 py-8">No dine-in staff assigned yet</div>
+              ) : (
+                <div className="space-y-2">
+                  {staff.map((s: any) => (
+                    <div key={s.id} className="bg-white/5 rounded-xl px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-white">{s.name || "—"}</div>
+                        <div className="text-xs text-white/40">{s.phone}</div>
+                      </div>
+                      <button
+                        onClick={() => removeStaff(s.id)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition"
+                      >
+                        Remove
+                      </button>
                     </div>
                   ))}
                 </div>

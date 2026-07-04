@@ -265,6 +265,8 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
             userId: customerId,
             title: 'Table Reserved!',
             body: `Your table at ${cfg.name} is confirmed for ${new Date(slotStart).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}`,
+            screen: 'TableBookingDetail',
+            bookingId,
         }).catch(() => {});
 
         emitToAdmin('new_table_booking', { bookingId, displayId, restaurantId, partySize, slotStart });
@@ -371,8 +373,8 @@ router.get('/mine', authenticate, async (req: AuthRequest, res) => {
                 FROM table_booking_items tbi WHERE tbi.booking_id = tb.id
             ) items ON true
             WHERE tb.customer_id = $1
-              ${status === 'upcoming' ? "AND tb.status IN ('confirmed','seated')" : ''}
-              ${status === 'past' ? "AND tb.status IN ('completed','no_show')" : ''}
+              ${status === 'upcoming' ? "AND tb.status IN ('confirmed','seated') AND tb.slot_end >= NOW()" : ''}
+              ${status === 'past' ? "AND (tb.status IN ('completed','no_show') OR (tb.status IN ('confirmed','seated') AND tb.slot_end < NOW()))" : ''}
               ${status === 'cancelled' ? "AND tb.status = 'cancelled'" : ''}
             ORDER BY tb.slot_start DESC
             LIMIT 50
@@ -507,6 +509,8 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
                 body: totalRefund > 0
                     ? `₹${(totalRefund / 100).toFixed(0)} refunded to your wallet.`
                     : 'Your booking has been cancelled.',
+                screen: 'TableBookingDetail',
+                bookingId: id,
             }).catch(() => {});
         }
 
@@ -527,16 +531,20 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
 // Staff / partner scans QR code → marks booking as 'seated'.
 router.post('/:id/checkin', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const allowedRoles = ['super_admin', 'admin', 'chef', 'kitchen_manager', 'partner', 'partner_kitchen'];
+    const allowedRoles = ['super_admin', 'admin', 'chef', 'kitchen_manager', 'partner', 'partner_kitchen', 'dine_in_staff'];
     if (!allowedRoles.includes(req.user!.role)) {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
 
     try {
+        // dine_in_staff can only check in bookings for their assigned restaurant
+        const restaurantFilter = req.user!.role === 'dine_in_staff'
+            ? `AND restaurant_id = '${req.user!.restaurantId}'` : '';
+
         const { rows } = await query(`
             UPDATE table_bookings
             SET status = 'seated', seated_at = NOW(), updated_at = NOW()
-            WHERE id = $1 AND status = 'confirmed'
+            WHERE id = $1 AND status = 'confirmed' ${restaurantFilter}
             RETURNING customer_id, restaurant_id, display_id, slot_start, party_size, occasion,
                       pre_order_amount_paise
         `, [id]);
@@ -798,7 +806,7 @@ router.post('/:id/pay', authenticate, async (req: AuthRequest, res) => {
 router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { method } = req.body as { method: 'cash' | 'card_pos' };
-    const allowedRoles = ['super_admin', 'admin', 'chef', 'kitchen_manager', 'partner', 'partner_kitchen'];
+    const allowedRoles = ['super_admin', 'admin', 'chef', 'kitchen_manager', 'partner', 'partner_kitchen', 'dine_in_staff'];
 
     if (!allowedRoles.includes(req.user!.role)) return res.status(403).json({ error: 'FORBIDDEN' });
     if (!['cash', 'card_pos'].includes(method)) return res.status(400).json({ error: 'method must be cash or card_pos' });
@@ -956,14 +964,17 @@ router.post('/:id/item-status', authenticate, async (req: AuthRequest, res) => {
 // Admin/partner marks a booking as no-show after slot time passes.
 router.post('/:id/no-show', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const allowedRoles = ['super_admin', 'admin', 'chef', 'kitchen_manager', 'partner'];
+    const allowedRoles = ['super_admin', 'admin', 'chef', 'kitchen_manager', 'partner', 'dine_in_staff'];
     if (!allowedRoles.includes(req.user!.role)) return res.status(403).json({ error: 'FORBIDDEN' });
 
     try {
+        const restaurantFilter = req.user!.role === 'dine_in_staff'
+            ? `AND restaurant_id = '${req.user!.restaurantId}'` : '';
+
         const { rows } = await query(`
             UPDATE table_bookings
             SET status = 'no_show', no_show_at = NOW()
-            WHERE id = $1 AND status = 'confirmed'
+            WHERE id = $1 AND status = 'confirmed' ${restaurantFilter}
             RETURNING customer_id, deposit_amount_paise, pre_order_amount_paise, display_id, restaurant_id
         `, [id]);
         if (!rows[0]) return res.status(400).json({ error: 'BOOKING_NOT_CONFIRMED' });

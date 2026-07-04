@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, RefreshControl, ScrollView, Alert,
+  ActivityIndicator, RefreshControl, ScrollView, Alert, Modal,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Clock, Users, CheckCircle, ChefHat, Receipt } from 'lucide-react-native';
+import { Clock, Users, CheckCircle, ChefHat, Receipt, QrCode, X } from 'lucide-react-native';
+import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { api } from '../api/client';
 import { fontFamily } from '../theme/typography';
 import { spacing } from '../theme/spacing';
@@ -49,11 +50,16 @@ const STATUS_LABELS: Record<string, string> = {
   no_show: 'No Show',
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const KitchenDineInScreen = () => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<KTab>('Today');
   const [refreshing, setRefreshing] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const scanLocked = useRef(false);
+  const cameraDevice = useCameraDevice('back');
 
   // All bookings for own restaurant today
   const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
@@ -121,6 +127,25 @@ const KitchenDineInScreen = () => {
     onError: (err: any) => Alert.alert('Error', err?.message || 'Failed.'),
   });
 
+  useEffect(() => {
+    Camera.requestCameraPermission();
+  }, []);
+
+  const codeScanner = useCodeScanner({
+    codeTypes: ['qr'],
+    onCodeScanned: (codes) => {
+      if (scanLocked.current) return;
+      const value = codes[0]?.value;
+      if (!value || !UUID_REGEX.test(value)) return;
+      scanLocked.current = true;
+      setScannerVisible(false);
+      checkinMutation.mutate(value, {
+        onSettled: () => { scanLocked.current = false; },
+        onSuccess: () => Alert.alert('Checked In', 'Guest has been checked in successfully.'),
+      });
+    },
+  });
+
   const onRefresh = async () => {
     setRefreshing(true);
     await queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in'] });
@@ -152,10 +177,38 @@ const KitchenDineInScreen = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* QR Scanner Modal */}
+      <Modal visible={scannerVisible} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
+        <View style={styles.scannerModal}>
+          <TouchableOpacity style={styles.scannerClose} onPress={() => setScannerVisible(false)}>
+            <X size={24} color={G.ink} />
+          </TouchableOpacity>
+          <Text style={styles.scannerTitle}>Scan Guest QR Code</Text>
+          <Text style={styles.scannerSub}>Point at the customer's booking QR code to check them in</Text>
+          {cameraDevice ? (
+            <Camera
+              device={cameraDevice}
+              isActive={scannerVisible}
+              codeScanner={codeScanner}
+              style={styles.cameraView}
+            />
+          ) : (
+            <View style={[styles.cameraView, styles.cameraFallback]}>
+              <Text style={styles.scannerSub}>Camera not available</Text>
+            </View>
+          )}
+          <View style={styles.scannerFrame} pointerEvents="none" />
+        </View>
+      </Modal>
+
       {/* Header */}
       <View style={styles.header}>
         <ChefHat size={20} color={G.green} />
         <Text style={styles.headerTitle}>Dine-In</Text>
+        <TouchableOpacity style={styles.scanQrBtn} onPress={() => setScannerVisible(true)}>
+          <QrCode size={18} color={G.green} />
+          <Text style={styles.scanQrText}>Scan QR</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tabs */}
@@ -461,6 +514,17 @@ const styles = StyleSheet.create({
   billActions: { flexDirection: 'row', gap: 8 },
   cashBtn: { flex: 1, backgroundColor: G.green + '22', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: G.green },
   cashBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: G.green },
+  // Header scan button
+  scanQrBtn: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: G.green + '22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: G.green },
+  scanQrText: { fontSize: 13, fontFamily: fontFamily.semibold, color: G.green },
+  // Scanner modal
+  scannerModal: { flex: 1, backgroundColor: G.bg, alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: 60 },
+  scannerClose: { position: 'absolute', top: 52, right: spacing.lg, padding: 8 },
+  scannerTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: G.ink, marginBottom: 8 },
+  scannerSub: { fontSize: 14, color: G.inkDim, fontFamily: fontFamily.regular, textAlign: 'center', marginBottom: 32 },
+  cameraView: { width: '100%', aspectRatio: 1, borderRadius: 20, overflow: 'hidden' },
+  cameraFallback: { backgroundColor: G.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: G.border },
+  scannerFrame: { position: 'absolute', top: 180, width: 220, height: 220, borderRadius: 16, borderWidth: 2, borderColor: G.green },
   // Empty
   emptyWrap: { flex: 1, alignItems: 'center', paddingTop: 80 },
   emptyText: { fontSize: 18, fontFamily: fontFamily.semibold, color: G.ink, marginTop: 16, marginBottom: 8 },
