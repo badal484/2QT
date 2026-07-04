@@ -65,6 +65,13 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     enabled: step === 1,
   });
 
+  // Fetch restaurant config (deposit, etc.)
+  const { data: restaurantConfig } = useQuery({
+    queryKey: ['restaurant', restaurantId],
+    queryFn: () => api.get(`/restaurants/${restaurantId}`).then((r: any) => r.restaurant),
+  });
+  const depositPaise: number = restaurantConfig?.deposit_paise || 0;
+
   // Fetch menu for pre-order
   const { data: menuData, isLoading: menuLoading } = useQuery({
     queryKey: ['restaurant-menu', restaurantId],
@@ -92,6 +99,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     const qty = preOrderItems[item.id] || 0;
     return sum + qty * item.price_paise;
   }, 0);
+  const totalDueNow = preOrderTotal + depositPaise;
 
   // Create booking mutation
   const createBooking = useMutation({
@@ -104,7 +112,16 @@ const TableBookingScreen = ({ navigation, route }: any) => {
       }
     },
     onError: (err: any) => {
-      Alert.alert('Booking Failed', err?.response?.data?.error || 'Please try again.');
+      const msg = err?.message || '';
+      if (msg === 'NO_TABLE_AVAILABLE') {
+        Alert.alert('No Tables Available', 'All tables are booked for this slot. Please choose a different time.');
+      } else if (msg === 'INSUFFICIENT_WALLET_BALANCE') {
+        Alert.alert('Insufficient Balance', `Your wallet needs ₹${(totalDueNow / 100).toFixed(0)} to complete this booking. Please top up your wallet or skip the pre-order.`);
+      } else if (msg === 'ALREADY_BOOKED_THIS_SLOT') {
+        Alert.alert('Already Booked', 'You already have a booking for this time slot.');
+      } else {
+        Alert.alert('Booking Failed', msg || 'Please try again.');
+      }
     },
   });
 
@@ -149,7 +166,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
       preOrderItems: items,
       specialRequests: specialRequests.trim() || undefined,
       occasion: occasion.trim() || undefined,
-      paymentMethod: preOrderTotal > 0 ? 'razorpay' : 'wallet',
+      paymentMethod: 'wallet',
     });
   };
 
@@ -454,9 +471,31 @@ const TableBookingScreen = ({ navigation, route }: any) => {
               </View>
             )}
 
+            {totalDueNow > 0 && (
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryCardTitle}>Payment Due Now</Text>
+                {preOrderTotal > 0 && (
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryItemName}>Pre-order</Text>
+                    <Text style={styles.summaryItemPrice}>₹{(preOrderTotal / 100).toFixed(0)}</Text>
+                  </View>
+                )}
+                {depositPaise > 0 && (
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryItemName}>Booking deposit (refundable)</Text>
+                    <Text style={styles.summaryItemPrice}>₹{(depositPaise / 100).toFixed(0)}</Text>
+                  </View>
+                )}
+                <View style={[styles.summaryItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB', marginTop: 6, paddingTop: 8 }]}>
+                  <Text style={[styles.summaryItemName, { fontFamily: fontFamily.semibold }]}>Total</Text>
+                  <Text style={[styles.summaryItemPrice, { fontFamily: fontFamily.bold }]}>₹{(totalDueNow / 100).toFixed(0)}</Text>
+                </View>
+              </View>
+            )}
+
             <Text style={styles.paymentNote}>
-              {preOrderTotal > 0
-                ? 'Payment for pre-order will be collected now. Remaining bill paid at restaurant.'
+              {totalDueNow > 0
+                ? 'Paid from wallet. Remaining bill settled at the restaurant.'
                 : 'No advance payment required. Bill settled at the restaurant.'}
             </Text>
           </Animated.View>
@@ -478,7 +517,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
             <>
               <Text style={styles.ctaBtnText}>
                 {step === STEPS.length - 1
-                  ? preOrderTotal > 0 ? `Pay ₹${(preOrderTotal / 100).toFixed(0)} & Confirm` : 'Confirm Booking'
+                  ? totalDueNow > 0 ? `Pay ₹${(totalDueNow / 100).toFixed(0)} & Confirm` : 'Confirm Booking'
                   : 'Continue'}
               </Text>
               <ChevronRight size={18} color="#fff" strokeWidth={2} />

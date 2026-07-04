@@ -780,6 +780,38 @@ router.patch('/users/:id/status', authenticate, requireRole('super_admin', 'admi
     res.json({ success: true });
 });
 
+// ── POST /admin/wallet/credit ─────────────────────────────────────────────────
+// Credit wallet balance to any customer. Admin-only — for refunds, compensation, testing.
+// Body: { phone, amountRupees, note? }
+router.post('/wallet/credit', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { phone, amountRupees, note } = req.body;
+    if (!phone || !amountRupees) return res.status(400).json({ error: 'phone and amountRupees are required' });
+    const amountPaise = Math.round(parseFloat(amountRupees) * 100);
+    if (amountPaise <= 0) return res.status(400).json({ error: 'amountRupees must be positive' });
+
+    try {
+        const cleanPhone = String(phone).replace(/\D/g, '');
+        const { rows: users } = await query('SELECT id FROM users WHERE phone = $1 AND role = $2', [cleanPhone, 'customer']);
+        if (!users[0]) return res.status(404).json({ error: 'Customer not found' });
+        const customerId = users[0].id;
+
+        await query(`
+            INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, $2)
+            ON CONFLICT (customer_id) DO UPDATE SET balance_paise = customer_wallet.balance_paise + $2
+        `, [customerId, amountPaise]);
+
+        const { rows: wallet } = await query('SELECT balance_paise FROM customer_wallet WHERE customer_id = $1', [customerId]);
+        await query(`
+            INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
+            VALUES ($1, $2, 'credit', $3, $4)
+        `, [customerId, amountPaise, note || `Admin credit by ${req.user!.userId}`, wallet[0].balance_paise]);
+
+        res.json({ success: true, amountPaise, newBalancePaise: wallet[0].balance_paise });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get('/inventory', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
         const { rows } = await query('SELECT name, unit, SUM(current_stock_grams) as current_stock_grams, SUM(reorder_threshold_grams) as reorder_threshold_grams FROM ingredients GROUP BY name, unit ORDER BY name');
