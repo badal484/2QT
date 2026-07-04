@@ -1058,37 +1058,37 @@ const HomeScreen = ({ navigation }: any) => {
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 14 }}>
                   {restaurants.map((rest: any) => {
+                    const CARD_W = SCREEN_WIDTH - spacing.lg * 2;
+                    const CARD_H = Math.round(CARD_W * 0.56);
                     const cover = getRestCoverPhoto(rest.photos);
                     const hasSlots = rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3;
                     return (
                       <TouchableOpacity
                         key={rest.id}
-                        style={{ width: 230, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 5, backgroundColor: '#111' }}
+                        style={{ width: CARD_W, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 5, backgroundColor: '#111' }}
                         activeOpacity={0.88}
                         onPress={() => navigation.navigate('RestaurantDetail', { restaurantId: rest.id })}
                       >
-                        {/* Image area — explicit width/height, no absoluteFill */}
-                        <View style={{ width: 230, height: 150 }}>
+                        <View style={{ width: CARD_W, height: CARD_H }}>
                           {cover ? (
-                            <NetworkImage uri={cover} style={{ width: 230, height: 150 }} width={230} height={150} />
+                            <NetworkImage uri={cover} style={{ width: CARD_W, height: CARD_H }} width={CARD_W} height={CARD_H} />
                           ) : (
-                            <View style={{ width: 230, height: 150, backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center' }}>
+                            <View style={{ width: CARD_W, height: CARD_H, backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center' }}>
                               <UtensilsCrossed size={40} color={colors.primary + '50'} />
                             </View>
                           )}
-                          {/* Gradient only over the image */}
                           <LinearGradient
                             colors={['transparent', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.70)']}
                             locations={[0.3, 0.6, 1]}
-                            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90, paddingHorizontal: 12, paddingBottom: 12, justifyContent: 'flex-end' }}
+                            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90, paddingHorizontal: 14, paddingBottom: 14, justifyContent: 'flex-end' }}
                           >
-                            <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: '#fff', marginBottom: 4 }} numberOfLines={1}>{rest.name}</Text>
+                            <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: '#fff', marginBottom: 5 }} numberOfLines={1}>{rest.name}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                               {rest.cuisine_type ? (
-                                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', fontFamily: fontFamily.regular, flex: 1, marginRight: 6 }} numberOfLines={1}>{rest.cuisine_type}</Text>
+                                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontFamily: fontFamily.regular, flex: 1, marginRight: 8 }} numberOfLines={1}>{rest.cuisine_type}</Text>
                               ) : <View style={{ flex: 1 }} />}
-                              <View style={{ backgroundColor: hasSlots ? '#10B981DD' : 'rgba(255,255,255,0.25)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 }}>
-                                <Text style={{ fontSize: 10, fontFamily: fontFamily.semibold, color: '#fff' }}>
+                              <View style={{ backgroundColor: hasSlots ? '#10B981DD' : 'rgba(255,255,255,0.25)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                <Text style={{ fontSize: 11, fontFamily: fontFamily.semibold, color: '#fff' }}>
                                   {hasSlots ? '● Slots open' : 'Check slots'}
                                 </Text>
                               </View>
