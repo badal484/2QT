@@ -914,7 +914,11 @@ router.get('/offer-targets', authenticate, requireRole('super_admin', 'admin'), 
 });
 
 router.get('/zones', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const { rows } = await query('SELECT * FROM zones ORDER BY name');
+    const { rows } = await query(`
+        SELECT z.*,
+               (SELECT COUNT(*) FROM menu_items m WHERE m.zone_id = z.id AND m.available = true) AS menu_item_count
+        FROM zones z ORDER BY z.name
+    `);
     res.json({ zones: rows });
 });
 
