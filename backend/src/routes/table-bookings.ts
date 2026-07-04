@@ -573,10 +573,13 @@ router.post('/:id/checkin', authenticate, async (req: AuthRequest, res) => {
 // Allowed by: customer (their own booking), staff/partner.
 router.post('/:id/post-order', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { items } = req.body as {
+    const { items, skipKitchen = false } = req.body as {
         items: { menuItemId: string; quantity: number; customizations?: any }[];
+        skipKitchen?: boolean;
     };
     if (!items?.length) return res.status(400).json({ error: 'items array required' });
+    // Only staff roles can bypass kitchen; customers always go through kitchen
+    const canSkipKitchen = skipKitchen && req.user!.role !== 'customer';
 
     try {
         const { rows: bookings } = await query(
@@ -608,13 +611,14 @@ router.post('/:id/post-order', authenticate, async (req: AuthRequest, res) => {
                 const linePaise = menuRows[0].price_paise * item.quantity;
                 addedAmountPaise += linePaise;
 
+                const itemStatus = canSkipKitchen ? 'served' : 'pending';
                 await client.query(`
                     INSERT INTO table_booking_items
                         (booking_id, menu_item_id, menu_item_name, price_paise, quantity,
-                         customizations, type, added_by)
-                    VALUES ($1,$2,$3,$4,$5,$6,'post_order',$7)
+                         customizations, type, status, added_by)
+                    VALUES ($1,$2,$3,$4,$5,$6,'post_order',$7,$8)
                 `, [id, item.menuItemId, menuRows[0].name, menuRows[0].price_paise,
-                    item.quantity, item.customizations ?? null, req.user!.userId]);
+                    item.quantity, item.customizations ?? null, itemStatus, req.user!.userId]);
 
                 ticketItems.push({ name: menuRows[0].name, quantity: item.quantity });
             }
@@ -625,10 +629,12 @@ router.post('/:id/post-order', authenticate, async (req: AuthRequest, res) => {
             );
         });
 
-        // Route ticket to kitchen or partner
-        await routeTicket(b.restaurant_id, 'table_order', {
-            bookingId: id, type: 'post_order', items: ticketItems, addedAmountPaise
-        });
+        // Route ticket to kitchen only if items need preparation
+        if (!canSkipKitchen) {
+            await routeTicket(b.restaurant_id, 'table_order', {
+                bookingId: id, type: 'post_order', items: ticketItems, addedAmountPaise
+            });
+        }
 
         // Notify customer that items were added (useful when waiter adds on their behalf)
         if (req.user!.role !== 'customer') {
