@@ -112,10 +112,21 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
         const resolvedItems: { menuItemId: string; name: string; pricePaise: number; quantity: number; customizations?: any }[] = [];
 
         for (const item of preOrderItems) {
-            const { rows: menuRows } = await query(
+            // Check restaurant-specific menu first, then fall back to zone kitchen menu
+            let { rows: menuRows } = await query(
                 'SELECT id, name, price_paise FROM restaurant_menu_items WHERE id = $1 AND restaurant_id = $2 AND is_available = true',
                 [item.menuItemId, restaurantId]
             );
+            if (!menuRows[0]) {
+                // Item may be from the zone's kitchen menu_items
+                const { rows: kitchenRows } = await query(`
+                    SELECT m.id, m.name, m.price_paise
+                    FROM menu_items m
+                    JOIN restaurant_config rc ON rc.zone_id = m.zone_id
+                    WHERE m.id = $1 AND rc.id = $2 AND m.available = true
+                `, [item.menuItemId, restaurantId]);
+                menuRows = kitchenRows;
+            }
             if (!menuRows[0]) return res.status(400).json({ error: `MENU_ITEM_NOT_FOUND: ${item.menuItemId}` });
             const linePaise = menuRows[0].price_paise * item.quantity;
             preOrderAmountPaise += linePaise;

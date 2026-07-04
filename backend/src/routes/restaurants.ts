@@ -85,26 +85,43 @@ router.get('/:id', async (req, res) => {
 });
 
 // ── GET /restaurants/:id/menu ─────────────────────────────────────────────────
-// Dine-in menu items, grouped by category.
+// Returns dine-in menu for pre-order. Uses restaurant_menu_items if configured;
+// falls back to the zone's kitchen menu_items so the same kitchen serves both.
 router.get('/:id/menu', async (req, res) => {
     const { id } = req.params;
     try {
-        const { rows } = await query(`
-            SELECT id, name, description, price_paise, category, image_url, is_veg, sort_order
+        // Try restaurant-specific menu first
+        const { rows: restItems } = await query(`
+            SELECT id, name, description, price_paise, category,
+                   image_url AS photo_url, is_veg, sort_order
             FROM restaurant_menu_items
             WHERE restaurant_id = $1 AND is_available = true
             ORDER BY category ASC, sort_order ASC, name ASC
         `, [id]);
 
-        // Group by category
+        let items = restItems;
+
+        // Fall back to the zone's kitchen menu if no restaurant-specific items
+        if (items.length === 0) {
+            const { rows: zoneItems } = await query(`
+                SELECT m.id, m.name, m.description, m.price_paise, m.category,
+                       m.photo_url, m.is_veg, m.sort_order
+                FROM menu_items m
+                JOIN restaurant_config rc ON rc.zone_id = m.zone_id
+                WHERE rc.id = $1 AND m.available = true
+                ORDER BY m.category ASC, m.sort_order ASC, m.name ASC
+            `, [id]);
+            items = zoneItems;
+        }
+
         const grouped: Record<string, any[]> = {};
-        for (const item of rows) {
+        for (const item of items) {
             const cat = item.category || 'Other';
             if (!grouped[cat]) grouped[cat] = [];
             grouped[cat].push(item);
         }
 
-        res.json({ menu: grouped, items: rows });
+        res.json({ menu: grouped, items });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
