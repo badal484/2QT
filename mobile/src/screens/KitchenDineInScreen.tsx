@@ -1,12 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, ScrollView, Alert, Modal,
+  Image, TextInput,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector, useDispatch } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Clock, Users, CheckCircle, ChefHat, Receipt, QrCode, X, LogOut } from 'lucide-react-native';
+import { Clock, Users, CheckCircle, ChefHat, Receipt, QrCode, X, LogOut, Plus, Minus, UtensilsCrossed, Zap } from 'lucide-react-native';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
@@ -67,6 +68,12 @@ const KitchenDineInScreen = () => {
   const scanLocked = useRef(false);
   const cameraDevice = useCameraDevice('back');
 
+  // Staff order state
+  const [staffOrderBooking, setStaffOrderBooking] = useState<any>(null);
+  const [staffOrderItems, setStaffOrderItems] = useState<Record<string, number>>({});
+  const [staffOrderSearch, setStaffOrderSearch] = useState('');
+  const [skipKitchen, setSkipKitchen] = useState(false);
+
   // All bookings for own restaurant today
   const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
     queryKey: ['kitchen-dine-in-today'],
@@ -122,6 +129,45 @@ const KitchenDineInScreen = () => {
     },
     onError: (err: any) => Alert.alert('Error', err?.message || 'Failed.'),
   });
+
+  const { data: staffMenuItems = [] } = useQuery({
+    queryKey: ['staff-order-menu', staffOrderBooking?.restaurant_id],
+    queryFn: () => api.get(`/restaurants/${staffOrderBooking.restaurant_id}/menu`).then((r: any) => r.items as any[]),
+    enabled: !!staffOrderBooking?.restaurant_id,
+  });
+
+  const filteredStaffMenu = useMemo(() => {
+    if (!staffOrderSearch.trim()) return staffMenuItems;
+    const q = staffOrderSearch.toLowerCase();
+    return staffMenuItems.filter((i: any) => i.name?.toLowerCase().includes(q) || i.category?.toLowerCase().includes(q));
+  }, [staffMenuItems, staffOrderSearch]);
+
+  const staffOrderTotal = useMemo(() =>
+    staffMenuItems.reduce((sum: number, item: any) => sum + (staffOrderItems[item.id] || 0) * item.price_paise, 0),
+    [staffMenuItems, staffOrderItems]);
+
+  const staffOrderMutation = useMutation({
+    mutationFn: ({ bookingId, items, skip }: { bookingId: string; items: any[]; skip: boolean }) =>
+      api.post(`/table-bookings/${bookingId}/post-order`, { items, skipKitchen: skip }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-tickets'] });
+      setStaffOrderBooking(null);
+      setStaffOrderItems({});
+      setStaffOrderSearch('');
+      setSkipKitchen(false);
+      Alert.alert('Done', skipKitchen ? 'Items added directly to bill.' : 'Order sent to kitchen.');
+    },
+    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed to add items.'),
+  });
+
+  const handleStaffOrder = () => {
+    const items = Object.entries(staffOrderItems)
+      .filter(([, qty]) => qty > 0)
+      .map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
+    if (!items.length) { Alert.alert('No Items', 'Add at least one item.'); return; }
+    staffOrderMutation.mutate({ bookingId: staffOrderBooking.id, items, skip: skipKitchen });
+  };
 
   const markPaidMutation = useMutation({
     mutationFn: ({ bookingId, method }: { bookingId: string; method: string }) =>
@@ -436,18 +482,24 @@ const KitchenDineInScreen = () => {
                     <BillLine
                       label="Outstanding"
                       value={`₹${(((b.pre_order_amount_paise + b.post_order_amount_paise + b.gst_amount_paise) - b.total_paid_paise) / 100).toFixed(0)}`}
-                      bold
-                      color={G.amber}
+                      bold color={G.amber}
                     />
                   </View>
 
                   <View style={styles.billActions}>
                     <TouchableOpacity
+                      style={styles.addItemStaffBtn}
+                      onPress={() => { setStaffOrderBooking(b); setStaffOrderItems({}); setSkipKitchen(false); }}
+                    >
+                      <Plus size={15} color={G.blue} />
+                      <Text style={styles.addItemStaffText}>Add Item</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       style={styles.cashBtn}
                       onPress={() => handleMarkPaid(b.id, b.display_id)}
                       disabled={markPaidMutation.isPending}
                     >
-                      <Text style={styles.cashBtnText}>Mark Paid (Cash/Card)</Text>
+                      <Text style={styles.cashBtnText}>Mark Paid</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -456,6 +508,124 @@ const KitchenDineInScreen = () => {
           )}
         </>
       )}
+
+      {/* ── Staff Order Modal ── */}
+      <Modal
+        visible={!!staffOrderBooking}
+        animationType="slide"
+        onRequestClose={() => { setStaffOrderBooking(null); setStaffOrderItems({}); setStaffOrderSearch(''); }}
+      >
+        <View style={[styles.soModal, { paddingTop: insets.top }]}>
+          {/* Header */}
+          <View style={styles.soHeader}>
+            <TouchableOpacity onPress={() => { setStaffOrderBooking(null); setStaffOrderItems({}); setStaffOrderSearch(''); }} style={styles.soCloseBtn}>
+              <X size={22} color={G.ink} />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.soTitle}>Add Items</Text>
+              <Text style={styles.soSub}>{staffOrderBooking?.display_id} · Table {staffOrderBooking?.table_number}</Text>
+            </View>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* Kitchen / Direct toggle */}
+          <View style={styles.soToggleRow}>
+            <TouchableOpacity
+              style={[styles.soToggleBtn, !skipKitchen && styles.soToggleBtnActive]}
+              onPress={() => setSkipKitchen(false)}
+            >
+              <UtensilsCrossed size={14} color={!skipKitchen ? G.bg : G.inkDim} />
+              <Text style={[styles.soToggleText, !skipKitchen && styles.soToggleTextActive]}>Via Kitchen</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.soToggleBtn, skipKitchen && styles.soToggleBtnDirect]}
+              onPress={() => setSkipKitchen(true)}
+            >
+              <Zap size={14} color={skipKitchen ? G.bg : G.inkDim} />
+              <Text style={[styles.soToggleText, skipKitchen && styles.soToggleTextActive]}>Direct to Bill</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.soToggleHint}>
+            {skipKitchen
+              ? 'Item goes straight to bill — no kitchen ticket (use for drinks, packaged items)'
+              : 'Item appears in Kitchen Tickets for preparation'}
+          </Text>
+
+          {/* Search */}
+          <View style={styles.soSearchWrap}>
+            <TextInput
+              style={styles.soSearchInput}
+              placeholder="Search dishes…"
+              placeholderTextColor={G.inkDim}
+              value={staffOrderSearch}
+              onChangeText={setStaffOrderSearch}
+              returnKeyType="search"
+            />
+          </View>
+
+          {/* Menu list */}
+          <FlatList
+            data={filteredStaffMenu}
+            keyExtractor={(item: any) => item.id}
+            contentContainerStyle={styles.soListContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<View style={styles.emptyWrap}><Text style={styles.emptySubText}>No items found</Text></View>}
+            renderItem={({ item }: any) => {
+              const qty = staffOrderItems[item.id] || 0;
+              return (
+                <View style={styles.soItemCard}>
+                  {item.photo_url
+                    ? <Image source={{ uri: item.photo_url }} style={styles.soItemImg} resizeMode="cover" />
+                    : <View style={[styles.soItemImg, styles.soItemImgFallback]}><Text style={{ fontSize: 22 }}>🍽️</Text></View>
+                  }
+                  <View style={styles.soItemInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <View style={[styles.vegDot, { backgroundColor: item.is_veg ? '#16A34A' : '#DC2626' }]} />
+                      <Text style={styles.soItemName} numberOfLines={2}>{item.name}</Text>
+                    </View>
+                    <Text style={styles.soItemPrice}>₹{(item.price_paise / 100).toFixed(0)}</Text>
+                  </View>
+                  <View style={styles.soItemCtrl}>
+                    {qty > 0 ? (
+                      <View style={styles.soQtyRow}>
+                        <TouchableOpacity style={styles.soQtyBtn} onPress={() => setStaffOrderItems(p => ({ ...p, [item.id]: Math.max(0, qty - 1) }))}>
+                          <Minus size={14} color={G.green} />
+                        </TouchableOpacity>
+                        <Text style={styles.soQtyText}>{qty}</Text>
+                        <TouchableOpacity style={styles.soQtyBtn} onPress={() => setStaffOrderItems(p => ({ ...p, [item.id]: qty + 1 }))}>
+                          <Plus size={14} color={G.green} />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={styles.soAddBtn} onPress={() => setStaffOrderItems(p => ({ ...p, [item.id]: 1 }))}>
+                        <Text style={styles.soAddBtnText}>Add</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            }}
+          />
+
+          {/* Footer */}
+          {staffOrderTotal > 0 && (
+            <View style={[styles.soFooter, { paddingBottom: insets.bottom + 12 }]}>
+              <TouchableOpacity
+                style={[styles.soConfirmBtn, skipKitchen && styles.soConfirmBtnDirect]}
+                onPress={handleStaffOrder}
+                disabled={staffOrderMutation.isPending}
+              >
+                {staffOrderMutation.isPending
+                  ? <ActivityIndicator color={G.bg} />
+                  : <Text style={styles.soConfirmText}>
+                      {skipKitchen ? '⚡ Add to Bill' : '🍳 Send to Kitchen'} · ₹{(staffOrderTotal / 100).toFixed(0)}
+                    </Text>
+                }
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -548,6 +718,42 @@ const styles = StyleSheet.create({
   cameraView: { width: '100%', aspectRatio: 1, borderRadius: 20, overflow: 'hidden' },
   cameraFallback: { backgroundColor: G.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: G.border },
   scannerFrame: { position: 'absolute', top: 180, width: 220, height: 220, borderRadius: 16, borderWidth: 2, borderColor: G.green },
+  // Bill — Add Item button
+  addItemStaffBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: G.blue + '18', borderRadius: 10, paddingVertical: 11, borderWidth: 1, borderColor: G.blue + '50' },
+  addItemStaffText: { fontSize: 13, fontFamily: fontFamily.semibold, color: G.blue },
+  // Staff order modal
+  soModal: { flex: 1, backgroundColor: G.bg },
+  soHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: G.border },
+  soCloseBtn: { width: 40, height: 40, justifyContent: 'center' },
+  soTitle: { fontSize: 17, fontFamily: fontFamily.bold, color: G.ink, textAlign: 'center' },
+  soSub: { fontSize: 12, fontFamily: fontFamily.regular, color: G.inkDim, textAlign: 'center' },
+  soToggleRow: { flexDirection: 'row', gap: 8, marginHorizontal: spacing.lg, marginTop: 14 },
+  soToggleBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: G.border, backgroundColor: G.surface },
+  soToggleBtnActive: { backgroundColor: G.green, borderColor: G.green },
+  soToggleBtnDirect: { backgroundColor: G.amber, borderColor: G.amber },
+  soToggleText: { fontSize: 13, fontFamily: fontFamily.semibold, color: G.inkDim },
+  soToggleTextActive: { color: G.bg },
+  soToggleHint: { fontSize: 11, fontFamily: fontFamily.regular, color: G.inkDim, marginHorizontal: spacing.lg, marginTop: 6, marginBottom: 4 },
+  soSearchWrap: { paddingHorizontal: spacing.lg, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: G.border },
+  soSearchInput: { backgroundColor: G.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: fontFamily.regular, color: G.ink, borderWidth: 1, borderColor: G.border },
+  soListContent: { padding: spacing.lg, gap: 10, paddingBottom: 120 },
+  soItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: G.card, borderRadius: 14, padding: 12, gap: 12, borderWidth: 1, borderColor: G.border },
+  soItemImg: { width: 70, height: 70, borderRadius: 10 },
+  soItemImgFallback: { backgroundColor: G.surface, justifyContent: 'center', alignItems: 'center' },
+  soItemInfo: { flex: 1, gap: 4 },
+  soItemName: { flex: 1, fontSize: 14, fontFamily: fontFamily.semibold, color: G.ink },
+  soItemPrice: { fontSize: 14, fontFamily: fontFamily.bold, color: G.green },
+  vegDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
+  soItemCtrl: { alignItems: 'center', minWidth: 76 },
+  soQtyRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: G.green, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 4 },
+  soQtyBtn: { width: 26, height: 26, justifyContent: 'center', alignItems: 'center' },
+  soQtyText: { fontSize: 15, fontFamily: fontFamily.semibold, color: G.ink, minWidth: 18, textAlign: 'center' },
+  soAddBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: G.green },
+  soAddBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: G.green },
+  soFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: G.surface, paddingHorizontal: spacing.lg, paddingTop: 12, borderTopWidth: 1, borderTopColor: G.border },
+  soConfirmBtn: { backgroundColor: G.green, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  soConfirmBtnDirect: { backgroundColor: G.amber },
+  soConfirmText: { fontSize: 15, fontFamily: fontFamily.semibold, color: G.bg },
   // Empty
   emptyWrap: { flex: 1, alignItems: 'center', paddingTop: 80 },
   emptyText: { fontSize: 18, fontFamily: fontFamily.semibold, color: G.ink, marginTop: 16, marginBottom: 8 },
