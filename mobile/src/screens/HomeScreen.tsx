@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
 import { addItem, setQuantity, setZone, setAddress, clearCart } from '../store/slices/cartSlice';
-import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight } from 'lucide-react-native';
+import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight, UtensilsCrossed } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../utils/kitchenHours';
@@ -135,6 +135,16 @@ const HomeScreen = ({ navigation }: any) => {
     staleTime: 5 * 60 * 1000,
   });
   const restaurants: any[] = restaurantsData || [];
+
+  const getRestCoverPhoto = (photos: any): string | null => {
+    if (!photos || !Array.isArray(photos) || photos.length === 0) return null;
+    const first = photos[0];
+    if (typeof first === 'string') {
+      try { const o = JSON.parse(first); if (o?.url) return o.url; } catch {}
+      return first.startsWith('http') ? first : null;
+    }
+    return first?.url || null;
+  };
 
   // 3 copies is enough for infinite-scroll feel while keeping the array tiny (was 500 copies = ~2500 items)
   const BANNER_COPIES = 3;
@@ -1054,13 +1064,13 @@ const HomeScreen = ({ navigation }: any) => {
                       activeOpacity={0.85}
                       onPress={() => navigation.navigate('RestaurantDetail', { restaurantId: rest.id })}
                     >
-                      {rest.image_url ? (
-                        <NetworkImage uri={rest.image_url} style={{ width: '100%', height: 110 }} />
+                      {(() => { const cover = getRestCoverPhoto(rest.photos); return cover ? (
+                        <NetworkImage uri={cover} style={{ width: '100%', height: 110 }} width={200} height={110} />
                       ) : (
                         <View style={{ width: '100%', height: 110, backgroundColor: '#1B5E4620', justifyContent: 'center', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 32 }}>🍽️</Text>
+                          <UtensilsCrossed size={32} color="#1B5E4660" />
                         </View>
-                      )}
+                      ); })()}
                       <View style={{ padding: 10 }}>
                         <Text style={{ fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink }} numberOfLines={1}>{rest.name}</Text>
                         {rest.cuisine_type && <Text style={{ fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular, marginTop: 1 }} numberOfLines={1}>{rest.cuisine_type}</Text>}

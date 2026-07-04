@@ -17,7 +17,7 @@ import { BouncingButton } from '../components/ui/BouncingButton';
 import { NetworkImage } from '../components/NetworkImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_HEIGHT = 280;
+const HERO_HEIGHT = 300;
 
 type MediaItem = { url: string; type: 'image' | 'video'; thumbnail_url?: string };
 
@@ -87,7 +87,7 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
       {item.type === 'video' ? (
         <TouchableOpacity style={styles.slide} activeOpacity={0.9} onPress={() => setVideoUri(item.url)}>
           {item.thumbnail_url
-            ? <NetworkImage uri={item.thumbnail_url} style={styles.slideImage} />
+            ? <Image source={{ uri: item.thumbnail_url }} style={styles.slideImage} resizeMode="contain" />
             : <View style={[styles.slideImage, styles.darkSlide]} />}
           <View style={styles.playOverlay}>
             <View style={styles.playBtn}>
@@ -96,7 +96,7 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
           </View>
         </TouchableOpacity>
       ) : (
-        <NetworkImage uri={item.url} style={styles.slideImage} />
+        <Image source={{ uri: item.url }} style={styles.slideImage} resizeMode="contain" />
       )}
     </View>
   );
@@ -278,9 +278,9 @@ const styles = StyleSheet.create({
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   heroWrap: { width: SCREEN_WIDTH, height: HERO_HEIGHT, position: 'relative' },
   gallery: { width: SCREEN_WIDTH, height: HERO_HEIGHT },
-  slide: { width: SCREEN_WIDTH, height: HERO_HEIGHT },
+  slide: { width: SCREEN_WIDTH, height: HERO_HEIGHT, backgroundColor: '#111' },
   slideImage: { width: '100%', height: '100%' },
-  darkSlide: { backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
+  darkSlide: { backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   heroPlaceholder: { backgroundColor: '#2D3748', justifyContent: 'center', alignItems: 'center' },
   playOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center' },
   playBtn: {
