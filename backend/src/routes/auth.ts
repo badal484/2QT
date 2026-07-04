@@ -191,7 +191,7 @@ router.post('/verify-otp', async (req, res) => {
         // Kitchen app: only pre-authorized accounts (role='chef' set by admin) can log in.
         // Never auto-promote an arbitrary phone number to chef.
         const { rows: chefRows } = await query(
-            `SELECT id FROM users WHERE phone = $1 AND role = 'chef'`,
+            `SELECT id FROM users WHERE phone = $1 AND role IN ('chef', 'kitchen_manager', 'partner_kitchen', 'dine_in_staff')`,
             [normalizedPhone]
         );
         if (chefRows.length === 0) {
