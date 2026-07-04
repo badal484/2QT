@@ -95,6 +95,22 @@ const KitchenDineInScreen = () => {
     onError: () => Alert.alert('Error', 'Failed to update item status.'),
   });
 
+  const checkinMutation = useMutation({
+    mutationFn: (bookingId: string) => api.post(`/table-bookings/${bookingId}/checkin`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
+    },
+    onError: (err: any) => Alert.alert('Error', err?.message || 'Check-in failed.'),
+  });
+
+  const noShowMutation = useMutation({
+    mutationFn: (bookingId: string) => api.post(`/table-bookings/${bookingId}/no-show`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
+    },
+    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed.'),
+  });
+
   const markPaidMutation = useMutation({
     mutationFn: ({ bookingId, method }: { bookingId: string; method: string }) =>
       api.post(`/table-bookings/${bookingId}/mark-paid`, { paymentMethod: method }),
@@ -102,7 +118,7 @@ const KitchenDineInScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
     },
-    onError: (err: any) => Alert.alert('Error', err?.response?.data?.error || 'Failed.'),
+    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed.'),
   });
 
   const onRefresh = async () => {
@@ -213,6 +229,30 @@ const KitchenDineInScreen = () => {
                   )}
                   {b.occasion && (
                     <Text style={styles.occasionTag}>{b.occasion}</Text>
+                  )}
+                  {/* Action buttons for confirmed bookings */}
+                  {b.status === 'confirmed' && (
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity
+                        style={styles.checkinBtn}
+                        onPress={() => checkinMutation.mutate(b.id)}
+                        disabled={checkinMutation.isPending}
+                      >
+                        <Text style={styles.checkinBtnText}>✓ Check In</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.noShowBtn}
+                        onPress={() =>
+                          Alert.alert('Mark No-Show', `Mark ${b.display_id} as no-show?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'No-Show', style: 'destructive', onPress: () => noShowMutation.mutate(b.id) },
+                          ])
+                        }
+                        disabled={noShowMutation.isPending}
+                      >
+                        <Text style={styles.noShowBtnText}>No Show</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               )}
@@ -385,6 +425,11 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, color: G.inkDim, fontFamily: fontFamily.medium },
   preOrderTag: { fontSize: 12, color: G.green, fontFamily: fontFamily.medium, marginTop: 4 },
   occasionTag: { fontSize: 12, color: G.amber, fontFamily: fontFamily.medium, marginTop: 2 },
+  cardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  checkinBtn: { flex: 1, backgroundColor: G.green + '22', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: G.green },
+  checkinBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: G.green },
+  noShowBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: G.red + '60', alignItems: 'center' },
+  noShowBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: G.red },
   // Tickets
   ticketCard: { backgroundColor: G.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: G.border },
   ticketHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },

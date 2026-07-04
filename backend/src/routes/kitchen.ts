@@ -658,8 +658,7 @@ router.get('/dine-in/today', authenticate, requireRole('chef', 'kitchen_manager'
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
             LEFT JOIN users u ON u.id = tb.customer_id
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
-            WHERE rc.partner_id IS NULL
-              AND ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+            WHERE ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
               AND tb.slot_start::date = CURRENT_DATE
               AND tb.status NOT IN ('cancelled','no_show')
             ORDER BY tb.slot_start
@@ -694,8 +693,7 @@ router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manage
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
             JOIN restaurant_menu_items rmi ON rmi.id = tbi.menu_item_id
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
-            WHERE rc.partner_id IS NULL
-              AND ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+            WHERE ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
               AND tbi.type = $2
               AND tbi.status != 'served'
               AND tb.status = 'seated'
@@ -730,8 +728,7 @@ router.get('/dine-in/bill', authenticate, requireRole('chef', 'kitchen_manager',
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
             LEFT JOIN users u ON u.id = tb.customer_id
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
-            WHERE rc.partner_id IS NULL
-              AND ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
+            WHERE ($1::uuid IS NULL OR rc.zone_id = $1::uuid)
               AND tb.status = 'seated'
               AND (tb.pre_order_amount_paise + tb.post_order_amount_paise) > tb.total_paid_paise
             ORDER BY tb.slot_start
