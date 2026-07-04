@@ -1519,7 +1519,7 @@ router.get('/restaurants', authenticate, requireRole('super_admin', 'admin', 'fi
             SELECT
                 rc.id, rc.name, rc.zone_id, rc.cuisine_type, rc.address,
                 rc.is_active, rc.commission_percent, rc.gst_percent,
-                rc.slot_duration_minutes, rc.deposit_paise, rc.created_at,
+                rc.slot_duration_minutes, rc.deposit_paise, rc.operating_hours, rc.created_at,
                 CASE WHEN rc.partner_id IS NULL THEN 'own' ELSE 'partner' END AS restaurant_type,
                 z.name AS zone_name,
                 u.name AS partner_name, u.phone AS partner_phone,
@@ -1694,6 +1694,24 @@ router.put('/restaurants/:id', authenticate, requireRole('super_admin', 'admin')
             slotDurationMinutes, advanceBookingDays, cancellationWindowMinutes,
             depositPaise, maxPartySize, gstPercent, commissionPercent, upiId, isActive]);
 
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        res.json({ restaurant: rows[0] });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── GET /admin/restaurants/:id ────────────────────────────────────────────────
+router.get('/restaurants/:id', authenticate, requireRole('super_admin', 'admin', 'finance'), async (req, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT rc.*, z.name AS zone_name, u.name AS partner_name, u.phone AS partner_phone,
+                   CASE WHEN rc.partner_id IS NULL THEN 'own' ELSE 'partner' END AS restaurant_type
+            FROM restaurant_config rc
+            JOIN zones z ON z.id = rc.zone_id
+            LEFT JOIN users u ON u.id = rc.partner_id
+            WHERE rc.id = $1
+        `, [req.params.id]);
         if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
         res.json({ restaurant: rows[0] });
     } catch (err: any) {
