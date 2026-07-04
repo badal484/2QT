@@ -1315,7 +1315,7 @@ router.get('/team/users', authenticate, requireRole('super_admin', 'admin'), asy
 router.post('/team/users', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { phone, name, role, kitchenId } = req.body as { phone: string; name: string; role: string; kitchenId?: string };
     if (!phone || !name || !role) return res.status(400).json({ error: 'phone, name, role required' });
-    if (!['finance', 'admin', 'chef', 'kitchen_manager', 'rider'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+    if (!['finance', 'admin', 'chef', 'kitchen_manager', 'rider', 'partner'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
     if (['chef', 'kitchen_manager'].includes(role) && !kitchenId) return res.status(400).json({ error: 'kitchenId required for chef/kitchen_manager' });
 
     const cleanPhone = phone.replace(/\D/g, '');
@@ -1539,6 +1539,84 @@ router.get('/restaurants', requireRole('super_admin', 'admin', 'finance'), async
             ORDER BY rc.created_at DESC
         `);
         res.json({ restaurants: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /admin/restaurants/onboard ───────────────────────────────────────────
+// One-shot: create partner user + restaurant + tables in a single transaction.
+// Body: { partnerPhone, partnerName, zoneId, restaurantName, cuisineType, address,
+//         commissionPercent, depositPaise, gstPercent, slotDurationMinutes,
+//         operatingHours, tables: [{tableNumber, capacity}] }
+router.post('/restaurants/onboard', requireRole('super_admin', 'admin'), async (req, res) => {
+    const {
+        partnerPhone, partnerName,
+        zoneId, restaurantName, cuisineType, address, lat, lng,
+        commissionPercent = 15, depositPaise = 20000, gstPercent = 5,
+        slotDurationMinutes = 90, advanceBookingDays = 7,
+        cancellationWindowMinutes = 120, maxPartySize = 10,
+        operatingHours = {}, upiId,
+        tables = [],
+    } = req.body;
+
+    if (!partnerPhone || !partnerName || !zoneId || !restaurantName) {
+        return res.status(400).json({ error: 'partnerPhone, partnerName, zoneId, restaurantName are required' });
+    }
+    const cleanPhone = partnerPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) return res.status(400).json({ error: 'Invalid partnerPhone' });
+
+    try {
+        const result = await withTransaction(async (client) => {
+            // 1. Create / upsert partner user
+            const { rows: userRows } = await client.query(`
+                INSERT INTO users (phone, name, role, is_active, is_verified, onboarding_complete)
+                VALUES ($1, $2, 'partner', true, true, true)
+                ON CONFLICT (phone) DO UPDATE
+                    SET name = EXCLUDED.name, role = 'partner', is_active = true, is_verified = true
+                RETURNING id, name, phone, role
+            `, [cleanPhone, partnerName.trim()]);
+            const partner = userRows[0];
+
+            // 2. Create restaurant linked to partner
+            const { rows: restRows } = await client.query(`
+                INSERT INTO restaurant_config
+                    (zone_id, name, cuisine_type, address, lat, lng,
+                     operating_hours, slot_duration_minutes, advance_booking_days,
+                     cancellation_window_minutes, deposit_paise, max_party_size,
+                     gst_percent, commission_percent, partner_id, upi_id)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+                RETURNING id, name
+            `, [
+                zoneId, restaurantName, cuisineType || null, address || null,
+                lat || null, lng || null, operatingHours,
+                slotDurationMinutes, advanceBookingDays, cancellationWindowMinutes,
+                depositPaise, maxPartySize, gstPercent, commissionPercent,
+                partner.id, upiId || null,
+            ]);
+            const restaurant = restRows[0];
+
+            // 3. Add tables if provided
+            const addedTables = [];
+            for (const t of tables) {
+                const { rows: tRows } = await client.query(`
+                    INSERT INTO restaurant_tables (restaurant_id, table_number, capacity)
+                    VALUES ($1,$2,$3) RETURNING *
+                `, [restaurant.id, t.tableNumber, t.capacity]);
+                addedTables.push(tRows[0]);
+            }
+
+            return { partner, restaurant, tables: addedTables };
+        });
+
+        emitToAdmin('restaurant_created', { restaurantId: result.restaurant.id, name: result.restaurant.name });
+        res.status(201).json({
+            success: true,
+            partner: result.partner,
+            restaurant: result.restaurant,
+            tables: result.tables,
+            loginInstruction: `Give the partner their phone number: ${cleanPhone}. They log in via OTP — no password needed.`,
+        });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

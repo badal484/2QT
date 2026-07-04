@@ -33,6 +33,7 @@ const PartnersTab = dynamic(() => import("./PartnersTab").then(m => ({ default: 
 const NotificationsTab = dynamic(() => import("./NotificationsTab").then(m => ({ default: m.NotificationsTab })), { ssr: false });
 const DispatchTab = dynamic(() => import("./DispatchTab").then(m => ({ default: m.DispatchTab })), { ssr: false });
 const MenuOffersTab = dynamic(() => import("./MenuOffersTab").then(m => ({ default: m.MenuOffersTab })), { ssr: false });
+const RestaurantsTab = dynamic(() => import("./RestaurantsTab").then(m => ({ default: m.RestaurantsTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1719,6 +1720,7 @@ const TABS = [
   { name: "Menu Offers", icon: Tag, component: MenuOffersTab },
   { name: "Kitchens", icon: Store, component: KitchensTab },
   { name: "Partners", icon: Store, component: PartnersTab },
+  { name: "Restaurants", icon: Utensils, component: RestaurantsTab },
   { name: "Team", icon: Users, component: TeamTab },
   { name: "Notifications", icon: Bell, component: NotificationsTab },
   { name: "Settings", icon: Settings, component: SettingsTab },
