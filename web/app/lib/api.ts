@@ -208,34 +208,24 @@ class ApiClient {
   }
 
   // File Upload
-  async uploadImage(file: File) {
+  private async uploadFile(endpoint: string, fieldName: string, file: File) {
     const formData = new FormData();
-    formData.append('image', file);
-
+    formData.append(fieldName, file);
     const token = typeof window !== 'undefined' ? localStorage.getItem('2qt_token') : null;
-    const res = await fetch(`${API_BASE_URL}/upload/image`, {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
       body: formData,
     });
-    
-    let data;
-    try {
-      const text = await res.text();
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}...`);
-      }
-    } catch (e: any) {
-      throw new Error(`Upload fetch error: ${e.message}`);
-    }
-
-    if (!res.ok) throw new Error(data.message || data.error || 'Failed to upload image');
+    const text = await res.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch { throw new Error(`Server returned non-JSON: ${text.slice(0, 100)}`); }
+    if (!res.ok) throw new Error(data.message || data.error || 'Upload failed');
     return data;
   }
+
+  async uploadImage(file: File) { return this.uploadFile('/upload/image', 'image', file); }
+  async uploadVideo(file: File) { return this.uploadFile('/upload/video', 'video', file); }
 
   // Rider Onboarding
   async applyToRide(vehicleType: string, licenseNumber: string, idPhotoUrl?: string) {

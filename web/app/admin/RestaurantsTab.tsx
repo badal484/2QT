@@ -1,12 +1,24 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   RefreshCw, X, Plus, ChevronRight,
   Copy, Check, MapPin, Phone,
-  ToggleLeft, ToggleRight, Trash2,
+  ToggleLeft, ToggleRight, Trash2, Image, Video, Upload, Play,
 } from "lucide-react";
+
+type MediaItem = { url: string; type: "image" | "video"; thumbnail_url?: string };
+
+const parsePhotos = (photos: any): MediaItem[] => {
+  if (!photos || !Array.isArray(photos)) return [];
+  return photos
+    .map((p: any) => {
+      if (typeof p === "string") return { url: p, type: "image" as const };
+      return { url: p.url, type: p.type ?? "image", thumbnail_url: p.thumbnail_url } as MediaItem;
+    })
+    .filter(p => p.url);
+};
 import { api } from "../lib/api";
 import { toast } from "sonner";
 
@@ -490,7 +502,12 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
   restaurant: any; zones?: any[]; onClose: () => void; onUpdated: () => void;
 }) {
   const [restaurant, setRestaurant] = useState(initialRestaurant);
-  const [tab, setTab] = useState<"info" | "tables" | "menu" | "bookings" | "hours">("info");
+  const [tab, setTab] = useState<"info" | "tables" | "menu" | "bookings" | "hours" | "media">("info");
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>(() => parsePhotos(initialRestaurant.photos));
+  const [savingMedia, setSavingMedia] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const imgInputRef = useRef<HTMLInputElement>(null);
+  const vidInputRef = useRef<HTMLInputElement>(null);
   const [tables, setTables] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -526,6 +543,38 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
     upiId: initialRestaurant.upi_id || "",
   });
   const [savingInfo, setSavingInfo] = useState(false);
+
+  const uploadMediaFile = async (file: File, type: "image" | "video"): Promise<MediaItem> => {
+    const r = type === "video" ? await api.uploadVideo(file) : await api.uploadImage(file);
+    return { url: r.url, type, thumbnail_url: r.thumbnailUrl };
+  };
+
+  const handlePickMedia = async (type: "image" | "video", files: FileList | null) => {
+    if (!files?.length) return;
+    setUploadingMedia(true);
+    try {
+      const uploaded = await Promise.all(Array.from(files).map(f => uploadMediaFile(f, type)));
+      setMediaItems(prev => [...prev, ...uploaded]);
+      toast.success(`${uploaded.length} ${type}(s) uploaded`);
+    } catch (e: any) {
+      toast.error(e.message || "Upload failed");
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const saveMedia = async () => {
+    setSavingMedia(true);
+    try {
+      await api.put(`/admin/restaurants/${restaurant.id}`, { photos: mediaItems });
+      toast.success("Media saved");
+      onUpdated();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save");
+    } finally {
+      setSavingMedia(false);
+    }
+  };
 
   const saveInfo = async () => {
     setSavingInfo(true);
@@ -711,7 +760,7 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
     no_show: "text-white/30",
   };
 
-  const tabBtn = (id: "info" | "tables" | "menu" | "bookings" | "hours", label: string) => (
+  const tabBtn = (id: "info" | "media" | "tables" | "menu" | "bookings" | "hours", label: string) => (
     <button
       onClick={() => setTab(id)}
       className={`px-3 py-1.5 rounded-lg text-xs transition ${tab === id ? "bg-purple-500/20 text-purple-300" : "text-white/40 hover:text-white/70"}`}
@@ -763,6 +812,7 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
         {/* Tabs */}
         <div className="px-6 py-3 border-b border-white/5 flex gap-1 flex-shrink-0">
           {tabBtn("info", "Info")}
+          {tabBtn("media", "Media")}
           {tabBtn("hours", "Hours")}
           {tabBtn("tables", "Tables")}
           {tabBtn("menu", "Menu")}
@@ -1033,6 +1083,87 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {tab === "media" && (
+            <div className="space-y-4">
+              <div className="text-xs text-white/40">
+                Photos and videos shown to customers on the restaurant page. First item is the cover. Supports JPG, PNG, WebP and MP4.
+              </div>
+
+              {/* Hidden file inputs */}
+              <input ref={imgInputRef} type="file" accept="image/*" multiple className="hidden"
+                onChange={e => handlePickMedia("image", e.target.files).then(() => { if (imgInputRef.current) imgInputRef.current.value = ""; })} />
+              <input ref={vidInputRef} type="file" accept="video/*" className="hidden"
+                onChange={e => handlePickMedia("video", e.target.files).then(() => { if (vidInputRef.current) vidInputRef.current.value = ""; })} />
+
+              {/* Upload buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => imgInputRef.current?.click()}
+                  disabled={uploadingMedia}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-semibold transition disabled:opacity-50"
+                >
+                  <Image className="w-4 h-4" /> Add Photos
+                </button>
+                <button
+                  onClick={() => vidInputRef.current?.click()}
+                  disabled={uploadingMedia}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-semibold transition disabled:opacity-50"
+                >
+                  <Video className="w-4 h-4" /> Add Video
+                </button>
+              </div>
+
+              {uploadingMedia && (
+                <div className="flex items-center gap-2 text-xs text-white/50">
+                  <Upload className="w-3.5 h-3.5 animate-bounce" /> Uploading to ImageKit…
+                </div>
+              )}
+
+              {/* Media grid */}
+              {mediaItems.length === 0 ? (
+                <div className="text-center py-12 text-white/20 text-sm">No media yet. Add photos or a video above.</div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {mediaItems.map((item, i) => (
+                    <div key={item.url} className="relative group aspect-square rounded-xl overflow-hidden bg-white/5">
+                      {item.type === "video" ? (
+                        <>
+                          {item.thumbnail_url
+                            ? <img src={item.thumbnail_url} alt="video" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center bg-black/40"><Play className="w-8 h-8 text-white/60" /></div>}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                              <Play className="w-4 h-4 text-white fill-white" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img src={item.url} alt={`photo-${i}`} className="w-full h-full object-cover" />
+                      )}
+                      {i === 0 && (
+                        <span className="absolute top-1 left-1 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">COVER</span>
+                      )}
+                      <button
+                        onClick={() => setMediaItems(prev => prev.filter((_, idx) => idx !== i))}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-red-600"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={saveMedia}
+                disabled={savingMedia}
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition disabled:opacity-50"
+              >
+                {savingMedia ? "Saving…" : `Save Media (${mediaItems.length} item${mediaItems.length !== 1 ? "s" : ""})`}
+              </button>
             </div>
           )}
 
