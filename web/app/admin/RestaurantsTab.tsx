@@ -225,15 +225,19 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
   onSuccess: (result: any) => void;
 }) {
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    partnerPhone: "", partnerName: "",
-    zoneId: zones[0]?.id ?? "",
-    restaurantName: "", cuisineType: "", address: "",
-    lat: "", lng: "",
-    commissionPercent: "15", depositPaise: "200", gstPercent: "5",
-    slotDurationMinutes: "90", advanceBookingDays: "7",
-    cancellationWindowMinutes: "120", maxPartySize: "10",
-    upiId: "",
+  const [form, setForm] = useState(() => {
+    const z = zones[0];
+    return {
+      partnerPhone: "", partnerName: "",
+      zoneId: z?.id ?? "",
+      restaurantName: "", cuisineType: "", address: "",
+      lat: z?.kitchen_lat != null ? String(z.kitchen_lat) : "",
+      lng: z?.kitchen_lng != null ? String(z.kitchen_lng) : "",
+      commissionPercent: "15", depositPaise: "200", gstPercent: "5",
+      slotDurationMinutes: "90", advanceBookingDays: "7",
+      cancellationWindowMinutes: "120", maxPartySize: "10",
+      upiId: "",
+    };
   });
   const [hours, setHours] = useState(DEFAULT_HOURS as Record<string, { open: string; close: string; closed: boolean }>);
   const [tables, setTables] = useState<TableRow[]>([
@@ -243,6 +247,16 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
   const [section, setSection] = useState<"partner" | "restaurant" | "tables" | "hours">("partner");
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const setZone = (zoneId: string) => {
+    const zone = zones.find(z => z.id === zoneId);
+    setForm(f => ({
+      ...f,
+      zoneId,
+      lat: zone?.kitchen_lat != null ? String(zone.kitchen_lat) : f.lat,
+      lng: zone?.kitchen_lng != null ? String(zone.kitchen_lng) : f.lng,
+    }));
+  };
 
   const submit = async () => {
     if (!form.partnerPhone.trim() || !form.partnerName.trim() || !form.zoneId || !form.restaurantName.trim()) {
@@ -353,7 +367,8 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
                 />
               </Field>
               <Field label="Zone *">
-                <Select value={form.zoneId} onChange={v => set("zoneId", v)}>
+                <Select value={form.zoneId} onChange={setZone}>
+                  <option value="">Select a zone…</option>
                   {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
                 </Select>
               </Field>
@@ -372,11 +387,21 @@ function OnboardDrawer({ zones, onClose, onSuccess }: {
                 />
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Latitude">
-                  <Input placeholder="12.9716" value={form.lat} onChange={e => set("lat", e.target.value)} />
+                <Field label="Latitude (from zone)">
+                  <Input
+                    placeholder="Auto-filled from zone"
+                    value={form.lat}
+                    onChange={e => set("lat", e.target.value)}
+                    className="opacity-60"
+                  />
                 </Field>
-                <Field label="Longitude">
-                  <Input placeholder="77.5946" value={form.lng} onChange={e => set("lng", e.target.value)} />
+                <Field label="Longitude (from zone)">
+                  <Input
+                    placeholder="Auto-filled from zone"
+                    value={form.lng}
+                    onChange={e => set("lng", e.target.value)}
+                    className="opacity-60"
+                  />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
