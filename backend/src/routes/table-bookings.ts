@@ -109,7 +109,7 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
 
         // 3. Resolve pre-order items + compute amount
         let preOrderAmountPaise = 0;
-        const resolvedItems: { menuItemId: string; name: string; pricePaise: number; quantity: number; customizations?: any }[] = [];
+        const resolvedItems: { menuItemId: string | null; name: string; pricePaise: number; quantity: number; customizations?: any }[] = [];
 
         for (const item of preOrderItems) {
             // Check restaurant-specific menu first, then fall back to zone kitchen menu
@@ -117,12 +117,13 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
                 'SELECT id, name, price_paise FROM restaurant_menu_items WHERE id = $1 AND restaurant_id = $2 AND is_available = true',
                 [item.menuItemId, restaurantId]
             );
+            let isRestaurantItem = !!menuRows[0];
+
             if (!menuRows[0]) {
                 // Item may be from the zone's kitchen menu_items — look up zone_id directly
                 const { rows: rcRows } = await query('SELECT zone_id FROM restaurant_config WHERE id = $1', [restaurantId]);
                 const zoneId = rcRows[0]?.zone_id;
                 if (zoneId) {
-                    // Try with available=true first, then without (kitchen may have paused)
                     let { rows: kitchenRows } = await query(
                         'SELECT id, name, price_paise FROM menu_items WHERE id = $1 AND zone_id = $2 AND available = true',
                         [item.menuItemId, zoneId]
@@ -135,7 +136,6 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
                         kitchenRows = kitchenAny;
                     }
                     if (!kitchenRows[0]) {
-                        // Last resort: match by item ID across all zones
                         const { rows: anyZone } = await query(
                             'SELECT id, name, price_paise FROM menu_items WHERE id = $1',
                             [item.menuItemId]
@@ -148,7 +148,15 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
             if (!menuRows[0]) return res.status(400).json({ error: `MENU_ITEM_NOT_FOUND: ${item.menuItemId}` });
             const linePaise = menuRows[0].price_paise * item.quantity;
             preOrderAmountPaise += linePaise;
-            resolvedItems.push({ menuItemId: item.menuItemId, name: menuRows[0].name, pricePaise: menuRows[0].price_paise, quantity: item.quantity, customizations: item.customizations });
+            // Only reference restaurant_menu_items FK when item actually lives there;
+            // fallback kitchen menu items use NULL to avoid FK violation.
+            resolvedItems.push({
+                menuItemId: isRestaurantItem ? item.menuItemId : null,
+                name: menuRows[0].name,
+                pricePaise: menuRows[0].price_paise,
+                quantity: item.quantity,
+                customizations: item.customizations,
+            });
         }
 
         // Deposit (if configured) is due regardless of pre-order
