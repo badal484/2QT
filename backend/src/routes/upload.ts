@@ -40,4 +40,26 @@ router.post('/image', generalLimiter, upload.single('image'), async (req: any, r
     }
 });
 
+const videoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+
+router.post('/video', generalLimiter, videoUpload.single('video'), async (req: any, res: any) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const response = await imagekit.upload({
+            file: req.file.buffer,
+            fileName: `${Date.now()}_${req.file.originalname}`,
+            folder: '/2qt/videos',
+        });
+
+        // ImageKit generates video thumbnails by appending /ik-thumbnail.jpg to the video URL
+        const thumbnailUrl = `${response.url}/ik-thumbnail.jpg`;
+
+        res.json({ url: response.url, thumbnailUrl });
+    } catch (err: any) {
+        console.error('ImageKit video upload error:', err);
+        res.status(500).json({ error: 'Upload failed', message: err.message || JSON.stringify(err) });
+    }
+});
+
 export default router;

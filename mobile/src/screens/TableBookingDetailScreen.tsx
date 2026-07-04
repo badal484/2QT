@@ -79,7 +79,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
   const cancelMutation = useMutation({
     mutationFn: () => api.post(`/table-bookings/${bookingId}/cancel`),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] }); refetch(); },
-    onError: (err: any) => Alert.alert('Cannot Cancel', err?.response?.data?.error || 'Please try again.'),
+    onError: (err: any) => Alert.alert('Cannot Cancel', err?.message || 'Please try again.'),
   });
 
   const postOrderMutation = useMutation({
@@ -90,7 +90,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
       queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['table-booking-bill', bookingId] });
     },
-    onError: (err: any) => Alert.alert('Error', err?.response?.data?.error || 'Failed to add items.'),
+    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed to add items.'),
   });
 
   const payMutation = useMutation({
@@ -99,7 +99,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
       if (data.razorpayOrderId) openRazorpay(data.razorpayOrderId, data.amountPaise);
       else { queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] }); refetch(); }
     },
-    onError: (err: any) => Alert.alert('Payment Error', err?.response?.data?.error || 'Failed.'),
+    onError: (err: any) => Alert.alert('Payment Error', err?.message || 'Failed.'),
   });
 
   const openRazorpay = useCallback((rzpOrderId: string, amountPaise: number) => {
@@ -259,14 +259,24 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
         )}
 
         {/* Cancellation info */}
-        {booking?.status === 'confirmed' && booking?.free_cancellation_until && (
-          <View style={styles.cancelInfoCard}>
-            <AlertCircle size={16} color="#92400E" />
-            <Text style={styles.cancelInfoText}>
-              Free cancellation until {new Date(booking.free_cancellation_until).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </View>
-        )}
+        {booking?.status === 'confirmed' && booking?.free_cancellation_until && (() => {
+          const canCancelFree = new Date() < new Date(booking.free_cancellation_until);
+          return canCancelFree ? (
+            <View style={styles.cancelInfoCard}>
+              <AlertCircle size={16} color="#92400E" />
+              <Text style={styles.cancelInfoText}>
+                Free cancellation until {new Date(booking.free_cancellation_until).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.cancelInfoCard, { backgroundColor: '#FEE2E2' }]}>
+              <AlertCircle size={16} color="#B91C1C" />
+              <Text style={[styles.cancelInfoText, { color: '#B91C1C' }]}>
+                Cancellation window has passed. Deposit will be forfeited if you cancel now.
+              </Text>
+            </View>
+          );
+        })()}
 
         {/* Action buttons */}
         <View style={styles.actionsWrap}>

@@ -74,7 +74,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
 
   // Fetch menu for pre-order
   const { data: menuData, isLoading: menuLoading, error: menuError, refetch: refetchMenu } = useQuery({
-    queryKey: ['restaurant-menu', restaurantId],
+    queryKey: ['table-booking-menu', restaurantId],
     queryFn: () => api.get(`/restaurants/${restaurantId}/menu`).then((r: any) => r.items as any[]),
     enabled: step === 2,
     retry: 1,
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   catPillText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted },
   catPillTextActive: { color: colors.primary },
   menuGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
-  menuGridCard: { flex: 1, backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
+  menuGridCard: { width: '48%', backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
   menuGridImgWrap: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F9FAFB', position: 'relative', marginBottom: 8 },
   menuGridImg: { width: '100%', height: '100%' },
   menuGridImgFallback: { alignItems: 'center', justifyContent: 'center' },

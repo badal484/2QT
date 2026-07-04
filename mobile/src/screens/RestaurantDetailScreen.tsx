@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
-  View, Text, ScrollView, Image, TouchableOpacity, StyleSheet,
-  Dimensions, StatusBar, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  Dimensions, StatusBar, ActivityIndicator, FlatList, Modal,
+  NativeScrollEvent, NativeSyntheticEvent,
 } from 'react-native';
+import Video from 'react-native-video';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { ChevronLeft, MapPin, Clock, Star, UtensilsCrossed, Users } from 'lucide-react-native';
+import { ChevronLeft, MapPin, Clock, Star, UtensilsCrossed, Users, Play, X } from 'lucide-react-native';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
@@ -15,11 +17,27 @@ import { BouncingButton } from '../components/ui/BouncingButton';
 import { NetworkImage } from '../components/NetworkImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const HERO_HEIGHT = 280;
+
+type MediaItem = { url: string; type: 'image' | 'video'; thumbnail_url?: string };
+
+const parsePhotos = (photos: any): MediaItem[] => {
+  if (!photos || !Array.isArray(photos) || photos.length === 0) return [];
+  return photos
+    .map((p: any) => {
+      if (typeof p === 'string') return { url: p, type: 'image' as const };
+      return { url: p.url, type: p.type ?? 'image', thumbnail_url: p.thumbnail_url } as MediaItem;
+    })
+    .filter(p => p.url);
+};
 
 const RestaurantDetailScreen = ({ navigation, route }: any) => {
   const { restaurantId } = route.params;
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
+  const flatListRef = useRef<FlatList>(null);
 
   const { data: restaurant, isLoading: restLoading } = useQuery({
     queryKey: ['restaurant', restaurantId],
@@ -30,6 +48,13 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
     queryKey: ['restaurant-menu', restaurantId],
     queryFn: () => api.get(`/restaurants/${restaurantId}/menu`).then((r: any) => r.menu as Record<string, any[]>),
   });
+
+  const mediaItems: MediaItem[] = parsePhotos(restaurant?.photos);
+
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    setGalleryIndex(idx);
+  }, []);
 
   if (restLoading) {
     return (
@@ -51,17 +76,60 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
   const opensAt = todayHours && !todayHours.closed ? todayHours.open : null;
   const closesAt = todayHours && !todayHours.closed ? todayHours.close : null;
 
+  const renderMediaSlide = ({ item }: { item: MediaItem }) => (
+    <View style={styles.slide}>
+      {item.type === 'video' ? (
+        <TouchableOpacity style={styles.slide} activeOpacity={0.9} onPress={() => setVideoUri(item.url)}>
+          {item.thumbnail_url
+            ? <NetworkImage uri={item.thumbnail_url} style={styles.slideImage} />
+            : <View style={[styles.slideImage, styles.darkSlide]} />}
+          <View style={styles.playOverlay}>
+            <View style={styles.playBtn}>
+              <Play size={28} color="#fff" fill="#fff" />
+            </View>
+          </View>
+        </TouchableOpacity>
+      ) : (
+        <NetworkImage uri={item.url} style={styles.slideImage} />
+      )}
+    </View>
+  );
+
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="light-content" />
 
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-        {/* Hero image */}
+        {/* Hero gallery */}
         <View style={styles.heroWrap}>
-          {restaurant?.image_url ? (
-            <NetworkImage uri={restaurant.image_url} style={styles.heroImage} />
+          {mediaItems.length > 0 ? (
+            <>
+              <FlatList
+                ref={flatListRef}
+                data={mediaItems}
+                keyExtractor={item => item.url}
+                renderItem={renderMediaSlide}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={16}
+                style={styles.gallery}
+              />
+              {/* Dot indicator */}
+              {mediaItems.length > 1 && (
+                <View style={styles.dotsRow}>
+                  {mediaItems.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[styles.dot, i === galleryIndex && styles.dotActive]}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
           ) : (
-            <View style={[styles.heroImage, styles.heroPlaceholder]}>
+            <View style={[styles.slideImage, styles.heroPlaceholder]}>
               <UtensilsCrossed size={48} color="#ffffff44" />
             </View>
           )}
@@ -156,8 +224,8 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
                     <Text style={styles.menuItemPrice}>₹{(item.price_paise / 100).toFixed(0)}</Text>
                   </View>
                 </View>
-                {item.image_url && (
-                  <NetworkImage uri={item.image_url} style={styles.menuItemImage} />
+                {item.photo_url && (
+                  <NetworkImage uri={item.photo_url} style={styles.menuItemImage} />
                 )}
               </View>
             ))}
@@ -177,6 +245,24 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
           <Text style={styles.bookBtnLargeText}>Reserve a Table</Text>
         </BouncingButton>
       </View>
+
+      {/* Full-screen video modal */}
+      <Modal visible={!!videoUri} animationType="fade" statusBarTranslucent>
+        <View style={styles.videoModal}>
+          <TouchableOpacity style={styles.videoClose} onPress={() => setVideoUri(null)}>
+            <X size={26} color="#fff" />
+          </TouchableOpacity>
+          {videoUri && (
+            <Video
+              source={{ uri: videoUri }}
+              style={styles.videoPlayer}
+              controls
+              resizeMode="contain"
+              paused={false}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -184,13 +270,29 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
-  heroWrap: { width: SCREEN_WIDTH, height: 240, position: 'relative' },
-  heroImage: { width: '100%', height: '100%' },
+  heroWrap: { width: SCREEN_WIDTH, height: HERO_HEIGHT, position: 'relative' },
+  gallery: { width: SCREEN_WIDTH, height: HERO_HEIGHT },
+  slide: { width: SCREEN_WIDTH, height: HERO_HEIGHT },
+  slideImage: { width: '100%', height: '100%' },
+  darkSlide: { backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
   heroPlaceholder: { backgroundColor: '#2D3748', justifyContent: 'center', alignItems: 'center' },
-  heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.3)' },
+  playOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center' },
+  playBtn: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)',
+  },
+  dotsRow: {
+    position: 'absolute', bottom: 14, left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
+  dotActive: { width: 18, backgroundColor: '#fff' },
+  heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.18)', pointerEvents: 'none' },
   backBtn: {
     position: 'absolute', left: 16, width: 40, height: 40,
-    borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center', alignItems: 'center',
   },
   infoCard: {
@@ -239,6 +341,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 16,
   },
   bookBtnLargeText: { color: '#fff', fontSize: 16, fontFamily: fontFamily.semibold },
+  videoModal: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+  videoClose: {
+    position: 'absolute', top: 52, right: 20, zIndex: 10,
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  videoPlayer: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * (9 / 16) },
 });
 
 export default RestaurantDetailScreen;
