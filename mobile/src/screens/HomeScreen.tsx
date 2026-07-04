@@ -1056,34 +1056,48 @@ const HomeScreen = ({ navigation }: any) => {
                     <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.primary }}>My Bookings</Text>
                   </TouchableOpacity>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 12 }}>
-                  {restaurants.map((rest: any) => (
-                    <TouchableOpacity
-                      key={rest.id}
-                      style={{ width: 200, borderRadius: 16, backgroundColor: '#fff', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 2 }}
-                      activeOpacity={0.85}
-                      onPress={() => navigation.navigate('RestaurantDetail', { restaurantId: rest.id })}
-                    >
-                      {(() => { const cover = getRestCoverPhoto(rest.photos); return cover ? (
-                        <NetworkImage uri={cover} style={{ width: '100%', height: 110 }} width={200} height={110} />
-                      ) : (
-                        <View style={{ width: '100%', height: 110, backgroundColor: '#1B5E4620', justifyContent: 'center', alignItems: 'center' }}>
-                          <UtensilsCrossed size={32} color="#1B5E4660" />
-                        </View>
-                      ); })()}
-                      <View style={{ padding: 10 }}>
-                        <Text style={{ fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink }} numberOfLines={1}>{rest.name}</Text>
-                        {rest.cuisine_type && <Text style={{ fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular, marginTop: 1 }} numberOfLines={1}>{rest.cuisine_type}</Text>}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 6 }}>
-                          <View style={{ backgroundColor: (rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3) ? '#10B98120' : '#F3F4F6', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontFamily: fontFamily.medium, color: (rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3) ? '#10B981' : colors.inkMuted }}>
-                              {(rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3) ? 'Slots available' : 'Check slots'}
-                            </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 14 }}>
+                  {restaurants.map((rest: any) => {
+                    const cover = getRestCoverPhoto(rest.photos);
+                    const hasSlots = rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3;
+                    return (
+                      <TouchableOpacity
+                        key={rest.id}
+                        style={{ width: 220, height: 160, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 6 }}
+                        activeOpacity={0.88}
+                        onPress={() => navigation.navigate('RestaurantDetail', { restaurantId: rest.id })}
+                      >
+                        {/* Full-bleed cover image */}
+                        {cover ? (
+                          <NetworkImage uri={cover} style={{ ...StyleSheet.absoluteFillObject }} width={220} height={160} />
+                        ) : (
+                          <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: colors.primary + '22', justifyContent: 'center', alignItems: 'center' }}>
+                            <UtensilsCrossed size={40} color={colors.primary + '60'} />
+                          </View>
+                        )}
+                        {/* Gradient overlay — bottom to top */}
+                        <LinearGradient
+                          colors={['transparent', 'rgba(0,0,0,0.22)', 'rgba(0,0,0,0.72)']}
+                          locations={[0, 0.45, 1]}
+                          style={StyleSheet.absoluteFill}
+                        />
+                        {/* Text sits at bottom of card */}
+                        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12 }}>
+                          <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: '#fff', marginBottom: 4 }} numberOfLines={1}>{rest.name}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            {rest.cuisine_type ? (
+                              <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontFamily: fontFamily.regular }} numberOfLines={1}>{rest.cuisine_type}</Text>
+                            ) : <View />}
+                            <View style={{ backgroundColor: hasSlots ? '#10B981' : 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 }}>
+                              <Text style={{ fontSize: 10, fontFamily: fontFamily.semibold, color: '#fff' }}>
+                                {hasSlots ? '● Slots open' : 'Check slots'}
+                              </Text>
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             )}
