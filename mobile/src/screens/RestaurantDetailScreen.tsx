@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, Image, TouchableOpacity, StyleSheet,
   Dimensions, StatusBar, ActivityIndicator, FlatList, Modal,
   NativeScrollEvent, NativeSyntheticEvent,
 } from 'react-native';
