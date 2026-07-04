@@ -1095,124 +1095,153 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
           )}
 
           {tab === "media" && (
-            <div className="space-y-4">
-              <div className="space-y-1.5 text-xs text-white/40">
-                <div>Photos and videos shown to customers on the restaurant page. <span className="text-purple-400 font-semibold">First item = cover photo</span> (shown on home screen card).</div>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {[
-                    { label: "Cover / Hero photo", size: "1200 × 800 px", tip: "Landscape 3:2, restaurant interior or food spread" },
-                    { label: "Square photos", size: "800 × 800 px", tip: "Food shots, ambience, team" },
-                    { label: "Home card thumbnail", size: "400 × 300 px", tip: "Auto-cropped from cover — keep subject centred" },
-                    { label: "Video", size: "1080p MP4 ≤ 60s", tip: "Reels-style vertical or 16:9 landscape" },
-                  ].map(({ label, size, tip }) => (
-                    <div key={label} className="bg-white/5 rounded-lg p-2">
-                      <div className="text-white/70 font-semibold text-[10px] mb-0.5">{label}</div>
-                      <div className="text-purple-300 font-mono text-[10px]">{size}</div>
-                      <div className="text-white/30 text-[9px] mt-0.5">{tip}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="space-y-5">
 
-              {/* Hidden file inputs */}
+              {/* Hidden inputs for gallery section */}
               <input ref={imgInputRef} type="file" accept="image/*" multiple className="hidden"
                 onChange={e => handlePickMedia("image", e.target.files).then(() => { if (imgInputRef.current) imgInputRef.current.value = ""; })} />
               <input ref={vidInputRef} type="file" accept="video/*" className="hidden"
                 onChange={e => handlePickMedia("video", e.target.files).then(() => { if (vidInputRef.current) vidInputRef.current.value = ""; })} />
 
-              {/* Cover photo — separate prominent upload */}
+              {/* ── Section 1: Home Card Photo ── */}
               <div>
-                <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">Cover Photo <span className="text-purple-400 normal-case font-semibold">(home card + hero)</span></div>
-                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-white/5 border border-white/10 group cursor-pointer"
-                  onClick={() => {
-                    const inp = document.createElement("input");
-                    inp.type = "file"; inp.accept = "image/*";
-                    inp.onchange = async (ev) => {
-                      const file = (ev.target as HTMLInputElement).files?.[0];
-                      if (!file) return;
-                      setUploadingMedia(true);
-                      try {
-                        const r = await api.uploadImage(file);
-                        const newItem: MediaItem = { url: r.url, type: "image" };
-                        setMediaItems(prev => [newItem, ...prev.filter(p => p !== prev[0] || prev.length === 0 || prev[0].url !== newItem.url)]);
-                        toast.success("Cover photo updated");
-                      } catch (e: any) { toast.error(e.message || "Upload failed"); }
-                      finally { setUploadingMedia(false); }
-                    };
-                    inp.click();
-                  }}
-                >
-                  {mediaItems[0] && mediaItems[0].type === "image" ? (
-                    <img src={mediaItems[0].url} alt="cover" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/20">
-                      <Image className="w-8 h-8" />
-                      <span className="text-xs">Click to upload cover photo</span>
-                      <span className="text-[10px]">Recommended: 1200 × 800 px</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-[10px] font-black text-white/40 uppercase tracking-widest">Home Card Photo</div>
+                  <div className="text-[9px] font-mono text-purple-400">Recommended: 400 × 300 px</div>
+                </div>
+                <div className="text-[9px] text-white/25 mb-2">Small thumbnail shown on the home screen restaurant card.</div>
+                <div className="flex gap-3 items-start">
+                  {/* 4:3 preview box */}
+                  <div
+                    className="relative rounded-xl overflow-hidden bg-white/5 border border-white/10 group cursor-pointer flex-shrink-0"
+                    style={{ width: 160, height: 120 }}
+                    onClick={() => {
+                      const inp = document.createElement("input");
+                      inp.type = "file"; inp.accept = "image/*";
+                      inp.onchange = async (ev) => {
+                        const file = (ev.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        setUploadingMedia(true);
+                        try {
+                          const r = await api.uploadImage(file);
+                          const newItem: MediaItem = { url: r.url, type: "image" };
+                          setMediaItems(prev => [newItem, ...prev.slice(1)]);
+                          toast.success("Home card photo updated");
+                        } catch (e: any) { toast.error(e.message || "Upload failed"); }
+                        finally { setUploadingMedia(false); }
+                      };
+                      inp.click();
+                    }}
+                  >
+                    {mediaItems[0]?.type === "image" ? (
+                      <img src={mediaItems[0].url} alt="card" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-white/20">
+                        <Image className="w-6 h-6" />
+                        <span className="text-[9px] text-center px-2">Click to upload</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1 text-white text-[10px] font-semibold">
+                      <Upload className="w-3 h-3" /> Replace
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white text-xs font-semibold">
-                    <Upload className="w-4 h-4" /> Replace Cover
+                    {mediaItems[0]?.type === "image" && (
+                      <span className="absolute top-1 left-1 bg-blue-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">CARD</span>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5 pt-1">
+                    <div className="bg-white/5 rounded-lg p-2">
+                      <div className="text-white/50 font-semibold text-[9px] mb-0.5">Size</div>
+                      <div className="text-purple-300 font-mono text-[9px]">400 × 300 px (4:3)</div>
+                    </div>
+                    <div className="bg-white/5 rounded-lg p-2">
+                      <div className="text-white/50 font-semibold text-[9px] mb-0.5">Usage</div>
+                      <div className="text-white/30 text-[9px]">Home screen card thumbnail. Keep subject centred.</div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Upload buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => imgInputRef.current?.click()}
-                  disabled={uploadingMedia}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-semibold transition disabled:opacity-50"
-                >
-                  <Image className="w-4 h-4" /> Add Photos
-                </button>
-                <button
-                  onClick={() => vidInputRef.current?.click()}
-                  disabled={uploadingMedia}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-semibold transition disabled:opacity-50"
-                >
-                  <Video className="w-4 h-4" /> Add Video
-                </button>
+              <div className="border-t border-white/10" />
+
+              {/* ── Section 2: Hero / Gallery ── */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-[10px] font-black text-white/40 uppercase tracking-widest">Hero / Gallery</div>
+                  <div className="text-[9px] font-mono text-purple-400">1200 × 800 px · 1080p video</div>
+                </div>
+                <div className="text-[9px] text-white/25 mb-3">Full-screen gallery shown on the restaurant detail page. First item is the hero slide.</div>
+
+                {/* Add buttons */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => imgInputRef.current?.click()}
+                    disabled={uploadingMedia}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-semibold transition disabled:opacity-50"
+                  >
+                    <Image className="w-3.5 h-3.5" /> Add Photos
+                  </button>
+                  <button
+                    onClick={() => vidInputRef.current?.click()}
+                    disabled={uploadingMedia}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-semibold transition disabled:opacity-50"
+                  >
+                    <Video className="w-3.5 h-3.5" /> Add Video
+                  </button>
+                </div>
+
+                {/* Size hint row */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {[
+                    { label: "Hero / landscape", size: "1200 × 800 px", tip: "3:2 ratio, restaurant interior or food spread" },
+                    { label: "Video clip", size: "1080p MP4 ≤ 60s", tip: "Reels-style vertical or 16:9 landscape" },
+                  ].map(({ label, size, tip }) => (
+                    <div key={label} className="bg-white/5 rounded-lg p-2">
+                      <div className="text-white/60 font-semibold text-[9px] mb-0.5">{label}</div>
+                      <div className="text-purple-300 font-mono text-[9px]">{size}</div>
+                      <div className="text-white/25 text-[8px] mt-0.5">{tip}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Gallery grid (items index 1..) */}
+                {mediaItems.slice(1).length === 0 ? (
+                  <div className="text-center py-8 text-white/20 text-xs border border-dashed border-white/10 rounded-xl">No gallery photos or videos yet.</div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {mediaItems.slice(1).map((item, i) => (
+                      <div key={item.url} className="relative group aspect-square rounded-xl overflow-hidden bg-white/5">
+                        {item.type === "video" ? (
+                          <>
+                            {item.thumbnail_url
+                              ? <img src={item.thumbnail_url} alt="video" className="w-full h-full object-cover" />
+                              : <div className="w-full h-full flex items-center justify-center bg-black/40"><Play className="w-8 h-8 text-white/60" /></div>}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center">
+                                <Play className="w-3.5 h-3.5 text-white fill-white" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <img src={item.url} alt={`gallery-${i}`} className="w-full h-full object-cover" />
+                        )}
+                        {i === 0 && (
+                          <span className="absolute top-1 left-1 bg-orange-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">HERO</span>
+                        )}
+                        <button
+                          onClick={() => setMediaItems(prev => prev.filter((_, idx) => idx !== i + 1))}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {uploadingMedia && (
                 <div className="flex items-center gap-2 text-xs text-white/50">
                   <Upload className="w-3.5 h-3.5 animate-bounce" /> Uploading to ImageKit…
-                </div>
-              )}
-
-              {/* Media grid */}
-              {mediaItems.length === 0 ? (
-                <div className="text-center py-12 text-white/20 text-sm">No media yet. Add photos or a video above.</div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {mediaItems.map((item, i) => (
-                    <div key={item.url} className="relative group aspect-square rounded-xl overflow-hidden bg-white/5">
-                      {item.type === "video" ? (
-                        <>
-                          {item.thumbnail_url
-                            ? <img src={item.thumbnail_url} alt="video" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center bg-black/40"><Play className="w-8 h-8 text-white/60" /></div>}
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
-                              <Play className="w-4 h-4 text-white fill-white" />
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <img src={item.url} alt={`photo-${i}`} className="w-full h-full object-cover" />
-                      )}
-                      {i === 0 && (
-                        <span className="absolute top-1 left-1 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">COVER</span>
-                      )}
-                      <button
-                        onClick={() => setMediaItems(prev => prev.filter((_, idx) => idx !== i))}
-                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-red-600"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
                 </div>
               )}
 
