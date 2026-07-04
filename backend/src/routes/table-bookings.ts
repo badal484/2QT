@@ -733,34 +733,45 @@ router.post('/:id/pay', authenticate, async (req: AuthRequest, res) => {
 
         if (paymentMethod === 'wallet') {
             await withTransaction(async (client) => {
+                // Lock booking row first to prevent double-payment race
+                const { rows: locked } = await client.query(`
+                    SELECT pre_order_amount_paise, post_order_amount_paise,
+                           gst_amount_paise, total_paid_paise, status
+                    FROM table_bookings WHERE id = $1 FOR UPDATE
+                `, [id]);
+                if (!locked[0] || locked[0].status !== 'seated') throw new Error('BOOKING_NOT_SEATED');
+                const lb = locked[0];
+                const freshOutstanding = lb.pre_order_amount_paise + lb.post_order_amount_paise + lb.gst_amount_paise - lb.total_paid_paise;
+                if (freshOutstanding <= 0) throw new Error('NOTHING_OUTSTANDING');
+
                 const { rows: wallet } = await client.query(
                     'SELECT balance_paise FROM customer_wallet WHERE customer_id = $1 FOR UPDATE',
                     [customerId]
                 );
                 const balance = wallet[0]?.balance_paise ?? 0;
-                if (balance < outstanding) throw new Error('INSUFFICIENT_WALLET_BALANCE');
+                if (balance < freshOutstanding) throw new Error('INSUFFICIENT_WALLET_BALANCE');
 
                 await client.query(
                     'UPDATE customer_wallet SET balance_paise = balance_paise - $2 WHERE customer_id = $1',
-                    [customerId, outstanding]
+                    [customerId, freshOutstanding]
                 );
                 await client.query(`
                     INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
                     SELECT $1,$2,'debit',$3,balance_paise FROM customer_wallet WHERE customer_id = $1
-                `, [customerId, outstanding, `Final bill at ${b.restaurant_name} (${b.display_id})`]);
+                `, [customerId, freshOutstanding, `Final bill at ${b.restaurant_name} (${b.display_id})`]);
 
                 await client.query(`
                     UPDATE table_bookings
                     SET total_paid_paise = total_paid_paise + $2,
                         final_payment_method = 'app_wallet',
                         status = 'completed', completed_at = NOW(), updated_at = NOW()
-                    WHERE id = $1
-                `, [id, outstanding]);
+                    WHERE id = $1 AND status = 'seated'
+                `, [id, freshOutstanding]);
 
                 await client.query(`
                     INSERT INTO table_booking_payments (booking_id, amount_paise, payment_method, payment_type)
                     VALUES ($1,$2,'wallet','final_settlement')
-                `, [id, outstanding]);
+                `, [id, freshOutstanding]);
             });
 
             emitToUser(customerId, 'wallet_updated', {});
@@ -797,6 +808,8 @@ router.post('/:id/pay', authenticate, async (req: AuthRequest, res) => {
         res.status(400).json({ error: 'INVALID_PAYMENT_METHOD' });
     } catch (err: any) {
         if (err.message === 'INSUFFICIENT_WALLET_BALANCE') return res.status(402).json({ error: err.message });
+        if (err.message === 'NOTHING_OUTSTANDING') return res.status(400).json({ error: 'NOTHING_OUTSTANDING', message: 'Bill is already fully paid' });
+        if (err.message === 'BOOKING_NOT_SEATED') return res.status(400).json({ error: 'BOOKING_NOT_SEATED' });
         res.status(500).json({ error: err.message });
     }
 });
@@ -812,31 +825,38 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
     if (!['cash', 'card_pos'].includes(method)) return res.status(400).json({ error: 'method must be cash or card_pos' });
 
     try {
-        const { rows } = await query(`
-            SELECT tb.customer_id, tb.restaurant_id, tb.display_id,
-                   tb.pre_order_amount_paise, tb.post_order_amount_paise,
-                   tb.gst_amount_paise, tb.total_paid_paise, tb.status
-            FROM table_bookings tb WHERE id = $1
-        `, [id]);
-        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
-        const b = rows[0];
+        // Quick existence check before acquiring lock
+        const { rows: exists } = await query('SELECT id FROM table_bookings WHERE id = $1', [id]);
+        if (!exists[0]) return res.status(404).json({ error: 'NOT_FOUND' });
 
-        if (b.status !== 'seated') return res.status(400).json({ error: 'BOOKING_NOT_SEATED' });
-
-        const grandTotal = b.pre_order_amount_paise + b.post_order_amount_paise + b.gst_amount_paise;
-        const outstanding = grandTotal - b.total_paid_paise;
-
-        if (outstanding <= 0) {
-            return res.status(400).json({ error: 'NOTHING_OUTSTANDING' });
-        }
+        let b: any = null;
+        let outstanding: number = 0;
+        let grandTotal: number = 0;
 
         await withTransaction(async (client) => {
+            // Lock the row to prevent concurrent /pay or mark-paid double-settling
+            const { rows } = await client.query(`
+                SELECT customer_id, restaurant_id, display_id,
+                       pre_order_amount_paise, post_order_amount_paise,
+                       gst_amount_paise, total_paid_paise, status
+                FROM table_bookings WHERE id = $1 FOR UPDATE
+            `, [id]);
+            if (!rows[0]) throw new Error('NOT_FOUND');
+            b = rows[0];
+
+            if (b.status !== 'seated') throw new Error('BOOKING_NOT_SEATED');
+
+            grandTotal = b.pre_order_amount_paise + b.post_order_amount_paise + b.gst_amount_paise;
+            outstanding = grandTotal - b.total_paid_paise;
+
+            if (outstanding <= 0) throw new Error('NOTHING_OUTSTANDING');
+
             await client.query(`
                 UPDATE table_bookings
                 SET total_paid_paise = total_paid_paise + $2,
                     final_payment_method = $3,
                     status = 'completed', completed_at = NOW(), updated_at = NOW()
-                WHERE id = $1
+                WHERE id = $1 AND status = 'seated'
             `, [id, outstanding, method === 'cash' ? 'cash' : 'card_pos']);
 
             await client.query(`
@@ -865,6 +885,9 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
 
         res.json({ success: true, outstandingCollectedPaise: outstanding, loyaltyPointsEarned: loyaltyPoints });
     } catch (err: any) {
+        if (err.message === 'BOOKING_NOT_SEATED') return res.status(400).json({ error: 'BOOKING_NOT_SEATED' });
+        if (err.message === 'NOTHING_OUTSTANDING') return res.status(400).json({ error: 'NOTHING_OUTSTANDING' });
+        if (err.message === 'NOT_FOUND') return res.status(404).json({ error: 'NOT_FOUND' });
         res.status(500).json({ error: err.message });
     }
 });
