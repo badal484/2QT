@@ -17,7 +17,7 @@ import { BouncingButton } from '../components/ui/BouncingButton';
 import { NetworkImage } from '../components/NetworkImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_HEIGHT = 300;
+const HERO_HEIGHT = 360;
 
 type MediaItem = { url: string; type: 'image' | 'video'; thumbnail_url?: string };
 
