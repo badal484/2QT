@@ -381,7 +381,9 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
           {/* Reschedule button — confirmed, max 2 times */}
           {booking?.status === 'confirmed' && (booking?.reschedule_count ?? 0) < 2 && (
             <TouchableOpacity style={styles.rescheduleBtn} onPress={() => { setRescheduleDate(new Date()); setRescheduleSlot(null); setShowReschedule(true); }}>
-              <Text style={styles.rescheduleBtnText}>Reschedule Booking</Text>
+              <Text style={styles.rescheduleBtnText}>
+                Reschedule Booking{(booking?.reschedule_count ?? 0) > 0 ? ` (${2 - (booking?.reschedule_count ?? 0)} left)` : ''}
+              </Text>
             </TouchableOpacity>
           )}
         </View>

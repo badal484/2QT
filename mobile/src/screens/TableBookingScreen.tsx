@@ -117,7 +117,28 @@ const TableBookingScreen = ({ navigation, route }: any) => {
       if (msg === 'NO_TABLE_AVAILABLE') {
         Alert.alert('No Tables Available', 'All tables are booked for this slot. Please choose a different time.');
       } else if (msg === 'INSUFFICIENT_WALLET_BALANCE') {
-        Alert.alert('Insufficient Balance', `Your wallet needs ₹${(totalDueNow / 100).toFixed(0)} to complete this booking. Please top up your wallet or skip the pre-order.`);
+        Alert.alert(
+          'Insufficient Wallet Balance',
+          `Your wallet doesn't have enough balance. Pay ₹${(totalDueNow / 100).toFixed(0)} via UPI or Card instead?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Pay via UPI / Card',
+              onPress: () => {
+                const items = Object.entries(preOrderItems)
+                  .filter(([, qty]) => qty > 0)
+                  .map(([menuItemId, quantity]) => ({ menuItemId, quantity: quantity as number }));
+                createBooking.mutate({
+                  restaurantId, slotStart: selectedSlot.slotStart, slotEnd: selectedSlot.slotEnd,
+                  partySize, preOrderItems: items,
+                  specialRequests: specialRequests.trim() || undefined,
+                  occasion: occasion.trim() || undefined,
+                  paymentMethod: 'razorpay',
+                });
+              },
+            },
+          ]
+        );
       } else if (msg === 'ALREADY_BOOKED_THIS_SLOT') {
         Alert.alert('Already Booked', 'You already have a booking for this time slot.');
       } else {
@@ -141,9 +162,13 @@ const TableBookingScreen = ({ navigation, route }: any) => {
       theme: { color: colors.primary },
     };
     RazorpayCheckout.open(options)
-      .then(() => {
-        api.post('/table-bookings/verify-payment', { bookingId, razorpayOrderId: rzpOrderId })
-          .catch(() => {});
+      .then((response: any) => {
+        api.post('/table-bookings/verify-payment', {
+          bookingId,
+          razorpayOrderId: response.razorpay_order_id || rzpOrderId,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpaySignature: response.razorpay_signature,
+        }).catch((e: any) => console.warn('[verify-payment]', e?.message));
         navigation.replace('TableBookingConfirmed', { bookingId });
       })
       .catch(() => {
@@ -504,9 +529,29 @@ const TableBookingScreen = ({ navigation, route }: any) => {
 
             <Text style={styles.paymentNote}>
               {totalDueNow > 0
-                ? 'Paid from wallet. Remaining bill settled at the restaurant.'
+                ? 'Default: deducted from wallet. Or choose UPI/Card below.'
                 : 'No advance payment required. Bill settled at the restaurant.'}
             </Text>
+            {totalDueNow > 0 && (
+              <TouchableOpacity
+                style={styles.upiBtn}
+                onPress={() => {
+                  const items = Object.entries(preOrderItems)
+                    .filter(([, qty]) => qty > 0)
+                    .map(([menuItemId, quantity]) => ({ menuItemId, quantity: quantity as number }));
+                  createBooking.mutate({
+                    restaurantId, slotStart: selectedSlot.slotStart, slotEnd: selectedSlot.slotEnd,
+                    partySize, preOrderItems: items,
+                    specialRequests: specialRequests.trim() || undefined,
+                    occasion: occasion.trim() || undefined,
+                    paymentMethod: 'razorpay',
+                  });
+                }}
+                disabled={createBooking.isPending}
+              >
+                <Text style={styles.upiBtnText}>Pay via UPI / Card instead</Text>
+              </TouchableOpacity>
+            )}
           </Animated.View>
         )}
 
@@ -664,6 +709,8 @@ const styles = StyleSheet.create({
   summaryItemName: { fontSize: 13, fontFamily: fontFamily.regular, color: colors.ink },
   summaryItemPrice: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.ink },
   paymentNote: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular, textAlign: 'center', lineHeight: 18, paddingHorizontal: 16 },
+  upiBtn: { marginTop: 10, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.primary, alignItems: 'center' },
+  upiBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.primary },
   // Bottom
   bottomBar: {
     paddingHorizontal: spacing.lg, paddingTop: 12,
