@@ -95,6 +95,44 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     onError: () => Alert.alert('Error', 'Could not update order status.'),
   });
 
+  const { data: preTickets = [] } = useQuery({
+    queryKey: ['board-dine-in-tickets', 'pre'],
+    queryFn: () => api.get('/kitchen/dine-in/tickets?type=pre'),
+    refetchInterval: 30000,
+  });
+
+  const { data: postTickets = [] } = useQuery({
+    queryKey: ['board-dine-in-tickets', 'post'],
+    queryFn: () => api.get('/kitchen/dine-in/tickets?type=post'),
+    refetchInterval: 30000,
+  });
+
+  const markDineInItemMutation = useMutation({
+    mutationFn: ({ bookingId, itemId, status }: { bookingId: string; itemId: string; status: string }) =>
+      api.post(`/table-bookings/${bookingId}/item-status`, { itemId, status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['board-dine-in-tickets'] }),
+    onError: () => Alert.alert('Error', 'Failed to update item status.'),
+  });
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const onOrderUpdate = () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
+    const onDineInUpdate = () => queryClient.invalidateQueries({ queryKey: ['board-dine-in-tickets'] });
+    socket.on('new_order', onOrderUpdate);
+    socket.on('order_updated', onOrderUpdate);
+    socket.on('table_order', onDineInUpdate);
+    socket.on('table_booking_updated', onDineInUpdate);
+    return () => {
+      socket.off('new_order', onOrderUpdate);
+      socket.off('order_updated', onOrderUpdate);
+      socket.off('table_order', onDineInUpdate);
+      socket.off('table_booking_updated', onDineInUpdate);
+    };
+  }, [queryClient]);
+
+  const allDineInTickets = [...preTickets, ...postTickets];
+
   const paused = menuData?.kitchenPaused;
   const incoming = orders?.orders?.filter((o: any) => o.status === 'confirmed') || [];
   const cooking = orders?.orders?.filter((o: any) =>
@@ -316,6 +354,76 @@ const KitchenBoardScreen = ({ navigation }: any) => {
             )}
           </View>
 
+          {/* Dine-In Tickets */}
+          {allDineInTickets.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionLabel}>DINE-IN TICKETS</Text>
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>{allDineInTickets.length}</Text>
+                </View>
+              </View>
+              {allDineInTickets.map((ticket: any) => (
+                <View key={ticket.booking_id} style={styles.dineCard}>
+                  <View style={styles.dineCardTop}>
+                    <Text style={styles.dineCardId}>{ticket.display_id}</Text>
+                    <View style={styles.dineTagRow}>
+                      {ticket.table_number ? (
+                        <View style={styles.dineTagTable}>
+                          <Text style={styles.dineTagText}>TABLE {ticket.table_number}</Text>
+                        </View>
+                      ) : null}
+                      <View style={[styles.dineTagType,
+                        ticket.type === 'pre' ? styles.dineTagPre : styles.dineTagPost,
+                      ]}>
+                        <Text style={[styles.dineTagText,
+                          { color: ticket.type === 'pre' ? G.green : G.amber },
+                        ]}>
+                          {ticket.type === 'pre' ? 'PRE-ORDER' : 'POST-ORDER'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.divider} />
+                  {ticket.items?.map((item: any) => (
+                    <View key={item.id} style={styles.dineItemRow}>
+                      <Text style={styles.dineItemQty}>{item.quantity}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.dineItemName}>{item.name}</Text>
+                        {item.special_note ? (
+                          <Text style={styles.dineItemNote}>{item.special_note}</Text>
+                        ) : null}
+                      </View>
+                      {item.status !== 'served' ? (
+                        <TouchableOpacity
+                          style={[styles.dineMarkBtn,
+                            item.status === 'preparing' && styles.dineMarkBtnServe,
+                          ]}
+                          onPress={() => markDineInItemMutation.mutate({
+                            bookingId: ticket.booking_id,
+                            itemId: item.id,
+                            status: item.status === 'pending' ? 'preparing' : 'served',
+                          })}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.dineMarkBtnText,
+                            { color: item.status === 'pending' ? G.amber : G.green },
+                          ]}>
+                            {item.status === 'pending' ? 'PREPARING' : 'SERVED'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.dineServedBadge}>
+                          <Text style={styles.dineServedText}>✓ DONE</Text>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
+
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
@@ -459,6 +567,37 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', backgroundColor: G.faint,
   },
   waitingText: { color: G.muted, fontSize: 10, fontWeight: '900', letterSpacing: 3 },
+
+  dineCard: {
+    backgroundColor: G.card, borderRadius: 20, padding: 18,
+    marginBottom: 14, borderWidth: 1, borderColor: G.border,
+  },
+  dineCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  dineCardId: { color: G.white, fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
+  dineTagRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  dineTagTable: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+    backgroundColor: G.faint, borderWidth: 1, borderColor: G.border,
+  },
+  dineTagType: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
+  dineTagPre: { backgroundColor: G.greenBg, borderColor: G.greenBorder },
+  dineTagPost: { backgroundColor: G.amberBg, borderColor: G.amberBorder },
+  dineTagText: { fontSize: 8, fontWeight: '900', letterSpacing: 2, color: G.muted },
+  dineItemRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  dineItemQty: { color: G.white, fontSize: 20, fontWeight: '900', width: 26 },
+  dineItemName: { color: G.dim, fontSize: 14, fontWeight: '600' },
+  dineItemNote: { color: G.muted, fontSize: 11, fontWeight: '500', marginTop: 2 },
+  dineMarkBtn: {
+    backgroundColor: G.amberBg, borderRadius: 10, borderWidth: 1,
+    borderColor: G.amberBorder, paddingHorizontal: 10, paddingVertical: 7,
+  },
+  dineMarkBtnServe: { backgroundColor: G.greenBg, borderColor: G.greenBorder },
+  dineMarkBtnText: { fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
+  dineServedBadge: {
+    backgroundColor: G.greenBg, borderRadius: 10, paddingHorizontal: 10,
+    paddingVertical: 7, borderWidth: 1, borderColor: G.greenBorder,
+  },
+  dineServedText: { color: G.green, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
 });
 
 export default KitchenBoardScreen;

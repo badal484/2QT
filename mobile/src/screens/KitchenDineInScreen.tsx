@@ -7,7 +7,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector, useDispatch } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Clock, Users, CheckCircle, ChefHat, Receipt, QrCode, X, LogOut, Plus, Minus, UtensilsCrossed, Zap } from 'lucide-react-native';
+import { Clock, Users, ChefHat, Receipt, QrCode, X, LogOut, Plus, Minus, UtensilsCrossed, Zap } from 'lucide-react-native';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
@@ -29,7 +29,7 @@ const G = {
   ink: '#FFFFFF',
 } as const;
 
-const TABS = ['Today', 'Tickets', 'Bill'] as const;
+const TABS = ['Today', 'Bill'] as const;
 type KTab = typeof TABS[number];
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -82,37 +82,12 @@ const KitchenDineInScreen = () => {
     refetchInterval: 30000,
   });
 
-  // Pending pre-order tickets (items to prepare)
-  const { data: preTickets = [], isLoading: preLoading } = useQuery({
-    queryKey: ['kitchen-dine-in-tickets', 'pre'],
-    queryFn: () => api.get('/kitchen/dine-in/tickets?type=pre'),
-    refetchInterval: 15000,
-    enabled: activeTab === 'Tickets',
-  });
-
-  // Pending post-order tickets
-  const { data: postTickets = [], isLoading: postLoading } = useQuery({
-    queryKey: ['kitchen-dine-in-tickets', 'post'],
-    queryFn: () => api.get('/kitchen/dine-in/tickets?type=post'),
-    refetchInterval: 15000,
-    enabled: activeTab === 'Tickets',
-  });
-
   // Seated bookings needing bill
   const { data: billBookings = [], isLoading: billLoading } = useQuery({
     queryKey: ['kitchen-dine-in-bill'],
     queryFn: () => api.get('/kitchen/dine-in/bill'),
     refetchInterval: 20000,
     enabled: activeTab === 'Bill',
-  });
-
-  const markItemMutation = useMutation({
-    mutationFn: ({ bookingId, itemId, status }: { bookingId: string; itemId: string; status: string }) =>
-      api.post(`/table-bookings/${bookingId}/item-status`, { itemId, status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-tickets'] });
-    },
-    onError: () => Alert.alert('Error', 'Failed to update item status.'),
   });
 
   const checkinMutation = useMutation({
@@ -247,9 +222,6 @@ const KitchenDineInScreen = () => {
       ]
     );
   };
-
-  const allTickets = [...preTickets, ...postTickets];
-  const isTicketsLoading = preLoading || postLoading;
 
   // Stats summary
   const confirmed = bookings.filter((b: any) => b.status === 'confirmed').length;
@@ -423,72 +395,6 @@ const KitchenDineInScreen = () => {
                       </TouchableOpacity>
                     </View>
                   )}
-                </View>
-              )}
-            />
-          )}
-        </>
-      )}
-
-      {/* ── TICKETS TAB ── */}
-      {activeTab === 'Tickets' && (
-        <>
-          {isTicketsLoading ? (
-            <ActivityIndicator color={G.green} style={{ marginTop: 40 }} />
-          ) : allTickets.length === 0 ? (
-            <View style={styles.emptyWrap}>
-              <CheckCircle size={48} color={G.green} strokeWidth={1} />
-              <Text style={styles.emptyText}>All caught up!</Text>
-              <Text style={styles.emptySubText}>No pending items to prepare.</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={allTickets}
-              keyExtractor={(t: any) => t.booking_id + t.id}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={G.green} />}
-              renderItem={({ item: ticket }: any) => (
-                <View style={styles.ticketCard}>
-                  <View style={styles.ticketHeader}>
-                    <Text style={styles.ticketRef}>{ticket.display_id}</Text>
-                    <View style={[styles.ticketTypeBadge, { backgroundColor: ticket.type === 'pre' ? G.green + '22' : G.blue + '22' }]}>
-                      <Text style={[styles.ticketTypeText, { color: ticket.type === 'pre' ? G.green : G.blue }]}>
-                        {ticket.type === 'pre' ? 'Pre-Order' : 'Post-Order'}
-                      </Text>
-                    </View>
-                  </View>
-                  {ticket.table_number && (
-                    <Text style={styles.ticketTable}>Table {ticket.table_number}</Text>
-                  )}
-                  {ticket.items?.map((item: any) => (
-                    <View key={item.id} style={styles.ticketItem}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.ticketItemName}>{item.name} × {item.quantity}</Text>
-                        {item.special_note && <Text style={styles.ticketItemNote}>{item.special_note}</Text>}
-                      </View>
-                      {item.status !== 'served' && (
-                        <TouchableOpacity
-                          style={[styles.markBtn, item.status === 'preparing' && styles.markBtnServe]}
-                          onPress={() => markItemMutation.mutate({
-                            bookingId: ticket.booking_id,
-                            itemId: item.id,
-                            status: item.status === 'pending' ? 'preparing' : 'served',
-                          })}
-                        >
-                          <Text style={styles.markBtnText}>
-                            {item.status === 'pending' ? 'Preparing' : 'Served'}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                      {item.status === 'served' && (
-                        <View style={styles.servedBadge}>
-                          <CheckCircle size={14} color={G.green} />
-                          <Text style={styles.servedText}>Served</Text>
-                        </View>
-                      )}
-                    </View>
-                  ))}
                 </View>
               )}
             />
