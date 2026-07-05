@@ -259,7 +259,7 @@ async function sendSMS(phone: string, message: string) {
 
 export class NotificationService {
     static async send(type: NotifType, data: any) {
-        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl } = data;
+        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl, screen, bookingId } = data;
         await sendNotification(type, {
             userId: userId || undefined,
             phone: phone || undefined,
@@ -275,6 +275,8 @@ export class NotificationService {
                 message:    String(message     ?? ''),
                 title:      String(title       ?? ''),
                 body:       String(body        ?? ''),
+                screen:     String(screen      ?? ''),
+                bookingId:  String(bookingId   ?? ''),
             },
             dedupeKey: displayId || undefined,
             imageUrl:  imageUrl  || undefined,

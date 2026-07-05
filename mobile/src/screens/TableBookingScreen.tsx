@@ -107,7 +107,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     mutationFn: (payload: any) => api.post('/table-bookings', payload),
     onSuccess: (data) => {
       if (data.razorpayOrderId) {
-        openRazorpay(data.razorpayOrderId, data.bookingId, data.amountPaise);
+        openRazorpay(data.razorpayOrderId, data.bookingId, data.amountPaise, data.razorpayKeyId);
       } else {
         navigation.replace('TableBookingConfirmed', { bookingId: data.bookingId });
       }
@@ -126,7 +126,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     },
   });
 
-  const openRazorpay = useCallback((rzpOrderId: string, bookingId: string, amountPaise: number) => {
+  const openRazorpay = useCallback((rzpOrderId: string, bookingId: string, amountPaise: number, rzpKey: string) => {
     if (!RazorpayCheckout) {
       Alert.alert('Error', 'Payment module not available.');
       return;
@@ -134,7 +134,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     const options = {
       description: `Table Booking – ${restaurantName}`,
       currency: 'INR',
-      key: 'rzp_test_placeholder',
+      key: rzpKey,
       amount: amountPaise,
       order_id: rzpOrderId,
       name: 'VELTO Food Palace',
@@ -142,7 +142,6 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     };
     RazorpayCheckout.open(options)
       .then(() => {
-        // webhook confirms; also call verify endpoint as fallback
         api.post('/table-bookings/verify-payment', { bookingId, razorpayOrderId: rzpOrderId })
           .catch(() => {});
         navigation.replace('TableBookingConfirmed', { bookingId });

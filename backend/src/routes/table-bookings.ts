@@ -107,56 +107,57 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
             return res.status(409).json({ error: 'ALREADY_BOOKED_THIS_SLOT' });
         }
 
-        // 3. Resolve pre-order items + compute amount
+        // 3. Resolve pre-order items + compute amount (batched — 3 queries max regardless of item count)
         let preOrderAmountPaise = 0;
         const resolvedItems: { menuItemId: string | null; name: string; pricePaise: number; quantity: number; customizations?: any }[] = [];
 
-        for (const item of preOrderItems) {
-            // Check restaurant-specific menu first, then fall back to zone kitchen menu
-            let { rows: menuRows } = await query(
-                'SELECT id, name, price_paise FROM restaurant_menu_items WHERE id = $1 AND restaurant_id = $2 AND is_available = true',
-                [item.menuItemId, restaurantId]
-            );
-            let isRestaurantItem = !!menuRows[0];
+        if (preOrderItems.length > 0) {
+            const itemIds = preOrderItems.map(i => i.menuItemId);
 
-            if (!menuRows[0]) {
-                // Item may be from the zone's kitchen menu_items — look up zone_id directly
+            // Batch 1: restaurant-specific menu
+            const { rows: restRows } = await query(
+                'SELECT id, name, price_paise FROM restaurant_menu_items WHERE id = ANY($1) AND restaurant_id = $2 AND is_available = true',
+                [itemIds, restaurantId]
+            );
+            const restMap = new Map(restRows.map(r => [r.id, r]));
+
+            // Batch 2: zone kitchen fallback for any IDs not found in restaurant menu
+            const missingIds = itemIds.filter(id => !restMap.has(id));
+            const fallbackMap = new Map<string, any>();
+            if (missingIds.length > 0) {
                 const { rows: rcRows } = await query('SELECT zone_id FROM restaurant_config WHERE id = $1', [restaurantId]);
                 const zoneId = rcRows[0]?.zone_id;
                 if (zoneId) {
-                    let { rows: kitchenRows } = await query(
-                        'SELECT id, name, price_paise FROM menu_items WHERE id = $1 AND zone_id = $2 AND available = true',
-                        [item.menuItemId, zoneId]
+                    const { rows: zoneRows } = await query(
+                        'SELECT id, name, price_paise FROM menu_items WHERE id = ANY($1) AND zone_id = $2',
+                        [missingIds, zoneId]
                     );
-                    if (!kitchenRows[0]) {
-                        const { rows: kitchenAny } = await query(
-                            'SELECT id, name, price_paise FROM menu_items WHERE id = $1 AND zone_id = $2',
-                            [item.menuItemId, zoneId]
-                        );
-                        kitchenRows = kitchenAny;
-                    }
-                    if (!kitchenRows[0]) {
-                        const { rows: anyZone } = await query(
-                            'SELECT id, name, price_paise FROM menu_items WHERE id = $1',
-                            [item.menuItemId]
-                        );
-                        kitchenRows = anyZone;
-                    }
-                    menuRows = kitchenRows;
+                    zoneRows.forEach(r => fallbackMap.set(r.id, r));
+                }
+                // Batch 3: last resort — any zone (for items still missing)
+                const stillMissing = missingIds.filter(id => !fallbackMap.has(id));
+                if (stillMissing.length > 0) {
+                    const { rows: anyRows } = await query(
+                        'SELECT id, name, price_paise FROM menu_items WHERE id = ANY($1)',
+                        [stillMissing]
+                    );
+                    anyRows.forEach(r => fallbackMap.set(r.id, r));
                 }
             }
-            if (!menuRows[0]) return res.status(400).json({ error: `MENU_ITEM_NOT_FOUND: ${item.menuItemId}` });
-            const linePaise = menuRows[0].price_paise * item.quantity;
-            preOrderAmountPaise += linePaise;
-            // Only reference restaurant_menu_items FK when item actually lives there;
-            // fallback kitchen menu items use NULL to avoid FK violation.
-            resolvedItems.push({
-                menuItemId: isRestaurantItem ? item.menuItemId : null,
-                name: menuRows[0].name,
-                pricePaise: menuRows[0].price_paise,
-                quantity: item.quantity,
-                customizations: item.customizations,
-            });
+
+            for (const item of preOrderItems) {
+                const restItem = restMap.get(item.menuItemId);
+                const menuItem = restItem ?? fallbackMap.get(item.menuItemId);
+                if (!menuItem) return res.status(400).json({ error: `MENU_ITEM_NOT_FOUND: ${item.menuItemId}` });
+                preOrderAmountPaise += menuItem.price_paise * item.quantity;
+                resolvedItems.push({
+                    menuItemId: restItem ? item.menuItemId : null,
+                    name: menuItem.name,
+                    pricePaise: menuItem.price_paise,
+                    quantity: item.quantity,
+                    customizations: item.customizations,
+                });
+            }
         }
 
         // Deposit (if configured) is due regardless of pre-order
@@ -613,51 +614,53 @@ router.post('/:id/post-order', authenticate, async (req: AuthRequest, res) => {
         let addedAmountPaise = 0;
         const ticketItems: { name: string; quantity: number }[] = [];
 
-        // Resolve zone_id once for fallback lookups
+        // Batch-resolve all item IDs (3 queries max regardless of item count)
         const { rows: rcRows } = await query(
             'SELECT zone_id FROM restaurant_config WHERE id = $1', [b.restaurant_id]
         );
         const zoneId = rcRows[0]?.zone_id ?? null;
+        const itemIds = items.map(i => i.menuItemId);
+
+        const { rows: restRows } = await query(
+            'SELECT id, name, price_paise FROM restaurant_menu_items WHERE id = ANY($1) AND restaurant_id = $2 AND is_available = true',
+            [itemIds, b.restaurant_id]
+        );
+        const restMap = new Map(restRows.map(r => [r.id, r]));
+
+        const missingIds = itemIds.filter(id => !restMap.has(id));
+        const fallbackMap = new Map<string, any>();
+        if (missingIds.length > 0 && zoneId) {
+            const { rows: zoneRows } = await query(
+                'SELECT id, name, price_paise FROM menu_items WHERE id = ANY($1) AND zone_id = $2',
+                [missingIds, zoneId]
+            );
+            zoneRows.forEach(r => fallbackMap.set(r.id, r));
+            const stillMissing = missingIds.filter(id => !fallbackMap.has(id));
+            if (stillMissing.length > 0) {
+                const { rows: anyRows } = await query('SELECT id, name, price_paise FROM menu_items WHERE id = ANY($1)', [stillMissing]);
+                anyRows.forEach(r => fallbackMap.set(r.id, r));
+            }
+        }
 
         await withTransaction(async (client) => {
             for (const item of items) {
-                // Try restaurant-specific menu first
-                let { rows: menuRows } = await client.query(
-                    'SELECT id, name, price_paise FROM restaurant_menu_items WHERE id = $1 AND restaurant_id = $2 AND is_available = true',
-                    [item.menuItemId, b.restaurant_id]
-                );
-                let isRestaurantItem = !!menuRows[0];
+                const restItem = restMap.get(item.menuItemId);
+                const menuItem = restItem ?? fallbackMap.get(item.menuItemId);
+                if (!menuItem) throw new Error(`ITEM_NOT_FOUND:${item.menuItemId}`);
 
-                // Fall back to zone kitchen menu_items (same as pre-order resolution)
-                if (!menuRows[0] && zoneId) {
-                    ({ rows: menuRows } = await client.query(
-                        'SELECT id, name, price_paise FROM menu_items WHERE id = $1 AND zone_id = $2',
-                        [item.menuItemId, zoneId]
-                    ));
-                    if (!menuRows[0]) {
-                        ({ rows: menuRows } = await client.query(
-                            'SELECT id, name, price_paise FROM menu_items WHERE id = $1',
-                            [item.menuItemId]
-                        ));
-                    }
-                }
-
-                if (!menuRows[0]) throw new Error(`ITEM_NOT_FOUND:${item.menuItemId}`);
-
-                const linePaise = menuRows[0].price_paise * item.quantity;
+                const linePaise = menuItem.price_paise * item.quantity;
                 addedAmountPaise += linePaise;
 
                 const itemStatus = canSkipKitchen ? 'served' : 'pending';
-                const resolvedMenuItemId = isRestaurantItem ? item.menuItemId : null;
                 await client.query(`
                     INSERT INTO table_booking_items
                         (booking_id, menu_item_id, menu_item_name, price_paise, quantity,
                          customizations, type, status, added_by)
                     VALUES ($1,$2,$3,$4,$5,$6,'post_order',$7,$8)
-                `, [id, resolvedMenuItemId, menuRows[0].name, menuRows[0].price_paise,
+                `, [id, restItem ? item.menuItemId : null, menuItem.name, menuItem.price_paise,
                     item.quantity, item.customizations ?? null, itemStatus, req.user!.userId]);
 
-                ticketItems.push({ name: menuRows[0].name, quantity: item.quantity });
+                ticketItems.push({ name: menuItem.name, quantity: item.quantity });
             }
 
             await client.query(
@@ -1091,6 +1094,105 @@ router.post('/:id/no-show', authenticate, async (req: AuthRequest, res) => {
         }).catch(() => {});
 
         res.json({ success: true, preOrderRefundedPaise: b.pre_order_amount_paise, depositForfeitedPaise: b.deposit_amount_paise });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /table-bookings/:id/reschedule ──────────────────────────────────────
+// Customer reschedules a confirmed booking (max 2 times). Finds new table in new slot.
+router.post('/:id/reschedule', authenticate, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { slotStart, slotEnd } = req.body as { slotStart: string; slotEnd: string };
+    const customerId = req.user!.userId;
+
+    if (!slotStart || !slotEnd) return res.status(400).json({ error: 'slotStart and slotEnd required' });
+
+    try {
+        const { rows } = await query(`
+            SELECT tb.*, rc.name AS restaurant_name, rc.cancellation_window_minutes,
+                   rc.slot_duration_minutes, rc.max_party_size
+            FROM table_bookings tb
+            JOIN restaurant_config rc ON rc.id = tb.restaurant_id
+            WHERE tb.id = $1
+        `, [id]);
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        const b = rows[0];
+
+        if (req.user!.role === 'customer' && b.customer_id !== customerId) {
+            return res.status(403).json({ error: 'FORBIDDEN' });
+        }
+        if (b.status !== 'confirmed') {
+            return res.status(400).json({ error: 'CANNOT_RESCHEDULE', message: 'Only confirmed bookings can be rescheduled' });
+        }
+        if (b.reschedule_count >= 2) {
+            return res.status(400).json({ error: 'RESCHEDULE_LIMIT', message: 'Maximum 2 reschedules allowed per booking' });
+        }
+        // Prevent rescheduling to same slot
+        if (b.slot_start === slotStart) {
+            return res.status(400).json({ error: 'SAME_SLOT', message: 'New slot must be different from current slot' });
+        }
+
+        let newTableId: string | null = null;
+        await withTransaction(async (client) => {
+            newTableId = await findFreeTable(b.restaurant_id, b.party_size, slotStart, slotEnd, client);
+            if (!newTableId) throw new Error('NO_TABLE_AVAILABLE');
+
+            await client.query(`
+                UPDATE table_bookings
+                SET slot_start = $2, slot_end = $3, table_id = $4,
+                    rescheduled_from_slot = $5,
+                    reschedule_count = reschedule_count + 1,
+                    reminder_24h_sent_at = NULL, reminder_2h_sent_at = NULL,
+                    updated_at = NOW()
+                WHERE id = $1
+            `, [id, slotStart, slotEnd, newTableId, b.slot_start]);
+        });
+
+        emitToUser(b.customer_id, 'table_booking_updated', { bookingId: id, event: 'rescheduled', slotStart, slotEnd });
+
+        NotificationService.send('broadcast_message', {
+            userId: b.customer_id,
+            title: 'Booking Rescheduled',
+            body: `Your table at ${b.restaurant_name} moved to ${new Date(slotStart).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`,
+            screen: 'TableBookingDetail',
+            bookingId: id,
+        }).catch(() => {});
+
+        res.json({ success: true, slotStart, slotEnd });
+    } catch (err: any) {
+        if (err.message === 'NO_TABLE_AVAILABLE') return res.status(409).json({ error: 'NO_TABLE_AVAILABLE' });
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /table-bookings/:id/feedback ────────────────────────────────────────
+// Customer submits a 1–5 star rating after dining (status must be completed).
+router.post('/:id/feedback', authenticate, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { rating, comment } = req.body as { rating: number; comment?: string };
+    const customerId = req.user!.userId;
+
+    if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'rating must be 1–5' });
+
+    try {
+        const { rows } = await query(
+            'SELECT customer_id, restaurant_id, feedback_at FROM table_bookings WHERE id = $1',
+            [id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        const b = rows[0];
+
+        if (b.customer_id !== customerId) return res.status(403).json({ error: 'FORBIDDEN' });
+        if (b.feedback_at) return res.status(409).json({ error: 'ALREADY_REVIEWED' });
+
+        await query(`
+            UPDATE table_bookings
+            SET feedback_rating = $2, feedback_comment = $3, feedback_at = NOW()
+            WHERE id = $1 AND status = 'completed'
+        `, [id, rating, comment?.trim() || null]);
+
+        res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
