@@ -12,6 +12,7 @@ import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-cam
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { api } from '../api/client';
+import { getSocket } from '../socket/client';
 import { fontFamily } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 
@@ -182,6 +183,31 @@ const KitchenDineInScreen = () => {
   useEffect(() => {
     Camera.requestCameraPermission();
   }, []);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const onTableOrder = () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
+    };
+    const onTableCheckin = () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-tickets'] });
+    };
+    const onBookingUpdated = () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
+    };
+    socket.on('table_order', onTableOrder);
+    socket.on('table_checkin', onTableCheckin);
+    socket.on('table_booking_updated', onBookingUpdated);
+    return () => {
+      socket.off('table_order', onTableOrder);
+      socket.off('table_checkin', onTableCheckin);
+      socket.off('table_booking_updated', onBookingUpdated);
+    };
+  }, [queryClient]);
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],

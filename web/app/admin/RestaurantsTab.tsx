@@ -676,6 +676,8 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
     }
   }, [restaurant.id]);
 
+  const [actioningBookingId, setActioningBookingId] = useState<string | null>(null);
+
   const fetchBookings = useCallback(async () => {
     setLoadingBookings(true);
     try {
@@ -685,6 +687,47 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
       setLoadingBookings(false);
     }
   }, [restaurant.id, bookingDate]);
+
+  const checkinBookingAdmin = async (bookingId: string) => {
+    setActioningBookingId(bookingId);
+    try {
+      await api.post(`/table-bookings/${bookingId}/checkin`);
+      toast.success('Guest checked in');
+      fetchBookings();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Check-in failed');
+    } finally {
+      setActioningBookingId(null);
+    }
+  };
+
+  const cancelBookingAdmin = async (bookingId: string, displayId: string) => {
+    if (!confirm(`Cancel booking ${displayId}? Any pre-order will be refunded to the customer's wallet.`)) return;
+    setActioningBookingId(bookingId);
+    try {
+      await api.post(`/table-bookings/${bookingId}/cancel`, { reason: 'Cancelled by admin' });
+      toast.success('Booking cancelled and refund issued');
+      fetchBookings();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Cancel failed');
+    } finally {
+      setActioningBookingId(null);
+    }
+  };
+
+  const noShowBookingAdmin = async (bookingId: string, displayId: string) => {
+    if (!confirm(`Mark ${displayId} as no-show? Deposit forfeited, pre-order refunded.`)) return;
+    setActioningBookingId(bookingId);
+    try {
+      await api.post(`/table-bookings/${bookingId}/no-show`);
+      toast.success('Marked as no-show');
+      fetchBookings();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed');
+    } finally {
+      setActioningBookingId(null);
+    }
+  };
 
   useEffect(() => {
     if (tab === "tables") fetchTables();
@@ -1124,23 +1167,51 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
                 <div className="text-center text-white/30 py-8">No bookings for this date</div>
               ) : (
                 <div className="space-y-2">
-                  {bookings.map((b: any) => (
-                    <div key={b.id} className="bg-white/5 rounded-xl px-4 py-3 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="text-white text-sm font-semibold">#{b.display_id} · {b.customer_name}</div>
-                        <span className={`text-xs font-semibold ${STATUS_COLOR[b.status] || "text-white/50"}`}>{b.status}</span>
+                  {bookings.map((b: any) => {
+                    const isActioning = actioningBookingId === b.id;
+                    return (
+                      <div key={b.id} className="bg-white/5 rounded-xl px-4 py-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-white text-sm font-semibold">#{b.display_id} · {b.customer_name}</div>
+                          <span className={`text-xs font-semibold ${STATUS_COLOR[b.status] || "text-white/50"}`}>{b.status}</span>
+                        </div>
+                        <div className="text-xs text-white/40">
+                          Table {b.table_number} · {b.party_size} guests ·{" "}
+                          {new Date(b.slot_start).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                          {" – "}
+                          {new Date(b.slot_end).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                        {b.total_paid_paise > 0 && (
+                          <div className="text-xs text-emerald-400">Paid: {fmt(b.total_paid_paise)}</div>
+                        )}
+                        {b.status === "confirmed" && (
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={() => checkinBookingAdmin(b.id)}
+                              disabled={isActioning}
+                              className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition disabled:opacity-40"
+                            >
+                              {isActioning ? "…" : "Check In"}
+                            </button>
+                            <button
+                              onClick={() => noShowBookingAdmin(b.id, b.display_id)}
+                              disabled={isActioning}
+                              className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition disabled:opacity-40"
+                            >
+                              {isActioning ? "…" : "No Show"}
+                            </button>
+                            <button
+                              onClick={() => cancelBookingAdmin(b.id, b.display_id)}
+                              disabled={isActioning}
+                              className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition disabled:opacity-40"
+                            >
+                              {isActioning ? "…" : "Cancel"}
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs text-white/40">
-                        Table {b.table_number} · {b.party_size} guests ·{" "}
-                        {new Date(b.slot_start).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                        {" – "}
-                        {new Date(b.slot_end).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                      {b.total_paid_paise > 0 && (
-                        <div className="text-xs text-emerald-400">Paid: {fmt(b.total_paid_paise)}</div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
