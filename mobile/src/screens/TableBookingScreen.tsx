@@ -172,8 +172,11 @@ const TableBookingScreen = ({ navigation, route }: any) => {
         navigation.replace('TableBookingConfirmed', { bookingId });
       })
       .catch(() => {
-        Alert.alert('Payment Cancelled', 'Your booking is saved. Complete payment from My Bookings.');
-        navigation.replace('TableBookingConfirmed', { bookingId });
+        Alert.alert(
+          'Payment Pending',
+          'Your booking is saved. Complete the payment from your booking details.',
+          [{ text: 'View Booking', onPress: () => navigation.replace('TableBookingDetail', { bookingId }) }],
+        );
       });
   }, [restaurantName, navigation]);
 
