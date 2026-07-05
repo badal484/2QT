@@ -342,10 +342,27 @@ const KitchenDineInScreen = () => {
                       </View>
                     )}
                   </View>
-                  {b.pre_order_amount_paise > 0 && (
-                    <Text style={styles.preOrderTag}>
-                      Pre-ordered · ₹{(b.pre_order_amount_paise / 100).toFixed(0)}
-                    </Text>
+                  {b.pre_order_items?.length > 0 && (
+                    <View style={styles.preOrderBox}>
+                      <Text style={styles.preOrderBoxLabel}>
+                        {b.status === 'confirmed' ? '📋 Pre-Order — Ready when seated' : '📋 Pre-Order'}
+                      </Text>
+                      {b.pre_order_items.map((item: any, idx: number) => (
+                        <View key={idx} style={styles.preOrderItem}>
+                          <Text style={styles.preOrderItemQty}>{item.quantity}×</Text>
+                          <Text style={styles.preOrderItemName}>{item.name}</Text>
+                          <View style={[styles.preOrderItemStatus, {
+                            backgroundColor: item.status === 'served' ? G.green + '22' : G.amber + '22'
+                          }]}>
+                            <Text style={[styles.preOrderItemStatusText, {
+                              color: item.status === 'served' ? G.green : G.amber
+                            }]}>
+                              {item.status === 'served' ? 'Done' : 'Pending'}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
                   )}
                   {b.occasion && (
                     <Text style={styles.occasionTag}>{b.occasion}</Text>
@@ -671,6 +688,13 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, color: G.inkDim, fontFamily: fontFamily.medium },
   preOrderTag: { fontSize: 12, color: G.green, fontFamily: fontFamily.medium, marginTop: 4 },
   occasionTag: { fontSize: 12, color: G.amber, fontFamily: fontFamily.medium, marginTop: 2 },
+  preOrderBox: { marginTop: 10, backgroundColor: G.surface, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: G.green + '33' },
+  preOrderBoxLabel: { fontSize: 11, color: G.green, fontFamily: fontFamily.semibold, marginBottom: 6, letterSpacing: 0.3 },
+  preOrderItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  preOrderItemQty: { fontSize: 13, color: G.green, fontFamily: fontFamily.bold, minWidth: 22 },
+  preOrderItemName: { flex: 1, fontSize: 13, color: G.ink, fontFamily: fontFamily.medium },
+  preOrderItemStatus: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  preOrderItemStatusText: { fontSize: 10, fontFamily: fontFamily.semibold },
   cardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   checkinBtn: { flex: 1, backgroundColor: G.green + '22', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: G.green },
   checkinBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: G.green },

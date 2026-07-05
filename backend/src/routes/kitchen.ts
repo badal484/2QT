@@ -664,11 +664,21 @@ router.get('/dine-in/today', authenticate, requireRole('chef', 'kitchen_manager'
                    tb.gst_amount_paise, tb.total_paid_paise,
                    tb.occasion,
                    u.name AS customer_name,
-                   rt.table_number
+                   rt.table_number,
+                   COALESCE(pre.items, '[]') AS pre_order_items
             FROM table_bookings tb
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
             LEFT JOIN users u ON u.id = tb.customer_id
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
+            LEFT JOIN LATERAL (
+                SELECT json_agg(json_build_object(
+                    'name', tbi.menu_item_name,
+                    'quantity', tbi.quantity,
+                    'status', tbi.status
+                ) ORDER BY tbi.ordered_at) AS items
+                FROM table_booking_items tbi
+                WHERE tbi.booking_id = tb.id AND tbi.type = 'pre_order'
+            ) pre ON true
             WHERE ${whereClause}
               AND tb.slot_start::date = CURRENT_DATE
               AND tb.status NOT IN ('cancelled','no_show')
