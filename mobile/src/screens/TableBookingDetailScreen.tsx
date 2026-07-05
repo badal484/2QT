@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal,
   ActivityIndicator, Alert, Image, TextInput, FlatList,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { api } from '../api/client';
+import { getSocket } from '../socket/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { spacing } from '../theme/spacing';
@@ -133,6 +134,19 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
     },
     onError: (err: any) => Alert.alert('Error', err?.message || 'Could not submit feedback.'),
   });
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const handler = (event: any) => {
+      if (event.bookingId === bookingId) {
+        queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
+        queryClient.invalidateQueries({ queryKey: ['table-booking-bill', bookingId] });
+      }
+    };
+    socket.on('table_booking_updated', handler);
+    return () => { socket.off('table_booking_updated', handler); };
+  }, [bookingId, queryClient]);
 
   const postOrderMutation = useMutation({
     mutationFn: (items: any[]) => api.post(`/table-bookings/${bookingId}/post-order`, { items }),

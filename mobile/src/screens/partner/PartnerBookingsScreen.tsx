@@ -63,6 +63,16 @@ const PartnerBookingsScreen = () => {
     refetchInterval: 30000,
   });
 
+  const checkinMutation = useMutation({
+    mutationFn: (bookingId: string) => api.post(`/table-bookings/${bookingId}/checkin`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partner-bookings'] });
+      Alert.alert('Checked In', 'Guest has been seated successfully.');
+      setShowDetail(null);
+    },
+    onError: (err: any) => Alert.alert('Error', err?.response?.data?.error || 'Check-in failed.'),
+  });
+
   const noShowMutation = useMutation({
     mutationFn: (bookingId: string) => api.post(`/table-bookings/${bookingId}/no-show`),
     onSuccess: () => {
@@ -245,6 +255,25 @@ const PartnerBookingsScreen = () => {
 
               {showDetail?.status === 'confirmed' && (
                 <TouchableOpacity
+                  style={styles.checkinBtn}
+                  onPress={() => Alert.alert(
+                    'Check In Guest',
+                    `Seat ${showDetail.display_id} for ${showDetail.party_size} guests?`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Check In', onPress: () => checkinMutation.mutate(showDetail.id) },
+                    ]
+                  )}
+                  disabled={checkinMutation.isPending}
+                >
+                  <Text style={styles.checkinBtnText}>
+                    {checkinMutation.isPending ? 'Checking in…' : 'Check In Guest'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {showDetail?.status === 'confirmed' && (
+                <TouchableOpacity
                   style={styles.noShowBtn}
                   onPress={() => handleNoShow(showDetail)}
                   disabled={noShowMutation.isPending}
@@ -330,6 +359,8 @@ const styles = StyleSheet.create({
   amountValue: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.primary },
   qrButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: colors.primary },
   qrButtonText: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.primary },
+  checkinBtn: { marginTop: 14, paddingVertical: 13, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center' },
+  checkinBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: '#fff' },
   noShowBtn: { marginTop: 10, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5', alignItems: 'center' },
   noShowBtnText: { fontSize: 14, fontFamily: fontFamily.medium, color: '#EF4444' },
   // QR modal
