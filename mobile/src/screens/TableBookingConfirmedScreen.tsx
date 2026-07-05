@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Share, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, Share, Alert, ActivityIndicator,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,12 +30,25 @@ const TableBookingConfirmedScreen = ({ navigation, route }: any) => {
   });
 
   const handleShare = async () => {
-    if (!booking) return;
+    if (!booking) {
+      Alert.alert('Please wait', 'Booking details are still loading.');
+      return;
+    }
     try {
       await Share.share({
-        message: `I've booked a table at ${booking.restaurant_name} for ${booking.party_size} guests on ${formatSlot(booking.slot_start)}. Ref: ${booking.display_id}`,
+        title: `Table at ${booking.restaurant_name || 'Restaurant'}`,
+        message: [
+          `I've booked a table at ${booking.restaurant_name || 'the restaurant'}!`,
+          `📅 ${formatSlot(booking.slot_start)}`,
+          `👥 ${booking.party_size} ${booking.party_size === 1 ? 'guest' : 'guests'}`,
+          `🔖 Ref: ${booking.display_id}`,
+        ].join('\n'),
       });
-    } catch (_) {}
+    } catch (e: any) {
+      if (e?.message !== 'User did not share' && e?.message !== 'User dismissed the dialog') {
+        Alert.alert('Unable to Share', 'Could not open share dialog. Please try again.');
+      }
+    }
   };
 
   return (
