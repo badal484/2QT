@@ -199,13 +199,19 @@ const KitchenDineInScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
     };
+    const onTableCheckout = () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
+    };
     socket.on('table_order', onTableOrder);
     socket.on('table_checkin', onTableCheckin);
     socket.on('table_booking_updated', onBookingUpdated);
+    socket.on('table_checkout', onTableCheckout);
     return () => {
       socket.off('table_order', onTableOrder);
       socket.off('table_checkin', onTableCheckin);
       socket.off('table_booking_updated', onBookingUpdated);
+      socket.off('table_checkout', onTableCheckout);
     };
   }, [queryClient]);
 
