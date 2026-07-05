@@ -703,7 +703,7 @@ router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manage
             SELECT tb.id AS booking_id, tb.display_id, rt.table_number,
                    json_agg(json_build_object(
                        'id', tbi.id,
-                       'name', rmi.name,
+                       'name', COALESCE(rmi.name, tbi.menu_item_name),
                        'quantity', tbi.quantity,
                        'status', tbi.status,
                        'special_note', tbi.customizations->>'note'
@@ -712,7 +712,7 @@ router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manage
             FROM table_booking_items tbi
             JOIN table_bookings tb ON tb.id = tbi.booking_id
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
-            JOIN restaurant_menu_items rmi ON rmi.id = tbi.menu_item_id
+            LEFT JOIN restaurant_menu_items rmi ON rmi.id = tbi.menu_item_id
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
             WHERE ${whereClause}
               AND tbi.type = $2
@@ -760,7 +760,9 @@ router.get('/dine-in/bill', authenticate, requireRole('chef', 'kitchen_manager',
             LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
             WHERE ${whereClause}
               AND tb.status = 'seated'
-              AND (tb.pre_order_amount_paise + tb.post_order_amount_paise) > tb.total_paid_paise
+              AND (tb.pre_order_amount_paise + tb.post_order_amount_paise + COALESCE(tb.gst_amount_paise,
+                   ROUND((tb.pre_order_amount_paise + tb.post_order_amount_paise) * rc.gst_percent / 100.0))
+                  ) > tb.total_paid_paise
             ORDER BY tb.slot_start
         `, params);
         res.json(rows);

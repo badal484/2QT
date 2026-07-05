@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal,
-  ActivityIndicator, Alert, Dimensions, Image, TextInput, FlatList,
+  ActivityIndicator, Alert, Image, TextInput, FlatList,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 import {
-  ChevronLeft, QrCode, Receipt, ShoppingBag, X, Plus, Minus,
+  ChevronLeft, QrCode, ShoppingBag, X, Plus, Minus,
   CheckCircle, AlertCircle, Clock, Users, Calendar, CreditCard,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -19,8 +19,6 @@ import { BouncingButton } from '../components/ui/BouncingButton';
 
 let RazorpayCheckout: any = null;
 try { RazorpayCheckout = require('react-native-razorpay').default; } catch (_) {}
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -64,7 +62,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
     refetchInterval: 20000,
   });
 
-  const { data: bill, refetch: refetchBill } = useQuery({
+  const { data: bill } = useQuery({
     queryKey: ['table-booking-bill', bookingId],
     queryFn: () => api.get(`/table-bookings/${bookingId}/bill`),
     enabled: booking?.status === 'seated',
@@ -95,6 +93,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
     onSuccess: () => {
       setShowOrderMore(false);
       setAddItems({});
+      setMenuSearch('');
       queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['table-booking-bill', bookingId] });
     },
@@ -141,7 +140,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
   const handlePostOrder = () => {
     const items = Object.entries(addItems)
       .filter(([, qty]) => qty > 0)
-      .map(([itemId, quantity]) => ({ itemId, quantity }));
+      .map(([itemId, quantity]) => ({ menuItemId: itemId, quantity }));
     if (!items.length) { Alert.alert('No Items', 'Please add at least one item.'); return; }
     postOrderMutation.mutate(items);
   };
