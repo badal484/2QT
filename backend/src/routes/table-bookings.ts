@@ -546,8 +546,13 @@ router.post('/:id/checkin', authenticate, async (req: AuthRequest, res) => {
 
     try {
         // dine_in_staff can only check in bookings for their assigned restaurant
-        const restaurantFilter = req.user!.role === 'dine_in_staff'
-            ? `AND restaurant_id = '${req.user!.restaurantId}'` : '';
+        const isDineInStaff = req.user!.role === 'dine_in_staff';
+        const checkinParams: any[] = [id];
+        let restaurantFilter = '';
+        if (isDineInStaff) {
+            checkinParams.push(req.user!.restaurantId);
+            restaurantFilter = `AND restaurant_id = $${checkinParams.length}`;
+        }
 
         const { rows } = await query(`
             UPDATE table_bookings
@@ -555,7 +560,7 @@ router.post('/:id/checkin', authenticate, async (req: AuthRequest, res) => {
             WHERE id = $1 AND status = 'confirmed' ${restaurantFilter}
             RETURNING customer_id, restaurant_id, display_id, slot_start, party_size, occasion,
                       pre_order_amount_paise
-        `, [id]);
+        `, checkinParams);
         if (!rows[0]) return res.status(400).json({ error: 'BOOKING_NOT_FOUND_OR_WRONG_STATUS' });
         const b = rows[0];
 
@@ -751,7 +756,7 @@ router.post('/:id/pay', authenticate, async (req: AuthRequest, res) => {
         const { rows } = await query(`
             SELECT tb.customer_id, tb.pre_order_amount_paise, tb.post_order_amount_paise,
                    tb.gst_amount_paise, tb.total_paid_paise, tb.status, tb.restaurant_id,
-                   tb.display_id, rc.name AS restaurant_name
+                   tb.display_id, rc.name AS restaurant_name, rc.gst_percent
             FROM table_bookings tb
             JOIN restaurant_config rc ON rc.id = tb.restaurant_id
             WHERE tb.id = $1
@@ -762,7 +767,9 @@ router.post('/:id/pay', authenticate, async (req: AuthRequest, res) => {
         if (b.customer_id !== customerId) return res.status(403).json({ error: 'FORBIDDEN' });
         if (b.status !== 'seated') return res.status(400).json({ error: 'BOOKING_NOT_SEATED' });
 
-        const grandTotal = b.pre_order_amount_paise + b.post_order_amount_paise + b.gst_amount_paise;
+        // Calculate fresh (not stale stored value) — post-order may have been added after first bill fetch
+        const freshGst = Math.round((b.pre_order_amount_paise + b.post_order_amount_paise) * b.gst_percent / 100);
+        const grandTotal = b.pre_order_amount_paise + b.post_order_amount_paise + freshGst;
         const outstanding = grandTotal - b.total_paid_paise;
 
         if (outstanding <= 0) {
@@ -779,7 +786,9 @@ router.post('/:id/pay', authenticate, async (req: AuthRequest, res) => {
                 `, [id]);
                 if (!locked[0] || locked[0].status !== 'seated') throw new Error('BOOKING_NOT_SEATED');
                 const lb = locked[0];
-                const freshOutstanding = lb.pre_order_amount_paise + lb.post_order_amount_paise + lb.gst_amount_paise - lb.total_paid_paise;
+                // Recalculate GST fresh — stored value may be stale if post-order items were added after first bill fetch
+                const lockedGst = Math.round((lb.pre_order_amount_paise + lb.post_order_amount_paise) * b.gst_percent / 100);
+                const freshOutstanding = lb.pre_order_amount_paise + lb.post_order_amount_paise + lockedGst - lb.total_paid_paise;
                 if (freshOutstanding <= 0) throw new Error('NOTHING_OUTSTANDING');
 
                 const { rows: wallet } = await client.query(
@@ -801,10 +810,11 @@ router.post('/:id/pay', authenticate, async (req: AuthRequest, res) => {
                 await client.query(`
                     UPDATE table_bookings
                     SET total_paid_paise = total_paid_paise + $2,
+                        gst_amount_paise = $3,
                         final_payment_method = 'app_wallet',
                         status = 'completed', completed_at = NOW(), updated_at = NOW()
                     WHERE id = $1 AND status = 'seated'
-                `, [id, freshOutstanding]);
+                `, [id, freshOutstanding, lockedGst]);
 
                 await client.query(`
                     INSERT INTO table_booking_payments (booking_id, amount_paise, payment_method, payment_type)
@@ -863,9 +873,13 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
     if (!['cash', 'card_pos'].includes(method)) return res.status(400).json({ error: 'method must be cash or card_pos' });
 
     try {
-        // Quick existence check before acquiring lock
-        const { rows: exists } = await query('SELECT id FROM table_bookings WHERE id = $1', [id]);
+        // Quick existence + gst_percent check before acquiring lock
+        const { rows: exists } = await query(`
+            SELECT tb.id, rc.gst_percent FROM table_bookings tb
+            JOIN restaurant_config rc ON rc.id = tb.restaurant_id WHERE tb.id = $1
+        `, [id]);
         if (!exists[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        const gstPercent: number = exists[0].gst_percent;
 
         let b: any = null;
         let outstanding: number = 0;
@@ -884,7 +898,9 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
 
             if (b.status !== 'seated') throw new Error('BOOKING_NOT_SEATED');
 
-            grandTotal = b.pre_order_amount_paise + b.post_order_amount_paise + b.gst_amount_paise;
+            // Recalculate GST fresh — stored value may be stale if post-order items were added after first bill fetch
+            const freshGst = Math.round((b.pre_order_amount_paise + b.post_order_amount_paise) * gstPercent / 100);
+            grandTotal = b.pre_order_amount_paise + b.post_order_amount_paise + freshGst;
             outstanding = grandTotal - b.total_paid_paise;
 
             if (outstanding <= 0) throw new Error('NOTHING_OUTSTANDING');
@@ -892,10 +908,11 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
             await client.query(`
                 UPDATE table_bookings
                 SET total_paid_paise = total_paid_paise + $2,
+                    gst_amount_paise = $4,
                     final_payment_method = $3,
                     status = 'completed', completed_at = NOW(), updated_at = NOW()
                 WHERE id = $1 AND status = 'seated'
-            `, [id, outstanding, method === 'cash' ? 'cash' : 'card_pos']);
+            `, [id, outstanding, method === 'cash' ? 'cash' : 'card_pos', freshGst]);
 
             await client.query(`
                 INSERT INTO table_booking_payments
@@ -1029,15 +1046,19 @@ router.post('/:id/no-show', authenticate, async (req: AuthRequest, res) => {
     if (!allowedRoles.includes(req.user!.role)) return res.status(403).json({ error: 'FORBIDDEN' });
 
     try {
-        const restaurantFilter = req.user!.role === 'dine_in_staff'
-            ? `AND restaurant_id = '${req.user!.restaurantId}'` : '';
+        const noShowParams: any[] = [id];
+        let noShowRestaurantFilter = '';
+        if (req.user!.role === 'dine_in_staff') {
+            noShowParams.push(req.user!.restaurantId);
+            noShowRestaurantFilter = `AND restaurant_id = $${noShowParams.length}`;
+        }
 
         const { rows } = await query(`
             UPDATE table_bookings
             SET status = 'no_show', no_show_at = NOW()
-            WHERE id = $1 AND status = 'confirmed' ${restaurantFilter}
+            WHERE id = $1 AND status = 'confirmed' ${noShowRestaurantFilter}
             RETURNING customer_id, deposit_amount_paise, pre_order_amount_paise, display_id, restaurant_id
-        `, [id]);
+        `, noShowParams);
         if (!rows[0]) return res.status(400).json({ error: 'BOOKING_NOT_CONFIRMED' });
         const b = rows[0];
 
