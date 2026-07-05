@@ -23,7 +23,7 @@ export function navigateTo(name: string, params?: Record<string, any>) {
 
 // Maps FCM notification data → screen name + params
 export function navigateFromNotification(data: Record<string, string>) {
-  const { type, orderId, screen } = data;
+  const { type, orderId, screen, bookingId } = data;
 
   // Explicit screen override from payload (for trigger rules)
   if (screen) {
@@ -34,6 +34,7 @@ export function navigateFromNotification(data: Record<string, string>) {
       Home: { name: 'Home' },
       OrderHistory: { name: 'OrderHistory' },
       RateOrder: { name: 'RateOrder', params: orderId ? { orderId } : undefined },
+      TableBookingDetail: { name: 'TableBookingDetail', params: bookingId ? { bookingId } : undefined },
     };
     const target = screenMap[screen];
     if (target) { navigateTo(target.name, target.params); return; }

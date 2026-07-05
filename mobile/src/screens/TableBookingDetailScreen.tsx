@@ -55,6 +55,12 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
   const [showOrderMore, setShowOrderMore] = useState(false);
   const [addItems, setAddItems] = useState<Record<string, number>>({});
   const [menuSearch, setMenuSearch] = useState('');
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState<Date>(new Date());
+  const [rescheduleSlot, setRescheduleSlot] = useState<any>(null);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   const { data: booking, isLoading, refetch } = useQuery({
     queryKey: ['table-booking', bookingId],
@@ -82,10 +88,50 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
     );
   }, [allMenuItems, menuSearch]);
 
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateOptions = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() + i); return d;
+  });
+  const rescheduleDateStr = `${rescheduleDate.getFullYear()}-${pad(rescheduleDate.getMonth() + 1)}-${pad(rescheduleDate.getDate())}`;
+
+  const { data: rescheduleSlots, isLoading: rescheduleSlotsLoading } = useQuery({
+    queryKey: ['reschedule-slots', booking?.restaurant_id, rescheduleDateStr, booking?.party_size],
+    queryFn: () => api.get(`/restaurants/${booking.restaurant_id}/availability?date=${rescheduleDateStr}&partySize=${booking.party_size}`)
+      .then((r: any) => r.slots as any[]),
+    enabled: showReschedule && !!booking?.restaurant_id,
+  });
+
   const cancelMutation = useMutation({
     mutationFn: () => api.post(`/table-bookings/${bookingId}/cancel`),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] }); refetch(); },
     onError: (err: any) => Alert.alert('Cannot Cancel', err?.message || 'Please try again.'),
+  });
+
+  const rescheduleMutation = useMutation({
+    mutationFn: (slot: any) => api.post(`/table-bookings/${bookingId}/reschedule`, { slotStart: slot.slotStart, slotEnd: slot.slotEnd }),
+    onSuccess: () => {
+      setShowReschedule(false);
+      setRescheduleSlot(null);
+      queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
+      refetch();
+      Alert.alert('Rescheduled!', 'Your booking has been moved to the new slot.');
+    },
+    onError: (err: any) => {
+      const msg = err?.message || '';
+      if (msg === 'NO_TABLE_AVAILABLE') Alert.alert('No Tables', 'No tables available for that slot. Try a different time.');
+      else if (msg === 'RESCHEDULE_LIMIT') Alert.alert('Limit Reached', 'Maximum 2 reschedules allowed per booking.');
+      else Alert.alert('Error', msg || 'Could not reschedule. Please try again.');
+    },
+  });
+
+  const feedbackMutation = useMutation({
+    mutationFn: (data: { rating: number; comment: string }) =>
+      api.post(`/table-bookings/${bookingId}/feedback`, data),
+    onSuccess: () => {
+      setFeedbackSubmitted(true);
+      queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
+    },
+    onError: (err: any) => Alert.alert('Error', err?.message || 'Could not submit feedback.'),
   });
 
   const postOrderMutation = useMutation({
@@ -103,18 +149,18 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
   const payMutation = useMutation({
     mutationFn: (method: string) => api.post(`/table-bookings/${bookingId}/pay`, { paymentMethod: method }),
     onSuccess: (data) => {
-      if (data.razorpayOrderId) openRazorpay(data.razorpayOrderId, data.amountPaise);
+      if (data.razorpayOrderId) openRazorpay(data.razorpayOrderId, data.amountPaise, data.razorpayKeyId);
       else { queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] }); refetch(); }
     },
     onError: (err: any) => Alert.alert('Payment Error', err?.message || 'Failed.'),
   });
 
-  const openRazorpay = useCallback((rzpOrderId: string, amountPaise: number) => {
+  const openRazorpay = useCallback((rzpOrderId: string, amountPaise: number, rzpKey: string) => {
     if (!RazorpayCheckout) { Alert.alert('Error', 'Payment module not available.'); return; }
     RazorpayCheckout.open({
       description: `Table Bill – ${booking?.restaurant_name}`,
       currency: 'INR',
-      key: 'rzp_test_placeholder',
+      key: rzpKey,
       amount: amountPaise,
       order_id: rzpOrderId,
       name: 'VELTO Food Palace',
@@ -317,7 +363,55 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
               </Text>
             </TouchableOpacity>
           )}
+
+          {/* Reschedule button — confirmed, max 2 times */}
+          {booking?.status === 'confirmed' && (booking?.reschedule_count ?? 0) < 2 && (
+            <TouchableOpacity style={styles.rescheduleBtn} onPress={() => { setRescheduleDate(new Date()); setRescheduleSlot(null); setShowReschedule(true); }}>
+              <Text style={styles.rescheduleBtnText}>Reschedule Booking</Text>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Feedback card — completed, not yet reviewed */}
+        {booking?.status === 'completed' && !booking?.feedback_at && !feedbackSubmitted && (
+          <View style={styles.feedbackCard}>
+            <Text style={styles.feedbackTitle}>How was your experience?</Text>
+            <Text style={styles.feedbackSub}>Rate your dining at {booking?.restaurant_name}</Text>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <TouchableOpacity key={star} onPress={() => setFeedbackRating(star)} style={styles.starBtn}>
+                  <Text style={[styles.starIcon, feedbackRating >= star && styles.starActive]}>★</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.feedbackInput}
+              placeholder="Tell us more (optional)…"
+              placeholderTextColor={colors.inkFaint}
+              value={feedbackComment}
+              onChangeText={setFeedbackComment}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+            <BouncingButton
+              style={[styles.feedbackSubmitBtn, feedbackRating === 0 && { opacity: 0.4 }]}
+              onPress={() => { if (feedbackRating > 0) feedbackMutation.mutate({ rating: feedbackRating, comment: feedbackComment }); }}
+              disabled={feedbackRating === 0 || feedbackMutation.isPending}
+            >
+              <Text style={styles.feedbackSubmitText}>
+                {feedbackMutation.isPending ? 'Submitting…' : 'Submit Review'}
+              </Text>
+            </BouncingButton>
+          </View>
+        )}
+
+        {booking?.status === 'completed' && (booking?.feedback_at || feedbackSubmitted) && (
+          <View style={[styles.feedbackCard, { alignItems: 'center', paddingVertical: 18 }]}>
+            <Text style={{ fontSize: 28 }}>🙏</Text>
+            <Text style={[styles.feedbackTitle, { marginTop: 8 }]}>Thanks for your feedback!</Text>
+          </View>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -336,6 +430,83 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
             </View>
             <Text style={styles.qrModalHint}>Show this to staff at the entrance</Text>
           </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Reschedule Modal */}
+      <Modal visible={showReschedule} animationType="slide" onRequestClose={() => setShowReschedule(false)}>
+        <View style={[styles.rsModal, { paddingTop: insets.top }]}>
+          <View style={styles.rsHeader}>
+            <TouchableOpacity onPress={() => setShowReschedule(false)} style={styles.backBtn}>
+              <X size={22} color={colors.ink} />
+            </TouchableOpacity>
+            <Text style={styles.rsTitle}>Reschedule</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+            <Text style={styles.rsSection}>Pick a new date</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rsDateScroll}>
+              {dateOptions.map((d, i) => {
+                const dStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                const selStr = rescheduleDateStr;
+                const isSelected = dStr === selStr;
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.rsDateCard, isSelected && styles.rsDateCardActive]}
+                    onPress={() => { setRescheduleDate(d); setRescheduleSlot(null); }}
+                  >
+                    <Text style={[styles.rsDateDay, isSelected && styles.rsDateTextActive]}>
+                      {d.toLocaleDateString('en-IN', { weekday: 'short' })}
+                    </Text>
+                    <Text style={[styles.rsDateNum, isSelected && styles.rsDateTextActive]}>{d.getDate()}</Text>
+                    <Text style={[styles.rsDateMon, isSelected && styles.rsDateTextActive]}>
+                      {d.toLocaleDateString('en-IN', { month: 'short' })}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <Text style={styles.rsSection}>Pick a time slot</Text>
+            {rescheduleSlotsLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+            ) : (
+              <View style={styles.rsSlotGrid}>
+                {(rescheduleSlots || []).map((slot: any, i: number) => {
+                  const d = new Date(slot.slotStart);
+                  const label = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                  const isActive = rescheduleSlot?.slotStart === slot.slotStart;
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.rsSlot, isActive && styles.rsSlotActive, !slot.available && styles.rsSlotDisabled]}
+                      disabled={!slot.available}
+                      onPress={() => setRescheduleSlot(slot)}
+                    >
+                      <Text style={[styles.rsSlotText, isActive && styles.rsSlotTextActive]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {!rescheduleSlotsLoading && !(rescheduleSlots?.length) && (
+                  <Text style={{ fontSize: 14, color: colors.inkMuted, padding: 16 }}>No slots available. Try another date.</Text>
+                )}
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={[styles.rsFooter, { paddingBottom: insets.bottom + 12 }]}>
+            <BouncingButton
+              style={[styles.rsConfirmBtn, (!rescheduleSlot || rescheduleMutation.isPending) && { opacity: 0.5 }]}
+              disabled={!rescheduleSlot || rescheduleMutation.isPending}
+              onPress={() => rescheduleSlot && rescheduleMutation.mutate(rescheduleSlot)}
+            >
+              <Text style={styles.rsConfirmText}>
+                {rescheduleMutation.isPending ? 'Moving booking…' : rescheduleSlot ? `Confirm – ${pad(new Date(rescheduleSlot.slotStart).getHours())}:${pad(new Date(rescheduleSlot.slotStart).getMinutes())}` : 'Select a slot'}
+              </Text>
+            </BouncingButton>
+          </View>
         </View>
       </Modal>
 
@@ -537,6 +708,38 @@ const styles = StyleSheet.create({
   omFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB' },
   placeOrderBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   placeOrderText: { fontSize: 15, fontFamily: fontFamily.semibold, color: '#fff' },
+  rescheduleBtn: { paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: '#6366F1', alignItems: 'center' },
+  rescheduleBtnText: { fontSize: 14, fontFamily: fontFamily.medium, color: '#6366F1' },
+  feedbackCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  feedbackTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, textAlign: 'center', marginBottom: 4 },
+  feedbackSub: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular, textAlign: 'center', marginBottom: 16 },
+  starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 14 },
+  starBtn: { padding: 4 },
+  starIcon: { fontSize: 36, color: '#D1D5DB' },
+  starActive: { color: '#F59E0B' },
+  feedbackInput: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink, backgroundColor: '#FAFAFA', minHeight: 80, marginBottom: 12 },
+  feedbackSubmitBtn: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  feedbackSubmitText: { fontSize: 15, fontFamily: fontFamily.semibold, color: '#fff' },
+  rsModal: { flex: 1, backgroundColor: colors.background },
+  rsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB' },
+  rsTitle: { fontSize: 17, fontFamily: fontFamily.bold, color: colors.ink },
+  rsSection: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, paddingHorizontal: 16, marginTop: 18, marginBottom: 8 },
+  rsDateScroll: { paddingHorizontal: 16, paddingBottom: 4, gap: 8 },
+  rsDateCard: { width: 58, paddingVertical: 10, borderRadius: 12, alignItems: 'center', backgroundColor: '#F3F4F6', borderWidth: 1.5, borderColor: 'transparent' },
+  rsDateCardActive: { backgroundColor: colors.primary + '15', borderColor: colors.primary },
+  rsDateDay: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted },
+  rsDateNum: { fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink, marginVertical: 2 },
+  rsDateMon: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted },
+  rsDateTextActive: { color: colors.primary },
+  rsSlotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16 },
+  rsSlot: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#F3F4F6', borderWidth: 1.5, borderColor: 'transparent' },
+  rsSlotActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  rsSlotDisabled: { opacity: 0.35 },
+  rsSlotText: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
+  rsSlotTextActive: { color: '#fff' },
+  rsFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB' },
+  rsConfirmBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  rsConfirmText: { fontSize: 15, fontFamily: fontFamily.semibold, color: '#fff' },
 });
 
 export default TableBookingDetailScreen;

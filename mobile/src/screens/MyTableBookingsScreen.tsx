@@ -21,7 +21,8 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
 const formatSlot = (iso: string) => {
   const d = new Date(iso);
-  return `${d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const timeStr = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} · ${timeStr}`;
 };
 
 const STATUS_COLORS: Record<string, string> = {
