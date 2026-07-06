@@ -586,11 +586,11 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
         const freshGst = Math.round(
             (booking.pre_order_amount_paise + booking.post_order_amount_paise) * (booking.gst_percent || 0) / 100
         );
-        const outstanding = (
+        const outstanding = Math.max(0, (
             booking.pre_order_amount_paise +
             booking.post_order_amount_paise +
             freshGst
-        ) - booking.total_paid_paise;
+        ) - booking.total_paid_paise);
 
         // Is free cancellation still available?
         const cutoff = new Date(booking.slot_start).getTime() - booking.cancellation_window_minutes * 60 * 1000;
@@ -632,7 +632,7 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
 
         // Compute refund amounts
         // Only refund to wallet if originally paid via wallet (not Razorpay gateway)
-        const paidViaGateway = !!b.gateway_payment_id;
+        const paidViaGateway = !!b.gateway_payment_id || b.status === 'pending_payment';
         const preOrderRefund = paidViaGateway ? 0 : b.pre_order_amount_paise;
         const depositRefund = isFreeCancellation ? (paidViaGateway ? 0 : b.deposit_amount_paise) : 0;
         const totalRefund = preOrderRefund + depositRefund;
@@ -867,7 +867,7 @@ router.get('/:id/bill', authenticate, async (req: AuthRequest, res) => {
         const subtotal = b.pre_order_amount_paise + b.post_order_amount_paise;
         const gstAmount = Math.round(subtotal * (b.gst_percent / 100));
         const grandTotal = subtotal + gstAmount;
-        const outstanding = grandTotal - b.total_paid_paise;
+        const outstanding = Math.max(0, grandTotal - b.total_paid_paise);
 
         // Mark bill_generated_at on first fetch during seated
         if (b.status === 'seated' && !b.bill_generated_at) {
@@ -1084,6 +1084,7 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
             );
         }
 
+        await routeTicket(b.restaurant_id, 'table_checkout', { bookingId: id, displayId: b.display_id, method });
         emitToUser(b.customer_id, 'table_booking_updated', { bookingId: id, status: 'completed' });
         NotificationService.send('broadcast_message', {
             userId: b.customer_id,
@@ -1220,7 +1221,7 @@ router.post('/:id/reschedule', authenticate, async (req: AuthRequest, res) => {
             return res.status(400).json({ error: 'RESCHEDULE_LIMIT', message: 'Maximum 2 reschedules allowed per booking' });
         }
         // Prevent rescheduling to same slot
-        if (b.slot_start === slotStart) {
+        if (new Date(b.slot_start).getTime() === new Date(slotStart).getTime()) {
             return res.status(400).json({ error: 'SAME_SLOT', message: 'New slot must be different from current slot' });
         }
 

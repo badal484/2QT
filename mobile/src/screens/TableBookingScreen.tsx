@@ -162,13 +162,17 @@ const TableBookingScreen = ({ navigation, route }: any) => {
       theme: { color: colors.primary },
     };
     RazorpayCheckout.open(options)
-      .then((response: any) => {
-        api.post('/table-bookings/verify-payment', {
-          bookingId,
-          razorpayOrderId: response.razorpay_order_id || rzpOrderId,
-          razorpayPaymentId: response.razorpay_payment_id,
-          razorpaySignature: response.razorpay_signature,
-        }).catch((e: any) => console.warn('[verify-payment]', e?.message));
+      .then(async (response: any) => {
+        try {
+          await api.post('/table-bookings/verify-payment', {
+            bookingId,
+            razorpayOrderId: response.razorpay_order_id || rzpOrderId,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature,
+          });
+        } catch {
+          Alert.alert('Payment Pending', 'Payment received but confirmation is delayed. Your booking details will update shortly.');
+        }
         navigation.replace('TableBookingConfirmed', { bookingId });
       })
       .catch(() => {
