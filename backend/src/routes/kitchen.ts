@@ -680,7 +680,7 @@ router.get('/dine-in/today', authenticate, requireRole('chef', 'kitchen_manager'
                 WHERE tbi.booking_id = tb.id AND tbi.type = 'pre_order'
             ) pre ON true
             WHERE ${whereClause}
-              AND tb.slot_start::date = CURRENT_DATE
+              AND (tb.slot_start AT TIME ZONE 'Asia/Kolkata')::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date
               AND tb.status NOT IN ('cancelled','no_show')
             ORDER BY tb.slot_start
         `, params);
@@ -717,7 +717,7 @@ router.get('/dine-in/tickets', authenticate, requireRole('chef', 'kitchen_manage
                        'quantity', tbi.quantity,
                        'status', tbi.status,
                        'special_note', tbi.customizations->>'note'
-                   ) ORDER BY tbi.created_at) AS items,
+                   ) ORDER BY tbi.ordered_at) AS items,
                    $2 AS type
             FROM table_booking_items tbi
             JOIN table_bookings tb ON tb.id = tbi.booking_id

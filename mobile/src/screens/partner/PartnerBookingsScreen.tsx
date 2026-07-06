@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, Modal, ScrollView, Alert,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { api } from '../../api/client';
+import { getSocket } from '../../socket/client';
 import { colors } from '../../theme/colors';
 import { fontFamily } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -70,7 +71,7 @@ const PartnerBookingsScreen = () => {
       Alert.alert('Checked In', 'Guest has been seated successfully.');
       setShowDetail(null);
     },
-    onError: (err: any) => Alert.alert('Error', err?.response?.data?.error || 'Check-in failed.'),
+    onError: (err: any) => Alert.alert('Error', err?.message || 'Check-in failed.'),
   });
 
   const noShowMutation = useMutation({
@@ -79,8 +80,24 @@ const PartnerBookingsScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['partner-bookings'] });
       setShowDetail(null);
     },
-    onError: (err: any) => Alert.alert('Error', err?.response?.data?.error || 'Failed.'),
+    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed.'),
   });
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ['partner-bookings'] });
+    socket.on('table_booking_updated', refresh);
+    socket.on('table_order', refresh);
+    socket.on('table_checkin', refresh);
+    socket.on('table_checkout', refresh);
+    return () => {
+      socket.off('table_booking_updated', refresh);
+      socket.off('table_order', refresh);
+      socket.off('table_checkin', refresh);
+      socket.off('table_checkout', refresh);
+    };
+  }, [queryClient]);
 
   const onRefresh = async () => {
     setRefreshing(true);

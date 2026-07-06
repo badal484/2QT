@@ -23,9 +23,11 @@ try { RazorpayCheckout = require('react-native-razorpay').default; } catch (_) {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
+const formatTime12h = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+
 const formatSlot = (iso: string) => {
   const d = new Date(iso);
-  return `${d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })} · ${formatTime12h(d)}`;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -180,7 +182,15 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
       name: 'VELTO Food Palace',
       theme: { color: colors.primary },
     })
-      .then(() => { queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] }); refetch(); })
+      .then((response: any) => {
+        api.post(`/table-bookings/${bookingId}/verify-final-payment`, {
+          razorpayOrderId: response.razorpay_order_id || rzpOrderId,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpaySignature: response.razorpay_signature,
+        }).catch((e: any) => console.warn('[verify-final-payment]', e?.message));
+        queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
+        refetch();
+      })
       .catch(() => {});
   }, [booking?.restaurant_name, bookingId, queryClient, refetch]);
 
@@ -250,7 +260,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
         <View style={styles.card}>
           <Text style={styles.restaurantName}>{booking?.restaurant_name}</Text>
           <DetailRow icon={<Calendar size={15} color={colors.inkMuted} />} label={formatSlot(booking?.slot_start)} />
-          <DetailRow icon={<Clock size={15} color={colors.inkMuted} />} label={`Until ${new Date(booking?.slot_end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`} />
+          <DetailRow icon={<Clock size={15} color={colors.inkMuted} />} label={`Until ${formatTime12h(new Date(booking?.slot_end))}`} />
           <DetailRow icon={<Users size={15} color={colors.inkMuted} />} label={`${booking?.party_size} guests`} />
           {booking?.occasion && (
             <DetailRow icon={<CheckCircle size={15} color={colors.inkMuted} />} label={booking.occasion} />
@@ -332,7 +342,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
             <View style={styles.cancelInfoCard}>
               <AlertCircle size={16} color="#92400E" />
               <Text style={styles.cancelInfoText}>
-                Free cancellation until {new Date(booking.free_cancellation_until).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                Free cancellation until {new Date(booking.free_cancellation_until).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}, {formatTime12h(new Date(booking.free_cancellation_until))}
               </Text>
             </View>
           ) : (
@@ -492,7 +502,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
               <View style={styles.rsSlotGrid}>
                 {(rescheduleSlots || []).map((slot: any, i: number) => {
                   const d = new Date(slot.slotStart);
-                  const label = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                  const label = formatTime12h(d);
                   const isActive = rescheduleSlot?.slotStart === slot.slotStart;
                   return (
                     <TouchableOpacity
@@ -519,7 +529,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
               onPress={() => rescheduleSlot && rescheduleMutation.mutate(rescheduleSlot)}
             >
               <Text style={styles.rsConfirmText}>
-                {rescheduleMutation.isPending ? 'Moving booking…' : rescheduleSlot ? `Confirm – ${pad(new Date(rescheduleSlot.slotStart).getHours())}:${pad(new Date(rescheduleSlot.slotStart).getMinutes())}` : 'Select a slot'}
+                {rescheduleMutation.isPending ? 'Moving booking…' : rescheduleSlot ? `Confirm – ${formatTime12h(new Date(rescheduleSlot.slotStart))}` : 'Select a slot'}
               </Text>
             </BouncingButton>
           </View>
@@ -724,8 +734,8 @@ const styles = StyleSheet.create({
   omFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB' },
   placeOrderBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   placeOrderText: { fontSize: 15, fontFamily: fontFamily.semibold, color: '#fff' },
-  rescheduleBtn: { paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: '#6366F1', alignItems: 'center' },
-  rescheduleBtnText: { fontSize: 14, fontFamily: fontFamily.medium, color: '#6366F1' },
+  rescheduleBtn: { paddingVertical: 14, borderRadius: 14, backgroundColor: '#6366F1', alignItems: 'center' },
+  rescheduleBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: '#fff' },
   feedbackCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
   feedbackTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, textAlign: 'center', marginBottom: 4 },
   feedbackSub: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular, textAlign: 'center', marginBottom: 16 },
