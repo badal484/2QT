@@ -128,6 +128,7 @@ const KitchenDineInScreen = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
       setStaffOrderBooking(null);
       setStaffOrderItems({});
       setStaffOrderSearch('');
@@ -165,6 +166,7 @@ const KitchenDineInScreen = () => {
     const onTableOrder = () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-tickets'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
     };
     const onTableCheckin = () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });

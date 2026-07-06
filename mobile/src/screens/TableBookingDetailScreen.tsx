@@ -21,8 +21,6 @@ import { BouncingButton } from '../components/ui/BouncingButton';
 let RazorpayCheckout: any = null;
 try { RazorpayCheckout = require('react-native-razorpay').default; } catch (_) {}
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
 const formatTime12h = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
 
 const formatSlot = (iso: string) => {
@@ -187,9 +185,16 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
           razorpayOrderId: response.razorpay_order_id || rzpOrderId,
           razorpayPaymentId: response.razorpay_payment_id,
           razorpaySignature: response.razorpay_signature,
-        }).catch((e: any) => console.warn('[verify-final-payment]', e?.message));
-        queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
-        refetch();
+        })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
+            refetch();
+          })
+          .catch((e: any) => {
+            console.warn('[verify-final-payment]', e?.message);
+            Alert.alert('Payment Received', 'Payment captured but confirmation is delayed. Your bill will update shortly.');
+            queryClient.invalidateQueries({ queryKey: ['table-booking', bookingId] });
+          });
       })
       .catch(() => {});
   }, [booking?.restaurant_name, bookingId, queryClient, refetch]);

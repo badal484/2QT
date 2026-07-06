@@ -482,6 +482,67 @@ router.get('/mine', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
+// ── GET /table-bookings/restaurant/:restaurantId ──────────────────────────────
+// Staff / admin / partner: list all bookings for a restaurant with filters.
+// MUST be registered before GET /:id to avoid route shadowing.
+router.get('/restaurant/:restaurantId', authenticate, async (req: AuthRequest, res) => {
+    const { restaurantId } = req.params;
+    const { date, status } = req.query as { date?: string; status?: string };
+    const allowedRoles = ['super_admin', 'admin', 'chef', 'kitchen_manager', 'partner', 'partner_kitchen', 'finance'];
+
+    if (!allowedRoles.includes(req.user!.role)) return res.status(403).json({ error: 'FORBIDDEN' });
+
+    // Partners can only see their own restaurant
+    if (req.user!.role === 'partner') {
+        const { rows } = await query('SELECT id FROM restaurant_config WHERE id=$1 AND partner_id=$2', [restaurantId, req.user!.userId]);
+        if (!rows[0]) return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    try {
+        const params: any[] = [restaurantId];
+        let dateFilter = '';
+        let statusFilter = '';
+
+        if (date) {
+            params.push(date);
+            dateFilter = `AND DATE(tb.slot_start AT TIME ZONE 'Asia/Kolkata') = $${params.length}`;
+        }
+        if (status) {
+            params.push(status);
+            statusFilter = `AND tb.status = $${params.length}`;
+        }
+
+        const { rows } = await query(`
+            SELECT
+                tb.id, tb.display_id, tb.status, tb.party_size,
+                tb.slot_start, tb.slot_end, tb.occasion, tb.special_requests,
+                tb.pre_order_amount_paise, tb.post_order_amount_paise,
+                tb.gst_amount_paise, tb.total_paid_paise, tb.deposit_amount_paise,
+                tb.final_payment_method, tb.seated_at, tb.completed_at,
+                u.name AS customer_name, u.phone AS customer_phone,
+                rt.table_number,
+                COALESCE(items.list, '[]') AS items
+            FROM table_bookings tb
+            JOIN users u ON u.id = tb.customer_id
+            LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
+            LEFT JOIN LATERAL (
+                SELECT json_agg(json_build_object(
+                    'name', tbi.menu_item_name, 'quantity', tbi.quantity,
+                    'type', tbi.type, 'status', tbi.status
+                ) ORDER BY tbi.ordered_at) AS list
+                FROM table_booking_items tbi WHERE tbi.booking_id = tb.id
+            ) items ON true
+            WHERE tb.restaurant_id = $1 ${dateFilter} ${statusFilter}
+            ORDER BY tb.slot_start ASC
+            LIMIT 100
+        `, params);
+
+        res.json({ bookings: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ── GET /table-bookings/:id ────────────────────────────────────────────────────
 router.get('/:id', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
@@ -521,11 +582,14 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
             return res.status(403).json({ error: 'FORBIDDEN' });
         }
 
-        // Compute outstanding
+        // Compute outstanding with fresh GST — stored gst_amount_paise may be NULL or stale
+        const freshGst = Math.round(
+            (booking.pre_order_amount_paise + booking.post_order_amount_paise) * (booking.gst_percent || 0) / 100
+        );
         const outstanding = (
             booking.pre_order_amount_paise +
             booking.post_order_amount_paise +
-            booking.gst_amount_paise
+            freshGst
         ) - booking.total_paid_paise;
 
         // Is free cancellation still available?
@@ -567,8 +631,10 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
         const isFreeCancellation = now < cutoff;
 
         // Compute refund amounts
-        const preOrderRefund = b.pre_order_amount_paise; // always refunded
-        const depositRefund = isFreeCancellation ? b.deposit_amount_paise : 0;
+        // Only refund to wallet if originally paid via wallet (not Razorpay gateway)
+        const paidViaGateway = !!b.gateway_payment_id;
+        const preOrderRefund = paidViaGateway ? 0 : b.pre_order_amount_paise;
+        const depositRefund = isFreeCancellation ? (paidViaGateway ? 0 : b.deposit_amount_paise) : 0;
         const totalRefund = preOrderRefund + depositRefund;
 
         await withTransaction(async (client) => {
@@ -1034,66 +1100,6 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
-// ── GET /table-bookings/restaurant/:restaurantId ──────────────────────────────
-// Staff / admin / partner: list all bookings for a restaurant with filters.
-router.get('/restaurant/:restaurantId', authenticate, async (req: AuthRequest, res) => {
-    const { restaurantId } = req.params;
-    const { date, status } = req.query as { date?: string; status?: string };
-    const allowedRoles = ['super_admin', 'admin', 'chef', 'kitchen_manager', 'partner', 'partner_kitchen', 'finance'];
-
-    if (!allowedRoles.includes(req.user!.role)) return res.status(403).json({ error: 'FORBIDDEN' });
-
-    // Partners can only see their own restaurant
-    if (req.user!.role === 'partner') {
-        const { rows } = await query('SELECT id FROM restaurant_config WHERE id=$1 AND partner_id=$2', [restaurantId, req.user!.userId]);
-        if (!rows[0]) return res.status(403).json({ error: 'FORBIDDEN' });
-    }
-
-    try {
-        const params: any[] = [restaurantId];
-        let dateFilter = '';
-        let statusFilter = '';
-
-        if (date) {
-            params.push(date);
-            dateFilter = `AND DATE(tb.slot_start AT TIME ZONE 'Asia/Kolkata') = $${params.length}`;
-        }
-        if (status) {
-            params.push(status);
-            statusFilter = `AND tb.status = $${params.length}`;
-        }
-
-        const { rows } = await query(`
-            SELECT
-                tb.id, tb.display_id, tb.status, tb.party_size,
-                tb.slot_start, tb.slot_end, tb.occasion, tb.special_requests,
-                tb.pre_order_amount_paise, tb.post_order_amount_paise,
-                tb.gst_amount_paise, tb.total_paid_paise, tb.deposit_amount_paise,
-                tb.final_payment_method, tb.seated_at, tb.completed_at,
-                u.name AS customer_name, u.phone AS customer_phone,
-                rt.table_number,
-                COALESCE(items.list, '[]') AS items
-            FROM table_bookings tb
-            JOIN users u ON u.id = tb.customer_id
-            LEFT JOIN restaurant_tables rt ON rt.id = tb.table_id
-            LEFT JOIN LATERAL (
-                SELECT json_agg(json_build_object(
-                    'name', tbi.menu_item_name, 'quantity', tbi.quantity,
-                    'type', tbi.type, 'status', tbi.status
-                ) ORDER BY tbi.ordered_at) AS list
-                FROM table_booking_items tbi WHERE tbi.booking_id = tb.id
-            ) items ON true
-            WHERE tb.restaurant_id = $1 ${dateFilter} ${statusFilter}
-            ORDER BY tb.slot_start ASC
-            LIMIT 100
-        `, params);
-
-        res.json({ bookings: rows });
-    } catch (err: any) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // ── POST /table-bookings/:id/item-status ──────────────────────────────────────
 // Kitchen/partner marks an individual item as preparing → served.
 router.post('/:id/item-status', authenticate, async (req: AuthRequest, res) => {
@@ -1144,13 +1150,14 @@ router.post('/:id/no-show', authenticate, async (req: AuthRequest, res) => {
             UPDATE table_bookings
             SET status = 'no_show', no_show_at = NOW()
             WHERE id = $1 AND status = 'confirmed' ${noShowRestaurantFilter}
-            RETURNING customer_id, deposit_amount_paise, pre_order_amount_paise, display_id, restaurant_id
+            RETURNING customer_id, deposit_amount_paise, pre_order_amount_paise, gateway_payment_id, display_id, restaurant_id
         `, noShowParams);
         if (!rows[0]) return res.status(400).json({ error: 'BOOKING_NOT_CONFIRMED' });
         const b = rows[0];
 
-        // Pre-order is refunded to wallet; deposit is forfeited (no-show penalty)
-        if (b.pre_order_amount_paise > 0) {
+        // Pre-order is refunded to wallet only if paid via wallet (not Razorpay gateway)
+        const noShowPaidViaGateway = !!b.gateway_payment_id;
+        if (b.pre_order_amount_paise > 0 && !noShowPaidViaGateway) {
             await withTransaction(async (client) => {
                 await client.query(`
                     INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1,$2)
