@@ -27,10 +27,11 @@ export const initSocket = (server: any) => {
             // Refresh kitchen_id/zone_id from DB — JWT payload may be stale
             // (e.g. admin assigned a zone/kitchen after the user last logged in)
             try {
-                const { rows } = await query('SELECT kitchen_id, zone_id FROM users WHERE id = $1', [decoded.userId]);
+                const { rows } = await query('SELECT kitchen_id, zone_id, restaurant_id FROM users WHERE id = $1', [decoded.userId]);
                 if (rows[0]) {
                     decoded.kitchenId = rows[0].kitchen_id ?? decoded.kitchenId;
                     decoded.zoneId = rows[0].zone_id ?? decoded.zoneId;
+                    decoded.restaurantId = rows[0].restaurant_id ?? decoded.restaurantId;
                 }
             } catch { /* non-critical — fall back to JWT payload values */ }
             (socket as any).user = decoded;
@@ -57,6 +58,10 @@ export const initSocket = (server: any) => {
 
         if (user.role === 'partner') {
             socket.join(`partner:${user.userId}`);
+        }
+
+        if (user.role === 'dine_in_staff' && user.restaurantId) {
+            socket.join(`restaurant:${user.restaurantId}`);
         }
 
         if (user.role === 'rider' || user.role === 'rider_captain' || user.role === 'super_admin') {
@@ -164,4 +169,8 @@ export const emitToAll = (event: string, data: any) => {
 
 export const emitToPartner = (partnerId: string, event: string, data: any) => {
     if (io) io.to(`partner:${partnerId}`).emit(event, data);
+};
+
+export const emitToRestaurant = (restaurantId: string, event: string, data: any) => {
+    if (io) io.to(`restaurant:${restaurantId}`).emit(event, data);
 };

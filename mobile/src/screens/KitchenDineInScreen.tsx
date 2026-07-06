@@ -125,14 +125,14 @@ const KitchenDineInScreen = () => {
   const staffOrderMutation = useMutation({
     mutationFn: ({ bookingId, items, skip }: { bookingId: string; items: any[]; skip: boolean }) =>
       api.post(`/table-bookings/${bookingId}/post-order`, { items, skipKitchen: skip }),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-tickets'] });
       setStaffOrderBooking(null);
       setStaffOrderItems({});
       setStaffOrderSearch('');
       setSkipKitchen(false);
-      Alert.alert('Done', skipKitchen ? 'Items added directly to bill.' : 'Order sent to kitchen.');
+      Alert.alert('Done', variables.skip ? 'Items added directly to bill.' : 'Order sent to kitchen.');
     },
     onError: (err: any) => Alert.alert('Error', err?.message || 'Failed to add items.'),
   });
@@ -147,7 +147,7 @@ const KitchenDineInScreen = () => {
 
   const markPaidMutation = useMutation({
     mutationFn: ({ bookingId, method }: { bookingId: string; method: string }) =>
-      api.post(`/table-bookings/${bookingId}/mark-paid`, { paymentMethod: method }),
+      api.post(`/table-bookings/${bookingId}/mark-paid`, { method }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
@@ -207,7 +207,10 @@ const KitchenDineInScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in'] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] }),
+      queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] }),
+    ]);
     setRefreshing(false);
   };
 

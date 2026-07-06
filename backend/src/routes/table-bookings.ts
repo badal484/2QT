@@ -2,7 +2,7 @@ import { Router } from 'express';
 import Razorpay from 'razorpay';
 import { query, withTransaction } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { emitToUser, emitToKitchen, emitToPartner, emitToAdmin } from '../socket';
+import { emitToUser, emitToKitchen, emitToPartner, emitToAdmin, emitToRestaurant } from '../socket';
 import { NotificationService } from '../services/notification.service';
 
 const router = Router();
@@ -40,6 +40,9 @@ async function findFreeTable(
 
 // Route a kitchen ticket to own restaurant kitchen or partner portal.
 async function routeTicket(restaurantId: string, event: string, data: any) {
+    // Always notify dine_in_staff watching this restaurant
+    emitToRestaurant(restaurantId, event, data);
+
     const { rows } = await query(
         'SELECT partner_id, zone_id FROM restaurant_config WHERE id = $1', [restaurantId]
     );
@@ -351,6 +354,90 @@ router.post('/verify-payment', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
+// ── POST /table-bookings/:id/verify-final-payment ─────────────────────────────
+// Verifies Razorpay payment for the final bill of a seated table booking.
+router.post('/:id/verify-final-payment', authenticate, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+        return res.status(400).json({ error: 'Missing payment fields' });
+    }
+
+    const crypto = await import('crypto');
+    const expected = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest('hex');
+
+    if (expected !== razorpaySignature) {
+        return res.status(400).json({ error: 'INVALID_SIGNATURE' });
+    }
+
+    try {
+        const { rows: exists } = await query(`
+            SELECT rc.gst_percent FROM table_bookings tb
+            JOIN restaurant_config rc ON rc.id = tb.restaurant_id WHERE tb.id = $1
+        `, [id]);
+        if (!exists[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        const gstPercent: number = exists[0].gst_percent;
+
+        let b: any = null;
+        let grandTotal = 0;
+        let outstanding = 0;
+
+        await withTransaction(async (client) => {
+            const { rows } = await client.query(`
+                SELECT customer_id, restaurant_id, display_id,
+                       pre_order_amount_paise, post_order_amount_paise,
+                       total_paid_paise, status
+                FROM table_bookings WHERE id = $1 FOR UPDATE
+            `, [id]);
+            if (!rows[0]) throw new Error('NOT_FOUND');
+            b = rows[0];
+            if (b.status !== 'seated') throw new Error('BOOKING_NOT_SEATED');
+
+            const freshGst = Math.round((b.pre_order_amount_paise + b.post_order_amount_paise) * gstPercent / 100);
+            grandTotal = b.pre_order_amount_paise + b.post_order_amount_paise + freshGst;
+            outstanding = grandTotal - b.total_paid_paise;
+            if (outstanding <= 0) throw new Error('NOTHING_OUTSTANDING');
+
+            await client.query(`
+                UPDATE table_bookings
+                SET total_paid_paise = total_paid_paise + $2,
+                    gst_amount_paise = $3,
+                    gateway_payment_id = $4,
+                    final_payment_method = 'gateway',
+                    status = 'completed', completed_at = NOW(), updated_at = NOW()
+                WHERE id = $1 AND status = 'seated'
+            `, [id, outstanding, freshGst, razorpayPaymentId]);
+
+            await client.query(`
+                INSERT INTO table_booking_payments
+                    (booking_id, amount_paise, payment_method, payment_type, gateway_payment_id)
+                VALUES ($1,$2,'gateway','final_settlement',$3)
+            `, [id, outstanding, razorpayPaymentId]);
+        });
+
+        const loyaltyPoints = Math.floor(grandTotal / 1000);
+        if (loyaltyPoints > 0) {
+            await query(
+                "INSERT INTO loyalty_transactions (customer_id, points, type) VALUES ($1,$2,'earn')",
+                [b.customer_id, loyaltyPoints]
+            );
+        }
+
+        emitToUser(b.customer_id, 'wallet_updated', {});
+        emitToUser(b.customer_id, 'table_booking_updated', { bookingId: id, status: 'completed' });
+        await routeTicket(b.restaurant_id, 'table_checkout', { bookingId: id, displayId: b.display_id, method: 'gateway' });
+
+        res.json({ success: true, loyaltyPointsEarned: loyaltyPoints });
+    } catch (err: any) {
+        if (err.message === 'BOOKING_NOT_SEATED') return res.status(400).json({ error: 'BOOKING_NOT_SEATED' });
+        if (err.message === 'NOTHING_OUTSTANDING') return res.status(200).json({ success: true }); // idempotent
+        if (err.message === 'NOT_FOUND') return res.status(404).json({ error: 'NOT_FOUND' });
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ── GET /table-bookings/mine ───────────────────────────────────────────────────
 router.get('/mine', authenticate, async (req: AuthRequest, res) => {
     const customerId = req.user!.userId;
@@ -569,12 +656,10 @@ router.post('/:id/checkin', authenticate, async (req: AuthRequest, res) => {
             bookingId: id, status: 'seated', message: 'Welcome! You\'re seated.'
         });
 
-        // Notify kitchen/partner to start serving the pre-order
-        if (b.pre_order_amount_paise > 0) {
-            await routeTicket(b.restaurant_id, 'table_checkin', {
-                bookingId: id, displayId: b.display_id, partySize: b.party_size, occasion: b.occasion
-            });
-        }
+        // Notify kitchen/partner to start preparing the pre-order
+        await routeTicket(b.restaurant_id, 'table_checkin', {
+            bookingId: id, displayId: b.display_id, partySize: b.party_size, occasion: b.occasion
+        });
 
         res.json({ success: true, displayId: b.display_id });
     } catch (err: any) {
@@ -934,7 +1019,6 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
         }
 
         emitToUser(b.customer_id, 'table_booking_updated', { bookingId: id, status: 'completed' });
-        emitToUser(b.customer_id, 'wallet_updated', {});
         NotificationService.send('broadcast_message', {
             userId: b.customer_id,
             title: 'Thanks for dining with us!',
@@ -1186,12 +1270,14 @@ router.post('/:id/feedback', authenticate, async (req: AuthRequest, res) => {
         if (b.customer_id !== customerId) return res.status(403).json({ error: 'FORBIDDEN' });
         if (b.feedback_at) return res.status(409).json({ error: 'ALREADY_REVIEWED' });
 
-        await query(`
+        const { rows: updated } = await query(`
             UPDATE table_bookings
             SET feedback_rating = $2, feedback_comment = $3, feedback_at = NOW()
             WHERE id = $1 AND status = 'completed'
+            RETURNING id
         `, [id, rating, comment?.trim() || null]);
 
+        if (!updated[0]) return res.status(400).json({ error: 'BOOKING_NOT_COMPLETED' });
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
