@@ -14,6 +14,7 @@ import { getSocket } from '../socket/client';
 import { LogOut, ChevronRight, Check, X, Wallet, History } from 'lucide-react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
+import { displayLocalNotification } from '../services/localNotif';
 
 const G = {
   bg: '#070F0C',
@@ -116,6 +117,9 @@ const RiderHomeScreen = ({ navigation }: any) => {
     import('react-native').then(({ Vibration }) => {
       Vibration.vibrate([1000, 1000], true);
     });
+    
+    // Play sound via local notification
+    displayLocalNotification('New Delivery Request', 'A new order is available. Tap to view.');
 
     startTimer(order._kitchenAssigned ? order.orderId : order.id, timeoutSeconds, order._kitchenAssigned);
   };
@@ -198,6 +202,31 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
 
   // ── GPS location heartbeat ─────────────────────────────────────────────────
+  
+  // ── Helper for Earnings ───────────────────────────────────────────────────
+  const getEstimatedEarnings = (order: any) => {
+    let base = 20;
+    if (order.kitchen_lat && order.customer_lat) {
+      const R = 6371;
+      const kLat = parseFloat(order.kitchen_lat);
+      const kLng = parseFloat(order.kitchen_lng);
+      const cLat = parseFloat(order.customer_lat);
+      const cLng = parseFloat(order.customer_lng);
+      
+      if (!isNaN(kLat) && !isNaN(kLng) && !isNaN(cLat) && !isNaN(cLng)) {
+        const dLat = (cLat - kLat) * (Math.PI / 180);
+        const dLng = (cLng - kLng) * (Math.PI / 180);
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(kLat * (Math.PI / 180)) * Math.cos(cLat * (Math.PI / 180)) *
+                  Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const dist = R * c;
+        if (dist > 2) base += (dist - 2) * 5;
+      }
+    }
+    const net = base - (20 * 0.1); 
+    return Math.floor(net);
+  };
   const latestLocationRef = useRef(currentLocation);
   useEffect(() => {
     latestLocationRef.current = currentLocation;
@@ -444,9 +473,9 @@ const RiderHomeScreen = ({ navigation }: any) => {
             </View>
             {!pendingOrder._kitchenAssigned && (
               <View style={[styles.notifDetail, { alignItems: 'flex-end' }]}>
-                <Text style={styles.notifDetailLabel}>EARNINGS</Text>
+                <Text style={styles.notifDetailLabel}>EST. EARNINGS</Text>
                 <Text style={[styles.notifDetailValue, { color: G.orange }]}>
-                  ₹{pendingOrder.delivery_fee_paise ? Math.round(pendingOrder.delivery_fee_paise / 100) : '—'}
+                  ₹{getEstimatedEarnings(pendingOrder)}
                 </Text>
               </View>
             )}

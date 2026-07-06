@@ -442,7 +442,7 @@ const CartScreen = ({ navigation }: any) => {
                 </Text>
               )}
             </View>
-            <Text style={styles.changeText}>Change</Text>
+            <Text style={styles.changeText}>{selectedAddress ? 'Change' : 'Add'}</Text>
           </BouncingButton>
         </Animated.View>
 

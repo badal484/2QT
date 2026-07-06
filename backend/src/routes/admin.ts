@@ -1811,6 +1811,18 @@ router.put('/restaurants/:id/tables/:tableId', authenticate, requireRole('super_
     }
 });
 
+// ── DELETE /admin/restaurants/:id/tables/:tableId ─────────────────────────────
+router.delete('/restaurants/:id/tables/:tableId', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+    const { tableId } = req.params;
+    try {
+        const { rowCount } = await query('DELETE FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2', [tableId, req.params.id]);
+        if (rowCount === 0) return res.status(404).json({ error: 'NOT_FOUND' });
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ── GET /admin/restaurants/:id/menu ───────────────────────────────────────────
 router.get('/restaurants/:id/menu', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     try {

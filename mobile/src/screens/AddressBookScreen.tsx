@@ -1,4 +1,4 @@
-import { ArrowLeft, MapPin, Navigation, Search } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Navigation, Search, Home, Briefcase, Building } from 'lucide-react-native';
 import React, { useState, useEffect, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
@@ -22,11 +22,11 @@ import { reverseGeocodeDetailed } from '../utils/geocode';
 import { RootState } from '../store';
 
 const LABELS = [
-  { key: 'Home',   icon: '🏠' },
-  { key: 'Office', icon: '💼' },
-  { key: 'PG',     icon: '🛏' },
-  { key: 'Hostel', icon: '🏨' },
-  { key: 'Other',  icon: '📍' },
+  { key: 'Home',   Icon: Home },
+  { key: 'Office', Icon: Briefcase },
+  { key: 'PG',     Icon: Building },
+  { key: 'Hostel', Icon: Building },
+  { key: 'Other',  Icon: MapPin },
 ];
 
 const AddressBookScreen = ({ navigation, route }: any) => {
@@ -265,7 +265,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
                   style={[styles.chip, active && styles.chipActive]}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.chipIcon}>{l.icon}</Text>
+                  <l.Icon size={16} color={active ? '#fff' : '#6B7280'} />
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>{l.key}</Text>
                 </BouncingButton>
               );
