@@ -34,6 +34,7 @@ const NotificationsTab = dynamic(() => import("./NotificationsTab").then(m => ({
 const DispatchTab = dynamic(() => import("./DispatchTab").then(m => ({ default: m.DispatchTab })), { ssr: false });
 const MenuOffersTab = dynamic(() => import("./MenuOffersTab").then(m => ({ default: m.MenuOffersTab })), { ssr: false });
 const RestaurantsTab = dynamic(() => import("./RestaurantsTab").then(m => ({ default: m.RestaurantsTab })), { ssr: false });
+const ActivityTab = dynamic(() => import("./ActivityTab"), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1753,34 +1754,42 @@ function RiderApplicationsTab() {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { name: "Overview", icon: LayoutDashboard, component: OverviewTab },
-  { name: "Orders", icon: ShoppingBag, component: OrdersTab },
-  { name: "Scheduled", icon: Calendar, component: ScheduledTab },
-  { name: "Menu", icon: Utensils, component: MenuTab },
-  { name: "Inventory", icon: Box, component: InventoryTab },
-  { name: "Fleet", icon: Bike, component: FleetTab },
-  { name: "Dispatch", icon: Package, component: DispatchTab },
-  { name: "Applications", icon: Info, component: RiderApplicationsTab },
-  { name: "Customers", icon: Users, component: CustomersTab },
-  { name: "Complaints", icon: AlertTriangle, component: ComplaintsTab },
-  { name: "Support", icon: LifeBuoy, component: SupportTab },
-  { name: "Finance", icon: Wallet, component: PayoutsTab },
-  { name: "Analytics", icon: BarChart3, component: AnalyticsTab },
-  { name: "Broadcast", icon: Send, component: BroadcastTab },
-  { name: "Systems", icon: Cpu, component: SystemsTab },
-  { name: "Campaigns", icon: Zap, component: CampaignsTab },
-  { name: "Marketing", icon: Zap, component: MarketingTab },
-  { name: "Promo Codes", icon: Ticket, component: PromoCodesTab },
-  { name: "Zones", icon: MapPin, component: ZonesTab },
-  { name: "Categories", icon: LayoutGrid, component: CategoriesTab },
-  { name: "Delivery Pricing", icon: Receipt, component: DeliveryPricingTab },
-  { name: "Menu Offers", icon: Tag, component: MenuOffersTab },
-  { name: "Kitchens", icon: Store, component: KitchensTab },
-  { name: "Partners", icon: Store, component: PartnersTab },
-  { name: "Restaurants", icon: Utensils, component: RestaurantsTab },
-  { name: "Team", icon: Users, component: TeamTab },
-  { name: "Notifications", icon: Bell, component: NotificationsTab },
-  { name: "Settings", icon: Settings, component: SettingsTab },
+  // Core
+  { name: "Overview",        icon: LayoutDashboard, component: OverviewTab },
+  { name: "Analytics",       icon: BarChart3,        component: AnalyticsTab },
+  // Orders & Fleet
+  { name: "Orders",          icon: ShoppingBag,      component: OrdersTab },
+  { name: "Scheduled",       icon: Calendar,         component: ScheduledTab },
+  { name: "Dispatch",        icon: Package,          component: DispatchTab },
+  { name: "Fleet",           icon: Bike,             component: FleetTab },
+  { name: "Applications",    icon: Info,             component: RiderApplicationsTab },
+  // Restaurants
+  { name: "Restaurants",     icon: Utensils,         component: RestaurantsTab },
+  { name: "Kitchens",        icon: Store,            component: KitchensTab },
+  { name: "Partners",        icon: Store,            component: PartnersTab },
+  { name: "Menu",            icon: Utensils,         component: MenuTab },
+  { name: "Categories",      icon: LayoutGrid,       component: CategoriesTab },
+  { name: "Inventory",       icon: Box,              component: InventoryTab },
+  // Growth
+  { name: "Broadcast",       icon: Send,             component: BroadcastTab },
+  { name: "Campaigns",       icon: Zap,              component: CampaignsTab },
+  { name: "Promo Codes",     icon: Ticket,           component: PromoCodesTab },
+  { name: "Menu Offers",     icon: Tag,              component: MenuOffersTab },
+  { name: "Marketing",       icon: Camera,           component: MarketingTab },
+  // Customers
+  { name: "Customers",       icon: Users,            component: CustomersTab },
+  { name: "Support",         icon: LifeBuoy,         component: SupportTab },
+  { name: "Complaints",      icon: AlertTriangle,    component: ComplaintsTab },
+  // Platform
+  { name: "Zones",           icon: MapPin,           component: ZonesTab },
+  { name: "Delivery Pricing",icon: Receipt,          component: DeliveryPricingTab },
+  { name: "Kitchen Health",  icon: Activity,         component: KitchenHealthTab },
+  { name: "Rider Payouts",   icon: Wallet,           component: PayoutsTab },
+  { name: "Notifications",   icon: Bell,             component: NotificationsTab },
+  { name: "Activity Log",    icon: Clock,            component: ActivityTab },
+  { name: "Team",            icon: Users,            component: TeamTab },
+  { name: "Systems",         icon: Cpu,              component: SystemsTab },
+  { name: "Settings",        icon: Settings,         component: SettingsTab },
 ];
 
 export default function AdminPage() {
@@ -1788,6 +1797,8 @@ export default function AdminPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("Overview");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (loading) return;
@@ -1853,38 +1864,63 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="flex-1 px-3 overflow-y-auto pb-4 space-y-6">
+        <div className="flex-1 px-3 overflow-y-auto pb-4">
           {[
-            { section: "Main", items: ["Overview", "Analytics", "Orders", "Scheduled", "Dispatch", "Fleet", "Customers", "Support"] },
-            { section: "Operations", items: ["Menu", "Inventory", "Categories", "Zones", "Delivery Pricing", "Menu Offers", "Kitchens", "Partners", "Restaurants", "Finance", "Applications"] },
-            { section: "System", items: ["Team", "Broadcast", "Marketing", "Promo Codes", "Campaigns", "Complaints", "Notifications", "Systems", "Settings"] },
-          ].map(group => (
-            <div key={group.section}>
-              <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-3 mb-2">{group.section}</div>
-              <div className="space-y-0.5">
-                {group.items.map(name => {
-                  const tab = TABS.find(t => t.name === name);
-                  if (!tab) return null;
-                  const isActive = activeTab === name;
-                  return (
-                    <button
-                      key={name}
-                      onClick={() => setActiveTab(name)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
-                        isActive ? "bg-white/[0.08] text-white" : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]"
-                      }`}
-                    >
-                      <tab.icon className={`w-4 h-4 shrink-0 ${isActive ? "text-brand-primary" : "text-zinc-500 group-hover:text-zinc-400"}`} />
-                      <span className="flex-1 text-left">{name}</span>
-                    </button>
-                  );
-                })}
+            { section: "Core",           items: ["Overview", "Analytics"] },
+            { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Fleet", "Applications"] },
+            { section: "Restaurants",    items: ["Restaurants", "Kitchens", "Partners", "Menu", "Categories", "Inventory"] },
+            { section: "Growth",         items: ["Broadcast", "Campaigns", "Promo Codes", "Menu Offers", "Marketing"] },
+            { section: "Customers",      items: ["Customers", "Support", "Complaints"] },
+            { section: "Platform",       items: ["Zones", "Delivery Pricing", "Kitchen Health", "Rider Payouts", "Notifications", "Activity Log", "Team", "Systems", "Settings"] },
+          ].map(group => {
+            const visibleItems = sidebarSearch
+              ? group.items.filter(n => n.toLowerCase().includes(sidebarSearch.toLowerCase()))
+              : group.items;
+            if (sidebarSearch && visibleItems.length === 0) return null;
+            const isCollapsed = collapsedSections.has(group.section) && !sidebarSearch;
+            return (
+              <div key={group.section} className="mt-5 first:mt-0">
+                <button
+                  onClick={() => setCollapsedSections(prev => {
+                    const next = new Set(prev);
+                    next.has(group.section) ? next.delete(group.section) : next.add(group.section);
+                    return next;
+                  })}
+                  className="w-full flex items-center justify-between px-3 mb-1 group"
+                >
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest group-hover:text-zinc-400 transition-colors">{group.section}</span>
+                  <ChevronRight className={`w-3 h-3 text-zinc-600 transition-transform duration-150 ${isCollapsed ? "" : "rotate-90"}`} />
+                </button>
+                {!isCollapsed && (
+                  <div className="space-y-0.5">
+                    {visibleItems.map(name => {
+                      const tab = TABS.find(t => t.name === name);
+                      if (!tab) return null;
+                      const isActive = activeTab === name;
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => { setActiveTab(name); setSidebarSearch(""); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
+                            isActive ? "bg-white/[0.08] text-white" : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]"
+                          }`}
+                        >
+                          <tab.icon className={`w-4 h-4 shrink-0 ${isActive ? "text-brand-primary" : "text-zinc-500 group-hover:text-zinc-400"}`} />
+                          <span className="flex-1 text-left">{name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          <div className="pt-4 border-t border-white/[0.05] px-3">
-            <button className="w-full flex items-center justify-between py-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
+          <div className="mt-5 pt-4 border-t border-white/[0.05] px-3">
+            <button
+              onClick={() => toast.info("Keyboard shortcuts modal coming soon!")}
+              className="w-full flex items-center justify-between py-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
               <span className="flex items-center gap-2"><Command className="w-4 h-4" /> Shortcuts</span>
               <span className="text-[10px] bg-white/[0.05] px-1.5 py-0.5 rounded font-mono">⌘K</span>
             </button>
@@ -1912,23 +1948,48 @@ export default function AdminPage() {
         <header className="h-16 px-8 border-b border-white/[0.05] flex items-center justify-between bg-[#07070e]/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
           <div className="flex items-center w-full max-w-md relative">
             <Search className="w-4 h-4 text-zinc-500 absolute left-3" />
-            <input 
-              type="text" 
-              placeholder="Global search..." 
+            <input
+              type="text"
+              value={sidebarSearch}
+              onChange={(e) => setSidebarSearch(e.target.value)}
+              placeholder="Search tabs..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && sidebarSearch.trim()) {
+                  const match = TABS.find(t => t.name.toLowerCase().includes(sidebarSearch.toLowerCase()));
+                  if (match) { setActiveTab(match.name); setSidebarSearch(""); }
+                  else toast.info("No matching tab found");
+                }
+                if (e.key === 'Escape') setSidebarSearch("");
+              }}
               className="w-full bg-[#11111a] border border-white/[0.05] rounded-lg pl-10 pr-12 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
             />
-            <div className="absolute right-3 flex gap-1">
-              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-white/[0.05] rounded font-mono text-zinc-500 border border-white/[0.05]">⌘</kbd>
-              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-white/[0.05] rounded font-mono text-zinc-500 border border-white/[0.05]">K</kbd>
-            </div>
+            {sidebarSearch ? (
+              <button onClick={() => setSidebarSearch("")} className="absolute right-3 text-zinc-500 hover:text-white transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <div className="absolute right-3 flex gap-1">
+                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-white/[0.05] rounded font-mono text-zinc-500 border border-white/[0.05]">⌘</kbd>
+                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-white/[0.05] rounded font-mono text-zinc-500 border border-white/[0.05]">K</kbd>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+            <button 
+              onClick={() => toast.info("No new notifications")}
+              className="relative w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+            >
               <Bell className="w-4 h-4" />
               <span className="absolute top-1 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-[#07070e]" />
             </button>
             <div className="w-px h-6 bg-white/[0.1]" />
-            <div className="flex items-center gap-2 cursor-pointer">
+            <div 
+              onClick={() => {
+                toast.success("Logging out...");
+                setTimeout(() => { logout(); router.push("/"); }, 1000);
+              }}
+              className="flex items-center gap-2 cursor-pointer hover:bg-white/[0.05] p-1 pr-2 rounded-full transition-colors"
+            >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-xs">
                 {user?.name?.[0] ?? "A"}
               </div>
