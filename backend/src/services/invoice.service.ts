@@ -8,9 +8,11 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
 
     // 1. Fetch Order Details
     const { rows: orderRows } = await query(`
-        SELECT o.*, u.name as customer_name, u.phone as customer_phone
+        SELECT o.*, u.name as customer_name, u.phone as customer_phone,
+               k.name as kitchen_name, k.address as kitchen_address
         FROM orders o
         JOIN users u ON o.customer_id = u.id
+        LEFT JOIN kitchens k ON o.kitchen_id = k.id
         WHERE o.id = $1
     `, [orderId]);
 
@@ -50,8 +52,8 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
        .fontSize(36).font('Helvetica-Bold')
        .text('2QT', 50, 35)
        .fontSize(11).font('Helvetica')
-       .text('Premium Food Delivery', 50, 75)
-       .text('Kundanahalli Central, Bengaluru', 50, 90);
+       .text(order.kitchen_name ? `Fulfilled by ${order.kitchen_name}` : 'Premium Food Delivery', 50, 75)
+       .text(order.kitchen_address || 'Kundanahalli Central, Bengaluru', 50, 90);
 
     // Invoice Title Area
     doc.fontSize(32).font('Helvetica-Bold')

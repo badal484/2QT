@@ -11,8 +11,13 @@ import {
 type MediaItem = { url: string; type: "image" | "video"; thumbnail_url?: string };
 
 const parsePhotos = (photos: any): MediaItem[] => {
-  if (!photos || !Array.isArray(photos)) return [];
-  return photos
+  if (!photos) return [];
+  let parsed = photos;
+  if (typeof photos === "string") {
+    try { parsed = JSON.parse(photos); } catch { return []; }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
     .map((p: any) => {
       if (typeof p === "string") {
         try {
@@ -780,6 +785,17 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
     }
   };
 
+  const deleteTable = async (t: any) => {
+    if (!confirm(`Delete table ${t.table_number}?`)) return;
+    try {
+      await api.delete(`/admin/restaurants/${restaurant.id}/tables/${t.id}`);
+      fetchTables();
+      toast.success("Table deleted");
+    } catch {
+      toast.error("Failed to delete table");
+    }
+  };
+
   const addMenuItem = async () => {
     if (!newItem.name.trim() || !newItem.pricePaise) return;
     setAddingItem(true);
@@ -1083,12 +1099,21 @@ function RestaurantDetailDrawer({ restaurant: initialRestaurant, zones = [], onC
                         <div className="text-white text-sm font-semibold">Table {t.table_number}</div>
                         <div className="text-xs text-white/40">Capacity: {t.capacity}</div>
                       </div>
-                      <button
-                        onClick={() => toggleTable(t)}
-                        className={`text-xs px-3 py-1 rounded-lg transition ${t.is_active ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" : "bg-red-500/10 text-red-400 hover:bg-red-500/20"}`}
-                      >
-                        {t.is_active ? "Active" : "Inactive"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleTable(t)}
+                          className={`text-xs px-3 py-1 rounded-lg transition ${t.is_active ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" : "bg-red-500/10 text-red-400 hover:bg-red-500/20"}`}
+                        >
+                          {t.is_active ? "Active" : "Inactive"}
+                        </button>
+                        <button
+                          onClick={() => deleteTable(t)}
+                          className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center flex-shrink-0"
+                          title="Delete Table"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
