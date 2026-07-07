@@ -34,23 +34,19 @@ export default function ActivityTab() {
   */
 
   const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'rider': return "🏍️";
-      case 'kitchen': return "👨‍🍳";
-      case 'finance': return "💰";
-      case 'admin': return "🛡️";
-      default: return "👤";
-    }
+    if (role.includes('rider')) return "🏍️";
+    if (role.includes('kitchen') || role === 'chef' || role === 'dine_in_staff') return "👨‍🍳";
+    if (role === 'finance') return "💰";
+    if (role.includes('admin')) return "🛡️";
+    return "👤";
   };
 
   const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'rider': return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
-      case 'kitchen': return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
-      case 'finance': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
-      case 'admin': return 'text-purple-400 bg-purple-400/10 border-purple-400/20';
-      default: return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
-    }
+    if (role.includes('rider')) return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
+    if (role.includes('kitchen') || role === 'chef' || role === 'dine_in_staff') return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
+    if (role === 'finance') return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
+    if (role.includes('admin')) return 'text-purple-400 bg-purple-400/10 border-purple-400/20';
+    return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
   };
 
   const formatAction = (action: string) => {
