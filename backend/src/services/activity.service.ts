@@ -40,9 +40,19 @@ export class ActivityLogService {
         let paramCount = 1;
 
         if (role && role !== 'all') {
-            queryStr += ` AND user_role = $${paramCount}`;
-            queryParams.push(role);
-            paramCount++;
+            if (role === 'admin') {
+                queryStr += ` AND user_role IN ('admin', 'super_admin')`;
+            } else if (role === 'kitchen') {
+                queryStr += ` AND user_role IN ('kitchen_manager', 'chef', 'dine_in_staff')`;
+            } else if (role === 'rider') {
+                queryStr += ` AND user_role IN ('rider', 'rider_captain')`;
+            } else if (role === 'finance') {
+                queryStr += ` AND user_role = 'finance'`;
+            } else {
+                queryStr += ` AND user_role = $${paramCount}`;
+                queryParams.push(role);
+                paramCount++;
+            }
         }
 
         if (action && action !== 'all') {
