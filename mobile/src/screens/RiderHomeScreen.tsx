@@ -119,7 +119,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     });
     
     // Play sound via local notification
-    displayLocalNotification('New Delivery Request', 'A new order is available. Tap to view.');
+    displayLocalNotification('New Delivery Request', 'A new order is available. Tap to view.', { type: 'order_update' });
 
     startTimer(order._kitchenAssigned ? order.orderId : order.id, timeoutSeconds, order._kitchenAssigned);
   };

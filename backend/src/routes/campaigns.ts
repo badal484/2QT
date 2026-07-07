@@ -10,7 +10,7 @@ const router = express.Router();
 const CAMPAIGN_TTL = 30;
 
 async function bustCampaignCache() {
-    try { await redis.del(keys.activeCampaigns()); } catch (_) {}
+    try { await redis.del(keys.activeCampaigns()); } catch (e) { console.warn('[cache] bustCampaignCache failed:', e); }
 }
 
 // Resolve audience for a campaign and send the configured notification template

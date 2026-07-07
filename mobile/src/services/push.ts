@@ -140,7 +140,7 @@ export function setupBackgroundHandler() {
             const { displayLocalNotification } = require('./localNotif');
             await displayLocalNotification(title, body, data);
         });
-    } catch {}
+    } catch (e) { console.warn('[FCM] onMessage handler setup failed:', e); }
 }
 
 export async function getInitialNotification() {

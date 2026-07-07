@@ -110,16 +110,42 @@ router.get('/activity-logs', authenticate, requireRole('super_admin', 'admin'), 
 
 router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
-        const { rows: activeOrders } = await query('SELECT count(*) FROM orders WHERE status NOT IN (\'delivered\', \'cancelled\')');
-        const { rows: revenue } = await query('SELECT sum(total_amount_paise) FROM orders WHERE payment_status = \'paid\' AND created_at >= CURRENT_DATE');
-        const { rows: ridersOnline } = await query("SELECT count(*) FROM users WHERE role IN ('rider', 'rider_captain') AND is_online = true");
-        const { rows: lowStock } = await query('SELECT count(*) FROM ingredients WHERE current_stock_grams <= reorder_threshold_grams');
+        const [
+            { rows: activeOrders },
+            { rows: revenue },
+            { rows: ridersOnline },
+            { rows: lowStock },
+            { rows: customers },
+            { rows: weeklyRev },
+        ] = await Promise.all([
+            query("SELECT count(*) FROM orders WHERE status NOT IN ('delivered','cancelled')"),
+            query("SELECT sum(total_amount_paise) FROM orders WHERE payment_status='paid' AND created_at >= CURRENT_DATE"),
+            query("SELECT count(*) FROM users WHERE role IN ('rider','rider_captain') AND is_online = true"),
+            query('SELECT count(*) FROM ingredients WHERE current_stock_grams <= reorder_threshold_grams'),
+            query("SELECT count(*) FROM users WHERE role='customer'"),
+            query(`
+                SELECT d::date AS day,
+                       to_char(d::date, 'Dy') AS label,
+                       COALESCE(SUM(o.total_amount_paise), 0) AS revenue_paise
+                FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day') d
+                LEFT JOIN orders o
+                       ON DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = d::date
+                      AND o.payment_status = 'paid'
+                GROUP BY d::date
+                ORDER BY d::date ASC
+            `),
+        ]);
 
         res.json({
             activeOrders: parseInt(activeOrders[0].count),
             todayRevenuePaise: parseInt(revenue[0].sum || '0'),
             ridersOnline: parseInt(ridersOnline[0].count),
-            lowStockAlerts: parseInt(lowStock[0].count)
+            lowStockAlerts: parseInt(lowStock[0].count),
+            totalCustomers: parseInt(customers[0].count),
+            weeklyRevenue: weeklyRev.map(r => ({
+                label: r.label,
+                revenuePaise: parseInt(r.revenue_paise),
+            })),
         });
     } catch (err: any) {
         console.error('Dashboard Error:', err);
@@ -238,11 +264,25 @@ router.get('/orders/scheduled', authenticate, requireRole('super_admin', 'admin'
     res.json({ scheduledOrders: rows });
 });
 
+router.delete('/scheduled-orders/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    try {
+        const { rowCount } = await query(
+            "UPDATE scheduled_orders SET status='cancelled' WHERE id=$1 AND status='scheduled'",
+            [id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'NOT_FOUND_OR_ALREADY_CANCELLED' });
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get('/menu', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(`
-        SELECT m.*, z.name as zone_name 
-        FROM menu_items m 
-        JOIN zones z ON m.zone_id = z.id 
+        SELECT m.*, z.name as zone_name
+        FROM menu_items m
+        JOIN zones z ON m.zone_id = z.id
         ORDER BY m.category, m.name
     `);
     res.json({ items: rows });

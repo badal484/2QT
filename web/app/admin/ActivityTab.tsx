@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Activity, User, Bike, ChefHat, ShieldAlert, CheckCircle, Search, Wallet } from 'lucide-react'; // Lucide for React Native? No, this is Next.js. Wait, this is a web app. Let me fix imports.
+import { RefreshCw, Activity, User, Bike, ChefHat, ShieldAlert, CheckCircle, Search, Wallet } from 'lucide-react';
 import { api } from '../lib/api';
 import { useSocketRefresh } from '../hooks/useSocketRefresh';
 
