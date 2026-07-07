@@ -458,7 +458,13 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
             })
         );
 
-        res.json({ riders: ridersWithLocation });
+        // Filter out ghost riders (app killed without toggling offline):
+        // Only return them if they have a recent location ping OR they are currently assigned an order
+        const trulyOnlineRiders = ridersWithLocation.filter(r => 
+            r.location !== null || (r.active_orders && r.active_orders.length > 0)
+        );
+
+        res.json({ riders: trulyOnlineRiders });
     } catch (err: any) {
         res.status(500).json({ error: 'FETCH_FAILED', message: err.message });
     }
