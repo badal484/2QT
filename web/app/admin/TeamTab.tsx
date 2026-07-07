@@ -8,19 +8,31 @@ import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const ROLE_META: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  finance:       { label: "Finance",       color: "text-emerald-400", bg: "bg-emerald-400/10", icon: IndianRupee },
-  admin:         { label: "Admin",         color: "text-blue-400",    bg: "bg-blue-400/10",    icon: ShieldCheck },
-  super_admin:   { label: "Super Admin",   color: "text-purple-400",  bg: "bg-purple-400/10",  icon: ShieldCheck },
-  chef:            { label: "Chef",            color: "text-orange-400",  bg: "bg-orange-400/10",  icon: ChefHat },
-  kitchen_manager: { label: "Kitchen Manager", color: "text-rose-400",    bg: "bg-rose-400/10",    icon: ChefHat },
-  rider:           { label: "Rider",           color: "text-yellow-400",  bg: "bg-yellow-400/10",  icon: Bike },
-  rider_captain:   { label: "Rider Captain",   color: "text-amber-400",   bg: "bg-amber-400/10",   icon: Bike },
+  finance:         { label: "Finance",          color: "text-emerald-400", bg: "bg-emerald-400/10", icon: IndianRupee },
+  admin:           { label: "Admin",            color: "text-blue-400",    bg: "bg-blue-400/10",    icon: ShieldCheck },
+  super_admin:     { label: "Super Admin",      color: "text-purple-400",  bg: "bg-purple-400/10",  icon: ShieldCheck },
+  chef:            { label: "Chef",             color: "text-orange-400",  bg: "bg-orange-400/10",  icon: ChefHat },
+  kitchen_manager: { label: "Kitchen Manager",  color: "text-rose-400",    bg: "bg-rose-400/10",    icon: ChefHat },
+  rider:           { label: "Rider",            color: "text-yellow-400",  bg: "bg-yellow-400/10",  icon: Bike },
+  rider_captain:   { label: "Rider Captain",    color: "text-amber-400",   bg: "bg-amber-400/10",   icon: Bike },
+  dine_in_staff:   { label: "Dine-in Staff",    color: "text-amber-300",   bg: "bg-amber-300/10",   icon: ChefHat },
+};
+
+const ROLE_LOGIN_URL: Record<string, string> = {
+  finance:         "2-qt.vercel.app/finance",
+  admin:           "2-qt.vercel.app/admin",
+  super_admin:     "2-qt.vercel.app/admin",
+  chef:            "2-qt.vercel.app/kitchen",
+  kitchen_manager: "2-qt.vercel.app/kitchen",
+  rider:           "Rider mobile app",
+  rider_captain:   "Rider mobile app",
+  dine_in_staff:   "2-qt.vercel.app/restaurant",
 };
 
 function AddUserModal({ open, onAdd, onClose, kitchens }: any) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"finance" | "admin" | "chef" | "kitchen_manager" | "rider">("finance");
+  const [role, setRole] = useState<"finance" | "admin" | "chef" | "kitchen_manager" | "rider" | "dine_in_staff">("finance");
   const [kitchenId, setKitchenId] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -84,12 +96,12 @@ function AddUserModal({ open, onAdd, onClose, kitchens }: any) {
                 className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-brand-primary/50 placeholder:text-white/20"
               />
             </div>
-            <p className="text-xs text-white/30 mt-1.5">They'll log in using this phone number + OTP at <span className="text-white/50">2-qt.vercel.app/finance</span></p>
+            <p className="text-xs text-white/30 mt-1.5">They'll log in via <span className="text-white/50 font-mono">{ROLE_LOGIN_URL[role] ?? "2-qt.vercel.app/login"}</span></p>
           </div>
           <div>
             <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Role</label>
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {(["finance", "admin", "chef", "kitchen_manager", "rider"] as const).map(r => {
+              {(["finance", "admin", "chef", "kitchen_manager", "rider", "dine_in_staff"] as const).map(r => {
                 const m = ROLE_META[r];
                 return (
                   <button
