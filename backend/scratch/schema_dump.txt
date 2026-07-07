@@ -1,0 +1,1120 @@
+
+Table: _migrations
+------------------------
+- filename (text) NOT NULL 
+- ran_at (timestamp with time zone)  DEFAULT now()
+
+Table: addresses
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- label (text) NOT NULL 
+- address_text (text) NOT NULL 
+- building_name (text)  
+- floor_number (text)  
+- flat_number (text)  
+- landmark (text)  
+- gate_access_code (text)  
+- delivery_instructions (text)  
+- lat (numeric) NOT NULL 
+- lng (numeric) NOT NULL 
+- zone_id (uuid)  
+- is_default (boolean)  DEFAULT false
+- is_serviceable (boolean)  DEFAULT false
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- deleted_at (timestamp with time zone)  
+
+Table: app_settings
+------------------------
+- key (text) NOT NULL 
+- value (text) NOT NULL 
+- description (text)  
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: campaigns
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- name (text) NOT NULL 
+- type (text) NOT NULL 
+- is_active (boolean)  DEFAULT true
+- discount_type (text)  DEFAULT 'percentage'::text
+- discount_percent (numeric)  DEFAULT 0
+- discount_flat_paise (integer)  DEFAULT 0
+- max_discount_paise (integer)  
+- min_order_paise (integer)  DEFAULT 0
+- winback_days (integer)  DEFAULT 7
+- flash_start (timestamp with time zone)  
+- flash_end (timestamp with time zone)  
+- happy_hour_start (time without time zone)  
+- happy_hour_end (time without time zone)  
+- happy_hour_days (ARRAY)  DEFAULT ARRAY['mon'::text, 'tue'::text, 'wed'::text, 'thu'::text, 'fri'::text, 'sat'::text, 'sun'::text]
+- config (jsonb)  DEFAULT '{}'::jsonb
+- created_by (uuid)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- audience_type (text)  DEFAULT 'all'::text
+- audience_segment (text)  
+- audience_conditions (jsonb)  DEFAULT '{}'::jsonb
+- schedule_start (timestamp with time zone)  
+- schedule_end (timestamp with time zone)  
+- notif_template_type (text)  
+- notif_sent_at (timestamp with time zone)  
+- reach_count (integer)  DEFAULT 0
+- conversion_count (integer)  DEFAULT 0
+- zone_id (uuid)  
+
+Table: cod_collections
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- rider_id (uuid) NOT NULL 
+- order_id (uuid)  
+- amount_paise (integer) NOT NULL 
+- collected_by (uuid)  
+- notes (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: collection_items
+------------------------
+- collection_id (uuid) NOT NULL 
+- menu_item_id (uuid) NOT NULL 
+- sort_order (integer) NOT NULL DEFAULT 0
+
+Table: collections
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- title (character varying) NOT NULL 
+- subtitle (character varying)  
+- sort_order (integer) NOT NULL DEFAULT 0
+- is_active (boolean) NOT NULL DEFAULT true
+- zone_id (uuid)  
+- created_at (timestamp with time zone)  DEFAULT CURRENT_TIMESTAMP
+- updated_at (timestamp with time zone)  DEFAULT CURRENT_TIMESTAMP
+
+Table: customer_milestones
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- milestone_order_number (integer) NOT NULL 
+- order_id (uuid)  
+- reward_type (text) NOT NULL 
+- reward_paise (integer)  DEFAULT 0
+- reached_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: customer_promo_uses
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- promo_code_id (uuid) NOT NULL 
+- order_id (uuid)  
+- used_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: customer_streaks
+------------------------
+- customer_id (uuid) NOT NULL 
+- current_streak (integer)  DEFAULT 0
+- longest_streak (integer)  DEFAULT 0
+- last_order_date (date)  
+- streak_freeze_used (boolean)  DEFAULT false
+
+Table: customer_wallet
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- balance_paise (integer) NOT NULL DEFAULT 0
+- last_updated (timestamp with time zone) NOT NULL DEFAULT now()
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: daily_financial_log
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- date (date) NOT NULL 
+- total_revenue_paise (bigint) NOT NULL DEFAULT 0
+- total_expenses_paise (bigint) NOT NULL DEFAULT 0
+- net_profit_paise (bigint) NOT NULL DEFAULT 0
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: delivery_fee_tiers
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- zone_id (uuid) NOT NULL 
+- from_paise (integer) NOT NULL 
+- to_paise (integer)  
+- fee_paise (integer) NOT NULL 
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: ingredients
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- kitchen_id (uuid) NOT NULL 
+- name (text) NOT NULL 
+- unit (text) NOT NULL 
+- current_stock_grams (numeric) NOT NULL DEFAULT 0
+- reorder_threshold_grams (numeric) NOT NULL DEFAULT 0
+- last_restocked_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: kitchen_applications
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- restaurant_name (text) NOT NULL 
+- owner_name (text) NOT NULL 
+- phone (text) NOT NULL 
+- email (text) NOT NULL 
+- address (text) NOT NULL 
+- city (text) NOT NULL 
+- cuisine_type (text)  
+- fssai_number (text)  
+- expected_daily_orders (integer)  
+- upi_id (text)  
+- status (text) NOT NULL DEFAULT 'new'::text
+- rejection_reason (text)  
+- reviewed_by (uuid)  
+- reviewed_at (timestamp with time zone)  
+- notes (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- kitchen_id (uuid)  
+- updated_at (timestamp with time zone)  
+
+Table: kitchen_metrics
+------------------------
+- id (integer) NOT NULL DEFAULT nextval('public.kitchen_metrics_id_seq'::regclass)
+- zone_id (uuid)  
+- fssai_status (character varying)  DEFAULT 'FSSAI Certified'::character varying
+- fssai_valid_till (character varying)  DEFAULT 'Valid ''27'::character varying
+- staff_temp_value (character varying)  DEFAULT '98.6°F Staff Temp'::character varying
+- staff_temp_time (character varying)  DEFAULT '10m ago'::character varying
+- sanitization_percent (character varying)  DEFAULT '100% Sanitized'::character varying
+- sanitization_freq (character varying)  DEFAULT 'Hourly'::character varying
+- pure_veg_status (character varying)  DEFAULT '100% Pure Veg'::character varying
+- pure_veg_audited (character varying)  DEFAULT 'Audited'::character varying
+- updated_at (timestamp with time zone)  DEFAULT CURRENT_TIMESTAMP
+
+Table: kitchen_payouts
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- kitchen_id (uuid) NOT NULL 
+- period_start (date) NOT NULL 
+- period_end (date) NOT NULL 
+- gross_sales_paise (bigint) NOT NULL DEFAULT 0
+- commission_paise (bigint) NOT NULL DEFAULT 0
+- net_payout_paise (bigint) NOT NULL DEFAULT 0
+- orders_count (integer) NOT NULL DEFAULT 0
+- status (text) NOT NULL DEFAULT 'pending'::text
+- upi_reference (text)  
+- bank_reference (text)  
+- paid_at (timestamp with time zone)  
+- approved_by (uuid)  
+- notes (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- razorpay_payout_id (text)  
+- payout_mode (text)  DEFAULT 'manual'::text
+- utr_number (text)  
+- failure_reason (text)  
+
+Table: kitchen_zones
+------------------------
+- kitchen_id (uuid) NOT NULL 
+- zone_id (uuid) NOT NULL 
+
+Table: kitchens
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- zone_id (uuid)  
+- name (text) NOT NULL 
+- address (text) NOT NULL 
+- lat (numeric) NOT NULL 
+- lng (numeric) NOT NULL 
+- is_paused (boolean)  DEFAULT false
+- pause_reason (text)  
+- pin_hash (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- fssai_license (text)  
+- gstin (text)  
+- is_partner (boolean)  DEFAULT false
+- partner_status (text)  DEFAULT 'none'::text
+- commission_rate (numeric)  DEFAULT 0.20
+- upi_id (text)  
+- bank_account (text)  
+- bank_name (text)  
+- ifsc (text)  
+- contact_name (text)  
+- contact_phone (text)  
+- contact_email (text)  
+- partner_approved_at (timestamp with time zone)  
+- partner_notes (text)  
+- razorpay_contact_id (text)  
+- razorpay_fund_account_id (text)  
+- auto_payout_enabled (boolean)  DEFAULT true
+- min_daily_payout_paise (integer)  DEFAULT 5000
+- pause_until (timestamp with time zone)  
+- is_active (boolean) NOT NULL DEFAULT true
+- opening_time (character varying)  DEFAULT '10:00'::character varying
+- closing_time (character varying)  DEFAULT '22:00'::character varying
+
+Table: loyalty_transactions
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- points (integer) NOT NULL 
+- description (text) NOT NULL DEFAULT ''::text
+- order_id (uuid)  
+- expires_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- type (text) NOT NULL DEFAULT 'earn'::text
+
+Table: marketing_campaigns
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- title (text) NOT NULL 
+- message (text) NOT NULL 
+- image_url (text)  
+- target_audience (text) NOT NULL 
+- zone_id (uuid)  
+- segment (text)  
+- scheduled_for (timestamp with time zone)  
+- queued_count (integer) NOT NULL DEFAULT 0
+- status (text) NOT NULL DEFAULT 'completed'::text
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: menu_categories
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- zone_id (uuid) NOT NULL 
+- name (text) NOT NULL 
+- slug (text) NOT NULL 
+- image_url (text) NOT NULL DEFAULT ''::text
+- sort_order (integer) NOT NULL DEFAULT 0
+- is_active (boolean) NOT NULL DEFAULT true
+- created_at (timestamp with time zone)  DEFAULT now()
+- updated_at (timestamp with time zone)  DEFAULT now()
+- banner_url (text) NOT NULL DEFAULT ''::text
+
+Table: menu_items
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- zone_id (uuid) NOT NULL 
+- kitchen_id (uuid)  
+- name (text) NOT NULL 
+- description (text)  
+- price_paise (integer) NOT NULL 
+- cost_price_paise (integer) NOT NULL 
+- photo_url (text)  
+- finished_dish_photo_url (text)  
+- category (text) NOT NULL 
+- station (text)  DEFAULT 'hot_section'::text
+- available (boolean)  DEFAULT true
+- daily_limit (integer)  DEFAULT 50
+- today_sold_count (integer)  DEFAULT 0
+- sold_out_reason (text)  
+- is_veg (boolean)  DEFAULT true
+- is_vegan (boolean)  DEFAULT false
+- spice_level (integer)  DEFAULT 1
+- allergens (ARRAY)  DEFAULT '{}'::text[]
+- prep_time_minutes (integer)  DEFAULT 15
+- sort_order (integer)  DEFAULT 0
+- search_vector (tsvector)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- image_url (text)  
+- is_egg (boolean)  DEFAULT false
+- is_bestseller (boolean)  DEFAULT false
+- is_new (boolean)  DEFAULT false
+- tags (ARRAY)  DEFAULT '{}'::text[]
+- customization_groups (jsonb)  DEFAULT '[]'::jsonb
+
+Table: menu_offers
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- title (text) NOT NULL 
+- discount_type (text)  DEFAULT 'percentage'::text
+- discount_percent (numeric)  DEFAULT 0
+- discount_flat_paise (integer)  DEFAULT 0
+- max_discount_paise (integer)  
+- target_type (text) NOT NULL 
+- target_id (uuid)  
+- start_time (timestamp with time zone)  
+- end_time (timestamp with time zone)  
+- audience (text)  DEFAULT 'all'::text
+- is_active (boolean)  DEFAULT true
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- zone_id (uuid)  
+- description (text)  
+- target_ids (ARRAY)  
+- audience_config (jsonb)  DEFAULT '{}'::jsonb
+
+Table: notification_preferences
+------------------------
+- user_id (uuid) NOT NULL 
+- order_updates (boolean)  DEFAULT true
+- promotions (boolean)  DEFAULT true
+- payouts (boolean)  DEFAULT true
+- push_enabled (boolean)  DEFAULT true
+- whatsapp_enabled (boolean)  DEFAULT true
+- updated_at (timestamp with time zone)  DEFAULT now()
+
+Table: notification_templates
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- type (text) NOT NULL 
+- label (text) NOT NULL 
+- title_template (text) NOT NULL 
+- body_template (text) NOT NULL 
+- whatsapp_template (text)  
+- channels (ARRAY)  DEFAULT ARRAY['push'::text, 'whatsapp'::text]
+- is_active (boolean)  DEFAULT true
+- updated_at (timestamp with time zone)  DEFAULT now()
+
+Table: notification_trigger_jobs
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- trigger_id (uuid) NOT NULL 
+- user_id (uuid) NOT NULL 
+- fire_at (timestamp with time zone) NOT NULL 
+- status (text) NOT NULL DEFAULT 'pending'::text
+- context (jsonb) NOT NULL DEFAULT '{}'::jsonb
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: notification_triggers
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- name (text) NOT NULL 
+- event_type (text) NOT NULL 
+- delay_minutes (integer) NOT NULL DEFAULT 0
+- template_type (text) NOT NULL 
+- channels (ARRAY)  DEFAULT ARRAY['push'::text, 'whatsapp'::text]
+- audience_type (text) NOT NULL DEFAULT 'all'::text
+- segment (text)  
+- conditions (jsonb) NOT NULL DEFAULT '{}'::jsonb
+- is_active (boolean) NOT NULL DEFAULT true
+- fired_count (integer) NOT NULL DEFAULT 0
+- last_fired_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: notifications
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- user_id (uuid) NOT NULL 
+- type (text) NOT NULL 
+- title (text) NOT NULL 
+- body (text) NOT NULL 
+- data (jsonb)  DEFAULT '{}'::jsonb
+- is_read (boolean)  DEFAULT false
+- channel (text)  DEFAULT 'push'::text
+- delivery_status (text)  DEFAULT 'sent'::text
+- created_at (timestamp with time zone)  DEFAULT now()
+
+Table: order_complaints
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- order_id (uuid) NOT NULL 
+- customer_id (uuid) NOT NULL 
+- rider_id (uuid)  
+- type (text) NOT NULL 
+- description (text) NOT NULL 
+- status (text) NOT NULL DEFAULT 'open'::text
+- refund_amount_paise (integer)  DEFAULT 0
+- refund_scope (text)  
+- is_cod_cash_order (boolean)  DEFAULT false
+- cod_cash_deduction_pending (boolean)  DEFAULT false
+- cod_cash_recovered (boolean)  DEFAULT false
+- admin_note (text)  
+- resolved_by (uuid)  
+- resolved_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: order_feedback
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- order_id (uuid) NOT NULL 
+- customer_id (uuid) NOT NULL 
+- rating (integer) NOT NULL 
+- comment (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- delivery_rating (integer)  
+
+Table: order_items
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- order_id (uuid) NOT NULL 
+- menu_item_id (uuid)  
+- menu_item_name (text) NOT NULL 
+- quantity (integer) NOT NULL 
+- price_paise (integer) NOT NULL 
+- station (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- customizations (jsonb)  DEFAULT '[]'::jsonb
+- special_instructions (text)  
+
+Table: orders
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- display_id (text)  
+- customer_id (uuid) NOT NULL 
+- kitchen_id (uuid)  
+- zone_id (uuid)  
+- rider_id (uuid)  
+- address_id (uuid) NOT NULL 
+- status (USER-DEFINED) NOT NULL DEFAULT 'pending_payment'::public.order_status
+- claimed_by_chef_id (uuid)  
+- claimed_at (timestamp with time zone)  
+- special_instructions (text)  
+- subtotal_paise (integer) NOT NULL 
+- delivery_fee_paise (integer) NOT NULL 
+- discount_paise (integer)  DEFAULT 0
+- loyalty_discount_paise (integer)  DEFAULT 0
+- wallet_deduction_paise (integer)  DEFAULT 0
+- surge_paise (integer)  DEFAULT 0
+- cgst_paise (integer) NOT NULL 
+- sgst_paise (integer) NOT NULL 
+- total_amount_paise (integer) NOT NULL 
+- gateway_amount_paise (integer) NOT NULL 
+- payment_method (text)  
+- payment_status (USER-DEFINED)  DEFAULT 'pending'::public.payment_status
+- gateway_order_id (text)  
+- gateway_payment_id (text)  
+- subscription_id (uuid)  
+- is_subscription_order (boolean)  DEFAULT false
+- is_scheduled (boolean)  DEFAULT false
+- scheduled_for (timestamp with time zone)  
+- delivery_otp (text)  
+- delivery_otp_expires_at (timestamp with time zone)  
+- delivered_at (timestamp with time zone)  
+- cancelled_at (timestamp with time zone)  
+- cancellation_reason (text)  
+- refund_amount_paise (integer)  DEFAULT 0
+- refund_status (USER-DEFINED)  DEFAULT 'none'::public.refund_status
+- invoice_number (text)  
+- invoice_url (text)  
+- buyer_gstin (text)  
+- buyer_company_name (text)  
+- estimated_delivery_at (timestamp with time zone)  
+- actual_delivery_minutes (integer)  
+- delivery_location_lat (numeric)  
+- delivery_location_lng (numeric)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- promo_code_id (uuid)  
+- delivery_contact_name (text)  
+- delivery_contact_phone (text)  
+- commission_rate (numeric)  DEFAULT 0
+- commission_paise (integer)  DEFAULT 0
+- kitchen_payout_paise (integer)  DEFAULT 0
+- platform_delivery_paise (integer)  DEFAULT 0
+- cod_cash_collected (boolean)  DEFAULT false
+- cod_collected_at (timestamp with time zone)  
+- cod_collected_by (uuid)  
+- cash_submit_requested_at (timestamp with time zone)  
+- cash_submit_confirmed_at (timestamp with time zone)  
+- cash_submit_confirmed_by (uuid)  
+- menu_offer_discount_paise (integer) NOT NULL DEFAULT 0
+- small_order_fee_paise (integer) NOT NULL DEFAULT 0
+- rider_tip_paise (integer) NOT NULL DEFAULT 0
+
+Table: partner_restaurant_payouts
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- partner_id (uuid) NOT NULL 
+- restaurant_id (uuid) NOT NULL 
+- period_start (date) NOT NULL 
+- period_end (date) NOT NULL 
+- gross_revenue_paise (integer) NOT NULL DEFAULT 0
+- app_payments_paise (integer) NOT NULL DEFAULT 0
+- cash_collected_paise (integer) NOT NULL DEFAULT 0
+- commission_paise (integer) NOT NULL DEFAULT 0
+- net_payout_paise (integer) NOT NULL DEFAULT 0
+- status (text) NOT NULL DEFAULT 'pending'::text
+- razorpay_payout_id (text)  
+- utr_number (text)  
+- failure_reason (text)  
+- notes (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- paid_at (timestamp with time zone)  
+
+Table: plus_subscriptions
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- status (text) NOT NULL DEFAULT 'active'::text
+- plan (text) NOT NULL DEFAULT 'monthly'::text
+- price_paise (integer) NOT NULL 
+- started_at (timestamp with time zone) NOT NULL DEFAULT now()
+- expires_at (timestamp with time zone) NOT NULL 
+- cancelled_at (timestamp with time zone)  
+- auto_renew (boolean)  DEFAULT true
+- razorpay_order_id (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: prep_tasks
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- kitchen_id (uuid)  
+- title (text) NOT NULL 
+- category (text) NOT NULL 
+- date (date) NOT NULL DEFAULT CURRENT_DATE
+- completed (boolean)  DEFAULT false
+- completed_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: production_batches
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- kitchen_id (uuid)  
+- item_name (text) NOT NULL 
+- target_quantity (integer) NOT NULL 
+- current_quantity (integer) NOT NULL DEFAULT 0
+- status (text) NOT NULL DEFAULT 'in_progress'::text
+- batch_start_at (timestamp with time zone) NOT NULL DEFAULT now()
+- completed_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: promo_codes
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- code (text) NOT NULL 
+- description (text)  
+- discount_type (USER-DEFINED) NOT NULL 
+- discount_value_paise (integer) NOT NULL 
+- min_order_paise (integer)  DEFAULT 0
+- max_discount_paise (integer)  
+- max_uses (integer)  
+- current_uses (integer)  DEFAULT 0
+- valid_from (timestamp with time zone) NOT NULL 
+- valid_until (timestamp with time zone) NOT NULL 
+- is_active (boolean)  DEFAULT true
+- applicable_to (USER-DEFINED)  DEFAULT 'all'::public.promo_applicable_to
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- discount_percent (integer)  
+- expires_at (timestamp with time zone)  
+- discount_flat_paise (integer)  DEFAULT 0
+- first_order_only (boolean)  DEFAULT false
+- new_user_only (boolean)  DEFAULT false
+- per_user_limit (integer)  
+- kitchen_id (uuid)  
+- zone_id (uuid)  
+
+Table: promotional_banners
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- title (character varying) NOT NULL 
+- subtitle (character varying) NOT NULL 
+- tag_text (character varying) NOT NULL 
+- image_url (character varying) NOT NULL 
+- action_type (character varying) NOT NULL 
+- action_payload (character varying)  
+- is_active (boolean)  DEFAULT true
+- display_order (integer)  DEFAULT 0
+- created_at (timestamp with time zone)  DEFAULT CURRENT_TIMESTAMP
+- updated_at (timestamp with time zone)  DEFAULT CURRENT_TIMESTAMP
+- banner_type (character varying)  DEFAULT 'MAIN'::character varying
+
+Table: push_subscriptions
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- user_id (uuid)  
+- endpoint (text) NOT NULL 
+- p256dh (text) NOT NULL 
+- auth (text) NOT NULL 
+- created_at (timestamp with time zone)  DEFAULT now()
+- updated_at (timestamp with time zone)  DEFAULT now()
+
+Table: recipe_ingredients
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- recipe_id (uuid) NOT NULL 
+- ingredient_id (uuid) NOT NULL 
+- quantity_grams (numeric) NOT NULL 
+- sequence (integer)  DEFAULT 0
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: recipes
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- menu_item_id (uuid) NOT NULL 
+- is_active (boolean)  DEFAULT true
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: recurring_meal_plans
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- address_id (uuid) NOT NULL 
+- name (text) NOT NULL 
+- starts_on (date) NOT NULL 
+- ends_on (date)  
+- status (text) NOT NULL DEFAULT 'active'::text
+- payment_method (text) NOT NULL 
+- paused_until (date)  
+- pause_reason (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: recurring_plan_day_configs
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- plan_id (uuid) NOT NULL 
+- day_of_week (integer) NOT NULL 
+- delivery_time (time without time zone) NOT NULL 
+- items (jsonb) NOT NULL 
+- special_instructions (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: recurring_plan_exceptions
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- plan_id (uuid) NOT NULL 
+- exception_date (date) NOT NULL 
+- exception_type (USER-DEFINED) NOT NULL 
+- modified_items (jsonb)  
+- modified_time (time without time zone)  
+- reason (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: referrals
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- referrer_id (uuid) NOT NULL 
+- referred_id (uuid) NOT NULL 
+- status (text) NOT NULL DEFAULT 'pending'::text
+- order_id (uuid)  
+- referrer_rewarded_at (timestamp with time zone)  
+- referred_rewarded_at (timestamp with time zone)  
+- fraud_score (integer)  DEFAULT 0
+- referred_device_id (text)  
+- referred_ip_address (inet)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: refresh_tokens
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- user_id (uuid) NOT NULL 
+- token_hash (text) NOT NULL 
+- expires_at (timestamp with time zone) NOT NULL 
+- revoked_at (timestamp with time zone)  
+- device_info (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: refunds
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- order_id (uuid) NOT NULL 
+- customer_id (uuid) NOT NULL 
+- complaint_id (uuid)  
+- amount_paise (integer) NOT NULL 
+- refund_type (text) NOT NULL 
+- reason (text)  
+- status (text) NOT NULL DEFAULT 'pending'::text
+- initiated_by (uuid)  
+- approved_by (uuid)  
+- razorpay_payment_id (text)  
+- razorpay_refund_id (text)  
+- razorpay_speed (text)  DEFAULT 'optimum'::text
+- failure_reason (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- processed_at (timestamp with time zone)  
+
+Table: restaurant_config
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- zone_id (uuid) NOT NULL 
+- name (text) NOT NULL 
+- description (text)  
+- cuisine_type (text)  
+- address (text)  
+- lat (numeric)  
+- lng (numeric)  
+- photos (ARRAY)  DEFAULT '{}'::text[]
+- operating_hours (jsonb) NOT NULL DEFAULT '{}'::jsonb
+- slot_duration_minutes (integer) NOT NULL DEFAULT 90
+- advance_booking_days (integer) NOT NULL DEFAULT 7
+- cancellation_window_minutes (integer) NOT NULL DEFAULT 120
+- deposit_paise (integer) NOT NULL DEFAULT 0
+- max_party_size (integer) NOT NULL DEFAULT 10
+- gst_percent (numeric) NOT NULL DEFAULT 5.00
+- commission_percent (numeric) NOT NULL DEFAULT 15.00
+- partner_id (uuid)  
+- upi_id (text)  
+- razorpay_contact_id (text)  
+- razorpay_fund_account_id (text)  
+- is_active (boolean) NOT NULL DEFAULT true
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: restaurant_menu_items
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- restaurant_id (uuid) NOT NULL 
+- name (text) NOT NULL 
+- description (text)  
+- price_paise (integer) NOT NULL 
+- category (text)  
+- image_url (text)  
+- is_veg (boolean) NOT NULL DEFAULT true
+- is_available (boolean) NOT NULL DEFAULT true
+- sort_order (integer) NOT NULL DEFAULT 0
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: restaurant_tables
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- restaurant_id (uuid) NOT NULL 
+- table_number (text) NOT NULL 
+- capacity (integer) NOT NULL 
+- is_active (boolean) NOT NULL DEFAULT true
+
+Table: rider_applications
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- user_id (uuid) NOT NULL 
+- vehicle_type (character varying) NOT NULL 
+- license_number (character varying) NOT NULL 
+- status (character varying)  DEFAULT 'pending'::character varying
+- rejection_reason (text)  
+- created_at (timestamp with time zone)  DEFAULT now()
+- updated_at (timestamp with time zone)  DEFAULT now()
+- id_photo_url (text)  
+
+Table: rider_daily_earnings
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- rider_id (uuid) NOT NULL 
+- date (date) NOT NULL 
+- deliveries_count (integer)  DEFAULT 0
+- online_minutes (integer)  DEFAULT 0
+- base_earnings_paise (integer)  DEFAULT 0
+- bonus_earnings_paise (integer)  DEFAULT 0
+- guarantee_topup_paise (integer)  DEFAULT 0
+- total_paise (integer)  DEFAULT 0
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- cash_collected_paise (integer)  DEFAULT 0
+
+Table: rider_payouts
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- rider_id (uuid) NOT NULL 
+- amount_paise (integer) NOT NULL 
+- status (USER-DEFINED)  DEFAULT 'pending'::public.payout_status
+- reference_id (text)  
+- paid_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: scheduled_orders
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- address_id (uuid) NOT NULL 
+- zone_id (uuid)  
+- scheduled_for (timestamp with time zone) NOT NULL 
+- items (jsonb) NOT NULL 
+- subtotal_paise (integer) NOT NULL 
+- delivery_fee_paise (integer) NOT NULL 
+- total_paise (integer) NOT NULL 
+- payment_method (text) NOT NULL 
+- payment_status (USER-DEFINED)  DEFAULT 'pending'::public.payment_status
+- status (text) NOT NULL DEFAULT 'scheduled'::text
+- actual_order_id (uuid)  
+- cancellation_reason (text)  
+- cancellation_refund_percent (integer)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: schema_migrations
+------------------------
+- version (text) NOT NULL 
+- executed_at (timestamp with time zone)  DEFAULT now()
+
+Table: service_requests
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- user_id (uuid)  
+- phone (character varying)  
+- area_name (character varying)  
+- pincode (character varying)  
+- lat (numeric)  
+- lng (numeric)  
+- notes (text)  
+- created_at (timestamp with time zone)  DEFAULT now()
+
+Table: shift_handovers
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- kitchen_id (uuid)  
+- chef_id (uuid) NOT NULL 
+- notes (text)  
+- cleaning_completed (boolean)  DEFAULT false
+- gas_safety_checked (boolean)  DEFAULT false
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: subscriptions
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- plan_type (text) NOT NULL 
+- meals_total (integer) NOT NULL 
+- meals_remaining (integer) NOT NULL 
+- price_paid_paise (integer) NOT NULL 
+- is_active (boolean)  DEFAULT true
+- start_date (date) NOT NULL 
+- end_date (date) NOT NULL 
+- upi_mandate_id (text)  
+- carry_forward_meals (integer)  DEFAULT 0
+- renewed_early (boolean)  DEFAULT false
+- renewed_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- plan_id (text)  
+- is_paused (boolean)  DEFAULT false
+- status (text)  DEFAULT 'active'::text
+- total_meals (integer)  
+- remaining_meals (integer)  
+- current_day_credits (integer)  DEFAULT 1
+- expires_at (timestamp with time zone)  
+
+Table: support_tickets
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- order_id (uuid)  
+- issue_type (text) NOT NULL 
+- description (text) NOT NULL 
+- status (text) NOT NULL DEFAULT 'open'::text
+- resolution (text)  
+- resolved_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: system_audit_logs
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- severity (USER-DEFINED) NOT NULL DEFAULT 'info'::public.log_severity
+- component (text) NOT NULL 
+- event_type (text) NOT NULL 
+- message (text) NOT NULL 
+- metadata (jsonb)  
+- source_ip (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: system_config
+------------------------
+- key (text) NOT NULL 
+- value (jsonb) NOT NULL 
+- updated_at (timestamp with time zone)  DEFAULT now()
+
+Table: table_booking_items
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- booking_id (uuid) NOT NULL 
+- menu_item_id (uuid)  
+- menu_item_name (text) NOT NULL 
+- price_paise (integer) NOT NULL 
+- quantity (integer) NOT NULL DEFAULT 1
+- customizations (jsonb)  
+- type (text) NOT NULL DEFAULT 'pre_order'::text
+- status (text) NOT NULL DEFAULT 'pending'::text
+- added_by (uuid)  
+- ordered_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: table_booking_payments
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- booking_id (uuid) NOT NULL 
+- amount_paise (integer) NOT NULL 
+- payment_method (text) NOT NULL 
+- payment_type (text) NOT NULL 
+- gateway_payment_id (text)  
+- gateway_order_id (text)  
+- collected_by (uuid)  
+- notes (text)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: table_booking_waitlist
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- restaurant_id (uuid) NOT NULL 
+- customer_id (uuid) NOT NULL 
+- slot_date (date) NOT NULL 
+- preferred_time (text)  
+- party_size (integer) NOT NULL 
+- notified_at (timestamp with time zone)  
+- status (text) NOT NULL DEFAULT 'waiting'::text
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: table_bookings
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- display_id (text) NOT NULL DEFAULT ('TB-'::text || lpad((nextval('public.table_booking_seq'::regclass))::text, 4, '0'::text))
+- restaurant_id (uuid) NOT NULL 
+- customer_id (uuid) NOT NULL 
+- table_id (uuid)  
+- party_size (integer) NOT NULL 
+- slot_start (timestamp with time zone) NOT NULL 
+- slot_end (timestamp with time zone) NOT NULL 
+- occasion (text)  
+- special_requests (text)  
+- status (text) NOT NULL DEFAULT 'confirmed'::text
+- pre_order_amount_paise (integer) NOT NULL DEFAULT 0
+- post_order_amount_paise (integer) NOT NULL DEFAULT 0
+- gst_amount_paise (integer) NOT NULL DEFAULT 0
+- deposit_amount_paise (integer) NOT NULL DEFAULT 0
+- total_paid_paise (integer) NOT NULL DEFAULT 0
+- gateway_order_id (text)  
+- gateway_payment_id (text)  
+- final_payment_method (text)  
+- seated_at (timestamp with time zone)  
+- bill_generated_at (timestamp with time zone)  
+- completed_at (timestamp with time zone)  
+- cancelled_at (timestamp with time zone)  
+- cancellation_reason (text)  
+- no_show_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- reminder_24h_sent_at (timestamp with time zone)  
+- reminder_2h_sent_at (timestamp with time zone)  
+- feedback_rating (smallint)  
+- feedback_comment (text)  
+- feedback_at (timestamp with time zone)  
+- rescheduled_from_slot (timestamp with time zone)  
+- reschedule_count (smallint) NOT NULL DEFAULT 0
+
+Table: team_activity_logs
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- user_id (uuid) NOT NULL 
+- user_name (character varying) NOT NULL 
+- user_role (character varying) NOT NULL 
+- action_type (character varying) NOT NULL 
+- entity_type (character varying) NOT NULL 
+- entity_id (character varying)  
+- details (jsonb)  DEFAULT '{}'::jsonb
+- created_at (timestamp with time zone)  DEFAULT now()
+
+Table: users
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- phone (text) NOT NULL 
+- name (text) NOT NULL 
+- email (text)  
+- role (USER-DEFINED) NOT NULL DEFAULT 'customer'::public.user_role
+- is_active (boolean)  DEFAULT true
+- referral_code (text)  
+- referred_by_id (uuid)  
+- kitchen_id (uuid)  
+- zone_id (uuid)  
+- upi_id (text)  
+- is_online (boolean)  DEFAULT false
+- current_order_id (uuid)  
+- fcm_token (text)  
+- device_platform (text)  DEFAULT 'android'::text
+- terms_accepted_at (timestamp with time zone)  
+- terms_version (text)  
+- deleted_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- onboarding_complete (boolean)  DEFAULT false
+- online_since (timestamp with time zone)  
+- is_verified (boolean)  DEFAULT false
+- photo_url (text)  
+- last_ip (text)  
+- device_id (text)  
+- razorpay_contact_id (text)  
+- razorpay_fund_account_id (text)  
+- pending_deductions_paise (integer)  DEFAULT 0
+- loyalty_tier (text)  DEFAULT 'bronze'::text
+- lifetime_orders (integer)  DEFAULT 0
+- lifetime_spend_paise (bigint)  DEFAULT 0
+- birthday (date)  
+- birthday_reward_year (integer)  
+- device_token (text)  
+- dine_in_restaurant_id (uuid)  
+
+Table: wallet_transactions
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- amount_paise (integer) NOT NULL 
+- type (USER-DEFINED) NOT NULL 
+- reference_id (uuid)  
+- description (text) NOT NULL 
+- balance_after_paise (integer) NOT NULL 
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+
+Table: weekly_payouts
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- rider_id (uuid) NOT NULL 
+- week_start (date) NOT NULL 
+- week_end (date) NOT NULL 
+- gross_earnings_paise (integer) NOT NULL 
+- platform_fee_paise (integer)  DEFAULT 0
+- net_amount_paise (integer) NOT NULL 
+- status (USER-DEFINED)  DEFAULT 'pending'::public.payout_status
+- cashfree_transfer_id (text)  
+- approved_by (uuid)  
+- approved_at (timestamp with time zone)  
+- paid_at (timestamp with time zone)  
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- upi_id (text)  
+- payment_reference (text)  
+- notes (text)  
+- cod_deductions_paise (integer)  DEFAULT 0
+- deduction_notes (text)  
+- razorpay_payout_id (text)  
+- payout_mode (text)  DEFAULT 'manual'::text
+- utr_number (text)  
+- complaint_deduction_paise (integer)  DEFAULT 0
+- failure_reason (text)  
+
+Table: winback_sends
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- customer_id (uuid) NOT NULL 
+- campaign_id (uuid) NOT NULL 
+- sent_at (timestamp with time zone) NOT NULL DEFAULT now()
+- sent_date (date) NOT NULL DEFAULT CURRENT_DATE
+- promo_code (text)  
+
+Table: zones
+------------------------
+- id (uuid) NOT NULL DEFAULT gen_random_uuid()
+- name (text) NOT NULL 
+- is_active (boolean)  DEFAULT true
+- radius_km (numeric) NOT NULL 
+- kitchen_lat (numeric) NOT NULL 
+- kitchen_lng (numeric) NOT NULL 
+- opening_time (time without time zone) NOT NULL 
+- closing_time (time without time zone) NOT NULL 
+- surge_enabled (boolean)  DEFAULT false
+- surge_fee_paise (integer)  DEFAULT 0
+- created_at (timestamp with time zone) NOT NULL DEFAULT now()
+- updated_at (timestamp with time zone) NOT NULL DEFAULT now()
+- city (text) NOT NULL DEFAULT 'Bengaluru'::text
+- delivery_fee_base_paise (integer) NOT NULL DEFAULT 2500
+- max_orders_per_hour (integer) NOT NULL DEFAULT 60
+- realistic_delivery_minutes (integer) NOT NULL DEFAULT 30
+- polygon_points (jsonb)  
+- delivery_fee_type (character varying)  DEFAULT 'flat'::character varying
+- base_delivery_fee_paise (integer)  DEFAULT 2500
+- per_km_fee_paise (integer)  DEFAULT 500
+- base_distance_km (numeric)  DEFAULT 0.00
+- free_delivery_above_paise (integer)  
+- surge_multiplier (numeric)  DEFAULT 1.00
+- min_order_paise (integer) NOT NULL DEFAULT 0
+- small_order_fee_paise (integer) NOT NULL DEFAULT 0
