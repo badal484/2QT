@@ -282,6 +282,7 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
         }).catch(() => {});
 
         emitToAdmin('new_table_booking', { bookingId, displayId, restaurantId, partySize, slotStart });
+        emitToRestaurant(restaurantId, 'new_table_booking', { bookingId, displayId, partySize, slotStart });
 
         res.json({ bookingId, displayId, status: 'confirmed', amountPaidPaise: totalDueNow });
     } catch (err: any) {

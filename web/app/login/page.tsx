@@ -129,6 +129,8 @@ function LoginForm() {
       router.push("/finance");
     } else if (userRole === "partner_kitchen") {
       router.push("/kitchen-portal");
+    } else if (userRole === "dine_in_staff") {
+      router.push("/restaurant");
     } else if (userRole === "chef" || userRole === "kitchen_manager") {
       router.push("/kitchen");
     } else if (userRole === "rider" || userRole === "rider_captain") {
