@@ -9,7 +9,7 @@ import { emitToAdmin, emitToAll } from '../socket';
 const PROMO_TTL = 30; // 30-second cache — admin disable reflects within 30s
 
 async function bustPromoCache() {
-    try { await redis.del(keys.activePromos()); } catch (_) {}
+    try { await redis.del(keys.activePromos()); } catch (e) { console.warn('[cache] bustPromoCache failed:', e); }
 }
 
 // GET all promo codes (admin only)

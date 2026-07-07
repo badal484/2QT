@@ -114,37 +114,43 @@ function OverviewTab() {
   }, [load]);
 
   const rev = (stats?.todayRevenuePaise ?? 0) / 100;
-  const revData = [45, 60, 40, 80, 55, 90, rev > 0 ? 100 : 30]; // 7 days data
-  const barColors = ["#ef4444", "#FF6B35", "#10b981", "#3b82f6", "#8b5cf6", "#FF6B35", "#10b981"];
+  const weeklyRaw: number[] = stats?.weeklyRevenue?.map((d: any) => d.revenuePaise) ?? [];
+  const weeklyLabels: string[] = stats?.weeklyRevenue?.map((d: any) => d.label) ?? [];
+  const maxRev = Math.max(...weeklyRaw, 1);
+  const revData = weeklyRaw.length > 0
+    ? weeklyRaw.map(v => Math.round((v / maxRev) * 100))
+    : Array(7).fill(0);
+  const barColors = Array(7).fill("#3b82f6").map((c, i) => i === 6 ? "#10b981" : c);
+  const weeklyTotal = weeklyRaw.reduce((s, v) => s + v, 0) / 100;
 
   const statCards = stats ? [
     {
-      label: "New Orders", value: stats.activeOrders * 3 + 12,
-      trend: "+5.1%", up: true, icon: ShoppingBag,
+      label: "Active Orders", value: stats.activeOrders,
+      trend: "live", up: true, icon: ShoppingBag,
       iconColor: "text-brand-primary", iconBg: "bg-brand-primary/10",
       trendColor: "text-emerald-400", sparkColor: "#10b981",
-      sparkData: [20, 35, 28, 45, 38, 52, 48, 60, 55, 70],
+      sparkData: Array(10).fill(stats.activeOrders),
     },
     {
-      label: "Active Users", value: "333",
-      trend: "+12.5%", up: true, icon: Users,
+      label: "Customers", value: (stats.totalCustomers ?? 0).toLocaleString("en-IN"),
+      trend: "total", up: true, icon: Users,
       iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10",
-      trendColor: "text-emerald-400", sparkColor: "#10b981",
-      sparkData: [100, 150, 120, 200, 180, 250, 220, 300, 280, 333],
+      trendColor: "text-zinc-500", sparkColor: "#10b981",
+      sparkData: Array(10).fill(stats.totalCustomers ?? 0),
     },
     {
       label: "Riders Online", value: stats.ridersOnline,
-      trend: "+1.9%", up: true, icon: Bike,
+      trend: "live", up: true, icon: Bike,
       iconColor: "text-blue-400", iconBg: "bg-blue-500/10",
       trendColor: "text-emerald-400", sparkColor: "#3b82f6",
-      sparkData: [10, 15, 12, 20, 18, 25, 22, 30, 28, stats.ridersOnline > 0 ? 35 : 15],
+      sparkData: Array(10).fill(stats.ridersOnline),
     },
     {
       label: "Stock Alerts", value: stats.lowStockAlerts,
-      trend: "+0.4%", up: false, icon: AlertCircle,
+      trend: stats.lowStockAlerts > 0 ? "action needed" : "all clear", up: false, icon: AlertCircle,
       iconColor: "text-red-400", iconBg: "bg-red-500/10",
-      trendColor: "text-red-400", sparkColor: "#ef4444",
-      sparkData: [5, 8, 6, 12, 10, 15, 12, 18, 14, stats.lowStockAlerts > 0 ? 20 : 5],
+      trendColor: stats.lowStockAlerts > 0 ? "text-red-400" : "text-emerald-400", sparkColor: "#ef4444",
+      sparkData: Array(10).fill(stats.lowStockAlerts),
     },
   ] : [];
 
@@ -165,12 +171,12 @@ function OverviewTab() {
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           <div className="flex items-start justify-between relative z-10">
             <div>
-              <p className="text-sm font-semibold text-zinc-400 mb-2">Total Revenue (Last 7 Days)</p>
-              <h2 className="text-5xl font-black text-white">₹{(rev || 12450).toLocaleString("en-IN")}</h2>
+              <p className="text-sm font-semibold text-zinc-400 mb-2">Revenue (Last 7 Days)</p>
+              <h2 className="text-5xl font-black text-white">₹{weeklyTotal.toLocaleString("en-IN")}</h2>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-xs font-bold text-emerald-400">+18%</span>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <TrendingUp className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-xs font-bold text-blue-400">7-day</span>
             </div>
           </div>
           <div className="relative z-10 w-full mt-4">
@@ -185,7 +191,9 @@ function OverviewTab() {
             <div className="pl-8">
               <BarChart data={revData} colors={barColors} />
               <div className="flex justify-between mt-2 text-[10px] text-zinc-500 font-bold uppercase tracking-widest px-2">
-                <span>7 Day</span><span>Mon</span><span>Tues</span><span>Wed</span><span>Thurs</span><span>Fri</span><span>7 Day</span>
+                {(weeklyLabels.length > 0 ? weeklyLabels : ['','','','','','','Today']).map((l, i) => (
+                  <span key={i}>{l}</span>
+                ))}
               </div>
             </div>
           </div>
@@ -203,7 +211,7 @@ function OverviewTab() {
               <p className="text-sm font-semibold text-zinc-400 mb-1">{s.label}</p>
               <h3 className="text-3xl font-black text-white mb-2">{s.value}</h3>
               <div className="flex items-end justify-between">
-                <span className={`text-[11px] font-bold ${s.trendColor}`}>{s.trend} ↑</span>
+                <span className={`text-[11px] font-bold ${s.trendColor}`}>{s.trend}</span>
                 <div className="w-16">
                   <Sparkline data={s.sparkData} color={s.sparkColor} />
                 </div>
@@ -504,13 +512,27 @@ function OrdersTab() {
 function ScheduledTab() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
-  useEffect(() => {
-    api.get("/admin/orders/scheduled").then(d => {
-      setOrders(d.scheduledOrders ?? []);
-      setLoading(false);
-    });
-  }, []);
+  const load = () => api.get("/admin/orders/scheduled").then(d => {
+    setOrders(d.scheduledOrders ?? []);
+    setLoading(false);
+  });
+
+  useEffect(() => { load(); }, []);
+
+  const cancelScheduled = async (id: string) => {
+    if (!confirm('Cancel this scheduled order? The customer will be notified.')) return;
+    setCancelling(true);
+    try {
+      await api.delete(`/admin/scheduled-orders/${id}`);
+      setOrders(prev => prev.filter(o => o.id !== id));
+      setSelectedId(null);
+      toast.success('Scheduled order cancelled');
+    } catch { toast.error('Failed to cancel'); }
+    finally { setCancelling(false); }
+  };
 
   return (
     <div>
@@ -529,31 +551,53 @@ function ScheduledTab() {
       ) : (
         <div className="grid gap-4">
           {orders.map(o => (
-            <div key={o.id} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-3xl p-6 flex items-center justify-between shadow-2xl shadow-black/40 hover:border-white/10 transition-all">
-              <div className="flex items-center gap-6">
-                <div className="w-14 h-14 rounded-2xl bg-white/[0.04] backdrop-blur-xl flex flex-col items-center justify-center shrink-0">
-                  <span className="text-[9px] font-black uppercase text-zinc-400 leading-none mb-1">
-                    {new Date(o.scheduled_for).toLocaleDateString("en-IN", { month: "short" })}
-                  </span>
-                  <span className="text-lg font-black tracking-tighter leading-none text-white">
-                    {new Date(o.scheduled_for).getDate()}
-                  </span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-lg font-black tracking-tighter italic text-white">{o.customer_name}</span>
-                    <span className="px-2 py-0.5 rounded-lg bg-white/[0.04] backdrop-blur-xl text-zinc-400 text-[8px] font-black uppercase tracking-widest">
-                      {new Date(o.scheduled_for).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+            <div key={o.id} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-3xl p-6 shadow-2xl shadow-black/40 transition-all">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="w-14 h-14 rounded-2xl bg-white/[0.04] backdrop-blur-xl flex flex-col items-center justify-center shrink-0">
+                    <span className="text-[9px] font-black uppercase text-zinc-400 leading-none mb-1">
+                      {new Date(o.scheduled_for).toLocaleDateString("en-IN", { month: "short" })}
+                    </span>
+                    <span className="text-lg font-black tracking-tighter leading-none text-white">
+                      {new Date(o.scheduled_for).getDate()}
                     </span>
                   </div>
-                  <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                    ₹{o.total_amount_paise / 100} • {o.type === "recurring" ? "Meal Plan" : "One-time Pre-order"}
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-lg font-black tracking-tighter italic text-white">{o.customer_name}</span>
+                      <span className="px-2 py-0.5 rounded-lg bg-white/[0.04] backdrop-blur-xl text-zinc-400 text-[8px] font-black uppercase tracking-widest">
+                        {new Date(o.scheduled_for).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                      ₹{o.total_amount_paise / 100} • {o.type === "recurring" ? "Meal Plan" : "One-time Pre-order"}
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={() => setSelectedId(prev => prev === o.id ? null : o.id)}
+                  className="px-5 py-2.5 rounded-xl bg-swish-green/15 text-swish-green text-[10px] font-black uppercase tracking-widest hover:bg-swish-green/30 transition-all shadow-lg"
+                >
+                  {selectedId === o.id ? 'Close' : 'Manage'}
+                </button>
               </div>
-              <button className="px-5 py-2.5 rounded-xl bg-swish-green/15 text-swish-green text-[10px] font-black uppercase tracking-widest hover:bg-swish-green transition-all shadow-lg">
-                Manage
-              </button>
+              {selectedId === o.id && (
+                <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between gap-4">
+                  <div className="flex flex-wrap gap-4 text-xs text-zinc-400">
+                    <span>Type: <span className="text-white font-bold">{o.type === 'recurring' ? 'Meal Plan' : 'One-time'}</span></span>
+                    <span>Amount: <span className="text-white font-bold">₹{(o.total_amount_paise / 100).toLocaleString('en-IN')}</span></span>
+                    <span>Slot: <span className="text-white font-bold">{new Date(o.scheduled_for).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span></span>
+                    {o.kitchen_name && <span>Kitchen: <span className="text-white font-bold">{o.kitchen_name}</span></span>}
+                  </div>
+                  <button
+                    onClick={() => cancelScheduled(o.id)}
+                    disabled={cancelling}
+                    className="shrink-0 px-4 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {cancelling ? 'Cancelling…' : 'Cancel Order'}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1365,7 +1409,7 @@ function AnalyticsTab() {
           { label: "Riders Online", value: stats?.ridersOnline ?? "—", icon: Bike, desc: "Ready for dispatch" },
           { label: "Stock Alerts", value: stats?.lowStockAlerts ?? "—", icon: AlertCircle, desc: "Items below threshold" },
           { label: "Avg Rating", value: feedback?.averageRating ?? "—", icon: Star, desc: "Food quality rating" },
-          { label: "Delivery ETA", value: "14 min", icon: Clock, desc: "Average this week" },
+          { label: "Delivery ETA", value: "—", icon: Clock, desc: "Not yet tracked" },
         ].map((m, i) => (
           <div key={i} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[28px] p-6 shadow-2xl shadow-black/40">
             <div className="w-10 h-10 rounded-xl bg-white/[0.04] backdrop-blur-xl flex items-center justify-center text-zinc-400 mb-4">

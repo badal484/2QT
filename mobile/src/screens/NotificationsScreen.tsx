@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  StyleSheet, RefreshControl, Switch,
+  View, Text, ScrollView, ActivityIndicator,
+  StyleSheet, RefreshControl,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Bell, BellOff, Check, CheckCheck, Package, Bike, Tag, Gift, Info, AlertCircle, CheckCircle2, XCircle, Sparkles, Megaphone, Wallet } from 'lucide-react-native';
+import { ArrowLeft, Bell, CheckCheck, Package, Bike, Sparkles, Wallet, CheckCircle2, XCircle } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
@@ -15,7 +15,6 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 const haptic = () => ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
 
-// ── Icon per notification type ──────────────────────────────────────────────
 const NotifIcon = ({ type, read }: { type: string; read: boolean }) => {
   const size = 20;
   if (read) return <Bell size={size} color={colors.inkFaint} />;
@@ -53,86 +52,10 @@ function relativeTime(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-// ── Preferences section ──────────────────────────────────────────────────────
-const PREF_ITEMS = [
-  { key: 'order_updates', label: 'Order Updates', desc: 'Confirmed, preparing, delivered' },
-  { key: 'promotions', label: 'Promotions & Offers', desc: 'Deals, coupons and campaigns' },
-  { key: 'payouts', label: 'Payout Alerts', desc: 'Rider and kitchen payout notifications' },
-];
-
-const PreferencesTab = () => {
-  const queryClient = useQueryClient();
-
-  const { data: prefs, isLoading } = useQuery({
-    queryKey: ['notif-prefs'],
-    queryFn: () => api.get('/notifications/preferences'),
-  });
-
-  const patchMutation = useMutation({
-    mutationFn: (body: Record<string, boolean>) => api.patch('/notifications/preferences', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notif-prefs'] }),
-  });
-
-  if (isLoading) return (
-    <View style={{ flex: 1, alignItems: 'center', paddingTop: 60 }}>
-      <ActivityIndicator color={colors.primary} />
-    </View>
-  );
-
-  const p = prefs?.preferences ?? {};
-
-  return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      <Text style={styles.prefNote}>
-        Control which notifications you receive. Order updates are always on for safety.
-      </Text>
-
-      {PREF_ITEMS.map((item, i) => (
-        <Animated.View key={item.key} entering={FadeInDown.delay(i * 50).duration(220)} style={styles.prefRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.prefLabel}>{item.label}</Text>
-            <Text style={styles.prefDesc}>{item.desc}</Text>
-          </View>
-          <Switch
-            value={item.key === 'order_updates' ? true : (p[item.key] !== false)}
-            disabled={item.key === 'order_updates'}
-            onValueChange={(val) => {
-              haptic();
-              patchMutation.mutate({ [item.key]: val });
-            }}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={colors.white}
-          />
-        </Animated.View>
-      ))}
-
-      <View style={styles.prefDivider} />
-
-      <View style={styles.prefRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.prefLabel}>Push Notifications</Text>
-          <Text style={styles.prefDesc}>Receive alerts even when app is closed</Text>
-        </View>
-        <Switch
-          value={p['push_enabled'] !== false}
-          onValueChange={(val) => {
-            haptic();
-            patchMutation.mutate({ push_enabled: val });
-          }}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor={colors.white}
-        />
-      </View>
-    </ScrollView>
-  );
-};
-
-// ── Main Screen ──────────────────────────────────────────────────────────────
 const NotificationsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'inbox' | 'settings'>('inbox');
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications'],
@@ -180,61 +103,36 @@ const NotificationsScreen = ({ navigation }: any) => {
             <Text style={styles.headerSub}>{unreadCount} unread</Text>
           )}
         </View>
-        {tab === 'inbox' && unreadCount > 0 && (
+        {unreadCount > 0 && (
           <BouncingButton
             style={styles.markAllBtn}
             onPress={() => readAllMutation.mutate()}
             disabled={readAllMutation.isPending}
             activeOpacity={0.8}
           >
-            <CheckCheck size={15} color={colors.primary} />
+            <CheckCheck size={16} color={colors.primary} />
             <Text style={styles.markAllText}>Mark all read</Text>
           </BouncingButton>
         )}
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabRow}>
-        <BouncingButton
-          style={[styles.tabBtn, tab === 'inbox' && styles.tabBtnActive]}
-          onPress={() => { haptic(); setTab('inbox'); }}
-          activeOpacity={0.8}
-        >
-          <Bell size={14} color={tab === 'inbox' ? colors.primary : colors.inkMuted} />
-          <Text style={[styles.tabText, tab === 'inbox' && styles.tabTextActive]}>Inbox</Text>
-          {unreadCount > 0 && tab !== 'inbox' && (
-            <View style={styles.tabBadge}><Text style={styles.tabBadgeText}>{unreadCount}</Text></View>
-          )}
-        </BouncingButton>
-        <BouncingButton
-          style={[styles.tabBtn, tab === 'settings' && styles.tabBtnActive]}
-          onPress={() => { haptic(); setTab('settings'); }}
-          activeOpacity={0.8}
-        >
-          <BellOff size={14} color={tab === 'settings' ? colors.primary : colors.inkMuted} />
-          <Text style={[styles.tabText, tab === 'settings' && styles.tabTextActive]}>Settings</Text>
-        </BouncingButton>
-      </View>
-
       {/* Content */}
-      {tab === 'settings' ? (
-        <PreferencesTab />
-      ) : isLoading ? (
+      {isLoading ? (
         <View style={styles.loader}>
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
-            <Bell size={32} color={colors.primary} />
+            <Bell size={40} color={colors.primary} />
           </View>
-          <Text style={styles.emptyTitle}>All caught up!</Text>
-          <Text style={styles.emptySub}>No notifications yet. We'll let you know about your orders, offers and wallet activity.</Text>
+          <Text style={styles.emptyTitle}>You're all caught up!</Text>
+          <Text style={styles.emptySub}>When you get updates about your orders or exclusive offers, they'll show up here.</Text>
         </View>
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         >
@@ -248,34 +146,38 @@ const NotificationsScreen = ({ navigation }: any) => {
                     readMutation.mutate(n.id);
                   }
                   
-                  // Deep linking logic
+                  // Proper Deep Linking
                   try {
-                    const parsedData = n.data ? JSON.parse(n.data) : {};
-                    if (parsedData.orderId) {
+                    const parsedData = n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : {};
+                    
+                    if (n.type.includes('table_booking') || n.type === 'booking_reminder') {
+                      navigation.navigate('MyTableBookings');
+                    } else if (n.type.includes('wallet') || n.type.includes('reward')) {
+                      navigation.navigate('Wallet');
+                    } else if (n.type.includes('promo')) {
+                      navigation.navigate('Home');
+                    } else if (parsedData.orderId) {
                       navigation.navigate('OrderConfirmed', { orderId: parsedData.orderId });
                     }
-                  } catch (err) {}
+                  } catch (err) {
+                     console.log('Deep link error', err);
+                  }
                 }}
                 activeOpacity={0.85}
               >
-                {/* Icon */}
                 <View style={[styles.notifIconBox, { backgroundColor: iconBg(n.type, n.is_read) }]}>
                   <NotifIcon type={n.type} read={n.is_read} />
                 </View>
 
-                {/* Body */}
                 <View style={styles.notifBody}>
                   <View style={styles.notifTitleRow}>
                     <Text style={[styles.notifTitle, !n.is_read && styles.notifTitleUnread]} numberOfLines={1}>
                       {n.title}
                     </Text>
-                    <Text style={styles.notifTime}>{relativeTime(n.created_at)}</Text>
+                    <Text style={[styles.notifTime, !n.is_read && styles.notifTimeUnread]}>{relativeTime(n.created_at)}</Text>
                   </View>
-                  <Text style={styles.notifMessage} numberOfLines={2}>{n.body}</Text>
+                  <Text style={[styles.notifMessage, !n.is_read && styles.notifMessageUnread]} numberOfLines={2}>{n.body}</Text>
                 </View>
-
-                {/* Unread dot */}
-                {!n.is_read && <View style={styles.unreadDot} />}
               </BouncingButton>
             </Animated.View>
           ))}
@@ -292,95 +194,60 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingBottom: 12,
+    paddingHorizontal: 16, paddingBottom: 16,
     backgroundColor: colors.white,
     borderBottomWidth: 1, borderBottomColor: colors.border,
     gap: 12,
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: colors.surfaceMuted,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink },
-  headerSub: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 1 },
+  headerTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: colors.ink },
+  headerSub: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.primary, marginTop: 2 },
   markAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: 20, backgroundColor: colors.primaryTint,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 24, backgroundColor: colors.primaryTint,
   },
-  markAllText: { fontSize: 11, fontFamily: fontFamily.bold, color: colors.primary },
-
-  tabRow: {
-    flexDirection: 'row', backgroundColor: colors.white,
-    paddingHorizontal: 16, paddingBottom: 12, paddingTop: 4,
-    borderBottomWidth: 1, borderBottomColor: colors.border, gap: 8,
-  },
-  tabBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 10, borderRadius: 14,
-    backgroundColor: colors.surfaceMuted,
-  },
-  tabBtnActive: { backgroundColor: colors.primaryTint },
-  tabText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted },
-  tabTextActive: { color: colors.primary },
-  tabBadge: {
-    backgroundColor: colors.primary, width: 18, height: 18, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  tabBadgeText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.white },
+  markAllText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary },
 
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   emptyIcon: {
-    width: 80, height: 80, borderRadius: 40,
+    width: 96, height: 96, borderRadius: 48,
     backgroundColor: colors.primaryTint,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 24,
   },
-  emptyTitle: { fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 8 },
-  emptySub: { fontSize: 14, fontFamily: fontFamily.regular, color: colors.inkMuted, textAlign: 'center', lineHeight: 21 },
+  emptyTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 8 },
+  emptySub: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', lineHeight: 22 },
 
   notifCard: {
     flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: colors.white, borderRadius: 20,
+    backgroundColor: colors.white, borderRadius: 24,
     padding: 16, marginBottom: 12,
-    borderWidth: 0,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 }, elevation: 4,
+    borderWidth: 1, borderColor: colors.border,
+    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
   notifCardUnread: {
     backgroundColor: '#FAFAFA',
-    borderWidth: 1, borderColor: colors.primary + '20',
+    borderColor: colors.primary + '30',
+    shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
   },
   notifIconBox: {
-    width: 48, height: 48, borderRadius: 24,
+    width: 52, height: 52, borderRadius: 26,
     alignItems: 'center', justifyContent: 'center',
-    marginRight: 14,
+    marginRight: 16,
   },
-  notifBody: { flex: 1 },
-  notifTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  notifTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, flex: 1, marginRight: 8 },
-  notifTitleUnread: { fontFamily: fontFamily.black, color: colors.ink },
-  notifTime: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkFaint },
-  notifMessage: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 18 },
-  unreadDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: colors.primary, marginLeft: 10, marginTop: 6,
-  },
-
-  // Preferences
-  prefNote: {
-    fontSize: 13, fontFamily: fontFamily.regular, color: colors.inkMuted,
-    lineHeight: 19, marginBottom: 20, paddingHorizontal: 4,
-  },
-  prefRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.white, borderRadius: 14,
-    paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  prefLabel: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 2 },
-  prefDesc: { fontSize: 12, fontFamily: fontFamily.regular, color: colors.inkMuted },
-  prefDivider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
+  notifBody: { flex: 1, justifyContent: 'center' },
+  notifTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  notifTitle: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, flex: 1, marginRight: 8 },
+  notifTitleUnread: { fontFamily: fontFamily.black, color: colors.primaryDark },
+  notifTime: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkFaint },
+  notifTimeUnread: { color: colors.primary, fontFamily: fontFamily.bold },
+  notifMessage: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 20 },
+  notifMessageUnread: { color: colors.ink, fontFamily: fontFamily.semibold },
 });

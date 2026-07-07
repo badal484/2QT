@@ -148,7 +148,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     try {
       const res = await api.get(`/menu/zones/check?lat=${mapRegion.latitude}&lng=${mapRegion.longitude}`);
       if (res.serviceable && res.zone?.id) zoneId = res.zone.id;
-    } catch {}
+    } catch (e) { console.warn('[AddressBook] zone check failed — address saved without zone:', e); }
 
     const baseAddress = addressFull || addressText;
     const fullAddress = buildingName.trim()
