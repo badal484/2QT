@@ -13,6 +13,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../providers";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
+import { ConfirmModal } from "../../../components/ConfirmModal";
 
 const LiveTrackingMap = dynamic(() => import("../../../components/LiveTrackingMap"), {
   ssr: false,
@@ -50,6 +51,7 @@ interface Order {
   sgst_paise: number;
   total_amount_paise: number;
   delivery_otp?: string;
+  food_rating?: number;
 }
 
 const STEPS = [
@@ -121,9 +123,10 @@ export default function OrderTrackingPage() {
   const [foodRating, setFoodRating]           = useState(0);
   const [deliveryRating, setDeliveryRating]   = useState(0);
   const [feedbackComment, setFeedbackComment] = useState("");
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState<boolean | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [invoiceLoading, setInvoiceLoading]   = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const prevStatusRef = useRef<string | null>(null);
 
   // Auth guard
@@ -134,7 +137,12 @@ export default function OrderTrackingPage() {
   // Data + socket
   useEffect(() => {
     api.get(`/orders/${id}`)
-      .then(d => { if (d.order) setOrder(d.order); })
+      .then(d => {
+        if (d.order) {
+          setOrder(d.order);
+          setFeedbackSubmitted(!!d.order.food_rating);
+        }
+      })
       .finally(() => setLoading(false));
 
     const pollInterval = setInterval(async () => {
@@ -215,6 +223,8 @@ export default function OrderTrackingPage() {
 
   const current = stepIndex(order.status);
   const isLive  = order.status === "out_for_delivery";
+  const showMap = !["delivered", "cancelled"].includes(order.status) &&
+    !!(order.customer_lat && order.customer_lng);
   const hero    = STATUS_HERO[order.status];
 
   return (
@@ -223,7 +233,7 @@ export default function OrderTrackingPage() {
       {/* ── Map / hero area ── */}
       <div
         className="relative w-full overflow-hidden"
-        style={{ height: isLive ? "65vh" : "52vh", minHeight: 260 }}
+        style={{ height: showMap ? (isLive ? "65vh" : "55vh") : "52vh", minHeight: 260 }}
       >
         {/* Floating nav */}
         <div className="absolute top-0 inset-x-0 z-50 px-4 pt-safe-top pt-4 flex items-center justify-between">
@@ -257,8 +267,8 @@ export default function OrderTrackingPage() {
 
         {/* Map or status illustration */}
         <AnimatePresence mode="wait">
-          {isLive ? (
-            <motion.div key="map" className="w-full h-full"
+          {showMap ? (
+            <motion.div key="map" className="w-full h-full relative"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <LiveTrackingMap
                 kitchenLat={order.kitchen_lat   ? Number(order.kitchen_lat)   : undefined}
@@ -271,6 +281,15 @@ export default function OrderTrackingPage() {
                 liveRiderLng={liveRider?.lng}
                 onEtaChange={handleEtaChange}
               />
+              {/* Status badge overlay (non-live statuses) */}
+              {!isLive && hero && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500]">
+                  <div className={`flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-white/60`}>
+                    <hero.icon className={`w-4 h-4 ${hero.iconClass}`} />
+                    <span className="text-sm font-bold text-zinc-800">{hero.heading}</span>
+                  </div>
+                </div>
+              )}
             </motion.div>
           ) : (
             <motion.div key="hero"
@@ -514,7 +533,7 @@ export default function OrderTrackingPage() {
         )}
 
         {/* Feedback */}
-        {order.status === "delivered" && (
+        {order.status === "delivered" && feedbackSubmitted !== null && (
           <div className="px-5 pt-4">
             {feedbackSubmitted ? (
               <div className="flex flex-col items-center gap-2 py-6">
@@ -583,20 +602,30 @@ export default function OrderTrackingPage() {
               <p className="text-xs text-red-400">Refund to wallet</p>
             </div>
             <button
-              onClick={async () => {
-                if (!confirm("Cancel this order?")) return;
-                try {
-                  await api.post(`/orders/${order.id}/cancel`, {});
-                  setOrder(prev => prev ? { ...prev, status: "cancelled" } : null);
-                  toast.success("Order cancelled. Refund initiated.");
-                } catch (e: any) { toast.error(e.message || "Failed to cancel"); }
-              }}
+              onClick={() => setCancelModalOpen(true)}
               className="bg-red-500 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-red-600 transition-all"
             >
               Cancel
             </button>
           </div>
         )}
+
+        <ConfirmModal
+          isOpen={cancelModalOpen}
+          title="Cancel Order?"
+          message="Your payment will be refunded to your 2QT Wallet."
+          confirmText="Yes, Cancel"
+          isDanger
+          onConfirm={async () => {
+            setCancelModalOpen(false);
+            try {
+              await api.post(`/orders/${order.id}/cancel`, {});
+              setOrder(prev => prev ? { ...prev, status: "cancelled" } : null);
+              toast.success("Order cancelled. Refund initiated.");
+            } catch (e: any) { toast.error(e.message || "Failed to cancel"); }
+          }}
+          onCancel={() => setCancelModalOpen(false)}
+        />
 
         {/* Help */}
         <div className="mx-5 mt-3 mb-8 bg-zinc-50 rounded-2xl p-4 flex items-center justify-between">

@@ -2,12 +2,11 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation, Bell, ShieldCheck } from "lucide-react";
+import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation, Bell, ShieldCheck, Download, RotateCcw, Phone, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
-import { ConfirmModal } from "../../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import PushNotifier from "../../components/PushNotifier";
 import dynamic from "next/dynamic";
@@ -23,6 +22,8 @@ const TABS = [
   { id: "orders", label: "Orders History", icon: ShoppingBag },
   { id: "wallet", label: "2QT Wallet", icon: Wallet },
   { id: "loyalty", label: "Loyalty Club", icon: Star },
+  { id: "plans", label: "My Plans", icon: Zap },
+  { id: "tables", label: "Table Bookings", icon: UtensilsCrossed },
   { id: "addresses", label: "Saved Places", icon: MapPin },
   { id: "support", label: "Help & Support", icon: HelpCircle },
 ];
@@ -46,6 +47,7 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
   const [referral, setReferral] = useState<any>(null);
   const [riderApp, setRiderApp] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
     order_updates: true, promotions: true, payouts: true,
     push_enabled: true, whatsapp_enabled: true,
@@ -83,17 +85,46 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
     if (referral?.referralCode) { navigator.clipboard.writeText(referral.referralCode); setCopied(true); setTimeout(() => setCopied(false), 2000); }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Photo must be under 5 MB"); return; }
+    setUploadingPhoto(true);
+    try {
+      const upload = await api.uploadImage(file);
+      const url = upload.url || upload.imageUrl || upload.photo_url;
+      if (!url) throw new Error("No URL returned from upload");
+      const updated = await api.updateProfile({ photo_url: url });
+      if (updated) { onUpdate({ ...user, photo_url: url }); toast.success("Profile photo updated!"); }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload photo");
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
+    }
+  };
+
   return (
     <div className="space-y-8">
       <section className="bg-white rounded-3xl border border-zinc-200 p-8 shadow-sm">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-3xl font-bold shadow-sm">
-              {(user?.name ?? "U")[0].toUpperCase()}
+            <div className="w-24 h-24 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-3xl font-bold shadow-sm overflow-hidden">
+              {user?.photo_url
+                ? <img src={user.photo_url} alt="Profile" className="w-full h-full object-cover" />
+                : (user?.name ?? "U")[0].toUpperCase()
+              }
             </div>
-            <button onClick={() => setEditing(true)} className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-zinc-900 border-2 border-white flex items-center justify-center text-white hover:bg-brand-primary transition-all">
-               <Edit3 className="w-4 h-4" />
-            </button>
+            {uploadingPhoto ? (
+              <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-zinc-900 border-2 border-white flex items-center justify-center">
+                <Loader2 className="w-4 h-4 text-white animate-spin" />
+              </div>
+            ) : (
+              <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-zinc-900 border-2 border-white flex items-center justify-center text-white hover:bg-brand-primary transition-all cursor-pointer">
+                <Edit3 className="w-4 h-4" />
+                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+              </label>
+            )}
           </div>
 
           <div className="flex-1 text-center md:text-left min-w-0">
@@ -297,13 +328,58 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
 function OrdersTab() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [invoiceLoading, setInvoiceLoading] = useState<Set<string>>(new Set());
+  const [reorderLoading, setReorderLoading] = useState<Set<string>>(new Set());
+  const router = useRouter();
 
-  useEffect(() => { 
-    api.get("/orders/mine").then(d => setOrders(d.orders ?? [])).finally(() => setLoading(false)); 
+  useEffect(() => {
+    api.get("/orders/mine").then(d => setOrders(d.orders ?? [])).finally(() => setLoading(false));
   }, []);
 
+  const openInvoice = async (orderId: string) => {
+    setInvoiceLoading(prev => new Set(prev).add(orderId));
+    try {
+      const res = await api.get(`/orders/${orderId}/invoice`);
+      if (res.url) window.open(res.url, "_blank");
+    } catch {
+      toast.error("Invoice not available");
+    } finally {
+      setInvoiceLoading(prev => { const s = new Set(prev); s.delete(orderId); return s; });
+    }
+  };
+
+  const reorder = async (order: any) => {
+    setReorderLoading(prev => new Set(prev).add(order.id));
+    try {
+      const menuRes = await api.get(`/menu?zoneId=${order.zone_id}`);
+      const currentItems: any[] = menuRes.items || [];
+      const available = (order.items || []).filter((old: any) =>
+        currentItems.find((ci: any) => ci.id === old.menu_item_id && ci.available)
+      );
+      if (available.length === 0) {
+        toast.error("None of the items from this order are currently available.");
+        return;
+      }
+      available.forEach((item: any) => {
+        const menuItem = currentItems.find((ci: any) => ci.id === item.menu_item_id);
+        if (menuItem) {
+          for (let i = 0; i < item.quantity; i++) {
+            (window as any).__2qt_addToCart?.({ id: menuItem.id, name: menuItem.name, price_paise: menuItem.price_paise, photo_url: menuItem.photo_url, is_veg: menuItem.is_veg, zone_id: order.zone_id, kitchen_id: order.kitchen_id });
+          }
+        }
+      });
+      if (available.length < (order.items || []).length) toast.info("Some sold-out items were skipped.");
+      toast.success("Items added! Head to menu to checkout.");
+      router.push("/menu");
+    } catch {
+      toast.error("Could not validate menu. Please try again.");
+    } finally {
+      setReorderLoading(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+    }
+  };
+
   if (loading) return <div className="grid gap-4">{[1,2,3].map(i => <div key={i} className="h-24 bg-white rounded-2xl animate-pulse shadow-sm" />)}</div>;
-  
+
   if (!orders.length) return (
     <div className="bg-white rounded-3xl border border-zinc-200 p-16 text-center shadow-sm">
       <div className="w-20 h-20 bg-brand-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -312,7 +388,7 @@ function OrdersTab() {
       <h3 className="text-2xl font-bold text-zinc-900 mb-3">No History Recorded</h3>
       <p className="text-zinc-500 text-sm font-medium mb-8 max-w-sm mx-auto">Your culinary journey starts at the menu. Ready to place your first order?</p>
       <Link href="/menu" className="inline-flex items-center gap-2 bg-brand-primary text-white px-8 py-4 rounded-xl text-sm font-semibold hover:bg-brand-dark transition-colors shadow-lg shadow-brand-primary/20">
-         Discover Menu <ArrowRight className="w-4 h-4" />
+        Discover Menu <ArrowRight className="w-4 h-4" />
       </Link>
     </div>
   );
@@ -320,27 +396,54 @@ function OrdersTab() {
   return (
     <div className="space-y-4">
       {orders.map((o: any) => (
-        <Link key={o.id} href={`/orders/${o.id}`}>
-          <motion.div whileHover={{ y: -2 }} className="bg-white rounded-2xl border border-zinc-200 p-6 flex items-center gap-6 hover:border-brand-primary/30 transition-all shadow-sm hover:shadow-md">
-            <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${o.status === "delivered" ? "bg-zinc-100 text-zinc-400" : "bg-brand-primary/10 text-brand-primary"}`}>
-               <ShoppingBag className="w-6 h-6" />
+        <div key={o.id} className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm hover:shadow-md transition-all">
+          <Link href={`/orders/${o.id}`} className="flex items-center gap-4 mb-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${o.status === "delivered" ? "bg-zinc-100 text-zinc-400" : "bg-brand-primary/10 text-brand-primary"}`}>
+              <ShoppingBag className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="text-lg font-bold text-zinc-900">Order #{o.display_id}</span>
+              <div className="flex items-center gap-3 mb-0.5">
+                <span className="text-base font-bold text-zinc-900">Order #{o.display_id}</span>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLOR[o.status]}`}>
                   {STATUS_LABEL[o.status] ?? o.status}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-sm font-medium text-zinc-500">
-                <span className="text-brand-primary font-bold">₹{o.total_amount_paise / 100}</span>
-                <span className="w-1.5 h-1.5 bg-zinc-300 rounded-full" />
+              <div className="flex items-center gap-2 text-sm font-medium text-zinc-500">
+                <span className="text-brand-primary font-bold">₹{(o.total_amount_paise / 100).toFixed(0)}</span>
+                <span className="w-1 h-1 bg-zinc-300 rounded-full" />
                 <span>{new Date(o.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long" })}</span>
               </div>
             </div>
-            <ChevronRight className="w-5 h-5 text-zinc-400" />
-          </motion.div>
-        </Link>
+            <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
+          </Link>
+
+          {o.status === "delivered" && (
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-zinc-100">
+              <button
+                onClick={() => openInvoice(o.id)}
+                disabled={invoiceLoading.has(o.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 transition-all disabled:opacity-50"
+              >
+                {invoiceLoading.has(o.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                Invoice
+              </button>
+              <button
+                onClick={() => reorder(o)}
+                disabled={reorderLoading.has(o.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand-primary/10 border border-brand-primary/20 text-xs font-semibold text-brand-primary hover:bg-brand-primary/20 transition-all disabled:opacity-50"
+              >
+                {reorderLoading.has(o.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                Reorder
+              </button>
+              <a
+                href="tel:+919999999999"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 border border-red-100 text-xs font-semibold text-red-600 hover:bg-red-100 transition-all"
+              >
+                <Phone className="w-3.5 h-3.5" /> Support
+              </a>
+            </div>
+          )}
+        </div>
       ))}
     </div>
   );
@@ -388,8 +491,10 @@ function WalletTab() {
             });
             const updated = await api.get("/customers/wallet");
             setWallet(updated);
+            toast.success(`₹${rechargeAmount} added to your wallet!`);
           } catch (e: any) {
             console.error("Wallet recharge verification failed", e);
+            toast.error("Payment verification failed. Contact support if amount was deducted.");
           }
         },
         theme: { color: "#FF6B35" },
@@ -489,7 +594,12 @@ function LoyaltyTab() {
 
   if (loading) return <div className="h-64 bg-white rounded-3xl animate-pulse shadow-sm" />;
   const pts = loyalty?.points ?? 0;
-  const tiers = [{ name: "Bronze", min: 0, color: "text-amber-700" }, { name: "Silver", min: 500, color: "text-zinc-500" }, { name: "Gold", min: 1500, color: "text-amber-500" }];
+  const tiers = [
+    { name: "Bronze",   min: 0,    color: "text-amber-700" },
+    { name: "Silver",   min: 1000, color: "text-zinc-500"  },
+    { name: "Gold",     min: 2000, color: "text-amber-500" },
+    { name: "Platinum", min: 5000, color: "text-cyan-600"  },
+  ];
   const currentTier = [...tiers].reverse().find(t => pts >= t.min) ?? tiers[0];
   const nextTier = tiers.find(t => t.min > pts);
   const progress = nextTier ? Math.min((pts / nextTier.min) * 100, 100) : 100;
@@ -712,10 +822,193 @@ function AddressesTab() {
   );
 }
 
+const SUPPORT_CATEGORIES = [
+  { key: "order_issue", label: "Order Issue", icon: "🛍️" },
+  { key: "payment", label: "Payment", icon: "💳" },
+  { key: "delivery", label: "Delivery", icon: "🚴" },
+  { key: "account", label: "My Account", icon: "👤" },
+  { key: "other", label: "Other", icon: "💬" },
+];
+
+// ── Table Bookings ────────────────────────────────────────────────────────────
+function TableBookingsTab() {
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/table-bookings/mine?status=upcoming")
+      .then((d: any) => setBookings(d.bookings ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const STATUS_COLOR: Record<string, string> = {
+    pending: "bg-amber-50 text-amber-600 border-amber-200",
+    confirmed: "bg-green-50 text-green-600 border-green-200",
+    completed: "bg-zinc-100 text-zinc-500 border-zinc-200",
+    cancelled: "bg-red-50 text-red-500 border-red-200",
+  };
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmtTime = (iso: string) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+
+  if (loading) return <div className="grid gap-4">{[1,2].map(i => <div key={i} className="h-24 bg-white rounded-2xl animate-pulse shadow-sm" />)}</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-zinc-900">Upcoming Bookings</h3>
+        <Link href="/table-booking" className="text-sm font-semibold text-brand-primary hover:text-brand-dark transition-colors">+ Book a table</Link>
+      </div>
+      {bookings.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-zinc-200 p-12 text-center shadow-sm">
+          <UtensilsCrossed className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
+          <p className="font-bold text-zinc-700 mb-1">No upcoming bookings</p>
+          <p className="text-zinc-400 text-sm mb-5">Reserve a table at your favourite restaurant.</p>
+          <Link href="/table-booking" className="inline-flex items-center gap-2 bg-brand-primary text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-dark transition-all shadow-md">
+            Browse Restaurants <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      ) : (
+        <>
+          {bookings.map((b: any) => (
+            <Link key={b.id} href={`/my-table-bookings/${b.id}`}>
+              <div className="bg-white rounded-2xl border border-zinc-200 p-5 flex items-center gap-4 hover:border-brand-primary/30 hover:shadow-md transition-all">
+                <div className="w-11 h-11 rounded-xl bg-brand-primary/10 flex items-center justify-center shrink-0">
+                  <UtensilsCrossed className="w-5 h-5 text-brand-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-zinc-900 text-sm truncate">{b.restaurant_name}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {new Date(b.slot_start).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })} · {fmtTime(b.slot_start)} · {b.party_size} guests
+                  </p>
+                </div>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${STATUS_COLOR[b.status] ?? STATUS_COLOR.pending} capitalize`}>
+                  {b.status}
+                </span>
+              </div>
+            </Link>
+          ))}
+          <Link href="/my-table-bookings" className="block text-center text-sm font-semibold text-brand-primary hover:text-brand-dark transition-colors py-2">
+            View all bookings →
+          </Link>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── My Plans ──────────────────────────────────────────────────────────────────
+function PlansTab() {
+  const [activeSubs, setActiveSubs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const reload = async () => {
+    const d = await api.get("/customers/subscriptions/my");
+    setActiveSubs(d.subscriptions ?? []);
+  };
+
+  useEffect(() => {
+    api.get("/customers/subscriptions/my")
+      .then(d => setActiveSubs(d.subscriptions ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handlePause = async (subId: string) => {
+    setActionLoading(subId + "_pause");
+    try { await api.post(`/customers/subscriptions/${subId}/pause`, {}); toast.success("Subscription paused."); await reload(); }
+    catch (e: any) { toast.error(e.message || "Failed to pause"); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleResume = async (subId: string) => {
+    setActionLoading(subId + "_resume");
+    try { await api.post(`/customers/subscriptions/${subId}/resume`, {}); toast.success("Subscription resumed!"); await reload(); }
+    catch (e: any) { toast.error(e.message || "Failed to resume"); }
+    finally { setActionLoading(null); }
+  };
+
+  if (loading) return <div className="grid gap-4">{[1,2].map(i => <div key={i} className="h-32 bg-white rounded-2xl animate-pulse shadow-sm" />)}</div>;
+
+  return (
+    <div className="space-y-6">
+      {activeSubs.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-zinc-200 p-16 text-center shadow-sm">
+          <div className="w-16 h-16 bg-brand-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Zap className="w-8 h-8 text-brand-primary" />
+          </div>
+          <h3 className="text-xl font-bold text-zinc-900 mb-2">No active plans</h3>
+          <p className="text-zinc-500 text-sm mb-6">Subscribe to a meal plan and save up to 30% on every order.</p>
+          <Link href="/subscription" className="inline-flex items-center gap-2 bg-brand-primary text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-dark transition-all shadow-md">
+            Browse Plans <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      ) : (
+        <>
+          {activeSubs.map((sub: any) => {
+            const isPaused = sub.status === "paused";
+            const total = sub.total_meals ?? (sub.remaining_meals ?? 0);
+            const used = total - (sub.remaining_meals ?? 0);
+            const pct = total > 0 ? Math.round((used / total) * 100) : 0;
+            return (
+              <div key={sub.id} className={`bg-white rounded-2xl border p-6 shadow-sm ${isPaused ? "border-amber-200" : "border-green-200"}`}>
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <p className="font-bold text-zinc-900 text-lg">{sub.plan_name ?? sub.plan_id?.replace("sub_", "").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}</p>
+                    <p className="text-sm text-zinc-500">{sub.remaining_meals} meals remaining{isPaused && <span className="ml-1 text-amber-600 font-semibold">· Paused</span>}</p>
+                    {sub.current_day_credits !== undefined && (
+                      <p className="text-xs text-zinc-400 mt-0.5">Today's credits: {sub.current_day_credits}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-zinc-400">Expires</p>
+                    <p className="text-sm font-semibold text-zinc-700">
+                      {sub.end_date ? new Date(sub.end_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs text-zinc-400 mb-1"><span>{used} used</span><span>{total} total</span></div>
+                  <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${isPaused ? "bg-amber-400" : "bg-green-500"}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isPaused ? (
+                    <button onClick={() => handleResume(sub.id)} disabled={actionLoading === sub.id + "_resume"}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-600 text-white text-xs font-bold hover:bg-green-700 transition-all disabled:opacity-50">
+                      {actionLoading === sub.id + "_resume" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      Resume
+                    </button>
+                  ) : (
+                    <button onClick={() => handlePause(sub.id)} disabled={actionLoading === sub.id + "_pause"}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-all disabled:opacity-50">
+                      {actionLoading === sub.id + "_pause" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      Pause
+                    </button>
+                  )}
+                  <Link href="/subscription" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 text-xs font-bold hover:bg-zinc-200 transition-all">
+                    Manage Plans
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+          <Link href="/subscription" className="block text-center text-sm font-semibold text-brand-primary hover:text-brand-dark transition-colors py-2">
+            + Get another plan
+          </Link>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Support ───────────────────────────────────────────────────────────────────
 function SupportTab() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState("order_issue");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -729,27 +1022,30 @@ function SupportTab() {
 
   useEffect(() => { loadTickets(); }, []);
 
-  useSocketRefresh(['ticket_status_updated', 'user_updated'], loadTickets);
-  useSocketRefresh(["ticket_updated"], loadTickets);
+  useSocketRefresh(['ticket_status_updated', 'ticket_updated'], loadTickets);
 
   const submit = async () => {
     if (!subject.trim() || !message.trim()) return;
     setSubmitting(true);
     try {
-      await api.post("/customers/support/tickets", { subject: subject.trim(), message: message.trim() });
+      await api.post("/customers/support/tickets", { category, subject: subject.trim(), message: message.trim() });
       setSubject("");
       setMessage("");
+      setCategory("order_issue");
       loadTickets();
+      toast.success("Ticket raised! We'll respond within 24 hours.");
     } catch (e: any) {
-      console.error(e);
+      toast.error("Could not submit ticket. Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const STATUS_COLOR: Record<string, string> = {
-    open: "bg-amber-50 text-amber-600 border-amber-200",
-    resolved: "bg-green-50 text-green-600 border-green-200",
+  const STATUS_META: Record<string, { label: string; cls: string }> = {
+    open:        { label: "Open",        cls: "bg-amber-50 text-amber-600 border-amber-200" },
+    in_progress: { label: "In Progress", cls: "bg-blue-50 text-blue-600 border-blue-200" },
+    resolved:    { label: "Resolved",    cls: "bg-green-50 text-green-600 border-green-200" },
+    closed:      { label: "Closed",      cls: "bg-zinc-100 text-zinc-500 border-zinc-200" },
   };
 
   return (
@@ -757,19 +1053,40 @@ function SupportTab() {
       <div className="bg-white rounded-3xl border border-zinc-200 p-8 shadow-sm">
         <h3 className="text-lg font-bold text-zinc-900 mb-6">Submit a Request</h3>
         <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-zinc-700 mb-2">Category</p>
+            <div className="flex flex-wrap gap-2">
+              {SUPPORT_CATEGORIES.map(cat => (
+                <button
+                  key={cat.key}
+                  onClick={() => setCategory(cat.key)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+                    category === cat.key
+                      ? "bg-brand-primary text-white border-brand-primary shadow-md"
+                      : "bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-brand-primary/40"
+                  }`}
+                >
+                  <span>{cat.icon}</span> {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <input
             value={subject}
             onChange={e => setSubject(e.target.value)}
             placeholder="Subject (e.g. Wrong item delivered)"
+            maxLength={100}
             className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3 px-4 text-sm font-medium outline-none focus:ring-2 ring-brand-primary/20 text-zinc-900"
           />
           <textarea
             value={message}
             onChange={e => setMessage(e.target.value)}
-            placeholder="Describe your issue in detail..."
+            placeholder="Describe your issue in detail — order ID, what happened, what you expect…"
             rows={4}
+            maxLength={1000}
             className="w-full bg-zinc-50 border border-zinc-200 rounded-xl py-3 px-4 text-sm font-medium outline-none focus:ring-2 ring-brand-primary/20 text-zinc-900 resize-none"
           />
+          <p className="text-xs text-zinc-400">💡 Including your Order ID speeds up resolution. Find it in Order History.</p>
           <button
             onClick={submit}
             disabled={submitting || !subject.trim() || !message.trim()}
@@ -792,26 +1109,33 @@ function SupportTab() {
           </div>
         ) : (
           <div className="space-y-4">
-            {tickets.map((t: any) => (
+            {tickets.map((t: any) => {
+              const meta = STATUS_META[t.status] ?? STATUS_META.open;
+              const catLabel = SUPPORT_CATEGORIES.find(c => c.key === t.category);
+              return (
               <div key={t.id} className="border border-zinc-100 rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-bold text-zinc-900">{t.subject}</p>
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_COLOR[t.status] ?? "bg-zinc-100 text-zinc-500 border-zinc-200"}`}>
-                    {t.status === "resolved" ? "Resolved" : "Open"}
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-zinc-900">{t.subject}</p>
+                    {catLabel && <p className="text-xs text-zinc-400 mt-0.5">{catLabel.icon} {catLabel.label}</p>}
+                  </div>
+                  <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full border ${meta.cls}`}>
+                    {meta.label}
                   </span>
                 </div>
                 <p className="text-sm text-zinc-500 mb-2">{t.message}</p>
-                {t.status === "resolved" && t.resolution && (
+                {(t.admin_reply || (t.status === "resolved" && t.resolution)) && (
                   <div className="mt-3 p-3 bg-green-50 rounded-xl border border-green-100">
                     <p className="text-xs font-bold text-green-700 mb-1">Support Response</p>
-                    <p className="text-sm text-green-800">{t.resolution}</p>
+                    <p className="text-sm text-green-800">{t.admin_reply || t.resolution}</p>
                   </div>
                 )}
                 <p className="text-xs text-zinc-400 mt-2">
-                  {new Date(t.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {new Date(t.createdAt || t.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -853,6 +1177,8 @@ function ProfileContent() {
     orders: <OrdersTab />,
     wallet: <WalletTab />,
     loyalty: <LoyaltyTab />,
+    plans: <PlansTab />,
+    tables: <TableBookingsTab />,
     addresses: <AddressesTab />,
     support: <SupportTab />,
   };
