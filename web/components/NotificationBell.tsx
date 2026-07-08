@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, CheckCheck, Package, Bike, X } from "lucide-react";
+import { Bell, CheckCheck, Package, Bike, X, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import { api } from "../app/lib/api";
 import { useAuth } from "../app/providers";
 
@@ -108,11 +109,11 @@ export function NotificationBell() {
             )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto divide-y divide-zinc-800/50">
+          <div className="max-h-72 overflow-y-auto divide-y divide-zinc-800/50">
             {notifs.length === 0 ? (
               <div className="py-10 text-center text-zinc-600 text-sm">No notifications yet</div>
             ) : (
-              notifs.map(n => (
+              notifs.slice(0, 8).map(n => (
                 <button
                   key={n.id}
                   onClick={() => markRead(n.id)}
@@ -135,6 +136,13 @@ export function NotificationBell() {
               ))
             )}
           </div>
+          <Link
+            href="/notifications"
+            onClick={() => setOpen(false)}
+            className="flex items-center justify-center gap-1.5 px-4 py-3 border-t border-zinc-800 text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+          >
+            View all notifications <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       )}
     </div>

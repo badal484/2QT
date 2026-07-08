@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Minus, ShoppingBag, X, ChevronRight,
   Star, Clock, Zap, CheckCircle2, Search,
-  ArrowLeft, Filter, Heart, Info, Loader2, MapPin, Check
+  ArrowLeft, Info, Loader2, MapPin, Check
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -96,6 +96,8 @@ export default function MenuPage() {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
   const [newAddressDetails, setNewAddressDetails] = useState({ label: "Home", flat: "", area: "", landmark: "" });
+  const [newAddressLat, setNewAddressLat] = useState<number | null>(null);
+  const [newAddressLng, setNewAddressLng] = useState<number | null>(null);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const [loading, setLoading] = useState(true);
@@ -122,6 +124,8 @@ export default function MenuPage() {
   const [reqForm, setReqForm] = useState({ area_name: '', pincode: '' });
   const [reqLoading, setReqLoading] = useState(false);
   const [reqError, setReqError] = useState('');
+  const [isVegOnly, setIsVegOnly] = useState(false);
+  const [scheduleTime, setScheduleTime] = useState("");
 
   const { user } = useAuth()!;
   const { items: cartItems, addItem, removeItem, total, clearCart } = useCart()!;
@@ -305,7 +309,8 @@ export default function MenuPage() {
   const filtered = items.filter(item =>
     item.available &&
     (activeCategory === "All" || item.category === activeCategory) &&
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (!isVegOnly || item.is_veg === true)
   );
 
   const qty = (id: string) => cartItems.find(i => i.id === id)?.quantity ?? 0;
@@ -332,22 +337,26 @@ export default function MenuPage() {
   const handleOpenAddressModal = () => {
     setIsAddingNewAddress(false);
     setNewAddressDetails({ label: "Home", flat: "", area: "", landmark: "" });
+    setNewAddressLat(null);
+    setNewAddressLng(null);
     setIsAddressModalOpen(true);
   };
 
   const handleSaveAddress = async () => {
     const fullText = `${newAddressDetails.flat.trim()}, ${newAddressDetails.area.trim()}${newAddressDetails.landmark.trim() ? `, Near ${newAddressDetails.landmark.trim()}` : ""}`;
-    
+
     if (fullText.length < 5 || !newAddressDetails.flat || !newAddressDetails.area) {
       toast.error("Please enter complete address details");
       return;
     }
+    const lat = newAddressLat ?? currentLocation[0];
+    const lng = newAddressLng ?? currentLocation[1];
     setIsSavingAddress(true);
     try {
       const res = await api.post("/customers/addresses", {
         label: newAddressDetails.label,
         addressText: fullText,
-        lat: currentLocation[0], lng: currentLocation[1],
+        lat, lng,
         zoneId,
       });
       if (res.address) {
@@ -394,13 +403,21 @@ export default function MenuPage() {
           promoCode: promoApplied || undefined,
           useWallet,
           useLoyalty,
+          scheduledTime: scheduleTime || undefined,
       });
 
       if (res.status === "confirmed") {
         haptics.success();
-        setOrderSuccessId(res.orderId);
         clearCart();
-        toast.success("Order Confirmed!");
+        if (pricing && res.orderId) {
+          try {
+            sessionStorage.setItem(`2qt_savings_${res.orderId}`, JSON.stringify({ ...pricing, promoCode: promoApplied || undefined }));
+          } catch {}
+          router.push(`/order-savings/${res.orderId}`);
+        } else {
+          setOrderSuccessId(res.orderId);
+          toast.success("Order Confirmed!");
+        }
         return;
       }
 
@@ -420,9 +437,16 @@ export default function MenuPage() {
                 razorpay_signature: response.razorpay_signature
               });
               haptics.success();
-              setOrderSuccessId(res.orderId);
               clearCart();
-              toast.success("Payment Successful!");
+              if (pricing && res.orderId) {
+                try {
+                  sessionStorage.setItem(`2qt_savings_${res.orderId}`, JSON.stringify({ ...pricing, promoCode: promoApplied || undefined }));
+                } catch {}
+                router.push(`/order-savings/${res.orderId}`);
+              } else {
+                setOrderSuccessId(res.orderId);
+                toast.success("Payment Successful!");
+              }
             } catch (err: any) {
               haptics.error();
               toast.error("Payment verification failed: " + err.message);
@@ -687,9 +711,15 @@ export default function MenuPage() {
                <span className="text-[9px] uppercase tracking-widest text-brand-primary mt-1 font-bold flex items-center gap-1"><Zap className="w-3 h-3 fill-brand-primary"/> 15-MIN DELIVERY</span>
             </Link>
 
-            <div className="flex items-center gap-3">
-              <Link href="/subscription" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold hover:bg-brand-primary/20 transition-colors">
-                <Zap className="w-3 h-3" /> Meal Plans
+            <div className="flex items-center gap-2">
+              <Link href="/live-kitchen" className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-full bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition-colors border border-red-100">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" /> Live Kitchen
+              </Link>
+              <Link href="/table-booking" className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-full bg-zinc-100 text-zinc-700 text-xs font-bold hover:bg-zinc-200 transition-colors">
+                🍽 Book Table
+              </Link>
+              <Link href="/subscription" className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold hover:bg-brand-primary/20 transition-colors">
+                <Zap className="w-3 h-3" /> Plans
               </Link>
               <NotificationBell />
               <Link href="/profile" className="w-10 h-10 rounded-full bg-[#111] text-white flex items-center justify-center font-bold text-sm hover:scale-105 transition-transform shadow-md">
@@ -775,14 +805,27 @@ export default function MenuPage() {
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
                 className={`whitespace-nowrap px-5 py-2.5 rounded-full text-sm font-bold transition-all shrink-0 ${
-                  activeCategory === cat 
-                  ? "bg-[#111] text-white shadow-[0_4px_15px_rgba(0,0,0,0.2)]" 
+                  activeCategory === cat
+                  ? "bg-[#111] text-white shadow-[0_4px_15px_rgba(0,0,0,0.2)]"
                   : "bg-white text-zinc-500 border border-black/[0.04] hover:bg-zinc-50 hover:text-zinc-900"
                 }`}
               >
                 {cat}
               </button>
             ))}
+            <button
+              onClick={() => setIsVegOnly(v => !v)}
+              className={`whitespace-nowrap flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-bold transition-all shrink-0 border ${
+                isVegOnly
+                  ? "bg-green-600 text-white border-green-600 shadow-md"
+                  : "bg-white text-green-700 border-green-200 hover:bg-green-50"
+              }`}
+            >
+              <span className={`inline-flex items-center justify-center w-4 h-4 border-2 ${isVegOnly ? 'border-white' : 'border-green-600'} rounded-[4px]`}>
+                <span className={`w-2 h-2 rounded-full ${isVegOnly ? 'bg-white' : 'bg-green-600'}`} />
+              </span>
+              Veg Only
+            </button>
           </div>
         </div>
 
@@ -1020,6 +1063,41 @@ export default function MenuPage() {
                     )}
 
                     <div className="space-y-4 mb-6">
+                      {/* Schedule Delivery */}
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm font-bold text-brand-dark">Delivery Time</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setScheduleTime("")}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
+                              !scheduleTime
+                                ? "bg-brand-primary/10 border-brand-primary text-brand-primary"
+                                : "bg-white border-black/10 text-black/60 hover:border-black/20"
+                            }`}
+                          >
+                            ASAP
+                          </button>
+                          <div className="flex-1 relative">
+                            <input
+                              type="datetime-local"
+                              value={scheduleTime}
+                              min={new Date(Date.now() + 30 * 60000).toISOString().slice(0, 16)}
+                              onChange={e => setScheduleTime(e.target.value)}
+                              className={`w-full py-2.5 px-3 rounded-xl text-sm font-bold border transition-all outline-none cursor-pointer ${
+                                scheduleTime
+                                  ? "bg-brand-primary/10 border-brand-primary text-brand-primary"
+                                  : "bg-white border-black/10 text-black/60"
+                              }`}
+                            />
+                          </div>
+                        </div>
+                        {scheduleTime && (
+                          <p className="text-xs text-brand-primary font-medium">
+                            Scheduled for {new Date(scheduleTime).toLocaleString("en-IN", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        )}
+                      </div>
+
                       <div className="flex flex-col gap-3">
                           <p className="text-sm font-bold text-brand-dark">Payment Method</p>
                           <div className="flex gap-3">
@@ -1291,16 +1369,17 @@ export default function MenuPage() {
                   <div className="space-y-5">
                     {/* Interactive Map Picker */}
                     <div className="h-48 rounded-2xl relative overflow-hidden">
-                       <MapPicker 
+                       <MapPicker
                          defaultCenter={currentLocation}
                          onLocationSelect={({ area, landmark, lat, lng }) => {
                            setNewAddressDetails(prev => ({
                              ...prev,
                              area: area || prev.area,
-                             landmark: landmark || prev.landmark
+                             landmark: landmark || prev.landmark,
                            }));
-                           // In a real app we'd also store lat/lng to send to the backend
-                         }} 
+                           setNewAddressLat(lat);
+                           setNewAddressLng(lng);
+                         }}
                        />
                     </div>
 
