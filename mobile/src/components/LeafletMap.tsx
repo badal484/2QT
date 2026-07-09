@@ -6,7 +6,12 @@ interface Marker {
   id: string;
   lat: number;
   lng: number;
-  iconUrl?: string; // Optional custom icon URL
+  iconUrl?: string;
+}
+
+interface RoutePoint {
+  lat: number;
+  lng: number;
 }
 
 interface LeafletMapProps {
@@ -14,6 +19,8 @@ interface LeafletMapProps {
   longitude: number;
   zoom?: number;
   markers?: Marker[];
+  routeFrom?: RoutePoint;
+  routeTo?: RoutePoint;
   onRegionChangeComplete?: (region: { latitude: number; longitude: number }) => void;
   onRegionChange?: () => void;
   style?: any;
@@ -24,13 +31,14 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   longitude,
   zoom = 15,
   markers = [],
+  routeFrom,
+  routeTo,
   onRegionChangeComplete,
   onRegionChange,
   style,
 }) => {
   const webviewRef = useRef<WebView>(null);
 
-  // When latitude/longitude props change, fly to the new location
   useEffect(() => {
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript(`
@@ -42,7 +50,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, [latitude, longitude, zoom]);
 
-  // When markers change, update them
   useEffect(() => {
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript(`
@@ -53,6 +60,24 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       `);
     }
   }, [markers]);
+
+  // Inject route update when from/to change
+  useEffect(() => {
+    if (!webviewRef.current) return;
+    if (routeFrom && routeTo) {
+      webviewRef.current.injectJavaScript(`
+        if (window.updateRoute) {
+          window.updateRoute(${routeFrom.lat}, ${routeFrom.lng}, ${routeTo.lat}, ${routeTo.lng});
+        }
+        true;
+      `);
+    } else {
+      webviewRef.current.injectJavaScript(`
+        if (window.clearRoute) { window.clearRoute(); }
+        true;
+      `);
+    }
+  }, [routeFrom?.lat, routeFrom?.lng, routeTo?.lat, routeTo?.lng]);
 
   const html = `
     <!DOCTYPE html>
@@ -110,6 +135,47 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         };
 
         window.updateMarkers(${JSON.stringify(markers)});
+
+        // ── Route polyline via OSRM ──────────────────────────────────────────
+        var routeLayer = null;
+
+        window.clearRoute = function() {
+          if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+        };
+
+        window.updateRoute = function(fromLat, fromLng, toLat, toLng) {
+          window.clearRoute();
+          var url = 'https://router.project-osrm.org/route/v1/driving/'
+            + fromLng + ',' + fromLat + ';'
+            + toLng + ',' + toLat
+            + '?overview=full&geometries=geojson';
+          fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (!data.routes || !data.routes[0]) return;
+              var coords = data.routes[0].geometry.coordinates.map(function(c) {
+                return [c[1], c[0]];
+              });
+              routeLayer = L.polyline(coords, {
+                color: '#10B981',
+                weight: 4,
+                opacity: 0.85,
+                dashArray: null,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }).addTo(map);
+            })
+            .catch(function() {
+              // Fallback: draw straight line
+              routeLayer = L.polyline([[fromLat, fromLng], [toLat, toLng]], {
+                color: '#10B981', weight: 3, opacity: 0.6, dashArray: '8 6',
+              }).addTo(map);
+            });
+        };
+
+        ${routeFrom && routeTo
+          ? `window.updateRoute(${routeFrom.lat}, ${routeFrom.lng}, ${routeTo.lat}, ${routeTo.lng});`
+          : ''}
 
         map.on('dragstart', function() {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'onRegionChange' }));

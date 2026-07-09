@@ -249,6 +249,20 @@ class ApiClient {
       method: 'POST',
     });
   }
+
+  // Admin: Rider Issues
+  async getRiderIssues() {
+    return this.request('/admin/rider-issues');
+  }
+
+  async resolveRiderIssue(id: string) {
+    return this.request(`/admin/rider-issues/${id}/resolve`, { method: 'PATCH' });
+  }
+
+  // Admin: Delivered Orders (POD review)
+  async getDeliveredOrders() {
+    return this.request('/admin/orders/delivered');
+  }
 }
 
 export const api = new ApiClient();

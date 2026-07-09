@@ -329,7 +329,6 @@ const CartScreen = ({ navigation }: any) => {
                         <View style={[styles.vegBadgeMini, { borderColor: vegColor, width: 6, height: 6 }]}>
                           <View style={[styles.vegDotMini, { backgroundColor: vegColor, width: 3, height: 3 }]} />
                         </View>
-                        <Text style={styles.recQuantityText}>1 Piece</Text>
                       </View>
                       <Text style={styles.recName} numberOfLines={1}>{rec.name}</Text>
                       <Text style={styles.recPrice}>₹{rec.price_paise / 100}</Text>
@@ -882,15 +881,6 @@ const styles = StyleSheet.create({
   recMeta: {
     paddingHorizontal: 8,
     paddingTop: 10,
-  },
-  recQuantityText: {
-    fontSize: 9,
-    fontFamily: fontFamily.bold,
-    color: '#D97706',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
   },
   recName: {
     fontSize: 12,

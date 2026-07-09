@@ -1,4 +1,4 @@
-import { Package, RotateCcw, ArrowLeft, Bike, AlertTriangle, Download, FileText } from 'lucide-react-native';
+import { Package, RotateCcw, ArrowLeft, Bike, AlertTriangle, Download, Star } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable } from 'react-native';
@@ -215,6 +215,17 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                                 : <Download size={18} color="#10B981" />
                               }
                             </BouncingButton>
+                            {!order.food_rating && (
+                              <BouncingButton
+                                style={[styles.invoiceIconBtn, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}
+                                onPress={() => {
+                                  ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
+                                  navigation.navigate('RateOrder', { orderId: order.id });
+                                }}
+                              >
+                                <Star size={18} color="#D97706" />
+                              </BouncingButton>
+                            )}
                             <BouncingButton
                               style={[styles.actionBtn, styles.supportBtn]}
                               onPress={callSupport}

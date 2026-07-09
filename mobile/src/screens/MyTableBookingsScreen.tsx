@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSocket } from '../socket/client';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ChevronLeft, Calendar, Clock, Users, ChevronRight, UtensilsCrossed } from 'lucide-react-native';
 import { api } from '../api/client';
@@ -54,6 +55,18 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
     queryFn: () =>
       api.get(`/table-bookings/mine?status=${activeTab}`).then((r: any) => r.bookings as any[]),
   });
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ['my-table-bookings'] });
+    socket.on('table_booking_updated', refresh);
+    socket.on('new_table_booking', refresh);
+    return () => {
+      socket.off('table_booking_updated', refresh);
+      socket.off('new_table_booking', refresh);
+    };
+  }, [queryClient]);
 
   const onRefresh = async () => {
     setRefreshing(true);

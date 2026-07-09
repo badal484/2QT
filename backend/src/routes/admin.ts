@@ -448,8 +448,8 @@ router.post('/rider-applications/:id/:action', authenticate, requireRole('super_
             const userId = rows[0].user_id;
 
             if (action === 'approve') {
-                await client.query('UPDATE users SET role = \'rider\', is_verified = true, is_active = true WHERE id = $1', [userId]);
-                emitToUser(userId, 'user_updated', { role: 'rider', is_verified: true, is_active: true });
+                await client.query('UPDATE users SET role = \'rider\', is_verified = true, is_active = true, onboarding_complete = true WHERE id = $1', [userId]);
+                emitToUser(userId, 'user_updated', { role: 'rider', is_verified: true, is_active: true, onboarding_complete: true });
                 
                 const { rows: uRows } = await client.query('SELECT phone, name FROM users WHERE id = $1', [userId]);
                 if (uRows[0]?.phone) {
@@ -578,6 +578,69 @@ router.post('/riders/:id/verify', authenticate, requireRole('super_admin', 'admi
     }
     emitToUser(id, 'user_updated', { is_verified: true, is_active: true });
     res.json({ success: true });
+});
+
+// ─── Rider Issues ─────────────────────────────────────────────────────────────
+router.get('/rider-issues', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT ri.id, ri.issue_type, ri.notes, ri.resolved, ri.resolved_at, ri.resolved_by,
+                   ri.created_at,
+                   o.display_id, o.id as order_id,
+                   ru.name as rider_name, ru.phone as rider_phone,
+                   cu.name as customer_name
+            FROM rider_issues ri
+            JOIN orders o ON ri.order_id = o.id
+            JOIN users ru ON ri.rider_id = ru.id
+            LEFT JOIN users cu ON o.customer_id = cu.id
+            ORDER BY ri.created_at DESC
+            LIMIT 200
+        `);
+        res.json({ issues: rows });
+    } catch (err) {
+        console.error('[admin/rider-issues]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.patch('/rider-issues/:id/resolve', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const adminId = req.user!.userId;
+    try {
+        await query(
+            `UPDATE rider_issues SET resolved = true, resolved_at = NOW(), resolved_by = $1 WHERE id = $2`,
+            [adminId, id]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[admin/rider-issues/resolve]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Delivered Orders (for POD review) ───────────────────────────────────────
+router.get('/orders/delivered', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT o.id, o.display_id, o.total_amount_paise, o.payment_method,
+                   o.delivered_at, o.pod_photo_url,
+                   cu.name as customer_name,
+                   ru.name as rider_name, ru.phone as rider_phone,
+                   json_agg(json_build_object('menu_item_name', oi.menu_item_name, 'quantity', oi.quantity)) as items
+            FROM orders o
+            JOIN users cu ON o.customer_id = cu.id
+            LEFT JOIN users ru ON o.rider_id = ru.id
+            LEFT JOIN order_items oi ON oi.order_id = o.id
+            WHERE o.status = 'delivered'
+            GROUP BY o.id, cu.name, ru.name, ru.phone
+            ORDER BY o.delivered_at DESC
+            LIMIT 100
+        `);
+        res.json({ orders: rows });
+    } catch (err) {
+        console.error('[admin/orders/delivered]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.post('/orders/:id/refund', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
