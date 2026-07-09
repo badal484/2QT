@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ShoppingBag, MapPin, Star, Heart, Clock, ChevronRight, Utensils, Smartphone, Download } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "./providers";
@@ -13,6 +13,27 @@ export default function HomePage() {
   const { user } = useAuth()!;
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [heroImages, setHeroImages] = useState<string[]>(["/premium_healthy_bowl_1777968667530.png"]);
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+
+  useEffect(() => {
+    fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1') + '/app/landing-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.landing_hero_images && data.landing_hero_images.length > 0) {
+          setHeroImages(data.landing_hero_images);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (heroImages.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveHeroIndex(prev => (prev + 1) % heroImages.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [heroImages.length]);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -88,7 +109,18 @@ export default function HomePage() {
           >
             <div className="relative z-10 w-full aspect-square md:aspect-[4/5] bg-white rounded-[32px] md:rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] p-3 md:p-4 overflow-hidden border border-black/5 hover:scale-[1.02] transition-transform duration-700">
                <div className="relative w-full h-full rounded-[24px] md:rounded-[32px] overflow-hidden bg-brand-light shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]">
-                 <Image src="/premium_healthy_bowl_1777968667530.png" alt="Gourmet Bowl" fill className="object-cover" priority />
+                 <AnimatePresence mode="wait">
+                   <motion.div
+                     key={activeHeroIndex}
+                     initial={{ opacity: 0, scale: 1.05 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     exit={{ opacity: 0, scale: 0.95 }}
+                     transition={{ duration: 0.8 }}
+                     className="absolute inset-0"
+                   >
+                     <Image src={heroImages[activeHeroIndex]} alt="Gourmet Bowl" fill className="object-cover" priority />
+                   </motion.div>
+                 </AnimatePresence>
                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                  <div className="absolute bottom-6 md:bottom-8 left-6 md:left-8 right-6 md:right-8 text-white">
                     <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] md:text-xs font-semibold mb-3 shadow-lg">
@@ -229,7 +261,18 @@ export default function HomePage() {
             <div className="relative w-[280px] md:w-[320px] aspect-[1/2.1] bg-black rounded-[48px] p-2 shadow-2xl border-4 border-zinc-800 transform rotate-[-5deg] hover:rotate-0 transition-transform duration-700 group">
               <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-20" /> {/* Notch */}
               <div className="relative w-full h-full bg-brand-light rounded-[38px] overflow-hidden">
-                <Image src="/premium_healthy_bowl_1777968667530.png" alt="App Preview" fill className="object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" />
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeHeroIndex}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.8 }}
+                    className="absolute inset-0"
+                  >
+                    <Image src={heroImages[activeHeroIndex]} alt="App Preview" fill className="object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" />
+                  </motion.div>
+                </AnimatePresence>
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                 <div className="absolute bottom-10 left-6 right-6">
                   <div className="text-white text-2xl font-bold mb-2">Track Order</div>

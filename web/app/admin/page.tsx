@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -35,6 +35,8 @@ const DispatchTab = dynamic(() => import("./DispatchTab").then(m => ({ default: 
 const MenuOffersTab = dynamic(() => import("./MenuOffersTab").then(m => ({ default: m.MenuOffersTab })), { ssr: false });
 const RestaurantsTab = dynamic(() => import("./RestaurantsTab").then(m => ({ default: m.RestaurantsTab })), { ssr: false });
 const ActivityTab = dynamic(() => import("./ActivityTab"), { ssr: false });
+const RiderIssuesTab = dynamic(() => import("./RiderIssuesTab").then(m => ({ default: m.RiderIssuesTab })), { ssr: false });
+const DeliveredOrdersTab = dynamic(() => import("./DeliveredOrdersTab").then(m => ({ default: m.DeliveredOrdersTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1476,6 +1478,79 @@ function SettingsTab() {
         <p className="text-zinc-400 text-sm">Changes take effect instantly — no redeploy needed.</p>
       </div>
 
+      {/* Landing Page Configuration */}
+      <div>
+        <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Landing Page</p>
+        <div className="p-5 bg-white/[0.03] border border-white/10 rounded-2xl">
+          <p className="text-sm font-semibold text-white mb-1">Hero Images Carousel</p>
+          <p className="text-xs text-zinc-500 mb-4">Recommended Size: 1000x1250 pixels (4:5 aspect ratio). Images will automatically slide on the main landing page.</p>
+          
+          {(() => {
+            let images: string[] = [];
+            const rawVal = settings["landing_hero_image"]?.value;
+            if (rawVal) {
+              try {
+                const parsed = JSON.parse(rawVal);
+                images = Array.isArray(parsed) ? parsed : (typeof parsed === 'string' ? [parsed] : []);
+              } catch (e) {
+                images = [rawVal.replace(/"/g, '')];
+              }
+            }
+            return (
+              <div className="flex flex-col gap-4">
+                {images.length > 0 && (
+                  <div className="flex flex-wrap gap-4">
+                    {images.map((img: string, idx: number) => (
+                      <div key={idx} className="relative group">
+                        <img src={img} alt={`Hero ${idx}`} className="w-16 h-20 object-cover rounded-xl border border-white/10" />
+                        <button 
+                          onClick={async () => {
+                            const newImages = images.filter((_, i) => i !== idx);
+                            await api.patch("/admin/settings/landing_hero_image", { value: JSON.stringify(newImages) });
+                            load();
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  disabled={saving}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setSaving(true);
+                    const toastId = toast.loading("Uploading image...");
+                    try {
+                      const uploadRes = await api.uploadImage(file);
+                      if (uploadRes.url) {
+                        const newImages = [...images, uploadRes.url];
+                        await api.patch("/admin/settings/landing_hero_image", { value: JSON.stringify(newImages) });
+                        toast.success("Hero image added to carousel", { id: toastId });
+                        load();
+                      } else {
+                        throw new Error("Upload failed");
+                      }
+                    } catch (err: any) {
+                      toast.error(err.message || "Failed to upload", { id: toastId });
+                    } finally {
+                      setSaving(false);
+                      e.target.value = '';
+                    }
+                  }}
+                  className="text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-widest file:bg-white/[0.04] file:text-white hover:file:bg-zinc-700/80 cursor-pointer"
+                />
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
       {/* Feature Flags */}
       <div>
         <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Feature Flags</p>
@@ -1807,6 +1882,8 @@ const TABS = [
   { name: "Dispatch",        icon: Package,          component: DispatchTab },
   { name: "Fleet",           icon: Bike,             component: FleetTab },
   { name: "Applications",    icon: Info,             component: RiderApplicationsTab },
+  { name: "Rider Issues",    icon: FileWarning,      component: RiderIssuesTab },
+  { name: "Deliveries",      icon: CheckSquare,      component: DeliveredOrdersTab },
   // Restaurants
   { name: "Restaurants",     icon: Utensils,         component: RestaurantsTab },
   { name: "Kitchens",        icon: Store,            component: KitchensTab },
@@ -1911,7 +1988,7 @@ export default function AdminPage() {
         <div className="flex-1 px-3 overflow-y-auto pb-4">
           {[
             { section: "Core",           items: ["Overview", "Analytics"] },
-            { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Fleet", "Applications"] },
+            { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Deliveries", "Fleet", "Applications", "Rider Issues"] },
             { section: "Restaurants",    items: ["Restaurants", "Kitchens", "Partners", "Menu", "Categories", "Inventory"] },
             { section: "Growth",         items: ["Broadcast", "Campaigns", "Promo Codes", "Menu Offers", "Marketing"] },
             { section: "Customers",      items: ["Customers", "Support", "Complaints"] },

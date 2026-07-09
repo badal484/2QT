@@ -1,14 +1,13 @@
 import { ArrowLeft, CreditCard, Plus, History } from 'lucide-react-native';
 import React from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Modal, TextInput } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Alert, StyleSheet, Modal, TextInput } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import RazorpayCheckout from 'react-native-razorpay';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import Animated, { FadeInDown, Layout, FadeIn } from 'react-native-reanimated';
-
-import { getSocket } from '../socket/client';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
@@ -19,7 +18,7 @@ const hapticOptions = {
 
 const WalletScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
-  const socket = getSocket();
+  const insets = useSafeAreaInsets();
   const [isModalVisible, setModalVisible] = React.useState(false);
   const [rechargeAmount, setRechargeAmount] = React.useState('');
 
@@ -30,8 +29,6 @@ const WalletScreen = ({ navigation }: any) => {
     queryKey: ['wallet'],
     queryFn: () => api.get('/customers/wallet'),
   });
-
-
 
   const { user } = useSelector((state: RootState) => state.auth);
 
@@ -129,7 +126,7 @@ const WalletScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       {/* Header Card */}
-      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+      <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, { paddingTop: Math.max(insets.top + 16, 48) }]}>
         <BouncingButton onPress={() => { triggerHaptic(); navigation.goBack(); }} style={styles.backButton}>
           <ArrowLeft size={24} color="#fff" />
         </BouncingButton>
@@ -170,10 +167,9 @@ const WalletScreen = ({ navigation }: any) => {
           </Animated.View>
         ) : (
           wallet?.transactions?.map((tx: any, index: number) => (
-            <Animated.View 
-              key={tx.id} 
+            <Animated.View
+              key={tx.id}
               entering={FadeInDown.delay(index * 50 + 200).duration(400)}
-              layout={Layout.springify()}
               style={styles.txRow}
             >
               <View style={styles.txInfo}>
@@ -236,7 +232,7 @@ const WalletScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   loadingContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  header: { paddingTop: 80, paddingHorizontal: 32, paddingBottom: 48, backgroundColor: '#1A1A2E', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 8, overflow: 'hidden' },
+  header: { paddingHorizontal: 32, paddingBottom: 48, backgroundColor: '#1A1A2E', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 8, overflow: 'hidden' },
   glassDecoration: { position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255, 107, 53, 0.15)' },
   glassDecoration2: { position: 'absolute', bottom: -20, left: -60, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
   backButton: { marginBottom: 24, alignSelf: 'flex-start' },

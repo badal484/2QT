@@ -1,4 +1,4 @@
-import { ArrowLeft, Share2, Copy, Gift } from 'lucide-react-native';
+import { ArrowLeft, Copy, Gift } from 'lucide-react-native';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Share, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -68,12 +68,18 @@ const ReferralScreen = ({ navigation }: any) => {
         <View style={styles.codeBox}>
           <Text style={styles.codeLabel}>Your Unique Code</Text>
           <Text style={styles.codeText}>{referralCode}</Text>
-          <TouchableOpacity 
-            style={styles.shareBtn}
-            onPress={onShare}
-          >
-            <Text style={styles.shareBtnText}>SHARE CODE</Text>
-          </TouchableOpacity>
+          <View style={styles.codeBtnRow}>
+            <TouchableOpacity
+              style={[styles.shareBtn, styles.copyBtn]}
+              onPress={() => Share.share({ message: referralCode })}
+            >
+              <Copy size={16} color="#1A1A2E" style={{ marginRight: 8 }} />
+              <Text style={styles.copyBtnText}>COPY</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.shareBtn} onPress={onShare}>
+              <Text style={styles.shareBtnText}>SHARE CODE</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Steps */}
@@ -229,12 +235,37 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 2,
   },
-  shareBtn: {
-    backgroundColor: '#1A1A2E',
-    paddingHorizontal: 32,
+  codeBtnRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  copyBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 16,
-    marginTop: 24,
+    marginTop: 0,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  copyBtnText: {
+    color: '#1A1A2E',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  shareBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1A1A2E',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
@@ -244,7 +275,7 @@ const styles = StyleSheet.create({
   shareBtnText: {
     color: '#fff',
     fontWeight: '900',
-    fontSize: 16,
+    fontSize: 14,
   },
   stepsSection: {
     marginTop: 40,

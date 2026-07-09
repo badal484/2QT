@@ -64,6 +64,8 @@ const ProfileScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const isRider = user?.role === 'rider';
+  const accent = isRider ? '#FC8019' : '#10B981';
+  const accentLight = isRider ? '#FFF3E8' : '#ECFDF5';
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet'],
@@ -114,9 +116,9 @@ const ProfileScreen = ({ navigation }: any) => {
             {user?.photo_url ? (
               <Image source={{ uri: user.photo_url }} style={styles.profilePic} />
             ) : (
-              <User size={32} color="#10B981" />
+              <User size={32} color={accent} />
             )}
-            <View style={styles.editPicBadge}>
+            <View style={[styles.editPicBadge, { backgroundColor: accent }]}>
               <Text style={styles.editPicText}>EDIT</Text>
             </View>
           </BouncingButton>
@@ -130,15 +132,20 @@ const ProfileScreen = ({ navigation }: any) => {
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statsRow}>
           {isRider ? (
             <>
-              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('RiderPayouts')}>
+              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('Payouts')}>
                 <Wallet size={20} color="#6B7280" />
                 <Text style={styles.statLabel}>Earnings</Text>
-                <Text style={styles.statValue}>₹{((riderStats?.totalEarnings ?? 0) / 100).toFixed(2)}</Text>
+                <Text style={styles.statValue}>₹{((riderStats?.totalEarnings ?? 0) / 100).toFixed(0)}</Text>
               </BouncingButton>
-              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('TripHistory')}>
+              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('RiderHistory')}>
                 <Package size={20} color="#6B7280" />
                 <Text style={styles.statLabel}>Total Trips</Text>
                 <Text style={styles.statValue}>{riderStats?.totalDeliveries || 0}</Text>
+              </BouncingButton>
+              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => {}}>
+                <Star size={20} color="#F59E0B" />
+                <Text style={styles.statLabel}>Rating</Text>
+                <Text style={[styles.statValue, { color: '#F59E0B' }]}>{(riderStats?.rating ?? 5.0).toFixed(1)}★</Text>
               </BouncingButton>
             </>
           ) : (
@@ -162,19 +169,19 @@ const ProfileScreen = ({ navigation }: any) => {
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.referralWrapper}>
             <BouncingButton 
               activeOpacity={0.9}
-              style={styles.referralCard}
+              style={[styles.referralCard, { backgroundColor: accentLight }]}
               onPress={() => {
                 ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
                 navigation.navigate('Referral');
               }}
             >
               <View style={styles.referralIconWrapper}>
-                <Gift size={20} color="#10B981" />
+                <Gift size={20} color={accent} />
               </View>
               <View style={styles.referralTextCol}>
-                <Text style={styles.referralTitle}>Invite & Earn ₹50</Text>
+                <Text style={[styles.referralTitle, { color: accent }]}>Invite & Earn ₹50</Text>
               </View>
-              <ChevronRight size={18} color="#10B981" />
+              <ChevronRight size={18} color={accent} />
             </BouncingButton>
           </Animated.View>
         )}
@@ -184,7 +191,8 @@ const ProfileScreen = ({ navigation }: any) => {
           <Text style={styles.groupLabel}>{isRider ? 'Fleet Management' : 'Activity'}</Text>
           {isRider ? (
             <>
-              <MinimalListItem icon={<ShieldCheck size={22} color="#6B7280" strokeWidth={1.5} />} title="Documents" onPress={() => navigation.navigate('Documents')} />
+              <MinimalListItem icon={<ShieldCheck size={22} color="#6B7280" strokeWidth={1.5} />} title="Documents" onPress={() => navigation.navigate('RiderDocuments')} />
+              <MinimalListItem icon={<Star size={22} color="#6B7280" strokeWidth={1.5} />} title="Daily Missions" onPress={() => navigation.navigate('RiderMissions')} />
             </>
           ) : (
             <>
@@ -198,8 +206,8 @@ const ProfileScreen = ({ navigation }: any) => {
         {/* HELP & SUPPORT GROUP */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={[styles.settingsGroup, { marginBottom: 40 }]}>
           <Text style={styles.groupLabel}>Support</Text>
-          <MinimalListItem icon={<Bell size={22} color="#6B7280" strokeWidth={1.5} />} title="Notifications" onPress={() => navigation.navigate('Notifications')} />
-          <MinimalListItem icon={<MessageCircle size={22} color="#6B7280" strokeWidth={1.5} />} title="Help & Support" onPress={() => navigation.navigate('Help')} />
+          <MinimalListItem icon={<Bell size={22} color="#6B7280" strokeWidth={1.5} />} title="Notifications" onPress={() => navigation.navigate(isRider ? 'RiderNotifications' : 'Notifications')} />
+          <MinimalListItem icon={<MessageCircle size={22} color="#6B7280" strokeWidth={1.5} />} title="Help & Support" onPress={() => navigation.navigate(isRider ? 'RiderHelp' : 'Help')} />
           <MinimalListItem icon={<LogOut size={22} color="#EF4444" strokeWidth={1.5} />} title="Sign Out" isDestructive={true} onPress={handleLogout} />
         </Animated.View>
 
@@ -271,7 +279,6 @@ const styles = StyleSheet.create({
   editPicBadge: {
     position: 'absolute',
     bottom: -4,
-    backgroundColor: '#10B981',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
@@ -382,7 +389,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   referralCard: {
-    backgroundColor: '#ECFDF5',
     padding: 16,
     borderRadius: 16,
     flexDirection: 'row',

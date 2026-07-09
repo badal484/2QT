@@ -420,6 +420,25 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
+          {/* Rate — show for delivered, unrated orders */}
+          {status === 'delivered' && !o?.food_rating && (
+            <BouncingButton
+              style={styles.rateCard}
+              onPress={() => { triggerHaptic(); navigation.navigate('RateOrder', { orderId }); }}
+              activeOpacity={0.85}
+            >
+              <View>
+                <Text style={styles.rateTitle}>How was your order?</Text>
+                <Text style={styles.rateSub}>Tap to rate your experience</Text>
+              </View>
+              <View style={styles.rateStars}>
+                {[1,2,3,4,5].map(s => (
+                  <Text key={s} style={{ fontSize: 20, color: '#EAB308' }}>★</Text>
+                ))}
+              </View>
+            </BouncingButton>
+          )}
+
           {/* Help */}
           <View style={styles.helpCard}>
             <View>
@@ -566,4 +585,10 @@ const styles = StyleSheet.create({
   // Home
   homeBtn: { alignItems: 'center', paddingVertical: 20 },
   homeBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.inkMuted },
+
+  // Rate
+  rateCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 20, padding: 16, marginTop: 12, backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#FDE68A' },
+  rateTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: '#92400E' },
+  rateSub: { fontSize: 12, fontFamily: fontFamily.regular, color: '#B45309', marginTop: 2 },
+  rateStars: { flexDirection: 'row', gap: 2 },
 });

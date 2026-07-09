@@ -1,14 +1,14 @@
 import { ArrowLeft, Star, Crown, Pizza } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, AppState } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, StyleSheet, AppState } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { getSocket } from '../socket/client';
 
 const LoyaltyScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
-  const socket = getSocket();
+  const insets = useSafeAreaInsets();
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
@@ -42,7 +42,7 @@ const LoyaltyScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       {/* Header Card */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 16, 48) }]}>
         <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft size={24} color="#1A1A2E" />
         </BouncingButton>
@@ -127,7 +127,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: {
-    paddingTop: 80,
     paddingHorizontal: 32,
     paddingBottom: 48,
     backgroundColor: '#1A1A2E',

@@ -1,440 +1,273 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, StyleSheet } from 'react-native';
+import {
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
+  StatusBar, StyleSheet,
+} from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ArrowLeft, Wallet, TrendingUp, Calendar, Trophy, Zap, Clock } from 'lucide-react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const R = {
+  orange: '#FC8019', orangeLight: '#FFF3E8',
+  green: '#1BA672', greenLight: '#E8F8F1',
+  amber: '#F59E0B', amberLight: '#FFFBEB',
+  ink: '#282C3F', gray: '#686B78', muted: '#93959F',
+  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+};
 
 const EarningsScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
+
   const { data, isLoading } = useQuery({
     queryKey: ['rider-earnings-history'],
     queryFn: () => api.get('/riders/earnings/history'),
   });
 
   if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
+    <View style={s.loadWrap}>
+      <ActivityIndicator size="large" color={R.orange} />
     </View>
   );
 
   const rawEarnings = data?.earnings || [];
-  const totalEarnings = rawEarnings.reduce((sum: number, day: any) => sum + parseInt(day.total_paise, 10), 0) || 0;
-  const totalDeliveries = rawEarnings.reduce((sum: number, day: any) => sum + parseInt(day.deliveries_count, 10), 0) || 0;
-
-  // Calculate chart velocity data (last 7 days)
+  const totalPaise = rawEarnings.reduce((sum: number, d: any) => sum + parseInt(d.total_paise, 10), 0);
+  const totalDeliveries = rawEarnings.reduce((sum: number, d: any) => sum + parseInt(d.deliveries_count, 10), 0);
   const chartData = [...rawEarnings].slice(0, 7).reverse();
-  const maxVal = chartData.reduce((max, d) => Math.max(max, parseInt(d.total_paise, 10)), 0) || 1;
-  const avgVal = chartData.length > 0 ? (totalEarnings / rawEarnings.length) : 0;
+  const maxVal = chartData.reduce((m: number, d: any) => Math.max(m, parseInt(d.total_paise, 10)), 0) || 1;
+  const dailyAvg = rawEarnings.length > 0 ? totalPaise / rawEarnings.length : 0;
+
+  const weekPaise = rawEarnings.slice(0, 7).reduce((s: number, d: any) => s + parseInt(d.total_paise, 10), 0);
+  const prevWeekPaise = rawEarnings.slice(7, 14).reduce((s: number, d: any) => s + parseInt(d.total_paise, 10), 0);
+  const weekDeliveries = rawEarnings.slice(0, 7).reduce((s: number, d: any) => s + parseInt(d.deliveries_count, 10), 0);
+  const weekPct = prevWeekPaise > 0 ? Math.round(((weekPaise - prevWeekPaise) / prevWeekPaise) * 100) : 0;
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <SafeAreaView style={styles.content} edges={['top']}>
-        {/* Premium Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            activeOpacity={0.7}
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <ArrowLeft size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.terminalLabel}>MISSIONS // EARNINGS</Text>
-            <Text style={styles.headerTitle}>Earnings Ledger</Text>
+    <View style={s.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
+
+      {/* Header */}
+      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <ArrowLeft size={20} color={R.ink} />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Earnings</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
+
+        {/* Hero card */}
+        <View style={s.heroCard}>
+          <View style={s.heroTop}>
+            <Wallet size={18} color={R.orange} />
+            <Text style={s.heroLabel}>TOTAL EARNINGS</Text>
           </View>
-          <View style={{ width: 40 }} />
+          <Text style={s.heroAmount}>₹{(totalPaise / 100).toFixed(2)}</Text>
+          <View style={s.heroStats}>
+            <View style={s.heroStatItem}>
+              <Trophy size={14} color={R.green} />
+              <Text style={s.heroStatVal}>{totalDeliveries}</Text>
+              <Text style={s.heroStatLbl}>Deliveries</Text>
+            </View>
+            <View style={s.heroStatDivider} />
+            <View style={s.heroStatItem}>
+              <Clock size={14} color={R.muted} />
+              <Text style={s.heroStatVal}>₹{(dailyAvg / 100).toFixed(0)}</Text>
+              <Text style={s.heroStatLbl}>Daily Avg</Text>
+            </View>
+          </View>
         </View>
 
-        <ScrollView 
-          style={styles.scrollView} 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {/* Total Performance Header Card */}
-          <View style={styles.headlineCard}>
-            <View style={styles.perfLabelRow}>
-              <TrendingUp size={14} color="#FF6B35" style={{ marginRight: 6 }} />
-              <Text style={styles.perfLabelText}>CUMULATIVE REVENUE</Text>
-            </View>
-            <Text style={styles.totalAmountText}>₹{(totalEarnings / 100).toFixed(2)}</Text>
-            
-            <View style={styles.metricsRow}>
-              <View style={styles.metricItem}>
-                <Trophy size={14} color="#22C55E" style={{ marginRight: 6 }} />
-                <Text style={styles.metricValue}>{totalDeliveries}</Text>
-                <Text style={styles.metricLabel}>DELIVERIES</Text>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.metricItem}>
-                <Clock size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.metricValue}>₹{(avgVal / 100).toFixed(0)}</Text>
-                <Text style={styles.metricLabel}>DAILY AVG</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Weekly Velocity Chart */}
-          {chartData.length > 0 && (
-            <View style={styles.chartContainer}>
-              <Text style={styles.chartTitle}>Weekly Velocity</Text>
-              
-              <View style={styles.chartWrapper}>
-                {/* Horizontal Guide Grid Lines */}
-                <View style={styles.gridLine} />
-                <View style={[styles.gridLine, { top: '50%' }]} />
-                <View style={[styles.gridLine, { top: '20%' }]} />
-
-                <View style={styles.chartRow}>
-                  {chartData.map((day: any, idx: number) => {
-                    const dayAmount = parseInt(day.total_paise, 10);
-                    const pct = (dayAmount / maxVal) * 100;
-                    const dayLabel = new Date(day.date).toLocaleDateString('en-IN', { weekday: 'short' });
-                    const isPeak = dayAmount === maxVal && dayAmount > 0;
-
-                    return (
-                      <View key={day.id || idx} style={styles.chartCol}>
-                        <View style={styles.chartTrack}>
-                          <View 
-                            style={[
-                              styles.chartBar, 
-                              { height: `${Math.max(8, pct)}%` },
-                              isPeak && styles.chartBarPeak
-                            ]} 
-                          />
-                        </View>
-                        <Text style={[styles.chartLabel, isPeak && styles.chartLabelPeak]}>{dayLabel}</Text>
-                        <Text style={[styles.chartValue, isPeak && styles.chartValuePeak]}>₹{(dayAmount / 100).toFixed(0)}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Daily Breakdown List Header */}
-          <View style={styles.sectionHeader}>
-            <Calendar size={16} color="#FF6B35" style={{ marginRight: 8 }} />
-            <Text style={styles.sectionTitle}>DAILY BREAKDOWN</Text>
-          </View>
-          
-          {/* Breakdown Items */}
-          {rawEarnings.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Wallet size={36} color="#475569" />
-              <Text style={styles.emptyText}>No historical earnings records found.</Text>
-            </View>
-          ) : (
-            rawEarnings.map((day: any) => (
-              <View key={day.id} style={styles.earningsCard}>
-                <View style={styles.cardLeft}>
-                  <View style={styles.dateIconWrapper}>
-                    <Calendar size={18} color="#FFFFFF" />
-                  </View>
-                  <View>
-                    <Text style={styles.cardDate}>
-                      {new Date(day.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+        {/* Weekly chart */}
+        {chartData.length > 0 && (
+          <View style={s.chartCard}>
+            <Text style={s.chartTitle}>This Week</Text>
+            <View style={s.chartRow}>
+              {chartData.map((day: any, idx: number) => {
+                const amount = parseInt(day.total_paise, 10);
+                const pct = (amount / maxVal) * 100;
+                const label = new Date(day.date).toLocaleDateString('en-IN', { weekday: 'short' });
+                const isPeak = amount === maxVal && amount > 0;
+                return (
+                  <View key={idx} style={s.chartCol}>
+                    <Text style={[s.chartBarAmt, isPeak && { color: R.orange }]}>
+                      {amount > 0 ? `₹${(amount / 100).toFixed(0)}` : ''}
                     </Text>
-                    <View style={styles.cardInfoRow}>
-                      <Zap size={10} color="#FF6B35" style={{ marginRight: 4 }} />
-                      <Text style={styles.cardInfoText}>{day.deliveries_count} DELIVERIES COMPLETED</Text>
+                    <View style={s.chartTrack}>
+                      <View style={[s.chartBar, { height: `${Math.max(6, pct)}%` as any }, isPeak && s.chartBarPeak]} />
                     </View>
+                    <Text style={[s.chartLbl, isPeak && { color: R.orange, fontWeight: '700' }]}>{label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Weekly summary */}
+        {rawEarnings.length > 0 && (
+          <View style={s.weekCard}>
+            <View style={s.weekTop}>
+              <Trophy size={14} color={R.amber} />
+              <Text style={s.weekLabel}>THIS WEEK</Text>
+              {weekPct !== 0 && (
+                <View style={[s.weekPctBadge, { backgroundColor: weekPct > 0 ? R.greenLight : '#FEF2F2' }]}>
+                  <Text style={[s.weekPctText, { color: weekPct > 0 ? R.green : '#EF4444' }]}>
+                    {weekPct > 0 ? '+' : ''}{weekPct}%
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={s.weekAmount}>₹{(weekPaise / 100).toFixed(0)}</Text>
+            <Text style={s.weekSub}>{weekDeliveries} deliveries this week</Text>
+          </View>
+        )}
+
+        {/* Daily breakdown */}
+        <View style={s.sectionHeader}>
+          <Calendar size={15} color={R.muted} />
+          <Text style={s.sectionTitle}>Daily Breakdown</Text>
+        </View>
+
+        <View style={s.listWrap}>
+          {rawEarnings.length === 0 ? (
+            <View style={s.empty}>
+              <Wallet size={40} color={R.border} />
+              <Text style={s.emptyTitle}>No earnings yet</Text>
+              <Text style={s.emptyText}>Complete deliveries to see your earnings here</Text>
+            </View>
+          ) : rawEarnings.map((day: any) => {
+            const basePaise = parseInt(day.base_earnings_paise || '0', 10);
+            const bonusPaise = parseInt(day.bonus_earnings_paise || '0', 10);
+            const total = parseInt(day.total_paise, 10);
+            return (
+              <View key={day.id} style={s.dayCard}>
+                <View style={s.dayIconWrap}>
+                  <Calendar size={16} color={R.orange} />
+                </View>
+                <View style={s.dayInfo}>
+                  <Text style={s.dayDate}>
+                    {new Date(day.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </Text>
+                  <View style={s.dayMeta}>
+                    <Zap size={11} color={R.muted} />
+                    <Text style={s.dayMetaText}>{day.deliveries_count} deliveries</Text>
+                    {bonusPaise > 0 && (
+                      <>
+                        <Text style={s.dayMetaDot}>·</Text>
+                        <Trophy size={11} color={R.amber} />
+                        <Text style={[s.dayMetaText, { color: R.amber }]}>
+                          ₹{(basePaise / 100).toFixed(0)} + ₹{(bonusPaise / 100).toFixed(0)} bonus
+                        </Text>
+                      </>
+                    )}
                   </View>
                 </View>
-                <Text style={styles.cardAmountText}>₹{day.total_paise / 100}</Text>
+                <View style={s.dayAmount}>
+                  <Text style={s.dayAmountText}>₹{(total / 100).toFixed(0)}</Text>
+                  <TrendingUp size={12} color={R.green} />
+                </View>
               </View>
-            ))
-          )}
-        </ScrollView>
-      </SafeAreaView>
+            );
+          })}
+        </View>
+      </ScrollView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0B0C10',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#0B0C10',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    flex: 1,
-  },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: R.bg },
+  loadWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: R.bg },
+
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-    backgroundColor: '#0D0E15',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1.5,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingBottom: 14, backgroundColor: R.white,
+    borderBottomWidth: 1, borderBottomColor: R.border,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#161726',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+  backBtn: {
+    width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: R.bg,
   },
-  headerTitleContainer: {
-    alignItems: 'center',
+  headerTitle: { fontSize: 17, fontWeight: '800', color: R.ink },
+
+  // Hero card
+  heroCard: {
+    margin: 16, backgroundColor: R.orange, borderRadius: 20, padding: 24,
+    shadowColor: R.orange, shadowOpacity: 0.25, shadowRadius: 16, elevation: 6,
   },
-  terminalLabel: {
-    color: '#FF6B35',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 2,
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  heroLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
+  heroAmount: { color: R.white, fontSize: 42, fontWeight: '900', letterSpacing: -1, marginBottom: 20 },
+  heroStats: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.12)', borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 12,
   },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 2,
+  heroStatItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  heroStatDivider: { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.25)' },
+  heroStatVal: { color: R.white, fontSize: 15, fontWeight: '800' },
+  heroStatLbl: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
+
+  // Chart
+  chartCard: {
+    marginHorizontal: 16, marginBottom: 12, backgroundColor: R.white, borderRadius: 20, padding: 20,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 24,
-    paddingBottom: 40,
-  },
-  headlineCard: {
-    backgroundColor: '#161726',
-    borderRadius: 28,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 24,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-  },
-  perfLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  perfLabelText: {
-    color: '#FF6B35',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-  },
-  totalAmountText: {
-    color: '#FFFFFF',
-    fontSize: 40,
-    fontWeight: '900',
-    letterSpacing: -1,
-    marginBottom: 20,
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0D0E15',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
-  },
-  metricItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metricValue: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-    marginRight: 6,
-  },
-  metricLabel: {
-    color: '#64748B',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  divider: {
-    width: 1.5,
-    height: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  chartContainer: {
-    backgroundColor: '#161726',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 28,
-    padding: 20,
-    marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-  },
-  chartTitle: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    marginBottom: 20,
-  },
-  chartWrapper: {
-    height: 150,
-    position: 'relative',
-    justifyContent: 'flex-end',
-  },
-  gridLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderStyle: 'dashed',
-  },
-  chartRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 120,
-    paddingHorizontal: 4,
-    zIndex: 10,
-  },
-  chartCol: {
-    alignItems: 'center',
-    flex: 1,
-  },
+  chartTitle: { fontSize: 13, fontWeight: '700', color: R.muted, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
+  chartRow: { flexDirection: 'row', alignItems: 'flex-end', height: 110 },
+  chartCol: { flex: 1, alignItems: 'center', gap: 4 },
+  chartBarAmt: { fontSize: 8, color: R.muted, fontWeight: '600', height: 12 },
   chartTrack: {
-    width: 8,
-    height: 84,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 4,
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
+    width: 10, height: 70, backgroundColor: R.bg, borderRadius: 5,
+    justifyContent: 'flex-end', overflow: 'hidden',
   },
-  chartBar: {
-    width: '100%',
-    backgroundColor: '#334155',
-    borderRadius: 4,
+  chartBar: { width: '100%', backgroundColor: R.border, borderRadius: 5 },
+  chartBarPeak: { backgroundColor: R.orange },
+  chartLbl: { fontSize: 9, color: R.muted, fontWeight: '600' },
+
+  // Week card
+  weekCard: {
+    marginHorizontal: 16, marginBottom: 12, backgroundColor: R.amberLight, borderRadius: 20, padding: 20,
+    borderWidth: 1, borderColor: '#FDE68A',
   },
-  chartBarPeak: {
-    backgroundColor: '#FF6B35',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
+  weekTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  weekLabel: { color: R.amber, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, flex: 1 },
+  weekPctBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  weekPctText: { fontSize: 11, fontWeight: '800' },
+  weekAmount: { fontSize: 32, fontWeight: '900', color: R.ink, letterSpacing: -1 },
+  weekSub: { fontSize: 12, color: R.gray, marginTop: 4 },
+
+  // Section header
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginBottom: 12, marginTop: 8 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: R.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  listWrap: { paddingHorizontal: 16, gap: 10 },
+
+  empty: {
+    alignItems: 'center', paddingVertical: 60, backgroundColor: R.white,
+    borderRadius: 20, margin: 16,
   },
-  chartLabel: {
-    color: '#64748B',
-    fontSize: 8,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    marginTop: 8,
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: R.ink, marginTop: 16 },
+  emptyText: { fontSize: 13, color: R.muted, marginTop: 4, textAlign: 'center', paddingHorizontal: 24 },
+
+  dayCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: R.white, borderRadius: 16, padding: 16,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
   },
-  chartLabelPeak: {
-    color: '#FF6B35',
+  dayIconWrap: {
+    width: 42, height: 42, borderRadius: 12, backgroundColor: R.orangeLight,
+    alignItems: 'center', justifyContent: 'center',
   },
-  chartValue: {
-    color: '#475569',
-    fontSize: 8,
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  chartValuePeak: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 4,
-  },
-  sectionTitle: {
-    color: '#FF6B35',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  emptyContainer: {
-    paddingVertical: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#161726',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  emptyText: {
-    color: '#64748B',
-    fontWeight: '700',
-    fontSize: 13,
-    marginTop: 12,
-  },
-  earningsCard: {
-    backgroundColor: '#161726',
-    padding: 20,
-    borderRadius: 24,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-  },
-  cardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dateIconWrapper: {
-    width: 38,
-    height: 38,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  cardDate: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  cardInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  cardInfoText: {
-    color: '#64748B',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  cardAmountText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 18,
-    letterSpacing: -0.5,
-  },
+  dayInfo: { flex: 1 },
+  dayDate: { fontSize: 14, fontWeight: '700', color: R.ink },
+  dayMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, flexWrap: 'wrap' },
+  dayMetaText: { fontSize: 11, color: R.muted },
+  dayMetaDot: { color: R.border, fontSize: 11 },
+  dayAmount: { alignItems: 'flex-end', gap: 4 },
+  dayAmountText: { fontSize: 18, fontWeight: '900', color: R.ink },
 });
 
 export default EarningsScreen;

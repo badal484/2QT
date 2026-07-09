@@ -1,14 +1,17 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import RiderHomeScreen from '../screens/RiderHomeScreen';
+import { RiderTabNavigator } from './RiderTabNavigator';
 import AssignedOrderScreen from '../screens/AssignedOrderScreen';
 import DeliveryOTPScreen from '../screens/DeliveryOTPScreen';
 import DoorPaymentScreen from '../screens/DoorPaymentScreen';
 import CashSubmitScreen from '../screens/CashSubmitScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PayoutsScreen from '../screens/PayoutsScreen';
-import EarningsScreen from '../screens/EarningsScreen';
-import RiderHistoryScreen from '../screens/RiderHistoryScreen';
+import RiderDocumentsScreen from '../screens/RiderDocumentsScreen';
+import RiderMissionsScreen from '../screens/RiderMissionsScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import HelpScreen from '../screens/HelpScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import VerificationPendingScreen from '../screens/VerificationPendingScreen';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
@@ -28,14 +31,20 @@ const RiderNavigator = () => {
         <Stack.Screen name="VerificationPending" component={VerificationPendingScreen} />
       ) : (
         <>
-          <Stack.Screen name="RiderHome" component={RiderHomeScreen} />
+          {/* Tab root — always the base */}
+          <Stack.Screen name="RiderTabs" component={RiderTabNavigator} options={{ animation: 'none' }} />
+
+          {/* Full-screen flows pushed on top of tabs */}
           <Stack.Screen name="AssignedOrder" component={AssignedOrderScreen} />
           <Stack.Screen name="DoorPayment" component={DoorPaymentScreen} />
           <Stack.Screen name="DeliveryOTP" component={DeliveryOTPScreen} />
           <Stack.Screen name="CashSubmit" component={CashSubmitScreen} />
           <Stack.Screen name="Payouts" component={PayoutsScreen} />
-          <Stack.Screen name="Earnings" component={EarningsScreen} />
-          <Stack.Screen name="RiderHistory" component={RiderHistoryScreen} />
+          <Stack.Screen name="RiderDocuments" component={RiderDocumentsScreen} />
+          <Stack.Screen name="RiderMissions" component={RiderMissionsScreen} />
+          <Stack.Screen name="RiderNotifications" component={NotificationsScreen} />
+          <Stack.Screen name="RiderHelp" component={HelpScreen} />
+          <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         </>
       )}
     </Stack.Navigator>

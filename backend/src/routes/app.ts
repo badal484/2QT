@@ -71,4 +71,17 @@ router.get('/geocode/reverse', async (req, res) => {
     }
 });
 
+router.get('/landing-config', async (req, res) => {
+    try {
+        const { rows } = await query("SELECT value FROM app_settings WHERE key = 'landing_hero_image'");
+        const image = rows[0]?.value || '["/premium_healthy_bowl_1777968667530.png"]';
+        const parsedImage = typeof image === 'string' && (image.startsWith('"') || image.startsWith('[')) ? JSON.parse(image) : image;
+        const heroImages = Array.isArray(parsedImage) ? parsedImage : (typeof parsedImage === 'string' ? [parsedImage] : []);
+        res.json({ landing_hero_images: heroImages });
+    } catch (err: any) {
+        console.error('[LANDING_CONFIG]', err.message);
+        res.status(500).json({ error: 'Failed to load landing config' });
+    }
+});
+
 export default router;

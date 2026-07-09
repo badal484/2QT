@@ -189,7 +189,7 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
 });
 
 router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { orderId, otp } = req.body;
+    const { orderId, otp, podPhotoUrl } = req.body;
     const riderId = req.user!.userId;
 
     // Development bypass for simulated missions
@@ -198,8 +198,8 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     }
 
     const { rows: orders } = await query(`
-        SELECT o.*, 
-               k.lat as kitchen_lat, k.lng as kitchen_lng, 
+        SELECT o.*,
+               k.lat as kitchen_lat, k.lng as kitchen_lng,
                a.lat as address_lat, a.lng as address_lng
         FROM orders o
         JOIN kitchens k ON o.kitchen_id = k.id
@@ -218,7 +218,10 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     console.log("[VERIFY-OTP] Starting transaction...");
     await withTransaction(async (client) => {
         console.log("[VERIFY-OTP] Transaction started. Updating orders...");
-        const updateRes = await client.query('UPDATE orders SET status = \'delivered\', delivered_at = NOW() WHERE id = $1 AND status = \'out_for_delivery\'', [orderId]);
+        const updateRes = await client.query(
+            'UPDATE orders SET status = \'delivered\', delivered_at = NOW(), pod_photo_url = $2 WHERE id = $1 AND status = \'out_for_delivery\'',
+            [orderId, podPhotoUrl || null],
+        );
         if (updateRes.rowCount === 0) {
             throw new Error('ALREADY_DELIVERED');
         }
@@ -658,6 +661,214 @@ router.post('/submit-cash-to-finance', authenticate, requireRole('rider', 'rider
     } catch (err) {
         console.error('[rider/submit-cash-to-finance]', err);
         res.status(500).json({ error: 'Failed to submit' });
+    }
+});
+
+// ─── Customer Unreachable ─────────────────────────────────────────────────────
+router.post('/orders/:id/customer-unreachable', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const riderId = req.user!.userId;
+    const { action } = req.body as { action: 'retry' | 'leave_at_door' | 'return' };
+
+    try {
+        const { rows } = await query(
+            `SELECT o.customer_id, o.display_id FROM orders o WHERE o.id = $1 AND o.rider_id = $2 AND o.status = 'out_for_delivery'`,
+            [id, riderId]
+        );
+        if (!rows.length) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        const order = rows[0];
+
+        await query(
+            `INSERT INTO rider_issues (order_id, rider_id, issue_type, notes, created_at)
+             VALUES ($1, $2, 'customer_unreachable', $3, NOW())
+             ON CONFLICT DO NOTHING`,
+            [id, riderId, `action=${action}`]
+        );
+
+        // Notify customer that rider is waiting
+        if (action === 'retry') {
+            emitToUser(order.customer_id, 'rider_waiting', { orderId: id, displayId: order.display_id });
+            NotificationService.send('rider_at_door', { userId: order.customer_id, orderId: id, displayId: order.display_id }).catch(() => {});
+        }
+
+        res.json({ success: true, action });
+    } catch (err) {
+        console.error('[customer-unreachable]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Report Issue ─────────────────────────────────────────────────────────────
+router.post('/orders/:id/report-issue', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const riderId = req.user!.userId;
+    const { issueType, notes } = req.body as { issueType: string; notes?: string };
+
+    if (!issueType) return res.status(400).json({ error: 'issueType required' });
+
+    try {
+        const { rows } = await query(
+            `SELECT id FROM orders WHERE id = $1 AND rider_id = $2`,
+            [id, riderId]
+        );
+        if (!rows.length) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+
+        await query(
+            `INSERT INTO rider_issues (order_id, rider_id, issue_type, notes, created_at)
+             VALUES ($1, $2, $3, $4, NOW())`,
+            [id, riderId, issueType, notes || null]
+        );
+
+        // Alert admin via socket
+        emitToAdmin('rider_issue_reported', { orderId: id, riderId, issueType, notes });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[report-issue]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Rider Documents ──────────────────────────────────────────────────────────
+router.get('/documents', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    try {
+        const { rows } = await query(
+            `SELECT vehicle_type, license_number, id_photo_url, status, created_at, updated_at
+             FROM rider_applications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+            [riderId]
+        );
+        res.json(rows[0] || null);
+    } catch (err) {
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.patch('/documents', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { vehicleType, licenseNumber, idPhotoUrl } = req.body;
+
+    try {
+        const { rows: existing } = await query(
+            'SELECT id FROM rider_applications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+            [riderId]
+        );
+
+        if (existing.length === 0) {
+            await query(
+                `INSERT INTO rider_applications (user_id, vehicle_type, license_number, id_photo_url, status)
+                 VALUES ($1, $2, $3, $4, 'pending')`,
+                [riderId, vehicleType || null, licenseNumber || null, idPhotoUrl || null]
+            );
+        } else {
+            const updates: string[] = [];
+            const vals: any[] = [];
+            let idx = 1;
+            if (vehicleType !== undefined) { updates.push(`vehicle_type = $${idx++}`); vals.push(vehicleType); }
+            if (licenseNumber !== undefined) { updates.push(`license_number = $${idx++}`); vals.push(licenseNumber); }
+            if (idPhotoUrl !== undefined) { updates.push(`id_photo_url = $${idx++}`); vals.push(idPhotoUrl); }
+            if (updates.length === 0) return res.json({ success: true });
+            // Always reset to pending so admin reviews the updated submission
+            updates.push(`status = 'pending'`);
+            updates.push(`updated_at = NOW()`);
+            vals.push(riderId);
+            await query(
+                `UPDATE rider_applications SET ${updates.join(', ')} WHERE user_id = $${idx}`,
+                vals
+            );
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[patch-documents]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Daily Missions ───────────────────────────────────────────────────────────
+router.get('/missions/daily', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    try {
+        const { rows: today } = await query(
+            `SELECT deliveries_count, total_paise, bonus_earnings_paise
+             FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE`,
+            [riderId]
+        );
+        const { rows: week } = await query(
+            `SELECT COALESCE(SUM(deliveries_count), 0) as week_deliveries,
+                    COALESCE(SUM(total_paise), 0) as week_paise
+             FROM rider_daily_earnings WHERE rider_id = $1 AND date >= CURRENT_DATE - INTERVAL '6 days'`,
+            [riderId]
+        );
+
+        const todayCount = parseInt(today[0]?.deliveries_count || '0');
+        const todayPaise = parseInt(today[0]?.total_paise || '0');
+        const weekCount = parseInt(week[0]?.week_deliveries || '0');
+        const weekPaise = parseInt(week[0]?.week_paise || '0');
+
+        const missions = [
+            {
+                id: 'daily_5',
+                title: '5 Deliveries Today',
+                description: 'Complete 5 deliveries today and earn ₹50 bonus',
+                bonusPaise: 5000,
+                target: 5,
+                progress: Math.min(todayCount, 5),
+                completed: todayCount >= 5,
+                type: 'daily',
+            },
+            {
+                id: 'daily_10',
+                title: '10 Deliveries Today',
+                description: 'Complete 10 deliveries and earn ₹120 bonus',
+                bonusPaise: 12000,
+                target: 10,
+                progress: Math.min(todayCount, 10),
+                completed: todayCount >= 10,
+                type: 'daily',
+            },
+            {
+                id: 'daily_earn_500',
+                title: 'Earn ₹500 Today',
+                description: 'Reach ₹500 in earnings today',
+                bonusPaise: 3000,
+                target: 50000,
+                progress: Math.min(todayPaise, 50000),
+                completed: todayPaise >= 50000,
+                type: 'daily',
+            },
+            {
+                id: 'weekly_30',
+                title: '30 Deliveries This Week',
+                description: 'Complete 30 deliveries this week and earn ₹300 bonus',
+                bonusPaise: 30000,
+                target: 30,
+                progress: Math.min(weekCount, 30),
+                completed: weekCount >= 30,
+                type: 'weekly',
+            },
+            {
+                id: 'weekly_earn_3000',
+                title: 'Earn ₹3000 This Week',
+                description: 'Reach ₹3000 in weekly earnings for a ₹200 bonus',
+                bonusPaise: 20000,
+                target: 300000,
+                progress: Math.min(weekPaise, 300000),
+                completed: weekPaise >= 300000,
+                type: 'weekly',
+            },
+        ];
+
+        res.json({
+            missions,
+            todayDeliveries: todayCount,
+            todayEarningsPaise: todayPaise,
+            weekDeliveries: weekCount,
+            weekEarningsPaise: weekPaise,
+        });
+    } catch (err) {
+        console.error('[missions/daily]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });
 
