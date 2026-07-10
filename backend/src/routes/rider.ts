@@ -580,8 +580,18 @@ router.get('/payouts', authenticate, requireRole('rider', 'rider_captain', 'supe
 });
 
 router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
     const riderZoneId = req.user!.zoneId;
     const role = req.user!.role;
+
+    // Capacity gate: if rider already has 3 active orders, nothing to show — no popup fires
+    if (role !== 'super_admin') {
+        const { rows: cap } = await query(
+            `SELECT COUNT(*) FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered','cancelled')`,
+            [riderId]
+        );
+        if (parseInt(cap[0].count) >= 3) return res.json({ orders: [] });
+    }
 
     // No zone? Still show all unclaimed orders — the DB zone filter only applies when zone is known.
     // A rider without a zone assigned can still see and claim orders.
