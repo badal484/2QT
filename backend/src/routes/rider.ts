@@ -363,16 +363,18 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         const cashToRecord = isCOD ? order.total_amount_paise : 0;
 
         // Systematic Financial Split — use zone-configurable rates, road distance if available
+        // Cap at 30 km to prevent earnings inflation from wrong kitchen/address coordinates
+        const MAX_EARNINGS_DISTANCE_KM = 30;
         let distanceKm = 0;
         if (order.delivery_distance_metres != null && order.delivery_distance_metres > 0) {
-            distanceKm = order.delivery_distance_metres / 1000;
+            distanceKm = Math.min(order.delivery_distance_metres / 1000, MAX_EARNINGS_DISTANCE_KM);
         } else {
             const kLat = parseFloat(order.kitchen_lat);
             const kLng = parseFloat(order.kitchen_lng);
             const cLat = parseFloat(order.delivery_location_lat || order.address_lat);
             const cLng = parseFloat(order.delivery_location_lng || order.address_lng);
             if (!isNaN(kLat) && !isNaN(kLng) && !isNaN(cLat) && !isNaN(cLng)) {
-                distanceKm = haversineKm(kLat, kLng, cLat, cLng);
+                distanceKm = Math.min(haversineKm(kLat, kLng, cLat, cLng), MAX_EARNINGS_DISTANCE_KM);
             }
         }
 
