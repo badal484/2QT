@@ -10,7 +10,7 @@ import { processWalletRefund, processBankRefund } from '../services/refund.servi
 const router = Router();
 
 router.get('/mine', authenticate, async (req: AuthRequest, res) => {
-    const limit = parseInt(req.query.limit as string) || 10;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
     const offset = parseInt(req.query.offset as string) || 0;
     // Single JOIN+aggregation replaces the N+1 correlated subquery per order
     const { rows } = await query(

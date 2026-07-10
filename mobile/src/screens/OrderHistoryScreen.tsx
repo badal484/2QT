@@ -39,11 +39,16 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState<Set<string>>(new Set());
   const [reorderLoading, setReorderLoading] = useState<Set<string>>(new Set());
+  const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LIMIT = 20;
 
   const openInvoice = async (orderId: string) => {
     setInvoiceLoading(prev => new Set(prev).add(orderId));
     try {
-      const res = await api.get(`/orders/${orderId}/invoice`);
+      const res = await api.get(`/allOrders/${orderId}/invoice`);
       const url = res.invoiceUrl?.startsWith('http')
         ? res.invoiceUrl
         : `${BACKEND_URL}${res.invoiceUrl}`;
@@ -63,13 +68,36 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   };
 
 
-  const { data: ordersData, isLoading } = useQuery({
+  const { isLoading } = useQuery({
     queryKey: ['order-history'],
-    queryFn: () => api.get('/orders/mine'),
+    queryFn: async () => {
+      const res = await api.get(`/allOrders/mine?limit=${LIMIT}&offset=0`);
+      const fetched: any[] = res.allOrders || [];
+      setAllOrders(fetched);
+      setOffset(LIMIT);
+      setHasMore(fetched.length === LIMIT);
+      return res;
+    },
   });
 
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await api.get(`/allOrders/mine?limit=${LIMIT}&offset=${offset}`);
+      const fetched: any[] = res.allOrders || [];
+      setAllOrders(prev => [...prev, ...fetched]);
+      setOffset(prev => prev + LIMIT);
+      setHasMore(fetched.length === LIMIT);
+    } catch {
+      Alert.alert('Error', 'Could not load more allOrders.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/orders/${id}/cancel`),
+    mutationFn: (id: string) => api.post(`/allOrders/${id}/cancel`),
     onSuccess: () => {
       setCancelTargetId(null);
       queryClient.invalidateQueries({ queryKey: ['order-history'] });
@@ -79,8 +107,6 @@ const OrderHistoryScreen = ({ navigation }: any) => {
       Alert.alert('Error', 'Could not cancel the order.');
     },
   });
-
-  const orders = ordersData?.orders || [];
 
   if (isLoading) return (
     <View style={styles.loadingContainer}>
@@ -109,12 +135,12 @@ const OrderHistoryScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {orders.length === 0 ? (
+        {allOrders.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconWrapper}>
               <Package size={32} color={colors.primary} />
             </View>
-            <Text style={styles.emptyTitle}>No orders yet</Text>
+            <Text style={styles.emptyTitle}>No allOrders yet</Text>
             <Text style={styles.emptySubText}>Your delicious journey is just one tap away.</Text>
             <BouncingButton
               style={styles.browseBtn}
@@ -124,7 +150,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
             </BouncingButton>
           </View>
         ) : (
-          orders.map((order: any, index: number) => (
+          allOrders.map((order: any, index: number) => (
             <Animated.View key={order.id} entering={FadeInDown.delay(index * 80)}>
               <View style={styles.orderCard}>
                 <View style={styles.orderCardHeader}>
@@ -295,6 +321,20 @@ const OrderHistoryScreen = ({ navigation }: any) => {
               </Animated.View>
             ))
           )}
+
+        {/* Load More */}
+        {hasMore && allOrders.length > 0 && (
+          <TouchableOpacity
+            style={styles.loadMoreBtn}
+            onPress={loadMore}
+            disabled={loadingMore}
+            activeOpacity={0.7}
+          >
+            {loadingMore
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <Text style={styles.loadMoreText}>Load more orders</Text>}
+          </TouchableOpacity>
+        )}
         </ScrollView>
 
         {/* Cancel Confirmation Modal */}
@@ -401,6 +441,12 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     modalKeepText: { fontFamily: fontFamily.bold, fontSize: 13, color: colors.ink, textTransform: 'uppercase', letterSpacing: 0.5 },
     modalCancelBtn: { flex: 1, backgroundColor: '#EF4444', paddingVertical: 14, borderRadius: 14, alignItems: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
     modalCancelText: { fontFamily: fontFamily.bold, fontSize: 13, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 0.5 },
+    loadMoreBtn: {
+      alignItems: 'center', justifyContent: 'center',
+      paddingVertical: 16, marginHorizontal: 16, marginBottom: 24, marginTop: 4,
+      borderRadius: 14, borderWidth: 1.5, borderColor: colors.primary,
+    },
+    loadMoreText: { fontFamily: fontFamily.bold, fontSize: 14, color: colors.primary },
   });
 
   export default OrderHistoryScreen;
