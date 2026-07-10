@@ -251,6 +251,21 @@ const RiderHomeScreen = ({ navigation }: any) => {
       showNotification({ ...data, id: data.orderId, display_id: data.displayId, delivery_address_text: data.deliveryAddress || null, _kitchenAssigned: true });
     };
 
+    const dispatcherAlertHandler = async (data: { orderId: string; displayId: string }) => {
+      if (!isOnlineRef.current) return;
+      if (pendingOrderRef.current) return;
+      // Remove from skipped so the rider sees it even if they dismissed it before
+      skippedIdsRef.current = skippedIdsRef.current.filter(id => id !== data.orderId);
+      setSkippedIds(prev => prev.filter(id => id !== data.orderId));
+      try {
+        const poolRes = await api.get('/riders/orders/pool');
+        queryClient.setQueryData(['rider-missions-pool'], poolRes);
+        const orders: any[] = poolRes?.orders || [];
+        const target = orders.find((o: any) => o.id === data.orderId) || orders.find((o: any) => !skippedIdsRef.current.includes(o.id));
+        if (target) showNotification(target);
+      } catch (e) { console.warn('[DISPATCHER_ALERT] pool fetch error', e); }
+    };
+
     const register = () => {
       const socket = getSocket();
       if (!socket) return false;
@@ -258,8 +273,10 @@ const RiderHomeScreen = ({ navigation }: any) => {
       // Off first to prevent duplicate listeners on reconnect
       socket.off('new_available_mission', missionHandler);
       socket.off('order_assigned', assignedHandler);
+      socket.off('dispatcher_order_alert', dispatcherAlertHandler);
       socket.on('new_available_mission', missionHandler);
       socket.on('order_assigned', assignedHandler);
+      socket.on('dispatcher_order_alert', dispatcherAlertHandler);
       // Re-register after every reconnect
       socket.off('connect', register);
       socket.on('connect', register);
@@ -278,6 +295,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       if (socket) {
         socket.off('new_available_mission', missionHandler);
         socket.off('order_assigned', assignedHandler);
+        socket.off('dispatcher_order_alert', dispatcherAlertHandler);
         socket.off('connect', register);
       }
     };

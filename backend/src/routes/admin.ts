@@ -5,7 +5,7 @@ import { query, withTransaction } from '../db';
 import { ActivityLogService } from '../services/activity.service';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
-import { emitToUser, emitToAdmin, emitToKitchen, emitToAll } from '../socket';
+import { emitToUser, emitToAdmin, emitToKitchen, emitToAll, emitToRiders } from '../socket';
 import { createPendingRefund } from '../services/refund.service';
 import { NotificationService } from '../services/notification.service';
 import { logSystemEvent } from '../utils/logger';
@@ -538,6 +538,23 @@ router.post('/orders/:id/assign', authenticate, requireRole('super_admin', 'admi
     }
     emitToAdmin('order_status_update', { orderId: id, status: 'out_for_delivery' });
     res.json({ success: true });
+});
+
+router.post('/orders/:id/alert-riders', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    try {
+        const { rows } = await query(
+            `SELECT id, zone_id, display_id FROM orders WHERE id = $1 AND status NOT IN ('delivered','cancelled')`,
+            [id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'Order not found or not alertable' });
+        const order = rows[0];
+        emitToRiders('dispatcher_order_alert', { orderId: order.id, displayId: order.display_id }, order.zone_id ?? undefined);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[admin/alert-riders]', err);
+        res.status(500).json({ error: 'Failed to alert riders' });
+    }
 });
 
 router.patch('/orders/:id/status', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
