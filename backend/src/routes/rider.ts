@@ -641,10 +641,17 @@ router.get('/orders/history', authenticate, requireRole('rider', 'rider_captain'
     const riderId = req.user!.userId;
     try {
         const { rows } = await query(`
-            SELECT o.*, u.name as customer_name, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng
+            SELECT o.*,
+                   u.name as customer_name,
+                   a.address_text as delivery_address_text,
+                   a.lat as customer_lat, a.lng as customer_lng,
+                   k.lat as kitchen_lat, k.lng as kitchen_lng,
+                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
             FROM orders o
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
+            LEFT JOIN kitchens k ON o.kitchen_id = k.id
+            LEFT JOIN zones z ON o.zone_id = z.id
             WHERE o.rider_id = $1 AND o.status IN ('delivered', 'cancelled')
             ORDER BY o.delivered_at DESC, o.created_at DESC
             LIMIT 50
@@ -653,6 +660,28 @@ router.get('/orders/history', authenticate, requireRole('rider', 'rider_captain'
         for (const order of rows) {
             const { rows: items } = await query('SELECT menu_item_name, quantity FROM order_items WHERE order_id = $1', [order.id]);
             order.items = items;
+
+            // Compute per-order earnings and distance for history display
+            if (order.status === 'delivered') {
+                let distanceKm = 0;
+                if (order.delivery_distance_metres > 0) {
+                    distanceKm = order.delivery_distance_metres / 1000;
+                } else if (order.kitchen_lat && order.customer_lat) {
+                    distanceKm = haversineKm(
+                        parseFloat(order.kitchen_lat), parseFloat(order.kitchen_lng),
+                        parseFloat(order.customer_lat), parseFloat(order.customer_lng),
+                    );
+                }
+                order.distance_km = Math.round(distanceKm * 10) / 10;
+
+                const basePay = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
+                const perKmPaise = order.rider_per_km_paise ?? 500;
+                const freeKm = parseFloat(order.rider_free_km ?? '2');
+                const distanceBonus = distanceKm > freeKm ? Math.floor((distanceKm - freeKm) * perKmPaise) : 0;
+                const tipPaise = parseInt(order.rider_tip_paise || '0', 10);
+                const platformFee = Math.floor(basePay * 0.1);
+                order.earnings_paise = basePay + distanceBonus + tipPaise - platformFee;
+            }
         }
 
         res.json({ orders: rows });
