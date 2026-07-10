@@ -66,7 +66,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     );
   };
 
-  const { isLoading } = useQuery({
+  const { isLoading, isError, refetch } = useQuery({
     queryKey: ['order-history'],
     queryFn: async () => {
       const res = await api.get(`/orders/mine?limit=${LIMIT}&offset=0`);
@@ -76,6 +76,8 @@ const OrderHistoryScreen = ({ navigation }: any) => {
       setHasMore(fetched.length === LIMIT);
       return res;
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const loadMore = async () => {
@@ -110,6 +112,16 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
       <Text style={styles.loadingText}>Loading orders…</Text>
+    </View>
+  );
+
+  if (isError) return (
+    <View style={styles.loadingContainer}>
+      <Package size={40} color="#D1D5DB" />
+      <Text style={[styles.loadingText, { marginTop: 16, color: '#EF4444' }]}>Failed to load orders</Text>
+      <TouchableOpacity onPress={() => refetch()} style={[styles.browseBtn, { marginTop: 20 }]}>
+        <Text style={styles.browseBtnText}>Retry</Text>
+      </TouchableOpacity>
     </View>
   );
 
