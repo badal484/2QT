@@ -1,7 +1,7 @@
 import React from 'react';
 import { NativeModules, Platform, PermissionsAndroid } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { getSocket, connectSocket, disconnectSocket } from '../socket/client';
 import { RootState } from '../store';
 import { updateUser } from '../store/slices/authSlice';
@@ -168,7 +168,24 @@ const RootNavigator = () => {
   const activeRole = BUILD_ROLE || user?.role;
 
   return (
-    <NavigationContainer ref={navigationRef} linking={linking as any} onReady={flushPendingNav}>
+    <NavigationContainer 
+      ref={navigationRef} 
+      linking={linking as any} 
+      onReady={flushPendingNav}
+      theme={{
+        ...DefaultTheme,
+        dark: false,
+        colors: {
+          ...DefaultTheme.colors,
+          primary: '#FC4603',
+          background: '#FAF8F4',
+          card: '#FFFFFF',
+          text: '#1A1F1C',
+          border: '#E6E2DA',
+          notification: '#FC4603',
+        },
+      }}
+    >
       {!user ? (
         <AuthNavigator />
       ) : (activeRole === 'customer' || activeRole === 'buyer') ? (
