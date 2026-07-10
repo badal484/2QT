@@ -464,6 +464,40 @@ router.post('/rider-applications/:id/:action', authenticate, requireRole('super_
     }
 });
 
+// ─── SOS Alerts ───────────────────────────────────────────────────────────────
+router.get('/sos-alerts', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { status = 'active' } = req.query;
+    try {
+        const { rows } = await query(`
+            SELECT s.*, u.name as rider_name, u.phone as rider_phone, o.display_id as order_display_id
+            FROM sos_alerts s
+            JOIN users u ON s.rider_id = u.id
+            LEFT JOIN orders o ON s.order_id = o.id
+            WHERE ($1 = 'all' OR s.status = $1)
+            ORDER BY s.created_at DESC
+            LIMIT 50
+        `, [status]);
+        res.json({ alerts: rows });
+    } catch (err) {
+        console.error('[admin/sos-alerts]', err);
+        res.json({ alerts: [] });
+    }
+});
+
+router.patch('/sos-alerts/:id/resolve', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { resolutionNote } = req.body;
+    try {
+        await query(
+            `UPDATE sos_alerts SET status = 'resolved', resolved_at = NOW(), resolved_by = $1, resolution_note = $2 WHERE id = $3`,
+            [req.user!.userId, resolutionNote || null, req.params.id]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[admin/sos-alerts/resolve]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
 router.get('/riders', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows: riders } = await query(`
         SELECT u.id, u.name, u.phone, u.is_online, u.is_verified,
@@ -578,6 +612,132 @@ router.post('/riders/:id/verify', authenticate, requireRole('super_admin', 'admi
     }
     emitToUser(id, 'user_updated', { is_verified: true, is_active: true });
     res.json({ success: true });
+});
+
+// ─── Rider Documents (KYC review) ────────────────────────────────────────────
+router.get('/riders/documents', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT ra.id as application_id, ra.user_id as rider_id,
+                   ra.vehicle_type, ra.license_number, ra.id_photo_url,
+                   ra.status, ra.doc_review_status, ra.doc_review_reason,
+                   ra.doc_reviewed_at, ra.created_at, ra.updated_at,
+                   u.name as rider_name, u.phone as rider_phone,
+                   u.is_verified, u.is_suspended
+            FROM rider_applications ra
+            JOIN users u ON ra.user_id = u.id
+            WHERE u.role IN ('rider', 'rider_captain')
+            ORDER BY
+              CASE ra.doc_review_status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 ELSE 2 END,
+              ra.updated_at DESC
+        `);
+        res.json({ documents: rows });
+    } catch (err) {
+        console.error('[admin/riders/documents]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.patch('/riders/:id/documents/review', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const riderId = req.params.id as string;
+    const { action, reason } = req.body; // action: 'approve' | 'reject'
+    if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'INVALID_ACTION' });
+    const adminId = req.user!.userId;
+    try {
+        const docStatus = action === 'approve' ? 'approved' : 'rejected';
+        const { rowCount } = await query(
+            `UPDATE rider_applications
+             SET doc_review_status = $1, doc_review_reason = $2, doc_reviewed_by = $3, doc_reviewed_at = NOW()
+             WHERE user_id = $4`,
+            [docStatus, reason || null, adminId, riderId]
+        );
+        if (!rowCount) return res.status(404).json({ error: 'NOT_FOUND' });
+        const { rows } = await query('SELECT name, phone FROM users WHERE id = $1', [riderId]);
+        if (rows[0]?.phone) {
+            const msg = action === 'approve'
+                ? `Hi ${rows[0].name}, your documents have been verified. You can now accept deliveries!`
+                : `Hi ${rows[0].name}, your documents were not approved. Reason: ${reason || 'Please re-upload clear photos.'}`;
+            NotificationService.send('generic_sms', { phone: rows[0].phone, message: msg }).catch(() => {});
+        }
+        emitToUser(riderId, 'document_review', { status: docStatus, reason: reason || null });
+        res.json({ success: true, docStatus });
+    } catch (err) {
+        console.error('[admin/riders/documents/review]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Rider Detail ────────────────────────────────────────────────────────────
+router.get('/riders/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    try {
+        const [profileRes, earningsRes, ordersRes, docsRes, payoutsRes] = await Promise.all([
+            query(`SELECT u.id, u.name, u.phone, u.is_verified, u.is_online, u.is_active,
+                          u.is_suspended, u.suspension_reason, u.suspended_at, u.created_at
+                   FROM users u WHERE u.id = $1 AND u.role IN ('rider', 'rider_captain')`, [id]),
+            query(`SELECT date, deliveries_count, total_paise, base_earnings_paise, bonus_earnings_paise, cash_collected_paise
+                   FROM rider_daily_earnings WHERE rider_id = $1 ORDER BY date DESC LIMIT 30`, [id]),
+            query(`SELECT o.id, o.display_id, o.status, o.total_amount_paise, o.payment_method,
+                          o.created_at, o.delivered_at, o.pod_photo_url,
+                          cu.name as customer_name
+                   FROM orders o JOIN users cu ON o.customer_id = cu.id
+                   WHERE o.rider_id = $1 ORDER BY o.created_at DESC LIMIT 20`, [id]),
+            query(`SELECT vehicle_type, license_number, id_photo_url, status, doc_review_status, doc_review_reason, updated_at
+                   FROM rider_applications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, [id]),
+            query(`SELECT COALESCE(SUM(amount_paise), 0) as total_paid FROM weekly_payouts WHERE rider_id = $1 AND status = 'paid'`, [id]),
+        ]);
+        if (!profileRes.rows[0]) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
+        const totalEarnings = earningsRes.rows.reduce((s: number, r: any) => s + parseInt(r.total_paise, 10), 0);
+        const totalDeliveries = earningsRes.rows.reduce((s: number, r: any) => s + parseInt(r.deliveries_count, 10), 0);
+        res.json({
+            rider: profileRes.rows[0],
+            earnings: earningsRes.rows,
+            stats: { totalEarningsPaise: totalEarnings, totalDeliveries, totalPaidPaise: parseInt(payoutsRes.rows[0].total_paid, 10) },
+            recentOrders: ordersRes.rows,
+            documents: docsRes.rows[0] || null,
+        });
+    } catch (err) {
+        console.error('[admin/riders/:id]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Rider Suspend / Reactivate ──────────────────────────────────────────────
+router.post('/riders/:id/suspend', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    const { reason } = req.body;
+    const adminId = req.user!.userId;
+    try {
+        await query(
+            `UPDATE users SET is_suspended = TRUE, is_active = FALSE, suspension_reason = $1,
+             suspended_at = NOW(), suspended_by = $2 WHERE id = $3`,
+            [reason || 'Suspended by admin', adminId, id]
+        );
+        emitToUser(id, 'user_updated', { is_suspended: true, is_active: false, suspension_reason: reason || 'Suspended by admin' });
+        logSystemEvent('RIDER_SUSPENDED', `Admin ${adminId} suspended rider ${id}. Reason: ${reason}`, 'warning', { riderId: id, adminId, reason });
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[admin/riders/suspend]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.post('/riders/:id/reactivate', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    const adminId = req.user!.userId;
+    try {
+        await query(
+            `UPDATE users SET is_suspended = FALSE, is_active = TRUE, suspension_reason = NULL,
+             suspended_at = NULL, suspended_by = NULL WHERE id = $1`,
+            [id]
+        );
+        emitToUser(id, 'user_updated', { is_suspended: false, is_active: true });
+        logSystemEvent('RIDER_REACTIVATED', `Admin ${adminId} reactivated rider ${id}`, 'info', { riderId: id, adminId });
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[admin/riders/reactivate]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 // ─── Rider Issues ─────────────────────────────────────────────────────────────

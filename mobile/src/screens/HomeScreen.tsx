@@ -9,7 +9,7 @@ import { api } from '../api/client';
 import { addItem, setQuantity, setZone, setAddress, clearCart } from '../store/slices/cartSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight, UtensilsCrossed } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../utils/kitchenHours';
 import { NetworkImage } from '../components/NetworkImage';
 import { CustomizationBottomSheet } from '../components/ui/CustomizationBottomSheet';
@@ -657,6 +657,15 @@ const HomeScreen = ({ navigation }: any) => {
 
   const totalCartQty = cartItems.reduce((acc, i) => acc + i.quantity, 0);
 
+  const pillBottomAnim = useSharedValue(Math.max(insets.bottom, 16) + 16);
+  React.useEffect(() => {
+    pillBottomAnim.value = withTiming(totalCartQty > 0 ? Math.max(insets.bottom, 16) + 84 : Math.max(insets.bottom, 16) + 16, { duration: 250 });
+  }, [totalCartQty, insets.bottom]);
+  
+  const safePillStyle = useAnimatedStyle(() => ({
+    bottom: pillBottomAnim.value
+  }));
+
   const flatListRef = useRef<any>(null);
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
@@ -1288,7 +1297,7 @@ const HomeScreen = ({ navigation }: any) => {
       {cartItems.length > 0 && listData.length > 0 && (
         <Animated.View
           entering={FadeInDown.duration(300)}
-          exiting={FadeInDown.duration(200).delay(0)}
+          exiting={FadeOutDown.duration(200)}
           style={[
             styles.floatingCartContainer,
             { bottom: Math.max(insets.bottom, 16) + 8 },
@@ -1317,7 +1326,7 @@ const HomeScreen = ({ navigation }: any) => {
       {primaryActiveOrder && (
         <Animated.View entering={FadeInDown.duration(400).springify().damping(15)} style={[
           styles.activeOrderPillContainer,
-          { bottom: totalCartQty > 0 ? Math.max(insets.bottom, 16) + 84 : Math.max(insets.bottom, 16) + 16 }
+          safePillStyle
         ]}>
           <BouncingButton
             activeOpacity={0.8}
@@ -1575,17 +1584,17 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: -12, alignSelf: 'center', width: 110, zIndex: 10,
   },
   qtyControl: {
-    flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 16,
+    flexDirection: 'row', backgroundColor: '#FC4603', borderRadius: 16,
     alignItems: 'center', justifyContent: 'space-between', height: 40,
-    shadowColor: '#24B059', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+    shadowColor: '#FC4603', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   qtyBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
   qtyBtnText: { color: '#FFFFFF', fontSize: 22, fontFamily: fontFamily.bold },
   qtyValue: { color: '#FFFFFF', fontSize: 15, fontFamily: fontFamily.extrabold },
   addBtn: {
-    backgroundColor: '#24B059', borderRadius: 16,
+    backgroundColor: '#FC4603', borderRadius: 16,
     height: 40, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#24B059', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+    shadowColor: '#FC4603', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   addBtnDisabled: { backgroundColor: colors.surfaceMuted },
   addBtnText: { color: '#FFFFFF', fontFamily: fontFamily.extrabold, fontSize: 15, letterSpacing: 0.5 },
@@ -1617,14 +1626,14 @@ const styles = StyleSheet.create({
   homeGridSoldOut: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
   homeGridSoldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
   homeGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
-  homeGridQtyControl: { flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 16, alignItems: 'center', justifyContent: 'space-between', height: 32, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  homeGridQtyControl: { flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 16, alignItems: 'center', justifyContent: 'space-between', height: 32, shadowColor: colors.primary, shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   homeGridQtyBtn: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
   homeGridQtyBtnText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
   homeGridQtyValue: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
-  homeGridAddBtn: { backgroundColor: '#24B059', borderRadius: 16, height: 32, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4, position: 'relative' },
-  homeGridAddBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
-  homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F3F4F6' },
-  homeGridCustomiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
+  homeGridAddBtn: { backgroundColor: '#FFFFFF', borderRadius: 16, height: 32, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4, position: 'relative' },
+  homeGridAddBtnText: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
+  homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  homeGridCustomiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: colors.primary, textTransform: 'uppercase' },
   homeGridInfo: { paddingHorizontal: 4 },
   homeGridName: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2, lineHeight: 18 },
   homeGridDesc: { fontSize: 11, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 14, marginBottom: 4 },
@@ -1637,7 +1646,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2, marginBottom: 3,
     borderWidth: StyleSheet.hairlineWidth, borderColor: '#F3F4F6',
   },
-  customisePillText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase', letterSpacing: 0.3 },
+  customisePillText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#FC4603', textTransform: 'uppercase', letterSpacing: 0.3 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 4 },
   bestsellerBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   bestsellerBadgeText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },

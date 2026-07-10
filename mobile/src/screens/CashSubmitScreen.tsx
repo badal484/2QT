@@ -8,11 +8,12 @@ import { Banknote, CheckCircle, ArrowRight } from 'lucide-react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 
-const G = {
-  bg: '#07080A', surface: '#10141A', card: '#161C25',
-  amber: '#F59E0B', amberDim: 'rgba(245,158,11,0.12)',
-  green: '#10B981', greenDim: 'rgba(16,185,129,0.12)',
-  white: '#FFFFFF', muted: '#6B7A8D', border: 'rgba(245,158,11,0.2)',
+const R = {
+  orange: '#FC8019', orangeLight: '#FFF3E8',
+  green: '#1BA672', greenLight: '#E8F8F1',
+  amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.08)',
+  ink: '#282C3F', gray: '#686B78', muted: '#93959F',
+  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
 };
 
 const ConfirmedOverlay = ({ amount, onDone }: { amount: string; onDone: () => void }) => {
@@ -29,12 +30,12 @@ const ConfirmedOverlay = ({ amount, onDone }: { amount: string; onDone: () => vo
   return (
     <Animated.View style={[styles.overlayRoot, { opacity }]}>
       <Animated.View style={[styles.overlayCard, { transform: [{ scale }] }]}>
-        <View style={styles.overlayIcon}>
-          <CheckCircle size={48} color={G.green} strokeWidth={1.8} />
+        <View style={styles.overlayIconWrap}>
+          <CheckCircle size={48} color={R.green} strokeWidth={1.8} />
         </View>
         <Text style={styles.overlayTitle}>Cash Submitted!</Text>
         <Text style={styles.overlayAmount}>₹{amount}</Text>
-        <Text style={styles.overlaySub}>Finance has been notified. You're cleared for your next order.</Text>
+        <Text style={styles.overlaySub}>Finance has been notified. You're all clear for the next order.</Text>
         <TouchableOpacity style={styles.overlayBtn} onPress={onDone} activeOpacity={0.9}>
           <Text style={styles.overlayBtnText}>Go to Home</Text>
         </TouchableOpacity>
@@ -58,7 +59,7 @@ const CashSubmitScreen = ({ route, navigation }: any) => {
   const handleDone = () => {
     queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
     queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
-    navigation.navigate('RiderHome');
+    navigation.navigate('RiderTabs');
   };
 
   const submitMutation = useMutation({
@@ -71,7 +72,7 @@ const CashSubmitScreen = ({ route, navigation }: any) => {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
 
       {/* Header */}
       <View style={styles.header}>
@@ -81,7 +82,9 @@ const CashSubmitScreen = ({ route, navigation }: any) => {
 
       {/* Amount card */}
       <View style={styles.amountCard}>
-        <Banknote size={28} color={G.amber} style={{ marginBottom: 12 }} />
+        <View style={styles.amountIconWrap}>
+          <Banknote size={28} color={R.amber} />
+        </View>
         <Text style={styles.amountLabel}>Hand over this amount</Text>
         <Text style={styles.amountValue}>₹{amountRupees}</Text>
         <Text style={styles.amountSub}>Give this cash to the Finance team at the kitchen</Text>
@@ -113,10 +116,10 @@ const CashSubmitScreen = ({ route, navigation }: any) => {
         activeOpacity={0.88}
       >
         {submitMutation.isPending
-          ? <ActivityIndicator color={G.bg} />
+          ? <ActivityIndicator color={R.white} />
           : <>
               <Text style={styles.submitBtnText}>I've Handed Over the Cash</Text>
-              <ArrowRight size={18} color={G.bg} />
+              <ArrowRight size={18} color={R.white} />
             </>
         }
       </TouchableOpacity>
@@ -129,66 +132,74 @@ const CashSubmitScreen = ({ route, navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: G.bg, paddingHorizontal: 24 },
+  root: { flex: 1, backgroundColor: R.white, paddingHorizontal: 24 },
+
   header: { paddingTop: 8, paddingBottom: 24, alignItems: 'center' },
-  headerTitle: { color: G.white, fontSize: 22, fontWeight: '900', letterSpacing: -0.3 },
-  headerSub: { color: G.muted, fontSize: 13, marginTop: 4, fontFamily: 'monospace' },
+  headerTitle: { color: R.ink, fontSize: 22, fontWeight: '900', letterSpacing: -0.3 },
+  headerSub: { color: R.muted, fontSize: 13, marginTop: 4 },
 
   amountCard: {
-    backgroundColor: G.amberDim, borderWidth: 1.5, borderColor: G.border,
+    backgroundColor: R.amberLight, borderWidth: 1.5, borderColor: '#FDE68A',
     borderRadius: 24, padding: 28, alignItems: 'center', marginBottom: 20,
   },
-  amountLabel: { color: G.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2 },
-  amountValue: { color: G.amber, fontSize: 52, fontWeight: '900', letterSpacing: -2, marginTop: 4 },
-  amountSub: { color: G.muted, fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  amountIconWrap: {
+    width: 56, height: 56, borderRadius: 16, backgroundColor: R.white,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+    borderWidth: 1, borderColor: '#FDE68A',
+    shadowColor: R.amber, shadowOpacity: 0.15, shadowRadius: 8, elevation: 2,
+  },
+  amountLabel: { color: R.gray, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2 },
+  amountValue: { color: R.amber, fontSize: 52, fontWeight: '900', letterSpacing: -2, marginTop: 4 },
+  amountSub: { color: R.gray, fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 20 },
 
   stepsCard: {
-    backgroundColor: G.surface, borderRadius: 20, padding: 20, gap: 16,
+    backgroundColor: R.bg, borderRadius: 20, padding: 20, gap: 16,
+    borderWidth: 1, borderColor: R.border,
   },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   stepNum: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: G.amberDim, borderWidth: 1.5, borderColor: G.border,
+    backgroundColor: R.orangeLight, borderWidth: 1.5, borderColor: '#FDDBB4',
     alignItems: 'center', justifyContent: 'center',
   },
-  stepNumText: { color: G.amber, fontWeight: '900', fontSize: 12 },
-  stepText: { flex: 1, color: G.white, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  stepNumText: { color: R.orange, fontWeight: '900', fontSize: 12 },
+  stepText: { flex: 1, color: R.ink, fontSize: 14, fontWeight: '600', lineHeight: 20 },
 
   submitBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: G.amber, borderRadius: 18, paddingVertical: 18, marginTop: 24,
-    shadowColor: G.amber, shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
+    backgroundColor: R.orange, borderRadius: 18, paddingVertical: 18, marginTop: 24,
+    shadowColor: R.orange, shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
   },
-  submitBtnText: { color: G.bg, fontSize: 16, fontWeight: '900' },
+  submitBtnText: { color: R.white, fontSize: 16, fontWeight: '900' },
 
   skipLink: { alignItems: 'center', marginTop: 16 },
-  skipText: { color: G.muted, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' },
+  skipText: { color: R.muted, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' },
 
   overlayRoot: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(7,8,10,0.96)',
+    backgroundColor: 'rgba(255,255,255,0.97)',
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 28, zIndex: 99,
   },
   overlayCard: {
-    width: '100%', backgroundColor: G.surface, borderRadius: 28,
+    width: '100%', backgroundColor: R.white, borderRadius: 28,
     padding: 28, alignItems: 'center', gap: 12,
-    borderWidth: 1, borderColor: 'rgba(16,185,129,0.2)',
+    borderWidth: 1, borderColor: '#B7E8D7',
+    shadowColor: R.green, shadowOpacity: 0.12, shadowRadius: 24, elevation: 8,
   },
-  overlayIcon: {
+  overlayIconWrap: {
     width: 88, height: 88, borderRadius: 44,
-    backgroundColor: G.greenDim, borderWidth: 1.5,
-    borderColor: 'rgba(16,185,129,0.25)',
+    backgroundColor: R.greenLight, borderWidth: 1.5, borderColor: '#B7E8D7',
     alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
-  overlayTitle: { color: G.white, fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  overlayAmount: { color: G.green, fontSize: 40, fontWeight: '900', letterSpacing: -1 },
-  overlaySub: { color: G.muted, fontSize: 13, textAlign: 'center', lineHeight: 20, marginTop: 4 },
+  overlayTitle: { color: R.ink, fontSize: 22, fontWeight: '900', textAlign: 'center' },
+  overlayAmount: { color: R.green, fontSize: 40, fontWeight: '900', letterSpacing: -1 },
+  overlaySub: { color: R.gray, fontSize: 13, textAlign: 'center', lineHeight: 20, marginTop: 4 },
   overlayBtn: {
-    width: '100%', backgroundColor: G.green, borderRadius: 16,
+    width: '100%', backgroundColor: R.orange, borderRadius: 16,
     paddingVertical: 16, alignItems: 'center', marginTop: 8,
   },
-  overlayBtnText: { color: G.white, fontSize: 15, fontWeight: '800' },
+  overlayBtnText: { color: R.white, fontSize: 15, fontWeight: '800' },
 });
 
 export default CashSubmitScreen;

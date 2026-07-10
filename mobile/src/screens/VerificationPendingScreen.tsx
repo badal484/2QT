@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Linking, ActivityIndicator, Alert } from 'react-native';
+import {
+  View, Text, TouchableOpacity, StyleSheet, StatusBar,
+  Linking, ActivityIndicator, Alert,
+} from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout, updateUser } from '../store/slices/authSlice';
 import { RootState } from '../store';
 import { api } from '../api/client';
-import { ShieldAlert, Clock, PhoneCall, LogOut, RefreshCw, CheckCircle2, Lock, ShieldCheck } from 'lucide-react-native';
+import {
+  ShieldCheck, Clock, PhoneCall, LogOut,
+  RefreshCw, CheckCircle2, Lock,
+} from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const R = {
+  orange: '#FC8019', orangeLight: '#FFF3E8',
+  green: '#1BA672', greenLight: '#E8F8F1',
+  amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.08)',
+  ink: '#282C3F', gray: '#686B78', muted: '#93959F',
+  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+};
 
 const VerificationPendingScreen = () => {
   const dispatch = useDispatch();
@@ -19,348 +33,206 @@ const VerificationPendingScreen = () => {
       if (res.user) {
         dispatch(updateUser(res.user));
         if (res.user.is_verified) {
-          Alert.alert('Clearance Activated', 'Your account has been verified! Welcome to the squad, Captain.');
+          Alert.alert('You\'re Approved!', 'Your account has been verified. Welcome to the team!');
         } else {
-          Alert.alert('Audit In Progress', 'Operations audit is still underway. This typically takes 24-48 hours. Thank you for your patience.');
+          Alert.alert('Still Under Review', 'Our team is still reviewing your documents. This usually takes 24-48 hours. Thank you for your patience.');
         }
       } else {
         throw new Error('User data not found');
       }
     } catch (err: any) {
-      Alert.alert('Sync Failed', err.message || 'Unable to contact verification server. Please check your connection.');
+      Alert.alert('Check Failed', err.message || 'Unable to reach server. Please check your connection.');
     } finally {
       setChecking(false);
     }
   };
 
+  const steps = [
+    {
+      icon: CheckCircle2,
+      title: 'Account Created',
+      desc: 'Profile created and documents submitted successfully.',
+      state: 'done' as const,
+    },
+    {
+      icon: Clock,
+      title: 'Document Verification',
+      desc: 'Our team is reviewing your licence and ID. This takes 24-48 hours.',
+      state: 'active' as const,
+    },
+    {
+      icon: Lock,
+      title: 'Account Activated',
+      desc: 'Once approved, you can start accepting delivery orders.',
+      state: 'pending' as const,
+    },
+  ];
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
       <SafeAreaView style={styles.content}>
-        
-        {/* Terminal Header */}
-        <View style={styles.header}>
-          <Text style={styles.terminalLabel}>COMMAND HUD // AUTH_AUDIT</Text>
-          <Text style={styles.headerTitle}>SECURITY AUDIT</Text>
-        </View>
 
-        {/* Status Graphic Card */}
-        <View style={styles.card}>
-          <View style={styles.iconWrapper}>
-            <ShieldAlert size={40} color="#FF6B35" />
+        {/* Top illustration area */}
+        <View style={styles.heroWrap}>
+          <View style={styles.heroIcon}>
+            <ShieldCheck size={40} color={R.orange} strokeWidth={1.8} />
           </View>
-          
-          <Text style={styles.title}>Clearance Pending</Text>
-          <Text style={styles.description}>
-            Your Captain credentials are currently undergoing operational review. We are validating database registry details and zone dispatch slots.
+          <Text style={styles.heroTitle}>Under Review</Text>
+          <Text style={styles.heroSub}>
+            Hi {user?.name?.split(' ')[0] || 'there'}! Your documents are being reviewed by our team. We'll notify you once approved.
           </Text>
-
-          {/* Verification Audit Steps Timeline */}
-          <View style={styles.timeline}>
-            
-            {/* Step 1 */}
-            <View style={styles.timelineItem}>
-              <View style={[styles.timelineNode, styles.timelineNodeSuccess]}>
-                <CheckCircle2 size={14} color="#22C55E" />
-              </View>
-              <View style={styles.timelineContent}>
-                <Text style={styles.timelineTitle}>Captain Registry</Text>
-                <Text style={styles.timelineDesc}>Profile created & identity submitted successfully.</Text>
-              </View>
-            </View>
-
-            <View style={[styles.timelineLine, styles.timelineLineSuccess]} />
-
-            {/* Step 2 */}
-            <View style={styles.timelineItem}>
-              <View style={[styles.timelineNode, styles.timelineNodeActive]}>
-                <Clock size={14} color="#FF6B35" />
-              </View>
-              <View style={styles.timelineContent}>
-                <Text style={styles.timelineTitleActive}>Credentials Verification</Text>
-                <Text style={styles.timelineDescActive}>Verification of driver licence and active vehicle protocol details.</Text>
-              </View>
-            </View>
-
-            <View style={styles.timelineLine} />
-
-            {/* Step 3 */}
-            <View style={styles.timelineItem}>
-              <View style={styles.timelineNode}>
-                <Lock size={12} color="#475569" />
-              </View>
-              <View style={styles.timelineContent}>
-                <Text style={styles.timelineTitleDisabled}>Clearance Activation</Text>
-                <Text style={styles.timelineDescDisabled}>Unlocks the active dispatch interface & mission accept keys.</Text>
-              </View>
-            </View>
-            
-          </View>
-
-          {/* Action Row */}
-          <TouchableOpacity 
-            style={styles.checkBtn}
-            onPress={checkStatus}
-            disabled={checking}
-          >
-            {checking ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <View style={styles.btnContent}>
-                <RefreshCw size={16} color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.checkText}>Verify Audit Status</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
 
-        {/* Support Section */}
-        <View style={styles.supportCard}>
-          <View style={styles.supportInfo}>
-            <Text style={styles.supportLabel}>NEED QUICK CLEARANCE?</Text>
-            <Text style={styles.supportTitle}>Operations Support Desk</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.contactBtn}
-            onPress={() => {
-              Linking.openURL('https://wa.me/919999999999?text=Hi%202QT%20Support%2C%20I%20am%20a%20Rider%20waiting%20for%20my%20account%20verification.');
-            }}
-          >
-            <PhoneCall size={18} color="#fff" />
-          </TouchableOpacity>
+        {/* Steps card */}
+        <View style={styles.card}>
+          {steps.map((step, i) => {
+            const Icon = step.icon;
+            const isDone = step.state === 'done';
+            const isActive = step.state === 'active';
+            return (
+              <View key={i}>
+                <View style={styles.stepRow}>
+                  {/* Node */}
+                  <View style={[
+                    styles.stepNode,
+                    isDone && styles.stepNodeDone,
+                    isActive && styles.stepNodeActive,
+                  ]}>
+                    <Icon
+                      size={14}
+                      color={isDone ? R.green : isActive ? R.orange : R.muted}
+                      strokeWidth={2.5}
+                    />
+                  </View>
+                  {/* Content */}
+                  <View style={styles.stepContent}>
+                    <Text style={[
+                      styles.stepTitle,
+                      isDone && { color: R.green },
+                      isActive && { color: R.orange },
+                      !isDone && !isActive && { color: R.muted },
+                    ]}>
+                      {step.title}
+                    </Text>
+                    <Text style={styles.stepDesc}>{step.desc}</Text>
+                  </View>
+                </View>
+                {i < steps.length - 1 && (
+                  <View style={[styles.stepLine, isDone && styles.stepLineDone]} />
+                )}
+              </View>
+            );
+          })}
         </View>
 
-        <TouchableOpacity 
-          style={styles.logoutBtn}
-          onPress={() => dispatch(logout())}
+        {/* Check status button */}
+        <TouchableOpacity
+          style={[styles.checkBtn, checking && { opacity: 0.7 }]}
+          onPress={checkStatus}
+          disabled={checking}
+          activeOpacity={0.88}
         >
-          <LogOut size={16} color="#64748B" style={{ marginRight: 8 }} />
-          <Text style={styles.logoutText}>Abort & Sign Out</Text>
+          {checking
+            ? <ActivityIndicator color={R.white} size="small" />
+            : <>
+                <RefreshCw size={16} color={R.white} />
+                <Text style={styles.checkBtnText}>Check Status</Text>
+              </>
+          }
         </TouchableOpacity>
+
+        {/* Support card */}
+        <View style={styles.supportCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.supportLabel}>NEED HELP?</Text>
+            <Text style={styles.supportTitle}>Contact Support</Text>
+            <Text style={styles.supportSub}>We're available 9AM – 9PM</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.contactBtn}
+            onPress={() => Linking.openURL('https://wa.me/919999999999?text=Hi%2C%20I%20am%20a%20rider%20waiting%20for%20account%20verification.')}
+            activeOpacity={0.85}
+          >
+            <PhoneCall size={18} color={R.white} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Sign out */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => dispatch(logout())} activeOpacity={0.7}>
+          <LogOut size={15} color={R.muted} />
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+
       </SafeAreaView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0B0C10',
-  },
+  root: { flex: 1, backgroundColor: R.bg },
   content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 32,
-    justifyContent: 'space-between',
+    flex: 1, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24,
+    gap: 16,
   },
-  header: {
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 10,
+
+  heroWrap: { alignItems: 'center', paddingVertical: 8 },
+  heroIcon: {
+    width: 80, height: 80, borderRadius: 24,
+    backgroundColor: R.orangeLight, borderWidth: 1, borderColor: '#FDDBB4',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
-  terminalLabel: {
-    color: '#FF6B35',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '900',
-    marginTop: 4,
-    letterSpacing: -0.5,
-  },
+  heroTitle: { color: R.ink, fontSize: 24, fontWeight: '900', letterSpacing: -0.5, marginBottom: 8 },
+  heroSub: { color: R.gray, fontSize: 14, lineHeight: 22, textAlign: 'center', paddingHorizontal: 8 },
+
   card: {
-    backgroundColor: '#161726',
-    borderRadius: 36,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 32,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.2,
-    shadowRadius: 30,
-    elevation: 8,
+    backgroundColor: R.white, borderRadius: 20, padding: 20,
+    borderWidth: 1, borderColor: R.border,
   },
-  iconWrapper: {
-    width: 76,
-    height: 76,
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.15)',
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  stepNode: {
+    width: 30, height: 30, borderRadius: 10,
+    backgroundColor: R.bg, borderWidth: 1, borderColor: R.border,
+    alignItems: 'center', justifyContent: 'center', zIndex: 1,
+    flexShrink: 0,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 10,
+  stepNodeDone: { backgroundColor: R.greenLight, borderColor: '#B7E8D7' },
+  stepNodeActive: { backgroundColor: R.orangeLight, borderColor: '#FDDBB4' },
+  stepContent: { flex: 1, paddingBottom: 4 },
+  stepTitle: { fontSize: 14, fontWeight: '800', marginBottom: 3 },
+  stepDesc: { color: R.muted, fontSize: 12, lineHeight: 17 },
+  stepLine: {
+    width: 2, height: 18, backgroundColor: R.border,
+    marginLeft: 14, marginVertical: 4,
   },
-  description: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 24,
-    paddingHorizontal: 8,
-  },
-  timeline: {
-    width: '100%',
-    marginBottom: 28,
-    paddingHorizontal: 4,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  timelineNode: {
-    width: 28,
-    height: 28,
-    backgroundColor: '#1E2035',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  timelineNodeSuccess: {
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-    borderColor: 'rgba(34, 197, 94, 0.25)',
-  },
-  timelineNodeActive: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderColor: 'rgba(255, 107, 53, 0.25)',
-  },
-  timelineContent: {
-    flex: 1,
-    marginLeft: 16,
-    paddingBottom: 16,
-  },
-  timelineTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#E2E8F0',
-  },
-  timelineTitleActive: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FF6B35',
-  },
-  timelineTitleDisabled: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  timelineDesc: {
-    fontSize: 10,
-    color: '#64748B',
-    marginTop: 2,
-    lineHeight: 14,
-  },
-  timelineDescActive: {
-    fontSize: 10,
-    color: '#94A3B8',
-    marginTop: 2,
-    lineHeight: 14,
-  },
-  timelineDescDisabled: {
-    fontSize: 10,
-    color: '#334155',
-    marginTop: 2,
-    lineHeight: 14,
-  },
-  timelineLine: {
-    width: 2,
-    height: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginLeft: 13,
-    marginTop: -16,
-    marginBottom: 4,
-  },
-  timelineLineSuccess: {
-    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-  },
+  stepLineDone: { backgroundColor: '#B7E8D7' },
+
   checkBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    height: 56,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: R.orange, borderRadius: 16, paddingVertical: 16,
+    shadowColor: R.orange, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6,
   },
-  btnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
+  checkBtnText: { color: R.white, fontWeight: '900', fontSize: 15 },
+
   supportCard: {
-    flexDirection: 'row',
-    backgroundColor: '#161726',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 24,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: R.white, borderRadius: 20, padding: 18,
+    borderWidth: 1, borderColor: R.border,
   },
-  supportInfo: {
-    flex: 1,
-  },
-  supportLabel: {
-    color: '#FF6B35',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-  },
-  supportTitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    marginTop: 2,
-  },
+  supportLabel: { color: R.orange, fontSize: 8, fontWeight: '900', letterSpacing: 1.5 },
+  supportTitle: { color: R.ink, fontSize: 15, fontWeight: '800', marginTop: 2 },
+  supportSub: { color: R.muted, fontSize: 12, marginTop: 2 },
   contactBtn: {
-    width: 44,
-    height: 44,
-    backgroundColor: '#FF6B35',
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    width: 46, height: 46, borderRadius: 14,
+    backgroundColor: R.orange, alignItems: 'center', justifyContent: 'center',
+    shadowColor: R.orange, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
   },
+
   logoutBtn: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 8,
   },
-  logoutText: {
-    color: '#64748B',
-    fontWeight: '800',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
+  logoutText: { color: R.muted, fontSize: 13, fontWeight: '700' },
 });
 
 export default VerificationPendingScreen;

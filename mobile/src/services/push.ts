@@ -71,9 +71,27 @@ export function subscribeToForegroundMessages(
     if (!msg) return () => {};
     try {
         return msg.onMessage(async (remoteMessage: any) => {
-            const title = remoteMessage.notification?.title ?? '';
-            const body  = remoteMessage.notification?.body  ?? '';
-            const data  = remoteMessage.data ?? {};
+            const data = remoteMessage.data ?? {};
+            let title = remoteMessage.notification?.title ?? '';
+            let body  = remoteMessage.notification?.body  ?? '';
+
+            if (!title && !body) {
+                const TYPE_LABELS: Record<string, string> = {
+                    order_confirmed:        'Order Confirmed! 🎉',
+                    order_preparing:        'Your food is being prepared 👨‍🍳',
+                    order_ready:            'Order Ready! 🛵',
+                    order_out_for_delivery: 'Rider on the way! 🛵',
+                    order_delivered:        'Order Delivered! 🎉',
+                    order_cancelled:        'Order Cancelled',
+                    rider_payout:           'Payment Sent! 💰',
+                    broadcast_message:      data.title ?? '2QT',
+                };
+                title = TYPE_LABELS[data.type] ?? data.title ?? '';
+                body  = data.body ?? '';
+            }
+
+            if (!title && !body) return; // Prevent blank 2QT notifications
+
             onMessage(title, body, data);
         });
     } catch {

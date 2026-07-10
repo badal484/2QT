@@ -10,7 +10,7 @@ import PartnerEarningsScreen from '../screens/partner/PartnerEarningsScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const PRIMARY = '#1B5E46';
+const PRIMARY = '#FC4603';
 
 const MainPartnerTabs = () => (
   <Tab.Navigator

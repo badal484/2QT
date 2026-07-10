@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { getSocket, connectSocket, disconnectSocket } from '../socket/client';
 import { RootState } from '../store';
 import { updateUser } from '../store/slices/authSlice';
+import { setFeatures } from '../store/slices/appSlice';
 import AuthNavigator from './AuthNavigator';
 import CustomerNavigator from './CustomerNavigator';
 import RiderNavigator from './RiderNavigator';
@@ -101,6 +102,12 @@ const RootNavigator = () => {
         if (status.maintenanceMode) {
           setIsMaintenance(true);
         }
+        if (status.featureLoyalty !== undefined) {
+          dispatch(setFeatures({
+            loyalty: status.featureLoyalty,
+            referrals: status.featureReferrals
+          }));
+        }
       } catch (err) {
         console.warn('--- SYSTEM CHECK FAILED --- (Server might be offline)', err);
       }
@@ -168,7 +175,7 @@ const RootNavigator = () => {
         <CustomerNavigator />
       ) : (activeRole === 'rider' || activeRole === 'rider_captain') ? (
         <RiderNavigator />
-      ) : (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen'].includes(activeRole)) ? (
+      ) : (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff'].includes(activeRole)) ? (
         <KitchenNavigator />
       ) : (activeRole === 'partner') ? (
         <PartnerNavigator />

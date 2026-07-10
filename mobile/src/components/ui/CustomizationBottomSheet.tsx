@@ -170,14 +170,14 @@ const styles = StyleSheet.create({
   requiredBadge: { fontSize: 10, fontFamily: fontFamily.bold, color: '#DC2626', backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
   
   optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
-  optionSelected: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+  optionSelected: { backgroundColor: colors.primaryTint, borderColor: colors.primary },
   optionLeft: { flexDirection: 'row', alignItems: 'center' },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  radioActive: { borderColor: '#22C55E' },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22C55E' },
+  radioActive: { borderColor: colors.primary },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   optionImage: { width: 32, height: 32, borderRadius: 8, marginRight: 12, backgroundColor: '#f1f1f1' },
   optionName: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
-  optionNameSelected: { fontFamily: fontFamily.bold, color: '#166534' },
+  optionNameSelected: { fontFamily: fontFamily.bold, color: colors.primaryDark },
   optionPrice: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.inkMuted },
   
   instructionInput: {
@@ -186,6 +186,6 @@ const styles = StyleSheet.create({
   },
   
   bottomBar: { padding: 16, paddingBottom: 32, borderTopWidth: 1, borderTopColor: '#F3F4F6', backgroundColor: '#fff' },
-  addBtn: { backgroundColor: '#22C55E', borderRadius: 16, height: 56, alignItems: 'center', justifyContent: 'center', shadowColor: '#22C55E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+  addBtn: { backgroundColor: colors.primary, borderRadius: 16, height: 56, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
   addBtnText: { fontSize: 16, fontFamily: fontFamily.black, color: '#fff' },
 });

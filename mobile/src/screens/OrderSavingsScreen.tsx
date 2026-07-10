@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated as RNAnimated, Share, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { Tag, Bike, Zap, Gift, ChevronRight, Share2 } from 'lucide-react-native';
 import { colors } from '../theme/colors';
@@ -51,6 +53,7 @@ interface SavingsParams {
 }
 
 const OrderSavingsScreen = ({ route, navigation }: any) => {
+  const { featureLoyalty } = useSelector((state: RootState) => state.app);
   const insets = useSafeAreaInsets();
   const {
     orderId,
@@ -106,7 +109,7 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
       color: '#7C3AED',
       bg: '#F5F3FF',
     },
-    loyaltyDiscountPaise > 0 && {
+    featureLoyalty && loyaltyDiscountPaise > 0 && {
       icon: <Zap size={18} color="#D97706" />,
       label: 'Loyalty Points',
       amount: loyaltyDiscountPaise / 100,
@@ -221,7 +224,7 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 44 },
   title: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.inkMuted, marginBottom: 4 },
   totalAmount: {
-    fontSize: 52, fontFamily: fontFamily.black, color: '#1B5E46', letterSpacing: -2,
+    fontSize: 52, fontFamily: fontFamily.black, color: '#FC4603', letterSpacing: -2,
     height: 64,
     backgroundColor: 'transparent',
     borderWidth: 0,
@@ -248,7 +251,7 @@ const styles = StyleSheet.create({
     marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6',
     alignItems: 'center',
   },
-  savingPercentText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#1B5E46' },
+  savingPercentText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#FC4603' },
 
   shareBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -262,7 +265,7 @@ const styles = StyleSheet.create({
   ctaGroup: { width: '100%', gap: 12, marginTop: 'auto' },
   trackBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#1B5E46',
+    backgroundColor: '#FC4603',
     borderRadius: 22, paddingVertical: 16,
     width: '100%',
   },

@@ -17,8 +17,7 @@ const R = {
   border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
 };
 
-// ─── Success screen ─────────────────────────────────────────────────────────
-const SuccessScreen = ({ onDone }: { onDone: () => void }) => {
+const SuccessScreen = ({ onDone, doneLabel = 'Back to Dashboard' }: { onDone: () => void; doneLabel?: string }) => {
   const insets = useSafeAreaInsets();
   const scale = useRef(new Animated.Value(0.5)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -27,84 +26,101 @@ const SuccessScreen = ({ onDone }: { onDone: () => void }) => {
 
   useEffect(() => {
     Animated.spring(scale, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }).start();
-    Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     const pulse = (anim: Animated.Value, delay: number) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(anim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 1, duration: 1600, useNativeDriver: true }),
           Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
         ]),
       ).start();
     pulse(ring1, 0);
-    pulse(ring2, 600);
+    pulse(ring2, 800);
   }, []);
 
   const ringStyle = (anim: Animated.Value) => ({
     position: 'absolute' as const,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 2,
-    borderColor: R.green,
-    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
-    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] }) }],
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 1.5,
+    borderColor: '#1BA672',
+    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }),
+    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.5] }) }],
   });
 
   return (
     <View style={[suc.root, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <View style={suc.hero}>
-        <Animated.View style={ringStyle(ring1)} />
-        <Animated.View style={ringStyle(ring2)} />
-        <Animated.View style={[suc.iconWrap, { transform: [{ scale }], opacity }]}>
-          <CheckCircle size={52} color={R.green} strokeWidth={1.8} />
-        </Animated.View>
-        <Animated.View style={{ opacity, alignItems: 'center' }}>
+        <View style={suc.iconContainer}>
+          <Animated.View style={ringStyle(ring1)} />
+          <Animated.View style={ringStyle(ring2)} />
+          <Animated.View style={[suc.iconWrap, { transform: [{ scale }], opacity }]}>
+            <CheckCircle size={56} color="#FFFFFF" strokeWidth={2.5} />
+          </Animated.View>
+        </View>
+        <Animated.View style={{ opacity, alignItems: 'center', marginTop: 10 }}>
           <Text style={suc.title}>Delivered!</Text>
           <Text style={suc.sub}>Order successfully handed to the customer.</Text>
         </Animated.View>
       </View>
 
-      <Animated.View style={[suc.confirmBox, { opacity }]}>
-        <CheckCircle size={16} color={R.green} />
-        <Text style={suc.confirmText}>OTP verified · Delivery confirmed</Text>
-      </Animated.View>
+      <Animated.View style={[suc.bottomSection, { opacity, transform: [{ translateY: opacity.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
+        <View style={suc.confirmBox}>
+          <View style={suc.confirmBadge}>
+            <CheckCircle size={14} color="#FFFFFF" />
+          </View>
+          <Text style={suc.confirmText}>OTP verified · Delivery confirmed</Text>
+        </View>
 
-      <TouchableOpacity style={suc.btn} onPress={onDone} activeOpacity={0.9}>
-        <Text style={suc.btnText}>Back to Dashboard</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={suc.btn} onPress={onDone} activeOpacity={0.9}>
+          <Text style={suc.btnText}>{doneLabel}</Text>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };
 
 const suc = StyleSheet.create({
   root: {
-    flex: 1, backgroundColor: R.white,
+    flex: 1, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28,
   },
-  hero: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24 },
+  hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  iconContainer: {
+    width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+  },
   iconWrap: {
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: R.greenLight, borderWidth: 2, borderColor: '#A7F3D0',
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: '#1BA672',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#1BA672', shadowOpacity: 0.4, shadowRadius: 20, elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  title: { color: '#282C3F', fontSize: 36, fontWeight: '900', textAlign: 'center' },
+  sub: { color: '#686B78', fontSize: 16, textAlign: 'center', lineHeight: 24, marginTop: 12, paddingHorizontal: 10 },
+  bottomSection: { width: '100%', alignItems: 'center', gap: 20 },
+  confirmBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#F8F8F8', borderWidth: 1, borderColor: '#E9E9EB',
+    paddingHorizontal: 24, paddingVertical: 16, borderRadius: 100,
+    width: '100%', justifyContent: 'center',
+  },
+  confirmBadge: {
+    width: 22, height: 22, borderRadius: 11, backgroundColor: '#1BA672',
     alignItems: 'center', justifyContent: 'center',
   },
-  title: { color: R.ink, fontSize: 34, fontWeight: '900', textAlign: 'center', marginTop: 8 },
-  sub: { color: R.muted, fontSize: 15, textAlign: 'center', lineHeight: 22, marginTop: 8 },
-  confirmBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: R.greenLight, borderWidth: 1, borderColor: '#A7F3D0',
-    paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16,
-    marginBottom: 20, width: '100%', justifyContent: 'center',
-  },
-  confirmText: { color: R.green, fontWeight: '700', fontSize: 13 },
+  confirmText: { color: '#282C3F', fontWeight: '800', fontSize: 13, letterSpacing: 0.2 },
   btn: {
-    width: '100%', backgroundColor: R.orange,
+    width: '100%', backgroundColor: '#FC8019',
     paddingVertical: 18, borderRadius: 16, alignItems: 'center',
-    shadowColor: R.orange, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+    shadowColor: '#FC8019', shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
   },
-  btnText: { color: R.white, fontSize: 16, fontWeight: '800' },
+  btnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
 });
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
@@ -157,7 +173,7 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
     },
   });
 
-  if (delivered) return <SuccessScreen onDone={handleDone} />;
+  if (delivered) return <SuccessScreen onDone={handleDone} doneLabel={isCashCod ? 'Submit Cash to Finance →' : 'Back to Dashboard'} />;
 
   const isBlocked = otp.length < 6 || verifyMutation.isPending || isUploadingPhoto;
 

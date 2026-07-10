@@ -9,8 +9,9 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 import PayoutsScreen from '../screens/PayoutsScreen';
 import RiderDocumentsScreen from '../screens/RiderDocumentsScreen';
 import RiderMissionsScreen from '../screens/RiderMissionsScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
-import HelpScreen from '../screens/HelpScreen';
+import RiderNotificationsScreen from '../screens/RiderNotificationsScreen';
+import RiderHelpScreen from '../screens/RiderHelpScreen';
+import RiderScorecardScreen from '../screens/RiderScorecardScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import VerificationPendingScreen from '../screens/VerificationPendingScreen';
 import { useSelector } from 'react-redux';
@@ -42,8 +43,9 @@ const RiderNavigator = () => {
           <Stack.Screen name="Payouts" component={PayoutsScreen} />
           <Stack.Screen name="RiderDocuments" component={RiderDocumentsScreen} />
           <Stack.Screen name="RiderMissions" component={RiderMissionsScreen} />
-          <Stack.Screen name="RiderNotifications" component={NotificationsScreen} />
-          <Stack.Screen name="RiderHelp" component={HelpScreen} />
+          <Stack.Screen name="RiderNotifications" component={RiderNotificationsScreen} />
+          <Stack.Screen name="RiderHelp" component={RiderHelpScreen} />
+          <Stack.Screen name="RiderScorecard" component={RiderScorecardScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         </>
       )}

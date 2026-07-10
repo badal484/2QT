@@ -503,7 +503,7 @@ const CartScreen = ({ navigation }: any) => {
         {/* Tip the Rider */}
         <Animated.View entering={FadeInDown.delay(120).duration(300)} style={styles.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-            <Heart size={18} color="#1B5E46" style={{ marginRight: 8 }} />
+            <Heart size={18} color="#FC4603" style={{ marginRight: 8 }} />
             <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Tip your delivery partner</Text>
           </View>
           <Text style={styles.tipSub}>100% of your tip goes directly to your rider. Thank you!</Text>
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
   savingsBannerText: {
     fontSize: 13,
     fontFamily: fontFamily.black,
-    color: '#1B5E46',
+    color: '#FC4603',
     letterSpacing: 0.2,
   },
 
@@ -730,7 +730,7 @@ const styles = StyleSheet.create({
   estimateTitle: {
     fontSize: 16,
     fontFamily: fontFamily.black,
-    color: '#1B5E46',
+    color: '#FC4603',
   },
   estimateSub: {
     fontSize: 13,
@@ -789,7 +789,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5E7EB',
   },
-  qtyBtnActive: { backgroundColor: '#1B5E46' },
+  qtyBtnActive: { backgroundColor: '#FC4603' },
   qtyBtnText: { fontSize: 16, color: colors.ink, fontFamily: fontFamily.black, lineHeight: 18 },
   qtyBtnActiveText: { color: '#FFFFFF' },
   qtyNum: { fontSize: 13, fontFamily: fontFamily.black, color: colors.ink, minWidth: 20, textAlign: 'center' },
@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
   addressBody: { flex: 1, marginRight: 8 },
   addressLabel: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 4, letterSpacing: -0.2 },
   addressText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 20 },
-  changeText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#1B5E46', marginTop: 4 },
+  changeText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#FC4603', marginTop: 4 },
 
   // Promo
   promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -822,12 +822,12 @@ const styles = StyleSheet.create({
   promoAppliedRow: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  promoAppliedText: { fontSize: 15, fontFamily: fontFamily.black, color: '#1B5E46' },
+  promoAppliedText: { fontSize: 15, fontFamily: fontFamily.black, color: '#FC4603' },
   promoSavingText: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 },
   promoInvalidText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.dangerTint },
   applyBtn: {
     height: 46, paddingHorizontal: 20, borderRadius: 14,
-    backgroundColor: '#1B5E46',
+    backgroundColor: '#FC4603',
     alignItems: 'center', justifyContent: 'center',
   },
   applyBtnDisabled: { backgroundColor: '#F7F8FA' },
@@ -862,7 +862,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#1B5E46',
+    backgroundColor: '#FC4603',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
   billTotalSavedText: {
     fontSize: 13,
     fontFamily: fontFamily.black,
-    color: '#1B5E46',
+    color: '#FC4603',
   },
 
   // Out-of-zone
@@ -940,7 +940,7 @@ const styles = StyleSheet.create({
   },
   footerCta: {
     height: 48,
-    backgroundColor: '#1B5E46',
+    backgroundColor: '#FC4603',
     borderRadius: 20,
     paddingHorizontal: 24,
     alignItems: 'center',
@@ -964,7 +964,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 12, letterSpacing: -0.5 },
   emptySub: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', lineHeight: 24 },
   exploreBtn: {
-    marginTop: 32, backgroundColor: '#1B5E46',
+    marginTop: 32, backgroundColor: '#FC4603',
     paddingHorizontal: 36, paddingVertical: 16, borderRadius: 20,
   },
   exploreBtnText: { fontSize: 15, fontFamily: fontFamily.black, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 },
@@ -978,11 +978,11 @@ const styles = StyleSheet.create({
   tipSub: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkFaint, marginBottom: 12, lineHeight: 18 },
   tipOptionsRow: { flexDirection: 'row', gap: 10 },
   tipChip: { flex: 1, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', alignItems: 'center' },
-  tipChipActive: { borderColor: '#1B5E46', backgroundColor: '#E8F2EC' },
+  tipChipActive: { borderColor: '#FC4603', backgroundColor: '#E8F2EC' },
   tipChipText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
-  tipChipTextActive: { color: '#1B5E46' },
+  tipChipTextActive: { color: '#FC4603' },
   promoChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#D1FAE5', backgroundColor: '#F0FDF4' },
-  promoChipCode: { fontSize: 12, fontFamily: fontFamily.black, color: '#1B5E46', letterSpacing: 0.5 },
+  promoChipCode: { fontSize: 12, fontFamily: fontFamily.black, color: '#FC4603', letterSpacing: 0.5 },
   promoChipDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: '#059669', maxWidth: 100 },
 
   plusBanner: {

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { api } from '../api/client';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearCart } from '../store/slices/cartSlice';
+import { RootState } from '../store';
 import RazorpayCheckout from 'react-native-razorpay';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
 import Animated, { FadeInDown, SlideInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring } from 'react-native-reanimated';
@@ -94,6 +95,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   const dispatch = useDispatch();
   const cart = useSelector((state: any) => state.cart);
   const { user } = useSelector((state: any) => state.auth);
+  const { featureLoyalty } = useSelector((state: RootState) => state.app);
   const appState = useRef(AppState.currentState);
   const insets = useSafeAreaInsets();
 
@@ -362,7 +364,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
             <View style={styles.divider} />
           )}
           {p.discountPaise > 0 && <View style={styles.billRow}><Text style={styles.billGreenLabel}>Promo Discount</Text><Text style={styles.billGreenValue}>-₹{p.discountPaise / 100}</Text></View>}
-          {p.loyaltyDiscountPaise > 0 && <View style={styles.billRow}><Text style={styles.billGreenLabel}>2QT Points Used</Text><Text style={styles.billGreenValue}>-₹{p.loyaltyDiscountPaise / 100}</Text></View>}
+          {featureLoyalty && p.loyaltyDiscountPaise > 0 && <View style={styles.billRow}><Text style={styles.billGreenLabel}>2QT Points Used</Text><Text style={styles.billGreenValue}>-₹{p.loyaltyDiscountPaise / 100}</Text></View>}
           {p.walletDeductionPaise > 0 && <View style={styles.billRow}><Text style={styles.billGreenLabel}>Wallet Used</Text><Text style={styles.billGreenValue}>-₹{p.walletDeductionPaise / 100}</Text></View>}
           
           <View style={styles.divider} />
@@ -373,7 +375,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         </Animated.View>
 
         {/* Use Wallet / Loyalty */}
-        {(walletBal > 0 || loyaltyPts > 0) && (
+        {(walletBal > 0 || (featureLoyalty && loyaltyPts > 0)) && (
           <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.card}>
             <Text style={styles.sectionTitle}>Apply Savings</Text>
             {walletBal > 0 && (
@@ -390,17 +392,17 @@ const CheckoutScreen = ({ navigation, route }: any) => {
                 </View>
               </TouchableOpacity>
             )}
-            {loyaltyPts > 0 && (
+            {featureLoyalty && loyaltyPts > 0 && (
               <TouchableOpacity style={[styles.savingsRow, { marginTop: walletBal > 0 ? 16 : 0 }]} activeOpacity={0.8} onPress={() => { triggerHaptic(); setUseLoyalty(!useLoyalty); }}>
-                <View style={[styles.savingsIcon, useLoyalty && { backgroundColor: '#1B5E46' }]}>
-                  <Sparkles size={16} color={useLoyalty ? '#fff' : '#1B5E46'} />
+                <View style={[styles.savingsIcon, useLoyalty && { backgroundColor: '#FC4603' }]}>
+                  <Sparkles size={16} color={useLoyalty ? '#fff' : '#FC4603'} />
                 </View>
                 <View style={styles.savingsInfo}>
                   <Text style={styles.savingsTitle}>Loyalty Points</Text>
                   <Text style={styles.savingsSub}>{loyaltyPts} points available</Text>
                 </View>
-                <View style={[styles.customCheckbox, useLoyalty && { borderColor: '#1B5E46' }]}>
-                  {useLoyalty && <View style={[styles.customCheckboxInner, { backgroundColor: '#1B5E46' }]} />}
+                <View style={[styles.customCheckbox, useLoyalty && { borderColor: '#FC4603' }]}>
+                  {useLoyalty && <View style={[styles.customCheckboxInner, { backgroundColor: '#FC4603' }]} />}
                 </View>
               </TouchableOpacity>
             )}
