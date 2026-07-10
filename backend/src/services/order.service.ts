@@ -5,6 +5,7 @@ import { emitToKitchen, emitToUser, emitToAdmin, emitToRiders } from '../socket'
 import { processReferral } from '../services/referral.service';
 import { TWO_QT } from '../config/constants';
 import { cancelTriggerJobs, checkWalletLowTrigger } from './trigger.service';
+import { computeAndStoreRoadDistance } from './distance.service';
 
 const getDeliveryOtpForOrder = () => {
     if (process.env.NODE_ENV === 'development') {
@@ -127,7 +128,7 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
                     delivery_otp = $3,
                     delivery_otp_expires_at = NOW() + interval '2 hours'
                 WHERE id = $4
-                RETURNING id, display_id, customer_id, kitchen_id, zone_id, total_amount_paise, gateway_amount_paise
+                RETURNING id, display_id, customer_id, kitchen_id, zone_id, total_amount_paise, gateway_amount_paise, address_id
             `, [paymentMethod, gatewayOrderId, otp, order.id]);
 
             const finalizedOrder = updatedRows[0];
@@ -278,6 +279,9 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
         emitToRiders('new_available_mission', { orderId: newOrder.id, displayId: newOrder.display_id }, newOrder.zone_id);
         emitToUser(newOrder.customer_id, 'order_status_update', { orderId: newOrder.id, status: 'confirmed' });
         emitToAdmin('new_order', { orderId: newOrder.id, display_id: newOrder.display_id, status: 'confirmed' });
+
+        // Compute real road distance async — stored on order so pool/earnings can use it
+        computeAndStoreRoadDistance(newOrder.id, newOrder.kitchen_id, newOrder.address_id).catch(() => {});
 
         NotificationService.send('order_confirmed', {
             userId: newOrder.customer_id,
