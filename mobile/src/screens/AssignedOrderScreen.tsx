@@ -10,13 +10,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft, Phone, Navigation, Package,
   CreditCard, ChevronRight, Info, AlertTriangle,
-  UserX, MessageSquareWarning, RefreshCw, DoorOpen, RotateCcw, X, MapPin,
-  ShieldAlert, CheckCircle2, MapPinCheck,
+  UserX, X, MapPin, Check,
+  ShieldAlert, RefreshCw, DoorOpen, RotateCcw,
 } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   red: '#EF4444', redLight: '#FEF2F2',
   blue: '#3B82F6', blueLight: '#EFF6FF',
@@ -60,15 +60,11 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [currentStatus, setCurrentStatus] = useState(order.status);
   const [showUnreachableModal, setShowUnreachableModal] = useState(false);
-  const [showIssueModal, setShowIssueModal] = useState(false);
   const [showSosModal, setShowSosModal] = useState(false);
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
-  const [arrivedAtKitchen, setArrivedAtKitchen] = useState(!!order.arrived_at_kitchen_at);
+  const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
   const [sosHolding, setSosHolding] = useState(false);
   const sosHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentLocationRef = useRef({ lat: 0, lng: 0 });
-  const arrivedAtKitchenRef = useRef(arrivedAtKitchen);
-  arrivedAtKitchenRef.current = arrivedAtKitchen;
   const queryClient = useQueryClient();
 
   // Socket — live status updates
@@ -85,7 +81,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     return () => { socket.off('order_status_update'); };
   }, [order.id, queryClient]);
 
-  // Geolocation — share location + geofence kitchen arrival
+  // Geolocation — share location
   useEffect(() => {
     const socket = getSocket();
     const watchId = Geolocation.watchPosition(
@@ -93,26 +89,12 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         currentLocationRef.current = { lat, lng };
         socket?.emit('update_location', { lat, lng });
-
-        // Geofence: auto-trigger kitchen arrival when within 100 m
-        if (
-          order.kitchen_lat && order.kitchen_lng &&
-          !arrivedAtKitchenRef.current &&
-          ['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus)
-        ) {
-          const dist = distanceMetres(lat, lng, parseFloat(order.kitchen_lat), parseFloat(order.kitchen_lng));
-          if (dist <= 100) {
-            arrivedAtKitchenRef.current = true;
-            setArrivedAtKitchen(true);
-            api.post(`/riders/orders/${order.id}/arrived-at-kitchen`, {}).catch(() => {});
-          }
-        }
       },
       () => {},
       { enableHighAccuracy: true, distanceFilter: 5, interval: 4000 },
     );
     return () => Geolocation.clearWatch(watchId);
-  }, [currentStatus]);
+  }, []);
 
   // AppState — re-emit location when foregrounded
   const appStateRef = useRef(AppState.currentState);
@@ -131,25 +113,15 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     return () => sub.remove();
   }, []);
 
-  // Mutations
+  // Reset checklist each time the order becomes ready for pickup
+  useEffect(() => { setCheckedItems(new Set()); }, [currentStatus]);
+
   const updateStatusMutation = useMutation({
     mutationFn: (status: string) => api.patch(`/riders/orders/${order.id}/status`, { status }),
     onSuccess: (data: any) => {
       setCurrentStatus(data.status || currentStatus);
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
     },
-  });
-
-  const arrivedMutation = useMutation({
-    mutationFn: () => api.post(`/riders/orders/${order.id}/arrived-at-kitchen`, {}),
-    onSuccess: () => setArrivedAtKitchen(true),
-    onError: () => setArrivedAtKitchen(true), // already marked — idempotent
-  });
-
-  const unclaimMutation = useMutation({
-    mutationFn: () => api.post(`/riders/orders/${order.id}/unclaim`, {}),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['rider-active-order'] }); navigation.goBack(); },
-    onError: (err: any) => Alert.alert('Error', err.message || 'Could not release order'),
   });
 
   const unreachableMutation = useMutation({
@@ -163,11 +135,6 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     },
   });
 
-  const reportIssueMutation = useMutation({
-    mutationFn: () => api.post(`/riders/orders/${order.id}/report-issue`, { issueType: selectedIssue }),
-    onSuccess: () => { setShowIssueModal(false); setSelectedIssue(null); Alert.alert('Issue Reported', 'Our team has been notified and will follow up.'); },
-    onError: () => Alert.alert('Error', 'Could not report issue. Please try again.'),
-  });
 
   const sosMutation = useMutation({
     mutationFn: (alertType: string) => api.post('/riders/sos', {
@@ -195,6 +162,8 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const isOutForDelivery = currentStatus === 'out_for_delivery';
   const isWaiting = ['confirmed', 'preparing'].includes(currentStatus);
   const currentStep = statusToStep(currentStatus);
+  const totalItems = order.items?.length || 0;
+  const allItemsChecked = totalItems === 0 || checkedItems.size === totalItems;
 
   const handleAction = () => {
     if (canPickup) { updateStatusMutation.mutate('out_for_delivery'); return; }
@@ -305,27 +274,6 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
 
-        {/* Kitchen arrival banner */}
-        {goingToKitchen && (
-          arrivedAtKitchen ? (
-            <View style={s.arrivedBanner}>
-              <CheckCircle2 size={18} color={R.green} />
-              <Text style={s.arrivedBannerText}>You've arrived at the kitchen</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={s.atKitchenBtn}
-              onPress={() => arrivedMutation.mutate()}
-              disabled={arrivedMutation.isPending}
-              activeOpacity={0.85}
-            >
-              <MapPinCheck size={18} color={R.orange} />
-              <Text style={s.atKitchenText}>I'm at the Kitchen</Text>
-              <Text style={s.atKitchenHint}>Tap when you arrive · auto-detected at 100 m</Text>
-            </TouchableOpacity>
-          )
-        )}
-
         {/* Destination card */}
         <View style={s.card}>
           <View style={s.destRow}>
@@ -392,6 +340,38 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
+        {/* Item verification checklist — appears when order is ready for pickup */}
+        {canPickup && order.items && order.items.length > 0 && (
+          <View style={s.verifyCard}>
+            <View style={s.verifyHeader}>
+              <Package size={16} color={R.orange} />
+              <Text style={s.verifyTitle}>Check items before pickup</Text>
+              <Text style={s.verifyProgress}>{checkedItems.size}/{order.items.length}</Text>
+            </View>
+            {order.items.map((item: any, idx: number) => {
+              const checked = checkedItems.has(idx);
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={[s.verifyRow, checked && s.verifyRowDone]}
+                  onPress={() => setCheckedItems(prev => {
+                    const next = new Set(prev);
+                    if (next.has(idx)) next.delete(idx); else next.add(idx);
+                    return next;
+                  })}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.checkbox, checked && s.checkboxChecked]}>
+                    {checked && <Check size={12} color={R.white} strokeWidth={3} />}
+                  </View>
+                  <Text style={[s.verifyItemQty, checked && s.verifyTextDone]}>{item.quantity}×</Text>
+                  <Text style={[s.verifyItemName, checked && s.verifyTextDone]}>{item.menu_item_name}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         {/* Customer not responding */}
         {isOutForDelivery && (
           <TouchableOpacity style={s.warnBtn} onPress={() => setShowUnreachableModal(true)} activeOpacity={0.8}>
@@ -400,26 +380,8 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         )}
 
-        {/* Report issue */}
-        <TouchableOpacity style={s.ghostBtn} onPress={() => setShowIssueModal(true)} activeOpacity={0.8}>
-          <MessageSquareWarning size={16} color={R.muted} />
-          <Text style={s.ghostBtnText}>Report an Issue</Text>
-        </TouchableOpacity>
 
-        {/* Release */}
-        {!isOutForDelivery && (
-          <TouchableOpacity
-            style={s.dangerBtn}
-            onPress={() => Alert.alert('Release Order', 'Return this order to the pool?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Release', style: 'destructive', onPress: () => unclaimMutation.mutate() },
-            ])}
-            activeOpacity={0.8}
-          >
-            <AlertTriangle size={16} color={R.red} />
-            <Text style={s.dangerBtnText}>Release Order</Text>
-          </TouchableOpacity>
-        )}
+
       </ScrollView>
 
       {/* SOS Modal */}
@@ -490,44 +452,6 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
         </View>
       </Modal>
 
-      {/* Report Issue Modal */}
-      <Modal visible={showIssueModal} transparent animationType="slide" onRequestClose={() => setShowIssueModal(false)}>
-        <View style={s.overlay}>
-          <View style={s.sheet}>
-            <View style={s.sheetHandle} />
-            <View style={s.sheetHeader}>
-              <Text style={s.sheetTitle}>Report an Issue</Text>
-              <TouchableOpacity onPress={() => setShowIssueModal(false)}>
-                <X size={22} color={R.muted} />
-              </TouchableOpacity>
-            </View>
-            {ISSUE_TYPES.map(it => (
-              <TouchableOpacity
-                key={it.key}
-                style={[s.optionRow, selectedIssue === it.key && s.optionRowSelected]}
-                onPress={() => setSelectedIssue(it.key)}
-                activeOpacity={0.8}
-              >
-                <View style={[s.optionIcon, { backgroundColor: selectedIssue === it.key ? R.redLight : R.bg }]}>
-                  <AlertTriangle size={18} color={selectedIssue === it.key ? R.red : R.muted} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.optionLabel, selectedIssue === it.key && { color: R.red }]}>{it.label}</Text>
-                  <Text style={s.optionDesc}>{it.desc}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={[s.submitBtn, (!selectedIssue || reportIssueMutation.isPending) && { opacity: 0.4 }]}
-              onPress={() => reportIssueMutation.mutate()}
-              disabled={!selectedIssue || reportIssueMutation.isPending}
-              activeOpacity={0.9}
-            >
-              <Text style={s.submitBtnText}>{reportIssueMutation.isPending ? 'Submitting…' : 'Submit Report'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* Footer action */}
       <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
@@ -538,9 +462,9 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           </View>
         ) : (
           <TouchableOpacity
-            style={[s.actionBtn, updateStatusMutation.isPending && { opacity: 0.7 }]}
+            style={[s.actionBtn, (updateStatusMutation.isPending || (canPickup && !allItemsChecked)) && { opacity: 0.45 }]}
             onPress={handleAction}
-            disabled={updateStatusMutation.isPending}
+            disabled={updateStatusMutation.isPending || (canPickup && !allItemsChecked)}
             activeOpacity={0.9}
           >
             {updateStatusMutation.isPending
@@ -548,7 +472,11 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
               : (
                 <View style={s.actionBtnRow}>
                   <Text style={s.actionBtnText}>
-                    {canPickup ? "I've Picked Up the Order" : 'Arrived at Customer'}
+                    {canPickup
+                      ? allItemsChecked
+                        ? "I've Picked Up the Order"
+                        : `Verify items (${checkedItems.size}/${totalItems})`
+                      : 'Arrived at Customer'}
                   </Text>
                   <ChevronRight size={20} color={R.white} strokeWidth={2.5} />
                 </View>
@@ -718,6 +646,29 @@ const s = StyleSheet.create({
   },
   actionBtnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   actionBtnText: { color: R.white, fontSize: 15, fontWeight: '800' },
+
+  // Item verification checklist
+  verifyCard: {
+    backgroundColor: R.white, borderRadius: 16, padding: 16, marginBottom: 12,
+    borderWidth: 1.5, borderColor: '#FFD4A8',
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  },
+  verifyHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  verifyTitle: { flex: 1, fontSize: 13, fontWeight: '800', color: R.orange, textTransform: 'uppercase', letterSpacing: 0.5 },
+  verifyProgress: { fontSize: 13, fontWeight: '800', color: R.orange },
+  verifyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: R.border,
+  },
+  verifyRowDone: { opacity: 0.6 },
+  checkbox: {
+    width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: R.border,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: R.bg,
+  },
+  checkboxChecked: { backgroundColor: R.green, borderColor: R.green },
+  verifyItemQty: { fontSize: 14, fontWeight: '800', color: R.orange, width: 28 },
+  verifyItemName: { flex: 1, fontSize: 14, fontWeight: '500', color: R.ink },
+  verifyTextDone: { textDecorationLine: 'line-through', color: R.muted },
 });
 
 export default AssignedOrderScreen;
