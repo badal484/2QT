@@ -735,8 +735,8 @@ export default function KitchenPage() {
                               </div>
                               <button
                                 onClick={() => assignRiderBatch(batch.id, [o])}
-                                disabled={!selectedRider[batch.id] || assigningId === batch.id}
-                                className="text-[9px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-lg transition-colors disabled:opacity-40"
+                                disabled={assigningId === batch.id}
+                                className="text-[9px] font-black uppercase tracking-widest bg-amber-500/20 hover:bg-amber-500/40 text-amber-500 border border-amber-500/30 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
                               >
                                 Assign Solo
                               </button>
