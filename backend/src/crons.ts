@@ -4,6 +4,8 @@ import { checkAllStockThresholds } from './services/stock.service';
 import { query, withTransaction } from './db';
 import { NotificationService } from './services/notification.service';
 import { emitToUser } from './socket';
+import { redis, keys } from './redis';
+import { haversineMetres } from './services/distance.service';
 
 export const initCrons = () => {
     console.log('Crons initialized.');
@@ -288,4 +290,131 @@ export const initCrons = () => {
             console.error('[CRON] Auto no-show cron failed:', err);
         }
     });
+
+    // --- Strict Auto-Dispatch Engine ---
+    // Runs every 30 seconds to intelligently batch and assign orders
+    let autoDispatchRunning = false;
+    setInterval(async () => {
+        if (autoDispatchRunning) return;
+        autoDispatchRunning = true;
+        try {
+            // Check if enabled
+            const { rows: settings } = await query("SELECT key, value FROM app_settings WHERE key IN ('auto_dispatch_enabled', 'max_batch_size')");
+            const enabledSetting = settings.find(s => s.key === 'auto_dispatch_enabled');
+            if (!enabledSetting || enabledSetting.value !== 'true') return;
+
+            const batchSetting = settings.find(s => s.key === 'max_batch_size');
+            const maxBatchSize = batchSetting ? parseInt(batchSetting.value, 10) || 1 : 1;
+
+            // Fetch unassigned ready orders
+            const { rows: orders } = await query(`
+                SELECT o.id, o.display_id, o.kitchen_id, o.zone_id, o.address_id,
+                       a.lat AS customer_lat, a.lng AS customer_lng, a.address_text AS delivery_address,
+                       k.lat AS kitchen_lat, k.lng AS kitchen_lng
+                FROM orders o
+                JOIN addresses a ON o.address_id = a.id
+                JOIN kitchens k ON o.kitchen_id = k.id
+                WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL
+                ORDER BY o.created_at ASC
+            `);
+
+            if (orders.length === 0) return;
+
+            // Group by Kitchen ID (batching should only happen per-kitchen)
+            const kitchens = [...new Set(orders.map(o => o.kitchen_id))];
+
+            for (const kId of kitchens) {
+                const kOrders = orders.filter(o => o.kitchen_id === kId);
+                const batches: any[] = [];
+                
+                if (maxBatchSize > 1) {
+                    for (const order of kOrders) {
+                        let placed = false;
+                        for (const batch of batches) {
+                            if (batch.orders.length < maxBatchSize) {
+                                const firstOrder = batch.orders[0];
+                                const dist = haversineMetres(
+                                    parseFloat(order.customer_lat), parseFloat(order.customer_lng),
+                                    parseFloat(firstOrder.customer_lat), parseFloat(firstOrder.customer_lng)
+                                );
+                                if (dist <= 1500) {
+                                    batch.orders.push(order);
+                                    placed = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!placed) batches.push({ orders: [order] });
+                    }
+                } else {
+                    for (const order of kOrders) { batches.push({ orders: [order] }); }
+                }
+
+                // For each batch, find the best rider
+                for (const batch of batches) {
+                    const firstOrder = batch.orders[0];
+                    const kLat = parseFloat(firstOrder.kitchen_lat);
+                    const kLng = parseFloat(firstOrder.kitchen_lng);
+
+                    // Fetch all online riders
+                    const { rows: riders } = await query(`
+                        SELECT u.id,
+                               (SELECT count(*) FROM orders o WHERE o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')) as active_count
+                        FROM users u
+                        WHERE u.role IN ('rider', 'rider_captain') AND u.is_online = true
+                    `);
+
+                    let bestRiderId = null;
+                    let bestScore = -Infinity;
+
+                    for (const rider of riders) {
+                        // For strict V1: Only assign to fully idle riders
+                        if (parseInt(rider.active_count) > 0) continue;
+
+                        const locStr = await redis.get(keys.riderLocation(rider.id));
+                        if (!locStr) continue;
+
+                        try {
+                            const loc = JSON.parse(locStr);
+                            const distFromKitchen = haversineMetres(kLat, kLng, loc.lat, loc.lng);
+                            
+                            // Base score is negative distance (closer = higher score)
+                            let score = -distFromKitchen;
+
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestRiderId = rider.id;
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (bestRiderId) {
+                        // Atomically assign the whole batch
+                        console.log(`[CRON] Auto-Assigning batch of ${batch.orders.length} to rider ${bestRiderId}`);
+                        for (const order of batch.orders) {
+                            const { rowCount } = await query(`
+                                UPDATE orders SET rider_id = $1
+                                WHERE id = $2 AND rider_id IS NULL AND status = 'ready_for_pickup'
+                            `, [bestRiderId, order.id]);
+
+                            if (rowCount > 0) {
+                                emitToUser(bestRiderId, 'order_assigned', {
+                                    orderId: order.id,
+                                    displayId: order.display_id,
+                                    assignedBy: 'system',
+                                    deliveryAddress: order.delivery_address || null,
+                                });
+                                // Legacy fallback
+                                await query('UPDATE users SET current_order_id = NULL WHERE id = $1', [bestRiderId]);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[CRON] Auto-dispatch engine error:', e);
+        } finally {
+            autoDispatchRunning = false;
+        }
+    }, 30000);
 };

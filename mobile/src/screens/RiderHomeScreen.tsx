@@ -554,20 +554,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
-      {/* ── Skipped pool banner ────────────────────────────────────────────── */}
-      {isOnline && !pendingOrder && activeOrders.length < 3 && (poolData?.orders || []).filter((o: any) => skippedIds.includes(o.id)).length > 0 && (
-        <TouchableOpacity 
-          style={{ position: 'absolute', bottom: 100, alignSelf: 'center', backgroundColor: S.ink, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 8, elevation: 6, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, zIndex: 30 }}
-          onPress={() => { skippedIdsRef.current = []; setSkippedIds([]); }}
-          activeOpacity={0.9}
-        >
-          <Text style={{ color: S.white, fontSize: 13, fontWeight: '700' }}>
-            {(poolData?.orders || []).filter((o: any) => skippedIds.includes(o.id)).length} hidden order(s) available
-          </Text>
-          <ChevronRight size={16} color={S.white} />
-        </TouchableOpacity>
-      )}
-
+      {/* Skipped pool banner removed as per True Decline logic */}
       {/* ── Incoming order notification ───────────────────────────────────── */}
       {pendingOrder && (
         <Animated.View style={[styles.notifSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] }]}>
@@ -624,7 +611,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.notifBtns}>
-              {/* Pool orders: rider can skip. Kitchen-assigned: no hiding — it's mandatory */}
+              {/* Pool orders: rider can decline. Kitchen-assigned: no hiding — it's mandatory */}
               {!pendingOrder._kitchenAssigned && (
                 <TouchableOpacity
                   style={styles.declineBtn}
@@ -634,7 +621,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.declineBtnText}>Skip</Text>
+                  <Text style={styles.declineBtnText}>Decline</Text>
                 </TouchableOpacity>
               )}
 
@@ -828,9 +815,9 @@ const styles = StyleSheet.create({
   declineBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 16, borderRadius: 14,
-    backgroundColor: 'transparent', borderWidth: 1.5, borderColor: S.border,
+    backgroundColor: S.redLight, borderWidth: 1.5, borderColor: S.red,
   },
-  declineBtnText: { color: S.muted, fontSize: 15, fontWeight: '600' },
+  declineBtnText: { color: S.red, fontSize: 15, fontWeight: '700' },
   acceptBtn: {
     flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 16, borderRadius: 14, backgroundColor: S.orange,

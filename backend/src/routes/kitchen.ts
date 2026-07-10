@@ -234,26 +234,31 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         if (status === 'preparing') {
             notificationType = 'order_preparing';
 
-            // Alert ALL online riders (no zone filter) — pool query handles zone filtering per-rider
-            emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id, status: 'preparing' });
+            const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
+            const autoDispatchEnabled = settings[0]?.value === 'true';
 
-            query(`
-                SELECT id FROM users
-                WHERE role IN ('rider', 'rider_captain')
-                  AND is_online = true
-                  AND zone_id = $1
-                  AND (SELECT COUNT(*) FROM orders WHERE rider_id = users.id AND status NOT IN ('delivered', 'cancelled')) < 3
-            `, [order.zone_id]).then(({ rows }) => {
-                if (rows.length > 0) {
-                    const riderIds = rows.map((r: any) => r.id);
-                    const { broadcastNotification } = require('../services/notification.service');
-                    broadcastNotification(
-                        riderIds,
-                        'New Delivery Request 🛵',
-                        `Order #${order.display_id} is being prepared — head to kitchen now!`
-                    ).catch(() => {});
-                }
-            }).catch(() => {});
+            if (!autoDispatchEnabled) {
+                // Alert ALL online riders (no zone filter) — pool query handles zone filtering per-rider
+                emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id, status: 'preparing' });
+
+                query(`
+                    SELECT id FROM users
+                    WHERE role IN ('rider', 'rider_captain')
+                      AND is_online = true
+                      AND zone_id = $1
+                      AND (SELECT COUNT(*) FROM orders WHERE rider_id = users.id AND status NOT IN ('delivered', 'cancelled')) < 3
+                `, [order.zone_id]).then(({ rows }) => {
+                    if (rows.length > 0) {
+                        const riderIds = rows.map((r: any) => r.id);
+                        const { broadcastNotification } = require('../services/notification.service');
+                        broadcastNotification(
+                            riderIds,
+                            'New Delivery Request 🛵',
+                            `Order #${order.display_id} is being prepared — head to kitchen now!`
+                        ).catch(() => {});
+                    }
+                }).catch(() => {});
+            }
         }
         if (status === 'ready_for_pickup') {
             notificationType = 'order_ready';
