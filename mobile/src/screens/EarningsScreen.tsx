@@ -5,11 +5,11 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, Wallet, TrendingUp, Calendar, Trophy, Zap, Clock } from 'lucide-react-native';
+import { ArrowLeft, Wallet, Trophy, Clock } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: '#FFFBEB',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
@@ -124,54 +124,6 @@ const EarningsScreen = ({ navigation }: any) => {
           </View>
         )}
 
-        {/* Daily breakdown */}
-        <View style={s.sectionHeader}>
-          <Calendar size={15} color={R.muted} />
-          <Text style={s.sectionTitle}>Daily Breakdown</Text>
-        </View>
-
-        <View style={s.listWrap}>
-          {rawEarnings.length === 0 ? (
-            <View style={s.empty}>
-              <Wallet size={40} color={R.border} />
-              <Text style={s.emptyTitle}>No earnings yet</Text>
-              <Text style={s.emptyText}>Complete deliveries to see your earnings here</Text>
-            </View>
-          ) : rawEarnings.map((day: any) => {
-            const basePaise = parseInt(day.base_earnings_paise || '0', 10);
-            const bonusPaise = parseInt(day.bonus_earnings_paise || '0', 10);
-            const total = parseInt(day.total_paise, 10);
-            return (
-              <View key={day.id} style={s.dayCard}>
-                <View style={s.dayIconWrap}>
-                  <Calendar size={16} color={R.orange} />
-                </View>
-                <View style={s.dayInfo}>
-                  <Text style={s.dayDate}>
-                    {new Date(day.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </Text>
-                  <View style={s.dayMeta}>
-                    <Zap size={11} color={R.muted} />
-                    <Text style={s.dayMetaText}>{day.deliveries_count} deliveries</Text>
-                    {bonusPaise > 0 && (
-                      <>
-                        <Text style={s.dayMetaDot}>·</Text>
-                        <Trophy size={11} color={R.amber} />
-                        <Text style={[s.dayMetaText, { color: R.amber }]}>
-                          ₹{(basePaise / 100).toFixed(0)} + ₹{(bonusPaise / 100).toFixed(0)} bonus
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                </View>
-                <View style={s.dayAmount}>
-                  <Text style={s.dayAmountText}>₹{(total / 100).toFixed(0)}</Text>
-                  <TrendingUp size={12} color={R.green} />
-                </View>
-              </View>
-            );
-          })}
-        </View>
       </ScrollView>
     </View>
   );
