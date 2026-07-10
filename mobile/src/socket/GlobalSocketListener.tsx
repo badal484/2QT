@@ -78,6 +78,10 @@ export const GlobalSocketListener: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     };
 
+    const handlePoolUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
+    };
+
     // ── Reconnect: refetch everything stale so missed events don't leave gaps ─
     const handleReconnect = () => {
       queryClient.invalidateQueries({ queryKey: ['menu'] });
@@ -111,6 +115,7 @@ export const GlobalSocketListener: React.FC = () => {
 
     socket.on('user_updated', handleUserUpdate);
     socket.on('new_notification', handleNotification);
+    socket.on('new_available_mission', handlePoolUpdate);
 
     socket.on('connect', handleReconnect);
 
@@ -135,6 +140,7 @@ export const GlobalSocketListener: React.FC = () => {
 
       socket.off('user_updated', handleUserUpdate);
       socket.off('new_notification', handleNotification);
+      socket.off('new_available_mission', handlePoolUpdate);
 
       socket.off('connect', handleReconnect);
     };

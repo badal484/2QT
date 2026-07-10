@@ -84,7 +84,7 @@ export function subscribeToForegroundMessages(
                     order_delivered:        'Order Delivered! 🎉',
                     order_cancelled:        'Order Cancelled',
                     rider_payout:           'Payment Sent! 💰',
-                    broadcast_message:      data.title ?? '2QT',
+                    broadcast_message:      data.title,
                 };
                 title = TYPE_LABELS[data.type] ?? data.title ?? '';
                 body  = data.body ?? '';
@@ -151,7 +151,7 @@ export function setupBackgroundHandler() {
                 rider_payout:           'Payment Sent! 💰',
                 broadcast_message:      data.title ?? '2QT',
             };
-            const title = TYPE_LABELS[data.type] ?? data.title ?? '2QT';
+            const title = TYPE_LABELS[data.type] ?? data.title ?? '';
             const body  = data.body ?? '';
             if (!title && !body) return; // nothing to show
 

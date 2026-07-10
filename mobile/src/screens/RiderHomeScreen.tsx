@@ -44,12 +44,14 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const insets = useSafeAreaInsets();
   const [isOnline, setIsOnline] = useState(user?.is_online || false);
+  const isOnlineRef = useRef(user?.is_online || false);
   const [currentLocation, setCurrentLocation] = useState({ latitude: 28.6139, longitude: 77.2090 });
   const [pendingOrder, setPendingOrder] = useState<any>(null);
-  const [countdown, setCountdown] = useState(15);
-  const [acceptingKA, setAcceptingKA] = useState(false);
+  const pendingOrderRef = useRef<any>(null);
+  const [acceptingKA] = useState(false);
   const [skippedIds, setSkippedIds] = useState<string[]>([]);
-  const countdownRef = useRef<any>(null);
+  const skippedIdsRef = useRef<string[]>([]);
+  const latestLocationRef = useRef({ latitude: 0, longitude: 0 });
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(400)).current;
   const queryClient = useQueryClient();
@@ -70,7 +72,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const { data: poolData } = useQuery({
     queryKey: ['rider-missions-pool'],
     queryFn: () => api.get('/riders/orders/pool'),
-    enabled: isOnline && (!activeOrderData?.orders || activeOrderData.orders.length === 0),
+    enabled: isOnline && (!activeOrderData?.orders || activeOrderData.orders.length < 3),
     refetchInterval: 5000,
   });
 
@@ -121,7 +123,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
         setCheckingIn(true);
         checkInMutation.mutate({ lat, lng });
       }
-    }, 30000);
+    }, 5000);
     return () => clearInterval(timer);
   }, [noZone, zonesData]);
 
@@ -165,7 +167,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const claimMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/riders/orders/${orderId}/claim`, {}),
     onSuccess: () => {
-      clearTimer();
       import('react-native').then(({ Vibration }) => Vibration.cancel());
       setPendingOrder(null);
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
@@ -182,66 +183,102 @@ const RiderHomeScreen = ({ navigation }: any) => {
     },
   });
 
-  const unclaimMutation = useMutation({
-    mutationFn: (orderId: string) => api.post(`/riders/orders/${orderId}/unclaim`, {}),
-    onSettled: () => {
-      hideNotification();
-      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-    },
-  });
 
-  const showNotification = (order: any, timeoutSeconds = 60) => {
+  const showNotification = (order: any) => {
+    pendingOrderRef.current = order;
     setPendingOrder(order);
-    setCountdown(timeoutSeconds);
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 70, friction: 10 }).start();
     import('react-native').then(({ Vibration }) => Vibration.vibrate([500, 500], true));
     displayLocalNotification('New Delivery Request', 'A new order is available. Tap to view.', { type: 'order_update' });
-    startTimer(order._kitchenAssigned ? order.orderId : order.id, timeoutSeconds, order._kitchenAssigned);
   };
 
   const hideNotification = () => {
+    pendingOrderRef.current = null;
     import('react-native').then(({ Vibration }) => Vibration.cancel());
     Animated.timing(slideAnim, { toValue: 400, useNativeDriver: true, duration: 250, easing: Easing.in(Easing.quad) }).start(() => setPendingOrder(null));
-    clearTimer();
   };
 
-  const startTimer = (orderId: string, seconds = 60, kitchenAssigned = false) => {
-    clearTimer();
-    let count = seconds;
-    countdownRef.current = setInterval(() => {
-      count -= 1;
-      setCountdown(count);
-      if (count <= 0) {
-        clearTimer();
-        import('react-native').then(({ Vibration }) => Vibration.cancel());
-        if (kitchenAssigned) unclaimMutation.mutate(orderId);
-        else { setSkippedIds(prev => [...prev, orderId]); hideNotification(); }
-      }
-    }, 1000);
-  };
+  // Keep isOnlineRef in sync so socket handlers always see the latest value
+  useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
 
-  const clearTimer = () => {
-    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
-  };
-
+  // Direct polling loop — bypasses React Query enabled/effect chain entirely.
+  // Runs every 4s when online; shows the alert immediately when a new order appears.
   useEffect(() => {
-    if (activeOrderFetched && activeOrders.length === 0 && !pendingOrder && pool.length > 0) {
-      showNotification(pool[0]);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poolData, activeOrders]);
+    if (!isOnline) return;
 
-  useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
-    const handler = (data: { orderId: string; displayId: string; assignedBy: string; deliveryAddress?: string }) => {
-      if (!isOnline) return;
-      showNotification({ ...data, id: data.orderId, display_id: data.displayId, delivery_address_text: data.deliveryAddress || null, _kitchenAssigned: true }, 40);
+    const checkPool = async () => {
+      if (pendingOrderRef.current) return;
+      try {
+        const data = await api.get('/riders/orders/pool');
+        queryClient.setQueryData(['rider-missions-pool'], data);
+        const orders: any[] = data?.orders || [];
+        const first = orders.find((o: any) => !skippedIdsRef.current.includes(o.id));
+        if (first) showNotification(first);
+      } catch {}
     };
-    socket.on('order_assigned', handler);
-    return () => { socket.off('order_assigned', handler); };
+
+    checkPool(); // immediate check on going online
+    const interval = setInterval(checkPool, 4000);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline]);
+
+  // Register socket listeners — retries every 200ms until the socket is ready
+  // (child effects run before parent effects, so socket may not exist yet on first render)
+  useEffect(() => {
+    let retryInterval: ReturnType<typeof setInterval> | null = null;
+
+    const missionHandler = async () => {
+      if (!isOnlineRef.current) return;
+      if (pendingOrderRef.current) return; // already showing an alert
+      try {
+        const data = await api.get('/riders/orders/pool');
+        // Update the cache so the pool UI stays consistent
+        queryClient.setQueryData(['rider-missions-pool'], data);
+        const orders: any[] = data?.orders || [];
+        const skipped: string[] = skippedIdsRef.current;
+        const first = orders.find((o: any) => !skipped.includes(o.id));
+        if (first) showNotification(first);
+      } catch {}
+    };
+
+    const assignedHandler = (data: { orderId: string; displayId: string; assignedBy: string; deliveryAddress?: string }) => {
+      if (!isOnlineRef.current) return;
+      showNotification({ ...data, id: data.orderId, display_id: data.displayId, delivery_address_text: data.deliveryAddress || null, _kitchenAssigned: true });
+    };
+
+    const register = () => {
+      const socket = getSocket();
+      if (!socket) return false;
+
+      // Off first to prevent duplicate listeners on reconnect
+      socket.off('new_available_mission', missionHandler);
+      socket.off('order_assigned', assignedHandler);
+      socket.on('new_available_mission', missionHandler);
+      socket.on('order_assigned', assignedHandler);
+      // Re-register after every reconnect
+      socket.off('connect', register);
+      socket.on('connect', register);
+      return true;
+    };
+
+    if (!register()) {
+      retryInterval = setInterval(() => {
+        if (register()) { clearInterval(retryInterval!); retryInterval = null; }
+      }, 200);
+    }
+
+    return () => {
+      if (retryInterval) clearInterval(retryInterval);
+      const socket = getSocket();
+      if (socket) {
+        socket.off('new_available_mission', missionHandler);
+        socket.off('order_assigned', assignedHandler);
+        socket.off('connect', register);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isOnline || activeOrders.length > 0) return;
@@ -271,7 +308,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     return Math.floor(base * 0.9);
   };
 
-  const latestLocationRef = useRef(currentLocation);
+
   useEffect(() => { latestLocationRef.current = currentLocation; }, [currentLocation]);
 
   useEffect(() => {
@@ -307,7 +344,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
     };
   }, [isOnline, accessToken]);
 
-  useEffect(() => () => clearTimer(), []);
 
   const todayEarnings = ((earnings?.totalPaise || 0) / 100).toFixed(0);
   const ordersToday = earnings?.deliveriesCount || 0;
@@ -394,12 +430,15 @@ const RiderHomeScreen = ({ navigation }: any) => {
         </View>
       </View>
 
+
+
+
       {/* ── No zone: head to nearest kitchen hub ─────────────────────────── */}
       {isOnline && noZone && activeOrders.length === 0 && !pendingOrder && (
         <View style={styles.zoneCard}>
           <View style={styles.zoneHeader}>
             <MapPin size={18} color={S.orange} />
-            <Text style={styles.zoneTitle}>Report to your delivery hub</Text>
+            <Text style={styles.zoneTitle}>Report to your delivery zone</Text>
           </View>
           {nearestZone ? (
             <>
@@ -424,23 +463,11 @@ const RiderHomeScreen = ({ navigation }: any) => {
                 activeOpacity={0.85}
               >
                 <Navigation size={16} color={S.white} />
-                <Text style={styles.navigateBtnText}>Navigate to Hub</Text>
+                <Text style={styles.navigateBtnText}>Navigate to Zone</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.checkInBtn, checkingIn && styles.checkInBtnDisabled]}
-                onPress={() => {
-                  if (checkingIn) return;
-                  setCheckingIn(true);
-                  checkInMutation.mutate({ lat: currentLocation.latitude, lng: currentLocation.longitude });
-                }}
-                activeOpacity={0.85}
-                disabled={checkingIn}
-              >
-                {checkingIn
-                  ? <Loader size={15} color={S.orange} />
-                  : <Text style={styles.checkInBtnText}>I'm Here — Check Me In</Text>}
-              </TouchableOpacity>
-              <Text style={styles.zoneHint}>You'll be auto-checked in once you're within {nearestZone.radius_km} km of the hub</Text>
+              <Text style={styles.zoneHint}>
+                You will be auto-assigned once you enter the zone boundary.
+              </Text>
             </>
           ) : (
             <Text style={styles.zoneDist}>Loading zone info…</Text>
@@ -509,6 +536,20 @@ const RiderHomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
+      {/* ── Skipped pool banner ────────────────────────────────────────────── */}
+      {isOnline && !pendingOrder && activeOrders.length < 3 && (poolData?.orders || []).filter((o: any) => skippedIds.includes(o.id)).length > 0 && (
+        <TouchableOpacity 
+          style={{ position: 'absolute', bottom: 100, alignSelf: 'center', backgroundColor: S.ink, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 8, elevation: 6, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, zIndex: 30 }}
+          onPress={() => { skippedIdsRef.current = []; setSkippedIds([]); }}
+          activeOpacity={0.9}
+        >
+          <Text style={{ color: S.white, fontSize: 13, fontWeight: '700' }}>
+            {(poolData?.orders || []).filter((o: any) => skippedIds.includes(o.id)).length} hidden order(s) available
+          </Text>
+          <ChevronRight size={16} color={S.white} />
+        </TouchableOpacity>
+      )}
+
       {/* ── Incoming order notification ───────────────────────────────────── */}
       {pendingOrder && (
         <Animated.View style={[styles.notifSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] }]}>
@@ -517,10 +558,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
             <Text style={styles.notifStripLabel}>
               {pendingOrder._kitchenAssigned ? '📦  Assigned by Kitchen' : '🛵  New Delivery Request'}
             </Text>
-            <View style={styles.countdownBadge}>
-              <Clock size={11} color={S.white} />
-              <Text style={styles.countdownText}>{countdown}s</Text>
-            </View>
           </View>
 
           <View style={styles.notifBody}>
@@ -557,39 +594,43 @@ const RiderHomeScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.notifBtns}>
-              <TouchableOpacity
-                style={styles.declineBtn}
-                onPress={() => {
-                  if (pendingOrder._kitchenAssigned) unclaimMutation.mutate(pendingOrder.orderId || pendingOrder.id);
-                  else { setSkippedIds(prev => [...prev, pendingOrder.id]); hideNotification(); }
-                }}
-                disabled={unclaimMutation.isPending}
-                activeOpacity={0.8}
-              >
-                <X size={18} color={S.red} />
-                <Text style={styles.declineBtnText}>Decline</Text>
-              </TouchableOpacity>
+              {/* Pool orders: rider can skip. Kitchen-assigned: no hiding — it's mandatory */}
+              {!pendingOrder._kitchenAssigned && (
+                <TouchableOpacity
+                  style={styles.declineBtn}
+                  onPress={() => {
+                    setSkippedIds(prev => { const next = [...prev, pendingOrder.id]; skippedIdsRef.current = next; return next; });
+                    hideNotification();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.declineBtnText}>Skip</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
-                style={[styles.acceptBtn, (claimMutation.isPending || acceptingKA) && { opacity: 0.6 },
-                  pendingOrder._kitchenAssigned && { backgroundColor: '#E67E22' }]}
+                style={[
+                  styles.acceptBtn,
+                  (claimMutation.isPending || acceptingKA) && { opacity: 0.6 },
+                  pendingOrder._kitchenAssigned && { backgroundColor: '#E67E22', flex: 1 },
+                ]}
                 onPress={async () => {
                   if (pendingOrder._kitchenAssigned) {
-                    clearTimer();
-                    setAcceptingKA(true);
-                    try { await api.get('/riders/orders/active'); hideNotification(); }
-                    catch { hideNotification(); queryClient.invalidateQueries({ queryKey: ['rider-active-order'] }); }
-                    finally { setAcceptingKA(false); }
+                    // Order already assigned — just acknowledge and dismiss
+                    hideNotification();
+                    queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
                   } else {
                     claimMutation.mutate(pendingOrder.id);
                   }
                 }}
-                disabled={claimMutation.isPending || unclaimMutation.isPending || acceptingKA}
+                disabled={claimMutation.isPending || acceptingKA}
                 activeOpacity={0.9}
               >
-                {acceptingKA
-                  ? <Text style={styles.acceptBtnText}>Accepting…</Text>
-                  : <><Check size={18} color={S.white} /><Text style={styles.acceptBtnText}>Accept</Text></>
+                {pendingOrder._kitchenAssigned
+                  ? <><ChevronRight size={18} color={S.white} /><Text style={styles.acceptBtnText}>Go to Order</Text></>
+                  : claimMutation.isPending
+                    ? <Text style={styles.acceptBtnText}>Claiming…</Text>
+                    : <><Check size={18} color={S.white} /><Text style={styles.acceptBtnText}>Accept</Text></>
                 }
               </TouchableOpacity>
             </View>
@@ -753,19 +794,19 @@ const styles = StyleSheet.create({
   notifField: { flex: 1 },
   notifFieldLabel: { fontSize: 10, fontWeight: '700', color: S.muted, letterSpacing: 0.8, marginBottom: 4 },
   notifFieldValue: { fontSize: 13, fontWeight: '600', color: S.ink, lineHeight: 18 },
-  notifBtns: { flexDirection: 'row', gap: 12 },
+  notifBtns: { flexDirection: 'row', gap: 10 },
   declineBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 15, borderRadius: 12,
-    backgroundColor: S.redLight, borderWidth: 1, borderColor: '#FECACA',
+    paddingVertical: 16, borderRadius: 14,
+    backgroundColor: 'transparent', borderWidth: 1.5, borderColor: S.border,
   },
-  declineBtnText: { color: S.red, fontSize: 15, fontWeight: '700' },
+  declineBtnText: { color: S.muted, fontSize: 15, fontWeight: '600' },
   acceptBtn: {
     flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 15, borderRadius: 12, backgroundColor: S.orange,
-    shadowColor: S.orange, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
+    paddingVertical: 16, borderRadius: 14, backgroundColor: S.orange,
+    shadowColor: S.orange, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
-  acceptBtnText: { color: S.white, fontSize: 15, fontWeight: '800' },
+  acceptBtnText: { color: S.white, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
 });
 
 export default RiderHomeScreen;

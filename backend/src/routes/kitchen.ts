@@ -234,12 +234,33 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         if (status === 'ready_for_pickup') {
             notificationType = 'order_ready';
             emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id }, order.zone_id);
+
+            // Also send a push notification to all online, available riders in this zone
+            query(`
+                SELECT id FROM users 
+                WHERE role IN ('rider', 'rider_captain') 
+                  AND is_online = true 
+                  AND zone_id = $1
+                  AND (SELECT COUNT(*) FROM orders WHERE rider_id = users.id AND status NOT IN ('delivered', 'cancelled')) < 3
+            `, [order.zone_id]).then(({ rows }) => {
+                if (rows.length > 0) {
+                    const riderIds = rows.map((r: any) => r.id);
+                    const { broadcastNotification } = require('../services/notification.service');
+                    broadcastNotification(
+                        riderIds,
+                        'New Delivery Request 🛵',
+                        `Order #${order.display_id} is ready for pickup! Tap to accept.`
+                    ).catch(() => {});
+                }
+            }).catch(err => console.error('[KITCHEN] Failed to send rider push:', err.message));
         }
         if (notificationType) {
             NotificationService.send(notificationType as any, {
                 userId: order.customer_id,
-                displayId: order.display_id,
-                orderId: id,
+                vars: {
+                    displayId: order.display_id,
+                    orderId: id,
+                }
             }).catch(() => {});
         }
 
