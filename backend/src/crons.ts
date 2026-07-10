@@ -118,6 +118,86 @@ export const initCrons = () => {
         }
     });
 
+    // Monday 10:00 AM IST (04:30 UTC) - Weekly rider payout
+    cron.schedule('30 4 * * 1', async () => {
+        try {
+            console.log('[CRON] Starting weekly rider payouts...');
+
+            // Compute week window: last Monday 00:00 to this Monday 00:00 IST
+            const { rows: riders } = await query(`
+                SELECT
+                    u.id AS rider_id,
+                    u.upi_id,
+                    u.bank_account_number,
+                    u.bank_ifsc,
+                    u.bank_account_name,
+                    u.payout_method,
+                    COALESCE(SUM(rde.total_paise), 0)::int AS total_earned_paise,
+                    COALESCE(paid.paid_paise, 0)::int       AS paid_paise
+                FROM users u
+                JOIN rider_daily_earnings rde ON rde.rider_id = u.id
+                LEFT JOIN (
+                    SELECT rider_id, SUM(net_amount_paise) AS paid_paise
+                    FROM weekly_payouts WHERE status = 'paid'
+                    GROUP BY rider_id
+                ) paid ON paid.rider_id = u.id
+                WHERE u.role IN ('rider', 'rider_captain')
+                GROUP BY u.id, u.upi_id, u.bank_account_number, u.bank_ifsc, u.bank_account_name, u.payout_method, paid.paid_paise
+                HAVING COALESCE(SUM(rde.total_paise), 0) - COALESCE(paid.paid_paise, 0) >= 10000
+            `);
+
+            if (riders.length === 0) {
+                console.log('[CRON] Weekly payouts: no riders with ≥₹100 pending');
+                return;
+            }
+
+            // Monday of this week (IST) as week_start; Sunday as week_end
+            const now = new Date();
+            const monday = new Date(now);
+            monday.setUTCDate(now.getUTCDate() - ((now.getUTCDay() + 6) % 7));
+            monday.setUTCHours(0, 0, 0, 0);
+            const sunday = new Date(monday);
+            sunday.setUTCDate(monday.getUTCDate() + 6);
+            const weekStart = monday.toISOString().slice(0, 10);
+            const weekEnd = sunday.toISOString().slice(0, 10);
+
+            for (const r of riders) {
+                const pending = r.total_earned_paise - r.paid_paise;
+                const hasPayoutMethod = r.payout_method === 'bank'
+                    ? !!(r.bank_account_number && r.bank_ifsc)
+                    : !!r.upi_id;
+
+                try {
+                    await query(`
+                        INSERT INTO weekly_payouts
+                          (rider_id, week_start, week_end, gross_earnings_paise, net_amount_paise, status, payout_mode, payout_method)
+                        VALUES ($1, $2, $3, $4, $4, $5, 'auto', $6)
+                        ON CONFLICT DO NOTHING
+                    `, [
+                        r.rider_id, weekStart, weekEnd, pending,
+                        hasPayoutMethod ? 'pending' : 'pending',
+                        r.payout_method || 'upi',
+                    ]);
+
+                    await NotificationService.send('broadcast_message', {
+                        userId: r.rider_id,
+                        title: 'Weekly Payout Initiated',
+                        body: `₹${(pending / 100).toFixed(0)} payout for this week is being processed${hasPayoutMethod ? '' : '. Add your UPI/bank details to receive it'}.`,
+                        screen: 'Payouts',
+                    }).catch(() => {});
+
+                    console.log(`[CRON] Payout created for rider ${r.rider_id}: ₹${(pending / 100).toFixed(0)} via ${r.payout_method}`);
+                } catch (innerErr) {
+                    console.error(`[CRON] Payout failed for rider ${r.rider_id}:`, innerErr);
+                }
+            }
+
+            console.log(`[CRON] Weekly payouts done: ${riders.length} riders processed`);
+        } catch (err) {
+            console.error('[CRON] Weekly payout cron failed:', err);
+        }
+    });
+
     // Every 15 mins - Auto mark no-show for confirmed bookings whose slot has ended
     cron.schedule('*/15 * * * *', async () => {
         try {

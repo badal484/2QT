@@ -551,17 +551,22 @@ router.get('/payouts', authenticate, requireRole('rider', 'rider_captain', 'supe
             query('SELECT * FROM weekly_payouts WHERE rider_id = $1 ORDER BY week_start DESC', [riderId]),
             query('SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]),
             query(`SELECT COALESCE(SUM(net_amount_paise), 0) as paid FROM weekly_payouts WHERE rider_id = $1 AND status = 'paid'`, [riderId]),
-            query('SELECT upi_id FROM users WHERE id = $1', [riderId]),
+            query('SELECT upi_id, bank_account_number, bank_ifsc, bank_account_name, payout_method FROM users WHERE id = $1', [riderId]),
             query('SELECT deliveries_count, total_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE', [riderId]),
         ]);
 
         const pendingAmountPaise = Math.max(0, parseInt(earningsRes.rows[0].total) - parseInt(paidRes.rows[0].paid));
         const today = todayRes.rows[0] || { deliveries_count: 0, total_paise: 0 };
+        const profile = profileRes.rows[0] || {};
 
         res.json({
             payouts: payoutsRes.rows,
             pendingAmountPaise,
-            storedUpiId: profileRes.rows[0]?.upi_id || null,
+            storedUpiId: profile.upi_id || null,
+            bankAccountNumber: profile.bank_account_number || null,
+            bankIfsc: profile.bank_ifsc || null,
+            bankAccountName: profile.bank_account_name || null,
+            payoutMethod: profile.payout_method || 'upi',
             todayDeliveries: parseInt(today.deliveries_count),
             todayEarningsPaise: parseInt(today.total_paise),
         });
@@ -1314,20 +1319,37 @@ router.get('/missions/daily', authenticate, requireRole('rider', 'rider_captain'
     }
 });
 
-// Rider saves their UPI ID for daily auto-payout
+// Rider saves their UPI ID for weekly auto-payout
 router.patch('/upi', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const { upiId } = req.body as { upiId: string };
     if (!upiId?.trim()) return res.status(400).json({ error: 'upiId required' });
     const riderId = req.user!.userId;
     try {
-        // Clear stored fund account so it gets recreated with new UPI
         await query(
-            `UPDATE users SET upi_id = $1, razorpay_fund_account_id = NULL WHERE id = $2`,
+            `UPDATE users SET upi_id = $1, payout_method = 'upi', razorpay_fund_account_id = NULL WHERE id = $2`,
             [upiId.trim(), riderId]
         );
-        res.json({ success: true, message: 'UPI saved — daily auto-payout enabled' });
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Failed to save UPI' });
+    }
+});
+
+// Rider saves bank account for weekly auto-payout
+router.patch('/bank-account', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { accountNumber, ifsc, accountName } = req.body as { accountNumber: string; ifsc: string; accountName: string };
+    if (!accountNumber?.trim() || !ifsc?.trim() || !accountName?.trim()) {
+        return res.status(400).json({ error: 'accountNumber, ifsc and accountName are required' });
+    }
+    const riderId = req.user!.userId;
+    try {
+        await query(
+            `UPDATE users SET bank_account_number = $1, bank_ifsc = $2, bank_account_name = $3, payout_method = 'bank', razorpay_fund_account_id = NULL WHERE id = $4`,
+            [accountNumber.trim(), ifsc.trim().toUpperCase(), accountName.trim(), riderId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save bank account' });
     }
 });
 

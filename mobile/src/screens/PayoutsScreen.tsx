@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, ActivityIndicator,
   Alert, StatusBar, StyleSheet, TextInput,
@@ -6,13 +6,13 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
-  ArrowLeft, Zap, CheckCircle, Clock, ArrowUpRight,
-  ShieldCheck, AlertCircle, Pencil,
+  ArrowLeft, CheckCircle, Clock, ShieldCheck, AlertCircle,
+  Pencil, Building2, Smartphone,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
   purple: '#8B5CF6', purpleLight: 'rgba(139,92,246,0.1)',
@@ -20,37 +20,52 @@ const R = {
   border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
 };
 
+type PayoutTab = 'bank' | 'upi';
+
 const PayoutsScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<PayoutTab>('bank');
+  const [editing, setEditing] = useState(false);
+
+  // Bank fields
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifsc, setIfsc] = useState('');
+  const [accountName, setAccountName] = useState('');
+
+  // UPI field
   const [upiInput, setUpiInput] = useState('');
-  const [editingUpi, setEditingUpi] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['rider-payouts-history'],
     queryFn: () => api.get('/riders/payouts'),
   });
 
+  // Sync tab to stored payout method once loaded
+  useEffect(() => {
+    if (data?.payoutMethod) {
+      setActiveTab(data.payoutMethod === 'bank' ? 'bank' : 'upi');
+    }
+  }, [data?.payoutMethod]);
+
+  const saveBankMutation = useMutation({
+    mutationFn: () => api.patch('/riders/bank-account', { accountNumber, ifsc, accountName }),
+    onSuccess: () => {
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
+      Alert.alert('Bank Account Saved', 'Earnings will be transferred to your bank every Monday at 10 AM.');
+    },
+    onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message || 'Could not save bank account'),
+  });
+
   const saveUpiMutation = useMutation({
     mutationFn: () => api.patch('/riders/upi', { upiId: upiInput.trim() }),
     onSuccess: () => {
-      setEditingUpi(false);
+      setEditing(false);
       setUpiInput('');
       queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
-      Alert.alert('UPI Saved!', 'Your earnings will be automatically transferred to this UPI every night at 11:45 PM.');
+      Alert.alert('UPI Saved', 'Earnings will be transferred to your UPI every Monday at 10 AM.');
     },
-    onError: (err: any) => Alert.alert('Error', err.message || 'Could not save UPI'),
-  });
-
-  const requestMutation = useMutation({
-    mutationFn: () => api.post('/riders/payouts/request', {
-      amountPaise: data?.pendingAmountPaise,
-      upiId: data?.storedUpiId || upiInput.trim(),
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
-      Alert.alert('Request Sent', 'Finance will process your settlement.');
-    },
-    onError: (err: any) => Alert.alert('Failed', err.response?.data?.message || err.message || 'Try again'),
+    onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message || 'Could not save UPI'),
   });
 
   if (isLoading) {
@@ -61,12 +76,46 @@ const PayoutsScreen = ({ navigation }: any) => {
     );
   }
 
-  const pendingPaise  = data?.pendingAmountPaise || 0;
-  const storedUpi     = data?.storedUpiId as string | null;
-  const todayPaise    = data?.todayEarningsPaise || 0;
-  const todayOrders   = data?.todayDeliveries || 0;
-  const canRequest    = pendingPaise >= 10000;
-  const autoPayActive = !!storedUpi;
+  const pendingPaise = data?.pendingAmountPaise || 0;
+  const todayPaise   = data?.todayEarningsPaise || 0;
+  const todayOrders  = data?.todayDeliveries || 0;
+  const payoutMethod = data?.payoutMethod || 'upi';
+
+  const storedUpi    = data?.storedUpiId as string | null;
+  const storedBank   = data?.bankAccountNumber as string | null;
+  const storedIfsc   = data?.bankIfsc as string | null;
+  const storedName   = data?.bankAccountName as string | null;
+
+  const hasBank = !!(storedBank && storedIfsc);
+  const hasUpi  = !!storedUpi;
+  const autoPayActive = payoutMethod === 'bank' ? hasBank : hasUpi;
+
+  const isSaving = saveBankMutation.isPending || saveUpiMutation.isPending;
+
+  const handleSave = () => {
+    if (activeTab === 'bank') {
+      if (!accountNumber.trim()) return Alert.alert('Required', 'Enter account number');
+      if (!ifsc.trim()) return Alert.alert('Required', 'Enter IFSC code');
+      if (!accountName.trim()) return Alert.alert('Required', 'Enter account holder name');
+      saveBankMutation.mutate();
+    } else {
+      if (!upiInput.trim()) return Alert.alert('Required', 'Enter your UPI ID');
+      saveUpiMutation.mutate();
+    }
+  };
+
+  const startEditing = () => {
+    if (activeTab === 'bank') {
+      setAccountNumber(storedBank || '');
+      setIfsc(storedIfsc || '');
+      setAccountName(storedName || '');
+    } else {
+      setUpiInput(storedUpi || '');
+    }
+    setEditing(true);
+  };
+
+  const currentSaved = activeTab === 'bank' ? hasBank : hasUpi;
 
   return (
     <View style={{ flex: 1, backgroundColor: R.bg }}>
@@ -111,105 +160,181 @@ const PayoutsScreen = ({ navigation }: any) => {
                 : <Clock size={14} color={R.muted} />
               }
               <Text style={[styles.scheduleText, autoPayActive && { color: R.green }]}>
-                {autoPayActive ? 'AUTO-PAY ACTIVE · Every night 11:45 PM' : 'Set UPI below to enable daily auto-pay'}
+                {autoPayActive
+                  ? `AUTO-PAY ACTIVE · Every Monday 10 AM`
+                  : 'Set payout method below to enable weekly auto-pay'}
               </Text>
             </View>
           </View>
 
-          {/* Auto-pay UPI setup */}
+          {/* Payout method card */}
           <View style={[styles.card, { borderColor: autoPayActive ? '#B7E8D7' : '#FDE68A' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={[styles.iconWrap, { backgroundColor: autoPayActive ? R.greenLight : R.amberLight }]}>
-                  <Zap size={16} color={autoPayActive ? R.green : R.amber} />
-                </View>
-                <Text style={styles.sectionTitle}>
-                  {autoPayActive ? 'Daily Auto-Pay' : 'Enable Daily Auto-Pay'}
-                </Text>
-              </View>
-              {autoPayActive && !editingUpi && (
-                <TouchableOpacity onPress={() => { setEditingUpi(true); setUpiInput(storedUpi || ''); }} activeOpacity={0.7}>
-                  <Pencil size={16} color={R.muted} />
-                </TouchableOpacity>
-              )}
+
+            {/* Tab switcher */}
+            <View style={styles.tabRow}>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'bank' && styles.tabActive]}
+                onPress={() => { setActiveTab('bank'); setEditing(false); }}
+                activeOpacity={0.8}
+              >
+                <Building2 size={14} color={activeTab === 'bank' ? R.white : R.muted} />
+                <Text style={[styles.tabText, activeTab === 'bank' && styles.tabTextActive]}>Bank Account</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'upi' && styles.tabActive]}
+                onPress={() => { setActiveTab('upi'); setEditing(false); }}
+                activeOpacity={0.8}
+              >
+                <Smartphone size={14} color={activeTab === 'upi' ? R.white : R.muted} />
+                <Text style={[styles.tabText, activeTab === 'upi' && styles.tabTextActive]}>UPI</Text>
+              </TouchableOpacity>
             </View>
 
-            {autoPayActive && !editingUpi ? (
-              <>
-                <View style={styles.upiDisplay}>
-                  <CheckCircle size={16} color={R.green} />
-                  <Text style={styles.upiDisplayText}>{storedUpi}</Text>
-                </View>
-                <Text style={styles.upiHint}>Your today's earnings will be transferred here at 11:45 PM every night</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.upiHint}>
-                  {editingUpi ? 'Enter new UPI ID to update:' : 'Enter your UPI ID once — we transfer earnings automatically every night:'}
-                </Text>
-                <TextInput
-                  style={styles.upiInput}
-                  placeholder="yourname@upi"
-                  placeholderTextColor={R.muted}
-                  value={upiInput}
-                  onChangeText={setUpiInput}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  {editingUpi && (
-                    <TouchableOpacity
-                      onPress={() => setEditingUpi(false)}
-                      style={[styles.saveBtn, { flex: 1, backgroundColor: R.bg, borderWidth: 1, borderColor: R.border }]}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.saveBtnText, { color: R.muted }]}>Cancel</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (!upiInput.trim()) return Alert.alert('Required', 'Enter your UPI ID');
-                      saveUpiMutation.mutate();
-                    }}
-                    style={[styles.saveBtn, { flex: 2, backgroundColor: R.orange, opacity: saveUpiMutation.isPending ? 0.6 : 1 }]}
-                    disabled={saveUpiMutation.isPending}
-                    activeOpacity={0.88}
-                  >
-                    {saveUpiMutation.isPending
-                      ? <ActivityIndicator size="small" color={R.white} />
-                      : <Text style={styles.saveBtnText}>Save & Activate Auto-Pay</Text>
-                    }
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+            <View style={{ marginTop: 16 }}>
+              {activeTab === 'bank' ? (
+                /* Bank tab */
+                currentSaved && !editing ? (
+                  <>
+                    <View style={styles.savedRow}>
+                      <CheckCircle size={16} color={R.green} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.savedName}>{storedName}</Text>
+                        <Text style={styles.savedDetail}>{'•'.repeat(8) + (storedBank?.slice(-4) || '')}</Text>
+                        <Text style={styles.savedDetail}>{storedIfsc}</Text>
+                      </View>
+                      <TouchableOpacity onPress={startEditing} activeOpacity={0.7}>
+                        <Pencil size={16} color={R.muted} />
+                      </TouchableOpacity>
+                    </View>
+                    {payoutMethod !== 'bank' && (
+                      <TouchableOpacity
+                        onPress={() => saveBankMutation.mutate()}
+                        style={[styles.saveBtn, { backgroundColor: R.green, marginTop: 12 }]}
+                        activeOpacity={0.88}
+                      >
+                        <Text style={styles.saveBtnText}>Use Bank for Payouts</Text>
+                      </TouchableOpacity>
+                    )}
+                    <Text style={styles.hint}>Weekly transfer every Monday 10 AM</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.hint}>
+                      {editing ? 'Update bank account details:' : 'Enter your bank details for weekly salary-style payouts:'}
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Account Holder Name"
+                      placeholderTextColor={R.muted}
+                      value={accountName}
+                      onChangeText={setAccountName}
+                      autoCapitalize="words"
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Account Number"
+                      placeholderTextColor={R.muted}
+                      value={accountNumber}
+                      onChangeText={setAccountNumber}
+                      keyboardType="numeric"
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="IFSC Code (e.g. SBIN0001234)"
+                      placeholderTextColor={R.muted}
+                      value={ifsc}
+                      onChangeText={(t) => setIfsc(t.toUpperCase())}
+                      autoCapitalize="characters"
+                    />
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      {editing && (
+                        <TouchableOpacity
+                          onPress={() => setEditing(false)}
+                          style={[styles.saveBtn, { flex: 1, backgroundColor: R.bg, borderWidth: 1, borderColor: R.border }]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.saveBtnText, { color: R.muted }]}>Cancel</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        onPress={handleSave}
+                        style={[styles.saveBtn, { flex: 2, backgroundColor: R.orange, opacity: isSaving ? 0.6 : 1 }]}
+                        disabled={isSaving}
+                        activeOpacity={0.88}
+                      >
+                        {isSaving
+                          ? <ActivityIndicator size="small" color={R.white} />
+                          : <Text style={styles.saveBtnText}>Save Bank Account</Text>
+                        }
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )
+              ) : (
+                /* UPI tab */
+                currentSaved && !editing ? (
+                  <>
+                    <View style={styles.savedRow}>
+                      <CheckCircle size={16} color={R.green} />
+                      <Text style={[styles.savedName, { flex: 1, fontFamily: 'monospace' }]}>{storedUpi}</Text>
+                      <TouchableOpacity onPress={startEditing} activeOpacity={0.7}>
+                        <Pencil size={16} color={R.muted} />
+                      </TouchableOpacity>
+                    </View>
+                    {payoutMethod !== 'upi' && (
+                      <TouchableOpacity
+                        onPress={() => saveUpiMutation.mutate()}
+                        style={[styles.saveBtn, { backgroundColor: R.green, marginTop: 12 }]}
+                        activeOpacity={0.88}
+                      >
+                        <Text style={styles.saveBtnText}>Use UPI for Payouts</Text>
+                      </TouchableOpacity>
+                    )}
+                    <Text style={styles.hint}>Weekly transfer every Monday 10 AM</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.hint}>
+                      {editing ? 'Enter new UPI ID:' : 'Enter your UPI ID for weekly auto-payouts:'}
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="yourname@upi"
+                      placeholderTextColor={R.muted}
+                      value={upiInput}
+                      onChangeText={setUpiInput}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                    />
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      {editing && (
+                        <TouchableOpacity
+                          onPress={() => setEditing(false)}
+                          style={[styles.saveBtn, { flex: 1, backgroundColor: R.bg, borderWidth: 1, borderColor: R.border }]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.saveBtnText, { color: R.muted }]}>Cancel</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        onPress={handleSave}
+                        style={[styles.saveBtn, { flex: 2, backgroundColor: R.orange, opacity: isSaving ? 0.6 : 1 }]}
+                        disabled={isSaving}
+                        activeOpacity={0.88}
+                      >
+                        {isSaving
+                          ? <ActivityIndicator size="small" color={R.white} />
+                          : <Text style={styles.saveBtnText}>Save UPI</Text>
+                        }
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )
+              )}
+            </View>
           </View>
 
-          {/* Manual request */}
-          {canRequest && (
-            <TouchableOpacity
-              onPress={() => {
-                const upi = storedUpi || upiInput.trim();
-                if (!upi) return Alert.alert('UPI Required', 'Set your UPI above first');
-                Alert.alert(
-                  'Request Manual Payout',
-                  `Request ₹${(pendingPaise / 100).toFixed(0)} to ${upi}?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Request', onPress: () => requestMutation.mutate() },
-                  ]
-                );
-              }}
-              style={[styles.manualBtn, requestMutation.isPending && { opacity: 0.6 }]}
-              disabled={requestMutation.isPending}
-              activeOpacity={0.85}
-            >
-              <ArrowUpRight size={16} color={R.orange} />
-              <Text style={styles.manualBtnText}>Request Manual Payout</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* History header */}
+          {/* Payout history header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
             <ShieldCheck size={14} color={R.orange} />
             <Text style={[styles.sectionTitle, { color: R.orange }]}>PAYOUT HISTORY</Text>
@@ -218,12 +343,14 @@ const PayoutsScreen = ({ navigation }: any) => {
           {(!data?.payouts || data.payouts.length === 0) ? (
             <View style={styles.emptyCard}>
               <AlertCircle size={32} color={R.muted} />
-              <Text style={styles.emptyText}>No payouts recorded yet</Text>
+              <Text style={styles.emptyText}>No payouts yet</Text>
+              <Text style={styles.emptyHint}>First payout runs Monday 10 AM</Text>
             </View>
           ) : (
             data.payouts.map((p: any) => {
               const isPaid = p.status === 'paid';
               const isAuto = p.payout_mode === 'auto';
+              const method = p.payout_method || 'upi';
               return (
                 <View key={p.id} style={styles.payoutRow}>
                   <View style={[styles.payoutIcon, { backgroundColor: isPaid ? R.greenLight : R.orangeLight }]}>
@@ -244,6 +371,11 @@ const PayoutsScreen = ({ navigation }: any) => {
                           <Text style={[styles.badgeText, { color: R.purple }]}>AUTO</Text>
                         </View>
                       )}
+                      <View style={[styles.badge, { backgroundColor: R.bg }]}>
+                        <Text style={[styles.badgeText, { color: R.muted }]}>
+                          {method === 'bank' ? 'BANK' : 'UPI'}
+                        </Text>
+                      </View>
                       {p.utr_number && (
                         <Text style={styles.utrText}>UTR: {p.utr_number}</Text>
                       )}
@@ -293,37 +425,45 @@ const styles = StyleSheet.create({
   },
   scheduleText: { color: R.muted, fontSize: 10, fontWeight: '700', flex: 1 },
 
-  iconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  sectionTitle: { color: R.ink, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
-  upiDisplay: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+  tabRow: {
+    flexDirection: 'row', gap: 8,
+    backgroundColor: R.bg, borderRadius: 14, padding: 4,
+    borderWidth: 1, borderColor: R.border,
+  },
+  tab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, borderRadius: 10,
+  },
+  tabActive: { backgroundColor: R.orange },
+  tabText: { fontSize: 12, fontWeight: '800', color: R.muted },
+  tabTextActive: { color: R.white },
+
+  savedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: R.greenLight, borderRadius: 12, padding: 14, marginBottom: 10,
     borderWidth: 1, borderColor: '#B7E8D7',
   },
-  upiDisplayText: { color: R.green, fontWeight: '800', fontSize: 14, fontFamily: 'monospace' },
-  upiHint: { color: R.gray, fontSize: 12, lineHeight: 18, marginBottom: 14 },
-  upiInput: {
+  savedName: { color: R.green, fontWeight: '800', fontSize: 14 },
+  savedDetail: { color: R.green, fontSize: 12, fontWeight: '600', opacity: 0.8, marginTop: 2 },
+
+  sectionTitle: { color: R.ink, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
+  hint: { color: R.gray, fontSize: 12, lineHeight: 18, marginBottom: 14 },
+  input: {
     backgroundColor: R.bg, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
     color: R.ink, fontSize: 15, fontWeight: '700',
-    borderWidth: 1, borderColor: R.border, marginBottom: 14,
+    borderWidth: 1, borderColor: R.border, marginBottom: 12,
   },
   saveBtn: {
     borderRadius: 14, paddingVertical: 15, alignItems: 'center', justifyContent: 'center',
   },
   saveBtnText: { color: R.white, fontWeight: '900', fontSize: 13 },
 
-  manualBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: R.orangeLight, borderRadius: 14, paddingVertical: 14,
-    borderWidth: 1, borderColor: '#FDDBB4',
-  },
-  manualBtnText: { color: R.orange, fontWeight: '700', fontSize: 13 },
-
   emptyCard: {
     backgroundColor: R.white, borderRadius: 20, paddingVertical: 48,
-    alignItems: 'center', gap: 10, borderWidth: 1, borderColor: R.border,
+    alignItems: 'center', gap: 8, borderWidth: 1, borderColor: R.border,
   },
   emptyText: { color: R.muted, fontWeight: '700', fontSize: 13 },
+  emptyHint: { color: R.muted, fontSize: 11 },
 
   payoutRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
