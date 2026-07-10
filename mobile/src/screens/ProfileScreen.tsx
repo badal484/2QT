@@ -585,6 +585,29 @@ const styles = StyleSheet.create({
   perfVal: { fontSize: 15, fontWeight: '800' },
   perfLabel: { fontSize: 10, color: '#93959F', fontWeight: '600' },
   perfDivider: { width: 1, height: 32, backgroundColor: '#E9E9EB' },
+  referralBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    padding: 16,
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  referralIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1BA672',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  referralTexts: { flex: 1 },
+  referralTitle: { fontSize: 16, fontWeight: '800', color: '#1BA672', marginBottom: 2 },
+  referralSub: { fontSize: 12, color: '#333333', fontWeight: '500' },
 });
 
 export default ProfileScreen;
+

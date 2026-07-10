@@ -15,7 +15,8 @@ router.get('/mine', authenticate, async (req: AuthRequest, res) => {
     // Single JOIN+aggregation replaces the N+1 correlated subquery per order
     const { rows } = await query(
         `SELECT o.*, a.address_text as delivery_address_text,
-                COALESCE(agg.items, '[]'::json) as items
+                COALESCE(agg.items, '[]'::json) as items,
+                EXISTS(SELECT 1 FROM order_feedback f WHERE f.order_id = o.id) as has_feedback
          FROM orders o
          LEFT JOIN addresses a ON o.address_id = a.id
          LEFT JOIN LATERAL (

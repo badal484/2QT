@@ -215,7 +215,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                                 : <Download size={18} color={colors.primary} />
                               }
                             </BouncingButton>
-                            {!order.food_rating && (
+                            {!order.food_rating && !order.has_feedback && (
                               <BouncingButton
                                 style={[styles.invoiceIconBtn, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}
                                 onPress={() => {
