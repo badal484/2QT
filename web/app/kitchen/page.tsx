@@ -728,7 +728,20 @@ export default function KitchenPage() {
                       
                       {batch.orders.map(o => (
                         <div key={o.id} className={`mb-3 ${isBatch ? 'pb-3 border-b border-white/5' : ''}`}>
-                          {isBatch && <div className="text-white font-bold text-sm mb-1.5 flex items-center gap-2"><span className="text-zinc-500">#{o.display_id}</span> {o.customer_name}</div>}
+                          {isBatch && (
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="text-white font-bold text-sm flex items-center gap-2">
+                                <span className="text-zinc-500">#{o.display_id}</span> {o.customer_name}
+                              </div>
+                              <button
+                                onClick={() => assignRiderBatch(batch.id, [o])}
+                                disabled={!selectedRider[batch.id] || assigningId === batch.id}
+                                className="text-[9px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-lg transition-colors disabled:opacity-40"
+                              >
+                                Assign Solo
+                              </button>
+                            </div>
+                          )}
                           <div className="flex items-start gap-1 text-zinc-500 text-xs mb-2">
                             <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
                             <span className="line-clamp-2">{o.delivery_address}</span>
