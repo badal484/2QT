@@ -26,8 +26,8 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 const S = {
-  orange: '#FC8019',
-  orangeLight: '#FFF3E8',
+  orange: '#FC4603',
+  orangeLight: '#FFF0E8',
   green: '#1BA672',
   greenLight: '#E8F8F1',
   red: '#EF4444',
@@ -571,6 +571,18 @@ const RiderHomeScreen = ({ navigation }: any) => {
           <View style={styles.notifBody}>
             <Text style={styles.notifOrderId}>{pendingOrder.display_id || pendingOrder.displayId}</Text>
 
+            {/* Items preview */}
+            {pendingOrder.items && pendingOrder.items.length > 0 && (
+              <View style={styles.notifItemsWrap}>
+                {pendingOrder.items.map((item: any, i: number) => (
+                  <View key={i} style={styles.notifItemChip}>
+                    <Text style={styles.notifItemChipQty}>{item.quantity}×</Text>
+                    <Text style={styles.notifItemChipName}>{item.menu_item_name}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* Prep time ETA row */}
             {pendingOrder.estimated_ready_at && (() => {
               const minsLeft = Math.max(0, Math.round((new Date(pendingOrder.estimated_ready_at).getTime() - Date.now()) / 60000));
@@ -815,6 +827,15 @@ const styles = StyleSheet.create({
     shadowColor: S.orange, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
   acceptBtnText: { color: S.white, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
+
+  notifItemsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  notifItemChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: S.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: S.border,
+  },
+  notifItemChipQty: { fontSize: 12, fontWeight: '800', color: S.orange },
+  notifItemChipName: { fontSize: 12, fontWeight: '600', color: S.ink },
 });
 
 export default RiderHomeScreen;
