@@ -83,6 +83,9 @@ const ZoneSchema = z.object({
     max_orders_per_hour: z.number().int().positive().optional().default(60),
     realistic_delivery_minutes: z.number().int().positive().optional().default(30),
     polygon_points: z.array(z.object({ lat: z.number(), lng: z.number() })).optional().nullable(),
+    rider_base_pay_paise: z.number().int().nonnegative().optional().default(2000),
+    rider_per_km_paise: z.number().int().nonnegative().optional().default(500),
+    rider_free_km: z.number().nonnegative().optional().default(2.0),
 });
 
 const imagekit = new ImageKit({
@@ -1190,15 +1193,17 @@ router.post('/zones', authenticate, requireRole('super_admin', 'admin'), validat
             delivery_fee_base_paise, opening_time, closing_time,
             max_orders_per_hour, realistic_delivery_minutes, polygon_points,
             delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise,
-            base_distance_km, free_delivery_above_paise, surge_multiplier } = req.body;
+            base_distance_km, free_delivery_above_paise, surge_multiplier,
+            rider_base_pay_paise, rider_per_km_paise, rider_free_km } = req.body;
     try {
         const { rows } = await query(`
             INSERT INTO zones (name, city, kitchen_lat, kitchen_lng, radius_km,
                 delivery_fee_base_paise, opening_time, closing_time,
                 max_orders_per_hour, realistic_delivery_minutes, polygon_points,
                 delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise,
-                base_distance_km, free_delivery_above_paise, surge_multiplier)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                base_distance_km, free_delivery_above_paise, surge_multiplier,
+                rider_base_pay_paise, rider_per_km_paise, rider_free_km)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
             RETURNING *
         `, [name, city, kitchen_lat, kitchen_lng, radius_km,
             base_delivery_fee_paise ?? delivery_fee_base_paise ?? 2500, opening_time, closing_time,
@@ -1209,7 +1214,10 @@ router.post('/zones', authenticate, requireRole('super_admin', 'admin'), validat
             per_km_fee_paise ?? 500,
             base_distance_km ?? 0,
             free_delivery_above_paise ?? null,
-            surge_multiplier ?? 1.0]);
+            surge_multiplier ?? 1.0,
+            rider_base_pay_paise ?? 2000,
+            rider_per_km_paise ?? 500,
+            rider_free_km ?? 2.0]);
         emitToAll('zone_updated', { action: 'create', zoneId: rows[0].id });
         res.status(201).json({ zone: rows[0] });
     } catch (err: any) {
@@ -1226,7 +1234,8 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
         kitchen_lat, kitchen_lng,
         delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise, base_distance_km,
         free_delivery_above_paise, surge_multiplier,
-        min_order_paise, small_order_fee_paise
+        min_order_paise, small_order_fee_paise,
+        rider_base_pay_paise, rider_per_km_paise, rider_free_km
     } = req.body;
 
     // Auto-compute zone center from polygon centroid when polygon changes
@@ -1261,6 +1270,9 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
                 surge_multiplier = COALESCE($20, surge_multiplier),
                 min_order_paise = COALESCE($21, min_order_paise),
                 small_order_fee_paise = COALESCE($22, small_order_fee_paise),
+                rider_base_pay_paise = COALESCE($23, rider_base_pay_paise),
+                rider_per_km_paise = COALESCE($24, rider_per_km_paise),
+                rider_free_km = COALESCE($25, rider_free_km),
                 updated_at = NOW()
             WHERE id = $12
             RETURNING *
@@ -1271,7 +1283,8 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
             computedKitchenLat ?? null, computedKitchenLng ?? null,
             delivery_fee_type ?? null, base_delivery_fee_paise ?? null, per_km_fee_paise ?? null,
             base_distance_km ?? null, free_delivery_above_paise ?? null, surge_multiplier ?? null,
-            min_order_paise ?? null, small_order_fee_paise ?? null]);
+            min_order_paise ?? null, small_order_fee_paise ?? null,
+            rider_base_pay_paise ?? null, rider_per_km_paise ?? null, rider_free_km ?? null]);
         if (rows.length === 0) return res.status(404).json({ error: 'ZONE_NOT_FOUND' });
 
         // Sync kitchen lat/lng to the new zone center so maps show the correct spot

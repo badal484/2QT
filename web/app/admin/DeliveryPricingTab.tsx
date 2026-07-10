@@ -49,6 +49,9 @@ export function DeliveryPricingTab() {
       surge_enabled: zone.surge_enabled,
       min_order_paise: zone.min_order_paise ?? "",
       small_order_fee_paise: zone.small_order_fee_paise ?? "",
+      rider_base_pay_paise: zone.rider_base_pay_paise ?? 2000,
+      rider_per_km_paise: zone.rider_per_km_paise ?? 500,
+      rider_free_km: zone.rider_free_km ?? 2.0,
     });
     loadTiers(zone.id);
   };
@@ -68,6 +71,9 @@ export function DeliveryPricingTab() {
         surge_enabled: form.surge_enabled,
         min_order_paise: form.min_order_paise !== "" ? parseInt(form.min_order_paise, 10) : 0,
         small_order_fee_paise: form.small_order_fee_paise !== "" ? parseInt(form.small_order_fee_paise, 10) : 0,
+        rider_base_pay_paise: parseInt(form.rider_base_pay_paise || "2000", 10),
+        rider_per_km_paise: parseInt(form.rider_per_km_paise || "500", 10),
+        rider_free_km: parseFloat(form.rider_free_km || "2.0"),
       });
       setEditing(null);
       load();
@@ -214,6 +220,21 @@ export function DeliveryPricingTab() {
 
                     <div className="border-t border-white/5" />
 
+                    {/* ── Rider Earnings ── */}
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-3">Rider Earnings</div>
+                      <div className="grid grid-cols-3 gap-4">
+                        {field("Base Pay (paise)", "rider_base_pay_paise", "number", "e.g. 2000 = ₹20")}
+                        {field("Per KM Rate (paise)", "rider_per_km_paise", "number", "e.g. 500 = ₹5/km")}
+                        {field("Free KM Included", "rider_free_km", "number", "e.g. 2.0")}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-2">
+                        Rider earns base pay + (distance − free km) × per-km rate. 10% platform fee deducted. Road distance used when available, haversine fallback.
+                      </p>
+                    </div>
+
+                    <div className="border-t border-white/5" />
+
                     {/* ── Delivery fee tiers ── */}
                     <div>
                       <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-3">
@@ -279,6 +300,8 @@ export function DeliveryPricingTab() {
                       { label: "Surge", value: `${zone.surge_multiplier || 1.0}x`, icon: Percent },
                       { label: "Min Order", value: zone.min_order_paise ? `₹${zone.min_order_paise / 100}` : "None", icon: DollarSign },
                       { label: "Small Order Fee", value: zone.small_order_fee_paise ? `₹${zone.small_order_fee_paise / 100}` : "None", icon: DollarSign },
+                      { label: "Rider Base Pay", value: `₹${(zone.rider_base_pay_paise ?? 2000) / 100}`, icon: Bike },
+                      { label: "Rider /km", value: `₹${(zone.rider_per_km_paise ?? 500) / 100}/km after ${zone.rider_free_km ?? 2}km`, icon: Bike },
                     ].map(({ label, value, icon: Icon }) => (
                       <div key={label} className="flex items-center gap-3 bg-black/20 p-3 rounded-xl border border-white/5">
                         <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">

@@ -329,10 +329,12 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     const { rows: orders } = await query(`
         SELECT o.*,
                k.lat as kitchen_lat, k.lng as kitchen_lng,
-               a.lat as address_lat, a.lng as address_lng
+               a.lat as address_lat, a.lng as address_lng,
+               z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
         FROM orders o
         JOIN kitchens k ON o.kitchen_id = k.id
         LEFT JOIN addresses a ON o.address_id = a.id
+        LEFT JOIN zones z ON o.zone_id = z.id
         WHERE o.id = $1 AND o.rider_id = $2
     `, [orderId, riderId]);
     const order = orders[0];
@@ -360,28 +362,26 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         const isCOD = order.payment_method === 'cod';
         const cashToRecord = isCOD ? order.total_amount_paise : 0;
 
-        // Systematic Financial Split
-        const kLat = parseFloat(order.kitchen_lat);
-        const kLng = parseFloat(order.kitchen_lng);
-        const cLat = parseFloat(order.delivery_location_lat || order.address_lat);
-        const cLng = parseFloat(order.delivery_location_lng || order.address_lng);
-
+        // Systematic Financial Split — use zone-configurable rates, road distance if available
         let distanceKm = 0;
-        if (!isNaN(kLat) && !isNaN(kLng) && !isNaN(cLat) && !isNaN(cLng)) {
-            const R = 6371;
-            const dLat = (cLat - kLat) * (Math.PI / 180);
-            const dLng = (cLng - kLng) * (Math.PI / 180);
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(kLat * (Math.PI / 180)) * Math.cos(cLat * (Math.PI / 180)) *
-                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            distanceKm = R * c;
+        if (order.delivery_distance_metres != null && order.delivery_distance_metres > 0) {
+            distanceKm = order.delivery_distance_metres / 1000;
+        } else {
+            const kLat = parseFloat(order.kitchen_lat);
+            const kLng = parseFloat(order.kitchen_lng);
+            const cLat = parseFloat(order.delivery_location_lat || order.address_lat);
+            const cLng = parseFloat(order.delivery_location_lng || order.address_lng);
+            if (!isNaN(kLat) && !isNaN(kLng) && !isNaN(cLat) && !isNaN(cLng)) {
+                distanceKm = haversineKm(kLat, kLng, cLat, cLng);
+            }
         }
 
-        const basePay = TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
-        const distanceBonus = distanceKm > 2 ? Math.floor((distanceKm - 2) * 500) : 0; // Rs. 5 per extra km
+        const basePay = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
+        const perKmPaise = order.rider_per_km_paise ?? 500;
+        const freeKm = parseFloat(order.rider_free_km ?? '2');
+        const distanceBonus = distanceKm > freeKm ? Math.floor((distanceKm - freeKm) * perKmPaise) : 0;
         const tipPaise = parseInt(order.rider_tip_paise || '0', 10);
-        const platformFee = Math.floor(basePay * 0.1); // 10% 2QT Commission
+        const platformFee = Math.floor(basePay * 0.1); // 10% platform commission
         const bonusPaise = distanceBonus + tipPaise;
         const netEarnings = basePay + bonusPaise - platformFee;
 
