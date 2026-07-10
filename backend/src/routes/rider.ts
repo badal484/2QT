@@ -142,7 +142,7 @@ router.post('/zone/check-in', authenticate, requireRole('rider', 'rider_captain'
         }
 
         if (!nearest) {
-            return res.status(422).json({ error: 'NOT_IN_RANGE', message: 'You are not close enough to any delivery zone yet.' });
+            return res.status(422).json({ error: 'NOT_IN_RANGE', message: 'You must move into the delivery zone to receive orders.' });
         }
 
         await query('UPDATE users SET zone_id = $1 WHERE id = $2', [nearest.id, riderId]);
@@ -281,6 +281,36 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
         res.json({ success: true, status });
     } catch (err) {
         console.error('[orders/status]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// Resend delivery OTP to customer
+router.post('/resend-otp', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { orderId } = req.body;
+    const riderId = req.user!.userId;
+    try {
+        const { rows } = await query(
+            `SELECT o.id, o.display_id, o.customer_id, o.delivery_otp, o.status
+             FROM orders o WHERE o.id = $1 AND o.rider_id = $2`,
+            [orderId, riderId]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        const order = rows[0];
+        if (order.status !== 'out_for_delivery') return res.status(400).json({ error: 'ORDER_NOT_OUT_FOR_DELIVERY' });
+
+        // Re-send OTP notification to customer
+        NotificationService.send('order_out_for_delivery', {
+            userId: order.customer_id,
+            displayId: order.display_id,
+            orderId: order.id,
+            riderName: 'Your rider',
+            otp: String(order.delivery_otp ?? ''),
+        }).catch(() => {});
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[resend-otp]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });
@@ -557,7 +587,7 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
         return res.json({ orders: [], noZone: true });
     }
 
-    const zoneFilter = riderZoneId ? 'AND k.zone_id = $1' : '';
+    const zoneFilter = riderZoneId ? 'AND o.zone_id = $1' : '';
     const params = riderZoneId ? [riderZoneId] : [];
 
     let rows: any[];
