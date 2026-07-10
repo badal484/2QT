@@ -11,7 +11,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { updateUser } from '../store/slices/authSlice';
 import { getSocket } from '../socket/client';
-import { ChevronRight, Check, X, IndianRupee, Clock, Navigation, MapPin, Loader } from 'lucide-react-native';
+import { ChevronRight, Check, X, IndianRupee, Navigation, MapPin } from 'lucide-react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
 import { displayLocalNotification } from '../services/localNotif';
@@ -583,15 +583,17 @@ const RiderHomeScreen = ({ navigation }: any) => {
               </View>
             )}
 
-            {/* Prep time ETA row */}
-            {pendingOrder.estimated_ready_at && (() => {
-              const minsLeft = Math.max(0, Math.round((new Date(pendingOrder.estimated_ready_at).getTime() - Date.now()) / 60000));
+            {/* Kitchen → customer distance */}
+            {pendingOrder.kitchen_lat && pendingOrder.kitchen_lng && pendingOrder.customer_lat && pendingOrder.customer_lng && (() => {
+              const km = haversineKm(
+                parseFloat(pendingOrder.kitchen_lat), parseFloat(pendingOrder.kitchen_lng),
+                parseFloat(pendingOrder.customer_lat), parseFloat(pendingOrder.customer_lng),
+              );
+              const label = km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
               return (
                 <View style={styles.prepTimeBadge}>
-                  <Clock size={12} color={minsLeft <= 2 ? S.green : S.orange} />
-                  <Text style={[styles.prepTimeText, { color: minsLeft <= 2 ? S.green : S.orange }]}>
-                    {minsLeft <= 0 ? 'Order ready now' : `Ready in ~${minsLeft} min`}
-                  </Text>
+                  <Navigation size={12} color={S.orange} />
+                  <Text style={[styles.prepTimeText, { color: S.orange }]}>{label} delivery distance</Text>
                 </View>
               );
             })()}
