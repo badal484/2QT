@@ -4,6 +4,7 @@ import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToKitchen, emitToRiders, emitToAdmin, emitToOrder, emitToAll } from '../socket';
 import { NotificationService } from '../services/notification.service';
+import { haversineMetres } from '../services/distance.service';
 import { redis, keys } from '../redis';
 import { sendFCM } from '../services/fcm.service';
 
@@ -598,7 +599,41 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
             order.items = items;
         }
 
-        res.json({ orders: rows });
+        const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'max_batch_size'");
+        const maxBatchSize = settings.length > 0 ? parseInt(settings[0].value, 10) || 1 : 1;
+
+        const batches: any[] = [];
+        
+        if (maxBatchSize > 1) {
+            for (const order of rows) {
+                let placed = false;
+                for (const batch of batches) {
+                    if (batch.orders.length < maxBatchSize) {
+                        const firstOrder = batch.orders[0];
+                        const dist = haversineMetres(
+                            parseFloat(order.customer_lat), parseFloat(order.customer_lng),
+                            parseFloat(firstOrder.customer_lat), parseFloat(firstOrder.customer_lng)
+                        );
+                        // Group if within 1.5km
+                        if (dist <= 1500) {
+                            batch.orders.push(order);
+                            placed = true;
+                            break;
+                        }
+                    }
+                }
+                if (!placed) {
+                    batches.push({ id: 'batch-' + order.id, orders: [order] });
+                }
+            }
+        } else {
+            // No batching
+            for (const order of rows) {
+                batches.push({ id: 'batch-' + order.id, orders: [order] });
+            }
+        }
+
+        res.json({ batches });
     } catch (err: any) {
         res.status(500).json({ error: 'FETCH_FAILED', message: err.message });
     }

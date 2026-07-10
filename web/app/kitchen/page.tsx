@@ -84,6 +84,11 @@ interface UnassignedOrder {
   items: { menu_item_name: string; quantity: number }[];
 }
 
+interface UnassignedBatch {
+  id: string;
+  orders: UnassignedOrder[];
+}
+
 interface MenuItem {
   id: string;
   name: string;
@@ -264,7 +269,8 @@ export default function KitchenPage() {
 
   // Dispatch
   const [riders, setRiders] = useState<LiveRider[]>([]);
-  const [unassigned, setUnassigned] = useState<UnassignedOrder[]>([]);
+  const [unassignedBatches, setUnassignedBatches] = useState<UnassignedBatch[]>([]);
+  const unassignedCount = unassignedBatches.reduce((acc, b) => acc + b.orders.length, 0);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [selectedRider, setSelectedRider] = useState<Record<string, string>>({});
   const dispatchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -366,7 +372,7 @@ export default function KitchenPage() {
         api.get("/kitchen/orders/unassigned"),
       ]);
       setRiders(ridersData.riders || []);
-      setUnassigned(unassignedData.orders || []);
+      setUnassignedBatches(unassignedData.batches || []);
     } catch {}
   }, []);
 
@@ -386,14 +392,16 @@ export default function KitchenPage() {
     return () => { socket.off("order_updated", handler); };
   }, [view, fetchDispatch]);
 
-  const assignRider = async (orderId: string) => {
-    const riderId = selectedRider[orderId];
+  const assignRiderBatch = async (batchId: string, batchOrders: UnassignedOrder[]) => {
+    const riderId = selectedRider[batchId];
     if (!riderId) { toast.error("Select a rider first"); return; }
-    setAssigningId(orderId);
+    setAssigningId(batchId);
     try {
-      await api.post(`/kitchen/orders/${orderId}/assign-rider`, { riderId });
-      toast.success("Rider assigned!");
-      setSelectedRider(prev => { const n = { ...prev }; delete n[orderId]; return n; });
+      await Promise.all(batchOrders.map(order => 
+        api.post(`/kitchen/orders/${order.id}/assign-rider`, { riderId })
+      ));
+      toast.success(batchOrders.length > 1 ? "Rider assigned to batch!" : "Rider assigned!");
+      setSelectedRider(prev => { const n = { ...prev }; delete n[batchId]; return n; });
       fetchDispatch();
     } catch (err: any) {
       toast.error(err.message || "Could not assign rider");
@@ -588,8 +596,8 @@ export default function KitchenPage() {
               className={`px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black uppercase tracking-widest transition-all flex items-center gap-1.5 whitespace-nowrap ${view === "dispatch" ? "bg-orange-500 text-black shadow-[0_0_16px_rgba(249,115,22,0.4)]" : "text-zinc-400 hover:text-white bg-white/5"}`}
             >
               <Zap className="w-3.5 h-3.5" /> Dispatch
-              {unassigned.length > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center">{unassigned.length}</span>
+              {unassignedCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center">{unassignedCount}</span>
               )}
             </button>
           )}
@@ -673,14 +681,14 @@ export default function KitchenPage() {
               <div>
                 <h2 className="text-base font-black uppercase tracking-widest text-red-400 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" /> Needs Assignment
-                  {unassigned.length > 0 && (
-                    <span className="bg-red-500 text-white text-xs font-black rounded-full w-5 h-5 flex items-center justify-center">{unassigned.length}</span>
+                  {unassignedCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-black rounded-full w-5 h-5 flex items-center justify-center">{unassignedCount}</span>
                   )}
                 </h2>
                 <p className="text-zinc-500 text-xs mt-1">Ready at kitchen, no rider assigned</p>
               </div>
 
-              {unassigned.length === 0 && (
+              {unassignedBatches.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-24 text-zinc-600">
                   <UserCheck className="w-7 h-7 mb-2 text-green-700" />
                   <p className="font-bold text-sm text-green-700">All orders have riders</p>
@@ -688,13 +696,16 @@ export default function KitchenPage() {
               )}
 
               <AnimatePresence>
-                {unassigned.map(order => {
-                  const waited = minutesSince(order.created_at);
+                {unassignedBatches.map(batch => {
+                  const isBatch = batch.orders.length > 1;
+                  const firstOrder = batch.orders[0];
+                  const waited = Math.max(...batch.orders.map(o => minutesSince(o.created_at)));
                   const isUrgent = waited > 10;
                   const availableRiders = riders;
+                  
                   return (
                     <motion.div
-                      key={order.id}
+                      key={batch.id}
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
@@ -702,33 +713,44 @@ export default function KitchenPage() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <div className="text-xl font-black text-white">#{order.display_id}</div>
-                          <div className="text-zinc-400 text-xs mt-0.5">{order.customer_name}</div>
+                          {isBatch ? (
+                            <div className="text-[11px] font-black text-amber-500 bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20 mb-2 inline-block">BATCH: {batch.orders.length} ORDERS</div>
+                          ) : (
+                            <div className="text-xl font-black text-white">#{firstOrder.display_id}</div>
+                          )}
+                          {!isBatch && <div className="text-zinc-400 text-xs mt-0.5">{firstOrder.customer_name}</div>}
                         </div>
                         <div className={`text-right ${isUrgent ? "text-red-400" : "text-zinc-400"}`}>
                           <div className="text-lg font-black">{waited}m</div>
                           {isUrgent && <div className="text-[10px] font-black text-red-400 animate-pulse">URGENT</div>}
                         </div>
                       </div>
-                      <div className="flex items-start gap-1 text-zinc-500 text-xs mb-3">
-                        <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
-                        <span className="line-clamp-2">{order.delivery_address}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {order.items.map((item, i) => (
-                          <span key={i} className="bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg text-xs text-zinc-300 font-semibold">
-                            {item.quantity}× {item.menu_item_name}
-                          </span>
-                        ))}
-                      </div>
+                      
+                      {batch.orders.map(o => (
+                        <div key={o.id} className={`mb-3 ${isBatch ? 'pb-3 border-b border-white/5' : ''}`}>
+                          {isBatch && <div className="text-white font-bold text-sm mb-1.5 flex items-center gap-2"><span className="text-zinc-500">#{o.display_id}</span> {o.customer_name}</div>}
+                          <div className="flex items-start gap-1 text-zinc-500 text-xs mb-2">
+                            <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+                            <span className="line-clamp-2">{o.delivery_address}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {o.items.map((item, i) => (
+                              <span key={i} className="bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg text-xs text-zinc-300 font-semibold">
+                                {item.quantity}× {item.menu_item_name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      
                       {availableRiders.length === 0 ? (
-                        <div className="text-center text-zinc-600 text-xs py-2 border border-white/5 rounded-xl">No idle riders available</div>
+                        <div className="text-center text-zinc-600 text-xs py-2 border border-white/5 rounded-xl mt-1">No idle riders available</div>
                       ) : (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 mt-2">
                           <div className="relative flex-1">
                             <select
-                              value={selectedRider[order.id] || ""}
-                              onChange={e => setSelectedRider(prev => ({ ...prev, [order.id]: e.target.value }))}
+                              value={selectedRider[batch.id] || ""}
+                              onChange={e => setSelectedRider(prev => ({ ...prev, [batch.id]: e.target.value }))}
                               className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white appearance-none cursor-pointer hover:bg-white/10 transition-all pr-7"
                             >
                               <option value="">Select rider…</option>
@@ -737,11 +759,11 @@ export default function KitchenPage() {
                             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
                           </div>
                           <button
-                            onClick={() => assignRider(order.id)}
-                            disabled={!selectedRider[order.id] || assigningId === order.id}
-                            className="px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-black font-black rounded-xl text-sm uppercase tracking-wider transition-all flex items-center gap-1.5"
+                            onClick={() => assignRiderBatch(batch.id, batch.orders)}
+                            disabled={!selectedRider[batch.id] || assigningId === batch.id}
+                            className={`px-4 py-2 hover:bg-orange-400 disabled:opacity-40 text-black font-black rounded-xl text-sm uppercase tracking-wider transition-all flex items-center gap-1.5 ${isBatch ? 'bg-amber-500' : 'bg-orange-500'}`}
                           >
-                            {assigningId === order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CircleDot className="w-3.5 h-3.5" /> Assign</>}
+                            {assigningId === batch.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CircleDot className="w-3.5 h-3.5" /> Assign</>}
                           </button>
                         </div>
                       )}
