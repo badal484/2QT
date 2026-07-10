@@ -165,12 +165,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
                 lineJoin: 'round',
               }).addTo(map);
             })
-            .catch(function() {
-              // Fallback: draw straight line
-              routeLayer = L.polyline([[fromLat, fromLng], [toLat, toLng]], {
-                color: '#10B981', weight: 3, opacity: 0.6, dashArray: '8 6',
-              }).addTo(map);
-            });
+            .catch(function() {});
         };
 
         ${routeFrom && routeTo
