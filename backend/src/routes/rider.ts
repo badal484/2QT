@@ -596,11 +596,13 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
             SELECT o.*, u.name as customer_name, u.phone as customer_phone, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng,
                    k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
                    k.avg_prep_time_minutes,
-                   (o.created_at + (k.avg_prep_time_minutes || ' minutes')::INTERVAL) AS estimated_ready_at
+                   (o.created_at + (k.avg_prep_time_minutes || ' minutes')::INTERVAL) AS estimated_ready_at,
+                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
             FROM orders o
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
+            LEFT JOIN zones z ON o.zone_id = z.id
             WHERE o.status IN ('preparing', 'ready_for_pickup') AND o.rider_id IS NULL ${zoneFilter}
             ORDER BY o.status DESC, o.created_at ASC
         `, params);
@@ -610,11 +612,13 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
         const result = await query(`
             SELECT o.*, u.name as customer_name, u.phone as customer_phone, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng,
                    k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
-                   NULL::INTEGER AS avg_prep_time_minutes, NULL::TIMESTAMPTZ AS estimated_ready_at
+                   NULL::INTEGER AS avg_prep_time_minutes, NULL::TIMESTAMPTZ AS estimated_ready_at,
+                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
             FROM orders o
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
+            LEFT JOIN zones z ON o.zone_id = z.id
             WHERE o.status IN ('preparing', 'ready_for_pickup') AND o.rider_id IS NULL ${zoneFilter}
             ORDER BY o.status DESC, o.created_at ASC
         `, params);

@@ -297,19 +297,15 @@ const RiderHomeScreen = ({ navigation }: any) => {
   }, [isOnline, activeOrders, pulseAnim]);
 
   const getEstimatedEarnings = (order: any) => {
-    let base = 20;
-    if (order.kitchen_lat && order.customer_lat) {
-      const R = 6371;
-      const kLat = parseFloat(order.kitchen_lat), kLng = parseFloat(order.kitchen_lng);
-      const cLat = parseFloat(order.customer_lat), cLng = parseFloat(order.customer_lng);
-      if (!isNaN(kLat) && !isNaN(kLng) && !isNaN(cLat) && !isNaN(cLng)) {
-        const dLat = (cLat - kLat) * (Math.PI / 180), dLng = (cLng - kLng) * (Math.PI / 180);
-        const a = Math.sin(dLat/2)**2 + Math.cos(kLat*(Math.PI/180))*Math.cos(cLat*(Math.PI/180))*Math.sin(dLng/2)**2;
-        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        if (dist > 2) base += (dist - 2) * 5;
-      }
-    }
-    return Math.floor(base * 0.9);
+    const basePaise = order.rider_base_pay_paise ?? 2000;
+    const perKmPaise = order.rider_per_km_paise ?? 500;
+    const freeKm = parseFloat(order.rider_free_km ?? '2');
+    const distanceKm = (order.delivery_distance_metres != null && order.delivery_distance_metres > 0)
+      ? order.delivery_distance_metres / 1000
+      : 0;
+    const distanceBonus = distanceKm > freeKm ? Math.floor((distanceKm - freeKm) * perKmPaise) : 0;
+    const platformFee = Math.floor(basePaise * 0.1);
+    return Math.floor((basePaise + distanceBonus - platformFee) / 100);
   };
 
 
@@ -583,24 +579,21 @@ const RiderHomeScreen = ({ navigation }: any) => {
               </View>
             )}
 
-            {/* Kitchen → customer road distance (Google Maps only) */}
-            {pendingOrder.delivery_distance_metres != null && pendingOrder.delivery_distance_metres > 0 && (() => {
-              const km = pendingOrder.delivery_distance_metres / 1000;
-              const label = km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
-              return (
-                <View style={styles.prepTimeBadge}>
-                  <Navigation size={12} color={S.orange} />
-                  <Text style={[styles.prepTimeText, { color: S.orange }]}>{label} road distance</Text>
-                </View>
-              );
-            })()}
-
             <View style={styles.notifRow}>
               <View style={styles.notifField}>
-                <Text style={styles.notifFieldLabel}>DELIVER TO</Text>
-                <Text style={styles.notifFieldValue} numberOfLines={2}>
-                  {pendingOrder.delivery_address_text || 'Nearby location'}
-                </Text>
+                <Text style={styles.notifFieldLabel}>DISTANCE</Text>
+                {pendingOrder.delivery_distance_metres != null && pendingOrder.delivery_distance_metres > 0 ? (() => {
+                  const km = pendingOrder.delivery_distance_metres / 1000;
+                  const label = km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+                  return (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                      <Navigation size={14} color={S.orange} />
+                      <Text style={[styles.notifFieldValue, { color: S.orange, fontSize: 18, fontWeight: '800' }]}>{label}</Text>
+                    </View>
+                  );
+                })() : (
+                  <Text style={[styles.notifFieldValue, { color: S.muted }]}>—</Text>
+                )}
               </View>
               {!pendingOrder._kitchenAssigned && (
                 <View style={[styles.notifField, { alignItems: 'flex-end' }]}>
