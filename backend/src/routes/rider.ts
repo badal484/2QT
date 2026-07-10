@@ -362,21 +362,11 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         const isCOD = order.payment_method === 'cod';
         const cashToRecord = isCOD ? order.total_amount_paise : 0;
 
-        // Systematic Financial Split — use zone-configurable rates, road distance if available
-        // Cap at 30 km to prevent earnings inflation from wrong kitchen/address coordinates
-        const MAX_EARNINGS_DISTANCE_KM = 30;
-        let distanceKm = 0;
-        if (order.delivery_distance_metres != null && order.delivery_distance_metres > 0) {
-            distanceKm = Math.min(order.delivery_distance_metres / 1000, MAX_EARNINGS_DISTANCE_KM);
-        } else {
-            const kLat = parseFloat(order.kitchen_lat);
-            const kLng = parseFloat(order.kitchen_lng);
-            const cLat = parseFloat(order.delivery_location_lat || order.address_lat);
-            const cLng = parseFloat(order.delivery_location_lng || order.address_lng);
-            if (!isNaN(kLat) && !isNaN(kLng) && !isNaN(cLat) && !isNaN(cLng)) {
-                distanceKm = Math.min(haversineKm(kLat, kLng, cLat, cLng), MAX_EARNINGS_DISTANCE_KM);
-            }
-        }
+        // Systematic Financial Split — use only real Google Maps road distance for earnings
+        // If not yet computed (order placed before feature), distance = 0, no km bonus
+        const distanceKm = (order.delivery_distance_metres != null && order.delivery_distance_metres > 0)
+            ? order.delivery_distance_metres / 1000
+            : 0;
 
         const basePay = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
         const perKmPaise = order.rider_per_km_paise ?? 500;
@@ -663,17 +653,11 @@ router.get('/orders/history', authenticate, requireRole('rider', 'rider_captain'
             const { rows: items } = await query('SELECT menu_item_name, quantity FROM order_items WHERE order_id = $1', [order.id]);
             order.items = items;
 
-            // Compute per-order earnings and distance for history display
+            // Compute per-order earnings and distance for history display (road distance only)
             if (order.status === 'delivered') {
-                let distanceKm = 0;
-                if (order.delivery_distance_metres > 0) {
-                    distanceKm = order.delivery_distance_metres / 1000;
-                } else if (order.kitchen_lat && order.customer_lat) {
-                    distanceKm = haversineKm(
-                        parseFloat(order.kitchen_lat), parseFloat(order.kitchen_lng),
-                        parseFloat(order.customer_lat), parseFloat(order.customer_lng),
-                    );
-                }
+                const distanceKm = (order.delivery_distance_metres != null && order.delivery_distance_metres > 0)
+                    ? order.delivery_distance_metres / 1000
+                    : 0;
                 order.distance_km = Math.round(distanceKm * 10) / 10;
 
                 const basePay = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;

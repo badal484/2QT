@@ -583,25 +583,14 @@ const RiderHomeScreen = ({ navigation }: any) => {
               </View>
             )}
 
-            {/* Kitchen → customer distance (road distance preferred, haversine fallback) */}
-            {(() => {
-              let km: number | null = null;
-              let isRoad = false;
-              if (pendingOrder.delivery_distance_metres != null && pendingOrder.delivery_distance_metres > 0) {
-                km = pendingOrder.delivery_distance_metres / 1000;
-                isRoad = true;
-              } else if (pendingOrder.kitchen_lat && pendingOrder.kitchen_lng && pendingOrder.customer_lat && pendingOrder.customer_lng) {
-                km = haversineKm(
-                  parseFloat(pendingOrder.kitchen_lat), parseFloat(pendingOrder.kitchen_lng),
-                  parseFloat(pendingOrder.customer_lat), parseFloat(pendingOrder.customer_lng),
-                );
-              }
-              if (km == null) return null;
+            {/* Kitchen → customer road distance (Google Maps only) */}
+            {pendingOrder.delivery_distance_metres != null && pendingOrder.delivery_distance_metres > 0 && (() => {
+              const km = pendingOrder.delivery_distance_metres / 1000;
               const label = km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
               return (
                 <View style={styles.prepTimeBadge}>
                   <Navigation size={12} color={S.orange} />
-                  <Text style={[styles.prepTimeText, { color: S.orange }]}>{label} {isRoad ? 'road distance' : 'distance'}</Text>
+                  <Text style={[styles.prepTimeText, { color: S.orange }]}>{label} road distance</Text>
                 </View>
               );
             })()}
