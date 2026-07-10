@@ -118,6 +118,46 @@ export const initCrons = () => {
         }
     });
 
+    // 00:01 daily — Assign daily missions to all active riders
+    cron.schedule('1 0 * * *', async () => {
+        try {
+            const { rowCount } = await query(`
+                INSERT INTO rider_missions (rider_id, template_id, date)
+                SELECT u.id, mt.id, CURRENT_DATE
+                FROM users u
+                CROSS JOIN mission_templates mt
+                WHERE u.role IN ('rider','rider_captain')
+                  AND mt.is_active = true
+                  AND mt.window_type = 'daily'
+                  AND (mt.zone_id IS NULL OR mt.zone_id = u.zone_id)
+                ON CONFLICT (rider_id, template_id, date) DO NOTHING
+            `);
+            console.log(`[CRON] Daily missions assigned: ${rowCount} rows`);
+        } catch (err) {
+            console.error('[CRON] Daily mission assignment failed:', err);
+        }
+    });
+
+    // 00:01 every Monday IST — Assign weekly missions
+    cron.schedule('1 0 * * 1', async () => {
+        try {
+            const { rowCount } = await query(`
+                INSERT INTO rider_missions (rider_id, template_id, date)
+                SELECT u.id, mt.id, date_trunc('week', CURRENT_DATE)::date
+                FROM users u
+                CROSS JOIN mission_templates mt
+                WHERE u.role IN ('rider','rider_captain')
+                  AND mt.is_active = true
+                  AND mt.window_type = 'weekly'
+                  AND (mt.zone_id IS NULL OR mt.zone_id = u.zone_id)
+                ON CONFLICT (rider_id, template_id, date) DO NOTHING
+            `);
+            console.log(`[CRON] Weekly missions assigned: ${rowCount} rows`);
+        } catch (err) {
+            console.error('[CRON] Weekly mission assignment failed:', err);
+        }
+    });
+
     // Monday 10:00 AM IST (04:30 UTC) - Weekly rider payout
     cron.schedule('30 4 * * 1', async () => {
         try {

@@ -16,6 +16,7 @@ import TicketDetailScreen from '../screens/admin/TicketDetailScreen';
 import StockScreen from '../screens/StockScreen';
 import BannersManagerScreen from '../screens/admin/BannersManagerScreen';
 import PromoCodesManagerScreen from '../screens/admin/PromoCodesManagerScreen';
+import AdminMissionsScreen from '../screens/admin/AdminMissionsScreen';
 
 import { LayoutDashboard, ShoppingBag, Truck, IndianRupee, Headphones } from 'lucide-react-native';
 
@@ -83,6 +84,7 @@ const AdminNavigator = () => {
       <Stack.Screen name="Stock" component={StockScreen} />
       <Stack.Screen name="BannersManager" component={BannersManagerScreen} />
       <Stack.Screen name="PromoCodesManager" component={PromoCodesManagerScreen} />
+      <Stack.Screen name="MissionBuilder" component={AdminMissionsScreen} />
     </Stack.Navigator>
   );
 };

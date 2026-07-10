@@ -19,6 +19,55 @@ const razorpay = new Razorpay({
 const router = Router();
 const DEV_TEST_DELIVERY_OTP = process.env.TEST_DELIVERY_OTP || '654321';
 
+// Update mission progress after a delivery completes
+async function updateMissionProgress(riderId: string): Promise<void> {
+    const [todayRes, weekRes] = await Promise.all([
+        query(`SELECT deliveries_count, total_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE`, [riderId]),
+        query(`SELECT COALESCE(SUM(deliveries_count),0)::int AS w_del, COALESCE(SUM(total_paise),0)::int AS w_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date >= date_trunc('week', CURRENT_DATE)`, [riderId]),
+    ]);
+    const todayDeliveries = parseInt(todayRes.rows[0]?.deliveries_count || '0');
+    const todayPaise      = parseInt(todayRes.rows[0]?.total_paise     || '0');
+    const weekDeliveries  = parseInt(weekRes.rows[0]?.w_del   || '0');
+    const weekPaise       = parseInt(weekRes.rows[0]?.w_paise || '0');
+
+    const { rows: missions } = await query(`
+        SELECT rm.id, rm.tier_reached, rm.bonus_awarded_paise, rm.status,
+               mt.type, mt.tiers, mt.window_type, mt.title
+        FROM rider_missions rm
+        JOIN mission_templates mt ON mt.id = rm.template_id
+        WHERE rm.rider_id = $1 AND rm.status = 'active'
+          AND ((mt.window_type = 'daily'  AND rm.date = CURRENT_DATE)
+           OR  (mt.window_type = 'weekly' AND rm.date = date_trunc('week', CURRENT_DATE)::date))
+    `, [riderId]);
+
+    for (const m of missions) {
+        const liveProgress = m.type === 'delivery_count'
+            ? (m.window_type === 'daily' ? todayDeliveries : weekDeliveries)
+            : (m.window_type === 'daily' ? todayPaise      : weekPaise);
+
+        const tiers: Array<{ target: number; reward_paise: number; label: string }> = m.tiers || [];
+        let newTierReached = 0;
+        let newTotalBonus  = 0;
+        for (let i = 0; i < tiers.length; i++) {
+            if (liveProgress >= tiers[i].target) { newTierReached = i + 1; newTotalBonus += tiers[i].reward_paise; }
+        }
+
+        if (newTierReached > m.tier_reached) {
+            const bonusToGive = newTotalBonus - m.bonus_awarded_paise;
+            const allDone     = newTierReached === tiers.length;
+            await query(`UPDATE rider_missions SET progress=$2, tier_reached=$3, bonus_awarded_paise=$4, status=$5, completed_at=CASE WHEN $5='completed' THEN NOW() ELSE completed_at END, updated_at=NOW() WHERE id=$1`,
+                [m.id, liveProgress, newTierReached, newTotalBonus, allDone ? 'completed' : 'active']);
+            if (bonusToGive > 0) {
+                await query(`INSERT INTO rider_daily_earnings (rider_id,date,deliveries_count,base_earnings_paise,bonus_earnings_paise,total_paise) VALUES ($1,CURRENT_DATE,0,0,$2,$2) ON CONFLICT (rider_id,date) DO UPDATE SET bonus_earnings_paise=COALESCE(rider_daily_earnings.bonus_earnings_paise,0)+$2, total_paise=rider_daily_earnings.total_paise+$2`, [riderId, bonusToGive]);
+                const tierLabel = tiers[newTierReached - 1]?.label || '';
+                NotificationService.send('broadcast_message', { userId: riderId, title: `🎯 Mission Tier Unlocked — ${tierLabel}`, body: `"${m.title}" ${tierLabel} complete! ₹${(bonusToGive / 100).toFixed(0)} bonus added.`, screen: 'Missions' }).catch(() => {});
+            }
+        } else {
+            await query(`UPDATE rider_missions SET progress=$2, updated_at=NOW() WHERE id=$1`, [m.id, liveProgress]);
+        }
+    }
+}
+
 router.post('/apply', authenticate, async (req: AuthRequest, res) => {
     const { vehicleType, licenseNumber, idPhotoUrl } = req.body;
     const userId = req.user!.userId;
@@ -394,6 +443,10 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
 
         console.log("[VERIFY-OTP] Transaction done.");
     });
+
+    // Update mission progress after delivery (fire-and-forget)
+    updateMissionProgress(riderId).catch((e) =>
+        console.error('[missions] progress update failed:', e));
 
     // Update streak: if last_active_date was yesterday → increment, if today → no-op, else reset to 1
     try {
