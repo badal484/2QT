@@ -230,16 +230,16 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
 
         // 2. Notification Queue
         let notificationType: string | null = null;
-        if (status === 'preparing') notificationType = 'order_preparing';
-        if (status === 'ready_for_pickup') {
-            notificationType = 'order_ready';
-            emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id }, order.zone_id);
+        if (status === 'preparing') {
+            notificationType = 'order_preparing';
 
-            // Also send a push notification to all online, available riders in this zone
+            // Alert ALL online riders (no zone filter) — pool query handles zone filtering per-rider
+            emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id, status: 'preparing' });
+
             query(`
-                SELECT id FROM users 
-                WHERE role IN ('rider', 'rider_captain') 
-                  AND is_online = true 
+                SELECT id FROM users
+                WHERE role IN ('rider', 'rider_captain')
+                  AND is_online = true
                   AND zone_id = $1
                   AND (SELECT COUNT(*) FROM orders WHERE rider_id = users.id AND status NOT IN ('delivered', 'cancelled')) < 3
             `, [order.zone_id]).then(({ rows }) => {
@@ -249,10 +249,22 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
                     broadcastNotification(
                         riderIds,
                         'New Delivery Request 🛵',
-                        `Order #${order.display_id} is ready for pickup! Tap to accept.`
+                        `Order #${order.display_id} is being prepared — head to kitchen now!`
                     ).catch(() => {});
                 }
-            }).catch(err => console.error('[KITCHEN] Failed to send rider push:', err.message));
+            }).catch(() => {});
+        }
+        if (status === 'ready_for_pickup') {
+            notificationType = 'order_ready';
+
+            // 3-minute escalation: if still no rider after 3 min, alert kitchen managers
+            const { notificationsQueue } = require('../jobs/queues');
+            notificationsQueue.add('rider_escalation', {
+                orderId: id,
+                displayId: order.display_id,
+                kitchenId: order.kitchen_id,
+                zoneId: order.zone_id,
+            }, { delay: 3 * 60 * 1000 }).catch(() => {});
         }
         if (notificationType) {
             NotificationService.send(notificationType as any, {

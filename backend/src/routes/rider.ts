@@ -583,10 +583,8 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
     const riderZoneId = req.user!.zoneId;
     const role = req.user!.role;
 
-    if (!riderZoneId && role !== 'super_admin') {
-        return res.json({ orders: [], noZone: true });
-    }
-
+    // No zone? Still show all unclaimed orders — the DB zone filter only applies when zone is known.
+    // A rider without a zone assigned can still see and claim orders.
     const zoneFilter = riderZoneId ? 'AND o.zone_id = $1' : '';
     const params = riderZoneId ? [riderZoneId] : [];
 
@@ -601,8 +599,8 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
-            WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL ${zoneFilter}
-            ORDER BY o.created_at ASC
+            WHERE o.status IN ('preparing', 'ready_for_pickup') AND o.rider_id IS NULL ${zoneFilter}
+            ORDER BY o.status DESC, o.created_at ASC
         `, params);
         rows = result.rows;
     } catch {
@@ -615,8 +613,8 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
-            WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL ${zoneFilter}
-            ORDER BY o.created_at ASC
+            WHERE o.status IN ('preparing', 'ready_for_pickup') AND o.rider_id IS NULL ${zoneFilter}
+            ORDER BY o.status DESC, o.created_at ASC
         `, params);
         rows = result.rows;
     }
@@ -668,7 +666,7 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
             if (activeOrders.length >= 3) throw new Error('RIDER_BUSY');
 
             const { rowCount } = await client.query(
-                "UPDATE orders SET rider_id = $1 WHERE id = $2 AND rider_id IS NULL AND status = 'ready_for_pickup'",
+                "UPDATE orders SET rider_id = $1 WHERE id = $2 AND rider_id IS NULL AND status IN ('preparing', 'ready_for_pickup')",
                 [riderId, id]
             );
             if (rowCount === 0) throw new Error('ORDER_UNAVAILABLE');
