@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, Package, Clock, IndianRupee, CheckCircle2, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Package, Clock, IndianRupee, CheckCircle2, XCircle, Navigation } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   red: '#EF4444', redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
@@ -27,15 +27,8 @@ const RiderHistoryScreen = ({ navigation }: any) => {
   const allOrders = data?.orders || [];
 
   const completed = allOrders.filter((o: any) => o.status === 'delivered');
-  const totalTipsPaise = completed.reduce((s: number, o: any) => s + parseInt(o.rider_tip_paise || '0', 10), 0);
-  const totalTipsRupees = (totalTipsPaise / 100).toFixed(0);
-  const avgMin = completed.length > 0
-    ? Math.round(completed.reduce((s: number, o: any) => {
-        if (o.delivered_at && o.created_at)
-          return s + (new Date(o.delivered_at).getTime() - new Date(o.created_at).getTime()) / 60000;
-        return s;
-      }, 0) / completed.length)
-    : 0;
+  const totalEarningsPaise = completed.reduce((s: number, o: any) => s + (o.earnings_paise || 0), 0);
+  const totalDistanceKm = completed.reduce((s: number, o: any) => s + (o.distance_km || 0), 0);
 
   const shown = tab === 'All' ? allOrders
     : tab === 'Delivered' ? allOrders.filter((o: any) => o.status === 'delivered')
@@ -73,18 +66,18 @@ const RiderHistoryScreen = ({ navigation }: any) => {
               <Text style={s.statLbl}>Delivered</Text>
             </View>
             <View style={s.statCard}>
-              <View style={[s.statIcon, { backgroundColor: R.orangeLight }]}>
-                <IndianRupee size={18} color={R.orange} />
+              <View style={[s.statIcon, { backgroundColor: R.greenLight }]}>
+                <IndianRupee size={18} color={R.green} />
               </View>
-              <Text style={s.statVal}>+₹{totalTipsRupees}</Text>
-              <Text style={s.statLbl}>Tips</Text>
+              <Text style={[s.statVal, { color: R.green }]}>₹{(totalEarningsPaise / 100).toFixed(0)}</Text>
+              <Text style={s.statLbl}>Earned</Text>
             </View>
             <View style={s.statCard}>
               <View style={[s.statIcon, { backgroundColor: '#EFF6FF' }]}>
-                <Clock size={18} color="#3B82F6" />
+                <Navigation size={18} color="#3B82F6" />
               </View>
-              <Text style={s.statVal}>{avgMin}m</Text>
-              <Text style={s.statLbl}>Avg Time</Text>
+              <Text style={s.statVal}>{totalDistanceKm.toFixed(1)} km</Text>
+              <Text style={s.statLbl}>Distance</Text>
             </View>
           </View>
 
@@ -117,6 +110,8 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                 ? Math.round((new Date(order.delivered_at).getTime() - new Date(order.created_at).getTime()) / 60000)
                 : null;
               const tipPaise = isDelivered ? parseInt(order.rider_tip_paise || '0', 10) : 0;
+              const earningsPaise: number | null = isDelivered ? (order.earnings_paise ?? null) : null;
+              const distanceKm: number | null = isDelivered ? (order.distance_km ?? null) : null;
 
               return (
                 <View key={order.id} style={s.card}>
@@ -165,7 +160,15 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                         {isCOD ? 'COD' : 'Online'}
                       </Text>
                     </View>
-                    {duration && <Text style={s.durText}><Clock size={11} color={R.muted} /> {duration} min</Text>}
+                    {duration && <Text style={s.durText}><Clock size={11} color={R.muted} /> {duration}m</Text>}
+                    {distanceKm != null && distanceKm > 0 && (
+                      <Text style={s.distText}>
+                        <Navigation size={11} color="#3B82F6" /> {distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m` : `${distanceKm.toFixed(1)} km`}
+                      </Text>
+                    )}
+                    {earningsPaise != null && earningsPaise > 0 && (
+                      <Text style={s.earnText}>₹{(earningsPaise / 100).toFixed(0)}</Text>
+                    )}
                     {tipPaise > 0 && <Text style={s.tipText}>+₹{(tipPaise / 100).toFixed(0)} tip</Text>}
                   </View>
                 </View>
@@ -239,6 +242,7 @@ const s = StyleSheet.create({
   payText: { fontSize: 11, fontWeight: '700' },
   durText: { fontSize: 12, color: R.muted, flex: 1 },
   earnText: { fontSize: 14, fontWeight: '800', color: R.green },
+  distText: { fontSize: 12, color: '#3B82F6', fontWeight: '700' },
   tipText: { fontSize: 13, fontWeight: '700', color: R.amber },
 });
 
