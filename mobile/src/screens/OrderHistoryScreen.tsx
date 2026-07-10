@@ -48,7 +48,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   const openInvoice = async (orderId: string) => {
     setInvoiceLoading(prev => new Set(prev).add(orderId));
     try {
-      const res = await api.get(`/allOrders/${orderId}/invoice`);
+      const res = await api.get(`/orders/${orderId}/invoice`);
       const url = res.invoiceUrl?.startsWith('http')
         ? res.invoiceUrl
         : `${BACKEND_URL}${res.invoiceUrl}`;
@@ -71,8 +71,8 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   const { isLoading } = useQuery({
     queryKey: ['order-history'],
     queryFn: async () => {
-      const res = await api.get(`/allOrders/mine?limit=${LIMIT}&offset=0`);
-      const fetched: any[] = res.allOrders || [];
+      const res = await api.get(`/orders/mine?limit=${LIMIT}&offset=0`);
+      const fetched: any[] = res.orders || [];
       setAllOrders(fetched);
       setOffset(LIMIT);
       setHasMore(fetched.length === LIMIT);
@@ -84,20 +84,20 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     if (!hasMore || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await api.get(`/allOrders/mine?limit=${LIMIT}&offset=${offset}`);
-      const fetched: any[] = res.allOrders || [];
+      const res = await api.get(`/orders/mine?limit=${LIMIT}&offset=${offset}`);
+      const fetched: any[] = res.orders || [];
       setAllOrders(prev => [...prev, ...fetched]);
       setOffset(prev => prev + LIMIT);
       setHasMore(fetched.length === LIMIT);
     } catch {
-      Alert.alert('Error', 'Could not load more allOrders.');
+      Alert.alert('Error', 'Could not load more orders.');
     } finally {
       setLoadingMore(false);
     }
   };
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/allOrders/${id}/cancel`),
+    mutationFn: (id: string) => api.post(`/orders/${id}/cancel`),
     onSuccess: () => {
       setCancelTargetId(null);
       queryClient.invalidateQueries({ queryKey: ['order-history'] });
@@ -140,7 +140,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
             <View style={styles.emptyIconWrapper}>
               <Package size={32} color={colors.primary} />
             </View>
-            <Text style={styles.emptyTitle}>No allOrders yet</Text>
+            <Text style={styles.emptyTitle}>No orders yet</Text>
             <Text style={styles.emptySubText}>Your delicious journey is just one tap away.</Text>
             <BouncingButton
               style={styles.browseBtn}
