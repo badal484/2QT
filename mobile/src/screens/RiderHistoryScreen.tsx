@@ -9,6 +9,7 @@ const R = {
   orange: '#FC8019', orangeLight: '#FFF3E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   red: '#EF4444', redLight: '#FEF2F2',
+  amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
   border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
 };
@@ -25,23 +26,9 @@ const RiderHistoryScreen = ({ navigation }: any) => {
 
   const allOrders = data?.orders || [];
 
-  const estimateEarnings = (o: any): number => {
-    let base = 2000;
-    const kLat = parseFloat(o.kitchen_lat), kLng = parseFloat(o.kitchen_lng);
-    const cLat = parseFloat(o.customer_lat), cLng = parseFloat(o.customer_lng);
-    if (!isNaN(kLat) && !isNaN(kLng) && !isNaN(cLat) && !isNaN(cLng)) {
-      const R6 = 6371;
-      const dLat = (cLat - kLat) * (Math.PI / 180);
-      const dLng = (cLng - kLng) * (Math.PI / 180);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(kLat * Math.PI / 180) * Math.cos(cLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-      const dist = R6 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      if (dist > 2) base += Math.floor((dist - 2) * 500);
-    }
-    return Math.floor(base * 0.9);
-  };
-
   const completed = allOrders.filter((o: any) => o.status === 'delivered');
-  const totalEarnings = completed.reduce((s: number, o: any) => s + estimateEarnings(o), 0) / 100;
+  const totalTipsPaise = completed.reduce((s: number, o: any) => s + parseInt(o.rider_tip_paise || '0', 10), 0);
+  const totalTipsRupees = (totalTipsPaise / 100).toFixed(0);
   const avgMin = completed.length > 0
     ? Math.round(completed.reduce((s: number, o: any) => {
         if (o.delivered_at && o.created_at)
@@ -89,8 +76,8 @@ const RiderHistoryScreen = ({ navigation }: any) => {
               <View style={[s.statIcon, { backgroundColor: R.orangeLight }]}>
                 <IndianRupee size={18} color={R.orange} />
               </View>
-              <Text style={s.statVal}>₹{totalEarnings.toFixed(0)}</Text>
-              <Text style={s.statLbl}>Earned</Text>
+              <Text style={s.statVal}>+₹{totalTipsRupees}</Text>
+              <Text style={s.statLbl}>Tips</Text>
             </View>
             <View style={s.statCard}>
               <View style={[s.statIcon, { backgroundColor: '#EFF6FF' }]}>
@@ -129,7 +116,7 @@ const RiderHistoryScreen = ({ navigation }: any) => {
               const duration = order.delivered_at && order.created_at
                 ? Math.round((new Date(order.delivered_at).getTime() - new Date(order.created_at).getTime()) / 60000)
                 : null;
-              const earned = isDelivered ? (estimateEarnings(order) / 100).toFixed(0) : null;
+              const tipPaise = isDelivered ? parseInt(order.rider_tip_paise || '0', 10) : 0;
 
               return (
                 <View key={order.id} style={s.card}>
@@ -179,7 +166,7 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                       </Text>
                     </View>
                     {duration && <Text style={s.durText}><Clock size={11} color={R.muted} /> {duration} min</Text>}
-                    {earned && <Text style={s.earnText}>+₹{earned}</Text>}
+                    {tipPaise > 0 && <Text style={s.tipText}>+₹{(tipPaise / 100).toFixed(0)} tip</Text>}
                   </View>
                 </View>
               );
@@ -252,6 +239,7 @@ const s = StyleSheet.create({
   payText: { fontSize: 11, fontWeight: '700' },
   durText: { fontSize: 12, color: R.muted, flex: 1 },
   earnText: { fontSize: 14, fontWeight: '800', color: R.green },
+  tipText: { fontSize: 13, fontWeight: '700', color: R.amber },
 });
 
 export default RiderHistoryScreen;

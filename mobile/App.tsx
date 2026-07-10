@@ -10,6 +10,7 @@ import { NetworkObserver } from './src/components/NetworkObserver';
 import { AppBootManager } from './src/components/AppBootManager';
 import SplashScreen from './src/screens/SplashScreen';
 import { GlobalSocketListener } from './src/socket/GlobalSocketListener';
+import { Toast } from './src/components/ui/Toast';
 
 if (!__DEV__) {
   console.log = () => {};
@@ -41,6 +42,7 @@ const App = () => {
                 <AppBootManager>
                   <RootNavigator />
                 </AppBootManager>
+                <Toast />
               </ErrorBoundary>
             </QueryClientProvider>
           </PersistGate>

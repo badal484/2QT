@@ -84,7 +84,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
 
   if (isLoading) return (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#10B981" />
+      <ActivityIndicator size="large" color={colors.primary} />
       <Text style={styles.loadingText}>Fetching Orders...</Text>
     </View>
   );
@@ -112,7 +112,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
         {orders.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconWrapper}>
-              <Package size={32} color="#10B981" />
+              <Package size={32} color={colors.primary} />
             </View>
             <Text style={styles.emptyTitle}>No orders yet</Text>
             <Text style={styles.emptySubText}>Your delicious journey is just one tap away.</Text>
@@ -171,7 +171,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                       </Text>
                       <Text style={[
                         styles.footerValue,
-                        order.payment_method === 'cod' && order.payment_status === 'cod_pending' && { color: '#1B5E46' }
+                        order.payment_method === 'cod' && order.payment_status === 'cod_pending' && { color: '#FC4603' }
                       ]}>
                         ₹{(order.total_amount_paise / 100).toFixed(2)}
                       </Text>
@@ -211,8 +211,8 @@ const OrderHistoryScreen = ({ navigation }: any) => {
                               disabled={invoiceLoading.has(order.id)}
                             >
                               {invoiceLoading.has(order.id)
-                                ? <ActivityIndicator size="small" color="#10B981" />
-                                : <Download size={18} color="#10B981" />
+                                ? <ActivityIndicator size="small" color={colors.primary} />
+                                : <Download size={18} color={colors.primary} />
                               }
                             </BouncingButton>
                             {!order.food_rating && (
@@ -350,10 +350,10 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     scrollContent: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 10 },
 
     emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-    emptyIconWrapper: { width: 88, height: 88, backgroundColor: '#FFFFFF', borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowColor: '#10B981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
+    emptyIconWrapper: { width: 88, height: 88, backgroundColor: '#FFFFFF', borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
     emptyTitle: { color: colors.ink, fontSize: 18, fontFamily: fontFamily.black, letterSpacing: -0.2 },
     emptySubText: { color: colors.inkMuted, textAlign: 'center', marginTop: 10, paddingHorizontal: 40, fontFamily: fontFamily.medium, fontSize: 14, lineHeight: 22 },
-    browseBtn: { marginTop: 32, backgroundColor: '#10B981', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 24, shadowColor: '#10B981', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+    browseBtn: { marginTop: 32, backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 24, shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
     browseBtnText: { color: '#fff', fontFamily: fontFamily.bold, textTransform: 'uppercase', letterSpacing: 1, fontSize: 13 },
 
     orderCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 4 },
@@ -368,8 +368,8 @@ const OrderHistoryScreen = ({ navigation }: any) => {
 
     itemsListContainer: { marginBottom: 16, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 20, borderWidth: 1, borderColor: '#F1F5F9' },
     itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    itemBadge: { backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16, marginRight: 12, borderWidth: 1, borderColor: '#D1FAE5' },
-    itemQty: { color: '#059669', fontFamily: fontFamily.black, fontSize: 12 },
+    itemBadge: { backgroundColor: colors.primaryTint, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16, marginRight: 12, borderWidth: 1, borderColor: colors.primaryTint },
+    itemQty: { color: colors.primary, fontFamily: fontFamily.black, fontSize: 12 },
     itemName: { color: colors.ink, fontFamily: fontFamily.bold, fontSize: 13, flex: 1 },
 
     orderCardFooter: { flexDirection: 'column', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
@@ -380,10 +380,10 @@ const OrderHistoryScreen = ({ navigation }: any) => {
 
     cancelBtn: { flex: 1, borderWidth: 1, borderColor: '#EF4444', paddingVertical: 12, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     cancelBtnText: { color: '#EF4444', fontFamily: fontFamily.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
-    trackBtn: { flex: 2, backgroundColor: '#10B981', paddingVertical: 12, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
+    trackBtn: { flex: 2, backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
     trackBtnText: { color: '#FFFFFF', fontFamily: fontFamily.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
     
-    invoiceIconBtn: { width: 44, height: 44, backgroundColor: '#ECFDF5', borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A7F3D0' },
+    invoiceIconBtn: { width: 44, height: 44, backgroundColor: colors.primaryTint, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primaryTint },
     actionBtn: { flex: 1, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
     supportBtn: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
     supportBtnText: { color: '#DC2626', fontFamily: fontFamily.bold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },

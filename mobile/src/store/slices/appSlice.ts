@@ -26,6 +26,8 @@ interface AppState {
   // Only set when serviceabilityStatus === 'serviceable'
   activeZoneId: string | null;
   activeZoneName: string | null;
+  featureLoyalty: boolean;
+  featureReferrals: boolean;
 }
 
 const initialState: AppState = {
@@ -33,6 +35,8 @@ const initialState: AppState = {
   serviceabilityStatus: 'idle',
   activeZoneId: null,
   activeZoneName: null,
+  featureLoyalty: true,
+  featureReferrals: true,
 };
 
 const appSlice = createSlice({
@@ -89,6 +93,11 @@ const appSlice = createSlice({
       // Keep activeZoneId — a network blip shouldn't wipe a valid cached zone
       state.serviceabilityStatus = 'network_error';
     },
+
+    setFeatures: (state, action: PayloadAction<{ loyalty: boolean; referrals: boolean }>) => {
+      state.featureLoyalty = action.payload.loyalty;
+      state.featureReferrals = action.payload.referrals;
+    },
   },
 });
 
@@ -99,6 +108,7 @@ export const {
   setUnserviceable,
   setNoLocation,
   setNetworkError,
+  setFeatures,
 } = appSlice.actions;
 
 export default appSlice.reducer;

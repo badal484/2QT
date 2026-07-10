@@ -263,6 +263,18 @@ class ApiClient {
   async getDeliveredOrders() {
     return this.request('/admin/orders/delivered');
   }
+
+  // Admin: SOS Alerts
+  async getSosAlerts(status = 'active') {
+    return this.request(`/admin/sos-alerts?status=${status}`);
+  }
+
+  async resolveSosAlert(id: string, resolutionNote?: string) {
+    return this.request(`/admin/sos-alerts/${id}/resolve`, {
+      method: 'PATCH',
+      body: JSON.stringify({ resolutionNote }),
+    });
+  }
 }
 
 export const api = new ApiClient();

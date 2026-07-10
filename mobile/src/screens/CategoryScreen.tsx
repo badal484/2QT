@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   
   gridAddBtnFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
   qtyControl: {
-    flexDirection: 'row', backgroundColor: '#24B059', borderRadius: 16,
+    flexDirection: 'row', backgroundColor: '#FC4603', borderRadius: 16,
     alignItems: 'center', justifyContent: 'space-between', height: 32,
     shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4
   },
@@ -396,14 +396,14 @@ const styles = StyleSheet.create({
   qtyBtnText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
   qtyValue: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
   addBtn: {
-    backgroundColor: '#24B059', borderRadius: 16, height: 32,
+    backgroundColor: '#FC4603', borderRadius: 16, height: 32,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4,
     position: 'relative'
   },
   addBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
   customiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F3F4F6' },
-  customiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#24B059', textTransform: 'uppercase' },
+  customiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#FC4603', textTransform: 'uppercase' },
   
   soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
   soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },

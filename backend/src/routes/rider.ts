@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
-import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { authenticate, requireRole, AuthRequest, invalidateUserCache } from '../middleware/auth';
 import { emitToUser, emitToRiders, emitToAdmin, emitToOrder, emitToKitchen } from '../socket';
 import { invoicesQueue } from '../jobs/queues';
 import { NotificationService } from '../services/notification.service';
@@ -44,8 +44,13 @@ router.post('/apply', authenticate, async (req: AuthRequest, res) => {
 
 router.get('/application-status', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
-    const { rows } = await query('SELECT * FROM rider_applications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [userId]);
-    res.json({ application: rows[0] || null });
+    try {
+        const { rows } = await query('SELECT * FROM rider_applications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [userId]);
+        res.json({ application: rows[0] || null });
+    } catch (err) {
+        console.error('[application-status]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.post('/location', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
@@ -53,56 +58,141 @@ router.post('/location', authenticate, requireRole('rider', 'rider_captain', 'su
     const riderId = req.user!.userId;
     const zoneId = req.user!.zoneId;
 
-    // 1. Emit to customer order rooms immediately (non-blocking)
-    const { rows } = await query("SELECT id FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered', 'cancelled')", [riderId]);
-    for (const row of rows) {
-        emitToOrder(row.id, 'rider_location', { lat, lng });
-    }
+    try {
+        // 1. Emit to customer order rooms immediately (non-blocking)
+        const { rows } = await query("SELECT id FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered', 'cancelled')", [riderId]);
+        for (const row of rows) {
+            emitToOrder(row.id, 'rider_location', { lat, lng });
+        }
 
-    // 2. Persist location to Redis (fire-and-forget, 5 min TTL)
-    redis.set(keys.riderLocation(riderId), JSON.stringify({ lat, lng, updatedAt: new Date() }), { EX: 300 })
-        .catch(() => {});
-
-    // 3. Zone Capacity Heartbeat (fire-and-forget)
-    if (zoneId) {
-        const capacityKey = keys.activeRidersInZone(zoneId);
-        const now = Date.now();
-        redis.zAdd(capacityKey, { score: now, value: riderId })
-            .then(() => redis.zRemRangeByScore(capacityKey, '-inf', now - 60000))
+        // 2. Persist location to Redis (fire-and-forget, 5 min TTL)
+        redis.set(keys.riderLocation(riderId), JSON.stringify({ lat, lng, updatedAt: new Date() }), { EX: 300 })
             .catch(() => {});
-    }
 
-    res.json({ success: true });
+        // 3. Zone Capacity Heartbeat (fire-and-forget)
+        if (zoneId) {
+            const capacityKey = keys.activeRidersInZone(zoneId);
+            const now = Date.now();
+            redis.zAdd(capacityKey, { score: now, value: riderId })
+                .then(() => redis.zRemRangeByScore(capacityKey, '-inf', now - 60000))
+                .catch(() => {});
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[location]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// Haversine distance in km
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Returns all active zones with their primary kitchen — used by unzoned riders to navigate to the nearest hub
+router.get('/available-zones', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (_req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT DISTINCT ON (z.id)
+                   z.id, z.name, z.radius_km, z.kitchen_lat, z.kitchen_lng,
+                   k.name as kitchen_name, k.address as kitchen_address
+            FROM zones z
+            LEFT JOIN kitchens k ON k.zone_id = z.id
+            WHERE z.is_active = true OR z.is_active IS NULL
+            ORDER BY z.id, z.name ASC
+            LIMIT 20
+        `);
+        res.json({ zones: rows });
+    } catch (err) {
+        console.error('[available-zones]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// Auto-assign rider to the nearest zone if they are within its radius (± 1 km buffer)
+router.post('/zone/check-in', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    if (req.user!.zoneId) return res.json({ success: true, alreadyAssigned: true });
+
+    const { lat, lng } = req.body;
+    if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
+
+    try {
+        const { rows: zones } = await query(`
+            SELECT z.id, z.name, z.radius_km, z.kitchen_lat, z.kitchen_lng
+            FROM zones z
+            WHERE z.is_active = true OR z.is_active IS NULL
+            ORDER BY z.name ASC
+        `);
+
+        const BUFFER_KM = 1;
+        let nearest: { id: string; name: string; dist: number } | null = null;
+
+        for (const z of zones) {
+            const dist = haversineKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng));
+            if (dist <= parseFloat(z.radius_km) + BUFFER_KM) {
+                if (!nearest || dist < nearest.dist) nearest = { id: z.id, name: z.name, dist };
+            }
+        }
+
+        if (!nearest) {
+            return res.status(422).json({ error: 'NOT_IN_RANGE', message: 'You are not close enough to any delivery zone yet.' });
+        }
+
+        await query('UPDATE users SET zone_id = $1 WHERE id = $2', [nearest.id, riderId]);
+        invalidateUserCache(riderId);
+        res.json({ success: true, zoneName: nearest.name });
+    } catch (err) {
+        console.error('[zone/check-in]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.post('/online', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { rows } = await query('SELECT is_verified FROM users WHERE id = $1', [req.user!.userId]);
-    if (!rows[0]?.is_verified) {
-        return res.status(403).json({ error: 'NOT_VERIFIED', message: 'Your account is pending administrative approval.' });
+    try {
+        const { rows } = await query('SELECT is_verified FROM users WHERE id = $1', [req.user!.userId]);
+        if (!rows[0]?.is_verified) {
+            return res.status(403).json({ error: 'NOT_VERIFIED', message: 'Your account is pending administrative approval.' });
+        }
+        await query('UPDATE users SET is_online = true WHERE id = $1', [req.user!.userId]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[online]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
     }
-    await query('UPDATE users SET is_online = true WHERE id = $1', [req.user!.userId]);
-    res.json({ success: true });
 });
 
 router.post('/offline', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    // Hard block: cannot go offline while actively delivering an order
-    const { rows: active } = await query(
-        "SELECT id FROM orders WHERE rider_id = $1 AND status = 'out_for_delivery' LIMIT 1",
-        [req.user!.userId]
-    );
-    if (active.length > 0) {
-        return res.status(409).json({
-            error: 'ACTIVE_DELIVERY',
-            message: 'Complete your current delivery before going offline.',
-        });
+    try {
+        // Hard block: cannot go offline while actively delivering an order
+        const { rows: active } = await query(
+            "SELECT id FROM orders WHERE rider_id = $1 AND status = 'out_for_delivery' LIMIT 1",
+            [req.user!.userId]
+        );
+        if (active.length > 0) {
+            return res.status(409).json({
+                error: 'ACTIVE_DELIVERY',
+                message: 'Complete your current delivery before going offline.',
+            });
+        }
+        await query('UPDATE users SET is_online = false WHERE id = $1', [req.user!.userId]);
+        redis.del(keys.riderLocation(req.user!.userId)).catch(() => {});
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[offline]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
     }
-    await query('UPDATE users SET is_online = false WHERE id = $1', [req.user!.userId]);
-    await redis.del(keys.riderLocation(req.user!.userId));
-    res.json({ success: true });
 });
 
 router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
+    try {
 
     const { rows } = await query(`
         SELECT o.*,
@@ -145,6 +235,10 @@ router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain',
     }
 
     res.json({ orders: rows });
+    } catch (err) {
+        console.error('[orders/active]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
@@ -154,38 +248,41 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
 
     // Development bypass for simulated missions
     if (process.env.NODE_ENV === 'development' && typeof id === 'string' && id.startsWith('MOCK-')) {
-        return res.json({ 
-            success: true, 
-            status, 
-            order: { id, display_id: 'VLT-999', status } 
+        return res.json({
+            success: true,
+            status,
+            order: { id, display_id: 'VLT-999', status }
         });
     }
 
-    const { rows } = await query(
-        `UPDATE orders SET status = $1 WHERE id = $2 AND rider_id = $3 
-         RETURNING id, display_id, customer_id, status, delivery_otp`, 
-        [status, id, riderId]
-    );
-    if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
-    const order = rows[0];
+    try {
+        const { rows } = await query(
+            `UPDATE orders SET status = $1 WHERE id = $2 AND rider_id = $3
+             RETURNING id, display_id, customer_id, status, delivery_otp`,
+            [status, id, riderId]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        const order = rows[0];
 
-    // 1. WebSocket Update
-    emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });
-    emitToOrder(id, 'order_status_update', { orderId: id, status });
+        emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });
+        emitToOrder(id, 'order_status_update', { orderId: id, status });
 
-    // 2. Push notification — direct call, no queue dependency
-    if (status === 'out_for_delivery') {
-        const { rows: riderRows } = await query('SELECT name FROM users WHERE id = $1', [riderId]);
-        NotificationService.send('order_out_for_delivery', {
-            userId: order.customer_id,
-            displayId: order.display_id,
-            orderId: id,
-            riderName: riderRows[0]?.name ?? 'Your rider',
-            otp: String(order.delivery_otp ?? ''),
-        }).catch(() => {});
+        if (status === 'out_for_delivery') {
+            const { rows: riderRows } = await query('SELECT name FROM users WHERE id = $1', [riderId]);
+            NotificationService.send('order_out_for_delivery', {
+                userId: order.customer_id,
+                displayId: order.display_id,
+                orderId: id,
+                riderName: riderRows[0]?.name ?? 'Your rider',
+                otp: String(order.delivery_otp ?? ''),
+            }).catch(() => {});
+        }
+
+        res.json({ success: true, status });
+    } catch (err) {
+        console.error('[orders/status]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
     }
-
-    res.json({ success: true, status });
 });
 
 router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
@@ -196,6 +293,8 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     if (process.env.NODE_ENV === 'development' && orderId.startsWith('MOCK-')) {
         return res.json({ success: true });
     }
+
+    try {
 
     const { rows: orders } = await query(`
         SELECT o.*,
@@ -251,13 +350,15 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
 
         const basePay = TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
         const distanceBonus = distanceKm > 2 ? Math.floor((distanceKm - 2) * 500) : 0; // Rs. 5 per extra km
+        const tipPaise = parseInt(order.rider_tip_paise || '0', 10);
         const platformFee = Math.floor(basePay * 0.1); // 10% 2QT Commission
-        const netEarnings = basePay + distanceBonus - platformFee;
+        const bonusPaise = distanceBonus + tipPaise;
+        const netEarnings = basePay + bonusPaise - platformFee;
 
-        console.log("[VERIFY-OTP] Updating earnings...", netEarnings);
+        console.log("[VERIFY-OTP] Updating earnings...", { netEarnings, tipPaise, distanceBonus });
         await client.query(`
             INSERT INTO rider_daily_earnings (
-                rider_id, date, deliveries_count, 
+                rider_id, date, deliveries_count,
                 base_earnings_paise, bonus_earnings_paise, total_paise, cash_collected_paise
             )
             VALUES ($1, CURRENT_DATE, 1, $3, $4, $5, $2)
@@ -267,14 +368,35 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
                 bonus_earnings_paise = COALESCE(rider_daily_earnings.bonus_earnings_paise, 0) + $4,
                 total_paise = rider_daily_earnings.total_paise + $5,
                 cash_collected_paise = COALESCE(rider_daily_earnings.cash_collected_paise, 0) + $2
-        `, [riderId, cashToRecord, basePay, distanceBonus, netEarnings]);
-        
-        // Record in rider wallet/ledger (No wallet_balance_paise in users table, rider payments handled via payouts)
+        `, [riderId, cashToRecord, basePay, bonusPaise, netEarnings]);
+
         console.log("[VERIFY-OTP] Transaction done.");
     });
 
-    // Notify Rider of net earnings update
-    emitToUser(riderId, 'earnings_updated', { earningsPaise: TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE });
+    // Update streak: if last_active_date was yesterday → increment, if today → no-op, else reset to 1
+    try {
+        await query(`
+            UPDATE users SET
+                last_active_date = CURRENT_DATE,
+                current_streak_days = CASE
+                    WHEN last_active_date = CURRENT_DATE - INTERVAL '1 day' THEN current_streak_days + 1
+                    WHEN last_active_date = CURRENT_DATE                     THEN current_streak_days
+                    ELSE 1
+                END,
+                longest_streak_days = GREATEST(longest_streak_days, CASE
+                    WHEN last_active_date = CURRENT_DATE - INTERVAL '1 day' THEN current_streak_days + 1
+                    WHEN last_active_date = CURRENT_DATE                     THEN current_streak_days
+                    ELSE 1
+                END)
+            WHERE id = $1
+        `, [riderId]);
+    } catch (e) {
+        console.error('[verify-otp] streak update failed:', e);
+    }
+
+    // Notify Rider of net earnings update (app will refetch exact figure)
+    const tipForNotif = parseInt(order.rider_tip_paise || '0', 10);
+    emitToUser(riderId, 'earnings_updated', { earningsPaise: TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE, tipPaise: tipForNotif });
 
     emitToUser(order.customer_id, 'order_status_update', { orderId, status: 'delivered' });
     emitToOrder(orderId, 'order_status_update', { orderId, status: 'delivered' });
@@ -287,10 +409,16 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
     scheduleTriggerSend('order_delivered', order.customer_id, { orderId }).catch(() => {});
 
     res.json({ success: true });
+    } catch (err: any) {
+        if (err.message === 'ALREADY_DELIVERED') return res.status(400).json({ error: 'ALREADY_DELIVERED' });
+        console.error('[verify-otp]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.get('/stats', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
+    try {
 
     const { rows: lifetime } = await query(`
         SELECT COALESCE(SUM(deliveries_count), 0) as "totalDeliveries",
@@ -312,65 +440,157 @@ router.get('/stats', authenticate, requireRole('rider', 'rider_captain', 'super_
         WHERE o.rider_id = $1
     `, [riderId]);
 
+    // Acceptance rate — rolling 30 days
+    const { rows: acceptance } = await query(`
+        SELECT
+            COUNT(*) FILTER (WHERE event_type = 'claimed')   AS claimed,
+            COUNT(*) FILTER (WHERE event_type IN ('unclaimed', 'skipped')) AS skipped
+        FROM rider_order_events
+        WHERE rider_id = $1 AND created_at >= NOW() - INTERVAL '30 days'
+    `, [riderId]);
+    const claimed = parseInt(acceptance[0].claimed || '0');
+    const skipped = parseInt(acceptance[0].skipped || '0');
+    const total = claimed + skipped;
+    const acceptanceRate = total > 0 ? Math.round((claimed / total) * 100) : 100;
+
+    // Completion rate — delivered vs cancelled after claiming, rolling 30 days
+    const { rows: completion } = await query(`
+        SELECT
+            COUNT(*) FILTER (WHERE o.status = 'delivered')  AS delivered,
+            COUNT(*) FILTER (WHERE o.status = 'cancelled')  AS cancelled
+        FROM orders o
+        JOIN rider_order_events roe ON roe.order_id = o.id AND roe.rider_id = o.rider_id AND roe.event_type = 'claimed'
+        WHERE o.rider_id = $1 AND roe.created_at >= NOW() - INTERVAL '30 days'
+    `, [riderId]);
+    const delivered = parseInt(completion[0].delivered || '0');
+    const cancelled = parseInt(completion[0].cancelled || '0');
+    const compTotal = delivered + cancelled;
+    const completionRate = compTotal > 0 ? Math.round((delivered / compTotal) * 100) : 100;
+
+    // Tier — based on lifetime deliveries
+    const totalDel = parseInt(lifetime[0].totalDeliveries);
+    const tier = totalDel >= 1000 ? 'platinum' : totalDel >= 500 ? 'gold' : totalDel >= 100 ? 'silver' : 'bronze';
+    const nextTierAt = totalDel >= 1000 ? null : totalDel >= 500 ? 1000 : totalDel >= 100 ? 500 : 100;
+
+    // Streak from users table
+    const { rows: streakRow } = await query(
+        'SELECT current_streak_days, longest_streak_days FROM users WHERE id = $1',
+        [riderId]
+    );
+
     res.json({
-        totalDeliveries: parseInt(lifetime[0].totalDeliveries),
+        totalDeliveries: totalDel,
         totalEarnings: parseInt(lifetime[0].totalEarnings),
         weekEarnings: parseInt(week[0].weekEarnings),
-        rating: parseFloat(rating[0].avg_rating || '5.0')
+        rating: parseFloat(rating[0].avg_rating || '5.0'),
+        acceptanceRate,
+        completionRate,
+        tier,
+        nextTierAt,
+        currentStreak: streakRow[0]?.current_streak_days ?? 0,
+        longestStreak: streakRow[0]?.longest_streak_days ?? 0,
     });
+    } catch (err) {
+        console.error('[stats]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.get('/earnings/history', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { rows } = await query(
-        'SELECT * FROM rider_daily_earnings WHERE rider_id = $1 ORDER BY date DESC LIMIT 30',
-        [req.user!.userId]
-    );
-    res.json({ earnings: rows });
+    try {
+        const { rows } = await query(
+            'SELECT * FROM rider_daily_earnings WHERE rider_id = $1 ORDER BY date DESC LIMIT 30',
+            [req.user!.userId]
+        );
+        res.json({ earnings: rows });
+    } catch (err) {
+        console.error('[earnings/history]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.get('/earnings/today', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { rows } = await query(
-        'SELECT deliveries_count as "deliveriesCount", total_paise as "totalPaise", cash_collected_paise as "cashCollectedPaise" FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE',
-        [req.user!.userId]
-    );
-    res.json(rows[0] || { deliveriesCount: 0, totalPaise: 0, cashCollectedPaise: 0 });
+    try {
+        const { rows } = await query(
+            'SELECT deliveries_count as "deliveriesCount", total_paise as "totalPaise", cash_collected_paise as "cashCollectedPaise" FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE',
+            [req.user!.userId]
+        );
+        res.json(rows[0] || { deliveriesCount: 0, totalPaise: 0, cashCollectedPaise: 0 });
+    } catch (err) {
+        console.error('[earnings/today]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.get('/payouts', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
+    try {
+        const [payoutsRes, earningsRes, paidRes, profileRes, todayRes] = await Promise.all([
+            query('SELECT * FROM weekly_payouts WHERE rider_id = $1 ORDER BY week_start DESC', [riderId]),
+            query('SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]),
+            query(`SELECT COALESCE(SUM(net_amount_paise), 0) as paid FROM weekly_payouts WHERE rider_id = $1 AND status = 'paid'`, [riderId]),
+            query('SELECT upi_id FROM users WHERE id = $1', [riderId]),
+            query('SELECT deliveries_count, total_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE', [riderId]),
+        ]);
 
-    const [payoutsRes, earningsRes, paidRes, profileRes, todayRes] = await Promise.all([
-        query('SELECT * FROM weekly_payouts WHERE rider_id = $1 ORDER BY week_start DESC', [riderId]),
-        query('SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]),
-        query(`SELECT COALESCE(SUM(net_amount_paise), 0) as paid FROM weekly_payouts WHERE rider_id = $1 AND status = 'paid'`, [riderId]),
-        query('SELECT upi_id FROM users WHERE id = $1', [riderId]),
-        query('SELECT deliveries_count, total_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE', [riderId]),
-    ]);
+        const pendingAmountPaise = Math.max(0, parseInt(earningsRes.rows[0].total) - parseInt(paidRes.rows[0].paid));
+        const today = todayRes.rows[0] || { deliveries_count: 0, total_paise: 0 };
 
-    const pendingAmountPaise = Math.max(0, parseInt(earningsRes.rows[0].total) - parseInt(paidRes.rows[0].paid));
-    const today = todayRes.rows[0] || { deliveries_count: 0, total_paise: 0 };
-
-    res.json({
-        payouts: payoutsRes.rows,
-        pendingAmountPaise,
-        storedUpiId: profileRes.rows[0]?.upi_id || null,
-        todayDeliveries: parseInt(today.deliveries_count),
-        todayEarningsPaise: parseInt(today.total_paise),
-    });
+        res.json({
+            payouts: payoutsRes.rows,
+            pendingAmountPaise,
+            storedUpiId: profileRes.rows[0]?.upi_id || null,
+            todayDeliveries: parseInt(today.deliveries_count),
+            todayEarningsPaise: parseInt(today.total_paise),
+        });
+    } catch (err) {
+        console.error('[payouts]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { rows } = await query(`
-        SELECT o.*, u.name as customer_name, u.phone as customer_phone, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng,
-               k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng
-        FROM orders o
-        JOIN users u ON o.customer_id = u.id
-        LEFT JOIN addresses a ON o.address_id = a.id
-        LEFT JOIN kitchens k ON o.kitchen_id = k.id
-        WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL
-        ORDER BY o.created_at ASC
-    `);
-    
+    const riderZoneId = req.user!.zoneId;
+    const role = req.user!.role;
+
+    if (!riderZoneId && role !== 'super_admin') {
+        return res.json({ orders: [], noZone: true });
+    }
+
+    const zoneFilter = riderZoneId ? 'AND k.zone_id = $1' : '';
+    const params = riderZoneId ? [riderZoneId] : [];
+
+    let rows: any[];
+    try {
+        const result = await query(`
+            SELECT o.*, u.name as customer_name, u.phone as customer_phone, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng,
+                   k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
+                   k.avg_prep_time_minutes,
+                   (o.created_at + (k.avg_prep_time_minutes || ' minutes')::INTERVAL) AS estimated_ready_at
+            FROM orders o
+            JOIN users u ON o.customer_id = u.id
+            LEFT JOIN addresses a ON o.address_id = a.id
+            LEFT JOIN kitchens k ON o.kitchen_id = k.id
+            WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL ${zoneFilter}
+            ORDER BY o.created_at ASC
+        `, params);
+        rows = result.rows;
+    } catch {
+        // avg_prep_time_minutes column may not exist yet (migration pending) — fall back without it
+        const result = await query(`
+            SELECT o.*, u.name as customer_name, u.phone as customer_phone, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng,
+                   k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
+                   NULL::INTEGER AS avg_prep_time_minutes, NULL::TIMESTAMPTZ AS estimated_ready_at
+            FROM orders o
+            JOIN users u ON o.customer_id = u.id
+            LEFT JOIN addresses a ON o.address_id = a.id
+            LEFT JOIN kitchens k ON o.kitchen_id = k.id
+            WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL ${zoneFilter}
+            ORDER BY o.created_at ASC
+        `, params);
+        rows = result.rows;
+    }
+
     for (const order of rows) {
         const { rows: items } = await query('SELECT menu_item_name, quantity FROM order_items WHERE order_id = $1', [order.id]);
         order.items = items;
@@ -381,22 +601,27 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
 
 router.get('/orders/history', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
-    const { rows } = await query(`
-        SELECT o.*, u.name as customer_name, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng
-        FROM orders o
-        JOIN users u ON o.customer_id = u.id
-        LEFT JOIN addresses a ON o.address_id = a.id
-        WHERE o.rider_id = $1 AND o.status IN ('delivered', 'cancelled')
-        ORDER BY o.delivered_at DESC, o.created_at DESC
-        LIMIT 50
-    `, [riderId]);
+    try {
+        const { rows } = await query(`
+            SELECT o.*, u.name as customer_name, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng
+            FROM orders o
+            JOIN users u ON o.customer_id = u.id
+            LEFT JOIN addresses a ON o.address_id = a.id
+            WHERE o.rider_id = $1 AND o.status IN ('delivered', 'cancelled')
+            ORDER BY o.delivered_at DESC, o.created_at DESC
+            LIMIT 50
+        `, [riderId]);
 
-    for (const order of rows) {
-        const { rows: items } = await query('SELECT menu_item_name, quantity FROM order_items WHERE order_id = $1', [order.id]);
-        order.items = items;
+        for (const order of rows) {
+            const { rows: items } = await query('SELECT menu_item_name, quantity FROM order_items WHERE order_id = $1', [order.id]);
+            order.items = items;
+        }
+
+        res.json({ orders: rows });
+    } catch (err) {
+        console.error('[orders/history]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
     }
-
-    res.json({ orders: rows });
 });
 
 router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
@@ -421,6 +646,9 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
             // Legacy compatibility
             await client.query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
         });
+
+        // Log claim event for acceptance rate tracking (non-fatal — table may not exist on older deployments)
+        query('INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [riderId, id, 'claimed']).catch(() => {});
 
         // Notify customer — include rider info so buyer app updates immediately without waiting for next poll
         const { rows: orderRows } = await query(
@@ -473,6 +701,9 @@ router.post('/orders/:id/unclaim', authenticate, requireRole('rider', 'rider_cap
             await client.query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
         });
 
+        // Log skip/unclaim event for acceptance rate tracking (non-fatal)
+        query('INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [riderId, id, 'unclaimed']).catch(() => {});
+
         // Notify kitchen dispatch panel immediately so it reappears in unassigned list
         if (kitchenId) emitToKitchen(kitchenId, 'order_updated', { orderId: id, riderDeclined: true });
         // Notify customer that rider assignment was cleared
@@ -485,11 +716,16 @@ router.post('/orders/:id/unclaim', authenticate, requireRole('rider', 'rider_cap
 });
 
 router.get('/', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { rows } = await query(
-        'SELECT * FROM rider_daily_earnings WHERE rider_id = $1 ORDER BY date DESC LIMIT 30',
-        [req.user!.userId]
-    );
-    res.json({ earnings: rows });
+    try {
+        const { rows } = await query(
+            'SELECT * FROM rider_daily_earnings WHERE rider_id = $1 ORDER BY date DESC LIMIT 30',
+            [req.user!.userId]
+        );
+        res.json({ earnings: rows });
+    } catch (err) {
+        console.error('[rider/]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
 });
 
 router.post('/payouts/request', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
@@ -725,6 +961,155 @@ router.post('/orders/:id/report-issue', authenticate, requireRole('rider', 'ride
         res.json({ success: true });
     } catch (err) {
         console.error('[report-issue]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Kitchen Arrival ──────────────────────────────────────────────────────────
+router.post('/orders/:id/arrived-at-kitchen', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const riderId = req.user!.userId;
+    try {
+        const { rows } = await query(
+            `UPDATE orders SET arrived_at_kitchen_at = NOW()
+             WHERE id = $1 AND rider_id = $2 AND arrived_at_kitchen_at IS NULL
+             RETURNING kitchen_id, customer_id, display_id`,
+            [id, riderId]
+        );
+        if (!rows[0]) return res.status(400).json({ error: 'Cannot mark arrival for this order' });
+
+        emitToKitchen(rows[0].kitchen_id, 'rider_arrived', { orderId: id, displayId: rows[0].display_id });
+        emitToUser(rows[0].customer_id, 'order_status_update', { orderId: id, riderAtKitchen: true });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[arrived-at-kitchen]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── SOS / Safety ─────────────────────────────────────────────────────────────
+router.post('/sos', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { alertType = 'emergency', lat, lng, orderId } = req.body;
+    try {
+        const { rows } = await query(
+            `INSERT INTO sos_alerts (rider_id, order_id, alert_type, lat, lng)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [riderId, orderId || null, alertType, lat || null, lng || null]
+        );
+
+        const { rows: riderInfo } = await query('SELECT name, phone FROM users WHERE id = $1', [riderId]);
+
+        emitToAdmin('sos_alert', {
+            sosId: rows[0].id,
+            riderId,
+            riderName: riderInfo[0]?.name,
+            riderPhone: riderInfo[0]?.phone,
+            orderId: orderId || null,
+            alertType,
+            lat, lng,
+            createdAt: new Date().toISOString(),
+        });
+
+        res.json({ success: true, sosId: rows[0].id });
+    } catch (err) {
+        console.error('[sos]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.patch('/sos/:sosId/resolve', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const { sosId } = req.params;
+    const { resolutionNote } = req.body;
+    const resolvedBy = req.user!.userId;
+    try {
+        await query(
+            `UPDATE sos_alerts SET status = 'resolved', resolved_at = NOW(), resolved_by = $1, resolution_note = $2
+             WHERE id = $3`,
+            [resolvedBy, resolutionNote || null, sosId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[sos/resolve]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Weekly Scorecard ─────────────────────────────────────────────────────────
+router.get('/scorecard', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    try {
+
+    const { rows: thisWeek } = await query(`
+        SELECT
+            COALESCE(SUM(deliveries_count), 0)          AS deliveries,
+            COALESCE(SUM(total_paise), 0)               AS earnings_paise,
+            COALESCE(SUM(bonus_earnings_paise), 0)      AS bonus_paise
+        FROM rider_daily_earnings
+        WHERE rider_id = $1 AND date >= DATE_TRUNC('week', CURRENT_DATE)
+    `, [riderId]);
+
+    const { rows: lastWeek } = await query(`
+        SELECT
+            COALESCE(SUM(deliveries_count), 0) AS deliveries,
+            COALESCE(SUM(total_paise), 0)      AS earnings_paise
+        FROM rider_daily_earnings
+        WHERE rider_id = $1
+          AND date >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '7 days'
+          AND date <  DATE_TRUNC('week', CURRENT_DATE)
+    `, [riderId]);
+
+    const { rows: ratingRow } = await query(`
+        SELECT AVG(f.delivery_rating) AS avg_rating
+        FROM order_feedback f
+        JOIN orders o ON f.order_id = o.id
+        WHERE o.rider_id = $1 AND o.delivered_at >= DATE_TRUNC('week', CURRENT_DATE)
+    `, [riderId]);
+
+    const { rows: bestDay } = await query(`
+        SELECT date, total_paise, deliveries_count
+        FROM rider_daily_earnings
+        WHERE rider_id = $1 AND date >= DATE_TRUNC('week', CURRENT_DATE)
+        ORDER BY total_paise DESC LIMIT 1
+    `, [riderId]);
+
+    const { rows: acc } = await query(`
+        SELECT
+            COUNT(*) FILTER (WHERE event_type = 'claimed')                  AS claimed,
+            COUNT(*) FILTER (WHERE event_type IN ('unclaimed', 'skipped'))  AS skipped
+        FROM rider_order_events
+        WHERE rider_id = $1 AND created_at >= DATE_TRUNC('week', CURRENT_DATE)
+    `, [riderId]);
+
+    const tw = thisWeek[0];
+    const lw = lastWeek[0];
+    const cl = parseInt(acc[0].claimed || '0');
+    const sk = parseInt(acc[0].skipped || '0');
+    const tot = cl + sk;
+
+    res.json({
+        thisWeek: {
+            deliveries:     parseInt(tw.deliveries),
+            earningsPaise:  parseInt(tw.earnings_paise),
+            bonusPaise:     parseInt(tw.bonus_paise),
+            avgRating:      parseFloat(ratingRow[0]?.avg_rating || '5.0'),
+            acceptanceRate: tot > 0 ? Math.round((cl / tot) * 100) : 100,
+            bestDay:        bestDay[0] || null,
+        },
+        lastWeek: {
+            deliveries:    parseInt(lw.deliveries),
+            earningsPaise: parseInt(lw.earnings_paise),
+        },
+        deliveriesChange: parseInt(lw.deliveries) > 0
+            ? Math.round(((parseInt(tw.deliveries) - parseInt(lw.deliveries)) / parseInt(lw.deliveries)) * 100)
+            : 0,
+        earningsChange: parseInt(lw.earnings_paise) > 0
+            ? Math.round(((parseInt(tw.earnings_paise) - parseInt(lw.earnings_paise)) / parseInt(lw.earnings_paise)) * 100)
+            : 0,
+    });
+    } catch (err) {
+        console.error('[scorecard]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });

@@ -5,10 +5,11 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import KitchenBoardScreen from '../screens/KitchenBoardScreen';
 import StockScreen from '../screens/StockScreen';
+import KitchenManageScreen from '../screens/KitchenManageScreen';
 import FeedbackScreen from '../screens/FeedbackScreen';
 import ShiftHandoverScreen from '../screens/ShiftHandoverScreen';
 import KitchenDineInScreen from '../screens/KitchenDineInScreen';
-import { ClipboardList, BarChart3, Star, UtensilsCrossed } from 'lucide-react-native';
+import { ClipboardList, BarChart3, Star, UtensilsCrossed, Settings } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -44,6 +45,13 @@ const MainKitchenTabs = () => {
           name="Board"
           component={KitchenBoardScreen}
           options={{ tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} /> }}
+        />
+      )}
+      {!isDineInStaff && (
+        <Tab.Screen
+          name="Manage"
+          component={KitchenManageScreen}
+          options={{ tabBarIcon: ({ color }) => <Settings size={22} color={color} /> }}
         />
       )}
       {!isDineInStaff && (

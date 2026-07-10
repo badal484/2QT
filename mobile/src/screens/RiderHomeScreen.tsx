@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StatusBar, Alert,
+  View, Text, TouchableOpacity, StatusBar, Alert, Linking,
   StyleSheet, Animated, Easing, Platform, PermissionsAndroid,
 } from 'react-native';
 import { LeafletMap } from '../components/LeafletMap';
@@ -11,10 +11,19 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { updateUser } from '../store/slices/authSlice';
 import { getSocket } from '../socket/client';
-import { ChevronRight, Check, X, IndianRupee, Clock } from 'lucide-react-native';
+import { ChevronRight, Check, X, IndianRupee, Clock, Navigation, MapPin, Loader } from 'lucide-react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
 import { displayLocalNotification } from '../services/localNotif';
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 const S = {
   orange: '#FC8019',
@@ -65,6 +74,78 @@ const RiderHomeScreen = ({ navigation }: any) => {
     refetchInterval: 5000,
   });
 
+  // Available zones — fetched only when rider has no zone assigned
+  const noZone = !!poolData?.noZone;
+  const { data: zonesData } = useQuery({
+    queryKey: ['available-zones'],
+    queryFn: () => api.get('/riders/available-zones'),
+    enabled: noZone,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const [checkingIn, setCheckingIn] = useState(false);
+  const checkingInRef = useRef(false);
+  const checkInMutation = useMutation({
+    mutationFn: (coords: { lat: number; lng: number }) =>
+      api.post('/riders/zone/check-in', coords),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
+      if (data?.zoneName) Alert.alert('Zone assigned!', `You've been checked in to ${data.zoneName}. Orders will start appearing now.`);
+    },
+    onError: (err: any) => {
+      // API client throws plain Error — message is the backend's verbose message
+      const msg: string = err?.message || '';
+      if (msg.toLowerCase().includes('not close enough') || msg === 'NOT_IN_RANGE') {
+        Alert.alert('Not in range yet', 'You need to be closer to the kitchen hub. Keep moving and the app will check again automatically.');
+      }
+      // other errors (network etc.) surfaced by the settled spinner disappearing — no extra alert needed
+    },
+    onSettled: () => { setCheckingIn(false); checkingInRef.current = false; },
+  });
+
+  // Auto proximity check every 30 s — uses ref so the interval doesn't reset on every GPS ping
+  useEffect(() => {
+    if (!noZone) return;
+    const zones: any[] = zonesData?.zones || [];
+    if (!zones.length) return;
+    const timer = setInterval(() => {
+      if (checkingInRef.current) return;
+      const { latitude: lat, longitude: lng } = latestLocationRef.current;
+      const inRange = zones.some(z =>
+        haversineKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng))
+        <= parseFloat(z.radius_km) + 1,
+      );
+      if (inRange) {
+        checkingInRef.current = true;
+        setCheckingIn(true);
+        checkInMutation.mutate({ lat, lng });
+      }
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [noZone, zonesData]);
+
+  // Nearest zone for display
+  const nearestZone = (() => {
+    const zones: any[] = zonesData?.zones || [];
+    if (!zones.length) return null;
+    const { latitude: lat, longitude: lng } = currentLocation;
+    return zones.reduce((best: any, z: any) => {
+      const dist = haversineKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng));
+      return !best || dist < best.dist ? { ...z, dist } : best;
+    }, null as any);
+  })();
+
+  const openMaps = (z: any) => {
+    const label = encodeURIComponent(z.kitchen_name || z.name);
+    const url = Platform.OS === 'ios'
+      ? `maps://?daddr=${z.kitchen_lat},${z.kitchen_lng}&q=${label}`
+      : `google.navigation:q=${z.kitchen_lat},${z.kitchen_lng}`;
+    Linking.openURL(url).catch(() =>
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${z.kitchen_lat},${z.kitchen_lng}`),
+    );
+  };
+
   const activeOrders = activeOrderData?.orders || [];
   const pool: any[] = (poolData?.orders || []).filter((o: any) => !skippedIds.includes(o.id));
 
@@ -75,6 +156,10 @@ const RiderHomeScreen = ({ navigation }: any) => {
       dispatch(updateUser({ is_online: val, online_since: val ? new Date().toISOString() : null }));
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
+    onError: (err: any) => {
+      const msg = err.response?.data?.message || err.message || 'Failed to change duty status';
+      Alert.alert('Cannot change status', msg);
+    }
   });
 
   const claimMutation = useMutation({
@@ -270,37 +355,101 @@ const RiderHomeScreen = ({ navigation }: any) => {
       <View style={[styles.topCard, { paddingTop: insets.top + 10 }]}>
         <View style={styles.topRow}>
           {/* Rider name + status */}
-          <View style={styles.nameBlock}>
-            <View style={[styles.statusDot, { backgroundColor: isOnline ? S.green : S.muted }]} />
+          <TouchableOpacity 
+            style={styles.nameBlock}
+            onPress={() => navigation.navigate('ProfileTab')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.avatarWrap}>
+              <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || 'R'}</Text>
+              <View style={[styles.statusDot, { backgroundColor: isOnline ? S.green : S.muted }]} />
+            </View>
             <View>
               <Text style={styles.nameText}>{user?.name?.split(' ')[0] || 'Rider'}</Text>
               <Text style={styles.statusText}>{isOnline ? 'Online' : 'Offline'}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Today earnings */}
           <View style={styles.earningsBlock}>
-            <IndianRupee size={13} color={S.orange} />
-            <Text style={styles.earningsAmt}>{todayEarnings}</Text>
+            <View style={styles.earningsAmtRow}>
+              <IndianRupee size={14} color={S.ink} />
+              <Text style={styles.earningsAmt}>{todayEarnings}</Text>
+            </View>
             <Text style={styles.earningsLabel}>{ordersToday} orders today</Text>
           </View>
 
           {/* Online toggle */}
           <TouchableOpacity
-            style={[styles.toggleBtn, isOnline ? styles.toggleBtnOn : styles.toggleBtnOff]}
+            style={[styles.togglePill, isOnline ? styles.togglePillOn : styles.togglePillOff]}
             onPress={() => toggleOnlineMutation.mutate(!isOnline)}
             disabled={toggleOnlineMutation.isPending}
-            activeOpacity={0.85}
+            activeOpacity={0.9}
           >
-            <Text style={[styles.toggleText, { color: isOnline ? S.white : S.orange }]}>
-              {isOnline ? 'ON DUTY' : 'GO ONLINE'}
+            <View style={[styles.toggleThumb, isOnline ? styles.toggleThumbOn : styles.toggleThumbOff]} />
+            <Text style={[styles.toggleText, isOnline ? styles.toggleTextOn : styles.toggleTextOff]}>
+              {isOnline ? 'ON DUTY' : 'OFF DUTY'}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* ── No zone: head to nearest kitchen hub ─────────────────────────── */}
+      {isOnline && noZone && activeOrders.length === 0 && !pendingOrder && (
+        <View style={styles.zoneCard}>
+          <View style={styles.zoneHeader}>
+            <MapPin size={18} color={S.orange} />
+            <Text style={styles.zoneTitle}>Report to your delivery hub</Text>
+          </View>
+          {nearestZone ? (
+            <>
+              <Text style={styles.zoneKitchen}>{nearestZone.kitchen_name || nearestZone.name}</Text>
+              <Text style={styles.zoneAddress} numberOfLines={2}>{nearestZone.kitchen_address || 'Kitchen location'}</Text>
+              <View style={styles.zoneDistRow}>
+                <Navigation size={13} color={S.muted} />
+                <Text style={styles.zoneDist}>
+                  {nearestZone.dist < 1
+                    ? `${Math.round(nearestZone.dist * 1000)} m away`
+                    : `${nearestZone.dist.toFixed(1)} km away`}
+                </Text>
+                {nearestZone.dist <= parseFloat(nearestZone.radius_km) + 1 && (
+                  <View style={styles.inRangeBadge}>
+                    <Text style={styles.inRangeText}>In range</Text>
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.navigateBtn}
+                onPress={() => openMaps(nearestZone)}
+                activeOpacity={0.85}
+              >
+                <Navigation size={16} color={S.white} />
+                <Text style={styles.navigateBtnText}>Navigate to Hub</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.checkInBtn, checkingIn && styles.checkInBtnDisabled]}
+                onPress={() => {
+                  if (checkingIn) return;
+                  setCheckingIn(true);
+                  checkInMutation.mutate({ lat: currentLocation.latitude, lng: currentLocation.longitude });
+                }}
+                activeOpacity={0.85}
+                disabled={checkingIn}
+              >
+                {checkingIn
+                  ? <Loader size={15} color={S.orange} />
+                  : <Text style={styles.checkInBtnText}>I'm Here — Check Me In</Text>}
+              </TouchableOpacity>
+              <Text style={styles.zoneHint}>You'll be auto-checked in once you're within {nearestZone.radius_km} km of the hub</Text>
+            </>
+          ) : (
+            <Text style={styles.zoneDist}>Loading zone info…</Text>
+          )}
+        </View>
+      )}
+
       {/* ── Waiting pulse (online, no orders) ────────────────────────────── */}
-      {isOnline && activeOrders.length === 0 && !pendingOrder && (
+      {isOnline && !poolData?.noZone && activeOrders.length === 0 && !pendingOrder && (
         <View style={styles.waitingCenter}>
           <View style={styles.pulseWrap}>
             <Animated.View style={[styles.pulseRing, { transform: [{ scale: pulseAnim }], opacity: pulseAnim.interpolate({ inputRange: [1, 1.6], outputRange: [0.35, 0] }) }]} />
@@ -377,6 +526,19 @@ const RiderHomeScreen = ({ navigation }: any) => {
           <View style={styles.notifBody}>
             <Text style={styles.notifOrderId}>{pendingOrder.display_id || pendingOrder.displayId}</Text>
 
+            {/* Prep time ETA row */}
+            {pendingOrder.estimated_ready_at && (() => {
+              const minsLeft = Math.max(0, Math.round((new Date(pendingOrder.estimated_ready_at).getTime() - Date.now()) / 60000));
+              return (
+                <View style={styles.prepTimeBadge}>
+                  <Clock size={12} color={minsLeft <= 2 ? S.green : S.orange} />
+                  <Text style={[styles.prepTimeText, { color: minsLeft <= 2 ? S.green : S.orange }]}>
+                    {minsLeft <= 0 ? 'Order ready now' : `Ready in ~${minsLeft} min`}
+                  </Text>
+                </View>
+              );
+            })()}
+
             <View style={styles.notifRow}>
               <View style={styles.notifField}>
                 <Text style={styles.notifFieldLabel}>DELIVER TO</Text>
@@ -449,20 +611,33 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
     elevation: 6,
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  nameBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  statusDot: { width: 10, height: 10, borderRadius: 5 },
-  nameText: { fontSize: 15, fontWeight: '800', color: S.ink },
-  statusText: { fontSize: 11, color: S.muted, fontWeight: '600', marginTop: 1 },
-  earningsBlock: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  earningsAmt: { fontSize: 15, fontWeight: '800', color: S.ink },
-  earningsLabel: { fontSize: 10, color: S.muted, fontWeight: '600', marginLeft: 4 },
-  toggleBtn: {
-    paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, borderWidth: 1.5,
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  nameBlock: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarWrap: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: S.orangeLight,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: S.orange,
   },
-  toggleBtnOn: { backgroundColor: S.orange, borderColor: S.orange },
-  toggleBtnOff: { backgroundColor: S.white, borderColor: S.orange },
-  toggleText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  avatarText: { color: S.orange, fontSize: 16, fontWeight: '900' },
+  statusDot: { position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: S.white },
+  nameText: { fontSize: 16, fontWeight: '800', color: S.ink, marginBottom: 2 },
+  statusText: { fontSize: 11, color: S.muted, fontWeight: '600' },
+  earningsBlock: { alignItems: 'center' },
+  earningsAmtRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  earningsAmt: { fontSize: 18, fontWeight: '900', color: S.ink },
+  earningsLabel: { fontSize: 10, color: S.muted, fontWeight: '600', marginTop: 2 },
+  
+  togglePill: {
+    flexDirection: 'row', alignItems: 'center', borderRadius: 24, paddingVertical: 4, paddingHorizontal: 4, width: 105,
+    borderWidth: 1.5,
+  },
+  togglePillOn: { backgroundColor: S.orange, borderColor: S.orange },
+  togglePillOff: { backgroundColor: S.white, borderColor: S.border },
+  toggleThumb: { width: 24, height: 24, borderRadius: 12, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  toggleThumbOn: { backgroundColor: S.white, transform: [{ translateX: 70 }] },
+  toggleThumbOff: { backgroundColor: S.muted, transform: [{ translateX: 0 }] },
+  toggleText: { position: 'absolute', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  toggleTextOn: { color: S.white, left: 12 },
+  toggleTextOff: { color: S.muted, right: 12 },
 
   // Waiting
   waitingCenter: {
@@ -484,6 +659,35 @@ const styles = StyleSheet.create({
   },
   waitingTitle: { color: S.ink, fontSize: 14, fontWeight: '700' },
   waitingSub: { color: S.muted, fontSize: 12, marginTop: 3, textAlign: 'center' },
+
+  // Zone check-in card
+  zoneCard: {
+    position: 'absolute', bottom: 100, left: 16, right: 16, zIndex: 30,
+    backgroundColor: S.white, borderRadius: 20, padding: 20,
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 20, elevation: 10,
+    borderWidth: 1, borderColor: '#FFE0C2',
+  },
+  zoneHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  zoneTitle: { fontSize: 13, fontWeight: '800', color: S.orange, textTransform: 'uppercase', letterSpacing: 0.5 },
+  zoneKitchen: { fontSize: 18, fontWeight: '900', color: S.ink, marginBottom: 3 },
+  zoneAddress: { fontSize: 13, color: S.muted, lineHeight: 18, marginBottom: 12 },
+  zoneDistRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+  zoneDist: { fontSize: 13, fontWeight: '600', color: S.muted },
+  inRangeBadge: { backgroundColor: '#E8F8F1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  inRangeText: { fontSize: 11, fontWeight: '800', color: '#1BA672' },
+  navigateBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: S.orange, borderRadius: 13, paddingVertical: 13, marginBottom: 10,
+  },
+  navigateBtnText: { fontSize: 15, fontWeight: '800', color: S.white },
+  checkInBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 13, paddingVertical: 12, marginBottom: 10,
+    borderWidth: 1.5, borderColor: S.orange,
+  },
+  checkInBtnDisabled: { opacity: 0.5 },
+  checkInBtnText: { fontSize: 14, fontWeight: '700', color: S.orange },
+  zoneHint: { fontSize: 11, color: S.muted, textAlign: 'center', lineHeight: 16 },
 
   // Offline
   offlineBanner: { position: 'absolute', bottom: 100, left: 20, right: 20, zIndex: 30 },
@@ -538,7 +742,13 @@ const styles = StyleSheet.create({
   },
   countdownText: { color: S.white, fontSize: 12, fontWeight: '800' },
   notifBody: { padding: 20 },
-  notifOrderId: { fontSize: 28, fontWeight: '900', color: S.ink, marginBottom: 14 },
+  notifOrderId: { fontSize: 28, fontWeight: '900', color: S.ink, marginBottom: 8 },
+  prepTimeBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
+    backgroundColor: S.orangeLight, marginBottom: 14,
+  },
+  prepTimeText: { fontSize: 12, fontWeight: '700' },
   notifRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   notifField: { flex: 1 },
   notifFieldLabel: { fontSize: 10, fontWeight: '700', color: S.muted, letterSpacing: 0.8, marginBottom: 4 },

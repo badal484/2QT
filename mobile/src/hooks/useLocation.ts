@@ -72,9 +72,12 @@ export const useLocation = () => {
       isFetchingRef.current = false;
     };
 
-    // High-accuracy GPS only — network location is 500m+ off in rural areas
+    // iOS high accuracy is fast. Android high accuracy indoors can take 20s+. 
+    // We use false for Android to get an instant network-based fix.
     Geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: true, timeout: 20000, maximumAge: 5000,
+      enableHighAccuracy: Platform.OS === 'ios', 
+      timeout: 15000, 
+      maximumAge: 10000,
     });
   }, []);
 

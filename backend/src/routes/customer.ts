@@ -186,6 +186,15 @@ router.post('/addresses', authenticate, async (req: AuthRequest, res) => {
     const { label, addressText, lat, lng, zoneId, flatNumber, buildingName } = req.body;
     const userId = req.user!.userId;
 
+    // Approach A: Silent Replace for standard labels
+    if (label && label !== 'Other') {
+        await query(`
+            UPDATE addresses 
+            SET deleted_at = NOW() 
+            WHERE customer_id = $1 AND label = $2 AND deleted_at IS NULL
+        `, [userId, label]);
+    }
+
     const { rows } = await query(`
         INSERT INTO addresses (customer_id, label, address_text, lat, lng, zone_id, flat_number, building_name)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

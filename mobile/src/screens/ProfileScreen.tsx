@@ -11,7 +11,12 @@ import {
   LogOut,
   ShieldCheck,
   Wallet,
-  Bell
+  Bell,
+  Flame,
+  TrendingUp,
+  Award,
+  BarChart2,
+  Sparkles,
 } from 'lucide-react-native';
 import React from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
@@ -60,6 +65,7 @@ const MinimalListItem = ({ icon, title, value, onPress, subtitle, color = "#1A1A
 
 const ProfileScreen = ({ navigation }: any) => {
   const { user } = useSelector((state: RootState) => state.auth);
+  const { featureLoyalty, featureReferrals } = useSelector((state: RootState) => state.app);
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -129,6 +135,20 @@ const ProfileScreen = ({ navigation }: any) => {
         </Animated.View>
 
         {/* STATS ROW (Swish Style) */}
+        {!isRider && featureReferrals && (
+          <Animated.View entering={FadeInDown.delay(120).duration(400)}>
+            <BouncingButton style={styles.referralBanner} activeOpacity={0.8} onPress={() => navigation.navigate('Referral')}>
+              <View style={styles.referralIconBox}>
+                <Gift size={20} color="#FFFFFF" />
+              </View>
+              <View style={styles.referralTexts}>
+                <Text style={styles.referralTitle}>Invite & Earn ₹50</Text>
+                <Text style={styles.referralSub}>Get ₹50 for every friend who orders.</Text>
+              </View>
+              <ChevronRight size={20} color="#FFFFFF" />
+            </BouncingButton>
+          </Animated.View>
+        )}
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statsRow}>
           {isRider ? (
             <>
@@ -150,41 +170,106 @@ const ProfileScreen = ({ navigation }: any) => {
             </>
           ) : (
             <>
-              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('Wallet')}>
+              <BouncingButton style={[styles.statBox, !featureLoyalty && { flex: 1 }]} activeOpacity={0.8} onPress={() => navigation.navigate('Wallet')}>
                 <Wallet size={20} color="#6B7280" />
                 <Text style={styles.statLabel}>Wallet Balance</Text>
                 <Text style={styles.statValue}>{wallet ? `₹${(wallet.balancePaise / 100).toFixed(2)}` : '₹0.00'}</Text>
               </BouncingButton>
-              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('Loyalty')}>
-                <Star size={20} color="#6B7280" />
-                <Text style={styles.statLabel}>Loyalty Points</Text>
-                <Text style={styles.statValue}>{loyalty?.points || 0}</Text>
-              </BouncingButton>
+              {featureLoyalty && (
+                <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('Loyalty')}>
+                  <Sparkles size={20} color="#FC4603" />
+                  <Text style={styles.statLabel}>Loyalty Points</Text>
+                  <Text style={[styles.statValue, { color: '#FC4603' }]}>{loyalty?.points || 0}</Text>
+                </BouncingButton>
+              )}
             </>
           )}
         </Animated.View>
 
-        {/* REFERRAL CARD (MINIMAL) */}
-        {!isRider && (
-          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.referralWrapper}>
-            <BouncingButton 
-              activeOpacity={0.9}
-              style={[styles.referralCard, { backgroundColor: accentLight }]}
-              onPress={() => {
-                ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-                navigation.navigate('Referral');
-              }}
-            >
-              <View style={styles.referralIconWrapper}>
-                <Gift size={20} color={accent} />
+        {/* RIDER TIER + STREAK CARD */}
+        {isRider && (
+          <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.tierCard}>
+            {/* Tier badge row */}
+            <View style={styles.tierRow}>
+              <View style={[styles.tierBadge, {
+                backgroundColor:
+                  riderStats?.tier === 'platinum' ? '#F3E8FF' :
+                  riderStats?.tier === 'gold'     ? '#FEF3C7' :
+                  riderStats?.tier === 'silver'   ? '#F1F5F9' : '#FFF3E8',
+              }]}>
+                <Text style={styles.tierEmoji}>
+                  {riderStats?.tier === 'platinum' ? '💎' :
+                   riderStats?.tier === 'gold'     ? '🥇' :
+                   riderStats?.tier === 'silver'   ? '🥈' : '🥉'}
+                </Text>
+                <Text style={[styles.tierName, {
+                  color:
+                    riderStats?.tier === 'platinum' ? '#7C3AED' :
+                    riderStats?.tier === 'gold'     ? '#D97706' :
+                    riderStats?.tier === 'silver'   ? '#64748B' : '#FC8019',
+                }]}>
+                  {(riderStats?.tier || 'bronze').charAt(0).toUpperCase() + (riderStats?.tier || 'bronze').slice(1)}
+                </Text>
               </View>
-              <View style={styles.referralTextCol}>
-                <Text style={[styles.referralTitle, { color: accent }]}>Invite & Earn ₹50</Text>
+              {riderStats?.nextTierAt && (
+                <Text style={styles.tierNextHint}>
+                  {riderStats.nextTierAt - (riderStats.totalDeliveries || 0)} trips to next tier
+                </Text>
+              )}
+              {/* Streak */}
+              <View style={styles.streakBadge}>
+                <Flame size={14} color={riderStats?.currentStreak > 0 ? '#FC8019' : '#93959F'} />
+                <Text style={[styles.streakText, { color: riderStats?.currentStreak > 0 ? '#FC8019' : '#93959F' }]}>
+                  {riderStats?.currentStreak || 0} day streak
+                </Text>
               </View>
-              <ChevronRight size={18} color={accent} />
-            </BouncingButton>
+            </View>
+            {/* Progress bar to next tier */}
+            {riderStats?.nextTierAt && (
+              <View style={styles.tierProgressTrack}>
+                <View style={[styles.tierProgressFill, {
+                  width: `${Math.min(100, Math.round(((riderStats.totalDeliveries || 0) / riderStats.nextTierAt) * 100))}%` as any,
+                }]} />
+              </View>
+            )}
+            {/* Acceptance + Completion rate */}
+            <View style={styles.perfRow}>
+              <View style={styles.perfItem}>
+                <TrendingUp size={13} color={
+                  (riderStats?.acceptanceRate ?? 100) >= 80 ? '#1BA672' :
+                  (riderStats?.acceptanceRate ?? 100) >= 60 ? '#FC8019' : '#EF4444'
+                } />
+                <Text style={[styles.perfVal, {
+                  color:
+                    (riderStats?.acceptanceRate ?? 100) >= 80 ? '#1BA672' :
+                    (riderStats?.acceptanceRate ?? 100) >= 60 ? '#FC8019' : '#EF4444',
+                }]}>{riderStats?.acceptanceRate ?? 100}%</Text>
+                <Text style={styles.perfLabel}>Acceptance</Text>
+              </View>
+              <View style={styles.perfDivider} />
+              <View style={styles.perfItem}>
+                <Award size={13} color={
+                  (riderStats?.completionRate ?? 100) >= 90 ? '#1BA672' :
+                  (riderStats?.completionRate ?? 100) >= 70 ? '#FC8019' : '#EF4444'
+                } />
+                <Text style={[styles.perfVal, {
+                  color:
+                    (riderStats?.completionRate ?? 100) >= 90 ? '#1BA672' :
+                    (riderStats?.completionRate ?? 100) >= 70 ? '#FC8019' : '#EF4444',
+                }]}>{riderStats?.completionRate ?? 100}%</Text>
+                <Text style={styles.perfLabel}>Completion</Text>
+              </View>
+              <View style={styles.perfDivider} />
+              <View style={styles.perfItem}>
+                <Flame size={13} color='#F59E0B' />
+                <Text style={[styles.perfVal, { color: '#F59E0B' }]}>{riderStats?.longestStreak || 0}d</Text>
+                <Text style={styles.perfLabel}>Best Streak</Text>
+              </View>
+            </View>
           </Animated.View>
         )}
+
+
 
         {/* ACTIVITY GROUP */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.settingsGroup}>
@@ -193,13 +278,15 @@ const ProfileScreen = ({ navigation }: any) => {
             <>
               <MinimalListItem icon={<ShieldCheck size={22} color="#6B7280" strokeWidth={1.5} />} title="Documents" onPress={() => navigation.navigate('RiderDocuments')} />
               <MinimalListItem icon={<Star size={22} color="#6B7280" strokeWidth={1.5} />} title="Daily Missions" onPress={() => navigation.navigate('RiderMissions')} />
+              <MinimalListItem icon={<BarChart2 size={22} color="#6B7280" strokeWidth={1.5} />} title="Weekly Scorecard" subtitle="Your performance this week" onPress={() => navigation.navigate('RiderScorecard')} />
             </>
           ) : (
             <>
               <MinimalListItem icon={<Package size={22} color="#6B7280" strokeWidth={1.5} />} title="Your Orders" onPress={() => navigation.navigate('OrdersTab')} />
-              <MinimalListItem icon={<Calendar size={22} color="#6B7280" strokeWidth={1.5} />} title="My Table Bookings" onPress={() => navigation.navigate('MyTableBookings')} />
-              <MinimalListItem icon={<MapPin size={22} color="#6B7280" strokeWidth={1.5} />} title="Saved Addresses" onPress={() => navigation.navigate('AddressBook')} />
+              {/* <MinimalListItem icon={<Calendar size={22} color="#6B7280" strokeWidth={1.5} />} title="My Table Bookings" onPress={() => navigation.navigate('MyTableBookings')} /> */}
+              <MinimalListItem icon={<MapPin size={22} color="#6B7280" strokeWidth={1.5} />} title="Saved Addresses" onPress={() => navigation.navigate('Address')} />
             </>
+
           )}
         </Animated.View>
 
@@ -466,6 +553,38 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 2,
   },
+
+  // Tier + streak card
+  tierCard: {
+    marginHorizontal: 16, marginBottom: 12, backgroundColor: '#FFFFFF',
+    borderRadius: 20, padding: 16,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    borderWidth: 1, borderColor: '#E9E9EB',
+  },
+  tierRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  tierBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  tierEmoji: { fontSize: 16 },
+  tierName: { fontSize: 14, fontWeight: '800' },
+  tierNextHint: { flex: 1, fontSize: 11, color: '#93959F', fontWeight: '600' },
+  streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  streakText: { fontSize: 12, fontWeight: '700' },
+  tierProgressTrack: {
+    height: 5, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden', marginBottom: 14,
+  },
+  tierProgressFill: {
+    height: 5, backgroundColor: '#FC8019', borderRadius: 3,
+  },
+  perfRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F8F8F8', borderRadius: 14, padding: 12,
+  },
+  perfItem: { flex: 1, alignItems: 'center', gap: 3 },
+  perfVal: { fontSize: 15, fontWeight: '800' },
+  perfLabel: { fontSize: 10, color: '#93959F', fontWeight: '600' },
+  perfDivider: { width: 1, height: 32, backgroundColor: '#E9E9EB' },
 });
 
 export default ProfileScreen;

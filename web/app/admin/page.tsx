@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare, ShieldCheck, ShieldAlert
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -37,6 +37,9 @@ const RestaurantsTab = dynamic(() => import("./RestaurantsTab").then(m => ({ def
 const ActivityTab = dynamic(() => import("./ActivityTab"), { ssr: false });
 const RiderIssuesTab = dynamic(() => import("./RiderIssuesTab").then(m => ({ default: m.RiderIssuesTab })), { ssr: false });
 const DeliveredOrdersTab = dynamic(() => import("./DeliveredOrdersTab").then(m => ({ default: m.DeliveredOrdersTab })), { ssr: false });
+const RiderDocumentsTab = dynamic(() => import("./RiderDocumentsTab").then(m => ({ default: m.RiderDocumentsTab })), { ssr: false });
+const RiderDetailDrawer = dynamic(() => import("./RiderDetailDrawer").then(m => ({ default: m.RiderDetailDrawer })), { ssr: false });
+const SOSAlertsTab = dynamic(() => import("./SOSAlertsTab").then(m => ({ default: m.SOSAlertsTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -740,7 +743,7 @@ function CustomersTab() {
 
 // ─── Fleet Tab ───────────────────────────────────────────────────────────────
 
-function FleetTab() {
+function FleetTab({ onOpenRider }: { onOpenRider?: (id: string) => void }) {
   const [riders, setRiders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -809,12 +812,22 @@ function FleetTab() {
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => verifyRider(r.id)}
-                  className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] uppercase tracking-widest transition-all"
-                >
-                  Verify & Approve
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => verifyRider(r.id)}
+                    className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] uppercase tracking-widest transition-all"
+                  >
+                    Verify & Approve
+                  </button>
+                  {onOpenRider && (
+                    <button
+                      onClick={() => onOpenRider(r.id)}
+                      className="px-3 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      Profile
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -867,6 +880,11 @@ function FleetTab() {
                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Waiting for dispatch</span>
                     </div>
                   )}
+                  {onOpenRider && (
+                    <button onClick={() => onOpenRider(r.id)} className="mt-3 w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all">
+                      View Full Profile
+                    </button>
+                  )}
                 </div>
               );
               })}
@@ -883,7 +901,7 @@ function FleetTab() {
           <h3 className="text-lg font-black tracking-tight text-white">Offline Riders</h3>
           <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[24px] p-2 shadow-2xl shadow-black/40">
             {offlineRiders.map(r => (
-              <div key={r.id} className="flex items-center justify-between p-4 hover:bg-white/[0.02] backdrop-blur-lg rounded-2xl transition-colors">
+              <div key={r.id} className="flex items-center justify-between p-4 hover:bg-white/[0.02] backdrop-blur-lg rounded-2xl transition-colors group">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-white/[0.04] backdrop-blur-xl flex items-center justify-center font-black italic text-zinc-300 text-xs">
                     {r.name?.[0]}
@@ -893,7 +911,14 @@ function FleetTab() {
                     <div className="text-[9px] font-black text-zinc-300 uppercase tracking-widest">{r.phone}</div>
                   </div>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-zinc-700/80" />
+                <div className="flex items-center gap-2">
+                  {onOpenRider && (
+                    <button onClick={() => onOpenRider(r.id)} className="hidden group-hover:block text-[9px] text-zinc-500 hover:text-white font-bold px-2 py-1 rounded-lg bg-white/5 transition-all">
+                      Profile
+                    </button>
+                  )}
+                  <div className="w-2 h-2 rounded-full bg-zinc-700/80" />
+                </div>
               </div>
             ))}
             {offlineRiders.length === 0 && (
@@ -1429,7 +1454,7 @@ function AnalyticsTab() {
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
-const FEATURE_FLAGS = ["feature_online_payments","feature_cod","feature_wallet","feature_subscriptions","feature_referrals","feature_scheduling","feature_live_kitchen","maintenance_mode","force_update"];
+const FEATURE_FLAGS = ["feature_online_payments","feature_cod","feature_wallet","feature_subscriptions","feature_referrals","feature_loyalty","feature_scheduling","feature_live_kitchen","maintenance_mode","force_update"];
 const BUSINESS_RULES = ["min_order_paise","platform_fee_percent","max_delivery_radius_km","surge_order_threshold","wallet_cashback_cap_paise","kitchen_auto_close_time","min_app_version","latest_app_version","support_contact"];
 
 function SettingsTab() {
@@ -1882,7 +1907,9 @@ const TABS = [
   { name: "Dispatch",        icon: Package,          component: DispatchTab },
   { name: "Fleet",           icon: Bike,             component: FleetTab },
   { name: "Applications",    icon: Info,             component: RiderApplicationsTab },
+  { name: "Rider Docs",      icon: ShieldCheck,      component: RiderDocumentsTab },
   { name: "Rider Issues",    icon: FileWarning,      component: RiderIssuesTab },
+  { name: "SOS Alerts",      icon: ShieldAlert,      component: SOSAlertsTab },
   { name: "Deliveries",      icon: CheckSquare,      component: DeliveredOrdersTab },
   // Restaurants
   { name: "Restaurants",     icon: Utensils,         component: RestaurantsTab },
@@ -1920,6 +1947,7 @@ export default function AdminPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [openRiderId, setOpenRiderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -1956,10 +1984,21 @@ export default function AdminPage() {
       setRefreshKey(prev => prev + 1);
     });
 
+    socket.on("sos_alert", (data) => {
+      const typeLabel = data.alertType === 'emergency' ? '🚨 EMERGENCY' : data.alertType === 'silent' ? '🤫 Silent Alert' : '📍 Location Share';
+      toast.error(`${typeLabel} — ${data.riderName || 'Unknown rider'}`, {
+        description: `Phone: ${data.riderPhone || 'N/A'} · Tap Safety Alerts tab`,
+        duration: 15000,
+        icon: <ShieldAlert className="w-4 h-4 text-red-400" />,
+      });
+      setActiveTab("SOS Alerts");
+    });
+
     return () => {
       socket.off("new_order");
       socket.off("order_status_update");
       socket.off("new_ticket");
+      socket.off("sos_alert");
       socket.disconnect();
     };
   }, [user, router]);
@@ -1988,7 +2027,7 @@ export default function AdminPage() {
         <div className="flex-1 px-3 overflow-y-auto pb-4">
           {[
             { section: "Core",           items: ["Overview", "Analytics"] },
-            { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Deliveries", "Fleet", "Applications", "Rider Issues"] },
+            { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Deliveries", "Fleet", "Applications", "Rider Docs", "Rider Issues", "SOS Alerts"] },
             { section: "Restaurants",    items: ["Restaurants", "Kitchens", "Partners", "Menu", "Categories", "Inventory"] },
             { section: "Growth",         items: ["Broadcast", "Campaigns", "Promo Codes", "Menu Offers", "Marketing"] },
             { section: "Customers",      items: ["Customers", "Support", "Complaints"] },
@@ -2129,11 +2168,22 @@ export default function AdminPage() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             >
-              <ActiveComponent />
+              {activeTab === "Rider Docs"
+                ? <RiderDocumentsTab onOpenRider={id => setOpenRiderId(id)} />
+                : activeTab === "Fleet"
+                ? <FleetTab onOpenRider={id => setOpenRiderId(id)} />
+                : <ActiveComponent />}
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Rider Detail Drawer */}
+      <AnimatePresence>
+        {openRiderId && (
+          <RiderDetailDrawer riderId={openRiderId} onClose={() => setOpenRiderId(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

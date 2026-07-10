@@ -1,10 +1,10 @@
 export const colors = {
-  primary: '#1B5E46',
-  primaryDark: '#123F30',
-  primaryTint: '#E8F2EC',
+  primary: '#FC4603',
+  primaryDark: '#D95A2D',
+  primaryTint: '#FFF0E8',
 
-  accent: '#1B5E46',
-  accentTint: '#E8F2EC',
+  accent: '#FC4603',
+  accentTint: '#FFF0E8',
 
   background: '#FAF8F4',
   surface: '#FFFFFF',
@@ -17,12 +17,12 @@ export const colors = {
   border: '#E6E2DA',
   borderStrong: '#D6D1C6',
 
-  success: '#1B5E46',
-  successTint: '#E8F2EC',
-  warning: '#B8853B',
-  warningTint: '#F5EDE0',
-  danger: '#B5453B',
-  dangerTint: '#F7E8E6',
+  success: '#10B981',
+  successTint: '#D1FAE5',
+  warning: '#F59E0B',
+  warningTint: '#FEF3C7',
+  danger: '#EF4444',
+  dangerTint: '#FEE2E2',
 
   overlay: 'rgba(26, 31, 28, 0.6)',
   white: '#FFFFFF',

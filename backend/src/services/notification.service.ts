@@ -10,7 +10,7 @@ export type NotifType =
     | 'order_out_for_delivery' | 'order_delivered' | 'order_cancelled'
     | 'rider_payout' | 'kitchen_payout' | 'low_subscription_meals'
     | 'rider_verified' | 'cash_submitted' | 'broadcast_message'
-    | 'low_stock_alert' | 'rider_guarantee_payout' | 'renewal_reminder';
+    | 'low_stock_alert' | 'rider_guarantee_payout' | 'renewal_reminder' | 'generic_sms';
 
 const PROMO_TYPES   = new Set(['broadcast_message', 'winback', 'birthday', 'flash_sale', 'renewal_reminder']);
 const PAYOUT_TYPES  = new Set(['rider_payout', 'kitchen_payout', 'rider_guarantee_payout']);
@@ -31,6 +31,7 @@ const FALLBACK_TEMPLATES: Record<string, { title_template: string; body_template
     rider_verified:         { title_template: 'You\'re Approved! 🏍️', body_template: 'Your rider account is live. Go online and start earning!', channels: ['push', 'whatsapp'] },
     broadcast_message:      { title_template: '{{title}}', body_template: '{{body}}', channels: ['push', 'whatsapp'] },
     cash_submitted:         { title_template: 'Cash Submission', body_template: 'Rider {{riderName}} submitted ₹{{amount}} cash for Order #{{displayId}}.', channels: ['push'] },
+    generic_sms:            { title_template: '{{title}}', body_template: '{{message}}', channels: ['whatsapp'] },
 };
 
 // ─── Template cache ───────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import {
   ArrowLeft, Phone, Navigation, Package,
   CreditCard, ChevronRight, Info, AlertTriangle,
   UserX, MessageSquareWarning, RefreshCw, DoorOpen, RotateCcw, X, MapPin,
+  ShieldAlert, CheckCircle2, MapPinCheck,
 } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
 
@@ -22,6 +23,16 @@ const R = {
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
   border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
 };
+
+// Haversine distance in metres
+function distanceMetres(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 const STEPS = [
   { key: 'kitchen', label: 'At Kitchen' },
@@ -50,9 +61,17 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const [currentStatus, setCurrentStatus] = useState(order.status);
   const [showUnreachableModal, setShowUnreachableModal] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showSosModal, setShowSosModal] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const [arrivedAtKitchen, setArrivedAtKitchen] = useState(!!order.arrived_at_kitchen_at);
+  const [sosHolding, setSosHolding] = useState(false);
+  const sosHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentLocationRef = useRef({ lat: 0, lng: 0 });
+  const arrivedAtKitchenRef = useRef(arrivedAtKitchen);
+  arrivedAtKitchenRef.current = arrivedAtKitchen;
   const queryClient = useQueryClient();
 
+  // Socket — live status updates
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
@@ -66,16 +85,36 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     return () => { socket.off('order_status_update'); };
   }, [order.id, queryClient]);
 
+  // Geolocation — share location + geofence kitchen arrival
   useEffect(() => {
     const socket = getSocket();
     const watchId = Geolocation.watchPosition(
-      pos => socket?.emit('update_location', { lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      pos => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        currentLocationRef.current = { lat, lng };
+        socket?.emit('update_location', { lat, lng });
+
+        // Geofence: auto-trigger kitchen arrival when within 100 m
+        if (
+          order.kitchen_lat && order.kitchen_lng &&
+          !arrivedAtKitchenRef.current &&
+          ['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus)
+        ) {
+          const dist = distanceMetres(lat, lng, parseFloat(order.kitchen_lat), parseFloat(order.kitchen_lng));
+          if (dist <= 100) {
+            arrivedAtKitchenRef.current = true;
+            setArrivedAtKitchen(true);
+            api.post(`/riders/orders/${order.id}/arrived-at-kitchen`, {}).catch(() => {});
+          }
+        }
+      },
       () => {},
       { enableHighAccuracy: true, distanceFilter: 5, interval: 4000 },
     );
     return () => Geolocation.clearWatch(watchId);
-  }, []);
+  }, [currentStatus]);
 
+  // AppState — re-emit location when foregrounded
   const appStateRef = useRef(AppState.currentState);
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
@@ -92,6 +131,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     return () => sub.remove();
   }, []);
 
+  // Mutations
   const updateStatusMutation = useMutation({
     mutationFn: (status: string) => api.patch(`/riders/orders/${order.id}/status`, { status }),
     onSuccess: (data: any) => {
@@ -100,12 +140,15 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     },
   });
 
+  const arrivedMutation = useMutation({
+    mutationFn: () => api.post(`/riders/orders/${order.id}/arrived-at-kitchen`, {}),
+    onSuccess: () => setArrivedAtKitchen(true),
+    onError: () => setArrivedAtKitchen(true), // already marked — idempotent
+  });
+
   const unclaimMutation = useMutation({
     mutationFn: () => api.post(`/riders/orders/${order.id}/unclaim`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-      navigation.goBack();
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['rider-active-order'] }); navigation.goBack(); },
     onError: (err: any) => Alert.alert('Error', err.message || 'Could not release order'),
   });
 
@@ -122,12 +165,29 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
 
   const reportIssueMutation = useMutation({
     mutationFn: () => api.post(`/riders/orders/${order.id}/report-issue`, { issueType: selectedIssue }),
-    onSuccess: () => {
-      setShowIssueModal(false);
-      setSelectedIssue(null);
-      Alert.alert('Issue Reported', 'Our team has been notified and will follow up.');
-    },
+    onSuccess: () => { setShowIssueModal(false); setSelectedIssue(null); Alert.alert('Issue Reported', 'Our team has been notified and will follow up.'); },
     onError: () => Alert.alert('Error', 'Could not report issue. Please try again.'),
+  });
+
+  const sosMutation = useMutation({
+    mutationFn: (alertType: string) => api.post('/riders/sos', {
+      alertType,
+      orderId: order.id,
+      lat: currentLocationRef.current.lat || null,
+      lng: currentLocationRef.current.lng || null,
+    }),
+    onSuccess: (_, alertType) => {
+      setShowSosModal(false);
+      if (alertType === 'emergency') {
+        Alert.alert('🚨 Emergency Alert Sent', 'Our ops team has been notified with your location. Calling emergency services now.', [
+          { text: 'Call 112', onPress: () => Linking.openURL('tel:112') },
+          { text: 'OK' },
+        ]);
+      } else {
+        Alert.alert('Alert Sent', 'Your location has been shared with our safety team. We will contact you shortly.');
+      }
+    },
+    onError: () => Alert.alert('Error', 'Could not send SOS. Please call 112 directly.'),
   });
 
   const goingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus);
@@ -163,6 +223,16 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     );
   };
 
+  // SOS hold-to-activate (2 seconds)
+  const onSosHoldStart = () => {
+    setSosHolding(true);
+    sosHoldTimer.current = setTimeout(() => { setSosHolding(false); setShowSosModal(true); }, 2000);
+  };
+  const onSosHoldEnd = () => {
+    setSosHolding(false);
+    if (sosHoldTimer.current) clearTimeout(sosHoldTimer.current);
+  };
+
   const destinationName = goingToKitchen ? (order.kitchen_name || 'Kitchen') : (order.customer_name || 'Customer');
   const destinationAddress = goingToKitchen
     ? (order.kitchen_address || order.kitchen_name || 'Kitchen')
@@ -184,18 +254,30 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           <View style={s.orderIdWrap}>
             <Text style={s.orderId}>{order.display_id}</Text>
           </View>
-          <View style={[s.statusChip,
-            isWaiting && { backgroundColor: '#F0F0F0' },
-            canPickup && { backgroundColor: R.greenLight },
-            isOutForDelivery && { backgroundColor: R.orangeLight },
-          ]}>
-            <Text style={[s.statusChipText,
-              isWaiting && { color: R.muted },
-              canPickup && { color: R.green },
-              isOutForDelivery && { color: R.orange },
+          <View style={s.headerRight}>
+            <View style={[s.statusChip,
+              isWaiting && { backgroundColor: '#F0F0F0' },
+              canPickup && { backgroundColor: R.greenLight },
+              isOutForDelivery && { backgroundColor: R.orangeLight },
             ]}>
-              {currentStatus.replace(/_/g, ' ')}
-            </Text>
+              <Text style={[s.statusChipText,
+                isWaiting && { color: R.muted },
+                canPickup && { color: R.green },
+                isOutForDelivery && { color: R.orange },
+              ]}>
+                {currentStatus.replace(/_/g, ' ')}
+              </Text>
+            </View>
+            {/* SOS hold button */}
+            <TouchableOpacity
+              style={[s.sosBtn, sosHolding && s.sosBtnHolding]}
+              onPressIn={onSosHoldStart}
+              onPressOut={onSosHoldEnd}
+              activeOpacity={0.85}
+            >
+              <ShieldAlert size={14} color={sosHolding ? R.white : R.red} />
+              <Text style={[s.sosBtnLabel, sosHolding && { color: R.white }]}>SOS</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -222,6 +304,27 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+
+        {/* Kitchen arrival banner */}
+        {goingToKitchen && (
+          arrivedAtKitchen ? (
+            <View style={s.arrivedBanner}>
+              <CheckCircle2 size={18} color={R.green} />
+              <Text style={s.arrivedBannerText}>You've arrived at the kitchen</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={s.atKitchenBtn}
+              onPress={() => arrivedMutation.mutate()}
+              disabled={arrivedMutation.isPending}
+              activeOpacity={0.85}
+            >
+              <MapPinCheck size={18} color={R.orange} />
+              <Text style={s.atKitchenText}>I'm at the Kitchen</Text>
+              <Text style={s.atKitchenHint}>Tap when you arrive · auto-detected at 100 m</Text>
+            </TouchableOpacity>
+          )
+        )}
 
         {/* Destination card */}
         <View style={s.card}>
@@ -318,6 +421,44 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* SOS Modal */}
+      <Modal visible={showSosModal} transparent animationType="slide" onRequestClose={() => setShowSosModal(false)}>
+        <View style={s.overlay}>
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <View style={s.sheetHeader}>
+              <View style={s.sosTitleRow}>
+                <ShieldAlert size={20} color={R.red} />
+                <Text style={[s.sheetTitle, { color: R.red }]}>Emergency Safety</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowSosModal(false)}>
+                <X size={22} color={R.muted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.sheetSub}>Your location will be shared with our safety team instantly.</Text>
+            {[
+              { type: 'emergency', label: '🚨 Call Emergency (112)', desc: 'Calls police + alerts our ops team with your live location', color: R.red, bg: R.redLight },
+              { type: 'share_location', label: '📍 Share Location with Ops', desc: 'Silent alert — ops will call you within 2 minutes', color: R.orange, bg: R.orangeLight },
+              { type: 'silent', label: '🤫 Silent Alert', desc: 'No sound, no call — discreet notification to safety team', color: R.blue, bg: R.blueLight },
+            ].map(opt => (
+              <TouchableOpacity
+                key={opt.type}
+                style={[s.optionRow, { backgroundColor: opt.bg, borderColor: opt.color, borderWidth: 1 }]}
+                onPress={() => sosMutation.mutate(opt.type)}
+                disabled={sosMutation.isPending}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.optionLabel, { color: opt.color }]}>{opt.label}</Text>
+                  <Text style={s.optionDesc}>{opt.desc}</Text>
+                </View>
+                <ChevronRight size={16} color={opt.color} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
 
       {/* Customer Unreachable Modal */}
       <Modal visible={showUnreachableModal} transparent animationType="slide" onRequestClose={() => setShowUnreachableModal(false)}>
@@ -434,8 +575,16 @@ const s = StyleSheet.create({
   },
   orderIdWrap: { flex: 1, alignItems: 'center' },
   orderId: { fontSize: 16, fontWeight: '800', color: R.ink },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusChip: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   statusChipText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  sosBtn: {
+    width: 44, borderRadius: 10, paddingVertical: 5,
+    backgroundColor: R.redLight, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: R.red, gap: 2,
+  },
+  sosBtnHolding: { backgroundColor: R.red },
+  sosBtnLabel: { fontSize: 8, fontWeight: '800', color: R.red, letterSpacing: 0.5 },
 
   stepRow: { flexDirection: 'row', alignItems: 'center' },
   stepItem: { alignItems: 'center' },
@@ -450,6 +599,21 @@ const s = StyleSheet.create({
   stepLabelActive: { color: R.ink, fontWeight: '700' },
   stepLine: { flex: 1, height: 2, backgroundColor: R.border, marginBottom: 18 },
   stepLineDone: { backgroundColor: R.orange },
+
+  // Kitchen arrival
+  atKitchenBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: R.orangeLight, borderRadius: 14, padding: 14, marginBottom: 12,
+    borderWidth: 1.5, borderColor: '#FFD4A8',
+  },
+  atKitchenText: { fontSize: 15, fontWeight: '800', color: R.orange, flex: 1 },
+  atKitchenHint: { fontSize: 10, color: R.muted, position: 'absolute', bottom: 6, right: 14 },
+  arrivedBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: R.greenLight, borderRadius: 14, padding: 14, marginBottom: 12,
+    borderWidth: 1, borderColor: '#B6EDD8',
+  },
+  arrivedBannerText: { fontSize: 14, fontWeight: '700', color: R.green },
 
   card: {
     backgroundColor: R.white, borderRadius: 16, padding: 16, marginBottom: 12,
@@ -522,6 +686,7 @@ const s = StyleSheet.create({
   },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: R.border, alignSelf: 'center', marginBottom: 20 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  sosTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: R.ink },
   sheetSub: { fontSize: 13, color: R.muted, marginBottom: 16 },
   optionRow: {

@@ -20,8 +20,6 @@ import { fontFamily } from '../theme/typography';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const HERO_H = Math.round(SCREEN_W * 0.82);
-const GREEN = '#2E7D32';
-const GREEN_LIGHT = '#E8F5E9';
 
 const PremiumBag = () => (
   <View style={{ width: 180, height: 240, alignItems: 'center', justifyContent: 'center' }}>
@@ -52,11 +50,13 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
     state.cart.items.find(ci => ci.menuItemId === item.id),
   );
   const zoneId = useSelector((state: RootState) => state.cart.zoneId);
+  const activeZoneId = useSelector((state: RootState) => state.app.activeZoneId);
+  const effectiveZoneId = zoneId || activeZoneId;
 
   const [showDetails, setShowDetails] = useState(false);
   const [activeCustomizationItem, setActiveCustomizationItem] = useState<any>(null);
 
-  const menuData = queryClient.getQueryData<any>(['menu', zoneId]);
+  const menuData = queryClient.getQueryData<any>(['menu', effectiveZoneId]);
   const relatedItems: any[] = (menuData?.items ?? [])
     .filter((i: any) => i.category === item.category && i.id !== item.id && i.available)
     .slice(0, 6);
@@ -504,19 +504,19 @@ const s = StyleSheet.create({
   detailToggleText: {
     fontSize: 14,
     fontFamily: fontFamily.semibold,
-    color: GREEN,
+    color: colors.primary,
   },
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   tagChip: {
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
-    backgroundColor: GREEN_LIGHT,
+    backgroundColor: colors.primaryTint,
   },
   tagChipText: {
     fontSize: 12,
     fontFamily: fontFamily.semibold,
-    color: GREEN,
+    color: colors.primary,
   },
 
   divider: { height: 28 },
@@ -581,7 +581,7 @@ const s = StyleSheet.create({
   },
   relatedAddText: {
     fontSize: 14,
-    color: GREEN,
+    color: colors.primary,
     fontFamily: fontFamily.black,
     letterSpacing: 0.5,
   },
@@ -594,7 +594,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: GREEN,
+    backgroundColor: colors.primary,
     borderRadius: 16,
     paddingHorizontal: 12,
     shadowColor: '#000',
@@ -708,16 +708,16 @@ const s = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: GREEN,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   promoIconText: { fontSize: 16, color: '#FFFFFF', fontFamily: fontFamily.black },
-  promoTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: GREEN, lineHeight: 18 },
+  promoTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary, lineHeight: 18 },
   promoSub: {
     fontSize: 11,
     fontFamily: fontFamily.semibold,
-    color: GREEN,
+    color: colors.primary,
     opacity: 0.7,
     marginTop: 1,
   },
@@ -740,7 +740,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: GREEN,
+    backgroundColor: colors.primary,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -777,7 +777,7 @@ const s = StyleSheet.create({
   addBtn: {
     width: 116,
     height: 42,
-    backgroundColor: GREEN,
+    backgroundColor: colors.primary,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -786,7 +786,7 @@ const s = StyleSheet.create({
   qtyControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: GREEN,
+    backgroundColor: colors.primary,
     borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 8,

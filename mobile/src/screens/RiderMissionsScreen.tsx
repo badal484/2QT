@@ -37,6 +37,10 @@ interface MissionsData {
 const MissionCard = ({ mission }: { mission: Mission }) => {
   const pct = Math.min(Math.round((mission.progress / mission.target) * 100), 100);
   const bonusRs = (mission.bonusPaise / 100).toFixed(0);
+  const isEarnings = mission.id.includes('earn');
+  const progressLabel = isEarnings
+    ? `₹${Math.floor(mission.progress / 100)} / ₹${Math.floor(mission.target / 100)}`
+    : `${mission.progress} / ${mission.target}`;
 
   return (
     <View style={[mc.card, mission.completed && mc.cardDone]}>
@@ -67,9 +71,7 @@ const MissionCard = ({ mission }: { mission: Mission }) => {
 
       <View style={mc.footer}>
         <Text style={mc.countText}>
-          {mission.completed
-            ? '✓ Mission completed!'
-            : `${mission.progress} / ${mission.target}`}
+          {mission.completed ? '✓ Mission completed!' : progressLabel}
         </Text>
         {mission.completed && (
           <View style={mc.completedBadge}>
