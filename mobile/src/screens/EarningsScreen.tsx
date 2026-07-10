@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, Wallet, Trophy, Clock } from 'lucide-react-native';
+import { ArrowLeft, Wallet, Trophy, Clock, Banknote } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const R = {
@@ -52,7 +52,13 @@ const EarningsScreen = ({ navigation }: any) => {
           <ArrowLeft size={20} color={R.ink} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Earnings</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          style={s.payoutBtn}
+          onPress={() => navigation.navigate('Payouts')}
+          activeOpacity={0.7}
+        >
+          <Banknote size={18} color={R.orange} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
@@ -141,6 +147,10 @@ const s = StyleSheet.create({
   backBtn: {
     width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
     backgroundColor: R.bg,
+  },
+  payoutBtn: {
+    width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: R.orangeLight,
   },
   headerTitle: { fontSize: 17, fontWeight: '800', color: R.ink },
 
