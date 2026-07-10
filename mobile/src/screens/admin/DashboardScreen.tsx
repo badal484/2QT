@@ -272,6 +272,12 @@ const DashboardScreen = ({ navigation }: any) => {
             icon={Trophy}
             onPress={() => navigation.navigate('MissionBuilder')}
           />
+          <NavItem
+            title="Order Capacity"
+            sub="Phase 1 / Phase 2 per zone"
+            icon={Layers}
+            onPress={() => navigation.navigate('ZoneCapacity')}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

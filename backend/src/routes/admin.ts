@@ -1235,7 +1235,8 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
         delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise, base_distance_km,
         free_delivery_above_paise, surge_multiplier,
         min_order_paise, small_order_fee_paise,
-        rider_base_pay_paise, rider_per_km_paise, rider_free_km
+        rider_base_pay_paise, rider_per_km_paise, rider_free_km,
+        max_concurrent_orders
     } = req.body;
 
     // Auto-compute zone center from polygon centroid when polygon changes
@@ -1273,6 +1274,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
                 rider_base_pay_paise = COALESCE($23, rider_base_pay_paise),
                 rider_per_km_paise = COALESCE($24, rider_per_km_paise),
                 rider_free_km = COALESCE($25, rider_free_km),
+                max_concurrent_orders = COALESCE($26, max_concurrent_orders),
                 updated_at = NOW()
             WHERE id = $12
             RETURNING *
@@ -1284,7 +1286,8 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
             delivery_fee_type ?? null, base_delivery_fee_paise ?? null, per_km_fee_paise ?? null,
             base_distance_km ?? null, free_delivery_above_paise ?? null, surge_multiplier ?? null,
             min_order_paise ?? null, small_order_fee_paise ?? null,
-            rider_base_pay_paise ?? null, rider_per_km_paise ?? null, rider_free_km ?? null]);
+            rider_base_pay_paise ?? null, rider_per_km_paise ?? null, rider_free_km ?? null,
+            max_concurrent_orders ?? null]);
         if (rows.length === 0) return res.status(404).json({ error: 'ZONE_NOT_FOUND' });
 
         // Sync kitchen lat/lng to the new zone center so maps show the correct spot

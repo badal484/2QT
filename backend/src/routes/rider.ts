@@ -634,17 +634,69 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
     const riderZoneId = req.user!.zoneId;
     const role = req.user!.role;
 
-    // Capacity gate: if rider already has 3 active orders, nothing to show — no popup fires
     if (role !== 'super_admin') {
-        const { rows: cap } = await query(
-            `SELECT COUNT(*) FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered','cancelled')`,
+        // Look up zone's max_concurrent_orders (default 1 if not set)
+        let maxConcurrent = 1;
+        if (riderZoneId) {
+            const { rows: zoneRows } = await query(
+                `SELECT COALESCE(max_concurrent_orders, 1) AS max FROM zones WHERE id = $1`, [riderZoneId]
+            );
+            maxConcurrent = parseInt(zoneRows[0]?.max || '1');
+        }
+
+        // Count rider's current active orders
+        const { rows: activeCap } = await query(
+            `SELECT COUNT(*) AS cnt, array_agg(kitchen_id) AS kitchen_ids, array_agg(status) AS statuses
+             FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered','cancelled')`,
             [riderId]
         );
-        if (parseInt(cap[0].count) >= 3) return res.json({ orders: [] });
+        const activeCount = parseInt(activeCap[0]?.cnt || '0');
+
+        // Hard cap reached — show nothing
+        if (activeCount >= maxConcurrent) return res.json({ orders: [] });
+
+        // Smart stacking (Phase 2): if rider has 1 active order and cap is 2,
+        // only show orders from the same kitchen AND rider must not be out_for_delivery
+        if (activeCount === 1 && maxConcurrent === 2) {
+            const statuses: string[] = activeCap[0]?.statuses || [];
+            const kitchenIds: string[] = activeCap[0]?.kitchen_ids || [];
+            const isOutForDelivery = statuses.some(s => s === 'out_for_delivery');
+            if (isOutForDelivery || !kitchenIds[0]) return res.json({ orders: [] });
+
+            // Only show orders from the exact same kitchen
+            const sameKitchenId = kitchenIds[0];
+            let stackRows: any[];
+            try {
+                const r = await query(`
+                    SELECT o.*, u.name as customer_name, u.phone as customer_phone,
+                           a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng,
+                           k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
+                           k.avg_prep_time_minutes,
+                           (o.created_at + (k.avg_prep_time_minutes || ' minutes')::INTERVAL) AS estimated_ready_at,
+                           z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
+                    FROM orders o
+                    JOIN users u ON o.customer_id = u.id
+                    LEFT JOIN addresses a ON o.address_id = a.id
+                    LEFT JOIN kitchens k ON o.kitchen_id = k.id
+                    LEFT JOIN zones z ON o.zone_id = z.id
+                    WHERE o.status IN ('preparing','ready_for_pickup') AND o.rider_id IS NULL
+                      AND o.kitchen_id = $1
+                    ORDER BY o.status DESC, o.created_at ASC
+                `, [sameKitchenId]);
+                stackRows = r.rows;
+            } catch {
+                stackRows = [];
+            }
+            for (const order of stackRows) {
+                const { rows: items } = await query('SELECT menu_item_name, quantity FROM order_items WHERE order_id = $1', [order.id]);
+                order.items = items;
+                order._kitchenAssigned = true; // flag: this is a stacked order from same kitchen
+            }
+            return res.json({ orders: stackRows });
+        }
     }
 
-    // No zone? Still show all unclaimed orders — the DB zone filter only applies when zone is known.
-    // A rider without a zone assigned can still see and claim orders.
+    // Normal pool: show all unclaimed orders in rider's zone
     const zoneFilter = riderZoneId ? 'AND o.zone_id = $1' : '';
     const params = riderZoneId ? [riderZoneId] : [];
 
@@ -666,7 +718,6 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
         `, params);
         rows = result.rows;
     } catch {
-        // avg_prep_time_minutes column may not exist yet (migration pending) — fall back without it
         const result = await query(`
             SELECT o.*, u.name as customer_name, u.phone as customer_phone, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng,
                    k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
