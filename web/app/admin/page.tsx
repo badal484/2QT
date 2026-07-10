@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare, ShieldCheck, ShieldAlert
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare, ShieldCheck, ShieldAlert, Trophy, Layers
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -40,6 +40,8 @@ const DeliveredOrdersTab = dynamic(() => import("./DeliveredOrdersTab").then(m =
 const RiderDocumentsTab = dynamic(() => import("./RiderDocumentsTab").then(m => ({ default: m.RiderDocumentsTab })), { ssr: false });
 const RiderDetailDrawer = dynamic(() => import("./RiderDetailDrawer").then(m => ({ default: m.RiderDetailDrawer })), { ssr: false });
 const SOSAlertsTab = dynamic(() => import("./SOSAlertsTab").then(m => ({ default: m.SOSAlertsTab })), { ssr: false });
+const MissionsTab = dynamic(() => import("./MissionsTab").then(m => ({ default: m.MissionsTab })), { ssr: false });
+const ZoneCapacityTab = dynamic(() => import("./ZoneCapacityTab").then(m => ({ default: m.ZoneCapacityTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1455,7 +1457,7 @@ function AnalyticsTab() {
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 const FEATURE_FLAGS = ["feature_online_payments","feature_cod","feature_wallet","feature_subscriptions","feature_referrals","feature_loyalty","feature_scheduling","feature_live_kitchen","maintenance_mode","force_update"];
-const BUSINESS_RULES = ["min_order_paise","platform_fee_percent","max_delivery_radius_km","surge_order_threshold","wallet_cashback_cap_paise","kitchen_auto_close_time","min_app_version","latest_app_version","support_contact"];
+const BUSINESS_RULES = ["min_order_paise","platform_fee_percent","max_delivery_radius_km","surge_order_threshold","wallet_cashback_cap_paise","kitchen_auto_close_time","min_app_version","latest_app_version","support_contact","max_batch_size"];
 
 function SettingsTab() {
   const [settings, setSettings] = useState<Record<string,any>>({});
@@ -1930,6 +1932,8 @@ const TABS = [
   { name: "Complaints",      icon: AlertTriangle,    component: ComplaintsTab },
   // Platform
   { name: "Zones",           icon: MapPin,           component: ZonesTab },
+  { name: "Order Capacity",  icon: Layers,           component: ZoneCapacityTab },
+  { name: "Missions",        icon: Trophy,           component: MissionsTab },
   { name: "Delivery Pricing",icon: Receipt,          component: DeliveryPricingTab },
   { name: "Kitchen Health",  icon: Activity,         component: KitchenHealthTab },
   { name: "Rider Payouts",   icon: Wallet,           component: PayoutsTab },
@@ -2031,7 +2035,7 @@ export default function AdminPage() {
             { section: "Restaurants",    items: ["Restaurants", "Kitchens", "Partners", "Menu", "Categories", "Inventory"] },
             { section: "Growth",         items: ["Broadcast", "Campaigns", "Promo Codes", "Menu Offers", "Marketing"] },
             { section: "Customers",      items: ["Customers", "Support", "Complaints"] },
-            { section: "Platform",       items: ["Zones", "Delivery Pricing", "Kitchen Health", "Rider Payouts", "Notifications", "Activity Log", "Team", "Systems", "Settings"] },
+            { section: "Platform",       items: ["Zones", "Order Capacity", "Missions", "Delivery Pricing", "Kitchen Health", "Rider Payouts", "Notifications", "Activity Log", "Team", "Systems", "Settings"] },
           ].map(group => {
             const visibleItems = sidebarSearch
               ? group.items.filter(n => n.toLowerCase().includes(sidebarSearch.toLowerCase()))
