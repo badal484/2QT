@@ -26,6 +26,7 @@ import menuOffersRoutes from './menu-offers';
 import restaurantsRoutes from './restaurants';
 import tableBookingsRoutes from './table-bookings';
 import partnerRoutes from './partner';
+import missionsRoutes from './missions';
 // ... other routes
 
 import { ActivityLogService } from '../services/activity.service';
@@ -120,6 +121,7 @@ router.use('/menu-offers', menuOffersRoutes);
 router.use('/restaurants', restaurantsRoutes);
 router.use('/table-bookings', tableBookingsRoutes);
 router.use('/partner', partnerRoutes);
+router.use('/missions', missionsRoutes);
 // ...
 
 export default router;

@@ -21,7 +21,8 @@ import {
   LayoutDashboard,
   IndianRupee,
   Ticket,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Trophy,
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -259,11 +260,17 @@ const DashboardScreen = ({ navigation }: any) => {
             icon={ImageIcon} 
             onPress={() => navigation.navigate('BannersManager')} 
           />
-          <NavItem 
-            title="Promo Codes" 
-            sub="Create and manage discount codes" 
-            icon={Ticket} 
-            onPress={() => navigation.navigate('PromoCodesManager')} 
+          <NavItem
+            title="Promo Codes"
+            sub="Create and manage discount codes"
+            icon={Ticket}
+            onPress={() => navigation.navigate('PromoCodesManager')}
+          />
+          <NavItem
+            title="Mission Builder"
+            sub="Create & toggle rider missions"
+            icon={Trophy}
+            onPress={() => navigation.navigate('MissionBuilder')}
           />
         </View>
       </ScrollView>
