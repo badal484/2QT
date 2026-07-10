@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { Search, RefreshCw, Phone, ChevronLeft, ChevronRight, Package, User, Bike, Clock, Banknote, Smartphone, AlertCircle } from "lucide-react";
+import { Search, RefreshCw, Phone, ChevronLeft, ChevronRight, Package, User, Bike, Clock, Banknote, Smartphone, Bell } from "lucide-react";
 import { api } from "../lib/api";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { toast } from "sonner";
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: "text-amber-400 bg-amber-400/10 border-amber-400/20",
@@ -40,6 +41,7 @@ export function DispatchTab() {
   const [status, setStatus] = useState("");
   const [date, setDate] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [alerting, setAlerting] = useState<string | null>(null);
 
   const load = useCallback(async (p = page) => {
     setLoading(true);
@@ -61,9 +63,22 @@ export function DispatchTab() {
 
   useSocketRefresh(["new_order", "order_status_update"], () => load(page));
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: { preventDefault: () => void }) => {
     e.preventDefault();
     load(1);
+  };
+
+  const handleAlertRiders = async (e: React.MouseEvent, orderId: string) => {
+    e.stopPropagation();
+    setAlerting(orderId);
+    try {
+      await api.post(`/admin/orders/${orderId}/alert-riders`, {});
+      toast.success("Riders alerted");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to alert riders");
+    } finally {
+      setTimeout(() => setAlerting(null), 2000);
+    }
   };
 
   const totalPages = Math.ceil(total / 50);
@@ -205,6 +220,22 @@ export function DispatchTab() {
                       ) : <span className="text-zinc-600 text-[11px]">—</span>}
                     </div>
                   </div>
+
+                  {/* Alert Riders */}
+                  {!["delivered", "cancelled"].includes(order.status) && (
+                    <button
+                      onClick={(e) => handleAlertRiders(e, order.id)}
+                      disabled={alerting === order.id}
+                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                        alerting === order.id
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                          : "bg-orange-500/10 border-orange-500/20 text-orange-400 hover:bg-orange-500/20"
+                      }`}
+                    >
+                      <Bell className="w-3 h-3" />
+                      {alerting === order.id ? "Sent!" : "Alert Riders"}
+                    </button>
+                  )}
 
                   {/* Amount + payment */}
                   <div className="text-right ml-auto">
