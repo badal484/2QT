@@ -1457,7 +1457,7 @@ function AnalyticsTab() {
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 const FEATURE_FLAGS = ["feature_online_payments","feature_cod","feature_wallet","feature_subscriptions","feature_referrals","feature_loyalty","feature_scheduling","feature_live_kitchen","maintenance_mode","force_update"];
-const BUSINESS_RULES = ["min_order_paise","platform_fee_percent","max_delivery_radius_km","surge_order_threshold","wallet_cashback_cap_paise","kitchen_auto_close_time","min_app_version","latest_app_version","support_contact","max_batch_size"];
+const BUSINESS_RULES = ["min_order_paise","platform_fee_percent","max_delivery_radius_km","surge_order_threshold","wallet_cashback_cap_paise","kitchen_auto_close_time","min_app_version","latest_app_version","support_contact","max_batch_size","auto_dispatch_enabled"];
 
 function SettingsTab() {
   const [settings, setSettings] = useState<Record<string,any>>({});
