@@ -153,6 +153,31 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                     <Text style={s.itemMore}>+{order.items.length - 2} more</Text>
                   )}
 
+                  {/* Distance + Earnings row — always shown for delivered orders */}
+                  {isDelivered && (
+                    <View style={s.cardStatsRow}>
+                      <View style={s.statPill}>
+                        <Navigation size={12} color="#3B82F6" />
+                        <Text style={s.statPillTextBlue}>
+                          {distanceKm != null && distanceKm > 0
+                            ? distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`
+                            : '— km'}
+                        </Text>
+                      </View>
+                      <View style={s.statPill}>
+                        <IndianRupee size={12} color={R.green} />
+                        <Text style={s.statPillTextGreen}>
+                          {earningsPaise != null ? `₹${(earningsPaise / 100).toFixed(0)} earned` : '—'}
+                        </Text>
+                      </View>
+                      {tipPaise > 0 && (
+                        <View style={[s.statPill, { backgroundColor: R.amberLight }]}>
+                          <Text style={[s.statPillTextGreen, { color: R.amber }]}>+₹{(tipPaise / 100).toFixed(0)} tip</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
                   {/* Footer */}
                   <View style={s.cardFooter}>
                     <View style={[s.payBadge, { backgroundColor: isCOD ? R.orangeLight : R.greenLight }]}>
@@ -160,16 +185,9 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                         {isCOD ? 'COD' : 'Online'}
                       </Text>
                     </View>
-                    {duration && <Text style={s.durText}><Clock size={11} color={R.muted} /> {duration}m</Text>}
-                    {distanceKm != null && distanceKm > 0 && (
-                      <Text style={s.distText}>
-                        <Navigation size={11} color="#3B82F6" /> {distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m` : `${distanceKm.toFixed(1)} km`}
-                      </Text>
+                    {duration != null && (
+                      <Text style={s.durText}><Clock size={11} color={R.muted} /> {duration} min</Text>
                     )}
-                    {earningsPaise != null && earningsPaise > 0 && (
-                      <Text style={s.earnText}>₹{(earningsPaise / 100).toFixed(0)}</Text>
-                    )}
-                    {tipPaise > 0 && <Text style={s.tipText}>+₹{(tipPaise / 100).toFixed(0)} tip</Text>}
                   </View>
                 </View>
               );
@@ -244,6 +262,11 @@ const s = StyleSheet.create({
   earnText: { fontSize: 14, fontWeight: '800', color: R.green },
   distText: { fontSize: 12, color: '#3B82F6', fontWeight: '700' },
   tipText: { fontSize: 13, fontWeight: '700', color: R.amber },
+
+  cardStatsRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 4, flexWrap: 'wrap' },
+  statPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F0F4FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+  statPillTextBlue: { fontSize: 12, fontWeight: '700', color: '#3B82F6' },
+  statPillTextGreen: { fontSize: 12, fontWeight: '700', color: R.green },
 });
 
 export default RiderHistoryScreen;
