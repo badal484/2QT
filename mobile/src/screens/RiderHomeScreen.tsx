@@ -168,12 +168,14 @@ const RiderHomeScreen = ({ navigation }: any) => {
     mutationFn: (orderId: string) => api.post(`/riders/orders/${orderId}/claim`, {}),
     onSuccess: () => {
       import('react-native').then(({ Vibration }) => Vibration.cancel());
+      pendingOrderRef.current = null;
       setPendingOrder(null);
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
     },
     onError: (err: any) => {
       import('react-native').then(({ Vibration }) => Vibration.cancel());
+      pendingOrderRef.current = null;
       setPendingOrder(null);
       if (err.message === 'RIDER_BUSY') {
         queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
@@ -212,9 +214,10 @@ const RiderHomeScreen = ({ navigation }: any) => {
         const data = await api.get('/riders/orders/pool');
         queryClient.setQueryData(['rider-missions-pool'], data);
         const orders: any[] = data?.orders || [];
+        console.log('[RIDER_POOL] polled —', orders.length, 'orders, noZone:', data?.noZone);
         const first = orders.find((o: any) => !skippedIdsRef.current.includes(o.id));
         if (first) showNotification(first);
-      } catch {}
+      } catch (e) { console.warn('[RIDER_POOL] error', e); }
     };
 
     checkPool(); // immediate check on going online
@@ -228,18 +231,19 @@ const RiderHomeScreen = ({ navigation }: any) => {
   useEffect(() => {
     let retryInterval: ReturnType<typeof setInterval> | null = null;
 
-    const missionHandler = async () => {
+    const missionHandler = async (socketData?: any) => {
+      console.log('[RIDER_SOCKET] new_available_mission received, online:', isOnlineRef.current, 'socketData:', socketData);
       if (!isOnlineRef.current) return;
       if (pendingOrderRef.current) return; // already showing an alert
       try {
         const data = await api.get('/riders/orders/pool');
-        // Update the cache so the pool UI stays consistent
         queryClient.setQueryData(['rider-missions-pool'], data);
         const orders: any[] = data?.orders || [];
+        console.log('[RIDER_SOCKET] pool returned', orders.length, 'orders, noZone:', data?.noZone);
         const skipped: string[] = skippedIdsRef.current;
         const first = orders.find((o: any) => !skipped.includes(o.id));
         if (first) showNotification(first);
-      } catch {}
+      } catch (e) { console.warn('[RIDER_SOCKET] pool fetch error', e); }
     };
 
     const assignedHandler = (data: { orderId: string; displayId: string; assignedBy: string; deliveryAddress?: string }) => {
@@ -556,7 +560,11 @@ const RiderHomeScreen = ({ navigation }: any) => {
           {/* Orange top strip */}
           <View style={[styles.notifStrip, pendingOrder._kitchenAssigned && { backgroundColor: '#E67E22' }]}>
             <Text style={styles.notifStripLabel}>
-              {pendingOrder._kitchenAssigned ? '📦  Assigned by Kitchen' : '🛵  New Delivery Request'}
+              {pendingOrder._kitchenAssigned
+                ? '📦  Assigned by Kitchen'
+                : pendingOrder.status === 'preparing'
+                  ? '🍳  Preparing Now — Head to Kitchen'
+                  : '✅  Ready for Pickup'}
             </Text>
           </View>
 

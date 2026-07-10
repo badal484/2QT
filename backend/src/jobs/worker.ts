@@ -35,6 +35,36 @@ const notifWorker = new Worker('2qt:notifications', async (job: Job) => {
         return;
     }
 
+    // 3-minute escalation: if no rider has accepted after ready_for_pickup, alert kitchen managers
+    if (type === 'rider_escalation' as any) {
+        const { orderId, displayId, kitchenId, zoneId } = data;
+        // Only escalate if still no rider assigned
+        const { rows: orderRows } = await query(
+            `SELECT rider_id FROM orders WHERE id = $1 AND status = 'ready_for_pickup'`,
+            [orderId]
+        );
+        if (!orderRows[0] || orderRows[0].rider_id) return; // already assigned or delivered
+
+        // Find kitchen managers for this kitchen
+        const { rows: managers } = await query(
+            `SELECT id FROM users WHERE role IN ('kitchen_manager', 'super_admin') AND kitchen_id = $1`,
+            [kitchenId]
+        );
+
+        const { emitToKitchen } = require('../socket');
+        emitToKitchen(kitchenId, 'rider_escalation', { orderId, displayId });
+
+        if (managers.length > 0) {
+            const { broadcastNotification } = require('../services/notification.service');
+            broadcastNotification(
+                managers.map((m: any) => m.id),
+                '⚠️ No Rider Found',
+                `Order #${displayId} has been waiting 3 min with no rider. Please assign manually.`
+            ).catch(() => {});
+        }
+        return;
+    }
+
     // Single notification
     await NotificationService.send(type, data);
 }, {
