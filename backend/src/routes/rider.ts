@@ -1165,7 +1165,7 @@ router.post('/submit-all-cash', authenticate, requireRole('rider', 'rider_captai
 
     if (!orderIds?.length) return res.status(400).json({ error: 'orderIds required' });
     if (!['physical', 'upi_transfer'].includes(method)) return res.status(400).json({ error: 'method must be physical or upi_transfer' });
-    if (method === 'upi_transfer' && !utrNumber?.trim()) return res.status(400).json({ error: 'utrNumber required for UPI transfer' });
+    // UTR is optional — finance verifies via their own UPI app
 
     try {
         const placeholders = orderIds.map((_, i) => `$${i + 2}`).join(',');
