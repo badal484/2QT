@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
-import { DollarSign, Percent, Bike, MapPin, Plus, Trash2, ChevronRight } from "lucide-react";
+import { DollarSign, Bike, MapPin, Plus, Trash2, ChevronRight, Calculator, Zap } from "lucide-react";
 
 export function DeliveryPricingTab() {
   const [zones, setZones] = useState<any[]>([]);
@@ -16,6 +16,36 @@ export function DeliveryPricingTab() {
   // Tiers state per zone
   const [tiers, setTiers] = useState<Record<string, any[]>>({});
   const [tierForm, setTierForm] = useState<Record<string, { from: string; to: string; fee: string }>>({});
+
+  // Live fee calculator
+  const [calcCart, setCalcCart] = useState("200");
+  const [calcDist, setCalcDist] = useState("3");
+
+  const previewFee = (zone: any, zoneTiers: any[]) => {
+    const cartPaise = Math.round(parseFloat(calcCart || "0") * 100);
+    const distKm = parseFloat(calcDist || "0");
+    const surgeMultiplier = parseFloat(zone.surge_multiplier || "1") || 1;
+    const surgeOn = zone.surge_enabled
+      && surgeMultiplier > 1
+      && (!zone.surge_expires_at || new Date(zone.surge_expires_at) > new Date());
+
+    // Tier match
+    const tier = zoneTiers.find(t => t.from_paise <= cartPaise && (t.to_paise == null || t.to_paise > cartPaise));
+    let base = 0;
+    if (tier) {
+      base = tier.fee_paise;
+    } else if (zone.delivery_fee_type === "per_km") {
+      const baseKm = parseFloat(zone.base_distance_km || "0");
+      const extraKm = Math.max(0, distKm - baseKm);
+      base = (zone.base_delivery_fee_paise || 0) + Math.ceil(extraKm * 10) / 10 * (zone.per_km_fee_paise || 0);
+    } else {
+      base = zone.base_delivery_fee_paise || 0;
+    }
+
+    if (zone.free_delivery_above_paise != null && cartPaise >= zone.free_delivery_above_paise) base = 0;
+    const surge = surgeOn ? Math.floor(base * surgeMultiplier) - base : 0;
+    return { base, surge, total: base + surge };
+  };
 
   const load = async () => {
     try {
@@ -316,27 +346,89 @@ export function DeliveryPricingTab() {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      { label: "Type", value: zone.delivery_fee_type === "per_km" ? "Per KM" : "Flat", icon: Bike },
-                      { label: "Base Fee", value: `₹${((zone.base_delivery_fee_paise || zone.delivery_fee_base_paise) ?? 0) / 100}`, icon: DollarSign },
-                      { label: "Free Above", value: zone.free_delivery_above_paise ? `₹${zone.free_delivery_above_paise / 100}` : "—", icon: DollarSign },
-                      { label: "Surge", value: zone.surge_enabled ? `${zone.surge_multiplier || 1.0}x${zone.surge_expires_at ? ` (until ${new Date(zone.surge_expires_at).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })})` : ''}` : "Off", icon: Percent },
-                      { label: "Min Order", value: zone.min_order_paise ? `₹${zone.min_order_paise / 100}` : "None", icon: DollarSign },
-                      { label: "Small Order Fee", value: zone.small_order_fee_paise ? `₹${zone.small_order_fee_paise / 100}` : "None", icon: DollarSign },
-                      { label: "Short-trip Pay", value: `₹${(zone.rider_base_pay_paise ?? 2000) / 100} (≤${zone.rider_free_km ?? 2}km)`, icon: Bike },
-                      { label: "Rider /km", value: `₹${(zone.rider_per_km_paise ?? 500) / 100}/km (full dist)`, icon: Bike },
-                    ].map(({ label, value, icon: Icon }) => (
-                      <div key={label} className="flex items-center gap-3 bg-black/20 p-3 rounded-xl border border-white/5">
-                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                          <Icon className="w-4 h-4 text-zinc-400" />
+                  <div className="p-5 space-y-5">
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: "Type", value: zone.delivery_fee_type === "per_km" ? "Per KM" : "Flat", icon: Bike },
+                        { label: "Base Fee", value: `₹${((zone.base_delivery_fee_paise || zone.delivery_fee_base_paise) ?? 0) / 100}`, icon: DollarSign },
+                        { label: "Free Above", value: zone.free_delivery_above_paise ? `₹${zone.free_delivery_above_paise / 100}` : "—", icon: DollarSign },
+                        {
+                          label: "Surge",
+                          value: zone.surge_enabled
+                            ? `${zone.surge_multiplier || 1.0}x${zone.surge_expires_at ? ` until ${new Date(zone.surge_expires_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })}` : " (no expiry)"}`
+                            : "Off",
+                          icon: Zap,
+                        },
+                        { label: "Min Order", value: zone.min_order_paise ? `₹${zone.min_order_paise / 100}` : "None", icon: DollarSign },
+                        { label: "Small Order Fee", value: zone.small_order_fee_paise ? `₹${zone.small_order_fee_paise / 100}` : "None", icon: DollarSign },
+                        { label: "Short-trip Pay", value: `₹${(zone.rider_base_pay_paise ?? 2000) / 100} (≤${zone.rider_free_km ?? 2}km)`, icon: Bike },
+                        { label: "Rider /km", value: `₹${(zone.rider_per_km_paise ?? 500) / 100}/km (full dist)`, icon: Bike },
+                      ].map(({ label, value, icon: Icon }) => (
+                        <div key={label} className="flex items-center gap-3 bg-black/20 p-3 rounded-xl border border-white/5">
+                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                            <Icon className="w-4 h-4 text-zinc-400" />
+                          </div>
+                          <div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">{label}</div>
+                            <div className="font-bold text-white text-sm">{value}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Live fee calculator */}
+                    <div className="bg-black/30 border border-white/5 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Calculator className="w-4 h-4 text-brand-primary" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Fee Preview Calculator</span>
+                      </div>
+                      <div className="flex items-end gap-3 flex-wrap">
+                        <div>
+                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Cart Value (₹)</div>
+                          <input
+                            type="number"
+                            value={calcCart}
+                            onChange={e => setCalcCart(e.target.value)}
+                            className="w-28 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50"
+                          />
                         </div>
                         <div>
-                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">{label}</div>
-                          <div className="font-bold text-white text-sm">{value}</div>
+                          <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Distance (km)</div>
+                          <input
+                            type="number"
+                            value={calcDist}
+                            onChange={e => setCalcDist(e.target.value)}
+                            className="w-28 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50"
+                          />
                         </div>
+                        {(() => {
+                          const { base, surge, total } = previewFee(zone, tiers[zone.id] ?? []);
+                          return (
+                            <div className="flex items-center gap-3 ml-2">
+                              <div className="text-center">
+                                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Base Fee</div>
+                                <div className="text-lg font-black text-white">₹{(base / 100).toFixed(0)}</div>
+                              </div>
+                              {surge > 0 && (
+                                <>
+                                  <span className="text-zinc-600 font-bold">+</span>
+                                  <div className="text-center">
+                                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Surge</div>
+                                    <div className="text-lg font-black text-amber-400">₹{(surge / 100).toFixed(0)}</div>
+                                  </div>
+                                </>
+                              )}
+                              <span className="text-zinc-600 font-bold">=</span>
+                              <div className="text-center bg-brand-primary/10 border border-brand-primary/20 rounded-xl px-4 py-2">
+                                <div className="text-[9px] font-black uppercase tracking-widest text-brand-primary mb-1">Customer Pays</div>
+                                <div className="text-xl font-black text-brand-primary">₹{(total / 100).toFixed(0)}</div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 )}
               </div>
