@@ -36,7 +36,7 @@ async function findBestRider(zoneId: string, kitchenLat: number, kitchenLng: num
         if (unavail) continue;
 
         const locRaw = await redis.get(keys.riderLocation(rider.id)).catch(() => null);
-        if (!locRaw) continue; // no GPS — rider is not actively sharing location
+        if (!locRaw) continue; // no GPS — rider not actively sharing location
 
         try {
             const loc = JSON.parse(locRaw);
@@ -56,26 +56,66 @@ async function findBestRider(zoneId: string, kitchenLat: number, kitchenLng: num
     return candidates[0].id;
 }
 
+// Find a ready_for_pickup order from the same kitchen whose delivery destination
+// is within 1.5 km of the anchor order's destination — kitchen-synced batching only.
+async function detectBatch(
+    kitchenId: string,
+    anchorOrderId: string,
+    anchorDeliveryLat: number | null,
+    anchorDeliveryLng: number | null,
+    zoneId: string,
+): Promise<string | null> {
+    if (!anchorDeliveryLat || !anchorDeliveryLng) return null;
+
+    const { rows } = await query(`
+        SELECT o.id,
+               COALESCE(o.delivery_location_lat, a.lat)  AS dlat,
+               COALESCE(o.delivery_location_lng, a.lng)  AS dlng
+        FROM orders o
+        LEFT JOIN addresses a ON a.id = o.address_id
+        WHERE o.kitchen_id = $1
+          AND o.id        != $2
+          AND o.zone_id    = $3
+          AND o.status     = 'ready_for_pickup'
+          AND o.rider_id  IS NULL
+        LIMIT 10
+    `, [kitchenId, anchorOrderId, zoneId]);
+
+    for (const row of rows) {
+        const dlat = parseFloat(row.dlat);
+        const dlng = parseFloat(row.dlng);
+        if (isNaN(dlat) || isNaN(dlng)) continue;
+        if (haversineKm(anchorDeliveryLat, anchorDeliveryLng, dlat, dlng) <= 1.5) {
+            return row.id; // first qualifying batch partner
+        }
+    }
+    return null;
+}
+
 export async function autoAssignOrder(orderId: string, attempt = 1): Promise<void> {
     try {
         const { rows } = await query(`
             SELECT o.id, o.display_id, o.zone_id, o.kitchen_id,
+                   COALESCE(o.delivery_location_lat, a.lat)  AS delivery_lat,
+                   COALESCE(o.delivery_location_lng, a.lng)  AS delivery_lng,
                    z.kitchen_lat, z.kitchen_lng
             FROM orders o
             JOIN zones z ON z.id = o.zone_id
+            LEFT JOIN addresses a ON a.id = o.address_id
             WHERE o.id = $1 AND o.status = 'ready_for_pickup' AND o.rider_id IS NULL
         `, [orderId]);
 
-        if (!rows[0]) return; // order already assigned or status changed
+        if (!rows[0]) return; // already assigned or status changed
 
         const order = rows[0];
         const kitchenLat = parseFloat(order.kitchen_lat);
         const kitchenLng = parseFloat(order.kitchen_lng);
+        const deliveryLat = order.delivery_lat ? parseFloat(order.delivery_lat) : null;
+        const deliveryLng = order.delivery_lng ? parseFloat(order.delivery_lng) : null;
 
         const riderId = await findBestRider(order.zone_id, kitchenLat, kitchenLng);
 
         if (!riderId) {
-            // No GPS-visible rider — fall back to pool broadcast for this zone
             console.log(`[AUTO-ASSIGN] No eligible riders for ${order.display_id} (attempt ${attempt}), broadcasting to pool`);
             emitToRiders('new_available_mission', {
                 orderId,
@@ -85,28 +125,56 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
             return;
         }
 
-        // Atomic assign — guard against race condition from a second trigger
+        // Kitchen-synced batch check — only bundle orders that are BOTH already ready
+        const batchOrderId = await detectBatch(
+            order.kitchen_id,
+            orderId,
+            deliveryLat,
+            deliveryLng,
+            order.zone_id,
+        );
+
+        // Assign anchor order atomically
         const { rowCount } = await query(`
             UPDATE orders
             SET rider_id = $1, auto_assigned = true
             WHERE id = $2 AND status = 'ready_for_pickup' AND rider_id IS NULL
         `, [riderId, orderId]);
 
-        if (!rowCount) return; // race — someone else grabbed it first
+        if (!rowCount) return; // race — someone else grabbed it
 
         console.log(`[AUTO-ASSIGN] ${order.display_id} → rider ${riderId} (attempt ${attempt})`);
+
+        // Assign batch partner if found (ignore failure — it may have been claimed already)
+        let batchDisplayId: string | undefined;
+        if (batchOrderId) {
+            const { rowCount: batchRowCount, rows: batchRows } = await query(`
+                UPDATE orders
+                SET rider_id = $1, auto_assigned = true
+                WHERE id = $2 AND status = 'ready_for_pickup' AND rider_id IS NULL
+                RETURNING display_id
+            `, [riderId, batchOrderId]);
+
+            if (batchRowCount) {
+                batchDisplayId = batchRows[0].display_id;
+                console.log(`[AUTO-ASSIGN] Batched ${batchDisplayId} with ${order.display_id} → rider ${riderId}`);
+            }
+        }
 
         emitToAdmin('order_status_update', {
             orderId,
             status: 'ready_for_pickup',
             riderId,
             autoAssigned: true,
+            batchOrderId: batchDisplayId ? batchOrderId : undefined,
         });
 
-        // Notify the assigned rider with a 30s opt-out window
+        // Notify the rider — include batch info if applicable
         emitToUser(riderId, 'order_auto_assigned', {
             orderId,
             displayId: order.display_id,
+            batchOrderId: batchDisplayId ? batchOrderId : undefined,
+            batchDisplayId,
             optOutWindowMs: 30000,
         });
 
@@ -124,7 +192,7 @@ export async function unassignAndReassign(orderId: string, riderId: string): Pro
             RETURNING id, display_id, zone_id
         `, [orderId, riderId]);
 
-        if (!rowCount) return; // already picked up or different rider
+        if (!rowCount) return;
 
         console.log(`[AUTO-ASSIGN] Rider ${riderId} declined ${rows[0].display_id}, reassigning…`);
 
