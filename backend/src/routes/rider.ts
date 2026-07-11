@@ -1295,7 +1295,7 @@ router.post('/create-cash-payment-link', authenticate, requireRole('rider', 'rid
             amount: totalPaise,
             currency: 'INR',
             description: `Cash handover — ${orderRows.length} COD order${orderRows.length > 1 ? 's' : ''}`,
-            reference_id: `cash_sub:${submission.id}`,
+            reference_id: `cs:${submission.id}`, // 3+36=39 chars, within Razorpay's 40-char limit
             customer: {
                 name: rider.name || 'Rider',
                 contact: rider.phone || '',
