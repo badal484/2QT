@@ -18,8 +18,6 @@ const R = {
   red: '#EF4444', redLight: '#FEF2F2',
 };
 
-const COMPANY_UPI = 'velto@upi'; // replace with actual UPI ID
-
 type Method = 'physical' | 'upi_transfer';
 
 const ConfirmedOverlay = ({ total, method, onDone }: { total: string; method: Method; onDone: () => void }) => {
@@ -59,6 +57,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const orders: any[] = data?.orders || [];
   const totalPaise: number = data?.totalPaise || 0;
   const overLimit: boolean = data?.overLimit || false;
+  const upiId: string = data?.upiId || 'badal90603@okaxis';
   const totalRupees = (totalPaise / 100).toFixed(0);
 
   const submitMutation = useMutation({
@@ -193,7 +192,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
             <View style={s.upiCard}>
               <View style={s.upiRow}>
                 <Text style={s.upiLabel}>Transfer ₹{totalRupees} to:</Text>
-                <Text style={s.upiId}>{COMPANY_UPI}</Text>
+                <Text style={s.upiId}>{upiId}</Text>
               </View>
               <Text style={s.upiNote}>Open any UPI app, transfer the exact amount, then enter the UTR number below.</Text>
               <TextInput

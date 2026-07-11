@@ -1608,6 +1608,7 @@ router.patch('/settings/:key', authenticate, requireRole('super_admin', 'admin')
     const { key } = req.params;
     const { value } = req.body;
     await query('UPDATE app_settings SET value = $1 WHERE key = $2', [value, key]);
+    redis.del(`2qt:setting:${key}`).catch(() => {}); // bust cached value immediately
     emitToAll('settings_updated', { key, value });
     res.json({ success: true });
 });
