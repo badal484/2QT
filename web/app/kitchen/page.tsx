@@ -116,6 +116,25 @@ interface InventoryItem {
   last_restocked_at: string | null;
 }
 
+// Three short ascending beeps — distinct from the order-arrival sound
+function playDispatchAlarm() {
+  try {
+    const ctx = new AudioContext();
+    [[880, 0], [1100, 0.35], [1320, 0.7]].forEach(([freq, start]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.45, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + 0.28);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + 0.3);
+    });
+    setTimeout(() => ctx.close(), 2000);
+  } catch {}
+}
+
 function minutesSince(ts: string) {
   return Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
 }
@@ -274,6 +293,9 @@ export default function KitchenPage() {
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [selectedRider, setSelectedRider] = useState<Record<string, string>>({});
   const dispatchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Manual assignment alert
+  const [needsManualAssignment, setNeedsManualAssignment] = useState(false);
+  const lastAlarmRef = useRef(0);
 
   // Manage
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -391,6 +413,46 @@ export default function KitchenPage() {
     socket.on("order_updated", handler);
     return () => { socket.off("order_updated", handler); };
   }, [view, fetchDispatch]);
+
+  // ── Manual assignment alert (all 3 layers + sound) ────────────────────────
+  useEffect(() => {
+    const handler = (data: { displayId: string; message: string }) => {
+      setNeedsManualAssignment(true);
+      // Also refresh the unassigned list immediately
+      fetchDispatch();
+
+      // Debounce alarm: only fire if last alarm was >8s ago
+      const now = Date.now();
+      if (now - lastAlarmRef.current < 8000) return;
+      lastAlarmRef.current = now;
+
+      // Layer 1: sound
+      playDispatchAlarm();
+
+      // Layer 3: browser notification
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification("⚠ Rider needed", {
+          body: `Order ${data.displayId} has no rider. Assign manually in Dispatch.`,
+          icon: "/favicon.ico",
+          tag: "dispatch-alert", // replaces itself instead of stacking
+        });
+      }
+    };
+    socket.on("order_needs_manual_assignment", handler);
+    return () => { socket.off("order_needs_manual_assignment", handler); };
+  }, [fetchDispatch]);
+
+  // Clear alert flag once all orders are assigned
+  useEffect(() => {
+    if (unassignedCount === 0) setNeedsManualAssignment(false);
+  }, [unassignedCount]);
+
+  // Request browser notification permission once on mount
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
 
   const assignRiderBatch = async (batchId: string, batchOrders: UnassignedOrder[]) => {
     const riderId = selectedRider[batchId];
@@ -592,12 +654,18 @@ export default function KitchenPage() {
 
           {["kitchen_manager", "super_admin"].includes(user?.role ?? "") && (
             <button
-              onClick={() => setView("dispatch")}
-              className={`px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black uppercase tracking-widest transition-all flex items-center gap-1.5 whitespace-nowrap ${view === "dispatch" ? "bg-orange-500 text-black shadow-[0_0_16px_rgba(249,115,22,0.4)]" : "text-zinc-400 hover:text-white bg-white/5"}`}
+              onClick={() => { setView("dispatch"); setNeedsManualAssignment(false); }}
+              className={`px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black uppercase tracking-widest transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                view === "dispatch"
+                  ? "bg-orange-500 text-black shadow-[0_0_16px_rgba(249,115,22,0.4)]"
+                  : needsManualAssignment
+                    ? "bg-red-500 text-white animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.6)]"
+                    : "text-zinc-400 hover:text-white bg-white/5"
+              }`}
             >
               <Zap className="w-3.5 h-3.5" /> Dispatch
               {unassignedCount > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center">{unassignedCount}</span>
+                <span className="bg-white text-red-600 text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center">{unassignedCount}</span>
               )}
             </button>
           )}
@@ -620,6 +688,24 @@ export default function KitchenPage() {
           )}
         </div>
       </header>
+
+      {/* ── Layer 2: Persistent banner (shows on every tab except Dispatch) ── */}
+      {needsManualAssignment && view !== "dispatch" && (
+        <div className="bg-red-600 text-white px-4 sm:px-6 py-3 flex items-center justify-between gap-4 shrink-0 z-40">
+          <div className="flex items-center gap-3 min-w-0">
+            <AlertCircle className="w-5 h-5 shrink-0 animate-pulse" />
+            <p className="text-sm font-bold truncate">
+              Orders need a rider — auto-assign couldn't find anyone. Assign manually now.
+            </p>
+          </div>
+          <button
+            onClick={() => { setView("dispatch"); setNeedsManualAssignment(false); }}
+            className="shrink-0 bg-white text-red-600 text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            Go to Dispatch →
+          </button>
+        </div>
+      )}
 
       {/* ── Main ── */}
       <main className="flex-1 p-4 sm:p-6">
