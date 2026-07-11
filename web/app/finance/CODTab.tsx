@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, CheckCircle2, AlertCircle, Wallet, X, ChevronRight } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertCircle, Wallet, X, ChevronRight, Banknote, Smartphone } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -80,6 +80,9 @@ export function CODTab() {
   const [confirmRider, setConfirmRider] = useState<any>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(true);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,6 +96,18 @@ export function CODTab() {
     }
   }, []);
 
+  const loadSubmissions = useCallback(async () => {
+    setSubmissionsLoading(true);
+    try {
+      const res = await api.get("/finance/cash-submissions?status=pending");
+      setSubmissions(res.submissions || []);
+    } catch {
+      toast.error("Failed to load cash submissions");
+    } finally {
+      setSubmissionsLoading(false);
+    }
+  }, []);
+
   const loadHistory = async () => {
     try {
       const res = await api.get("/finance/cod/history?limit=30");
@@ -102,11 +117,26 @@ export function CODTab() {
     }
   };
 
+  const handleConfirmSubmission = async (submissionId: string) => {
+    setConfirmingId(submissionId);
+    try {
+      await api.post(`/finance/cash-submissions/${submissionId}/confirm`, {});
+      toast.success("Cash submission confirmed");
+      await Promise.all([loadSubmissions(), load()]);
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || "Failed to confirm submission");
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadSubmissions(); }, [loadSubmissions]);
   useEffect(() => { if (showHistory) loadHistory(); }, [showHistory]);
 
-  useSocketRefresh(["cod_updated", "order_status_update"], () => {
+  useSocketRefresh(["cod_updated", "order_status_update", "cash_submitted"], () => {
     load();
+    loadSubmissions();
     if (showHistory) loadHistory();
   });
 
@@ -152,6 +182,68 @@ export function CODTab() {
 
       {!showHistory ? (
         <>
+          {/* ── Cash Submission Inbox ── */}
+          {(submissionsLoading || submissions.length > 0) && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Banknote className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm font-bold text-white">Rider Submissions Inbox</span>
+                {submissions.length > 0 && (
+                  <span className="ml-auto text-xs font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">{submissions.length} pending</span>
+                )}
+              </div>
+
+              {submissionsLoading ? (
+                <div className="flex items-center justify-center h-16">
+                  <RefreshCw className="w-4 h-4 text-white/20 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {submissions.map((s: any) => (
+                    <div key={s.id} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            {s.method === 'upi_transfer' ? (
+                              <Smartphone className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                            ) : (
+                              <Banknote className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            )}
+                            <span className="text-sm font-black text-white truncate">{s.rider_name}</span>
+                            <span className="text-xs text-white/40">{s.rider_phone}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-white/40">
+                            <span>{s.order_count} order{s.order_count !== 1 ? 's' : ''}</span>
+                            <span>·</span>
+                            <span>{s.method === 'upi_transfer' ? 'UPI Transfer' : 'Physical Cash'}</span>
+                            {s.utr_number && (
+                              <>
+                                <span>·</span>
+                                <span className="font-mono text-blue-300">UTR: {s.utr_number}</span>
+                              </>
+                            )}
+                            <span>·</span>
+                            <span>{new Date(s.submitted_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-lg font-black text-emerald-400">{fmt(parseInt(s.total_amount_paise))}</span>
+                          <button
+                            onClick={() => handleConfirmSubmission(s.id)}
+                            disabled={confirmingId === s.id}
+                            className="px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-400 transition-colors disabled:opacity-50"
+                          >
+                            {confirmingId === s.id ? 'Confirming…' : 'Confirm'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Total pending banner */}
           {totalPending > 0 && (
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between">

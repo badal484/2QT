@@ -438,7 +438,7 @@ export default function MenuPage() {
           useWallet,
           useLoyalty,
           scheduledTime: scheduleTime || undefined,
-          riderTipPaise: riderTip > 0 ? riderTip : undefined,
+          riderTipPaise: riderTip > 0 ? riderTip * 100 : undefined,
           instructions: deliveryInstructions.trim() || undefined,
           deliveryContactName: altReceiver && altName.trim() ? altName.trim() : undefined,
           deliveryContactPhone: altReceiver && altPhone.trim() ? altPhone.trim() : undefined,
@@ -1097,7 +1097,9 @@ export default function MenuPage() {
                             >
                               <Tag className="w-3 h-3" />
                               {p.code}
-                              {p.type === 'percentage' ? ` — ${p.value}% off` : ` — ₹${p.value / 100} off`}
+                              {p.discount_type === 'percentage'
+                                ? ` — ${p.discount_percent}% off`
+                                : ` — ₹${(p.discount_flat_paise ?? 0) / 100} off`}
                             </button>
                           ))}
                         </div>
