@@ -42,11 +42,12 @@ const AddressScreen = ({ navigation }: any) => {
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const currentAddressId = useSelector((state: any) => state.cart.addressId);
 
-  const { data: addresses, isLoading } = useQuery({
+  const { data: addresses, isLoading, isError, refetch } = useQuery({
     queryKey: ['addresses'],
     queryFn: () => api.get('/customers/addresses'),
     staleTime: 0,       // always re-fetch on mount so zone status is current
     gcTime: 0,          // don't serve inactive-zone data from cache
+    retry: 1,
   });
 
   const deleteMutation = useMutation({
@@ -191,6 +192,15 @@ const AddressScreen = ({ navigation }: any) => {
           {/* Saved addresses */}
           {isLoading ? (
             <ActivityIndicator color={colors.primary} style={{ marginTop: 32 }} />
+          ) : isError ? (
+            <View style={{ alignItems: 'center', marginTop: 32, gap: 12 }}>
+              <Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center' }}>
+                Could not load saved addresses.
+              </Text>
+              <TouchableOpacity onPress={() => refetch()} style={{ paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.primary }}>
+                <Text style={{ color: colors.primary, fontFamily: fontFamily.bold, fontSize: 14 }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
           ) : savedList.length > 0 && (
             <View style={styles.savedAddressesContainer}>
               <Text style={styles.sectionLabel}>SAVED ADDRESSES</Text>
