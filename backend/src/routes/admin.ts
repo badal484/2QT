@@ -1250,7 +1250,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
         realistic_delivery_minutes, surge_enabled, polygon_points,
         kitchen_lat, kitchen_lng,
         delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise, base_distance_km,
-        free_delivery_above_paise, surge_multiplier,
+        free_delivery_above_paise, surge_multiplier, surge_expires_at,
         min_order_paise, small_order_fee_paise,
         rider_base_pay_paise, rider_per_km_paise, rider_free_km,
         max_concurrent_orders
@@ -1286,6 +1286,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
                 base_distance_km = COALESCE($18, base_distance_km),
                 free_delivery_above_paise = COALESCE($19, free_delivery_above_paise),
                 surge_multiplier = COALESCE($20, surge_multiplier),
+                surge_expires_at = CASE WHEN $27::timestamptz IS NOT NULL THEN $27::timestamptz ELSE surge_expires_at END,
                 min_order_paise = COALESCE($21, min_order_paise),
                 small_order_fee_paise = COALESCE($22, small_order_fee_paise),
                 rider_base_pay_paise = COALESCE($23, rider_base_pay_paise),
@@ -1304,7 +1305,7 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
             base_distance_km ?? null, free_delivery_above_paise ?? null, surge_multiplier ?? null,
             min_order_paise ?? null, small_order_fee_paise ?? null,
             rider_base_pay_paise ?? null, rider_per_km_paise ?? null, rider_free_km ?? null,
-            max_concurrent_orders ?? null]);
+            max_concurrent_orders ?? null, surge_expires_at ?? null]);
         if (rows.length === 0) return res.status(404).json({ error: 'ZONE_NOT_FOUND' });
 
         // Sync kitchen lat/lng to the new zone center so maps show the correct spot

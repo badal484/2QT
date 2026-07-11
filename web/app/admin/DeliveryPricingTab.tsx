@@ -47,6 +47,7 @@ export function DeliveryPricingTab() {
       free_delivery_above_paise: zone.free_delivery_above_paise ?? "",
       surge_multiplier: zone.surge_multiplier || "1.0",
       surge_enabled: zone.surge_enabled,
+      surge_duration_hours: "",
       min_order_paise: zone.min_order_paise ?? "",
       small_order_fee_paise: zone.small_order_fee_paise ?? "",
       rider_base_pay_paise: zone.rider_base_pay_paise ?? 2000,
@@ -69,6 +70,9 @@ export function DeliveryPricingTab() {
         free_delivery_above_paise: form.free_delivery_above_paise !== "" ? parseInt(form.free_delivery_above_paise, 10) : null,
         surge_multiplier: parseFloat(form.surge_multiplier || "1.0"),
         surge_enabled: form.surge_enabled,
+        surge_expires_at: form.surge_enabled && form.surge_duration_hours
+          ? new Date(Date.now() + parseFloat(form.surge_duration_hours) * 3600 * 1000).toISOString()
+          : undefined,
         min_order_paise: form.min_order_paise !== "" ? parseInt(form.min_order_paise, 10) : 0,
         small_order_fee_paise: form.small_order_fee_paise !== "" ? parseInt(form.small_order_fee_paise, 10) : 0,
         rider_base_pay_paise: parseInt(form.rider_base_pay_paise || "2000", 10),
@@ -201,6 +205,25 @@ export function DeliveryPricingTab() {
                         {field("Free Delivery Above (paise)", "free_delivery_above_paise", "number", "e.g. 30000")}
                         {field("Surge Multiplier", "surge_multiplier", "number", "1.0")}
                         {field("Surge Enabled", "surge_enabled", "checkbox")}
+                        {form.surge_enabled && (
+                          <div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Surge Duration</div>
+                            <select
+                              value={form.surge_duration_hours}
+                              onChange={e => setForm({ ...form, surge_duration_hours: e.target.value })}
+                              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-brand-primary/50"
+                            >
+                              <option value="">No expiry</option>
+                              <option value="1">1 hour</option>
+                              <option value="2">2 hours</option>
+                              <option value="4">4 hours</option>
+                              <option value="6">6 hours</option>
+                              <option value="12">12 hours</option>
+                              <option value="24">24 hours</option>
+                            </select>
+                            <p className="text-[10px] text-zinc-500 mt-1">Surge auto-expires after this duration.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -224,12 +247,13 @@ export function DeliveryPricingTab() {
                     <div>
                       <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-3">Rider Earnings</div>
                       <div className="grid grid-cols-3 gap-4">
-                        {field("Base Pay (paise)", "rider_base_pay_paise", "number", "e.g. 2000 = ₹20")}
-                        {field("Per KM Rate (paise)", "rider_per_km_paise", "number", "e.g. 500 = ₹5/km")}
-                        {field("Free KM Included", "rider_free_km", "number", "e.g. 2.0")}
+                        {field("Short-trip Flat Pay (paise)", "rider_base_pay_paise", "number", "e.g. 1500 = ₹15")}
+                        {field("Per KM Rate (paise)", "rider_per_km_paise", "number", "e.g. 800 = ₹8/km")}
+                        {field("Short-trip Threshold (km)", "rider_free_km", "number", "e.g. 1.0")}
                       </div>
                       <p className="text-[10px] text-zinc-500 mt-2">
-                        Rider earns base pay + (distance − free km) × per-km rate. 10% platform fee deducted. Road distance used when available, haversine fallback.
+                        ≤ threshold km → flat pay. &gt; threshold km → per-km rate × full distance. Surge multiplier applied on top. 10% platform fee deducted.
+                        Example: threshold 1km, flat ₹15, per-km ₹8 → 1km = ₹15, 3km = ₹24.
                       </p>
                     </div>
 
@@ -297,11 +321,11 @@ export function DeliveryPricingTab() {
                       { label: "Type", value: zone.delivery_fee_type === "per_km" ? "Per KM" : "Flat", icon: Bike },
                       { label: "Base Fee", value: `₹${((zone.base_delivery_fee_paise || zone.delivery_fee_base_paise) ?? 0) / 100}`, icon: DollarSign },
                       { label: "Free Above", value: zone.free_delivery_above_paise ? `₹${zone.free_delivery_above_paise / 100}` : "—", icon: DollarSign },
-                      { label: "Surge", value: `${zone.surge_multiplier || 1.0}x`, icon: Percent },
+                      { label: "Surge", value: zone.surge_enabled ? `${zone.surge_multiplier || 1.0}x${zone.surge_expires_at ? ` (until ${new Date(zone.surge_expires_at).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })})` : ''}` : "Off", icon: Percent },
                       { label: "Min Order", value: zone.min_order_paise ? `₹${zone.min_order_paise / 100}` : "None", icon: DollarSign },
                       { label: "Small Order Fee", value: zone.small_order_fee_paise ? `₹${zone.small_order_fee_paise / 100}` : "None", icon: DollarSign },
-                      { label: "Rider Base Pay", value: `₹${(zone.rider_base_pay_paise ?? 2000) / 100}`, icon: Bike },
-                      { label: "Rider /km", value: `₹${(zone.rider_per_km_paise ?? 500) / 100}/km after ${zone.rider_free_km ?? 2}km`, icon: Bike },
+                      { label: "Short-trip Pay", value: `₹${(zone.rider_base_pay_paise ?? 2000) / 100} (≤${zone.rider_free_km ?? 2}km)`, icon: Bike },
+                      { label: "Rider /km", value: `₹${(zone.rider_per_km_paise ?? 500) / 100}/km (full dist)`, icon: Bike },
                     ].map(({ label, value, icon: Icon }) => (
                       <div key={label} className="flex items-center gap-3 bg-black/20 p-3 rounded-xl border border-white/5">
                         <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
