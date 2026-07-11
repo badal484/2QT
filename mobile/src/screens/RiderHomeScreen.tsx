@@ -238,7 +238,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
         queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       }
     }, 1000);
-  }, [clearAutoAssign, queryClient]);
+  }, [queryClient]);
 
   // Keep isOnlineRef in sync so socket handlers always see the latest value
   useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
@@ -250,6 +250,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
     const checkPool = async () => {
       if (pendingOrderRef.current) return;
+      if (autoAssignedOrderRef.current) return; // auto-assign overlay is showing
       try {
         const data = await api.get('/riders/orders/pool');
         queryClient.setQueryData(['rider-missions-pool'], data);
@@ -275,6 +276,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       console.log('[RIDER_SOCKET] new_available_mission received, online:', isOnlineRef.current, 'socketData:', socketData);
       if (!isOnlineRef.current) return;
       if (pendingOrderRef.current) return; // already showing an alert
+      if (autoAssignedOrderRef.current) return; // auto-assign overlay takes priority
       try {
         const data = await api.get('/riders/orders/pool');
         queryClient.setQueryData(['rider-missions-pool'], data);
