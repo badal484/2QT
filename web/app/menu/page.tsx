@@ -1604,7 +1604,7 @@ export default function MenuPage() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: "spring", damping: 20, stiffness: 200 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] pointer-events-none"
+            className={`fixed left-1/2 -translate-x-1/2 z-[150] pointer-events-none transition-all duration-300 ${cartItems.length > 0 ? 'bottom-28' : 'bottom-6'}`}
           >
             <a
               href="/orders"
