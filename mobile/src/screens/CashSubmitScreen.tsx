@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  ScrollView, TextInput, Animated, Alert, ActivityIndicator,
+  ScrollView, TextInput, Alert, ActivityIndicator, Linking, Clipboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Banknote, CheckCircle, ArrowLeft, Smartphone, Building2, Info } from 'lucide-react-native';
+import {
+  Banknote, CheckCircle, ArrowLeft, Smartphone, Building2,
+  Info, Clock, Copy, ExternalLink,
+} from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 
@@ -20,20 +23,33 @@ const R = {
 
 type Method = 'physical' | 'upi_transfer';
 
-const ConfirmedOverlay = ({ total, method, onDone }: { total: string; method: Method; onDone: () => void }) => {
+// ── Pending overlay (shown after submit, before finance confirms) ─────────────
+const PendingOverlay = ({
+  total, method, onDone,
+}: { total: string; method: Method; onDone: () => void }) => {
+  const isUpi = method === 'upi_transfer';
   return (
     <View style={s.overlayRoot}>
-      <View style={s.overlayCard}>
-        <View style={s.overlayIconWrap}>
-          <CheckCircle size={48} color={R.green} strokeWidth={1.8} />
+      <View style={[s.overlayCard, isUpi ? s.overlayCardBlue : s.overlayCardAmber]}>
+        <View style={[s.overlayIconWrap, isUpi ? s.overlayIconBlue : s.overlayIconAmber]}>
+          <Clock size={48} color={isUpi ? R.blue : R.amber} strokeWidth={1.8} />
         </View>
-        <Text style={s.overlayTitle}>{method === 'upi_transfer' ? 'Transfer Recorded!' : 'Cash Submitted!'}</Text>
-        <Text style={s.overlayAmount}>₹{total}</Text>
-        <Text style={s.overlaySub}>
-          {method === 'upi_transfer'
-            ? 'Finance will verify your UTR and confirm the transfer shortly.'
-            : 'Finance has been notified. Hand over the cash and wait for confirmation.'}
+        <Text style={s.overlayTitle}>
+          {isUpi ? 'UTR Submitted' : 'Finance Notified'}
         </Text>
+        <Text style={[s.overlayAmount, { color: isUpi ? R.blue : R.amber }]}>
+          ₹{total}
+        </Text>
+        <Text style={s.overlaySub}>
+          {isUpi
+            ? 'Finance is verifying your UTR number. You\'ll be notified once the transfer is confirmed.'
+            : 'Please hand over the cash at the finance desk. Your badge will clear once finance confirms receipt.'}
+        </Text>
+        <View style={s.overlayBadge}>
+          <Text style={[s.overlayBadgeText, { color: isUpi ? R.blue : R.amber }]}>
+            {isUpi ? 'Pending UTR Verification' : 'Pending Finance Confirmation'}
+          </Text>
+        </View>
         <TouchableOpacity style={s.overlayBtn} onPress={onDone} activeOpacity={0.9}>
           <Text style={s.overlayBtnText}>Back to Home</Text>
         </TouchableOpacity>
@@ -48,6 +64,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const [method, setMethod] = useState<Method>('physical');
   const [utrNumber, setUtrNumber] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [upiLaunched, setUpiLaunched] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['cash-in-hand'],
@@ -59,6 +76,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const overLimit: boolean = data?.overLimit || false;
   const upiId: string = data?.upiId || 'badal90603@okaxis';
   const totalRupees = (totalPaise / 100).toFixed(0);
+  const totalDecimal = (totalPaise / 100).toFixed(2);
 
   const submitMutation = useMutation({
     mutationFn: () => api.post('/riders/submit-all-cash', {
@@ -78,29 +96,57 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const handleSubmit = () => {
     if (!orders.length) return;
     if (method === 'upi_transfer' && utrNumber.trim().length < 4) {
-      Alert.alert('Invalid UTR', 'Please enter a valid UTR / transaction reference number.');
+      Alert.alert('Enter UTR', 'Please enter the UTR / transaction reference from your UPI app after paying.');
       return;
     }
     submitMutation.mutate();
   };
 
+  // Open the native UPI app chooser with amount + payee pre-filled
+  const openUpiApp = async (appScheme?: string) => {
+    const note = encodeURIComponent('Cash submission - 2QT');
+    const name = encodeURIComponent('2QT Food Palace');
+    const baseParams = `pa=${upiId}&pn=${name}&am=${totalDecimal}&cu=INR&tn=${note}`;
+
+    let url: string;
+    if (appScheme === 'gpay') {
+      url = `tez://upi/pay?${baseParams}`;
+    } else if (appScheme === 'phonepe') {
+      url = `phonepe://pay?${baseParams}`;
+    } else if (appScheme === 'paytm') {
+      url = `paytmmp://pay?${baseParams}`;
+    } else {
+      // Generic UPI intent — opens native chooser with ALL installed UPI apps
+      url = `upi://pay?${baseParams}`;
+    }
+
+    const canOpen = await Linking.canOpenURL(url).catch(() => false);
+    if (canOpen) {
+      await Linking.openURL(url);
+      setUpiLaunched(true);
+    } else if (appScheme) {
+      // Specific app not installed — fall back to generic chooser
+      openUpiApp();
+    } else {
+      Alert.alert('No UPI App Found', 'Please install GPay, PhonePe, or Paytm to make UPI payments.');
+    }
+  };
+
+  const copyUpiId = () => {
+    Clipboard.setString(upiId);
+    Alert.alert('Copied!', `${upiId} copied to clipboard.`);
+  };
+
   const handleDone = () => navigation.navigate('RiderTabs');
 
   if (submitted) {
-    return (
-      <ConfirmedOverlay
-        total={totalRupees}
-        method={method}
-        onDone={handleDone}
-      />
-    );
+    return <PendingOverlay total={totalRupees} method={method} onDone={handleDone} />;
   }
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={R.white} />
 
-      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <ArrowLeft size={20} color={R.ink} />
@@ -110,9 +156,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
       </View>
 
       {isLoading ? (
-        <View style={s.center}>
-          <ActivityIndicator size="large" color={R.orange} />
-        </View>
+        <View style={s.center}><ActivityIndicator size="large" color={R.orange} /></View>
       ) : isError ? (
         <View style={s.center}>
           <Text style={s.errorText}>Couldn't load cash details</Text>
@@ -134,15 +178,13 @@ const CashSubmitScreen = ({ navigation }: any) => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 32 }}
         >
-          {/* Over-limit warning */}
           {overLimit && (
             <View style={s.limitWarn}>
               <Info size={16} color={R.red} />
-              <Text style={s.limitWarnText}>You've hit the ₹2,000 cash limit. Submit now to resume COD orders.</Text>
+              <Text style={s.limitWarnText}>You've hit the cash limit. Submit now to resume COD orders.</Text>
             </View>
           )}
 
-          {/* Total amount card */}
           <View style={s.amountCard}>
             <View style={s.amountIconWrap}>
               <Banknote size={28} color={R.amber} />
@@ -152,7 +194,6 @@ const CashSubmitScreen = ({ navigation }: any) => {
             <Text style={s.amountSub}>{orders.length} COD order{orders.length > 1 ? 's' : ''}</Text>
           </View>
 
-          {/* Orders list */}
           <Text style={s.sectionTitle}>Pending Orders</Text>
           <View style={s.ordersList}>
             {orders.map((order: any) => (
@@ -164,7 +205,6 @@ const CashSubmitScreen = ({ navigation }: any) => {
             ))}
           </View>
 
-          {/* Method selector */}
           <Text style={s.sectionTitle}>Submission Method</Text>
           <View style={s.methodRow}>
             <TouchableOpacity
@@ -187,43 +227,87 @@ const CashSubmitScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          {/* UPI instructions + UTR input */}
+          {/* ── UPI Transfer Section ── */}
           {method === 'upi_transfer' && (
             <View style={s.upiCard}>
-              <View style={s.upiRow}>
-                <Text style={s.upiLabel}>Transfer ₹{totalRupees} to:</Text>
-                <Text style={s.upiId}>{upiId}</Text>
+              {/* Amount + UPI ID */}
+              <View style={s.upiHeader}>
+                <Text style={s.upiHeaderLabel}>Send exactly</Text>
+                <Text style={s.upiHeaderAmount}>₹{totalRupees}</Text>
+                <View style={s.upiIdRow}>
+                  <Text style={s.upiId}>{upiId}</Text>
+                  <TouchableOpacity onPress={copyUpiId} style={s.copyBtn} activeOpacity={0.7}>
+                    <Copy size={14} color={R.blue} />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <Text style={s.upiNote}>Open any UPI app, transfer the exact amount, then enter the UTR number below.</Text>
-              <TextInput
-                style={s.utrInput}
-                placeholder="Enter UTR / Transaction Reference"
-                placeholderTextColor={R.muted}
-                value={utrNumber}
-                onChangeText={setUtrNumber}
-                autoCapitalize="characters"
-                returnKeyType="done"
-              />
+
+              {/* Quick-launch UPI app buttons */}
+              <Text style={s.upiAppLabel}>Open in your UPI app</Text>
+              <TouchableOpacity style={s.payNowBtn} onPress={() => openUpiApp()} activeOpacity={0.85}>
+                <ExternalLink size={18} color={R.white} />
+                <Text style={s.payNowBtnText}>Pay ₹{totalRupees} via UPI</Text>
+              </TouchableOpacity>
+              <View style={s.appShortcuts}>
+                {[
+                  { label: 'GPay', scheme: 'gpay' },
+                  { label: 'PhonePe', scheme: 'phonepe' },
+                  { label: 'Paytm', scheme: 'paytm' },
+                ].map(app => (
+                  <TouchableOpacity
+                    key={app.scheme}
+                    style={s.appBtn}
+                    onPress={() => openUpiApp(app.scheme)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={s.appBtnText}>{app.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* UTR input — shown after user has launched UPI app */}
+              <View style={s.utrSection}>
+                <Text style={s.utrLabel}>
+                  {upiLaunched
+                    ? '✓ Enter the UTR from your UPI app after paying'
+                    : 'After paying, enter the UTR / Transaction Reference'}
+                </Text>
+                <TextInput
+                  style={[s.utrInput, upiLaunched && s.utrInputActive]}
+                  placeholder="12-digit UTR or transaction ref"
+                  placeholderTextColor={R.muted}
+                  value={utrNumber}
+                  onChangeText={setUtrNumber}
+                  autoCapitalize="characters"
+                  returnKeyType="done"
+                  keyboardType="default"
+                />
+              </View>
             </View>
           )}
 
-          {/* Physical steps */}
+          {/* ── Physical Cash Steps ── */}
           {method === 'physical' && (
             <View style={s.stepsCard}>
               {[
                 'Walk to the finance desk at your kitchen',
                 `Hand over ₹${totalRupees} cash`,
-                'Tap the button below to notify finance',
+                'Tap below to notify finance — they will confirm receipt',
               ].map((step, i) => (
                 <View key={i} style={s.stepRow}>
                   <View style={s.stepNum}><Text style={s.stepNumText}>{i + 1}</Text></View>
                   <Text style={s.stepText}>{step}</Text>
                 </View>
               ))}
+              <View style={s.physicalNote}>
+                <Clock size={14} color={R.amber} />
+                <Text style={s.physicalNoteText}>
+                  Your badge will clear once finance confirms. Do not leave until they've acknowledged.
+                </Text>
+              </View>
             </View>
           )}
 
-          {/* Submit */}
           <TouchableOpacity
             style={[s.submitBtn, submitMutation.isPending && { opacity: 0.6 }]}
             onPress={handleSubmit}
@@ -233,7 +317,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
             {submitMutation.isPending
               ? <ActivityIndicator color={R.white} />
               : <Text style={s.submitBtnText}>
-                  {method === 'upi_transfer' ? 'Confirm UPI Transfer' : "I've Handed Over the Cash"}
+                  {method === 'upi_transfer' ? 'Submit UTR for Verification' : "I've Handed Over the Cash"}
                 </Text>
             }
           </TouchableOpacity>
@@ -318,21 +402,46 @@ const s = StyleSheet.create({
   methodBtnTextActive: { color: R.orange },
   methodBtnSub: { fontSize: 11, color: R.muted, textAlign: 'center' },
 
+  // UPI card
   upiCard: {
-    backgroundColor: R.blueLight, borderRadius: 16, padding: 16, marginBottom: 20,
-    borderWidth: 1, borderColor: '#BFDBFE', gap: 10,
+    backgroundColor: R.blueLight, borderRadius: 20, padding: 18, marginBottom: 20,
+    borderWidth: 1, borderColor: '#BFDBFE', gap: 16,
   },
-  upiRow: { alignItems: 'center', gap: 4 },
-  upiLabel: { fontSize: 12, fontWeight: '600', color: R.blue },
-  upiId: { fontSize: 20, fontWeight: '900', color: R.ink, letterSpacing: 0.5 },
-  upiNote: { fontSize: 12, color: R.gray, lineHeight: 18, textAlign: 'center' },
+  upiHeader: { alignItems: 'center', gap: 4 },
+  upiHeaderLabel: { fontSize: 12, fontWeight: '700', color: R.blue, textTransform: 'uppercase', letterSpacing: 0.8 },
+  upiHeaderAmount: { fontSize: 40, fontWeight: '900', color: R.ink, letterSpacing: -1.5 },
+  upiIdRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  upiId: { fontSize: 16, fontWeight: '700', color: R.blue },
+  copyBtn: {
+    width: 28, height: 28, borderRadius: 8, backgroundColor: '#DBEAFE',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  upiAppLabel: { fontSize: 12, fontWeight: '700', color: R.gray, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.6 },
+  payNowBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    backgroundColor: R.blue, borderRadius: 14, paddingVertical: 16,
+  },
+  payNowBtnText: { color: R.white, fontSize: 16, fontWeight: '900' },
+  appShortcuts: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
+  appBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 12,
+    backgroundColor: R.white, borderWidth: 1.5, borderColor: '#93C5FD',
+    alignItems: 'center',
+  },
+  appBtnText: { fontSize: 13, fontWeight: '800', color: R.blue },
+
+  utrSection: { gap: 8 },
+  utrLabel: { fontSize: 12, fontWeight: '600', color: R.gray, lineHeight: 18 },
   utrInput: {
     backgroundColor: R.white, borderRadius: 12, padding: 14,
     borderWidth: 1.5, borderColor: '#93C5FD',
     fontSize: 15, fontWeight: '700', color: R.ink,
     textAlign: 'center', letterSpacing: 1,
   },
+  utrInputActive: { borderColor: R.blue, borderWidth: 2 },
 
+  // Physical steps
   stepsCard: {
     backgroundColor: R.bg, borderRadius: 16, padding: 16, gap: 14, marginBottom: 20,
     borderWidth: 1, borderColor: R.border,
@@ -345,6 +454,12 @@ const s = StyleSheet.create({
   },
   stepNumText: { color: R.orange, fontWeight: '900', fontSize: 12 },
   stepText: { flex: 1, color: R.ink, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  physicalNote: {
+    flexDirection: 'row', gap: 8, alignItems: 'flex-start',
+    backgroundColor: R.amberLight, borderRadius: 10, padding: 10,
+    borderWidth: 1, borderColor: '#FDE68A', marginTop: 4,
+  },
+  physicalNoteText: { flex: 1, fontSize: 12, color: R.gray, lineHeight: 17 },
 
   submitBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -356,6 +471,7 @@ const s = StyleSheet.create({
   skipLink: { alignItems: 'center', paddingVertical: 8 },
   skipText: { color: R.muted, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' },
 
+  // Pending overlay
   overlayRoot: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(255,255,255,0.97)',
@@ -365,17 +481,23 @@ const s = StyleSheet.create({
   overlayCard: {
     width: '100%', backgroundColor: R.white, borderRadius: 28,
     padding: 28, alignItems: 'center', gap: 12,
-    borderWidth: 1, borderColor: '#B7E8D7',
-    shadowColor: R.green, shadowOpacity: 0.12, shadowRadius: 24, elevation: 8,
+    shadowOpacity: 0.1, shadowRadius: 24, elevation: 8,
   },
+  overlayCardAmber: { borderWidth: 1, borderColor: '#FDE68A', shadowColor: R.amber },
+  overlayCardBlue: { borderWidth: 1, borderColor: '#BFDBFE', shadowColor: R.blue },
   overlayIconWrap: {
-    width: 88, height: 88, borderRadius: 44, backgroundColor: R.greenLight,
-    borderWidth: 1.5, borderColor: '#B7E8D7',
+    width: 88, height: 88, borderRadius: 44,
     alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
+  overlayIconAmber: { backgroundColor: R.amberLight, borderWidth: 1.5, borderColor: '#FDE68A' },
+  overlayIconBlue: { backgroundColor: R.blueLight, borderWidth: 1.5, borderColor: '#BFDBFE' },
   overlayTitle: { color: R.ink, fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  overlayAmount: { color: R.green, fontSize: 40, fontWeight: '900', letterSpacing: -1 },
+  overlayAmount: { fontSize: 40, fontWeight: '900', letterSpacing: -1 },
   overlaySub: { color: R.gray, fontSize: 13, textAlign: 'center', lineHeight: 20, marginTop: 4 },
+  overlayBadge: {
+    backgroundColor: '#F3F4F6', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6,
+  },
+  overlayBadgeText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.4 },
   overlayBtn: {
     width: '100%', backgroundColor: R.orange, borderRadius: 16,
     paddingVertical: 16, alignItems: 'center', marginTop: 8,
