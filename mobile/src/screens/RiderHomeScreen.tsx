@@ -262,10 +262,21 @@ const RiderHomeScreen = ({ navigation }: any) => {
       }
       if (isOnline) {
         if (accessToken) startRiderLocationService(accessToken);
-        getSocket()?.emit('update_location', { lat: latestLocationRef.current.latitude, lng: latestLocationRef.current.longitude });
+        // Don't emit immediately — getCurrentPosition below will send the first real fix
       } else {
         stopRiderLocationService();
       }
+      // Get a fast first fix so the map doesn't start on the default Delhi coordinates
+      Geolocation.getCurrentPosition(
+        pos => {
+          const { latitude, longitude } = pos.coords;
+          setCurrentLocation({ latitude, longitude });
+          if (isOnline) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
+        },
+        () => { /* silent — watchPosition will recover */ },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+      );
+
       watchId = Geolocation.watchPosition(
         pos => {
           const { latitude, longitude } = pos.coords;
