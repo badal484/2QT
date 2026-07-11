@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StatusBar, Alert, Linking,
-  StyleSheet, Animated, Easing, Platform, PermissionsAndroid, Vibration,
+  StyleSheet, Animated, Platform, PermissionsAndroid, Vibration,
 } from 'react-native';
 import { LeafletMap } from '../components/LeafletMap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -46,14 +46,9 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const [isOnline, setIsOnline] = useState(user?.is_online || false);
   const isOnlineRef = useRef(user?.is_online || false);
   const [currentLocation, setCurrentLocation] = useState({ latitude: 28.6139, longitude: 77.2090 });
-  const [pendingOrder, setPendingOrder] = useState<any>(null);
-  const pendingOrderRef = useRef<any>(null);
-  const [skippedIds, setSkippedIds] = useState<string[]>([]);
-  const skippedIdsRef = useRef<string[]>([]);
 
   const latestLocationRef = useRef({ latitude: 0, longitude: 0 });
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(400)).current;
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
 
@@ -75,15 +70,8 @@ const RiderHomeScreen = ({ navigation }: any) => {
     refetchInterval: isOnline ? 8000 : false,
   });
 
-  const { data: poolData } = useQuery({
-    queryKey: ['rider-missions-pool'],
-    queryFn: () => api.get('/riders/orders/pool'),
-    enabled: isOnline && (!activeOrderData?.orders || activeOrderData.orders.length < 3),
-    refetchInterval: 5000,
-  });
-
-  // Available zones — fetched only when rider has no zone assigned
-  const noZone = !!poolData?.noZone;
+  // No zone = rider is online but zone_id is not yet assigned
+  const noZone = isOnline && !user?.zoneId;
   const { data: zonesData } = useQuery({
     queryKey: ['available-zones'],
     queryFn: () => api.get('/riders/available-zones'),
@@ -98,7 +86,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
       api.post('/riders/zone/check-in', coords),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['me'] });
-      queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
       if (data?.zoneName) Alert.alert('Zone assigned!', `You've been checked in to ${data.zoneName}. Orders will start appearing now.`);
     },
     onError: (err: any) => {
@@ -155,7 +142,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
   };
 
   const activeOrders = activeOrderData?.orders || [];
-  const pool: any[] = (poolData?.orders || []).filter((o: any) => !skippedIds.includes(o.id));
 
   const toggleOnlineMutation = useMutation({
     mutationFn: (online: boolean) => api.post(online ? '/riders/online' : '/riders/offline', {}),
@@ -169,42 +155,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
       Alert.alert('Cannot change status', msg);
     }
   });
-
-  const claimMutation = useMutation({
-    mutationFn: (orderId: string) => api.post(`/riders/orders/${orderId}/claim`, {}),
-    onSuccess: () => {
-      Vibration.cancel();
-      pendingOrderRef.current = null;
-      setPendingOrder(null);
-      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-      queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
-    },
-    onError: (err: any) => {
-      Vibration.cancel();
-      pendingOrderRef.current = null;
-      setPendingOrder(null);
-      if (err.message === 'RIDER_BUSY') {
-        queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-      } else {
-        Alert.alert('Order Taken', 'This order was claimed by another rider.');
-      }
-    },
-  });
-
-
-  const showNotification = (order: any) => {
-    pendingOrderRef.current = order;
-    setPendingOrder(order);
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 70, friction: 10 }).start();
-    Vibration.vibrate([500, 500], true);
-    displayLocalNotification('New Delivery Request', 'A new order is available. Tap to view.', { type: 'order_update' });
-  };
-
-  const hideNotification = () => {
-    pendingOrderRef.current = null;
-    Vibration.cancel();
-    Animated.timing(slideAnim, { toValue: 400, useNativeDriver: true, duration: 250, easing: Easing.in(Easing.quad) }).start(() => setPendingOrder(null));
-  };
 
   const clearAutoAssign = useCallback(() => {
     if (autoAssignTimerRef.current) {
@@ -243,92 +193,20 @@ const RiderHomeScreen = ({ navigation }: any) => {
   // Keep isOnlineRef in sync so socket handlers always see the latest value
   useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
 
-  // Direct polling loop — bypasses React Query enabled/effect chain entirely.
-  // Runs every 4s when online; shows the alert immediately when a new order appears.
-  useEffect(() => {
-    if (!isOnline) return;
-
-    const checkPool = async () => {
-      if (pendingOrderRef.current) return;
-      if (autoAssignedOrderRef.current) return; // auto-assign overlay is showing
-      try {
-        const data = await api.get('/riders/orders/pool');
-        queryClient.setQueryData(['rider-missions-pool'], data);
-        const orders: any[] = data?.orders || [];
-        console.log('[RIDER_POOL] polled —', orders.length, 'orders, noZone:', data?.noZone);
-        const first = orders.find((o: any) => !skippedIdsRef.current.includes(o.id));
-        if (first) showNotification(first);
-      } catch (e) { console.warn('[RIDER_POOL] error', e); }
-    };
-
-    checkPool(); // immediate check on going online
-    const interval = setInterval(checkPool, 4000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnline]);
-
-  // Register socket listeners — retries every 200ms until the socket is ready
-  // (child effects run before parent effects, so socket may not exist yet on first render)
+  // Register socket listener for auto-assign events
   useEffect(() => {
     let retryInterval: ReturnType<typeof setInterval> | null = null;
-
-    const missionHandler = async (socketData?: any) => {
-      console.log('[RIDER_SOCKET] new_available_mission received, online:', isOnlineRef.current, 'socketData:', socketData);
-      if (!isOnlineRef.current) return;
-      if (pendingOrderRef.current) return; // already showing an alert
-      if (autoAssignedOrderRef.current) return; // auto-assign overlay takes priority
-      try {
-        const data = await api.get('/riders/orders/pool');
-        queryClient.setQueryData(['rider-missions-pool'], data);
-        const orders: any[] = data?.orders || [];
-        console.log('[RIDER_SOCKET] pool returned', orders.length, 'orders, noZone:', data?.noZone);
-        const skipped: string[] = skippedIdsRef.current;
-        const first = orders.find((o: any) => !skipped.includes(o.id));
-        if (first) showNotification(first);
-      } catch (e) { console.warn('[RIDER_SOCKET] pool fetch error', e); }
-    };
-
-    const assignedHandler = (data: { orderId: string; displayId: string; assignedBy: string; deliveryAddress?: string }) => {
-      if (!isOnlineRef.current) return;
-      if (autoAssignedOrderRef.current) return; // auto-assign overlay takes priority
-      showNotification({ ...data, id: data.orderId, display_id: data.displayId, delivery_address_text: data.deliveryAddress || null, _kitchenAssigned: true });
-    };
 
     const autoAssignedHandler = (data: { orderId: string; displayId: string; batchDisplayId?: string; optOutWindowMs: number }) => {
       if (!isOnlineRef.current) return;
       showAutoAssign({ orderId: data.orderId, displayId: data.displayId, batchDisplayId: data.batchDisplayId });
     };
 
-    const dispatcherAlertHandler = async (data: { orderId: string; displayId: string }) => {
-      if (!isOnlineRef.current) return;
-      if (pendingOrderRef.current) return;
-      if (autoAssignedOrderRef.current) return; // auto-assign overlay takes priority
-      // Remove from skipped so the rider sees it even if they dismissed it before
-      skippedIdsRef.current = skippedIdsRef.current.filter(id => id !== data.orderId);
-      setSkippedIds(prev => prev.filter(id => id !== data.orderId));
-      try {
-        const poolRes = await api.get('/riders/orders/pool');
-        queryClient.setQueryData(['rider-missions-pool'], poolRes);
-        const orders: any[] = poolRes?.orders || [];
-        const target = orders.find((o: any) => o.id === data.orderId) || orders.find((o: any) => !skippedIdsRef.current.includes(o.id));
-        if (target) showNotification(target);
-      } catch (e) { console.warn('[DISPATCHER_ALERT] pool fetch error', e); }
-    };
-
     const register = () => {
       const socket = getSocket();
       if (!socket) return false;
-
-      // Off first to prevent duplicate listeners on reconnect
-      socket.off('new_available_mission', missionHandler);
-      socket.off('order_assigned', assignedHandler);
-      socket.off('dispatcher_order_alert', dispatcherAlertHandler);
       socket.off('order_auto_assigned', autoAssignedHandler);
-      socket.on('new_available_mission', missionHandler);
-      socket.on('order_assigned', assignedHandler);
-      socket.on('dispatcher_order_alert', dispatcherAlertHandler);
       socket.on('order_auto_assigned', autoAssignedHandler);
-      // Re-register after every reconnect
       socket.off('connect', register);
       socket.on('connect', register);
       return true;
@@ -344,9 +222,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
       if (retryInterval) clearInterval(retryInterval);
       const socket = getSocket();
       if (socket) {
-        socket.off('new_available_mission', missionHandler);
-        socket.off('order_assigned', assignedHandler);
-        socket.off('dispatcher_order_alert', dispatcherAlertHandler);
         socket.off('order_auto_assigned', autoAssignedHandler);
         socket.off('connect', register);
       }
@@ -366,17 +241,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
     return () => loop.stop();
   }, [isOnline, activeOrders, pulseAnim]);
 
-  const getEstimatedEarnings = (order: any) => {
-    const basePaise = order.rider_base_pay_paise ?? 2000;
-    const perKmPaise = order.rider_per_km_paise ?? 500;
-    const freeKm = parseFloat(order.rider_free_km ?? '2');
-    const distanceKm = (order.delivery_distance_metres != null && order.delivery_distance_metres > 0)
-      ? order.delivery_distance_metres / 1000
-      : 0;
-    const distanceBonus = distanceKm > freeKm ? Math.floor((distanceKm - freeKm) * perKmPaise) : 0;
-    const platformFee = Math.floor(basePaise * 0.1);
-    return Math.floor((basePaise + distanceBonus - platformFee) / 100);
-  };
 
 
   useEffect(() => { latestLocationRef.current = currentLocation; }, [currentLocation]);
@@ -507,7 +371,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
 
       {/* ── No zone: head to nearest kitchen hub ─────────────────────────── */}
-      {isOnline && noZone && activeOrders.length === 0 && !pendingOrder && (
+      {isOnline && noZone && activeOrders.length === 0 && (
         <View style={styles.zoneCard}>
           <View style={styles.zoneHeader}>
             <MapPin size={18} color={S.orange} />
@@ -549,7 +413,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       )}
 
       {/* ── Waiting pulse (online, no orders) ────────────────────────────── */}
-      {isOnline && !poolData?.noZone && activeOrders.length === 0 && !pendingOrder && (
+      {isOnline && !noZone && activeOrders.length === 0 && (
         <View style={styles.waitingCenter}>
           <View style={styles.pulseWrap}>
             <Animated.View style={[styles.pulseRing, { transform: [{ scale: pulseAnim }], opacity: pulseAnim.interpolate({ inputRange: [1, 1.6], outputRange: [0.35, 0] }) }]} />
@@ -576,7 +440,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       )}
 
       {/* ── Active orders list ────────────────────────────────────────────── */}
-      {activeOrders.length > 0 && !pendingOrder && (
+      {activeOrders.length > 0 && (
         <View style={[styles.ordersSheet, { paddingBottom: insets.bottom + 16 }]}>
           {activeOrders.map((order: any, idx: number) => {
             const goingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(order.status);
@@ -609,8 +473,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
-      {/* Skipped pool banner removed as per True Decline logic */}
-      {/* ── Incoming order notification ───────────────────────────────────── */}
       {/* ── Auto-assigned overlay (rider has 30s to opt out) ───────────────── */}
       {autoAssignedOrder && (
         <View style={[styles.autoAssignSheet, { paddingBottom: insets.bottom + 16 }]}>
@@ -668,106 +530,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
-      {pendingOrder && (
-        <Animated.View style={[styles.notifSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] }]}>
-          {/* Orange top strip */}
-          <View style={[styles.notifStrip, pendingOrder._kitchenAssigned && { backgroundColor: '#E67E22' }]}>
-            <Text style={styles.notifStripLabel}>
-              {pendingOrder._kitchenAssigned
-                ? '📦  Assigned by Kitchen'
-                : pendingOrder.status === 'preparing'
-                  ? '🍳  Preparing Now — Head to Kitchen'
-                  : '✅  Ready for Pickup'}
-            </Text>
-          </View>
-
-          <View style={styles.notifBody}>
-            <Text style={styles.notifOrderId}>{pendingOrder.display_id || pendingOrder.displayId}</Text>
-
-            {/* Items preview */}
-            {pendingOrder.items && pendingOrder.items.length > 0 && (
-              <View style={styles.notifItemsWrap}>
-                {pendingOrder.items.map((item: any, i: number) => (
-                  <View key={i} style={styles.notifItemChip}>
-                    <Text style={styles.notifItemChipQty}>{item.quantity}×</Text>
-                    <Text style={styles.notifItemChipName}>{item.menu_item_name}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <View style={styles.notifRow}>
-              <View style={styles.notifField}>
-                <Text style={styles.notifFieldLabel}>DISTANCE</Text>
-                {pendingOrder.delivery_distance_metres != null && pendingOrder.delivery_distance_metres > 0 ? (() => {
-                  const km = pendingOrder.delivery_distance_metres / 1000;
-                  const label = km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
-                  return (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-                      <Navigation size={14} color={S.orange} />
-                      <Text style={[styles.notifFieldValue, { color: S.orange, fontSize: 18, fontWeight: '800' }]}>{label}</Text>
-                    </View>
-                  );
-                })() : (
-                  <Text style={[styles.notifFieldValue, { color: S.muted }]}>—</Text>
-                )}
-              </View>
-              {!pendingOrder._kitchenAssigned && (
-                <View style={[styles.notifField, { alignItems: 'flex-end' }]}>
-                  <Text style={styles.notifFieldLabel}>EST. EARNINGS</Text>
-                  <Text style={[styles.notifFieldValue, { color: S.orange, fontSize: 20, fontWeight: '800' }]}>
-                    ₹{getEstimatedEarnings(pendingOrder)}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.notifBtns}>
-              {!pendingOrder._kitchenAssigned && (
-                <TouchableOpacity
-                  style={styles.skipBtn}
-                  onPress={() => {
-                    const orderId = pendingOrder.id;
-                    skippedIdsRef.current = [...skippedIdsRef.current, orderId];
-                    setSkippedIds(prev => [...prev, orderId]);
-                    hideNotification();
-                    api.post(`/riders/orders/${orderId}/skip`, {}).catch(() => {});
-                  }}
-                  disabled={claimMutation.isPending}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.skipBtnText}>Not now</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[
-                  styles.acceptBtn,
-                  { flex: 1 },
-                  claimMutation.isPending && { opacity: 0.6 },
-                  pendingOrder._kitchenAssigned && { backgroundColor: '#E67E22' },
-                ]}
-                onPress={async () => {
-                  if (pendingOrder._kitchenAssigned) {
-                    hideNotification();
-                    queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-                  } else {
-                    claimMutation.mutate(pendingOrder.id);
-                  }
-                }}
-                disabled={claimMutation.isPending}
-                activeOpacity={0.9}
-              >
-                {pendingOrder._kitchenAssigned
-                  ? <><ChevronRight size={18} color={S.white} /><Text style={styles.acceptBtnText}>Go to Order</Text></>
-                  : claimMutation.isPending
-                    ? <Text style={styles.acceptBtnText}>Claiming…</Text>
-                    : <><Check size={18} color={S.white} /><Text style={styles.acceptBtnText}>Accept</Text></>
-                }
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Animated.View>
-      )}
     </View>
   );
 };
@@ -895,36 +657,9 @@ const styles = StyleSheet.create({
   orderDestLabel: { fontSize: 10, fontWeight: '700', color: S.muted, letterSpacing: 0.5, marginBottom: 2 },
   orderDestText: { fontSize: 13, fontWeight: '600', color: S.ink },
 
-  // Incoming notification
-  notifSheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50,
-    backgroundColor: S.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 24, shadowOffset: { width: 0, height: -4 },
-    elevation: 16,
-  },
-  notifStrip: {
-    backgroundColor: S.orange, paddingHorizontal: 20, paddingVertical: 12,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
-  notifStripLabel: { color: S.white, fontSize: 13, fontWeight: '700' },
-  countdownBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4,
-  },
-  countdownText: { color: S.white, fontSize: 12, fontWeight: '800' },
+  // Auto-assign notification sheet (shared styles)
   notifBody: { padding: 20 },
   notifOrderId: { fontSize: 28, fontWeight: '900', color: S.ink, marginBottom: 8 },
-  prepTimeBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
-    backgroundColor: S.orangeLight, marginBottom: 14,
-  },
-  prepTimeText: { fontSize: 12, fontWeight: '700' },
-  notifRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  notifField: { flex: 1 },
-  notifFieldLabel: { fontSize: 10, fontWeight: '700', color: S.muted, letterSpacing: 0.8, marginBottom: 4 },
-  notifFieldValue: { fontSize: 13, fontWeight: '600', color: S.ink, lineHeight: 18 },
   notifBtns: { flexDirection: 'row', gap: 10 },
   declineBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -938,21 +673,6 @@ const styles = StyleSheet.create({
     shadowColor: S.orange, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
   acceptBtnText: { color: S.white, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
-  skipBtn: {
-    paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14,
-    backgroundColor: S.bg, borderWidth: 1, borderColor: S.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  skipBtnText: { color: S.muted, fontSize: 14, fontWeight: '600' },
-
-  notifItemsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  notifItemChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: S.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
-    borderWidth: 1, borderColor: S.border,
-  },
-  notifItemChipQty: { fontSize: 12, fontWeight: '800', color: S.orange },
-  notifItemChipName: { fontSize: 12, fontWeight: '600', color: S.ink },
 
   // Auto-assign overlay
   autoAssignSheet: {

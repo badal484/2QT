@@ -234,36 +234,6 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         let notificationType: string | null = null;
         if (status === 'preparing') {
             notificationType = 'order_preparing';
-
-            // Check zone dispatch mode — fail-safe: if migration hasn't run yet, defaults to manual
-            let isAutoZone = false;
-            try {
-                const { rows: zoneRows } = await query('SELECT dispatch_mode FROM zones WHERE id = $1', [order.zone_id]);
-                isAutoZone = zoneRows[0]?.dispatch_mode === 'auto';
-            } catch { /* dispatch_mode column not yet migrated — treat as manual */ }
-
-            if (!isAutoZone) {
-                // Manual mode: broadcast immediately at preparing so riders can head to kitchen
-                emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id, status: 'preparing' });
-
-                query(`
-                    SELECT id FROM users
-                    WHERE role IN ('rider', 'rider_captain')
-                      AND is_online = true
-                      AND zone_id = $1
-                      AND (SELECT COUNT(*) FROM orders WHERE rider_id = users.id AND status NOT IN ('delivered', 'cancelled')) < 3
-                `, [order.zone_id]).then(({ rows }) => {
-                    if (rows.length > 0) {
-                        const riderIds = rows.map((r: any) => r.id);
-                        const { broadcastNotification } = require('../services/notification.service');
-                        broadcastNotification(
-                            riderIds,
-                            'New Delivery Request 🛵',
-                            `Order #${order.display_id} is being prepared — head to kitchen now!`
-                        ).catch(() => {});
-                    }
-                }).catch(() => {});
-            }
         }
         if (status === 'ready_for_pickup') {
             notificationType = 'order_ready';
@@ -277,13 +247,8 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
                 zoneId: order.zone_id,
             }, { delay: 3 * 60 * 1000 }).catch(() => {});
 
-            // Auto-assign zone: fire-and-forget, fail-safe if migration not yet run
-            try {
-                const { rows: zoneRows } = await query('SELECT dispatch_mode FROM zones WHERE id = $1', [order.zone_id]);
-                if (zoneRows[0]?.dispatch_mode === 'auto') {
-                    autoAssignOrder(id).catch(() => {});
-                }
-            } catch { /* dispatch_mode column not yet migrated — skip */ }
+            // Always auto-assign — no pool, no cherry-picking
+            autoAssignOrder(id).catch(() => {});
         }
         if (notificationType) {
             NotificationService.send(notificationType as any, {
