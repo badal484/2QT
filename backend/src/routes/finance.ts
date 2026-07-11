@@ -147,7 +147,9 @@ router.post('/cod/mark-collected', financeAccess, financeRole, async (req: AuthR
       SET cod_cash_collected = TRUE,
           cod_collected_at = NOW(),
           cod_collected_by = $${orderIds.length + 1},
-          payment_status = 'paid'
+          payment_status = 'paid',
+          cash_submit_confirmed_at = NOW(),
+          cash_submit_confirmed_by = $${orderIds.length + 1}
       WHERE id IN (${placeholders}) AND payment_method = 'cod' AND cod_cash_collected = FALSE
       RETURNING id, total_amount_paise
     `, [...orderIds, req.user!.userId]);
