@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
 import { addItem, setQuantity, setZone, setAddress, clearCart } from '../store/slices/cartSlice';
+import { setServiceabilityChecking, setServiceable, setUnserviceable, setNetworkError } from '../store/slices/appSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight, UtensilsCrossed } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, { FadeInDown, FadeOutDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
@@ -47,6 +48,27 @@ const HomeScreen = ({ navigation }: any) => {
 
   // If address has a zone use it; if address exists but has no zone, fall back to GPS zone
   const effectiveZoneId = zoneId || activeZoneId;
+
+  const [retrying, setRetrying] = useState(false);
+  const retryZoneCheck = useCallback(async () => {
+    if (!location) { navigation.navigate('Address'); return; }
+    setRetrying(true);
+    dispatch(setServiceabilityChecking());
+    try {
+      const res = await api.get(`/menu/zones/check?lat=${location.latitude}&lng=${location.longitude}`);
+      if (res.serviceable && res.zone?.id) {
+        dispatch(setZone(res.zone.id));
+        dispatch(setServiceable({ zoneId: res.zone.id, zoneName: res.zone.name || null, location }));
+        queryClient.invalidateQueries({ queryKey: ['menu'] });
+      } else {
+        dispatch(setUnserviceable(location));
+      }
+    } catch {
+      dispatch(setNetworkError());
+    } finally {
+      setRetrying(false);
+    }
+  }, [location, dispatch, queryClient, navigation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -1153,8 +1175,10 @@ const HomeScreen = ({ navigation }: any) => {
               <Text style={styles.comingSoonSub}>
                 Couldn't verify your delivery area. Check your connection, then retry or change address.
               </Text>
-              <BouncingButton style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}>
-                <Text style={styles.ctaPrimaryText}>Retry / Change Address</Text>
+              <BouncingButton style={styles.ctaPrimary} onPress={() => { triggerHaptic(); retryZoneCheck(); }} disabled={retrying} activeOpacity={0.85}>
+                {retrying
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.ctaPrimaryText}>Retry / Change Address</Text>}
               </BouncingButton>
             </Animated.View>
           ) : unserviceableLocation ? (
