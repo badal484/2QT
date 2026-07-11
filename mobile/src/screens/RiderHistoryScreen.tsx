@@ -186,11 +186,6 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                         </View>
                       </View>
 
-                      <View style={s.addressRow}>
-                        <View style={s.addressDot} />
-                        <Text style={s.addressText} numberOfLines={1}>{order.delivery_address_text || 'Customer Location'}</Text>
-                      </View>
-
                       {isDelivered && (
                         <View style={s.tagsRow}>
                           {order.distance_km != null && (
@@ -292,9 +287,6 @@ const s = StyleSheet.create({
   earnText: { fontSize: 18, fontWeight: '900', color: R.green },
   cancelText: { fontSize: 13, fontWeight: '700', color: R.red },
 
-  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  addressDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: R.orange, marginLeft: 2 },
-  addressText: { flex: 1, fontSize: 13, color: R.ink, fontWeight: '500' },
   
   tagsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', borderTopWidth: 1, borderTopColor: R.border, paddingTop: 12 },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
