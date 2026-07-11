@@ -133,6 +133,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
       else if (action === 'leave_at_door') Alert.alert('Confirmed', 'Leave the order at the door and take a photo as proof.');
       else { Alert.alert('Return Order', 'Please return the order to the kitchen.'); navigation.goBack(); }
     },
+    onError: () => Alert.alert('Error', 'Could not send update. Please try again.'),
   });
 
 

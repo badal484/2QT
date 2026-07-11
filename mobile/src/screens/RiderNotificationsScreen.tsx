@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api/client';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   red: '#EF4444', redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
@@ -91,7 +91,7 @@ const RiderNotificationsScreen = ({ navigation }: any) => {
         navigation.navigate('RiderMissions');
       }
       // suspend/reactivate — no navigation, just reading is enough
-    } catch (_) {}
+    } catch (e) { console.error('[notification-nav]', e); }
   };
 
   return (
