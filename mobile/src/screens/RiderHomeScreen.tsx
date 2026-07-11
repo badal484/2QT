@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StatusBar, Alert, Linking,
   StyleSheet, Animated, Easing, Platform, PermissionsAndroid,
@@ -56,6 +56,12 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const slideAnim = useRef(new Animated.Value(400)).current;
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
+
+  // Auto-assign overlay state
+  const [autoAssignedOrder, setAutoAssignedOrder] = useState<{ orderId: string; displayId: string } | null>(null);
+  const autoAssignedOrderRef = useRef<{ orderId: string; displayId: string } | null>(null);
+  const [autoAssignCountdown, setAutoAssignCountdown] = useState(30);
+  const autoAssignTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: earnings } = useQuery({
     queryKey: ['rider-earnings'],
@@ -200,6 +206,40 @@ const RiderHomeScreen = ({ navigation }: any) => {
     Animated.timing(slideAnim, { toValue: 400, useNativeDriver: true, duration: 250, easing: Easing.in(Easing.quad) }).start(() => setPendingOrder(null));
   };
 
+  const clearAutoAssign = useCallback(() => {
+    if (autoAssignTimerRef.current) {
+      clearInterval(autoAssignTimerRef.current);
+      autoAssignTimerRef.current = null;
+    }
+    autoAssignedOrderRef.current = null;
+    setAutoAssignedOrder(null);
+    setAutoAssignCountdown(30);
+  }, []);
+
+  const showAutoAssign = useCallback((data: { orderId: string; displayId: string }) => {
+    autoAssignedOrderRef.current = data;
+    setAutoAssignedOrder(data);
+    setAutoAssignCountdown(30);
+    import('react-native').then(({ Vibration }) => Vibration.vibrate([300, 200, 300], false));
+    displayLocalNotification("You've been assigned an order", `Order ${data.displayId} - tap to view.`, { type: 'order_update' });
+
+    if (autoAssignTimerRef.current) clearInterval(autoAssignTimerRef.current);
+    let remaining = 30;
+    autoAssignTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setAutoAssignCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(autoAssignTimerRef.current!);
+        autoAssignTimerRef.current = null;
+        // Window closed — dismiss overlay and refresh active orders
+        autoAssignedOrderRef.current = null;
+        setAutoAssignedOrder(null);
+        setAutoAssignCountdown(30);
+        queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+      }
+    }, 1000);
+  }, [clearAutoAssign, queryClient]);
+
   // Keep isOnlineRef in sync so socket handlers always see the latest value
   useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
 
@@ -251,6 +291,11 @@ const RiderHomeScreen = ({ navigation }: any) => {
       showNotification({ ...data, id: data.orderId, display_id: data.displayId, delivery_address_text: data.deliveryAddress || null, _kitchenAssigned: true });
     };
 
+    const autoAssignedHandler = (data: { orderId: string; displayId: string; optOutWindowMs: number }) => {
+      if (!isOnlineRef.current) return;
+      showAutoAssign({ orderId: data.orderId, displayId: data.displayId });
+    };
+
     const dispatcherAlertHandler = async (data: { orderId: string; displayId: string }) => {
       if (!isOnlineRef.current) return;
       if (pendingOrderRef.current) return;
@@ -274,9 +319,11 @@ const RiderHomeScreen = ({ navigation }: any) => {
       socket.off('new_available_mission', missionHandler);
       socket.off('order_assigned', assignedHandler);
       socket.off('dispatcher_order_alert', dispatcherAlertHandler);
+      socket.off('order_auto_assigned', autoAssignedHandler);
       socket.on('new_available_mission', missionHandler);
       socket.on('order_assigned', assignedHandler);
       socket.on('dispatcher_order_alert', dispatcherAlertHandler);
+      socket.on('order_auto_assigned', autoAssignedHandler);
       // Re-register after every reconnect
       socket.off('connect', register);
       socket.on('connect', register);
@@ -296,6 +343,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
         socket.off('new_available_mission', missionHandler);
         socket.off('order_assigned', assignedHandler);
         socket.off('dispatcher_order_alert', dispatcherAlertHandler);
+        socket.off('order_auto_assigned', autoAssignedHandler);
         socket.off('connect', register);
       }
     };
@@ -348,8 +396,11 @@ const RiderHomeScreen = ({ navigation }: any) => {
           setCurrentLocation({ latitude, longitude });
           if (isOnline) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
         },
-        () => {},
-        { enableHighAccuracy: false, distanceFilter: 5, interval: 4000, timeout: 15000, maximumAge: 10000 },
+        (err) => {
+          console.log('[Geolocation Error]', err);
+          Alert.alert('GPS Error', 'Failed to get location: ' + err.message);
+        },
+        { enableHighAccuracy: true, distanceFilter: 5, interval: 4000, timeout: 15000, maximumAge: 10000 },
       );
       interval = setInterval(() => {
         if (isOnline) getSocket()?.emit('update_location', { lat: latestLocationRef.current.latitude, lng: latestLocationRef.current.longitude });
@@ -556,6 +607,48 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
       {/* Skipped pool banner removed as per True Decline logic */}
       {/* ── Incoming order notification ───────────────────────────────────── */}
+      {/* ── Auto-assigned overlay (rider has 30s to opt out) ───────────────── */}
+      {autoAssignedOrder && (
+        <View style={[styles.autoAssignSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={styles.autoAssignStrip}>
+            <Text style={styles.autoAssignStripLabel}>⚡  Auto-Assigned to You</Text>
+            <View style={styles.autoAssignCountdownBadge}>
+              <Text style={styles.autoAssignCountdownText}>{autoAssignCountdown}s</Text>
+            </View>
+          </View>
+          <View style={styles.notifBody}>
+            <Text style={styles.notifOrderId}>{autoAssignedOrder.displayId}</Text>
+            <Text style={{ color: S.muted, fontSize: 13, marginBottom: 16, lineHeight: 18 }}>
+              This order has been assigned directly to you. It will lock in when the timer expires.
+            </Text>
+            <View style={styles.notifBtns}>
+              <TouchableOpacity
+                style={styles.declineBtn}
+                onPress={async () => {
+                  const orderId = autoAssignedOrder.orderId;
+                  clearAutoAssign();
+                  try { await api.post(`/riders/orders/${orderId}/mark-unavailable`, {}); } catch {}
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.declineBtnText}>I'm Unavailable</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.acceptBtn, { backgroundColor: '#5B21B6' }]}
+                onPress={() => {
+                  clearAutoAssign();
+                  queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+                }}
+                activeOpacity={0.9}
+              >
+                <Check size={18} color={S.white} />
+                <Text style={styles.acceptBtnText}>Got It</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       {pendingOrder && (
         <Animated.View style={[styles.notifSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] }]}>
           {/* Orange top strip */}
@@ -833,6 +926,24 @@ const styles = StyleSheet.create({
   },
   notifItemChipQty: { fontSize: 12, fontWeight: '800', color: S.orange },
   notifItemChipName: { fontSize: 12, fontWeight: '600', color: S.ink },
+
+  // Auto-assign overlay
+  autoAssignSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 55,
+    backgroundColor: S.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: -4 },
+    elevation: 18,
+  },
+  autoAssignStrip: {
+    backgroundColor: '#5B21B6', paddingHorizontal: 20, paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  autoAssignStripLabel: { color: S.white, fontSize: 13, fontWeight: '700' },
+  autoAssignCountdownBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
+  },
+  autoAssignCountdownText: { color: S.white, fontSize: 14, fontWeight: '900' },
 });
 
 export default RiderHomeScreen;
