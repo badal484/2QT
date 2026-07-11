@@ -85,6 +85,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     mutationFn: (coords: { lat: number; lng: number }) =>
       api.post('/riders/zone/check-in', coords),
     onSuccess: (data: any) => {
+      if (data?.zoneId) dispatch(updateUser({ zoneId: data.zoneId }));
       queryClient.invalidateQueries({ queryKey: ['me'] });
       if (data?.zoneName) Alert.alert('Zone assigned!', `You've been checked in to ${data.zoneName}. Orders will start appearing now.`);
     },
