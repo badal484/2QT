@@ -146,19 +146,24 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 }
 
 // Returns all active zones with their primary kitchen — used by unzoned riders to navigate to the nearest hub
-router.get('/available-zones', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (_req: AuthRequest, res) => {
+router.get('/available-zones', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     try {
-        const { rows } = await query(`
-            SELECT DISTINCT ON (z.id)
-                   z.id, z.name, z.radius_km, z.kitchen_lat, z.kitchen_lng,
-                   k.name as kitchen_name, k.address as kitchen_address
-            FROM zones z
-            LEFT JOIN kitchens k ON k.zone_id = z.id
-            WHERE z.is_active = true OR z.is_active IS NULL
-            ORDER BY z.id, z.name ASC
-            LIMIT 20
-        `);
-        res.json({ zones: rows });
+        const [zonesResult, riderResult] = await Promise.all([
+            query(`
+                SELECT DISTINCT ON (z.id)
+                       z.id, z.name, z.radius_km, z.kitchen_lat, z.kitchen_lng,
+                       k.name as kitchen_name, k.address as kitchen_address
+                FROM zones z
+                LEFT JOIN kitchens k ON k.zone_id = z.id
+                WHERE z.is_active = true OR z.is_active IS NULL
+                ORDER BY z.id, z.name ASC
+                LIMIT 20
+            `),
+            query('SELECT zone_id FROM users WHERE id = $1', [req.user!.userId]),
+        ]);
+        // Return the rider's actual DB zone_id so mobile can sync Redux even when JWT is stale
+        const currentZoneId: string | null = riderResult.rows[0]?.zone_id ?? null;
+        res.json({ zones: zonesResult.rows, currentZoneId });
     } catch (err) {
         console.error('[available-zones]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });

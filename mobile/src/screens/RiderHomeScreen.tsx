@@ -79,6 +79,13 @@ const RiderHomeScreen = ({ navigation }: any) => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Sync: if DB already has a zone but Redux is stale (persisted from before assignment), fix it now
+  useEffect(() => {
+    if (zonesData?.currentZoneId && !user?.zoneId) {
+      dispatch(updateUser({ zoneId: zonesData.currentZoneId }));
+    }
+  }, [zonesData?.currentZoneId]);
+
   const [checkingIn, setCheckingIn] = useState(false);
   const checkingInRef = useRef(false);
   const checkInMutation = useMutation({
