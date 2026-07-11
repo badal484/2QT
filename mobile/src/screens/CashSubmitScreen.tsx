@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  ScrollView, Alert, ActivityIndicator, Linking, Clipboard,
+  ScrollView, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Banknote, CheckCircle, ArrowLeft, Smartphone, Building2,
-  Info, Clock, Copy, ExternalLink, CheckCircle2,
+  Info, Clock, ExternalLink, CheckCircle2,
 } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
