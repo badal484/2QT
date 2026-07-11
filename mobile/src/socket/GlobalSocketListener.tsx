@@ -15,6 +15,8 @@ export const GlobalSocketListener: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['order'] });
       queryClient.invalidateQueries({ queryKey: ['activeOrders'] });
       queryClient.invalidateQueries({ queryKey: ['scheduledOrders'] });
+      // Rider active order — keeps rider home screen in sync when status changes
+      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
     };
 
     // ── Menu, categories, offers ──────────────────────────────────────────────
@@ -92,6 +94,10 @@ export const GlobalSocketListener: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['menuOffers'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['home'] });
+      // Rider-specific queries — any orders missed while disconnected
+      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+      queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
+      queryClient.invalidateQueries({ queryKey: ['rider-order-history'] });
     };
 
     // ── Bind ──────────────────────────────────────────────────────────────────
