@@ -198,6 +198,100 @@ router.get('/cod/history', financeAccess, financeRole, async (req: AuthRequest, 
   }
 });
 
+// ─── Cash Submissions (grouped rider hand-ins) ───────────────────────────────
+
+// GET /finance/cash-submissions?status=pending
+router.get('/cash-submissions', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  try {
+    const { status = 'pending' } = req.query as { status?: string };
+    const { rows } = await query(`
+      SELECT
+        cs.id, cs.total_amount_paise, cs.order_count, cs.method, cs.utr_number,
+        cs.status, cs.submitted_at, cs.confirmed_at, cs.notes,
+        u.id  AS rider_id,  u.name  AS rider_name,  u.phone AS rider_phone,
+        cb.name AS confirmed_by_name
+      FROM cash_submissions cs
+      JOIN users u  ON cs.rider_id = u.id
+      LEFT JOIN users cb ON cs.confirmed_by = cb.id
+      WHERE cs.status = $1
+      ORDER BY cs.submitted_at DESC
+    `, [status]);
+    res.json({ submissions: rows });
+  } catch (err) {
+    console.error('[finance/cash-submissions GET]', err);
+    res.status(500).json({ error: 'Failed to fetch cash submissions' });
+  }
+});
+
+// POST /finance/cash-submissions/:id/confirm
+router.post('/cash-submissions/:id/confirm', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { notes } = req.body as { notes?: string };
+  const confirmedBy = req.user!.userId;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: [submission] } = await client.query(`
+      SELECT id, rider_id, total_amount_paise, order_count, status
+      FROM cash_submissions WHERE id = $1 FOR UPDATE
+    `, [id]);
+
+    if (!submission) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Submission not found' }); }
+    if (submission.status !== 'pending') { await client.query('ROLLBACK'); return res.status(409).json({ error: `Submission already ${submission.status}` }); }
+
+    const { rows: subOrders } = await client.query(`
+      SELECT order_id, amount_paise FROM cash_submission_orders WHERE submission_id = $1
+    `, [id]);
+
+    if (subOrders.length > 0) {
+      const orderIds = subOrders.map((o: any) => o.order_id);
+      const orderPh  = orderIds.map((_: any, i: number) => `$${i + 1}`).join(',');
+
+      await client.query(`
+        UPDATE orders
+        SET cod_cash_collected = TRUE,
+            cod_collected_at = NOW(),
+            cod_collected_by = $${orderIds.length + 1},
+            payment_status = 'paid',
+            cash_submit_confirmed_at = NOW(),
+            cash_submit_confirmed_by = $${orderIds.length + 2}
+        WHERE id IN (${orderPh}) AND payment_method = 'cod' AND cod_cash_collected = FALSE
+      `, [...orderIds, confirmedBy, confirmedBy]);
+
+      for (const so of subOrders) {
+        await client.query(`
+          INSERT INTO cod_collections (rider_id, order_id, amount_paise, collected_by, notes)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [submission.rider_id, so.order_id, so.amount_paise, confirmedBy, notes || null]);
+      }
+    }
+
+    await client.query(`
+      UPDATE cash_submissions
+      SET status = 'confirmed', confirmed_at = NOW(), confirmed_by = $1, notes = $2
+      WHERE id = $3
+    `, [confirmedBy, notes || null, id]);
+
+    await client.query('COMMIT');
+
+    emitToUser(submission.rider_id, 'cash_confirmed', {
+      submissionId: id,
+      totalPaise: submission.total_amount_paise,
+    });
+    emitToAll('cod_updated', { action: 'collected', riderIds: [submission.rider_id], count: subOrders.length });
+
+    res.json({ success: true, confirmedCount: subOrders.length, totalPaise: submission.total_amount_paise });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[finance/cash-submissions confirm]', err);
+    res.status(500).json({ error: 'Failed to confirm submission' });
+  } finally {
+    client.release();
+  }
+});
+
 // ─── Rider Payouts ────────────────────────────────────────────────────────────
 
 router.get('/rider-payouts', financeAccess, financeRole, async (req: AuthRequest, res) => {

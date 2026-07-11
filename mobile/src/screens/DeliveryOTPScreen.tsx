@@ -88,7 +88,7 @@ const suc = StyleSheet.create({
 const RESEND_COOLDOWN = 30;
 
 const DeliveryOTPScreen = ({ route, navigation }: any) => {
-  const { orderId, isCashCod, amountPaise, displayId } = route.params;
+  const { orderId, displayId } = route.params;
   const insets = useSafeAreaInsets();
   const [otp, setOtp] = useState('');
   const [focused, setFocused] = useState(false);
@@ -105,11 +105,8 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
   const handleDone = () => {
     queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
     queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
-    if (isCashCod) {
-      navigation.replace('CashSubmit', { orderId, amountPaise, displayId });
-    } else {
-      navigation.navigate('RiderTabs');
-    }
+    queryClient.invalidateQueries({ queryKey: ['cash-in-hand'] });
+    navigation.navigate('RiderTabs');
   };
 
   const startCooldown = useCallback(() => {
@@ -187,7 +184,7 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
     resendMutation.mutate();
   };
 
-  if (delivered) return <SuccessScreen onDone={handleDone} doneLabel={isCashCod ? 'Submit Cash to Finance →' : 'Back to Dashboard'} />;
+  if (delivered) return <SuccessScreen onDone={handleDone} doneLabel="Back to Dashboard" />;
 
   // Photo is optional — never block confirmation on upload; show a warning row instead
   const isBlocked = otp.length < 6 || verifyMutation.isPending;

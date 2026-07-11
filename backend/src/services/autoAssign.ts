@@ -11,7 +11,14 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function findBestRider(zoneId: string, kitchenLat: number, kitchenLng: number): Promise<string | null> {
+const COD_CASH_LIMIT_PAISE = 200_000; // ₹2000 — rider cannot take more COD orders above this
+
+async function findBestRider(
+    zoneId: string,
+    kitchenLat: number,
+    kitchenLng: number,
+    isCodOrder = false,
+): Promise<string | null> {
     const { rows: riders } = await query(`
         SELECT u.id,
                COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) AS active_orders
@@ -34,6 +41,18 @@ async function findBestRider(zoneId: string, kitchenLat: number, kitchenLng: num
         // Skip riders in 60s opt-out cooldown
         const unavail = await redis.get(`2qt:auto_unavail:${rider.id}`).catch(() => null);
         if (unavail) continue;
+
+        // For COD orders: skip riders who are already at or above the cash-in-hand limit
+        if (isCodOrder) {
+            const { rows: cashRows } = await query(`
+                SELECT COALESCE(SUM(total_amount_paise), 0)::int AS cash_paise
+                FROM orders
+                WHERE rider_id = $1 AND payment_method = 'cod'
+                  AND status = 'delivered' AND cod_cash_collected = FALSE
+            `, [rider.id]);
+            const cashInHand = parseInt(cashRows[0].cash_paise, 10);
+            if (cashInHand >= COD_CASH_LIMIT_PAISE) continue;
+        }
 
         const locRaw = await redis.get(keys.riderLocation(rider.id)).catch(() => null);
         if (!locRaw) continue; // no GPS — rider not actively sharing location
@@ -120,7 +139,7 @@ async function detectBatch(
 export async function autoAssignOrder(orderId: string, attempt = 1): Promise<void> {
     try {
         const { rows } = await query(`
-            SELECT o.id, o.display_id, o.zone_id, o.kitchen_id,
+            SELECT o.id, o.display_id, o.zone_id, o.kitchen_id, o.payment_method,
                    COALESCE(o.delivery_location_lat, a.lat)  AS delivery_lat,
                    COALESCE(o.delivery_location_lng, a.lng)  AS delivery_lng,
                    z.kitchen_lat, z.kitchen_lng
@@ -138,7 +157,7 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
         const deliveryLat = order.delivery_lat ? parseFloat(order.delivery_lat) : null;
         const deliveryLng = order.delivery_lng ? parseFloat(order.delivery_lng) : null;
 
-        const riderId = await findBestRider(order.zone_id, kitchenLat, kitchenLng);
+        const riderId = await findBestRider(order.zone_id, kitchenLat, kitchenLng, order.payment_method === 'cod');
 
         if (!riderId) {
             console.log(`[AUTO-ASSIGN] No eligible riders for ${order.display_id} (attempt ${attempt}) — alerting admin`);
