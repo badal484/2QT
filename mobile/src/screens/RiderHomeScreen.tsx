@@ -723,6 +723,22 @@ const RiderHomeScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.notifBtns}>
+              {!pendingOrder._kitchenAssigned && (
+                <TouchableOpacity
+                  style={styles.skipBtn}
+                  onPress={() => {
+                    const orderId = pendingOrder.id;
+                    skippedIdsRef.current = [...skippedIdsRef.current, orderId];
+                    setSkippedIds(prev => [...prev, orderId]);
+                    hideNotification();
+                    api.post(`/riders/orders/${orderId}/skip`, {}).catch(() => {});
+                  }}
+                  disabled={claimMutation.isPending}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.skipBtnText}>Not now</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[
                   styles.acceptBtn,
@@ -732,7 +748,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
                 ]}
                 onPress={async () => {
                   if (pendingOrder._kitchenAssigned) {
-                    // Order already assigned — just acknowledge and dismiss
                     hideNotification();
                     queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
                   } else {
@@ -923,6 +938,12 @@ const styles = StyleSheet.create({
     shadowColor: S.orange, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
   acceptBtnText: { color: S.white, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
+  skipBtn: {
+    paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14,
+    backgroundColor: S.bg, borderWidth: 1, borderColor: S.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  skipBtnText: { color: S.muted, fontSize: 14, fontWeight: '600' },
 
   notifItemsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   notifItemChip: {
