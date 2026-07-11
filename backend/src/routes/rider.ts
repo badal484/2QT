@@ -253,6 +253,17 @@ router.post('/orders/:id/mark-unavailable', authenticate, requireRole('rider', '
     }
 });
 
+router.post('/orders/:id/skip', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { id } = req.params;
+    // Log skip for acceptance rate tracking — non-blocking
+    query(
+        'INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [riderId, id, 'skipped'],
+    ).catch(() => {});
+    res.json({ ok: true });
+});
+
 router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
     try {
