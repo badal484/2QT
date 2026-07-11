@@ -13,8 +13,11 @@ export const connectSocket = (token: string) => {
 
   socket = io(SOCKET_URL, {
     auth: { token },
-    transports: ['websocket'],
+    transports: ['polling', 'websocket'],
     reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
     extraHeaders: {
       'Bypass-Tunnel-Reminder': 'true'
     }
