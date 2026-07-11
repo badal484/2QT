@@ -1323,23 +1323,6 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
     }
 });
 
-router.patch('/zones/:id/dispatch-mode', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
-    const { dispatch_mode } = req.body;
-    if (!['manual', 'auto'].includes(dispatch_mode)) {
-        return res.status(400).json({ error: 'dispatch_mode must be "manual" or "auto"' });
-    }
-    try {
-        const { rows } = await query(
-            'UPDATE zones SET dispatch_mode = $1 WHERE id = $2 RETURNING id, name, dispatch_mode',
-            [dispatch_mode, id]
-        );
-        if (!rows[0]) return res.status(404).json({ error: 'Zone not found' });
-        res.json({ zone: rows[0] });
-    } catch (err: any) {
-        res.status(500).json({ error: 'Failed to update dispatch mode', details: err.message });
-    }
-});
 
 router.delete('/zones/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const id = req.params.id as string;

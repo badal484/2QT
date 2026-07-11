@@ -116,12 +116,22 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
         const riderId = await findBestRider(order.zone_id, kitchenLat, kitchenLng);
 
         if (!riderId) {
-            console.log(`[AUTO-ASSIGN] No eligible riders for ${order.display_id} (attempt ${attempt}), broadcasting to pool`);
-            emitToRiders('new_available_mission', {
+            console.log(`[AUTO-ASSIGN] No eligible riders for ${order.display_id} (attempt ${attempt}) — alerting admin`);
+            emitToAdmin('order_needs_manual_assignment', {
                 orderId,
                 displayId: order.display_id,
-                status: 'ready_for_pickup',
-            }, order.zone_id);
+                zoneId: order.zone_id,
+                attempt,
+                message: `No available rider found for ${order.display_id}. Manual assignment needed.`,
+            });
+            if (attempt >= 2) {
+                // Absolute last resort — broadcast to all online riders in zone
+                console.log(`[AUTO-ASSIGN] Last resort broadcast for ${order.display_id}`);
+                emitToRiders('order_needs_rider', {
+                    orderId,
+                    displayId: order.display_id,
+                }, order.zone_id);
+            }
             return;
         }
 
