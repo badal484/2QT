@@ -3,7 +3,6 @@ import {
   View, Text, TouchableOpacity, StatusBar, Alert, Linking,
   StyleSheet, Animated, Easing, Platform, PermissionsAndroid,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LeafletMap } from '../components/LeafletMap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -53,21 +52,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const [skippedIds, setSkippedIds] = useState<string[]>([]);
   const skippedIdsRef = useRef<string[]>([]);
 
-  // Load persisted declines on mount (4-hour TTL)
-  useEffect(() => {
-    AsyncStorage.getItem('rider_skipped_orders').then(raw => {
-      if (!raw) return;
-      try {
-        const map: Record<string, number> = JSON.parse(raw);
-        const cutoff = Date.now() - 4 * 60 * 60 * 1000;
-        const ids = Object.entries(map).filter(([, ts]) => ts > cutoff).map(([id]) => id);
-        if (ids.length > 0) {
-          skippedIdsRef.current = ids;
-          setSkippedIds(ids);
-        }
-      } catch {}
-    }).catch(() => {});
-  }, []);
   const latestLocationRef = useRef({ latitude: 0, longitude: 0 });
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(400)).current;
@@ -216,17 +200,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
     import('react-native').then(({ Vibration }) => Vibration.vibrate([500, 500], true));
     displayLocalNotification('New Delivery Request', 'A new order is available. Tap to view.', { type: 'order_update' });
   };
-
-  const persistDecline = useCallback((orderId: string) => {
-    AsyncStorage.getItem('rider_skipped_orders').then(raw => {
-      const map: Record<string, number> = raw ? JSON.parse(raw) : {};
-      const cutoff = Date.now() - 4 * 60 * 60 * 1000;
-      // Prune expired entries while we're here
-      for (const id of Object.keys(map)) { if (map[id] < cutoff) delete map[id]; }
-      map[orderId] = Date.now();
-      AsyncStorage.setItem('rider_skipped_orders', JSON.stringify(map)).catch(() => {});
-    }).catch(() => {});
-  }, []);
 
   const hideNotification = () => {
     pendingOrderRef.current = null;
@@ -747,27 +720,12 @@ const RiderHomeScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.notifBtns}>
-              {/* Pool orders: rider can decline. Kitchen-assigned: no hiding — it's mandatory */}
-              {!pendingOrder._kitchenAssigned && (
-                <TouchableOpacity
-                  style={styles.declineBtn}
-                  onPress={() => {
-                    const id = pendingOrder.id;
-                    setSkippedIds(prev => { const next = [...prev, id]; skippedIdsRef.current = next; return next; });
-                    persistDecline(id);
-                    hideNotification();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.declineBtnText}>Decline</Text>
-                </TouchableOpacity>
-              )}
-
               <TouchableOpacity
                 style={[
                   styles.acceptBtn,
+                  { flex: 1 },
                   (claimMutation.isPending || acceptingKA) && { opacity: 0.6 },
-                  pendingOrder._kitchenAssigned && { backgroundColor: '#E67E22', flex: 1 },
+                  pendingOrder._kitchenAssigned && { backgroundColor: '#E67E22' },
                 ]}
                 onPress={async () => {
                   if (pendingOrder._kitchenAssigned) {

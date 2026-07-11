@@ -15,7 +15,7 @@ export interface ToastOptions {
 
 class ToastManager {
   listener: ((options: ToastOptions) => void) | null = null;
-  timeout: NodeJS.Timeout | null = null;
+  timeout: ReturnType<typeof setTimeout> | null = null;
   
   show(options: ToastOptions) {
     if (this.listener) this.listener(options);

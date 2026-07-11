@@ -14,7 +14,7 @@ import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { uploadToImageKit } from '../utils/imageKit';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   red: '#EF4444', redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: '#FFFBEB',
@@ -289,7 +289,7 @@ const s = StyleSheet.create({
   photoWrapper: { borderRadius: 16, overflow: 'hidden', position: 'relative' },
   docPhoto: { width: '100%', height: 200, backgroundColor: R.bg },
   photoOverlay: {
-    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.85)',
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.85)',
     alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   uploadingText: { color: R.orange, fontSize: 13, fontWeight: '600' },
