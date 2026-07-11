@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StatusBar, Alert, Linking,
+  View, Text, TouchableOpacity, StatusBar, Alert, Linking, Modal,
   StyleSheet, Animated, Platform, PermissionsAndroid, Vibration,
 } from 'react-native';
 import { LeafletMap } from '../components/LeafletMap';
@@ -57,6 +57,9 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const autoAssignedOrderRef = useRef<{ orderId: string; displayId: string; batchDisplayId?: string } | null>(null);
   const [autoAssignCountdown, setAutoAssignCountdown] = useState(30);
   const autoAssignTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sheetSlide = useRef(new Animated.Value(600)).current;
+  const flashAnim = useRef(new Animated.Value(0)).current;
+  const flashLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const { data: earnings } = useQuery({
     queryKey: ['rider-earnings'],
@@ -178,18 +181,20 @@ const RiderHomeScreen = ({ navigation }: any) => {
     autoAssignedOrderRef.current = data;
     setAutoAssignedOrder(data);
     setAutoAssignCountdown(30);
-    Vibration.vibrate([300, 200, 300], false);
-    displayLocalNotification("You've been assigned an order", `Order ${data.displayId} - tap to view.`, { type: 'order_update' });
+    // 3-burst vibration on arrival
+    Vibration.vibrate([0, 500, 150, 500, 150, 500], false);
+    displayLocalNotification('🚴 New Order Assigned!', `${data.displayId} — tap to view. You have 30s to opt out.`, { type: 'order_update' });
 
     if (autoAssignTimerRef.current) clearInterval(autoAssignTimerRef.current);
     let remaining = 30;
     autoAssignTimerRef.current = setInterval(() => {
       remaining -= 1;
       setAutoAssignCountdown(remaining);
+      // Reminder vibrations so rider doesn't miss it
+      if (remaining === 20 || remaining === 10) Vibration.vibrate([0, 300, 100, 300], false);
       if (remaining <= 0) {
         clearInterval(autoAssignTimerRef.current!);
         autoAssignTimerRef.current = null;
-        // Window closed — dismiss overlay and refresh active orders
         autoAssignedOrderRef.current = null;
         setAutoAssignedOrder(null);
         setAutoAssignCountdown(30);
@@ -197,6 +202,24 @@ const RiderHomeScreen = ({ navigation }: any) => {
       }
     }, 1000);
   }, [queryClient]);
+
+  // Animate sheet in + flash strip whenever a new order arrives
+  useEffect(() => {
+    if (autoAssignedOrder) {
+      sheetSlide.setValue(600);
+      Animated.spring(sheetSlide, { toValue: 0, useNativeDriver: true, tension: 70, friction: 12 }).start();
+      flashLoopRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flashAnim, { toValue: 1, duration: 350, useNativeDriver: false }),
+          Animated.timing(flashAnim, { toValue: 0, duration: 350, useNativeDriver: false }),
+        ]),
+      );
+      flashLoopRef.current.start();
+    } else {
+      flashLoopRef.current?.stop();
+      flashLoopRef.current = null;
+    }
+  }, [autoAssignedOrder]);
 
   // Keep isOnlineRef in sync so socket handlers always see the latest value
   useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
@@ -492,62 +515,63 @@ const RiderHomeScreen = ({ navigation }: any) => {
         </View>
       )}
 
-      {/* ── Auto-assigned overlay (rider has 30s to opt out) ───────────────── */}
-      {autoAssignedOrder && (
-        <View style={[styles.autoAssignSheet, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={styles.autoAssignStrip}>
-            <Text style={styles.autoAssignStripLabel}>⚡  Auto-Assigned to You</Text>
-            <View style={styles.autoAssignCountdownBadge}>
-              <Text style={styles.autoAssignCountdownText}>{autoAssignCountdown}s</Text>
-            </View>
-          </View>
-          <View style={styles.notifBody}>
-            <Text style={styles.notifOrderId}>{autoAssignedOrder.displayId}</Text>
-            {autoAssignedOrder.batchDisplayId ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <View style={{ backgroundColor: '#EDE9FE', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Text style={{ color: '#5B21B6', fontSize: 11, fontWeight: '800' }}>
-                    📦 BATCH · {autoAssignedOrder.batchDisplayId}
-                  </Text>
-                </View>
+      {/* ── Auto-assigned modal (rider has 30s to opt out) ─────────────────── */}
+      <Modal visible={!!autoAssignedOrder} transparent animationType="none" statusBarTranslucent onRequestClose={() => {}}>
+        <View style={styles.modalBackdrop}>
+          <Animated.View style={[styles.autoAssignSheet, { paddingBottom: insets.bottom + 20, transform: [{ translateY: sheetSlide }] }]}>
+            {/* Flashing strip */}
+            <Animated.View style={[styles.autoAssignStrip, { backgroundColor: flashAnim.interpolate({ inputRange: [0, 1], outputRange: ['#5B21B6', '#FC4603'] }) }]}>
+              <Text style={styles.autoAssignStripLabel}>⚡  New Order Assigned!</Text>
+              <View style={[styles.autoAssignCountdownBadge, autoAssignCountdown <= 10 && styles.autoAssignCountdownUrgent]}>
+                <Text style={styles.autoAssignCountdownText}>{autoAssignCountdown}s</Text>
               </View>
-            ) : null}
-            <Text style={{ color: S.muted, fontSize: 13, marginBottom: 16, lineHeight: 18 }}>
-              {autoAssignedOrder.batchDisplayId
-                ? 'Two orders from the same kitchen — pick up both in one trip.'
-                : 'This order has been assigned directly to you. It will lock in when the timer expires.'}
-            </Text>
-            <View style={styles.notifBtns}>
-              <TouchableOpacity
-                style={styles.declineBtn}
-                onPress={async () => {
-                  const orderId = autoAssignedOrder.orderId;
-                  clearAutoAssign();
-                  try {
-                    await api.post(`/riders/orders/${orderId}/mark-unavailable`, {});
-                  } catch {
-                    Alert.alert('Error', 'Could not update status. Please try again.');
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.declineBtnText}>I'm Unavailable</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.acceptBtn, { backgroundColor: '#5B21B6' }]}
-                onPress={() => {
-                  clearAutoAssign();
-                  queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-                }}
-                activeOpacity={0.9}
-              >
-                <Check size={18} color={S.white} />
-                <Text style={styles.acceptBtnText}>Got It</Text>
-              </TouchableOpacity>
+            </Animated.View>
+
+            <View style={styles.notifBody}>
+              <Text style={styles.notifOrderId}>{autoAssignedOrder?.displayId}</Text>
+              {autoAssignedOrder?.batchDisplayId ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <View style={{ backgroundColor: '#EDE9FE', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ color: '#5B21B6', fontSize: 11, fontWeight: '800' }}>
+                      📦 BATCH · {autoAssignedOrder.batchDisplayId}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+              <Text style={{ color: S.muted, fontSize: 13, marginBottom: 20, lineHeight: 19 }}>
+                {autoAssignedOrder?.batchDisplayId
+                  ? 'Two orders from the same kitchen — pick up both in one trip.'
+                  : 'This order is yours. It locks in automatically when the timer hits zero.'}
+              </Text>
+              <View style={styles.notifBtns}>
+                <TouchableOpacity
+                  style={styles.declineBtn}
+                  onPress={async () => {
+                    const orderId = autoAssignedOrder!.orderId;
+                    clearAutoAssign();
+                    try { await api.post(`/riders/orders/${orderId}/mark-unavailable`, {}); }
+                    catch { Alert.alert('Error', 'Could not update status. Please try again.'); }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.declineBtnText}>I'm Unavailable</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.acceptBtn, { backgroundColor: '#5B21B6' }]}
+                  onPress={() => {
+                    clearAutoAssign();
+                    queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+                  }}
+                  activeOpacity={0.9}
+                >
+                  <Check size={18} color={S.white} />
+                  <Text style={styles.acceptBtnText}>Got It</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </Animated.View>
         </View>
-      )}
+      </Modal>
 
     </View>
   );
@@ -693,23 +717,26 @@ const styles = StyleSheet.create({
   },
   acceptBtnText: { color: S.white, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
 
-  // Auto-assign overlay
+  // Auto-assign modal
+  modalBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
+  },
   autoAssignSheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 55,
     backgroundColor: S.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: -4 },
-    elevation: 18,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: -4 },
+    elevation: 24,
   },
   autoAssignStrip: {
-    backgroundColor: '#5B21B6', paddingHorizontal: 20, paddingVertical: 12,
+    paddingHorizontal: 20, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  autoAssignStripLabel: { color: S.white, fontSize: 13, fontWeight: '700' },
+  autoAssignStripLabel: { color: S.white, fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
   autoAssignCountdownBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5,
   },
-  autoAssignCountdownText: { color: S.white, fontSize: 14, fontWeight: '900' },
+  autoAssignCountdownUrgent: { backgroundColor: 'rgba(239,68,68,0.45)' },
+  autoAssignCountdownText: { color: S.white, fontSize: 15, fontWeight: '900' },
 });
 
 export default RiderHomeScreen;

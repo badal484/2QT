@@ -17,6 +17,34 @@ const R = {
 
 const TABS = ['All', 'Delivered', 'Cancelled'] as const;
 
+function groupByDate(orders: any[]): { label: string; key: string; orders: any[] }[] {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const todayStr = today.toDateString();
+  const yesterdayStr = yesterday.toDateString();
+
+  const map: Record<string, any[]> = {};
+  for (const o of orders) {
+    const key = new Date(o.created_at).toDateString();
+    if (!map[key]) map[key] = [];
+    map[key].push(o);
+  }
+
+  return Object.keys(map)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+    .map(key => {
+      let label: string;
+      if (key === todayStr) label = 'Today';
+      else if (key === yesterdayStr) label = 'Yesterday';
+      else label = new Date(key).toLocaleDateString('en-IN', {
+        day: 'numeric', month: 'short',
+        ...(new Date(key).getFullYear() !== today.getFullYear() && { year: 'numeric' }),
+      });
+      return { label, key, orders: map[key] };
+    });
+}
+
 const RiderHistoryScreen = ({ navigation }: any) => {
   const [tab, setTab] = useState<typeof TABS[number]>('All');
 
@@ -34,6 +62,8 @@ const RiderHistoryScreen = ({ navigation }: any) => {
   const shown = tab === 'All' ? allOrders
     : tab === 'Delivered' ? allOrders.filter((o: any) => o.status === 'delivered')
     : allOrders.filter((o: any) => o.status === 'cancelled');
+
+  const groups = groupByDate(shown);
 
   if (isLoading) return (
     <View style={s.loadingWrap}>
@@ -114,7 +144,7 @@ const RiderHistoryScreen = ({ navigation }: any) => {
             ))}
           </View>
 
-          {/* List */}
+          {/* List — grouped by date */}
           <View style={s.list}>
             {shown.length === 0 ? (
               <View style={s.empty}>
@@ -122,68 +152,74 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                 <Text style={s.emptyTitle}>No orders here</Text>
                 <Text style={s.emptyText}>Your {tab.toLowerCase()} orders will appear here</Text>
               </View>
-            ) : shown.map((order: any) => {
-              const isDelivered = order.status === 'delivered';
-              const earningsPaise: number | null = isDelivered ? (order.earnings_paise ?? null) : null;
-              const dateStr = new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-              const timeStr = new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-              return (
-                <View key={order.id} style={s.listItem}>
-                  {/* Top Row: Icon + ID + Status */}
-                  <View style={s.itemTopRow}>
-                    <View style={s.itemTopLeft}>
-                      <View style={[s.iconBox, { backgroundColor: isDelivered ? R.greenLight : R.redLight }]}>
-                        {isDelivered ? <CheckCircle2 size={16} color={R.green} /> : <XCircle size={16} color={R.red} />}
-                      </View>
-                      <View>
-                        <Text style={s.orderId}>{order.display_id}</Text>
-                        <Text style={s.timeText}>{dateStr} • {timeStr}</Text>
-                      </View>
-                    </View>
-                    <View style={s.itemTopRight}>
-                      {isDelivered ? (
-                        <Text style={s.earnText}>₹{(earningsPaise! / 100).toFixed(0)}</Text>
-                      ) : (
-                        <Text style={s.cancelText}>Cancelled</Text>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Address */}
-                  <View style={s.addressRow}>
-                    <View style={s.addressDot} />
-                    <Text style={s.addressText} numberOfLines={1}>{order.delivery_address_text || 'Customer Location'}</Text>
-                  </View>
-                  
-                  {/* Colorful Tags Container */}
-                  {isDelivered && (
-                    <View style={s.tagsRow}>
-                      {order.distance_km != null && (
-                        <View style={[s.tag, { backgroundColor: R.blueLight }]}>
-                          <Navigation size={12} color={R.blue} />
-                          <Text style={[s.tagText, { color: R.blue }]}>{order.distance_km < 1 ? `${Math.round(order.distance_km * 1000)}m` : `${order.distance_km.toFixed(1)}km`}</Text>
-                        </View>
-                      )}
-                      {order.payment_method?.toLowerCase() === 'cod' ? (
-                        <View style={[s.tag, { backgroundColor: R.orangeLight }]}>
-                          <Text style={[s.tagText, { color: R.orange }]}>COD</Text>
-                        </View>
-                      ) : (
-                        <View style={[s.tag, { backgroundColor: R.greenLight }]}>
-                          <Text style={[s.tagText, { color: R.green }]}>Online</Text>
-                        </View>
-                      )}
-                      {parseInt(order.rider_tip_paise || '0') > 0 && (
-                        <View style={[s.tag, { backgroundColor: R.amberLight }]}>
-                          <Text style={[s.tagText, { color: R.amber }]}>+₹{(parseInt(order.rider_tip_paise) / 100).toFixed(0)} Tip</Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
+            ) : groups.map(group => (
+              <View key={group.key}>
+                {/* Date header */}
+                <View style={s.dateHeader}>
+                  <Text style={s.dateHeaderText}>{group.label}</Text>
+                  <Text style={s.dateHeaderCount}>{group.orders.length} order{group.orders.length !== 1 ? 's' : ''}</Text>
                 </View>
-              );
-            })}
+
+                {group.orders.map((order: any) => {
+                  const isDelivered = order.status === 'delivered';
+                  const earningsPaise: number | null = isDelivered ? (order.earnings_paise ?? null) : null;
+                  const timeStr = new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                  return (
+                    <View key={order.id} style={s.listItem}>
+                      <View style={s.itemTopRow}>
+                        <View style={s.itemTopLeft}>
+                          <View style={[s.iconBox, { backgroundColor: isDelivered ? R.greenLight : R.redLight }]}>
+                            {isDelivered ? <CheckCircle2 size={16} color={R.green} /> : <XCircle size={16} color={R.red} />}
+                          </View>
+                          <View>
+                            <Text style={s.orderId}>{order.display_id}</Text>
+                            <Text style={s.timeText}>{timeStr}</Text>
+                          </View>
+                        </View>
+                        <View style={s.itemTopRight}>
+                          {isDelivered ? (
+                            <Text style={s.earnText}>₹{((earningsPaise ?? 0) / 100).toFixed(0)}</Text>
+                          ) : (
+                            <Text style={s.cancelText}>Cancelled</Text>
+                          )}
+                        </View>
+                      </View>
+
+                      <View style={s.addressRow}>
+                        <View style={s.addressDot} />
+                        <Text style={s.addressText} numberOfLines={1}>{order.delivery_address_text || 'Customer Location'}</Text>
+                      </View>
+
+                      {isDelivered && (
+                        <View style={s.tagsRow}>
+                          {order.distance_km != null && (
+                            <View style={[s.tag, { backgroundColor: R.blueLight }]}>
+                              <Navigation size={12} color={R.blue} />
+                              <Text style={[s.tagText, { color: R.blue }]}>{order.distance_km < 1 ? `${Math.round(order.distance_km * 1000)}m` : `${order.distance_km.toFixed(1)}km`}</Text>
+                            </View>
+                          )}
+                          {order.payment_method?.toLowerCase() === 'cod' ? (
+                            <View style={[s.tag, { backgroundColor: R.orangeLight }]}>
+                              <Text style={[s.tagText, { color: R.orange }]}>COD</Text>
+                            </View>
+                          ) : (
+                            <View style={[s.tag, { backgroundColor: R.greenLight }]}>
+                              <Text style={[s.tagText, { color: R.green }]}>Online</Text>
+                            </View>
+                          )}
+                          {parseInt(order.rider_tip_paise || '0') > 0 && (
+                            <View style={[s.tag, { backgroundColor: R.amberLight }]}>
+                              <Text style={[s.tagText, { color: R.amber }]}>+₹{(parseInt(order.rider_tip_paise) / 100).toFixed(0)} Tip</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -228,6 +264,13 @@ const s = StyleSheet.create({
   tabTextActive: { color: R.white, fontWeight: '700' },
 
   list: { paddingHorizontal: 16, gap: 12 },
+
+  dateHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 10, paddingHorizontal: 4, marginBottom: 4,
+  },
+  dateHeaderText: { fontSize: 13, fontWeight: '800', color: R.ink, letterSpacing: 0.2 },
+  dateHeaderCount: { fontSize: 11, fontWeight: '600', color: R.muted },
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: R.ink, marginTop: 16 },
   emptyText: { fontSize: 13, color: R.muted, marginTop: 4 },
