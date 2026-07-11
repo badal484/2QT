@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation, Bell, ShieldCheck, Download, RotateCcw, Phone, UtensilsCrossed } from "lucide-react";
+import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation, Bell, ShieldCheck, Download, RotateCcw, Phone, UtensilsCrossed, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
@@ -83,6 +83,17 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
 
   const copy = () => {
     if (referral?.referralCode) { navigator.clipboard.writeText(referral.referralCode); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+  };
+
+  const shareReferral = async () => {
+    if (!referral?.referralCode) return;
+    const text = `Use my code ${referral.referralCode} on VELTO Food Palace and get a discount on your first order!`;
+    if (navigator.share) {
+      await navigator.share({ title: "Join VELTO Food Palace", text }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text);
+      toast.success("Invite message copied!");
+    }
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -272,6 +283,9 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
                     <span className="flex-1 font-bold text-2xl tracking-wide">{referral.referralCode}</span>
                     <button onClick={copy} className="h-10 px-6 rounded-xl bg-white text-brand-primary text-sm font-bold shadow-md hover:scale-105 transition-all">
                       {copied ? "Copied!" : "Copy"}
+                    </button>
+                    <button onClick={shareReferral} className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-all">
+                      <Share2 className="w-4 h-4 text-white" />
                     </button>
                   </div>
                </div>

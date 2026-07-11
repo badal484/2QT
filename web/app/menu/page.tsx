@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Minus, ShoppingBag, X, ChevronRight,
   Star, Clock, Zap, CheckCircle2, Search,
-  ArrowLeft, Info, Loader2, MapPin, Check
+  ArrowLeft, Info, Loader2, MapPin, Check,
+  Bike, Tag, MessageSquare, User, Phone, AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -126,6 +127,18 @@ export default function MenuPage() {
   const [reqError, setReqError] = useState('');
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [scheduleTime, setScheduleTime] = useState("");
+  // Cart extras
+  const [riderTip, setRiderTip] = useState(0);
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
+  const [altReceiver, setAltReceiver] = useState(false);
+  const [altName, setAltName] = useState("");
+  const [altPhone, setAltPhone] = useState("");
+  // Active order pill + kitchen status
+  const [activeOrder, setActiveOrder] = useState<any>(null);
+  const [kitchenPaused, setKitchenPaused] = useState(false);
+  const [pauseReason, setPauseReason] = useState<string | null>(null);
+  // Available promo chips
+  const [availablePromos, setAvailablePromos] = useState<any[]>([]);
 
   const { user } = useAuth()!;
   const { items: cartItems, addItem, removeItem, total, clearCart } = useCart()!;
@@ -188,6 +201,8 @@ export default function MenuPage() {
           ]);
           const freshItems = menuRes.items ?? [];
           const freshBanners = bannerRes.banners ?? [];
+          setKitchenPaused(menuRes.kitchenPaused || false);
+          setPauseReason(menuRes.pauseReason || null);
           applyMenuData(freshItems, freshBanners);
           try {
             localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), items: freshItems, banners: freshBanners }));
@@ -306,6 +321,25 @@ export default function MenuPage() {
     return () => clearTimeout(timer);
   }, [isCartOpen, cartItems, deliveryAddress, promoApplied, useWallet, useLoyalty]);
 
+  // Active order — poll every 30s so the floating pill stays fresh
+  useEffect(() => {
+    if (!user) return;
+    const fetch = () => api.get('/orders/active')
+      .then((d: any) => setActiveOrder(d.activeOrders?.[0] ?? null))
+      .catch(() => {});
+    fetch();
+    const id = setInterval(fetch, 30_000);
+    return () => clearInterval(id);
+  }, [user]);
+
+  // Available promo chips for the cart
+  useEffect(() => {
+    if (!zoneId) return;
+    api.get(`/promo-codes/active?zoneId=${zoneId}`)
+      .then((d: any) => setAvailablePromos(d.promoCodes ?? []))
+      .catch(() => {});
+  }, [zoneId]);
+
   const filtered = items.filter(item =>
     item.available &&
     (activeCategory === "All" || item.category === activeCategory) &&
@@ -404,6 +438,10 @@ export default function MenuPage() {
           useWallet,
           useLoyalty,
           scheduledTime: scheduleTime || undefined,
+          riderTipPaise: riderTip > 0 ? riderTip : undefined,
+          instructions: deliveryInstructions.trim() || undefined,
+          deliveryContactName: altReceiver && altName.trim() ? altName.trim() : undefined,
+          deliveryContactPhone: altReceiver && altPhone.trim() ? altPhone.trim() : undefined,
       });
 
       if (res.status === "confirmed") {
@@ -797,6 +835,18 @@ export default function MenuPage() {
           </div>
         )}
 
+        {/* ── Kitchen Paused Banner ── */}
+        {kitchenPaused && (
+          <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-amber-900">Kitchen is temporarily paused</p>
+              {pauseReason && <p className="text-xs text-amber-700 mt-0.5">{pauseReason}</p>}
+              <p className="text-xs text-amber-600 mt-0.5">You can still browse. We&apos;ll be back shortly!</p>
+            </div>
+          </div>
+        )}
+
         {/* ── Categories Scroll ── */}
         <div className="sticky top-[110px] z-[70] bg-[#F9FAFB]/95 backdrop-blur-md -mx-4 px-4 md:mx-0 md:px-0 py-2 mb-2 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]">
           <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar">
@@ -1034,6 +1084,26 @@ export default function MenuPage() {
                       )}
                     </div>
 
+                    {/* Promo Chips */}
+                    {availablePromos.length > 0 && !promoApplied && (
+                      <div className="mb-4">
+                        <p className="text-xs font-bold text-black/40 uppercase tracking-wider mb-2">Available Offers</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {availablePromos.map((p: any) => (
+                            <button
+                              key={p.code}
+                              onClick={() => { setPromoCode(p.code); setPromoApplied(p.code); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-bold hover:bg-green-100 transition-colors"
+                            >
+                              <Tag className="w-3 h-3" />
+                              {p.code}
+                              {p.type === 'percentage' ? ` — ${p.value}% off` : ` — ₹${p.value / 100} off`}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Wallet & Loyalty */}
                     {user && (walletBalance > 0 || loyaltyPoints > 0) && (
                       <div className="mb-4 space-y-2">
@@ -1061,6 +1131,74 @@ export default function MenuPage() {
                         )}
                       </div>
                     )}
+
+                    {/* Delivery Instructions */}
+                    <div className="mb-4">
+                      <label className="text-sm font-bold text-brand-dark block mb-1.5">Delivery Instructions</label>
+                      <div className="relative">
+                        <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-black/30" />
+                        <textarea
+                          placeholder="e.g. Ring the bell, leave at door, fragile items..."
+                          value={deliveryInstructions}
+                          onChange={e => setDeliveryInstructions(e.target.value)}
+                          rows={2}
+                          className="w-full border border-black/10 rounded-xl pl-9 pr-3 py-2.5 text-sm font-medium focus:outline-none focus:border-brand-primary resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Alternate Receiver */}
+                    <div className="mb-4">
+                      <button
+                        onClick={() => setAltReceiver(v => !v)}
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-sm font-semibold transition-all ${altReceiver ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-zinc-50 border-black/10 text-black/60"}`}
+                      >
+                        <span className="flex items-center gap-2"><User className="w-4 h-4" /> Someone else will receive the order</span>
+                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${altReceiver ? "bg-blue-500 border-blue-500" : "border-black/20"}`}>
+                          {altReceiver && <Check className="w-3 h-3 text-white" />}
+                        </span>
+                      </button>
+                      {altReceiver && (
+                        <div className="mt-2 space-y-2">
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/30" />
+                            <input
+                              type="text"
+                              placeholder="Receiver's full name"
+                              value={altName}
+                              onChange={e => setAltName(e.target.value)}
+                              className="w-full border border-black/10 rounded-xl pl-9 pr-3 py-2.5 text-sm font-medium focus:outline-none focus:border-brand-primary"
+                            />
+                          </div>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/30" />
+                            <input
+                              type="tel"
+                              placeholder="Receiver's phone number"
+                              value={altPhone}
+                              onChange={e => setAltPhone(e.target.value)}
+                              className="w-full border border-black/10 rounded-xl pl-9 pr-3 py-2.5 text-sm font-medium focus:outline-none focus:border-brand-primary"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Rider Tip */}
+                    <div className="mb-4">
+                      <p className="text-sm font-bold text-brand-dark mb-1.5">Tip Your Rider</p>
+                      <div className="flex gap-2">
+                        {[0, 20, 50, 100].map(amt => (
+                          <button
+                            key={amt}
+                            onClick={() => setRiderTip(amt)}
+                            className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${riderTip === amt ? "bg-brand-primary/10 border-brand-primary text-brand-primary" : "bg-white border-black/10 text-black/60 hover:border-black/20"}`}
+                          >
+                            {amt === 0 ? "None" : `₹${amt}`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
                     <div className="space-y-4 mb-6">
                       {/* Schedule Delivery */}
@@ -1150,6 +1288,12 @@ export default function MenuPage() {
                                  <span>-₹{pricing.loyaltyDiscountPaise / 100}</span>
                               </div>
                             )}
+                            {riderTip > 0 && (
+                              <div className="flex justify-between text-sm font-medium text-brand-primary">
+                                 <span className="flex items-center gap-1"><Bike className="w-3.5 h-3.5" /> Rider Tip</span>
+                                 <span>+₹{riderTip}</span>
+                              </div>
+                            )}
                           </>
                         ) : (
                           <>
@@ -1179,7 +1323,7 @@ export default function MenuPage() {
                    <div className="flex justify-between items-end px-1">
                       <span className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Total Amount</span>
                       <span className="text-2xl font-black text-brand-dark">
-                        {pricing ? `₹${pricing.totalAmountPaise / 100}` : `₹${Math.round(total + 2500 + (total * 0.05)) / 100}`}
+                        {pricing ? `₹${(pricing.totalAmountPaise + riderTip * 100) / 100}` : `₹${Math.round(total + 2500 + (total * 0.05)) / 100}`}
                       </span>
                    </div>
                    
@@ -1446,6 +1590,30 @@ export default function MenuPage() {
                 )}
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Active Order Floating Pill ── */}
+      <AnimatePresence>
+        {activeOrder && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", damping: 20, stiffness: 200 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] pointer-events-none"
+          >
+            <a
+              href="/orders"
+              className="pointer-events-auto flex items-center gap-3 bg-brand-dark text-white px-5 py-3 rounded-full shadow-2xl shadow-black/40 hover:bg-black transition-colors"
+            >
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-sm font-bold">
+                Order #{activeOrder.display_id} · {activeOrder.status?.replace(/_/g, " ")}
+              </span>
+              <ChevronRight className="w-4 h-4 opacity-70" />
+            </a>
           </motion.div>
         )}
       </AnimatePresence>
