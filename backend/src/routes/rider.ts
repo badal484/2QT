@@ -410,7 +410,8 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         SELECT o.*,
                k.lat as kitchen_lat, k.lng as kitchen_lng,
                a.lat as address_lat, a.lng as address_lng,
-               z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
+               z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km,
+               z.surge_enabled, z.surge_multiplier, z.surge_expires_at
         FROM orders o
         JOIN kitchens k ON o.kitchen_id = k.id
         LEFT JOIN addresses a ON o.address_id = a.id
@@ -449,14 +450,20 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
             ? order.delivery_distance_metres / 1000
             : 0;
 
-        const basePay = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
+        const shortTripPaise = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
         const perKmPaise = order.rider_per_km_paise ?? 500;
         const freeKm = parseFloat(order.rider_free_km ?? '2');
-        const distanceBonus = distanceKm > freeKm ? Math.floor((distanceKm - freeKm) * perKmPaise) : 0;
+        // New model: ≤ threshold → flat rate; > threshold → per-km × full distance
+        const baseEarnings = distanceKm <= freeKm
+            ? shortTripPaise
+            : Math.floor(distanceKm * perKmPaise);
+        const surgeActive = order.surge_enabled && parseFloat(order.surge_multiplier ?? '1') > 1
+            && (!order.surge_expires_at || new Date(order.surge_expires_at) > new Date());
+        const surgeMultiplier = surgeActive ? parseFloat(order.surge_multiplier) : 1;
         const tipPaise = parseInt(order.rider_tip_paise || '0', 10);
-        const platformFee = Math.floor(basePay * 0.1); // 10% platform commission
-        const bonusPaise = distanceBonus + tipPaise;
-        const netEarnings = basePay + bonusPaise - platformFee;
+        const platformFee = Math.floor(baseEarnings * 0.1); // 10% platform commission
+        const bonusPaise = tipPaise;
+        const netEarnings = Math.floor(baseEarnings * surgeMultiplier) + bonusPaise - platformFee;
 
         console.log("[VERIFY-OTP] Updating earnings...", { netEarnings, tipPaise, distanceBonus });
         await client.query(`
@@ -712,7 +719,8 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
                            k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
                            k.avg_prep_time_minutes,
                            (o.created_at + (k.avg_prep_time_minutes || ' minutes')::INTERVAL) AS estimated_ready_at,
-                           z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
+                           z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km,
+                           z.surge_enabled, z.surge_multiplier, z.surge_expires_at
                     FROM orders o
                     JOIN users u ON o.customer_id = u.id
                     LEFT JOIN addresses a ON o.address_id = a.id
@@ -746,7 +754,8 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
                    k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
                    k.avg_prep_time_minutes,
                    (o.created_at + (k.avg_prep_time_minutes || ' minutes')::INTERVAL) AS estimated_ready_at,
-                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
+                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km,
+                   z.surge_enabled, z.surge_multiplier, z.surge_expires_at
             FROM orders o
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
@@ -761,7 +770,8 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
             SELECT o.*, u.name as customer_name, u.phone as customer_phone, a.address_text as delivery_address_text, a.lat as customer_lat, a.lng as customer_lng,
                    k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
                    NULL::INTEGER AS avg_prep_time_minutes, NULL::TIMESTAMPTZ AS estimated_ready_at,
-                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
+                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km,
+                   z.surge_enabled, z.surge_multiplier, z.surge_expires_at
             FROM orders o
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
@@ -790,7 +800,8 @@ router.get('/orders/history', authenticate, requireRole('rider', 'rider_captain'
                    a.address_text as delivery_address_text,
                    a.lat as customer_lat, a.lng as customer_lng,
                    k.lat as kitchen_lat, k.lng as kitchen_lng,
-                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km
+                   z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km,
+                   z.surge_enabled, z.surge_multiplier, z.surge_expires_at
             FROM orders o
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
@@ -812,13 +823,18 @@ router.get('/orders/history', authenticate, requireRole('rider', 'rider_captain'
                     : 0;
                 order.distance_km = Math.round(distanceKm * 10) / 10;
 
-                const basePay = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
+                const shortTripPaise = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
                 const perKmPaise = order.rider_per_km_paise ?? 500;
                 const freeKm = parseFloat(order.rider_free_km ?? '2');
-                const distanceBonus = distanceKm > freeKm ? Math.floor((distanceKm - freeKm) * perKmPaise) : 0;
+                const baseEarnings = distanceKm <= freeKm
+                    ? shortTripPaise
+                    : Math.floor(distanceKm * perKmPaise);
+                const surgeActive = order.surge_enabled && parseFloat(order.surge_multiplier ?? '1') > 1
+                    && (!order.surge_expires_at || new Date(order.surge_expires_at) > new Date());
+                const surgeMultiplier = surgeActive ? parseFloat(order.surge_multiplier) : 1;
                 const tipPaise = parseInt(order.rider_tip_paise || '0', 10);
-                const platformFee = Math.floor(basePay * 0.1);
-                order.earnings_paise = basePay + distanceBonus + tipPaise - platformFee;
+                const platformFee = Math.floor(baseEarnings * 0.1);
+                order.earnings_paise = Math.floor(baseEarnings * surgeMultiplier) + tipPaise - platformFee;
             }
         }
 
