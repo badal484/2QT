@@ -276,7 +276,13 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
         }
 
         emitToKitchen(newOrder.kitchen_id, 'new_order', { orderId: newOrder.id });
-        emitToRiders('new_available_mission', { orderId: newOrder.id, displayId: newOrder.display_id }, newOrder.zone_id);
+
+        const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
+        const autoDispatchEnabled = settings[0]?.value === 'true';
+        if (!autoDispatchEnabled) {
+            emitToRiders('new_available_mission', { orderId: newOrder.id, displayId: newOrder.display_id }, newOrder.zone_id);
+        }
+
         emitToUser(newOrder.customer_id, 'order_status_update', { orderId: newOrder.id, status: 'confirmed' });
         emitToAdmin('new_order', { orderId: newOrder.id, display_id: newOrder.display_id, status: 'confirmed' });
 

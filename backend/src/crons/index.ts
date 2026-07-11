@@ -132,7 +132,12 @@ export const initCrons = () => {
 
                     // SYSTEMATIC INTEGRATION: Notify Kitchen and Rider Pool
                     emitToKitchen(kitchenId, 'new_order', { orderId, displayId });
-                    emitToRiders('new_available_mission', { orderId, displayId, zoneId: s.zone_id }, s.zone_id);
+
+                    const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
+                    const autoDispatchEnabled = settings[0]?.value === 'true';
+                    if (!autoDispatchEnabled) {
+                        emitToRiders('new_available_mission', { orderId, displayId, zoneId: s.zone_id }, s.zone_id);
+                    }
                 });
             } catch (err) {
                 console.error(`[CRON_ERROR] Failed to convert scheduled order ${s.id}:`, err);
