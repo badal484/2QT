@@ -1233,6 +1233,81 @@ router.post('/submit-all-cash', authenticate, requireRole('rider', 'rider_captai
     }
 });
 
+// POST /riders/create-cash-payment-link
+// Creates a Razorpay Payment Link for the rider to pay their full cash-in-hand in one tap.
+// On payment_link.paid webhook, the submission is auto-confirmed.
+router.post('/create-cash-payment-link', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    try {
+        const { rows: orderRows } = await query(`
+            SELECT id, total_amount_paise, display_id
+            FROM orders
+            WHERE rider_id = $1
+              AND payment_method = 'cod'
+              AND status = 'delivered'
+              AND cod_cash_collected = FALSE
+            ORDER BY delivered_at DESC NULLS LAST
+        `, [riderId]);
+
+        if (!orderRows.length) return res.status(400).json({ error: 'No pending cash orders' });
+
+        const { rows: [rider] } = await query('SELECT name, phone FROM users WHERE id = $1', [riderId]);
+        const totalPaise = orderRows.reduce((s: number, o: any) => s + parseInt(o.total_amount_paise, 10), 0);
+
+        // Create submission record first (so we have the ID for reference_id)
+        const { rows: [submission] } = await query(`
+            INSERT INTO cash_submissions (rider_id, total_amount_paise, order_count, method)
+            VALUES ($1, $2, $3, 'razorpay_link')
+            RETURNING id
+        `, [riderId, totalPaise, orderRows.length]);
+
+        // Link orders to submission
+        for (const order of orderRows) {
+            await query(`
+                INSERT INTO cash_submission_orders (submission_id, order_id, amount_paise)
+                VALUES ($1, $2, $3) ON CONFLICT DO NOTHING
+            `, [submission.id, order.id, order.total_amount_paise]);
+        }
+
+        // Stamp submit-requested on orders
+        const ids = orderRows.map((o: any) => o.id);
+        const ph = ids.map((_: any, i: number) => `$${i + 1}`).join(',');
+        await query(`UPDATE orders SET cash_submit_requested_at = COALESCE(cash_submit_requested_at, NOW()) WHERE id IN (${ph})`, ids);
+
+        // Create Razorpay Payment Link
+        const link: any = await razorpay.paymentLink.create({
+            amount: totalPaise,
+            currency: 'INR',
+            description: `Cash handover — ${orderRows.length} COD order${orderRows.length > 1 ? 's' : ''}`,
+            reference_id: `cash_sub:${submission.id}`,
+            customer: {
+                name: rider.name || 'Rider',
+                contact: rider.phone || '',
+            },
+            notify: { sms: false, email: false },
+            reminder_enable: false,
+            expire_by: Math.floor(Date.now() / 1000) + 3600, // 1-hour expiry
+        });
+
+        // Store link details on submission
+        await query(`
+            UPDATE cash_submissions
+            SET razorpay_link_id = $1, razorpay_link_url = $2
+            WHERE id = $3
+        `, [link.id, link.short_url, submission.id]);
+
+        res.json({
+            submissionId: submission.id,
+            paymentUrl: link.short_url,
+            totalPaise,
+            orderCount: orderRows.length,
+        });
+    } catch (err) {
+        console.error('[rider/create-cash-payment-link]', err);
+        res.status(500).json({ error: 'Failed to create payment link' });
+    }
+});
+
 // ─── Customer Unreachable ─────────────────────────────────────────────────────
 router.post('/orders/:id/customer-unreachable', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;

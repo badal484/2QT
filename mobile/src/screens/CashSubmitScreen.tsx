@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Banknote, CheckCircle, ArrowLeft, Smartphone, Building2,
-  Info, Clock, ExternalLink, CheckCircle2,
+  Info, Clock, ExternalLink, CheckCircle2, ShieldCheck,
 } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -19,35 +19,37 @@ const R = {
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
   border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
   red: '#EF4444', redLight: '#FEF2F2',
+  rzp: '#072654', rzpLight: '#EEF2FB',
 };
 
-type Method = 'physical' | 'upi_transfer';
+type Method = 'physical' | 'razorpay_link';
 
-// ── Pending overlay (shown after submit, before finance confirms) ─────────────
+// ── Pending overlay shown after submission ────────────────────────────────────
 const PendingOverlay = ({
   total, method, onDone,
 }: { total: string; method: Method; onDone: () => void }) => {
-  const isUpi = method === 'upi_transfer';
+  const isRzp = method === 'razorpay_link';
   return (
     <View style={s.overlayRoot}>
-      <View style={[s.overlayCard, isUpi ? s.overlayCardBlue : s.overlayCardAmber]}>
-        <View style={[s.overlayIconWrap, isUpi ? s.overlayIconBlue : s.overlayIconAmber]}>
-          <Clock size={48} color={isUpi ? R.blue : R.amber} strokeWidth={1.8} />
+      <View style={[s.overlayCard, isRzp ? s.overlayCardBlue : s.overlayCardAmber]}>
+        <View style={[s.overlayIconWrap, isRzp ? s.overlayIconBlue : s.overlayIconAmber]}>
+          {isRzp
+            ? <ShieldCheck size={48} color={R.blue} strokeWidth={1.8} />
+            : <Clock size={48} color={R.amber} strokeWidth={1.8} />
+          }
         </View>
         <Text style={s.overlayTitle}>
-          {isUpi ? 'UTR Submitted' : 'Finance Notified'}
+          {isRzp ? 'Payment Processing' : 'Finance Notified'}
         </Text>
-        <Text style={[s.overlayAmount, { color: isUpi ? R.blue : R.amber }]}>
-          ₹{total}
-        </Text>
+        <Text style={[s.overlayAmount, { color: isRzp ? R.blue : R.amber }]}>₹{total}</Text>
         <Text style={s.overlaySub}>
-          {isUpi
-            ? 'Finance is verifying your UTR number. You\'ll be notified once the transfer is confirmed.'
+          {isRzp
+            ? 'Your payment is being verified automatically. Your cash badge will clear once confirmed.'
             : 'Please hand over the cash at the finance desk. Your badge will clear once finance confirms receipt.'}
         </Text>
         <View style={s.overlayBadge}>
-          <Text style={[s.overlayBadgeText, { color: isUpi ? R.blue : R.amber }]}>
-            {isUpi ? 'Pending UTR Verification' : 'Pending Finance Confirmation'}
+          <Text style={[s.overlayBadgeText, { color: isRzp ? R.blue : R.amber }]}>
+            {isRzp ? 'Auto-verifying via Razorpay' : 'Pending Finance Confirmation'}
           </Text>
         </View>
         <TouchableOpacity style={s.overlayBtn} onPress={onDone} activeOpacity={0.9}>
@@ -63,7 +65,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const [method, setMethod] = useState<Method>('physical');
   const [submitted, setSubmitted] = useState(false);
-  const [upiLaunched, setUpiLaunched] = useState(false);
+  const [rzpLoading, setRzpLoading] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['cash-in-hand'],
@@ -73,63 +75,43 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const orders: any[] = data?.orders || [];
   const totalPaise: number = data?.totalPaise || 0;
   const overLimit: boolean = data?.overLimit || false;
-  const upiId: string = data?.upiId || 'badal90603@okaxis';
   const totalRupees = (totalPaise / 100).toFixed(0);
-  const totalDecimal = (totalPaise / 100).toFixed(2);
 
+  // Physical cash submission
   const submitMutation = useMutation({
     mutationFn: () => api.post('/riders/submit-all-cash', {
       orderIds: orders.map(o => o.id),
-      method,
+      method: 'physical',
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cash-in-hand'] });
-      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
       setSubmitted(true);
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || e.message || 'Could not submit. Try again.'),
   });
 
-  const handleSubmit = () => {
+  // Razorpay Payment Link — one tap, auto-confirmed by webhook
+  const handleRazorpayPay = async () => {
     if (!orders.length) return;
-    if (method === 'upi_transfer' && !upiLaunched) {
-      Alert.alert('Pay First', 'Please tap "Pay via UPI" to complete the transfer before submitting.');
-      return;
+    setRzpLoading(true);
+    try {
+      const res: any = await api.post('/riders/create-cash-payment-link', {});
+      await Linking.openURL(res.paymentUrl);
+      queryClient.invalidateQueries({ queryKey: ['cash-in-hand'] });
+      setMethod('razorpay_link');
+      setSubmitted(true);
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.error || 'Could not create payment link. Try again.');
+    } finally {
+      setRzpLoading(false);
     }
+  };
+
+  const handlePhysicalSubmit = () => {
+    if (!orders.length) return;
     submitMutation.mutate();
   };
-
-  // Open the native UPI app chooser with amount + payee pre-filled
-  const openUpiApp = async (appScheme?: string) => {
-    const note = encodeURIComponent('Cash submission - 2QT');
-    const name = encodeURIComponent('2QT Food Palace');
-    const baseParams = `pa=${upiId}&pn=${name}&am=${totalDecimal}&cu=INR&tn=${note}`;
-
-    let url: string;
-    if (appScheme === 'gpay') {
-      url = `tez://upi/pay?${baseParams}`;
-    } else if (appScheme === 'phonepe') {
-      url = `phonepe://pay?${baseParams}`;
-    } else if (appScheme === 'paytm') {
-      url = `paytmmp://pay?${baseParams}`;
-    } else {
-      // Generic UPI intent — opens native chooser with ALL installed UPI apps
-      url = `upi://pay?${baseParams}`;
-    }
-
-    const canOpen = await Linking.canOpenURL(url).catch(() => false);
-    if (canOpen) {
-      await Linking.openURL(url);
-      setUpiLaunched(true);
-    } else if (appScheme) {
-      // Specific app not installed — fall back to generic chooser
-      openUpiApp();
-    } else {
-      Alert.alert('No UPI App Found', 'Please install GPay, PhonePe, or Paytm to make UPI payments.');
-    }
-  };
-
 
   const handleDone = () => navigation.navigate('RiderTabs');
 
@@ -179,6 +161,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
             </View>
           )}
 
+          {/* Total amount card */}
           <View style={s.amountCard}>
             <View style={s.amountIconWrap}>
               <Banknote size={28} color={R.amber} />
@@ -188,6 +171,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
             <Text style={s.amountSub}>{orders.length} COD order{orders.length > 1 ? 's' : ''}</Text>
           </View>
 
+          {/* Orders list */}
           <Text style={s.sectionTitle}>Pending Orders</Text>
           <View style={s.ordersList}>
             {orders.map((order: any) => (
@@ -199,6 +183,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
             ))}
           </View>
 
+          {/* Method selector */}
           <Text style={s.sectionTitle}>Submission Method</Text>
           <View style={s.methodRow}>
             <TouchableOpacity
@@ -211,71 +196,54 @@ const CashSubmitScreen = ({ navigation }: any) => {
               <Text style={s.methodBtnSub}>Hand cash in person</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[s.methodBtn, method === 'upi_transfer' && s.methodBtnActive]}
-              onPress={() => setMethod('upi_transfer')}
+              style={[s.methodBtn, method === 'razorpay_link' && s.methodBtnActive]}
+              onPress={() => setMethod('razorpay_link')}
               activeOpacity={0.8}
             >
-              <Smartphone size={20} color={method === 'upi_transfer' ? R.orange : R.muted} />
-              <Text style={[s.methodBtnText, method === 'upi_transfer' && s.methodBtnTextActive]}>UPI Transfer</Text>
-              <Text style={s.methodBtnSub}>Send via UPI app</Text>
+              <Smartphone size={20} color={method === 'razorpay_link' ? R.orange : R.muted} />
+              <Text style={[s.methodBtnText, method === 'razorpay_link' && s.methodBtnTextActive]}>Pay Online</Text>
+              <Text style={s.methodBtnSub}>GPay / PhonePe / Card</Text>
             </TouchableOpacity>
           </View>
 
-          {/* ── UPI Transfer Section ── */}
-          {method === 'upi_transfer' && (
-            <View style={s.upiCard}>
-              {/* Amount + UPI ID */}
-              <View style={s.upiHeader}>
-                <Text style={s.upiHeaderLabel}>Send exactly</Text>
-                <Text style={s.upiHeaderAmount}>₹{totalRupees}</Text>
-                <Text style={s.upiId}>{upiId}</Text>
+          {/* ── Razorpay section ── */}
+          {method === 'razorpay_link' && (
+            <View style={s.rzpCard}>
+              <View style={s.rzpHeader}>
+                <ShieldCheck size={22} color={R.rzp} />
+                <Text style={s.rzpTitle}>Secure Payment via Razorpay</Text>
+              </View>
+              <Text style={s.rzpSub}>
+                Pay ₹{totalRupees} instantly using GPay, PhonePe, Paytm, UPI, Debit / Credit card or Net Banking.
+                Your badge clears automatically once the payment is confirmed — no manual steps.
+              </Text>
+              <View style={s.rzpFeatures}>
+                {['GPay & PhonePe', 'UPI / Cards / Netbanking', 'Auto-verified instantly'].map(f => (
+                  <View key={f} style={s.rzpFeatureRow}>
+                    <CheckCircle2 size={14} color={R.green} />
+                    <Text style={s.rzpFeatureText}>{f}</Text>
+                  </View>
+                ))}
               </View>
 
-              {!upiLaunched ? (
-                <>
-                  {/* Quick-launch buttons */}
-                  <Text style={s.upiAppLabel}>Open in your UPI app</Text>
-                  <TouchableOpacity style={s.payNowBtn} onPress={() => openUpiApp()} activeOpacity={0.85}>
-                    <ExternalLink size={18} color={R.white} />
-                    <Text style={s.payNowBtnText}>Pay ₹{totalRupees} via UPI</Text>
-                  </TouchableOpacity>
-                  <View style={s.appShortcuts}>
-                    {[
-                      { label: 'GPay', scheme: 'gpay' },
-                      { label: 'PhonePe', scheme: 'phonepe' },
-                      { label: 'Paytm', scheme: 'paytm' },
-                    ].map(app => (
-                      <TouchableOpacity
-                        key={app.scheme}
-                        style={s.appBtn}
-                        onPress={() => openUpiApp(app.scheme)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={s.appBtnText}>{app.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              ) : (
-                /* After pay — just a confirmation tick, no UTR needed */
-                <View style={s.paidConfirm}>
-                  <CheckCircle2 size={28} color={R.green} strokeWidth={2} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.paidConfirmTitle}>Payment Initiated</Text>
-                    <Text style={s.paidConfirmSub}>Finance will verify the transfer in your UPI app.</Text>
-                  </View>
-                </View>
-              )}
-
-              {upiLaunched && (
-                <TouchableOpacity onPress={() => setUpiLaunched(false)} activeOpacity={0.7} style={s.repayLink}>
-                  <Text style={s.repayLinkText}>Pay again / use a different app</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={[s.rzpBtn, rzpLoading && { opacity: 0.6 }]}
+                onPress={handleRazorpayPay}
+                disabled={rzpLoading}
+                activeOpacity={0.88}
+              >
+                {rzpLoading
+                  ? <ActivityIndicator color={R.white} />
+                  : <>
+                      <ExternalLink size={18} color={R.white} />
+                      <Text style={s.rzpBtnText}>Pay ₹{totalRupees} via Razorpay</Text>
+                    </>
+                }
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* ── Physical Cash Steps ── */}
+          {/* ── Physical cash steps ── */}
           {method === 'physical' && (
             <View style={s.stepsCard}>
               {[
@@ -297,19 +265,20 @@ const CashSubmitScreen = ({ navigation }: any) => {
             </View>
           )}
 
-          <TouchableOpacity
-            style={[s.submitBtn, submitMutation.isPending && { opacity: 0.6 }]}
-            onPress={handleSubmit}
-            disabled={submitMutation.isPending}
-            activeOpacity={0.88}
-          >
-            {submitMutation.isPending
-              ? <ActivityIndicator color={R.white} />
-              : <Text style={s.submitBtnText}>
-                  {method === 'upi_transfer' ? "Done — I've Paid" : "I've Handed Over the Cash"}
-                </Text>
-            }
-          </TouchableOpacity>
+          {/* Physical submit button */}
+          {method === 'physical' && (
+            <TouchableOpacity
+              style={[s.submitBtn, submitMutation.isPending && { opacity: 0.6 }]}
+              onPress={handlePhysicalSubmit}
+              disabled={submitMutation.isPending}
+              activeOpacity={0.88}
+            >
+              {submitMutation.isPending
+                ? <ActivityIndicator color={R.white} />
+                : <Text style={s.submitBtnText}>I've Handed Over the Cash</Text>
+              }
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             onPress={() =>
@@ -391,38 +360,22 @@ const s = StyleSheet.create({
   methodBtnTextActive: { color: R.orange },
   methodBtnSub: { fontSize: 11, color: R.muted, textAlign: 'center' },
 
-  // UPI card
-  upiCard: {
-    backgroundColor: R.blueLight, borderRadius: 20, padding: 18, marginBottom: 20,
-    borderWidth: 1, borderColor: '#BFDBFE', gap: 16,
+  // Razorpay card
+  rzpCard: {
+    backgroundColor: R.rzpLight, borderRadius: 20, padding: 18, marginBottom: 20,
+    borderWidth: 1, borderColor: '#C7D7F5', gap: 12,
   },
-  upiHeader: { alignItems: 'center', gap: 4 },
-  upiHeaderLabel: { fontSize: 12, fontWeight: '700', color: R.blue, textTransform: 'uppercase', letterSpacing: 0.8 },
-  upiHeaderAmount: { fontSize: 40, fontWeight: '900', color: R.ink, letterSpacing: -1.5 },
-  upiId: { fontSize: 16, fontWeight: '700', color: R.blue },
-  upiAppLabel: { fontSize: 12, fontWeight: '700', color: R.gray, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.6 },
-  payNowBtn: {
+  rzpHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rzpTitle: { fontSize: 15, fontWeight: '900', color: R.rzp },
+  rzpSub: { fontSize: 13, color: R.gray, lineHeight: 19 },
+  rzpFeatures: { gap: 8 },
+  rzpFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rzpFeatureText: { fontSize: 13, fontWeight: '600', color: R.ink },
+  rzpBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: R.blue, borderRadius: 14, paddingVertical: 16,
+    backgroundColor: R.rzp, borderRadius: 14, paddingVertical: 16, marginTop: 4,
   },
-  payNowBtnText: { color: R.white, fontSize: 16, fontWeight: '900' },
-  appShortcuts: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
-  appBtn: {
-    flex: 1, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: R.white, borderWidth: 1.5, borderColor: '#93C5FD',
-    alignItems: 'center',
-  },
-  appBtnText: { fontSize: 13, fontWeight: '800', color: R.blue },
-
-  paidConfirm: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: R.greenLight, borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: '#B7E8D7',
-  },
-  paidConfirmTitle: { fontSize: 14, fontWeight: '800', color: R.green },
-  paidConfirmSub: { fontSize: 12, color: R.gray, lineHeight: 17, marginTop: 2 },
-  repayLink: { alignItems: 'center', paddingTop: 4 },
-  repayLinkText: { fontSize: 12, color: R.blue, fontWeight: '600', textDecorationLine: 'underline' },
+  rzpBtnText: { color: R.white, fontSize: 16, fontWeight: '900' },
 
   // Physical steps
   stepsCard: {
@@ -467,13 +420,13 @@ const s = StyleSheet.create({
     shadowOpacity: 0.1, shadowRadius: 24, elevation: 8,
   },
   overlayCardAmber: { borderWidth: 1, borderColor: '#FDE68A', shadowColor: R.amber },
-  overlayCardBlue: { borderWidth: 1, borderColor: '#BFDBFE', shadowColor: R.blue },
+  overlayCardBlue: { borderWidth: 1, borderColor: '#C7D7F5', shadowColor: R.rzp },
   overlayIconWrap: {
     width: 88, height: 88, borderRadius: 44,
     alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
   overlayIconAmber: { backgroundColor: R.amberLight, borderWidth: 1.5, borderColor: '#FDE68A' },
-  overlayIconBlue: { backgroundColor: R.blueLight, borderWidth: 1.5, borderColor: '#BFDBFE' },
+  overlayIconBlue: { backgroundColor: R.rzpLight, borderWidth: 1.5, borderColor: '#C7D7F5' },
   overlayTitle: { color: R.ink, fontSize: 22, fontWeight: '900', textAlign: 'center' },
   overlayAmount: { fontSize: 40, fontWeight: '900', letterSpacing: -1 },
   overlaySub: { color: R.gray, fontSize: 13, textAlign: 'center', lineHeight: 20, marginTop: 4 },
