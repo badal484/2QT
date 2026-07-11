@@ -12,6 +12,7 @@ import { TWO_QT } from '../config/constants';
 import { getAppSetting, getAppSettingInt } from '../utils/appSettings';
 import { pushService } from '../services/push.service';
 import Razorpay from 'razorpay';
+import crypto from 'crypto';
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || '',
@@ -1249,10 +1250,11 @@ router.post('/submit-all-cash', authenticate, requireRole('rider', 'rider_captai
     }
 });
 
-// POST /riders/create-cash-payment-link
-// Creates a Razorpay Payment Link for the rider to pay their full cash-in-hand in one tap.
-// On payment_link.paid webhook, the submission is auto-confirmed.
-router.post('/create-cash-payment-link', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+// POST /riders/create-cash-order
+// Creates a Razorpay Order for in-app native checkout (no browser redirect).
+// Mobile opens RazorpayCheckout.open() with the returned orderId.
+// On success, mobile calls /riders/confirm-cash-payment to verify + auto-confirm.
+router.post('/create-cash-order', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
     try {
         const { rows: orderRows } = await query(`
@@ -1270,7 +1272,7 @@ router.post('/create-cash-payment-link', authenticate, requireRole('rider', 'rid
         const { rows: [rider] } = await query('SELECT name, phone FROM users WHERE id = $1', [riderId]);
         const totalPaise = orderRows.reduce((s: number, o: any) => s + parseInt(o.total_amount_paise, 10), 0);
 
-        // Create submission record first (so we have the ID for reference_id)
+        // Create submission record
         const { rows: [submission] } = await query(`
             INSERT INTO cash_submissions (rider_id, total_amount_paise, order_count, method)
             VALUES ($1, $2, $3, 'razorpay_link')
@@ -1285,42 +1287,106 @@ router.post('/create-cash-payment-link', authenticate, requireRole('rider', 'rid
             `, [submission.id, order.id, order.total_amount_paise]);
         }
 
-        // Stamp submit-requested on orders
+        // Stamp submit-requested
         const ids = orderRows.map((o: any) => o.id);
         const ph = ids.map((_: any, i: number) => `$${i + 1}`).join(',');
         await query(`UPDATE orders SET cash_submit_requested_at = COALESCE(cash_submit_requested_at, NOW()) WHERE id IN (${ph})`, ids);
 
-        // Create Razorpay Payment Link
-        const link: any = await razorpay.paymentLink.create({
+        // Create Razorpay Order (not Payment Link — native in-app checkout)
+        const rzpOrder: any = await razorpay.orders.create({
             amount: totalPaise,
             currency: 'INR',
-            description: `Cash handover — ${orderRows.length} COD order${orderRows.length > 1 ? 's' : ''}`,
-            reference_id: `cs:${submission.id}`, // 3+36=39 chars, within Razorpay's 40-char limit
-            customer: {
-                name: rider.name || 'Rider',
-                contact: rider.phone || '',
+            notes: {
+                type: 'cash_submission',
+                submissionId: submission.id,
+                riderId,
             },
-            notify: { sms: false, email: false },
-            reminder_enable: false,
-            expire_by: Math.floor(Date.now() / 1000) + 3600, // 1-hour expiry
         });
-
-        // Store link details on submission
-        await query(`
-            UPDATE cash_submissions
-            SET razorpay_link_id = $1, razorpay_link_url = $2
-            WHERE id = $3
-        `, [link.id, link.short_url, submission.id]);
 
         res.json({
             submissionId: submission.id,
-            paymentUrl: link.short_url,
-            totalPaise,
+            rzpOrderId: rzpOrder.id,
+            amount: totalPaise,
+            key: process.env.RAZORPAY_KEY_ID,
+            riderName: rider.name || 'Rider',
+            riderPhone: rider.phone || '',
             orderCount: orderRows.length,
         });
     } catch (err) {
-        console.error('[rider/create-cash-payment-link]', err);
-        res.status(500).json({ error: 'Failed to create payment link' });
+        console.error('[rider/create-cash-order]', err);
+        res.status(500).json({ error: 'Failed to create payment order' });
+    }
+});
+
+// POST /riders/confirm-cash-payment
+// Called by mobile after RazorpayCheckout.open() succeeds.
+// Verifies Razorpay signature, then confirms the submission.
+// Webhook order.paid is a fallback — this is the primary confirmation path.
+router.post('/confirm-cash-payment', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { submissionId, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+
+    if (!submissionId || !razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
+        return res.status(400).json({ error: 'Missing payment credentials' });
+    }
+
+    // Verify Razorpay signature
+    const expectedSig = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest('hex');
+
+    if (expectedSig !== razorpaySignature) {
+        console.error('[confirm-cash-payment] signature mismatch', { submissionId });
+        return res.status(400).json({ error: 'INVALID_SIGNATURE' });
+    }
+
+    try {
+        const { rows: [submission] } = await query(
+            'SELECT id, rider_id, total_amount_paise, order_count, status FROM cash_submissions WHERE id = $1 AND rider_id = $2',
+            [submissionId, riderId]
+        );
+        if (!submission) return res.status(404).json({ error: 'SUBMISSION_NOT_FOUND' });
+        if (submission.status === 'confirmed') return res.json({ status: 'already_confirmed' });
+
+        const { rows: subOrders } = await query(
+            'SELECT order_id, amount_paise FROM cash_submission_orders WHERE submission_id = $1',
+            [submissionId]
+        );
+
+        if (subOrders.length > 0) {
+            const orderIds = subOrders.map((o: any) => o.order_id);
+            const placeholders = orderIds.map((_: any, i: number) => `$${i + 1}`).join(',');
+            await query(
+                `UPDATE orders
+                 SET cod_cash_collected = TRUE, cod_collected_at = NOW(),
+                     payment_status = 'paid', cash_submit_confirmed_at = NOW(),
+                     gateway_payment_id = COALESCE(gateway_payment_id, $${orderIds.length + 1})
+                 WHERE id IN (${placeholders}) AND payment_method = 'cod' AND cod_cash_collected = FALSE`,
+                [...orderIds, razorpayPaymentId]
+            );
+        }
+
+        await query(
+            `UPDATE cash_submissions
+             SET status = 'confirmed', confirmed_at = NOW(), utr_number = COALESCE(utr_number, $2)
+             WHERE id = $1`,
+            [submissionId, razorpayPaymentId]
+        );
+
+        emitToUser(riderId, 'cash_confirmed', { submissionId, totalPaise: submission.total_amount_paise });
+        emitToAdmin('cash_submitted', {
+            submissionId, riderId,
+            method: 'razorpay_link',
+            totalPaise: submission.total_amount_paise,
+            orderCount: submission.order_count,
+            autoConfirmed: true,
+        });
+
+        res.json({ status: 'confirmed', totalPaise: submission.total_amount_paise });
+    } catch (err) {
+        console.error('[confirm-cash-payment]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });
 

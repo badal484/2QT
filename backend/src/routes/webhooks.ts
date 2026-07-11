@@ -109,6 +109,44 @@ router.post('/razorpay', async (req, res) => {
             return res.json({ status: 'ok' });
         }
 
+        // ── Cash submission paid via native in-app checkout (fallback if mobile confirm fails) ──
+        if (notes.type === 'cash_submission') {
+            const submissionId = notes.submissionId as string;
+            try {
+                const { rows: [submission] } = await query(
+                    'SELECT id, rider_id, total_amount_paise, order_count, status FROM cash_submissions WHERE id = $1',
+                    [submissionId]
+                );
+                if (submission && submission.status !== 'confirmed') {
+                    const { rows: subOrders } = await query(
+                        'SELECT order_id FROM cash_submission_orders WHERE submission_id = $1',
+                        [submissionId]
+                    );
+                    if (subOrders.length > 0) {
+                        const orderIds = subOrders.map((o: any) => o.order_id);
+                        const ph = orderIds.map((_: any, i: number) => `$${i + 1}`).join(',');
+                        await query(
+                            `UPDATE orders SET cod_cash_collected = TRUE, cod_collected_at = NOW(),
+                             payment_status = 'paid', cash_submit_confirmed_at = NOW(),
+                             gateway_payment_id = COALESCE(gateway_payment_id, $${orderIds.length + 1})
+                             WHERE id IN (${ph}) AND payment_method = 'cod' AND cod_cash_collected = FALSE`,
+                            [...orderIds, rzpPaymentId]
+                        );
+                    }
+                    await query(
+                        `UPDATE cash_submissions SET status = 'confirmed', confirmed_at = NOW(),
+                         utr_number = COALESCE(utr_number, $2) WHERE id = $1`,
+                        [submissionId, rzpPaymentId]
+                    );
+                    emitToUser(submission.rider_id, 'cash_confirmed', { submissionId, totalPaise: submission.total_amount_paise });
+                    emitToAdmin('cash_submitted', { submissionId, riderId: submission.rider_id, method: 'razorpay_link', totalPaise: submission.total_amount_paise, orderCount: submission.order_count, autoConfirmed: true });
+                }
+            } catch (err) {
+                console.error('[webhook cash_submission order.paid fallback]', err);
+            }
+            return res.json({ status: 'ok' });
+        }
+
         // ── Standard food delivery order ──────────────────────────────────────
         const internalOrderId = notes.orderId;
         const paymentMethod = payload.payment.entity.method;
