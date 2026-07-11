@@ -20,7 +20,7 @@ const ReferralScreen = ({ navigation }: any) => {
     try {
       await Share.share({
         title: 'Join me on 2QT!',
-        message: `Order fresh, home-style food from 2QT and get ₹50 off on your first order! Use my code: ${referralCode}\n\nDownload here: https://2qt.in/app`,
+        message: `Order fresh, home-style food from 2QT and get ₹50 off on your first order! Use my code: ${referralCode}\n\nDownload here: https://play.google.com/store/apps/details?id=com.veltomobile.buyer`,
       }, {
         dialogTitle: 'Share your 2QT invite code',
         subject: 'Join me on 2QT!',
