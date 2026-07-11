@@ -634,7 +634,14 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
     const riderZoneId = req.user!.zoneId;
     const role = req.user!.role;
 
+    const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
+    const autoDispatchEnabled = settings[0]?.value === 'true';
+    if (autoDispatchEnabled) {
+        return res.json({ orders: [] });
+    }
+
     if (role !== 'super_admin') {
+
         // Look up zone's max_concurrent_orders (default 1 if not set)
         let maxConcurrent = 1;
         if (riderZoneId) {
