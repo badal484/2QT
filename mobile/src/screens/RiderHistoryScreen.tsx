@@ -163,7 +163,7 @@ const RiderHistoryScreen = ({ navigation }: any) => {
                 {group.orders.map((order: any) => {
                   const isDelivered = order.status === 'delivered';
                   const earningsPaise: number | null = isDelivered ? (order.earnings_paise ?? null) : null;
-                  const timeStr = new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const timeStr = new Date(order.created_at).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
 
                   return (
                     <View key={order.id} style={s.listItem}>
