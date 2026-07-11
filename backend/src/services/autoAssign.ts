@@ -1,6 +1,7 @@
 import { query } from '../db';
 import { redis, keys } from '../redis';
 import { emitToUser, emitToRiders, emitToAdmin } from '../socket';
+import { getAppSettingInt } from '../utils/appSettings';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
@@ -10,8 +11,6 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
         + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
-const COD_CASH_LIMIT_PAISE = 200_000; // ₹2000 — rider cannot take more COD orders above this
 
 async function findBestRider(
     zoneId: string,
@@ -42,16 +41,19 @@ async function findBestRider(
         const unavail = await redis.get(`2qt:auto_unavail:${rider.id}`).catch(() => null);
         if (unavail) continue;
 
-        // For COD orders: skip riders who are already at or above the cash-in-hand limit
+        // For COD orders: skip riders at or above the admin-configurable cash-in-hand limit
         if (isCodOrder) {
-            const { rows: cashRows } = await query(`
-                SELECT COALESCE(SUM(total_amount_paise), 0)::int AS cash_paise
-                FROM orders
-                WHERE rider_id = $1 AND payment_method = 'cod'
-                  AND status = 'delivered' AND cod_cash_collected = FALSE
-            `, [rider.id]);
+            const [limitPaise, { rows: cashRows }] = await Promise.all([
+                getAppSettingInt('cod_cash_limit_paise', 200_000),
+                query(`
+                    SELECT COALESCE(SUM(total_amount_paise), 0)::int AS cash_paise
+                    FROM orders
+                    WHERE rider_id = $1 AND payment_method = 'cod'
+                      AND status = 'delivered' AND cod_cash_collected = FALSE
+                `, [rider.id]),
+            ]);
             const cashInHand = parseInt(cashRows[0].cash_paise, 10);
-            if (cashInHand >= COD_CASH_LIMIT_PAISE) continue;
+            if (cashInHand >= limitPaise) continue;
         }
 
         const locRaw = await redis.get(keys.riderLocation(rider.id)).catch(() => null);

@@ -9,6 +9,7 @@ import { invoicesQueue } from '../jobs/queues';
 import { NotificationService } from '../services/notification.service';
 import { scheduleTriggerSend, cancelTriggerJobs } from '../services/trigger.service';
 import { TWO_QT } from '../config/constants';
+import { getAppSetting, getAppSettingInt } from '../utils/appSettings';
 import { pushService } from '../services/push.service';
 import Razorpay from 'razorpay';
 
@@ -1122,23 +1123,29 @@ router.post('/submit-cash-to-finance', authenticate, requireRole('rider', 'rider
 // Returns all unsubmitted COD orders for the badge + submit screen
 router.get('/cash-in-hand', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
-    const COD_LIMIT_PAISE = 200_000; // ₹2000
     try {
-        const { rows } = await query(`
-            SELECT id, display_id, total_amount_paise, delivered_at, cod_rider_collected_at
-            FROM orders
-            WHERE rider_id = $1
-              AND payment_method = 'cod'
-              AND status = 'delivered'
-              AND cod_cash_collected = FALSE
-            ORDER BY delivered_at DESC NULLS LAST
-        `, [riderId]);
-        const totalPaise = rows.reduce((s, o) => s + parseInt(o.total_amount_paise, 10), 0);
+        const [limitPaise, rawUpi, { rows }] = await Promise.all([
+            getAppSettingInt('cod_cash_limit_paise', 200_000),
+            getAppSetting('company_upi_id', '"badal90603@okaxis"'),
+            query(`
+                SELECT id, display_id, total_amount_paise, delivered_at, cod_rider_collected_at
+                FROM orders
+                WHERE rider_id = $1
+                  AND payment_method = 'cod'
+                  AND status = 'delivered'
+                  AND cod_cash_collected = FALSE
+                ORDER BY delivered_at DESC NULLS LAST
+            `, [riderId]),
+        ]);
+        const totalPaise = rows.reduce((s: number, o: any) => s + parseInt(o.total_amount_paise, 10), 0);
+        // app_settings stores strings as JSON strings (e.g. '"value"') — strip surrounding quotes if present
+        const upiId = rawUpi.replace(/^"|"$/g, '');
         res.json({
             orders: rows,
             totalPaise,
-            overLimit: totalPaise >= COD_LIMIT_PAISE,
-            limitPaise: COD_LIMIT_PAISE,
+            overLimit: totalPaise >= limitPaise,
+            limitPaise,
+            upiId,
         });
     } catch (err) {
         console.error('[rider/cash-in-hand]', err);
