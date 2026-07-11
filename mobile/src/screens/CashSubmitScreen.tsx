@@ -124,7 +124,20 @@ const CashSubmitScreen = ({ route, navigation }: any) => {
         }
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={handleDone} style={styles.skipLink} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={() =>
+          Alert.alert(
+            'Skip Cash Submission?',
+            'Finance will not be notified. You must hand over the cash before your next shift.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Skip for Now', style: 'destructive', onPress: handleDone },
+            ]
+          )
+        }
+        style={styles.skipLink}
+        activeOpacity={0.7}
+      >
         <Text style={styles.skipText}>Submit later (not recommended)</Text>
       </TouchableOpacity>
     </View>

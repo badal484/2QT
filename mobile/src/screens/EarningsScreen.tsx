@@ -41,8 +41,8 @@ const EarningsScreen = ({ navigation }: any) => {
   );
 
   const rawEarnings = data?.earnings || [];
-  const totalPaise = rawEarnings.reduce((sum: number, d: any) => sum + parseInt(d.total_paise, 10), 0);
-  const totalDeliveries = rawEarnings.reduce((sum: number, d: any) => sum + parseInt(d.deliveries_count, 10), 0);
+  const totalPaise = rawEarnings.reduce((sum: number, d: any) => sum + (parseInt(d.total_paise ?? '0', 10) || 0), 0);
+  const totalDeliveries = rawEarnings.reduce((sum: number, d: any) => sum + (parseInt(d.deliveries_count ?? '0', 10) || 0), 0);
   
   // Sort by date descending
   const sortedEarnings = [...rawEarnings].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());

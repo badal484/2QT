@@ -48,7 +48,8 @@ const PayoutsScreen = ({ navigation }: any) => {
   }, [data?.payoutMethod]);
 
   const saveBankMutation = useMutation({
-    mutationFn: () => api.patch('/riders/bank-account', { accountNumber, ifsc, accountName }),
+    mutationFn: (data: { accountNumber: string; ifsc: string; accountName: string }) =>
+      api.patch('/riders/bank-account', data),
     onSuccess: () => {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
@@ -58,7 +59,7 @@ const PayoutsScreen = ({ navigation }: any) => {
   });
 
   const saveUpiMutation = useMutation({
-    mutationFn: () => api.patch('/riders/upi', { upiId: upiInput.trim() }),
+    mutationFn: (data: { upiId: string }) => api.patch('/riders/upi', data),
     onSuccess: () => {
       setEditing(false);
       setUpiInput('');
@@ -97,10 +98,10 @@ const PayoutsScreen = ({ navigation }: any) => {
       if (!accountNumber.trim()) return Alert.alert('Required', 'Enter account number');
       if (!ifsc.trim()) return Alert.alert('Required', 'Enter IFSC code');
       if (!accountName.trim()) return Alert.alert('Required', 'Enter account holder name');
-      saveBankMutation.mutate();
+      saveBankMutation.mutate({ accountNumber: accountNumber.trim(), ifsc: ifsc.trim(), accountName: accountName.trim() });
     } else {
       if (!upiInput.trim()) return Alert.alert('Required', 'Enter your UPI ID');
-      saveUpiMutation.mutate();
+      saveUpiMutation.mutate({ upiId: upiInput.trim() });
     }
   };
 
@@ -222,7 +223,7 @@ const PayoutsScreen = ({ navigation }: any) => {
                     </View>
                     {payoutMethod !== 'bank' && (
                       <TouchableOpacity
-                        onPress={() => saveBankMutation.mutate()}
+                        onPress={() => saveBankMutation.mutate({ accountNumber: storedBank!, ifsc: storedIfsc!, accountName: storedName! })}
                         style={[styles.saveBtn, { backgroundColor: R.ink, marginTop: 12, opacity: isSaving ? 0.6 : 1 }]}
                         disabled={isSaving}
                         activeOpacity={0.88}
@@ -299,7 +300,7 @@ const PayoutsScreen = ({ navigation }: any) => {
                     </View>
                     {payoutMethod !== 'upi' && (
                       <TouchableOpacity
-                        onPress={() => saveUpiMutation.mutate()}
+                        onPress={() => saveUpiMutation.mutate({ upiId: storedUpi! })}
                         style={[styles.saveBtn, { backgroundColor: R.ink, marginTop: 12, opacity: isSaving ? 0.6 : 1 }]}
                         disabled={isSaving}
                         activeOpacity={0.88}

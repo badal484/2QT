@@ -9,7 +9,7 @@ import { api } from '../api/client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft, Phone, Navigation, Package,
-  CreditCard, ChevronRight, Info, AlertTriangle,
+  CreditCard, ChevronRight, Info,
   UserX, X, MapPin, Check,
   ShieldAlert, RefreshCw, DoorOpen, RotateCcw,
 } from 'lucide-react-native';
@@ -24,16 +24,6 @@ const R = {
   border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
 };
 
-// Haversine distance in metres
-function distanceMetres(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 const STEPS = [
   { key: 'kitchen', label: 'At Kitchen' },
   { key: 'picked_up', label: 'Picked Up' },
@@ -46,14 +36,6 @@ const statusToStep = (status: string): number => {
   if (status === 'delivered') return 2;
   return 0;
 };
-
-const ISSUE_TYPES = [
-  { key: 'damaged_packaging', label: 'Damaged Packaging', desc: 'Order packaging is broken or leaking' },
-  { key: 'wrong_order', label: 'Wrong Order', desc: "Items don't match what was ordered" },
-  { key: 'missing_items', label: 'Missing Items', desc: 'Some items are missing from the order' },
-  { key: 'unsafe_location', label: 'Unsafe Location', desc: 'Cannot safely reach delivery address' },
-  { key: 'other', label: 'Other Issue', desc: 'Something else went wrong' },
-];
 
 const AssignedOrderScreen = ({ route, navigation }: any) => {
   const { order } = route.params;
@@ -72,13 +54,15 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     const socket = getSocket();
     if (!socket) return;
     socket.emit('join_order', order.id);
-    socket.on('order_status_update', (data: any) => {
+    const handleStatusUpdate = (data: any) => {
       if (data.orderId === order.id) {
         setCurrentStatus(data.status);
         queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       }
-    });
-    return () => { socket.off('order_status_update'); };
+    };
+    socket.on('order_status_update', handleStatusUpdate);
+    // Pass handler ref so we don't remove other screens' listeners
+    return () => { socket.off('order_status_update', handleStatusUpdate); };
   }, [order.id, queryClient]);
 
   // Geolocation — share location

@@ -110,7 +110,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     onSettled: () => { setCheckingIn(false); checkingInRef.current = false; },
   });
 
-  // Auto proximity check every 30 s — uses ref so the interval doesn't reset on every GPS ping
+  // Auto proximity check every 5 s — uses ref so the interval doesn't reset on every GPS ping
   useEffect(() => {
     if (!noZone) return;
     const zones: any[] = zonesData?.zones || [];
@@ -118,6 +118,8 @@ const RiderHomeScreen = ({ navigation }: any) => {
     const timer = setInterval(() => {
       if (checkingInRef.current) return;
       const { latitude: lat, longitude: lng } = latestLocationRef.current;
+      // Skip until we have a real GPS fix (default is 0,0)
+      if (lat === 0 && lng === 0) return;
       const inRange = zones.some(z =>
         haversineKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng))
         <= parseFloat(z.radius_km) + 1,
@@ -484,6 +486,11 @@ const RiderHomeScreen = ({ navigation }: any) => {
       {/* ── Active orders list ────────────────────────────────────────────── */}
       {activeOrders.length > 0 && (
         <View style={[styles.ordersSheet, { paddingBottom: insets.bottom + 16 }]}>
+          {activeOrders.length > 1 && (
+            <View style={styles.batchBanner}>
+              <Text style={styles.batchBannerText}>📦 BATCH · {activeOrders.length} orders · pick up all from kitchen</Text>
+            </View>
+          )}
           {activeOrders.map((order: any, idx: number) => {
             const goingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(order.status);
             const dest = goingToKitchen ? (order.kitchen_name || 'Kitchen') : (order.customer_name || 'Customer');
@@ -501,7 +508,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
                     <Text style={styles.orderIdText}>{order.display_id}</Text>
                     {activeOrders.length > 1 && (
                       <View style={styles.orderIndexBadge}>
-                        <Text style={styles.orderIndexText}>#{idx + 1}</Text>
+                        <Text style={styles.orderIndexText}>{idx + 1}/{activeOrders.length}</Text>
                       </View>
                     )}
                   </View>
@@ -697,6 +704,11 @@ const styles = StyleSheet.create({
   orderIdText: { fontSize: 16, fontWeight: '800', color: S.ink },
   orderIndexBadge: { backgroundColor: S.border, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   orderIndexText: { fontSize: 10, fontWeight: '700', color: S.muted },
+  batchBanner: {
+    backgroundColor: '#EDE9FE', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    borderWidth: 1, borderColor: '#DDD6FE',
+  },
+  batchBannerText: { fontSize: 12, fontWeight: '800', color: '#5B21B6' },
   orderDestLabel: { fontSize: 10, fontWeight: '700', color: S.muted, letterSpacing: 0.5, marginBottom: 2 },
   orderDestText: { fontSize: 13, fontWeight: '600', color: S.ink },
 

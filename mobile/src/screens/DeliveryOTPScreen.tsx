@@ -189,7 +189,8 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
 
   if (delivered) return <SuccessScreen onDone={handleDone} doneLabel={isCashCod ? 'Submit Cash to Finance →' : 'Back to Dashboard'} />;
 
-  const isBlocked = otp.length < 6 || verifyMutation.isPending || isUploadingPhoto;
+  // Photo is optional — never block confirmation on upload; show a warning row instead
+  const isBlocked = otp.length < 6 || verifyMutation.isPending;
 
   return (
     <KeyboardAvoidingView
