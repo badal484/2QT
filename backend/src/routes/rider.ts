@@ -197,7 +197,7 @@ router.post('/zone/check-in', authenticate, requireRole('rider', 'rider_captain'
 
         await query('UPDATE users SET zone_id = $1 WHERE id = $2', [nearest.id, riderId]);
         invalidateUserCache(riderId);
-        res.json({ success: true, zoneName: nearest.name });
+        res.json({ success: true, zoneId: nearest.id, zoneName: nearest.name });
     } catch (err) {
         console.error('[zone/check-in]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
