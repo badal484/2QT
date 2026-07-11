@@ -235,6 +235,17 @@ const RiderHomeScreen = ({ navigation }: any) => {
   // Keep isOnlineRef in sync so socket handlers always see the latest value
   useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
 
+  // Listen for finance confirming cash submission — clear badge immediately
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['cash-in-hand'] });
+    };
+    socket.on('cash_confirmed', handler);
+    return () => { socket.off('cash_confirmed', handler); };
+  }, [queryClient]);
+
   // Register socket listener for auto-assign events
   useEffect(() => {
     let retryInterval: ReturnType<typeof setInterval> | null = null;
