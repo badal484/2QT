@@ -11,7 +11,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { updateUser } from '../store/slices/authSlice';
 import { getSocket } from '../socket/client';
-import { ChevronRight, Check, X, IndianRupee, Navigation, MapPin } from 'lucide-react-native';
+import { ChevronRight, Check, X, IndianRupee, Navigation, MapPin, Banknote } from 'lucide-react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
 import { displayLocalNotification } from '../services/localNotif';
@@ -65,6 +65,15 @@ const RiderHomeScreen = ({ navigation }: any) => {
     queryKey: ['rider-earnings'],
     queryFn: () => api.get('/riders/earnings/today'),
   });
+
+  const { data: cashData } = useQuery({
+    queryKey: ['cash-in-hand'],
+    queryFn: () => api.get('/riders/cash-in-hand'),
+    enabled: isOnline,
+    staleTime: 30_000,
+  });
+  const cashInHandPaise: number = cashData?.totalPaise || 0;
+  const cashOverLimit: boolean = cashData?.overLimit || false;
 
   const { data: activeOrderData, isFetched: activeOrderFetched } = useQuery({
     queryKey: ['rider-active-order'],
@@ -414,6 +423,22 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
 
 
+      {/* ── Cash-in-hand badge ───────────────────────────────────────────── */}
+      {cashInHandPaise > 0 && (
+        <TouchableOpacity
+          style={[styles.cashBadge, cashOverLimit && styles.cashBadgeUrgent]}
+          onPress={() => navigation.navigate('CashSubmit')}
+          activeOpacity={0.85}
+        >
+          <Banknote size={16} color={cashOverLimit ? '#DC2626' : '#F59E0B'} />
+          <Text style={[styles.cashBadgeText, cashOverLimit && styles.cashBadgeTextUrgent]}>
+            Cash in hand: ₹{(cashInHandPaise / 100).toFixed(0)}
+            {cashOverLimit ? ' · LIMIT REACHED' : ''}
+          </Text>
+          <Text style={styles.cashBadgeAction}>Submit →</Text>
+        </TouchableOpacity>
+      )}
+
       {/* ── No zone: head to nearest kitchen hub ─────────────────────────── */}
       {isOnline && noZone && activeOrders.length === 0 && (
         <View style={styles.zoneCard}>
@@ -749,6 +774,19 @@ const styles = StyleSheet.create({
   },
   autoAssignCountdownUrgent: { backgroundColor: 'rgba(239,68,68,0.45)' },
   autoAssignCountdownText: { color: S.white, fontSize: 15, fontWeight: '900' },
+
+  // Cash-in-hand badge
+  cashBadge: {
+    position: 'absolute', top: 130, left: 16, right: 16, zIndex: 45,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FFFBEB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+    borderWidth: 1, borderColor: '#FDE68A',
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 4,
+  },
+  cashBadgeUrgent: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  cashBadgeText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#92400E' },
+  cashBadgeTextUrgent: { color: '#DC2626' },
+  cashBadgeAction: { fontSize: 12, fontWeight: '800', color: S.orange },
 });
 
 export default RiderHomeScreen;

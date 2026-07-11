@@ -1118,6 +1118,114 @@ router.post('/submit-cash-to-finance', authenticate, requireRole('rider', 'rider
     }
 });
 
+// GET /riders/cash-in-hand
+// Returns all unsubmitted COD orders for the badge + submit screen
+router.get('/cash-in-hand', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const COD_LIMIT_PAISE = 200_000; // ₹2000
+    try {
+        const { rows } = await query(`
+            SELECT id, display_id, total_amount_paise, delivered_at, cod_rider_collected_at
+            FROM orders
+            WHERE rider_id = $1
+              AND payment_method = 'cod'
+              AND status = 'delivered'
+              AND cod_cash_collected = FALSE
+            ORDER BY delivered_at DESC NULLS LAST
+        `, [riderId]);
+        const totalPaise = rows.reduce((s, o) => s + parseInt(o.total_amount_paise, 10), 0);
+        res.json({
+            orders: rows,
+            totalPaise,
+            overLimit: totalPaise >= COD_LIMIT_PAISE,
+            limitPaise: COD_LIMIT_PAISE,
+        });
+    } catch (err) {
+        console.error('[rider/cash-in-hand]', err);
+        res.status(500).json({ error: 'Failed to fetch cash in hand' });
+    }
+});
+
+// POST /riders/submit-all-cash
+// Batch submission: physical hand-in or UPI transfer with UTR
+router.post('/submit-all-cash', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { orderIds, method, utrNumber } = req.body as {
+        orderIds: string[];
+        method: 'physical' | 'upi_transfer';
+        utrNumber?: string;
+    };
+
+    if (!orderIds?.length) return res.status(400).json({ error: 'orderIds required' });
+    if (!['physical', 'upi_transfer'].includes(method)) return res.status(400).json({ error: 'method must be physical or upi_transfer' });
+    if (method === 'upi_transfer' && !utrNumber?.trim()) return res.status(400).json({ error: 'utrNumber required for UPI transfer' });
+
+    try {
+        const placeholders = orderIds.map((_, i) => `$${i + 2}`).join(',');
+        const { rows: orders } = await query(`
+            SELECT id, total_amount_paise, display_id, cod_cash_collected
+            FROM orders
+            WHERE rider_id = $1
+              AND id IN (${placeholders})
+              AND payment_method = 'cod'
+              AND status = 'delivered'
+        `, [riderId, ...orderIds]);
+
+        if (!orders.length) return res.status(404).json({ error: 'No valid orders found' });
+
+        const pending = orders.filter(o => !o.cod_cash_collected);
+        if (!pending.length) return res.status(409).json({ error: 'All orders already confirmed by finance' });
+
+        const totalPaise = pending.reduce((s, o) => s + parseInt(o.total_amount_paise, 10), 0);
+
+        // Create grouped submission record
+        const { rows: [submission] } = await query(`
+            INSERT INTO cash_submissions (rider_id, total_amount_paise, order_count, method, utr_number)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
+        `, [riderId, totalPaise, pending.length, method, utrNumber?.trim() || null]);
+
+        // Link each order to this submission
+        for (const order of pending) {
+            await query(`
+                INSERT INTO cash_submission_orders (submission_id, order_id, amount_paise)
+                VALUES ($1, $2, $3)
+                ON CONFLICT DO NOTHING
+            `, [submission.id, order.id, order.total_amount_paise]);
+        }
+
+        // Stamp submit-requested on all pending orders (idempotent)
+        const pendingIds = pending.map(o => o.id);
+        const pp = pendingIds.map((_, i) => `$${i + 1}`).join(',');
+        await query(`
+            UPDATE orders SET cash_submit_requested_at = COALESCE(cash_submit_requested_at, NOW())
+            WHERE id IN (${pp})
+        `, pendingIds);
+
+        emitToAdmin('cash_submitted', {
+            submissionId: submission.id,
+            riderId,
+            method,
+            utrNumber: utrNumber?.trim() || null,
+            totalPaise,
+            orderCount: pending.length,
+        });
+
+        res.json({
+            success: true,
+            submissionId: submission.id,
+            totalPaise,
+            orderCount: pending.length,
+            message: method === 'upi_transfer'
+                ? 'UPI transfer recorded. Finance will verify and confirm.'
+                : 'Finance has been notified. Hand over the cash and wait for confirmation.',
+        });
+    } catch (err) {
+        console.error('[rider/submit-all-cash]', err);
+        res.status(500).json({ error: 'Failed to submit cash' });
+    }
+});
+
 // ─── Customer Unreachable ─────────────────────────────────────────────────────
 router.post('/orders/:id/customer-unreachable', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
