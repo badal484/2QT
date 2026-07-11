@@ -290,6 +290,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
     const assignedHandler = (data: { orderId: string; displayId: string; assignedBy: string; deliveryAddress?: string }) => {
       if (!isOnlineRef.current) return;
+      if (autoAssignedOrderRef.current) return; // auto-assign overlay takes priority
       showNotification({ ...data, id: data.orderId, display_id: data.displayId, delivery_address_text: data.deliveryAddress || null, _kitchenAssigned: true });
     };
 
@@ -301,6 +302,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     const dispatcherAlertHandler = async (data: { orderId: string; displayId: string }) => {
       if (!isOnlineRef.current) return;
       if (pendingOrderRef.current) return;
+      if (autoAssignedOrderRef.current) return; // auto-assign overlay takes priority
       // Remove from skipped so the rider sees it even if they dismissed it before
       skippedIdsRef.current = skippedIdsRef.current.filter(id => id !== data.orderId);
       setSkippedIds(prev => prev.filter(id => id !== data.orderId));

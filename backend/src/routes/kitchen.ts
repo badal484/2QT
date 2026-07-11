@@ -235,9 +235,12 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         if (status === 'preparing') {
             notificationType = 'order_preparing';
 
-            // Check zone dispatch mode — auto zones hold pool broadcast until ready_for_pickup
-            const { rows: zoneRows } = await query('SELECT dispatch_mode FROM zones WHERE id = $1', [order.zone_id]);
-            const isAutoZone = zoneRows[0]?.dispatch_mode === 'auto';
+            // Check zone dispatch mode — fail-safe: if migration hasn't run yet, defaults to manual
+            let isAutoZone = false;
+            try {
+                const { rows: zoneRows } = await query('SELECT dispatch_mode FROM zones WHERE id = $1', [order.zone_id]);
+                isAutoZone = zoneRows[0]?.dispatch_mode === 'auto';
+            } catch { /* dispatch_mode column not yet migrated — treat as manual */ }
 
             if (!isAutoZone) {
                 // Manual mode: broadcast immediately at preparing so riders can head to kitchen
@@ -274,11 +277,13 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
                 zoneId: order.zone_id,
             }, { delay: 3 * 60 * 1000 }).catch(() => {});
 
-            // Auto-assign zone: fire-and-forget assignment at pickup readiness
-            const { rows: zoneRows } = await query('SELECT dispatch_mode FROM zones WHERE id = $1', [order.zone_id]);
-            if (zoneRows[0]?.dispatch_mode === 'auto') {
-                autoAssignOrder(id).catch(() => {});
-            }
+            // Auto-assign zone: fire-and-forget, fail-safe if migration not yet run
+            try {
+                const { rows: zoneRows } = await query('SELECT dispatch_mode FROM zones WHERE id = $1', [order.zone_id]);
+                if (zoneRows[0]?.dispatch_mode === 'auto') {
+                    autoAssignOrder(id).catch(() => {});
+                }
+            } catch { /* dispatch_mode column not yet migrated — skip */ }
         }
         if (notificationType) {
             NotificationService.send(notificationType as any, {
