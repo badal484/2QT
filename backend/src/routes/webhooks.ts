@@ -140,8 +140,8 @@ router.post('/razorpay', async (req, res) => {
         if (!referenceId) return res.json({ status: 'no_reference_id' });
 
         // ── Cash submission paid via Payment Link (reference_id = "cash_sub:{id}") ──
-        if (referenceId.startsWith('cash_sub:')) {
-            const submissionId = referenceId.replace('cash_sub:', '');
+        if (referenceId.startsWith('cs:')) {
+            const submissionId = referenceId.slice(3); // strip "cs:" prefix
             try {
                 const { rows: [submission] } = await query(
                     `SELECT id, rider_id, total_amount_paise, order_count, status
