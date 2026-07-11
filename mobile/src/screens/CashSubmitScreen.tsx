@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  ScrollView, TextInput, Alert, ActivityIndicator, Linking, Clipboard,
+  ScrollView, Alert, ActivityIndicator, Linking, Clipboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Banknote, CheckCircle, ArrowLeft, Smartphone, Building2,
-  Info, Clock, Copy, ExternalLink,
+  Info, Clock, Copy, ExternalLink, CheckCircle2,
 } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -62,7 +62,6 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [method, setMethod] = useState<Method>('physical');
-  const [utrNumber, setUtrNumber] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [upiLaunched, setUpiLaunched] = useState(false);
 
@@ -82,7 +81,6 @@ const CashSubmitScreen = ({ navigation }: any) => {
     mutationFn: () => api.post('/riders/submit-all-cash', {
       orderIds: orders.map(o => o.id),
       method,
-      utrNumber: method === 'upi_transfer' ? utrNumber.trim() : undefined,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cash-in-hand'] });
@@ -95,8 +93,8 @@ const CashSubmitScreen = ({ navigation }: any) => {
 
   const handleSubmit = () => {
     if (!orders.length) return;
-    if (method === 'upi_transfer' && utrNumber.trim().length < 4) {
-      Alert.alert('Enter UTR', 'Please enter the UTR / transaction reference from your UPI app after paying.');
+    if (method === 'upi_transfer' && !upiLaunched) {
+      Alert.alert('Pay First', 'Please tap "Pay via UPI" to complete the transfer before submitting.');
       return;
     }
     submitMutation.mutate();
@@ -242,47 +240,47 @@ const CashSubmitScreen = ({ navigation }: any) => {
                 </View>
               </View>
 
-              {/* Quick-launch UPI app buttons */}
-              <Text style={s.upiAppLabel}>Open in your UPI app</Text>
-              <TouchableOpacity style={s.payNowBtn} onPress={() => openUpiApp()} activeOpacity={0.85}>
-                <ExternalLink size={18} color={R.white} />
-                <Text style={s.payNowBtnText}>Pay ₹{totalRupees} via UPI</Text>
-              </TouchableOpacity>
-              <View style={s.appShortcuts}>
-                {[
-                  { label: 'GPay', scheme: 'gpay' },
-                  { label: 'PhonePe', scheme: 'phonepe' },
-                  { label: 'Paytm', scheme: 'paytm' },
-                ].map(app => (
-                  <TouchableOpacity
-                    key={app.scheme}
-                    style={s.appBtn}
-                    onPress={() => openUpiApp(app.scheme)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={s.appBtnText}>{app.label}</Text>
+              {!upiLaunched ? (
+                <>
+                  {/* Quick-launch buttons */}
+                  <Text style={s.upiAppLabel}>Open in your UPI app</Text>
+                  <TouchableOpacity style={s.payNowBtn} onPress={() => openUpiApp()} activeOpacity={0.85}>
+                    <ExternalLink size={18} color={R.white} />
+                    <Text style={s.payNowBtnText}>Pay ₹{totalRupees} via UPI</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
+                  <View style={s.appShortcuts}>
+                    {[
+                      { label: 'GPay', scheme: 'gpay' },
+                      { label: 'PhonePe', scheme: 'phonepe' },
+                      { label: 'Paytm', scheme: 'paytm' },
+                    ].map(app => (
+                      <TouchableOpacity
+                        key={app.scheme}
+                        style={s.appBtn}
+                        onPress={() => openUpiApp(app.scheme)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={s.appBtnText}>{app.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              ) : (
+                /* After pay — just a confirmation tick, no UTR needed */
+                <View style={s.paidConfirm}>
+                  <CheckCircle2 size={28} color={R.green} strokeWidth={2} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.paidConfirmTitle}>Payment Initiated</Text>
+                    <Text style={s.paidConfirmSub}>Finance will verify the transfer in your UPI app.</Text>
+                  </View>
+                </View>
+              )}
 
-              {/* UTR input — shown after user has launched UPI app */}
-              <View style={s.utrSection}>
-                <Text style={s.utrLabel}>
-                  {upiLaunched
-                    ? '✓ Enter the UTR from your UPI app after paying'
-                    : 'After paying, enter the UTR / Transaction Reference'}
-                </Text>
-                <TextInput
-                  style={[s.utrInput, upiLaunched && s.utrInputActive]}
-                  placeholder="12-digit UTR or transaction ref"
-                  placeholderTextColor={R.muted}
-                  value={utrNumber}
-                  onChangeText={setUtrNumber}
-                  autoCapitalize="characters"
-                  returnKeyType="done"
-                  keyboardType="default"
-                />
-              </View>
+              {upiLaunched && (
+                <TouchableOpacity onPress={() => setUpiLaunched(false)} activeOpacity={0.7} style={s.repayLink}>
+                  <Text style={s.repayLinkText}>Pay again / use a different app</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -317,7 +315,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
             {submitMutation.isPending
               ? <ActivityIndicator color={R.white} />
               : <Text style={s.submitBtnText}>
-                  {method === 'upi_transfer' ? 'Submit UTR for Verification' : "I've Handed Over the Cash"}
+                  {method === 'upi_transfer' ? "Done — I've Paid" : "I've Handed Over the Cash"}
                 </Text>
             }
           </TouchableOpacity>
@@ -431,15 +429,15 @@ const s = StyleSheet.create({
   },
   appBtnText: { fontSize: 13, fontWeight: '800', color: R.blue },
 
-  utrSection: { gap: 8 },
-  utrLabel: { fontSize: 12, fontWeight: '600', color: R.gray, lineHeight: 18 },
-  utrInput: {
-    backgroundColor: R.white, borderRadius: 12, padding: 14,
-    borderWidth: 1.5, borderColor: '#93C5FD',
-    fontSize: 15, fontWeight: '700', color: R.ink,
-    textAlign: 'center', letterSpacing: 1,
+  paidConfirm: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: R.greenLight, borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#B7E8D7',
   },
-  utrInputActive: { borderColor: R.blue, borderWidth: 2 },
+  paidConfirmTitle: { fontSize: 14, fontWeight: '800', color: R.green },
+  paidConfirmSub: { fontSize: 12, color: R.gray, lineHeight: 17, marginTop: 2 },
+  repayLink: { alignItems: 'center', paddingTop: 4 },
+  repayLinkText: { fontSize: 12, color: R.blue, fontWeight: '600', textDecorationLine: 'underline' },
 
   // Physical steps
   stepsCard: {
