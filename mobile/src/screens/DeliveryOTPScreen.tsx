@@ -12,7 +12,7 @@ import { launchCamera } from 'react-native-image-picker';
 import { uploadToImageKit } from '../utils/imageKit';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8', orangeMid: '#FFE0C0',
+  orange: '#FC4603', orangeLight: '#FFF0E8', orangeMid: '#FFE0C0',
   green: '#1BA672', greenLight: '#E8F8F1',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
   border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
@@ -24,51 +24,29 @@ const SuccessScreen = ({ onDone, doneLabel = 'Back to Dashboard' }: { onDone: ()
   const insets = useSafeAreaInsets();
   const scale = useRef(new Animated.Value(0.5)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const ring1 = useRef(new Animated.Value(0)).current;
-  const ring2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.spring(scale, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }).start();
-    Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-    const pulse = (anim: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, { toValue: 1, duration: 1600, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
-        ]),
-      ).start();
-    pulse(ring1, 0);
-    pulse(ring2, 800);
+    Animated.spring(scale, { toValue: 1, tension: 50, friction: 6, useNativeDriver: true }).start();
+    Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   }, []);
-
-  const ringStyle = (anim: Animated.Value) => ({
-    position: 'absolute' as const,
-    width: 140, height: 140, borderRadius: 70,
-    borderWidth: 1.5, borderColor: R.green,
-    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }),
-    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.5] }) }],
-  });
 
   return (
     <View style={[suc.root, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
+      <StatusBar barStyle="dark-content" backgroundColor={R.bg} />
+      
       <View style={suc.hero}>
-        <View style={suc.iconContainer}>
-          <Animated.View style={ringStyle(ring1)} />
-          <Animated.View style={ringStyle(ring2)} />
-          <Animated.View style={[suc.iconWrap, { transform: [{ scale }], opacity }]}>
-            <CheckCircle size={56} color={R.white} strokeWidth={2.5} />
-          </Animated.View>
-        </View>
-        <Animated.View style={{ opacity, alignItems: 'center', marginTop: 10 }}>
+        <Animated.View style={[suc.iconWrap, { transform: [{ scale }], opacity }]}>
+          <CheckCircle size={52} color={R.green} strokeWidth={2.5} />
+        </Animated.View>
+        <Animated.View style={{ opacity, alignItems: 'center', marginTop: 24, transform: [{ translateY: opacity.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
           <Text style={suc.title}>Delivered!</Text>
           <Text style={suc.sub}>Order successfully handed to the customer.</Text>
         </Animated.View>
       </View>
+
       <Animated.View style={[suc.bottomSection, { opacity, transform: [{ translateY: opacity.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
         <View style={suc.confirmBox}>
-          <View style={suc.confirmBadge}><CheckCircle size={14} color={R.white} /></View>
+          <CheckCircle size={16} color={R.green} />
           <Text style={suc.confirmText}>OTP verified · Delivery confirmed</Text>
         </View>
         <TouchableOpacity style={suc.btn} onPress={onDone} activeOpacity={0.9}>
@@ -80,29 +58,28 @@ const SuccessScreen = ({ onDone, doneLabel = 'Back to Dashboard' }: { onDone: ()
 };
 
 const suc = StyleSheet.create({
-  root: { flex: 1, backgroundColor: R.white, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28 },
+  root: { flex: 1, backgroundColor: R.bg, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 },
   hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  iconContainer: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   iconWrap: {
-    width: 100, height: 100, borderRadius: 50, backgroundColor: R.green,
+    width: 100, height: 100, borderRadius: 50, backgroundColor: R.greenLight,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: R.green, shadowOpacity: 0.4, shadowRadius: 20, elevation: 10, shadowOffset: { width: 0, height: 8 },
+    borderWidth: 2, borderColor: '#B7E8D7',
   },
-  title: { color: R.ink, fontSize: 36, fontWeight: '900', textAlign: 'center' },
-  sub: { color: R.gray, fontSize: 16, textAlign: 'center', lineHeight: 24, marginTop: 12, paddingHorizontal: 10 },
+  title: { color: R.ink, fontSize: 32, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5 },
+  sub: { color: R.gray, fontSize: 15, textAlign: 'center', lineHeight: 22, marginTop: 8, paddingHorizontal: 20 },
   bottomSection: { width: '100%', alignItems: 'center', gap: 20 },
   confirmBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: R.bg, borderWidth: 1, borderColor: R.border,
-    paddingHorizontal: 24, paddingVertical: 16, borderRadius: 100,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: R.white, borderWidth: 1, borderColor: R.border,
+    paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16,
     width: '100%', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8, elevation: 2,
   },
-  confirmBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: R.green, alignItems: 'center', justifyContent: 'center' },
-  confirmText: { color: R.ink, fontWeight: '800', fontSize: 13, letterSpacing: 0.2 },
+  confirmText: { color: R.ink, fontWeight: '700', fontSize: 13, letterSpacing: 0.2 },
   btn: {
-    width: '100%', backgroundColor: R.orange,
+    width: '100%', backgroundColor: R.ink,
     paddingVertical: 18, borderRadius: 16, alignItems: 'center',
-    shadowColor: R.orange, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6, shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, shadowOffset: { width: 0, height: 4 },
   },
   btnText: { color: R.white, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
 });

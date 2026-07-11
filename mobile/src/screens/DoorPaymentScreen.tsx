@@ -11,7 +11,7 @@ import { CircleCheck, Banknote, Smartphone } from 'lucide-react-native';
 import { ENV } from '../config/env';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.08)',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',

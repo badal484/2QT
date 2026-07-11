@@ -15,7 +15,7 @@ import { uploadToImageKit } from '../utils/imageKit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
   border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',

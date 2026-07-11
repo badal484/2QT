@@ -31,7 +31,7 @@ const queryClient = new QueryClient({
 
 const App = () => {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#FAF8F4' }}>
       <SafeAreaProvider>
         <Provider store={store}>
           <PersistGate loading={<SplashScreen />} persistor={persistor}>

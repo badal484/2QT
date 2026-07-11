@@ -12,7 +12,7 @@ const G = {
   bg: '#070707', card: '#111111', border: 'rgba(255,255,255,0.07)', faint: 'rgba(255,255,255,0.05)',
   green: '#00D084', greenBg: 'rgba(0,208,132,0.08)',
   red: '#EF4444', redBg: 'rgba(239,68,68,0.08)',
-  orange: '#FC8019', orangeBg: 'rgba(252,128,25,0.08)',
+  orange: '#FC4603', orangeBg: 'rgba(252,128,25,0.08)',
   white: '#FFFFFF', dim: 'rgba(255,255,255,0.55)', muted: 'rgba(255,255,255,0.2)',
 };
 
