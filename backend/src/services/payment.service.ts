@@ -162,6 +162,7 @@ export const calculatePricing = async ({
     const { rows: zoneRows } = await query(`
         SELECT delivery_fee_type, base_delivery_fee_paise, per_km_fee_paise,
                base_distance_km, free_delivery_above_paise, surge_multiplier,
+               surge_enabled, surge_expires_at,
                min_order_paise, small_order_fee_paise
         FROM zones WHERE id = $1
     `, [zoneId]);
@@ -352,7 +353,7 @@ export const calculatePricing = async ({
             // Fallback: flat or per_km
             if (zone.delivery_fee_type === 'per_km') {
                 const extraKm = Math.max(0, distanceKm - parseFloat(zone.base_distance_km));
-                deliveryFeePaise = zone.base_delivery_fee_paise + Math.ceil(extraKm) * zone.per_km_fee_paise;
+                deliveryFeePaise = zone.base_delivery_fee_paise + Math.ceil(extraKm * 10) / 10 * zone.per_km_fee_paise;
             } else {
                 deliveryFeePaise = zone.base_delivery_fee_paise;
             }
@@ -366,8 +367,11 @@ export const calculatePricing = async ({
         // Campaign free-delivery override
         if (campaignFreeDelivery) deliveryFeePaise = 0;
 
-        // Surge on top of whatever delivery fee was set
-        if (zone.surge_multiplier && parseFloat(zone.surge_multiplier) > 1.0) {
+        // Surge on top of whatever delivery fee was set — only when enabled and not expired
+        const surgeActive = zone.surge_enabled
+            && zone.surge_multiplier && parseFloat(zone.surge_multiplier) > 1.0
+            && (!zone.surge_expires_at || new Date(zone.surge_expires_at) > new Date());
+        if (surgeActive) {
             const withSurge = Math.floor(deliveryFeePaise * parseFloat(zone.surge_multiplier));
             surgePaise = withSurge - deliveryFeePaise;
         }
