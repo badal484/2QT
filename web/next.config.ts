@@ -59,6 +59,22 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  // ── Redirects ───────────────────────────────────────────────────────────────
+  async redirects() {
+    return [
+      {
+        source: '/app',
+        destination: 'https://play.google.com/store/apps/details?id=com.veltomobile.buyer',
+        permanent: false,
+      },
+      {
+        source: '/download',
+        destination: 'https://play.google.com/store/apps/details?id=com.veltomobile.buyer',
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

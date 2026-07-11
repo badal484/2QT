@@ -2598,7 +2598,7 @@ const ClosedBottomSheet = ({
 
       <View style={closedSS.content}>
         <Image
-          source={require('../images/closed_store.png')}
+          source={require('../images/closed_store.jpg')}
           style={{ width: 250, height: 180, marginBottom: 24 }}
           resizeMode="contain"
         />
