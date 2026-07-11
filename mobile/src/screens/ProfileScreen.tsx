@@ -70,8 +70,8 @@ const ProfileScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const isRider = user?.role === 'rider';
-  const accent = isRider ? '#FC8019' : '#10B981';
-  const accentLight = isRider ? '#FFF3E8' : '#ECFDF5';
+  const accent = isRider ? '#FC4603' : '#10B981';
+  const accentLight = isRider ? '#FFF0E8' : '#ECFDF5';
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet'],
@@ -186,88 +186,6 @@ const ProfileScreen = ({ navigation }: any) => {
           )}
         </Animated.View>
 
-        {/* RIDER TIER + STREAK CARD */}
-        {isRider && (
-          <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.tierCard}>
-            {/* Tier badge row */}
-            <View style={styles.tierRow}>
-              <View style={[styles.tierBadge, {
-                backgroundColor:
-                  riderStats?.tier === 'platinum' ? '#F3E8FF' :
-                  riderStats?.tier === 'gold'     ? '#FEF3C7' :
-                  riderStats?.tier === 'silver'   ? '#F1F5F9' : '#FFF3E8',
-              }]}>
-                <Text style={styles.tierEmoji}>
-                  {riderStats?.tier === 'platinum' ? '💎' :
-                   riderStats?.tier === 'gold'     ? '🥇' :
-                   riderStats?.tier === 'silver'   ? '🥈' : '🥉'}
-                </Text>
-                <Text style={[styles.tierName, {
-                  color:
-                    riderStats?.tier === 'platinum' ? '#7C3AED' :
-                    riderStats?.tier === 'gold'     ? '#D97706' :
-                    riderStats?.tier === 'silver'   ? '#64748B' : '#FC8019',
-                }]}>
-                  {(riderStats?.tier || 'bronze').charAt(0).toUpperCase() + (riderStats?.tier || 'bronze').slice(1)}
-                </Text>
-              </View>
-              {riderStats?.nextTierAt && (
-                <Text style={styles.tierNextHint}>
-                  {riderStats.nextTierAt - (riderStats.totalDeliveries || 0)} trips to next tier
-                </Text>
-              )}
-              {/* Streak */}
-              <View style={styles.streakBadge}>
-                <Flame size={14} color={riderStats?.currentStreak > 0 ? '#FC8019' : '#93959F'} />
-                <Text style={[styles.streakText, { color: riderStats?.currentStreak > 0 ? '#FC8019' : '#93959F' }]}>
-                  {riderStats?.currentStreak || 0} day streak
-                </Text>
-              </View>
-            </View>
-            {/* Progress bar to next tier */}
-            {riderStats?.nextTierAt && (
-              <View style={styles.tierProgressTrack}>
-                <View style={[styles.tierProgressFill, {
-                  width: `${Math.min(100, Math.round(((riderStats.totalDeliveries || 0) / riderStats.nextTierAt) * 100))}%` as any,
-                }]} />
-              </View>
-            )}
-            {/* Acceptance + Completion rate */}
-            <View style={styles.perfRow}>
-              <View style={styles.perfItem}>
-                <TrendingUp size={13} color={
-                  (riderStats?.acceptanceRate ?? 100) >= 80 ? '#1BA672' :
-                  (riderStats?.acceptanceRate ?? 100) >= 60 ? '#FC8019' : '#EF4444'
-                } />
-                <Text style={[styles.perfVal, {
-                  color:
-                    (riderStats?.acceptanceRate ?? 100) >= 80 ? '#1BA672' :
-                    (riderStats?.acceptanceRate ?? 100) >= 60 ? '#FC8019' : '#EF4444',
-                }]}>{riderStats?.acceptanceRate ?? 100}%</Text>
-                <Text style={styles.perfLabel}>Acceptance</Text>
-              </View>
-              <View style={styles.perfDivider} />
-              <View style={styles.perfItem}>
-                <Award size={13} color={
-                  (riderStats?.completionRate ?? 100) >= 90 ? '#1BA672' :
-                  (riderStats?.completionRate ?? 100) >= 70 ? '#FC8019' : '#EF4444'
-                } />
-                <Text style={[styles.perfVal, {
-                  color:
-                    (riderStats?.completionRate ?? 100) >= 90 ? '#1BA672' :
-                    (riderStats?.completionRate ?? 100) >= 70 ? '#FC8019' : '#EF4444',
-                }]}>{riderStats?.completionRate ?? 100}%</Text>
-                <Text style={styles.perfLabel}>Completion</Text>
-              </View>
-              <View style={styles.perfDivider} />
-              <View style={styles.perfItem}>
-                <Flame size={13} color='#F59E0B' />
-                <Text style={[styles.perfVal, { color: '#F59E0B' }]}>{riderStats?.longestStreak || 0}d</Text>
-                <Text style={styles.perfLabel}>Best Streak</Text>
-              </View>
-            </View>
-          </Animated.View>
-        )}
 
 
 
@@ -490,15 +408,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 16,
   },
-  referralTextCol: {
-    flex: 1,
-  },
-  referralTitle: {
-    color: '#10B981',
-    fontWeight: '800',
-    fontSize: 15,
-  },
-
   devCard: {
     marginHorizontal: 16,
     backgroundColor: '#FFFFFF',
@@ -575,7 +484,7 @@ const styles = StyleSheet.create({
     height: 5, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden', marginBottom: 14,
   },
   tierProgressFill: {
-    height: 5, backgroundColor: '#FC8019', borderRadius: 3,
+    height: 5, backgroundColor: '#FC4603', borderRadius: 3,
   },
   perfRow: {
     flexDirection: 'row', alignItems: 'center',
