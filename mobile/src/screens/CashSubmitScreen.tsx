@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  ScrollView, Alert, ActivityIndicator, Linking,
+  ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Banknote, CheckCircle, ArrowLeft, Smartphone, Building2,
-  Info, Clock, ExternalLink, CheckCircle2, ShieldCheck,
+  Info, Clock, CheckCircle2, ShieldCheck,
 } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import RazorpayCheckout from 'react-native-razorpay';
 import { api } from '../api/client';
 
 const R = {
@@ -22,34 +23,34 @@ const R = {
   rzp: '#072654', rzpLight: '#EEF2FB',
 };
 
-type Method = 'physical' | 'razorpay_link';
+type Method = 'physical' | 'razorpay';
 
-// ── Pending overlay shown after submission ────────────────────────────────────
-const PendingOverlay = ({
+// ── Result overlay shown after submission ─────────────────────────────────────
+const ResultOverlay = ({
   total, method, onDone,
 }: { total: string; method: Method; onDone: () => void }) => {
-  const isRzp = method === 'razorpay_link';
+  const isRzp = method === 'razorpay';
   return (
     <View style={s.overlayRoot}>
-      <View style={[s.overlayCard, isRzp ? s.overlayCardBlue : s.overlayCardAmber]}>
-        <View style={[s.overlayIconWrap, isRzp ? s.overlayIconBlue : s.overlayIconAmber]}>
+      <View style={[s.overlayCard, isRzp ? s.overlayCardGreen : s.overlayCardAmber]}>
+        <View style={[s.overlayIconWrap, isRzp ? s.overlayIconGreen : s.overlayIconAmber]}>
           {isRzp
-            ? <ShieldCheck size={48} color={R.blue} strokeWidth={1.8} />
+            ? <ShieldCheck size={48} color={R.green} strokeWidth={1.8} />
             : <Clock size={48} color={R.amber} strokeWidth={1.8} />
           }
         </View>
         <Text style={s.overlayTitle}>
-          {isRzp ? 'Payment Processing' : 'Finance Notified'}
+          {isRzp ? 'Payment Confirmed!' : 'Finance Notified'}
         </Text>
-        <Text style={[s.overlayAmount, { color: isRzp ? R.blue : R.amber }]}>₹{total}</Text>
+        <Text style={[s.overlayAmount, { color: isRzp ? R.green : R.amber }]}>₹{total}</Text>
         <Text style={s.overlaySub}>
           {isRzp
-            ? 'Your payment is being verified automatically. Your cash badge will clear once confirmed.'
+            ? 'Your payment has been verified. Your cash badge has been cleared automatically.'
             : 'Please hand over the cash at the finance desk. Your badge will clear once finance confirms receipt.'}
         </Text>
         <View style={s.overlayBadge}>
-          <Text style={[s.overlayBadgeText, { color: isRzp ? R.blue : R.amber }]}>
-            {isRzp ? 'Auto-verifying via Razorpay' : 'Pending Finance Confirmation'}
+          <Text style={[s.overlayBadgeText, { color: isRzp ? R.green : R.amber }]}>
+            {isRzp ? 'Verified via Razorpay' : 'Pending Finance Confirmation'}
           </Text>
         </View>
         <TouchableOpacity style={s.overlayBtn} onPress={onDone} activeOpacity={0.9}>
@@ -66,6 +67,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const [method, setMethod] = useState<Method>('physical');
   const [submitted, setSubmitted] = useState(false);
   const [rzpLoading, setRzpLoading] = useState(false);
+  const [confirmedTotal, setConfirmedTotal] = useState('');
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['cash-in-hand'],
@@ -91,18 +93,47 @@ const CashSubmitScreen = ({ navigation }: any) => {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || e.message || 'Could not submit. Try again.'),
   });
 
-  // Razorpay Payment Link — one tap, auto-confirmed by webhook
+  // Razorpay native in-app checkout — no browser redirect
   const handleRazorpayPay = async () => {
     if (!orders.length) return;
     setRzpLoading(true);
     try {
-      const res: any = await api.post('/riders/create-cash-payment-link', {});
-      await Linking.openURL(res.paymentUrl);
+      // Step 1: create order on backend
+      const orderRes: any = await api.post('/riders/create-cash-order', {});
+
+      // Step 2: open native Razorpay checkout (bottom sheet, stays in-app)
+      const paymentData: any = await RazorpayCheckout.open({
+        key: orderRes.key,
+        amount: orderRes.amount,
+        currency: 'INR',
+        order_id: orderRes.rzpOrderId,
+        name: '2QT Food',
+        description: `Cash handover — ${orderRes.orderCount} order${orderRes.orderCount > 1 ? 's' : ''}`,
+        prefill: {
+          name: orderRes.riderName,
+          contact: orderRes.riderPhone,
+        },
+        theme: { color: '#FC4603' },
+      });
+
+      // Step 3: verify signature + confirm on backend
+      await api.post('/riders/confirm-cash-payment', {
+        submissionId: orderRes.submissionId,
+        razorpayPaymentId: paymentData.razorpay_payment_id,
+        razorpayOrderId: paymentData.razorpay_order_id,
+        razorpaySignature: paymentData.razorpay_signature,
+      });
+
       queryClient.invalidateQueries({ queryKey: ['cash-in-hand'] });
-      setMethod('razorpay_link');
+      queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
+      setConfirmedTotal((orderRes.amount / 100).toFixed(0));
+      setMethod('razorpay');
       setSubmitted(true);
     } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.error || 'Could not create payment link. Try again.');
+      // error.code === 0 means user cancelled — don't show error for that
+      if (e?.code !== 0) {
+        Alert.alert('Payment Failed', e?.response?.data?.error || e?.description || 'Payment could not be completed. Try again.');
+      }
     } finally {
       setRzpLoading(false);
     }
@@ -116,7 +147,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
   const handleDone = () => navigation.navigate('RiderTabs');
 
   if (submitted) {
-    return <PendingOverlay total={totalRupees} method={method} onDone={handleDone} />;
+    return <ResultOverlay total={confirmedTotal || totalRupees} method={method} onDone={handleDone} />;
   }
 
   return (
@@ -196,18 +227,18 @@ const CashSubmitScreen = ({ navigation }: any) => {
               <Text style={s.methodBtnSub}>Hand cash in person</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[s.methodBtn, method === 'razorpay_link' && s.methodBtnActive]}
-              onPress={() => setMethod('razorpay_link')}
+              style={[s.methodBtn, method === 'razorpay' && s.methodBtnActive]}
+              onPress={() => setMethod('razorpay')}
               activeOpacity={0.8}
             >
-              <Smartphone size={20} color={method === 'razorpay_link' ? R.orange : R.muted} />
-              <Text style={[s.methodBtnText, method === 'razorpay_link' && s.methodBtnTextActive]}>Pay Online</Text>
+              <Smartphone size={20} color={method === 'razorpay' ? R.orange : R.muted} />
+              <Text style={[s.methodBtnText, method === 'razorpay' && s.methodBtnTextActive]}>Pay Online</Text>
               <Text style={s.methodBtnSub}>GPay / PhonePe / Card</Text>
             </TouchableOpacity>
           </View>
 
           {/* ── Razorpay section ── */}
-          {method === 'razorpay_link' && (
+          {method === 'razorpay' && (
             <View style={s.rzpCard}>
               <View style={s.rzpHeader}>
                 <ShieldCheck size={22} color={R.rzp} />
@@ -235,7 +266,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
                 {rzpLoading
                   ? <ActivityIndicator color={R.white} />
                   : <>
-                      <ExternalLink size={18} color={R.white} />
+                      <ShieldCheck size={18} color={R.white} />
                       <Text style={s.rzpBtnText}>Pay ₹{totalRupees} via Razorpay</Text>
                     </>
                 }
@@ -420,13 +451,13 @@ const s = StyleSheet.create({
     shadowOpacity: 0.1, shadowRadius: 24, elevation: 8,
   },
   overlayCardAmber: { borderWidth: 1, borderColor: '#FDE68A', shadowColor: R.amber },
-  overlayCardBlue: { borderWidth: 1, borderColor: '#C7D7F5', shadowColor: R.rzp },
+  overlayCardGreen: { borderWidth: 1, borderColor: '#A7F3D0', shadowColor: R.green },
   overlayIconWrap: {
     width: 88, height: 88, borderRadius: 44,
     alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
   overlayIconAmber: { backgroundColor: R.amberLight, borderWidth: 1.5, borderColor: '#FDE68A' },
-  overlayIconBlue: { backgroundColor: R.rzpLight, borderWidth: 1.5, borderColor: '#C7D7F5' },
+  overlayIconGreen: { backgroundColor: R.greenLight, borderWidth: 1.5, borderColor: '#A7F3D0' },
   overlayTitle: { color: R.ink, fontSize: 22, fontWeight: '900', textAlign: 'center' },
   overlayAmount: { fontSize: 40, fontWeight: '900', letterSpacing: -1 },
   overlaySub: { color: R.gray, fontSize: 13, textAlign: 'center', lineHeight: 20, marginTop: 4 },
