@@ -26,7 +26,7 @@ export const RiderTabNavigator = () => {
           shadowRadius: 12,
           shadowOffset: { width: 0, height: -2 },
         },
-        tabBarActiveTintColor: '#FC8019',
+        tabBarActiveTintColor: '#FC4603',
         tabBarInactiveTintColor: '#93959F',
         tabBarLabelStyle: {
           fontSize: 11,

@@ -56,16 +56,26 @@ async function findBestRider(zoneId: string, kitchenLat: number, kitchenLng: num
     return candidates[0].id;
 }
 
-// Find a ready_for_pickup order from the same kitchen whose delivery destination
-// is within 1.5 km of the anchor order's destination — kitchen-synced batching only.
+// Find a ready_for_pickup order from the same kitchen suitable for batching.
+// Two filters must both pass:
+//   1. Delivery points ≤ 2 km apart (pre-filter for obvious non-batches)
+//   2. Detour factor: the best batch route (K→A→B or K→B→A) must be
+//      ≤ 40% longer than the farther single delivery. This rejects pairs
+//      where one delivery is in the opposite direction from the other.
 async function detectBatch(
     kitchenId: string,
+    kitchenLat: number,
+    kitchenLng: number,
     anchorOrderId: string,
     anchorDeliveryLat: number | null,
     anchorDeliveryLng: number | null,
     zoneId: string,
 ): Promise<string | null> {
     if (!anchorDeliveryLat || !anchorDeliveryLng) return null;
+    if (isNaN(kitchenLat) || isNaN(kitchenLng)) return null;
+
+    const MAX_DELIVERY_DIST_KM = 2.0;
+    const MAX_DETOUR_FACTOR    = 1.4;
 
     const { rows } = await query(`
         SELECT o.id,
@@ -81,13 +91,28 @@ async function detectBatch(
         LIMIT 10
     `, [kitchenId, anchorOrderId, zoneId]);
 
+    const directA = haversineKm(kitchenLat, kitchenLng, anchorDeliveryLat, anchorDeliveryLng);
+
     for (const row of rows) {
         const dlat = parseFloat(row.dlat);
         const dlng = parseFloat(row.dlng);
         if (isNaN(dlat) || isNaN(dlng)) continue;
-        if (haversineKm(anchorDeliveryLat, anchorDeliveryLng, dlat, dlng) <= 1.5) {
-            return row.id; // first qualifying batch partner
-        }
+
+        // Filter 1: delivery points must be close
+        const betweenDeliveries = haversineKm(anchorDeliveryLat, anchorDeliveryLng, dlat, dlng);
+        if (betweenDeliveries > MAX_DELIVERY_DIST_KM) continue;
+
+        // Filter 2: detour check — reject if one delivery is a backtrack from the other.
+        // Compare best batch route against the longer of the two individual routes.
+        const directB   = haversineKm(kitchenLat, kitchenLng, dlat, dlng);
+        const routeAB   = directA + betweenDeliveries; // K→A→B
+        const routeBA   = directB + betweenDeliveries; // K→B→A
+        const maxDirect = Math.max(directA, directB);
+        const bestRoute = Math.min(routeAB, routeBA);
+
+        if (bestRoute > maxDirect * MAX_DETOUR_FACTOR) continue;
+
+        return row.id;
     }
     return null;
 }
@@ -138,6 +163,8 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
         // Kitchen-synced batch check — only bundle orders that are BOTH already ready
         const batchOrderId = await detectBatch(
             order.kitchen_id,
+            kitchenLat,
+            kitchenLng,
             orderId,
             deliveryLat,
             deliveryLng,

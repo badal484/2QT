@@ -69,8 +69,19 @@ export function navigateFromNotification(data: Record<string, string>) {
     case 'flash_sale':
     case 'happy_hour':
     case 'broadcast_message':
-    default:
-      navigateTo('Home');
+    default: {
+      const state = require('../store/index').store.getState();
+      const role = state.auth.user?.role;
+      if (role === 'rider' || role === 'rider_captain') {
+        navigateTo('RiderTabs');
+      } else if (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff'].includes(role)) {
+        navigateTo('KitchenTabs');
+      } else if (role === 'partner') {
+        navigateTo('PartnerDashboard');
+      } else {
+        navigateTo('Home');
+      }
       break;
+    }
   }
 }

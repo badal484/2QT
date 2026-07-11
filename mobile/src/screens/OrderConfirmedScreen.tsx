@@ -212,19 +212,42 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
   return (
     <View style={styles.root}>
 
-      {/* ── Live Map ── */}
+      {/* ── Live Map / Placeholder ── */}
       <View style={styles.mapContainer}>
-        <TrackingLeafletMap
-          riderLocation={riderLocation}
-          customerLocation={customerLocation}
-          kitchenLocation={kitchenLocation}
-          riderHeading={heading}
-          initialLat={customerLocation?.lat ?? globalLocation?.latitude ?? 20.5937}
-          initialLng={customerLocation?.lng ?? globalLocation?.longitude ?? 78.9629}
-          initialZoom={customerLocation ? 15 : globalLocation ? 14 : 5}
-          onEtaUpdate={setEtaMins}
-          style={StyleSheet.absoluteFill}
-        />
+        {status === 'out_for_delivery' ? (
+          <TrackingLeafletMap
+            riderLocation={riderLocation}
+            customerLocation={customerLocation}
+            kitchenLocation={kitchenLocation}
+            riderHeading={heading}
+            initialLat={customerLocation?.lat ?? globalLocation?.latitude ?? 20.5937}
+            initialLng={customerLocation?.lng ?? globalLocation?.longitude ?? 78.9629}
+            initialZoom={customerLocation ? 15 : globalLocation ? 14 : 5}
+            onEtaUpdate={setEtaMins}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : (
+          <View style={styles.placeholderContainer}>
+            {(() => {
+              let Icon = ShoppingBag;
+              let title = 'Order Confirmed';
+              let sub = 'Restaurant has received your order';
+              if (status === 'preparing') { Icon = ChefHat; title = 'Preparing Food'; sub = 'The kitchen is preparing your order'; }
+              else if (status === 'ready_for_pickup') { Icon = Package; title = 'Ready for Pickup'; sub = 'Waiting for delivery partner'; }
+              else if (status === 'delivered') { Icon = CircleCheck; title = 'Order Delivered'; sub = 'Enjoy your meal!'; }
+              
+              return (
+                <View style={styles.placeholderContent}>
+                  <View style={styles.placeholderIconBox}>
+                    <Icon size={36} color={colors.primary} strokeWidth={2.5} />
+                  </View>
+                  <Text style={styles.placeholderTitle}>{title}</Text>
+                  <Text style={styles.placeholderSub}>{sub}</Text>
+                </View>
+              );
+            })()}
+          </View>
+        )}
         {/* Floating back button */}
         <BouncingButton
           style={[styles.backBtn, { top: insets.top + 12 }]}
@@ -476,8 +499,13 @@ export default OrderConfirmedScreen;
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f0ede9' },
 
-  // Map
+  // Map & Placeholder
   mapContainer: { height: '48%', backgroundColor: '#f0ede9' },
+  placeholderContainer: { flex: 1, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' },
+  placeholderContent: { alignItems: 'center', marginTop: -40 },
+  placeholderIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  placeholderTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 4 },
+  placeholderSub: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted },
 
   // Floating overlays on map
   backBtn: {
