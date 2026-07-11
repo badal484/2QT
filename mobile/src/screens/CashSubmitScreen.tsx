@@ -130,10 +130,6 @@ const CashSubmitScreen = ({ navigation }: any) => {
     }
   };
 
-  const copyUpiId = () => {
-    Clipboard.setString(upiId);
-    Alert.alert('Copied!', `${upiId} copied to clipboard.`);
-  };
 
   const handleDone = () => navigation.navigate('RiderTabs');
 
@@ -232,12 +228,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
               <View style={s.upiHeader}>
                 <Text style={s.upiHeaderLabel}>Send exactly</Text>
                 <Text style={s.upiHeaderAmount}>₹{totalRupees}</Text>
-                <View style={s.upiIdRow}>
-                  <Text style={s.upiId}>{upiId}</Text>
-                  <TouchableOpacity onPress={copyUpiId} style={s.copyBtn} activeOpacity={0.7}>
-                    <Copy size={14} color={R.blue} />
-                  </TouchableOpacity>
-                </View>
+                <Text style={s.upiId}>{upiId}</Text>
               </View>
 
               {!upiLaunched ? (
@@ -408,13 +399,7 @@ const s = StyleSheet.create({
   upiHeader: { alignItems: 'center', gap: 4 },
   upiHeaderLabel: { fontSize: 12, fontWeight: '700', color: R.blue, textTransform: 'uppercase', letterSpacing: 0.8 },
   upiHeaderAmount: { fontSize: 40, fontWeight: '900', color: R.ink, letterSpacing: -1.5 },
-  upiIdRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   upiId: { fontSize: 16, fontWeight: '700', color: R.blue },
-  copyBtn: {
-    width: 28, height: 28, borderRadius: 8, backgroundColor: '#DBEAFE',
-    alignItems: 'center', justifyContent: 'center',
-  },
-
   upiAppLabel: { fontSize: 12, fontWeight: '700', color: R.gray, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.6 },
   payNowBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
