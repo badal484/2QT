@@ -75,8 +75,8 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
 
   // Auto-assign overlay state
-  const [autoAssignedOrder, setAutoAssignedOrder] = useState<{ orderId: string; displayId: string } | null>(null);
-  const autoAssignedOrderRef = useRef<{ orderId: string; displayId: string } | null>(null);
+  const [autoAssignedOrder, setAutoAssignedOrder] = useState<{ orderId: string; displayId: string; batchDisplayId?: string } | null>(null);
+  const autoAssignedOrderRef = useRef<{ orderId: string; displayId: string; batchDisplayId?: string } | null>(null);
   const [autoAssignCountdown, setAutoAssignCountdown] = useState(30);
   const autoAssignTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -244,7 +244,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     setAutoAssignCountdown(30);
   }, []);
 
-  const showAutoAssign = useCallback((data: { orderId: string; displayId: string }) => {
+  const showAutoAssign = useCallback((data: { orderId: string; displayId: string; batchDisplayId?: string }) => {
     autoAssignedOrderRef.current = data;
     setAutoAssignedOrder(data);
     setAutoAssignCountdown(30);
@@ -322,9 +322,9 @@ const RiderHomeScreen = ({ navigation }: any) => {
       showNotification({ ...data, id: data.orderId, display_id: data.displayId, delivery_address_text: data.deliveryAddress || null, _kitchenAssigned: true });
     };
 
-    const autoAssignedHandler = (data: { orderId: string; displayId: string; optOutWindowMs: number }) => {
+    const autoAssignedHandler = (data: { orderId: string; displayId: string; batchDisplayId?: string; optOutWindowMs: number }) => {
       if (!isOnlineRef.current) return;
-      showAutoAssign({ orderId: data.orderId, displayId: data.displayId });
+      showAutoAssign({ orderId: data.orderId, displayId: data.displayId, batchDisplayId: data.batchDisplayId });
     };
 
     const dispatcherAlertHandler = async (data: { orderId: string; displayId: string }) => {
@@ -650,8 +650,19 @@ const RiderHomeScreen = ({ navigation }: any) => {
           </View>
           <View style={styles.notifBody}>
             <Text style={styles.notifOrderId}>{autoAssignedOrder.displayId}</Text>
+            {autoAssignedOrder.batchDisplayId ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <View style={{ backgroundColor: '#EDE9FE', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Text style={{ color: '#5B21B6', fontSize: 11, fontWeight: '800' }}>
+                    📦 BATCH · {autoAssignedOrder.batchDisplayId}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             <Text style={{ color: S.muted, fontSize: 13, marginBottom: 16, lineHeight: 18 }}>
-              This order has been assigned directly to you. It will lock in when the timer expires.
+              {autoAssignedOrder.batchDisplayId
+                ? 'Two orders from the same kitchen — pick up both in one trip.'
+                : 'This order has been assigned directly to you. It will lock in when the timer expires.'}
             </Text>
             <View style={styles.notifBtns}>
               <TouchableOpacity
