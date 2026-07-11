@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, Package, Clock, IndianRupee, CheckCircle2, XCircle, Navigation } from 'lucide-react-native';
+import { ArrowLeft, Package, IndianRupee, CheckCircle2, XCircle, Navigation } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const R = {
@@ -10,8 +10,9 @@ const R = {
   green: '#1BA672', greenLight: '#E8F8F1',
   red: '#EF4444', redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
-  ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  blue: '#3B82F6', blueLight: '#EFF6FF',
+  ink: '#1A1F1C', gray: '#6B7570', muted: '#9CA3A0',
+  border: '#E5E7EB', bg: '#F8F9FA', white: '#FFFFFF',
 };
 
 const TABS = ['All', 'Delivered', 'Cancelled'] as const;
@@ -19,7 +20,7 @@ const TABS = ['All', 'Delivered', 'Cancelled'] as const;
 const RiderHistoryScreen = ({ navigation }: any) => {
   const [tab, setTab] = useState<typeof TABS[number]>('All');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['rider-order-history'],
     queryFn: () => api.get('/riders/orders/history'),
   });
@@ -40,6 +41,16 @@ const RiderHistoryScreen = ({ navigation }: any) => {
     </View>
   );
 
+  if (isError) return (
+    <View style={s.loadingWrap}>
+      <Package size={40} color={R.border} />
+      <Text style={[s.emptyTitle, { marginTop: 16 }]}>Couldn't load history</Text>
+      <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 12, backgroundColor: R.orange, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }} activeOpacity={0.85}>
+        <Text style={{ color: R.white, fontWeight: '700', fontSize: 14 }}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor={R.white} />
@@ -55,29 +66,37 @@ const RiderHistoryScreen = ({ navigation }: any) => {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          
+          {/* Vibrant Compact Stats */}
+          <View style={s.statsWrapper}>
+            <View style={s.statCard}>
+              <View style={[s.statIconBox, { backgroundColor: R.greenLight }]}>
+                <Package size={16} color={R.green} />
+              </View>
+              <View>
+                <Text style={s.statVal}>{completed.length}</Text>
+                <Text style={s.statLbl}>Delivered</Text>
+              </View>
+            </View>
+            
+            <View style={s.statCard}>
+              <View style={[s.statIconBox, { backgroundColor: R.greenLight }]}>
+                <IndianRupee size={16} color={R.green} />
+              </View>
+              <View>
+                <Text style={[s.statVal, { color: R.green }]}>₹{(totalEarningsPaise / 100).toFixed(0)}</Text>
+                <Text style={s.statLbl}>Earned</Text>
+              </View>
+            </View>
 
-          {/* Stats */}
-          <View style={s.statsRow}>
             <View style={s.statCard}>
-              <View style={[s.statIcon, { backgroundColor: R.greenLight }]}>
-                <Package size={18} color={R.green} />
+              <View style={[s.statIconBox, { backgroundColor: R.blueLight }]}>
+                <Navigation size={16} color={R.blue} />
               </View>
-              <Text style={s.statVal}>{completed.length}</Text>
-              <Text style={s.statLbl}>Delivered</Text>
-            </View>
-            <View style={s.statCard}>
-              <View style={[s.statIcon, { backgroundColor: R.greenLight }]}>
-                <IndianRupee size={18} color={R.green} />
+              <View>
+                <Text style={s.statVal}>{totalDistanceKm.toFixed(1)} <Text style={{fontSize: 12}}>km</Text></Text>
+                <Text style={s.statLbl}>Distance</Text>
               </View>
-              <Text style={[s.statVal, { color: R.green }]}>₹{(totalEarningsPaise / 100).toFixed(0)}</Text>
-              <Text style={s.statLbl}>Earned</Text>
-            </View>
-            <View style={s.statCard}>
-              <View style={[s.statIcon, { backgroundColor: '#EFF6FF' }]}>
-                <Navigation size={18} color="#3B82F6" />
-              </View>
-              <Text style={s.statVal}>{totalDistanceKm.toFixed(1)} km</Text>
-              <Text style={s.statLbl}>Distance</Text>
             </View>
           </View>
 
@@ -105,90 +124,63 @@ const RiderHistoryScreen = ({ navigation }: any) => {
               </View>
             ) : shown.map((order: any) => {
               const isDelivered = order.status === 'delivered';
-              const isCOD = order.payment_method?.toLowerCase() === 'cod';
-              const duration = order.delivered_at && order.created_at
-                ? Math.round((new Date(order.delivered_at).getTime() - new Date(order.created_at).getTime()) / 60000)
-                : null;
-              const tipPaise = isDelivered ? parseInt(order.rider_tip_paise || '0', 10) : 0;
               const earningsPaise: number | null = isDelivered ? (order.earnings_paise ?? null) : null;
-              const distanceKm: number | null = isDelivered ? (order.distance_km ?? null) : null;
+              const dateStr = new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+              const timeStr = new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
               return (
-                <View key={order.id} style={s.card}>
-                  {/* Top row */}
-                  <View style={s.cardTop}>
-                    <View>
-                      <Text style={s.orderId}>{order.display_id}</Text>
-                      <Text style={s.orderDate}>
-                        {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        {' · '}
-                        {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Text>
+                <View key={order.id} style={s.listItem}>
+                  {/* Top Row: Icon + ID + Status */}
+                  <View style={s.itemTopRow}>
+                    <View style={s.itemTopLeft}>
+                      <View style={[s.iconBox, { backgroundColor: isDelivered ? R.greenLight : R.redLight }]}>
+                        {isDelivered ? <CheckCircle2 size={16} color={R.green} /> : <XCircle size={16} color={R.red} />}
+                      </View>
+                      <View>
+                        <Text style={s.orderId}>{order.display_id}</Text>
+                        <Text style={s.timeText}>{dateStr} • {timeStr}</Text>
+                      </View>
                     </View>
-                    <View style={[s.badge, { backgroundColor: isDelivered ? R.greenLight : R.redLight }]}>
-                      {isDelivered
-                        ? <CheckCircle2 size={12} color={R.green} />
-                        : <XCircle size={12} color={R.red} />}
-                      <Text style={[s.badgeText, { color: isDelivered ? R.green : R.red }]}>
-                        {isDelivered ? 'Delivered' : 'Cancelled'}
-                      </Text>
+                    <View style={s.itemTopRight}>
+                      {isDelivered ? (
+                        <Text style={s.earnText}>₹{(earningsPaise! / 100).toFixed(0)}</Text>
+                      ) : (
+                        <Text style={s.cancelText}>Cancelled</Text>
+                      )}
                     </View>
                   </View>
 
                   {/* Address */}
                   <View style={s.addressRow}>
                     <View style={s.addressDot} />
-                    <Text style={s.addressText} numberOfLines={1}>
-                      {order.delivery_address_text || 'Customer Location'}
-                    </Text>
+                    <Text style={s.addressText} numberOfLines={1}>{order.delivery_address_text || 'Customer Location'}</Text>
                   </View>
-
-                  {/* Items */}
-                  {order.items?.slice(0, 2).map((item: any, i: number) => (
-                    <Text key={i} style={s.itemText} numberOfLines={1}>
-                      {item.quantity}× {item.menu_item_name}
-                    </Text>
-                  ))}
-                  {(order.items?.length || 0) > 2 && (
-                    <Text style={s.itemMore}>+{order.items.length - 2} more</Text>
-                  )}
-
-                  {/* Distance + Earnings row — always shown for delivered orders */}
+                  
+                  {/* Colorful Tags Container */}
                   {isDelivered && (
-                    <View style={s.cardStatsRow}>
-                      <View style={s.statPill}>
-                        <Navigation size={12} color="#3B82F6" />
-                        <Text style={s.statPillTextBlue}>
-                          {distanceKm != null && distanceKm > 0
-                            ? distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`
-                            : '— km'}
-                        </Text>
-                      </View>
-                      <View style={s.statPill}>
-                        <IndianRupee size={12} color={R.green} />
-                        <Text style={s.statPillTextGreen}>
-                          {earningsPaise != null ? `₹${(earningsPaise / 100).toFixed(0)} earned` : '—'}
-                        </Text>
-                      </View>
-                      {tipPaise > 0 && (
-                        <View style={[s.statPill, { backgroundColor: R.amberLight }]}>
-                          <Text style={[s.statPillTextGreen, { color: R.amber }]}>+₹{(tipPaise / 100).toFixed(0)} tip</Text>
+                    <View style={s.tagsRow}>
+                      {order.distance_km != null && (
+                        <View style={[s.tag, { backgroundColor: R.blueLight }]}>
+                          <Navigation size={12} color={R.blue} />
+                          <Text style={[s.tagText, { color: R.blue }]}>{order.distance_km < 1 ? `${Math.round(order.distance_km * 1000)}m` : `${order.distance_km.toFixed(1)}km`}</Text>
+                        </View>
+                      )}
+                      {order.payment_method?.toLowerCase() === 'cod' ? (
+                        <View style={[s.tag, { backgroundColor: R.orangeLight }]}>
+                          <Text style={[s.tagText, { color: R.orange }]}>COD</Text>
+                        </View>
+                      ) : (
+                        <View style={[s.tag, { backgroundColor: R.greenLight }]}>
+                          <Text style={[s.tagText, { color: R.green }]}>Online</Text>
+                        </View>
+                      )}
+                      {parseInt(order.rider_tip_paise || '0') > 0 && (
+                        <View style={[s.tag, { backgroundColor: R.amberLight }]}>
+                          <Text style={[s.tagText, { color: R.amber }]}>+₹{(parseInt(order.rider_tip_paise) / 100).toFixed(0)} Tip</Text>
                         </View>
                       )}
                     </View>
                   )}
-
-                  {/* Footer */}
-                  <View style={s.cardFooter}>
-                    <View style={[s.payBadge, { backgroundColor: isCOD ? R.orangeLight : R.greenLight }]}>
-                      <Text style={[s.payText, { color: isCOD ? R.orange : R.green }]}>
-                        {isCOD ? 'COD' : 'Online'}
-                      </Text>
-                    </View>
-                    {duration != null && (
-                      <Text style={s.durText}><Clock size={11} color={R.muted} /> {duration} min</Text>
-                    )}
-                  </View>
                 </View>
               );
             })}
@@ -205,25 +197,28 @@ const s = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: R.white,
+    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: R.white,
     borderBottomWidth: 1, borderBottomColor: R.border,
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: R.bg,
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
   },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: R.ink },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: R.ink },
 
-  statsRow: { flexDirection: 'row', gap: 12, padding: 16 },
+  statsWrapper: {
+    flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 16, marginBottom: 16,
+  },
   statCard: {
-    flex: 1, backgroundColor: R.white, borderRadius: 16, padding: 16, alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    flex: 1, backgroundColor: R.white, borderRadius: 12, padding: 12,
+    borderWidth: 1, borderColor: R.border, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 4, elevation: 1,
+    flexDirection: 'column', gap: 8,
   },
-  statIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  statVal: { fontSize: 18, fontWeight: '800', color: R.ink },
-  statLbl: { fontSize: 11, color: R.muted, fontWeight: '600', marginTop: 2 },
+  statIconBox: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  statVal: { fontSize: 16, fontWeight: '800', color: R.ink },
+  statLbl: { fontSize: 11, fontWeight: '600', color: R.gray, marginTop: 2 },
 
-  tabRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 16 },
+  tabRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 12 },
   tab: {
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
     backgroundColor: R.white, borderWidth: 1, borderColor: R.border,
@@ -233,40 +228,34 @@ const s = StyleSheet.create({
   tabTextActive: { color: R.white, fontWeight: '700' },
 
   list: { paddingHorizontal: 16, gap: 12 },
-
-  empty: { alignItems: 'center', paddingVertical: 60, backgroundColor: R.white, borderRadius: 20, marginTop: 8 },
+  empty: { alignItems: 'center', paddingVertical: 60 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: R.ink, marginTop: 16 },
   emptyText: { fontSize: 13, color: R.muted, marginTop: 4 },
 
-  card: {
+  listItem: {
     backgroundColor: R.white, borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    borderWidth: 1, borderColor: R.border,
+    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 2,
   },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  orderId: { fontSize: 15, fontWeight: '800', color: R.ink },
-  orderDate: { fontSize: 12, color: R.muted, marginTop: 2 },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  badgeText: { fontSize: 11, fontWeight: '700' },
+  itemTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  itemTopLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconBox: {
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+  },
+  orderId: { fontSize: 15, fontWeight: '800', color: R.ink, marginBottom: 2 },
+  timeText: { fontSize: 12, color: R.gray, fontWeight: '500' },
+  
+  itemTopRight: { alignItems: 'flex-end', justifyContent: 'center' },
+  earnText: { fontSize: 18, fontWeight: '900', color: R.green },
+  cancelText: { fontSize: 13, fontWeight: '700', color: R.red },
 
-  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  addressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: R.orange },
-  addressText: { flex: 1, fontSize: 13, color: R.gray },
-
-  itemText: { fontSize: 12, color: R.muted, marginBottom: 2 },
-  itemMore: { fontSize: 12, color: R.orange, fontWeight: '600', marginTop: 2 },
-
-  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: R.border },
-  payBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  payText: { fontSize: 11, fontWeight: '700' },
-  durText: { fontSize: 12, color: R.muted, flex: 1 },
-  earnText: { fontSize: 14, fontWeight: '800', color: R.green },
-  distText: { fontSize: 12, color: '#3B82F6', fontWeight: '700' },
-  tipText: { fontSize: 13, fontWeight: '700', color: R.amber },
-
-  cardStatsRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 4, flexWrap: 'wrap' },
-  statPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F0F4FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  statPillTextBlue: { fontSize: 12, fontWeight: '700', color: '#3B82F6' },
-  statPillTextGreen: { fontSize: 12, fontWeight: '700', color: R.green },
+  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  addressDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: R.orange, marginLeft: 2 },
+  addressText: { flex: 1, fontSize: 13, color: R.ink, fontWeight: '500' },
+  
+  tagsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', borderTopWidth: 1, borderTopColor: R.border, paddingTop: 12 },
+  tag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  tagText: { fontSize: 12, fontWeight: '700' },
 });
 
 export default RiderHistoryScreen;

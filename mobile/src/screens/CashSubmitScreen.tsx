@@ -9,7 +9,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 
 const R = {
-  orange: '#FC8019', orangeLight: '#FFF3E8',
+  orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.08)',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
@@ -65,7 +65,7 @@ const CashSubmitScreen = ({ route, navigation }: any) => {
   const submitMutation = useMutation({
     mutationFn: () => api.post('/riders/submit-cash-to-finance', { orderId }),
     onSuccess: () => setSubmitted(true),
-    onError: (e: any) => Alert.alert('Error', e.message || 'Could not submit. Try again.'),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || e.message || 'Could not submit. Try again.'),
   });
 
   if (submitted) return <ConfirmedOverlay amount={amountRupees} onDone={handleDone} />;

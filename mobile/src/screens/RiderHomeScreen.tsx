@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StatusBar, Alert, Linking,
-  StyleSheet, Animated, Easing, Platform, PermissionsAndroid,
+  StyleSheet, Animated, Easing, Platform, PermissionsAndroid, Vibration,
 } from 'react-native';
 import { LeafletMap } from '../components/LeafletMap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -48,7 +48,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const [currentLocation, setCurrentLocation] = useState({ latitude: 28.6139, longitude: 77.2090 });
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const pendingOrderRef = useRef<any>(null);
-  const [acceptingKA] = useState(false);
   const [skippedIds, setSkippedIds] = useState<string[]>([]);
   const skippedIdsRef = useRef<string[]>([]);
 
@@ -174,14 +173,14 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const claimMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/riders/orders/${orderId}/claim`, {}),
     onSuccess: () => {
-      import('react-native').then(({ Vibration }) => Vibration.cancel());
+      Vibration.cancel();
       pendingOrderRef.current = null;
       setPendingOrder(null);
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       queryClient.invalidateQueries({ queryKey: ['rider-missions-pool'] });
     },
     onError: (err: any) => {
-      import('react-native').then(({ Vibration }) => Vibration.cancel());
+      Vibration.cancel();
       pendingOrderRef.current = null;
       setPendingOrder(null);
       if (err.message === 'RIDER_BUSY') {
@@ -197,13 +196,13 @@ const RiderHomeScreen = ({ navigation }: any) => {
     pendingOrderRef.current = order;
     setPendingOrder(order);
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 70, friction: 10 }).start();
-    import('react-native').then(({ Vibration }) => Vibration.vibrate([500, 500], true));
+    Vibration.vibrate([500, 500], true);
     displayLocalNotification('New Delivery Request', 'A new order is available. Tap to view.', { type: 'order_update' });
   };
 
   const hideNotification = () => {
     pendingOrderRef.current = null;
-    import('react-native').then(({ Vibration }) => Vibration.cancel());
+    Vibration.cancel();
     Animated.timing(slideAnim, { toValue: 400, useNativeDriver: true, duration: 250, easing: Easing.in(Easing.quad) }).start(() => setPendingOrder(null));
   };
 
@@ -221,7 +220,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     autoAssignedOrderRef.current = data;
     setAutoAssignedOrder(data);
     setAutoAssignCountdown(30);
-    import('react-native').then(({ Vibration }) => Vibration.vibrate([300, 200, 300], false));
+    Vibration.vibrate([300, 200, 300], false);
     displayLocalNotification("You've been assigned an order", `Order ${data.displayId} - tap to view.`, { type: 'order_update' });
 
     if (autoAssignTimerRef.current) clearInterval(autoAssignTimerRef.current);
@@ -403,7 +402,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
         },
         (err) => {
           console.log('[Geolocation Error]', err);
-          Alert.alert('GPS Error', 'Failed to get location: ' + err.message);
+          Alert.alert('Location Error', 'Unable to get your location. Check that GPS is enabled and location permission is granted.');
         },
         { enableHighAccuracy: true, distanceFilter: 5, interval: 4000, timeout: 15000, maximumAge: 10000 },
       );
@@ -643,7 +642,11 @@ const RiderHomeScreen = ({ navigation }: any) => {
                 onPress={async () => {
                   const orderId = autoAssignedOrder.orderId;
                   clearAutoAssign();
-                  try { await api.post(`/riders/orders/${orderId}/mark-unavailable`, {}); } catch {}
+                  try {
+                    await api.post(`/riders/orders/${orderId}/mark-unavailable`, {});
+                  } catch {
+                    Alert.alert('Error', 'Could not update status. Please try again.');
+                  }
                 }}
                 activeOpacity={0.7}
               >
@@ -724,7 +727,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
                 style={[
                   styles.acceptBtn,
                   { flex: 1 },
-                  (claimMutation.isPending || acceptingKA) && { opacity: 0.6 },
+                  claimMutation.isPending && { opacity: 0.6 },
                   pendingOrder._kitchenAssigned && { backgroundColor: '#E67E22' },
                 ]}
                 onPress={async () => {
@@ -736,7 +739,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
                     claimMutation.mutate(pendingOrder.id);
                   }
                 }}
-                disabled={claimMutation.isPending || acceptingKA}
+                disabled={claimMutation.isPending}
                 activeOpacity={0.9}
               >
                 {pendingOrder._kitchenAssigned
