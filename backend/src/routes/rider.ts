@@ -439,7 +439,8 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         await client.query('UPDATE users SET current_order_id = NULL WHERE id = $1', [riderId]);
         
         const isCOD = order.payment_method === 'cod';
-        const cashToRecord = isCOD ? order.total_amount_paise : 0;
+        // Only record cash when rider actually has physical cash (UPI-at-door already settles payment)
+        const cashToRecord = isCOD && !order.cod_cash_collected ? order.total_amount_paise : 0;
 
         // Systematic Financial Split — use only real Google Maps road distance for earnings
         // If not yet computed (order placed before feature), distance = 0, no km bonus
@@ -1054,8 +1055,13 @@ router.post('/confirm-door-payment', authenticate, requireRole('rider', 'rider_c
                  WHERE id = $1`,
                 [orderId]
             );
+        } else {
+            // Cash: record when rider collected from customer (finance uses this to reconcile timing)
+            await query(
+                'UPDATE orders SET cod_rider_collected_at = COALESCE(cod_rider_collected_at, NOW()) WHERE id = $1',
+                [orderId]
+            );
         }
-        // For 'cash': no update needed — already cod_pending from order placement
 
         res.json({ success: true, method });
     } catch (err) {
@@ -1086,10 +1092,19 @@ router.post('/submit-cash-to-finance', authenticate, requireRole('rider', 'rider
         if (order.status !== 'delivered') return res.status(400).json({ error: 'Order not yet delivered' });
         if (order.cod_cash_collected) return res.status(409).json({ error: 'Cash already confirmed by finance' });
 
+        // Idempotent — only stamp the first time
         await query(
-            'UPDATE orders SET cash_submit_requested_at = NOW() WHERE id = $1',
+            'UPDATE orders SET cash_submit_requested_at = COALESCE(cash_submit_requested_at, NOW()) WHERE id = $1',
             [orderId]
         );
+
+        // Real-time alert to finance dashboard
+        emitToAdmin('cash_submitted', {
+            orderId,
+            displayId: order.display_id,
+            riderId,
+            amountPaise: order.total_amount_paise,
+        });
 
         res.json({
             success: true,
