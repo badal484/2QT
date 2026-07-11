@@ -5,6 +5,7 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToKitchen, emitToRiders, emitToAdmin, emitToOrder, emitToAll } from '../socket';
 import { NotificationService } from '../services/notification.service';
 import { haversineMetres } from '../services/distance.service';
+import { autoAssignOrder } from '../services/autoAssign';
 import { redis, keys } from '../redis';
 import { sendFCM } from '../services/fcm.service';
 
@@ -234,11 +235,12 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         if (status === 'preparing') {
             notificationType = 'order_preparing';
 
-            const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
-            const autoDispatchEnabled = settings[0]?.value === 'true';
+            // Check zone dispatch mode — auto zones hold pool broadcast until ready_for_pickup
+            const { rows: zoneRows } = await query('SELECT dispatch_mode FROM zones WHERE id = $1', [order.zone_id]);
+            const isAutoZone = zoneRows[0]?.dispatch_mode === 'auto';
 
-            if (!autoDispatchEnabled) {
-                // Alert ALL online riders (no zone filter) — pool query handles zone filtering per-rider
+            if (!isAutoZone) {
+                // Manual mode: broadcast immediately at preparing so riders can head to kitchen
                 emitToRiders('new_available_mission', { orderId: id, displayId: order.display_id, status: 'preparing' });
 
                 query(`
@@ -271,6 +273,12 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
                 kitchenId: order.kitchen_id,
                 zoneId: order.zone_id,
             }, { delay: 3 * 60 * 1000 }).catch(() => {});
+
+            // Auto-assign zone: fire-and-forget assignment at pickup readiness
+            const { rows: zoneRows } = await query('SELECT dispatch_mode FROM zones WHERE id = $1', [order.zone_id]);
+            if (zoneRows[0]?.dispatch_mode === 'auto') {
+                autoAssignOrder(id).catch(() => {});
+            }
         }
         if (notificationType) {
             NotificationService.send(notificationType as any, {

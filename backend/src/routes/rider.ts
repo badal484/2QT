@@ -4,6 +4,7 @@ import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest, invalidateUserCache } from '../middleware/auth';
 import { emitToUser, emitToRiders, emitToAdmin, emitToOrder, emitToKitchen } from '../socket';
+import { unassignAndReassign } from '../services/autoAssign';
 import { invoicesQueue } from '../jobs/queues';
 import { NotificationService } from '../services/notification.service';
 import { scheduleTriggerSend, cancelTriggerJobs } from '../services/trigger.service';
@@ -235,6 +236,19 @@ router.post('/offline', authenticate, requireRole('rider', 'rider_captain', 'sup
         res.json({ success: true });
     } catch (err) {
         console.error('[offline]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// Rider opts out of an auto-assigned order within the 30s window
+router.post('/orders/:id/mark-unavailable', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { id: orderId } = req.params;
+    try {
+        await unassignAndReassign(orderId, riderId);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[mark-unavailable]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });
