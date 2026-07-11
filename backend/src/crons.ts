@@ -314,7 +314,7 @@ export const initCrons = () => {
                 FROM orders o
                 JOIN addresses a ON o.address_id = a.id
                 JOIN kitchens k ON o.kitchen_id = k.id
-                WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL
+                WHERE o.status IN ('confirmed', 'preparing', 'ready_for_pickup') AND o.rider_id IS NULL
                 ORDER BY o.created_at ASC
             `);
 
@@ -356,12 +356,11 @@ export const initCrons = () => {
                     const kLat = parseFloat(firstOrder.kitchen_lat);
                     const kLng = parseFloat(firstOrder.kitchen_lng);
 
-                    // Fetch all online riders
                     const { rows: riders } = await query(`
                         SELECT u.id,
                                (SELECT count(*) FROM orders o WHERE o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')) as active_count
                         FROM users u
-                        WHERE u.role IN ('rider', 'rider_captain') AND u.is_online = true
+                        WHERE u.role IN ('rider', 'rider_captain', 'super_admin') AND u.is_online = true
                     `);
 
                     let bestRiderId = null;
@@ -394,10 +393,10 @@ export const initCrons = () => {
                         for (const order of batch.orders) {
                             const { rowCount } = await query(`
                                 UPDATE orders SET rider_id = $1
-                                WHERE id = $2 AND rider_id IS NULL AND status = 'ready_for_pickup'
+                                WHERE id = $2 AND rider_id IS NULL AND status IN ('confirmed', 'preparing', 'ready_for_pickup')
                             `, [bestRiderId, order.id]);
 
-                            if (rowCount > 0) {
+                            if ((rowCount ?? 0) > 0) {
                                 emitToUser(bestRiderId, 'order_assigned', {
                                     orderId: order.id,
                                     displayId: order.display_id,
