@@ -137,6 +137,10 @@ router.post('/tickets/:id/reply', supportAccess, supportRole, async (req: AuthRe
         if (!tickets[0]) return res.status(404).json({ error: 'TICKET_NOT_FOUND' });
         const ticket = tickets[0];
 
+        // Fetch agent name
+        const { rows: agentRows } = await query('SELECT name FROM users WHERE id = $1', [agentId]);
+        const agentName = agentRows[0]?.name || 'Support Team';
+
         // Insert message
         const { rows: msgRows } = await query(
             `INSERT INTO ticket_messages (ticket_id, sender_id, sender_type, message)
@@ -162,12 +166,15 @@ router.post('/tickets/:id/reply', supportAccess, supportRole, async (req: AuthRe
         const isRider = !!ticket.rider_id;
         if (userId) {
             emitToUser(userId, 'ticket_replied', { ticketId: id, message: message.trim() });
-            NotificationService.send('broadcast_message', {
+            NotificationService.send('chat_message', {
                 userId,
                 title: 'Support Team Replied',
                 body: message.trim().substring(0, 80),
                 screen: isRider ? 'RiderSupportTicketDetail' : 'SupportTicketDetail',
                 ticketId: id,
+                senderName: agentName,
+                message: message.trim(),
+                timestamp: msgRows[0]?.created_at?.toISOString() || new Date().toISOString()
             }).catch(() => {});
         }
 

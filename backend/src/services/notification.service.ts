@@ -9,7 +9,7 @@ export type NotifType =
     | 'order_confirmed' | 'order_preparing' | 'order_ready'
     | 'order_out_for_delivery' | 'order_delivered' | 'order_cancelled'
     | 'rider_payout' | 'kitchen_payout' | 'low_subscription_meals'
-    | 'rider_verified' | 'cash_submitted' | 'broadcast_message'
+    | 'rider_verified' | 'cash_submitted' | 'broadcast_message' | 'chat_message'
     | 'low_stock_alert' | 'rider_guarantee_payout' | 'renewal_reminder' | 'generic_sms';
 
 const PROMO_TYPES   = new Set(['broadcast_message', 'winback', 'birthday', 'flash_sale', 'renewal_reminder']);
@@ -32,6 +32,7 @@ const FALLBACK_TEMPLATES: Record<string, { title_template: string; body_template
     broadcast_message:      { title_template: '{{title}}', body_template: '{{body}}', channels: ['push', 'whatsapp'] },
     cash_submitted:         { title_template: 'Cash Submission', body_template: 'Rider {{riderName}} submitted ₹{{amount}} cash for Order #{{displayId}}.', channels: ['push'] },
     generic_sms:            { title_template: '{{title}}', body_template: '{{message}}', channels: ['whatsapp'] },
+    chat_message:           { title_template: '{{title}}', body_template: '{{senderName}}: {{message}}', channels: ['push'] },
 };
 
 // ─── Template cache ───────────────────────────────────────────────────────────
@@ -260,7 +261,7 @@ async function sendSMS(phone: string, message: string) {
 
 export class NotificationService {
     static async send(type: NotifType, data: any) {
-        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl, screen, bookingId } = data;
+        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl, screen, bookingId, ticketId, senderName, timestamp } = data;
         await sendNotification(type, {
             userId: userId || undefined,
             phone: phone || undefined,
@@ -278,6 +279,9 @@ export class NotificationService {
                 body:       String(body        ?? ''),
                 screen:     String(screen      ?? ''),
                 bookingId:  String(bookingId   ?? ''),
+                ticketId:   String(ticketId    ?? ''),
+                senderName: String(senderName  ?? ''),
+                timestamp:  String(timestamp   ?? ''),
             },
             dedupeKey: displayId || undefined,
             imageUrl:  imageUrl  || undefined,

@@ -57,13 +57,15 @@ export async function sendFCM(
     if (!a) return 'skipped';
 
     try {
+        const isChat = data.type === 'chat_message';
+
         await getMessaging(a).send({
             token,
-            notification: { title, body, imageUrl: imageUrl || undefined },
+            ...(isChat ? {} : { notification: { title, body, imageUrl: imageUrl || undefined } }),
             data,
             android: {
                 priority: 'high',
-                notification: { sound: 'default', channelId: 'order_updates', imageUrl: imageUrl || undefined },
+                ...(isChat ? {} : { notification: { sound: 'default', channelId: 'order_updates', imageUrl: imageUrl || undefined } }),
             },
             apns: {
                 payload: { aps: { alert: { title, body }, sound: 'default', badge: 1 } },
