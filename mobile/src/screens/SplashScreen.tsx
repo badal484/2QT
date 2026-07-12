@@ -101,7 +101,7 @@ const SplashScreen = () => {
       </Animated.View>
 
       {/* Subtitle */}
-      <Animated.View style={[styles.subtitleContainer, subtitleStyle]}>
+      <Animated.View style={[styles.subtitleContainer, subtitleStyle, { bottom: height * 0.12 }]}>
         <Text style={styles.subtitle}>Premium Culinary Experience</Text>
       </Animated.View>
     </View>
@@ -164,7 +164,6 @@ const styles = StyleSheet.create({
   },
   subtitleContainer: {
     position: 'absolute',
-    bottom: height * 0.12,
     alignItems: 'center',
   },
   subtitle: {
