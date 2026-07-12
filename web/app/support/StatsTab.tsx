@@ -21,7 +21,7 @@ interface Agent {
   id: string;
   name: string;
   phone: string;
-  open_tickets?: number;
+  open_count?: number;
 }
 
 interface StatCardProps {
@@ -111,7 +111,7 @@ export default function StatsTab() {
     },
     {
       label: "Avg Resolution",
-      value: stats ? `${stats.avg_resolution_hours.toFixed(1)}h` : "—",
+      value: stats ? `${(stats.avg_resolution_hours ?? 0).toFixed(1)}h` : "—",
       sub: "Average time to resolve",
       icon: Clock,
       color: "text-violet-400",
@@ -210,7 +210,7 @@ export default function StatsTab() {
                   <p className="text-xs text-zinc-600">{agent.phone}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-white">{agent.open_tickets ?? 0}</p>
+                  <p className="text-sm font-bold text-white">{agent.open_count ?? 0}</p>
                   <p className="text-[10px] text-zinc-600">open tickets</p>
                 </div>
               </div>

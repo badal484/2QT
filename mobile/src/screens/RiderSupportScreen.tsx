@@ -493,7 +493,7 @@ const OrderPicker = ({
 }) => {
   const { data, isLoading } = useQuery({
     queryKey: ['rider-delivered-orders-mini'],
-    queryFn: () => api.get('/riders/orders?status=delivered&limit=10'),
+    queryFn: () => api.get('/riders/orders/history'),
     staleTime: 60_000,
   });
 

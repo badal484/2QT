@@ -302,9 +302,11 @@ router.get('/sos-alerts', supportAccess, supportRole, async (req: AuthRequest, r
         const { rows } = await query(`
             SELECT s.*,
                    u.name AS rider_name,
-                   u.phone AS rider_phone
+                   u.phone AS rider_phone,
+                   o.display_id AS order_display_id
             FROM sos_alerts s
             LEFT JOIN users u ON u.id = s.rider_id
+            LEFT JOIN orders o ON o.id = s.order_id
             ORDER BY
                 CASE WHEN s.status = 'active' THEN 0 ELSE 1 END ASC,
                 s.created_at DESC

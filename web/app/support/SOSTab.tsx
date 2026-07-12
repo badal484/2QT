@@ -15,8 +15,8 @@ interface SOSAlert {
   rider_name: string;
   rider_phone: string;
   alert_type: string;
-  latitude: number | null;
-  longitude: number | null;
+  lat: number | null;
+  lng: number | null;
   order_id: string | null;
   order_display_id: string | null;
   status: "active" | "resolved";
@@ -179,9 +179,9 @@ export default function SOSTab() {
                           <span className="flex items-center gap-1">
                             <Phone className="w-3 h-3" /> {alert.rider_phone}
                           </span>
-                          {alert.latitude && alert.longitude && (
+                          {alert.lat && alert.lng && (
                             <a
-                              href={`https://maps.google.com/?q=${alert.latitude},${alert.longitude}`}
+                              href={`https://maps.google.com/?q=${alert.lat},${alert.lng}`}
                               target="_blank"
                               rel="noreferrer"
                               onClick={e => e.stopPropagation()}
