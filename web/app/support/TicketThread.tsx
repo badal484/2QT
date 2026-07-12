@@ -95,6 +95,10 @@ export function TicketThread({ ticketId, onClose }: Props) {
   const [showResolutionInput, setShowResolutionInput] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingPriority, setUpdatingPriority] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [priorityOpen, setPriorityOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const priorityRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -129,6 +133,16 @@ export function TicketThread({ ticketId, onClose }: Props) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) setStatusOpen(false);
+      if (priorityRef.current && !priorityRef.current.contains(e.target as Node)) setPriorityOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const sendReply = async () => {
     if (!reply.trim()) return;
@@ -287,51 +301,58 @@ export function TicketThread({ ticketId, onClose }: Props) {
       {/* Action bar */}
       <div className="px-5 py-3 border-b border-white/[0.05] flex items-center gap-2 flex-wrap">
         {/* Status dropdown */}
-        <div className="relative group">
+        <div className="relative" ref={statusRef}>
           <button
             disabled={updatingStatus}
+            onClick={() => { setStatusOpen(o => !o); setPriorityOpen(false); }}
             className="flex items-center gap-1.5 bg-white/[0.06] hover:bg-white/10 border border-white/10 text-white/70 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
           >
             {updatingStatus ? <RefreshCw className="w-3 h-3 animate-spin" /> : null}
             {STATUS_OPTIONS.find(s => s.value === ticket.status)?.label ?? ticket.status}
             <ChevronDown className="w-3 h-3" />
           </button>
-          <div className="absolute top-full left-0 mt-1 bg-[#141420] border border-white/10 rounded-xl shadow-xl py-1 z-20 hidden group-hover:block min-w-[150px]">
-            {STATUS_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => {
-                  if (opt.value === "resolved") setShowResolutionInput(true);
-                  else changeStatus(opt.value);
-                }}
-                className="w-full text-left px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/5 transition-colors"
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          {statusOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-[#141420] border border-white/10 rounded-xl shadow-xl py-1 z-20 min-w-[150px]">
+              {STATUS_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setStatusOpen(false);
+                    if (opt.value === "resolved") setShowResolutionInput(true);
+                    else changeStatus(opt.value);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Priority dropdown */}
-        <div className="relative group">
+        <div className="relative" ref={priorityRef}>
           <button
             disabled={updatingPriority}
+            onClick={() => { setPriorityOpen(o => !o); setStatusOpen(false); }}
             className="flex items-center gap-1.5 bg-white/[0.06] hover:bg-white/10 border border-white/10 text-white/70 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
           >
             Priority: {ticket.priority}
             <ChevronDown className="w-3 h-3" />
           </button>
-          <div className="absolute top-full left-0 mt-1 bg-[#141420] border border-white/10 rounded-xl shadow-xl py-1 z-20 hidden group-hover:block min-w-[120px]">
-            {PRIORITY_OPTIONS.map(p => (
-              <button
-                key={p}
-                onClick={() => changePriority(p)}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors ${PRIORITY_COLORS[p]}`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
+          {priorityOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-[#141420] border border-white/10 rounded-xl shadow-xl py-1 z-20 min-w-[120px]">
+              {PRIORITY_OPTIONS.map(p => (
+                <button
+                  key={p}
+                  onClick={() => { setPriorityOpen(false); changePriority(p); }}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors ${PRIORITY_COLORS[p]}`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Assign to self */}
