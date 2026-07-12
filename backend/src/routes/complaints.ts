@@ -145,8 +145,14 @@ router.post('/:id/resolve', authenticate, requireRole('super_admin', 'admin'), a
                 ? complaint.total_amount_paise
                 : refund_scope === 'partial' ? refund_amount_paise : 0;
 
-            // COD cash recovery: deduct from rider's next payout regardless of refund path
-            if (refundPaise > 0 && complaint.is_cod_cash_order && complaint.rider_id) {
+            // COD cash recovery: only deduct from rider if cash is STILL with them.
+            // If cod_cash_collected=TRUE the rider already handed the cash to finance,
+            // so admin holds the money and no rider deduction is needed.
+            const cashStillWithRider = complaint.payment_method === 'cod'
+                && !complaint.cod_cash_collected
+                && complaint.rider_id;
+
+            if (refundPaise > 0 && cashStillWithRider) {
                 await client.query(
                     'UPDATE order_complaints SET cod_cash_deduction_pending = true WHERE id = $1', [id]
                 );
