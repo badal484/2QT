@@ -467,7 +467,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         const bonusPaise = tipPaise;
         const netEarnings = Math.floor(baseEarnings * surgeMultiplier) + bonusPaise - platformFee;
 
-        console.log("[VERIFY-OTP] Updating earnings...", { netEarnings, tipPaise, distanceBonus });
+        console.log("[VERIFY-OTP] Updating earnings...", { netEarnings, tipPaise, baseEarnings });
         await client.query(`
             INSERT INTO rider_daily_earnings (
                 rider_id, date, deliveries_count,
@@ -480,7 +480,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
                 bonus_earnings_paise = COALESCE(rider_daily_earnings.bonus_earnings_paise, 0) + $4,
                 total_paise = rider_daily_earnings.total_paise + $5,
                 cash_collected_paise = COALESCE(rider_daily_earnings.cash_collected_paise, 0) + $2
-        `, [riderId, cashToRecord, basePay, bonusPaise, netEarnings]);
+        `, [riderId, cashToRecord, baseEarnings, bonusPaise, netEarnings]);
 
         console.log("[VERIFY-OTP] Transaction done.");
     });
