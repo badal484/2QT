@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { OtpBoxInput } from "../components/ui/OtpBoxInput";
 import dynamic from "next/dynamic";
 
 const OverviewTab = dynamic(() => import("./OverviewTab").then(m => ({ default: m.OverviewTab })), { ssr: false });
@@ -128,19 +129,17 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
               </button>
             </motion.form>
           ) : (
-            <motion.form key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={verifyOTP} className="space-y-4">
+            <motion.form key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={verifyOTP} className="space-y-5">
               <div>
-                <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">OTP Code</label>
-                <input
-                  type="text"
+                <label className="text-xs text-white/40 font-semibold uppercase tracking-wider block mb-3">OTP Code</label>
+                <OtpBoxInput
                   value={otp}
-                  onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="• • • • • •"
-                  autoComplete="one-time-code"
-                  className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 placeholder:text-white/20 tracking-[0.4em] text-center font-mono text-lg"
+                  onChange={setOtp}
+                  onComplete={val => { setOtp(val); }}
+                  accentColor="border-emerald-500"
                 />
               </div>
-              <button type="submit" disabled={loading || otp.length < 4}
+              <button type="submit" disabled={loading || otp.replace(/\s/g,"").length < 4}
                 className="w-full py-3.5 rounded-xl bg-emerald-500 text-white font-black text-sm hover:bg-emerald-400 transition-colors disabled:opacity-40">
                 {loading ? "Verifying..." : "Verify & Sign In"}
               </button>

@@ -9,6 +9,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { OtpBoxInput } from "../components/ui/OtpBoxInput";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (paise: number | string) =>
@@ -96,11 +97,15 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
                 </button>
               </motion.form>
             ) : (
-              <motion.form key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={verifyOTP} className="space-y-4">
+              <motion.form key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={verifyOTP} className="space-y-5">
                 <div>
-                  <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">OTP Code</label>
-                  <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="• • • • • •"
-                    className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[#F97316]/50 placeholder:text-white/20 tracking-[0.4em] text-center font-mono text-lg" />
+                  <label className="text-xs text-white/40 font-semibold uppercase tracking-wider block mb-3">OTP Code</label>
+                  <OtpBoxInput
+                    value={otp}
+                    onChange={setOtp}
+                    onComplete={val => { setOtp(val); }}
+                    accentColor="border-[#F97316]"
+                  />
                 </div>
                 {devOtp && (
                   <div className="px-4 py-3 rounded-xl bg-[#F97316]/10 border border-[#F97316]/20 text-center">
@@ -108,7 +113,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
                     <p className="text-xl font-mono text-[#F97316] tracking-widest">{devOtp}</p>
                   </div>
                 )}
-                <button type="submit" disabled={loading || otp.length < 4}
+                <button type="submit" disabled={loading || otp.replace(/\s/g,"").length < 4}
                   className="w-full py-3.5 rounded-xl bg-[#F97316] text-white font-black text-sm hover:bg-[#ea6c08] transition-colors disabled:opacity-40">
                   {loading ? "Verifying..." : "Verify & Sign In"}
                 </button>
