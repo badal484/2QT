@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Plus, X, RefreshCw, ShieldCheck, IndianRupee, UserX, Phone, ChefHat, Bike } from "lucide-react";
+import { Users, Plus, X, RefreshCw, ShieldCheck, IndianRupee, UserX, Phone, ChefHat, Bike, Headphones } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -16,6 +16,7 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; icon
   rider:           { label: "Rider",            color: "text-yellow-400",  bg: "bg-yellow-400/10",  icon: Bike },
   rider_captain:   { label: "Rider Captain",    color: "text-amber-400",   bg: "bg-amber-400/10",   icon: Bike },
   dine_in_staff:   { label: "Dine-in Staff",    color: "text-amber-300",   bg: "bg-amber-300/10",   icon: ChefHat },
+  support:         { label: "Support",          color: "text-sky-400",     bg: "bg-sky-400/10",     icon: Headphones },
 };
 
 const ROLE_LOGIN_URL: Record<string, string> = {
@@ -27,12 +28,13 @@ const ROLE_LOGIN_URL: Record<string, string> = {
   rider:           "Rider mobile app",
   rider_captain:   "Rider mobile app",
   dine_in_staff:   "2-qt.vercel.app/restaurant",
+  support:         "2-qt.vercel.app/support",
 };
 
 function AddUserModal({ open, onAdd, onClose, kitchens }: any) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"finance" | "admin" | "chef" | "kitchen_manager" | "rider" | "dine_in_staff">("finance");
+  const [role, setRole] = useState<"finance" | "admin" | "chef" | "kitchen_manager" | "rider" | "dine_in_staff" | "support">("finance");
   const [kitchenId, setKitchenId] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -101,7 +103,7 @@ function AddUserModal({ open, onAdd, onClose, kitchens }: any) {
           <div>
             <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Role</label>
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {(["finance", "admin", "chef", "kitchen_manager", "rider", "dine_in_staff"] as const).map(r => {
+              {(["finance", "admin", "chef", "kitchen_manager", "rider", "dine_in_staff", "support"] as const).map(r => {
                 const m = ROLE_META[r];
                 return (
                   <button
@@ -126,6 +128,7 @@ function AddUserModal({ open, onAdd, onClose, kitchens }: any) {
               {role === "chef" && "Logs in at /kitchen — KDS only (order flow)"}
               {role === "kitchen_manager" && "Logs in at /kitchen — KDS + Dispatch (assign riders)"}
               {role === "rider" && "Logs in via the Rider mobile app"}
+              {role === "support" && "Accesses /support dashboard — tickets, SOS alerts, refund decisions"}
             </p>
           </div>
 
@@ -211,10 +214,11 @@ export function TeamTab() {
     }
   };
 
-  const financeUsers = users.filter(u => u.role === "finance");
-  const adminUsers = users.filter(u => ["admin", "super_admin"].includes(u.role));
-  const kitchenUsers = users.filter(u => ["chef", "kitchen_manager"].includes(u.role));
-  const riderUsers = users.filter(u => ["rider", "rider_captain"].includes(u.role));
+  const financeUsers  = users.filter(u => u.role === "finance");
+  const adminUsers    = users.filter(u => ["admin", "super_admin"].includes(u.role));
+  const kitchenUsers  = users.filter(u => ["chef", "kitchen_manager"].includes(u.role));
+  const riderUsers    = users.filter(u => ["rider", "rider_captain"].includes(u.role));
+  const supportUsers  = users.filter(u => u.role === "support");
 
   return (
     <div className="p-6 space-y-6">
@@ -257,6 +261,13 @@ export function TeamTab() {
           <div>
             <div className="text-sm font-bold text-yellow-400">Riders</div>
             <div className="text-xs text-white/40 mt-0.5">Login via <span className="font-mono text-white/60">Rider App</span> · Phone + OTP</div>
+          </div>
+        </div>
+        <div className="bg-sky-500/5 border border-sky-500/15 rounded-2xl p-4 flex gap-3">
+          <Headphones className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="text-sm font-bold text-sky-400">Support</div>
+            <div className="text-xs text-white/40 mt-0.5">Login at <span className="font-mono text-white/60">/support</span> · Phone + OTP</div>
           </div>
         </div>
       </div>
@@ -329,6 +340,25 @@ export function TeamTab() {
             ) : (
               <div className="space-y-2">
                 {riderUsers.map(u => (
+                  <UserRow key={u.id} user={u} onDeactivate={handleDeactivate} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Support Team */}
+          <div>
+            <div className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">Support Team ({supportUsers.length})</div>
+            {supportUsers.length === 0 ? (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+                <Headphones className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                <p className="text-white/30 text-sm">No support agents yet.</p>
+                <p className="text-white/20 text-xs mt-1">Support agents log in at /support using phone + OTP</p>
+                <button onClick={() => setShowAdd(true)} className="text-sky-400 text-sm font-bold mt-2 hover:underline">Add agent →</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {supportUsers.map(u => (
                   <UserRow key={u.id} user={u} onDeactivate={handleDeactivate} />
                 ))}
               </div>
