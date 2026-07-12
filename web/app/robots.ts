@@ -17,7 +17,6 @@ export default function robots(): MetadataRoute.Robots {
           "/rider/*",
           "/profile",
           "/profile/*",
-          "/orders",
           "/orders/*",
           "/login",
           "/api/*",

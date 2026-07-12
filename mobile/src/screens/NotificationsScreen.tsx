@@ -98,7 +98,7 @@ const NotificationsScreen = ({ navigation }: any) => {
           <ArrowLeft size={20} color={colors.ink} />
         </BouncingButton>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Notifications</Text>
+          <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>Notifications</Text>
           {unreadCount > 0 && (
             <Text style={styles.headerSub}>{unreadCount} unread</Text>
           )}
@@ -204,14 +204,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: colors.ink },
+  headerTitle: { fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink },
   headerSub: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.primary, marginTop: 2 },
   markAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 16, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 24, backgroundColor: colors.primaryTint,
   },
-  markAllText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary },
+  markAllText: { fontSize: 12, fontFamily: fontFamily.bold, color: colors.primary },
 
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
