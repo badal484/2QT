@@ -43,6 +43,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState("");
   const [loading, setLoading] = useState(false);
 
   const sendOTP = async (e: React.FormEvent) => {
@@ -51,7 +52,8 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
     if (digits.length < 10) return toast.error("Enter a valid phone number");
     setLoading(true);
     try {
-      await api.sendOtp(digits);
+      const data = await api.sendOtp(digits);
+      if (data?.devOtp) { setOtp(data.devOtp); setDevOtp(data.devOtp); }
       setStep("otp");
       toast.success("OTP sent");
     } catch (err: any) {
@@ -130,6 +132,12 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
             </motion.form>
           ) : (
             <motion.form key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={verifyOTP} className="space-y-5">
+              {devOtp && (
+                <div className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <p className="text-xs text-white/40 uppercase tracking-widest font-bold mb-1">SMS not configured — your OTP</p>
+                  <p className="text-2xl font-black tracking-[0.5em] text-emerald-400">{devOtp}</p>
+                </div>
+              )}
               <div>
                 <label className="text-xs text-white/40 font-semibold uppercase tracking-wider block mb-3">OTP Code</label>
                 <OtpBoxInput
