@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, Dimensions, ActivityIndicator, Image, RefreshControl, Animated as RNAnimated, PanResponder } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, useWindowDimensions, ActivityIndicator, Image, RefreshControl, Animated as RNAnimated, PanResponder } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,7 +22,6 @@ import { radius, spacing } from '../theme/spacing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentDeviceToken } from '../services/push';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const hapticOptions = {
   enableVibrateFallback: true,
@@ -30,6 +29,7 @@ const hapticOptions = {
 };
 
 const HomeScreen = ({ navigation }: any) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const { user } = useSelector((state: RootState) => state.auth);
   const { items: cartItems, zoneId, addressId } = useSelector((state: RootState) => state.cart);
   const dispatch = useDispatch();

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Animated, Dimensions
+  Animated
 } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { ArrowLeft, Navigation, MapPin, Search } from 'lucide-react-native';
@@ -11,7 +11,6 @@ import { api } from '../api/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BOTTOM_SHEET_HEIGHT = 160;
 
 interface Props {

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, Image, TouchableOpacity, StyleSheet,
-  Dimensions, StatusBar, ActivityIndicator, FlatList, Modal,
+  useWindowDimensions, StatusBar, ActivityIndicator, FlatList, Modal,
   NativeScrollEvent, NativeSyntheticEvent,
 } from 'react-native';
 import Video from 'react-native-video';
@@ -16,7 +16,6 @@ import { spacing, radius } from '../theme/spacing';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { NetworkImage } from '../components/NetworkImage';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = 360;
 
 type MediaItem = { url: string; type: 'image' | 'video'; thumbnail_url?: string };
@@ -38,6 +37,7 @@ const parsePhotos = (photos: any): MediaItem[] => {
 };
 
 const RestaurantDetailScreen = ({ navigation, route }: any) => {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
   const { restaurantId } = route.params;
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -83,9 +83,9 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
   const closesAt = todayHours && !todayHours.closed ? todayHours.close : null;
 
   const renderMediaSlide = ({ item }: { item: MediaItem }) => (
-    <View style={styles.slide}>
+    <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
       {item.type === 'video' ? (
-        <TouchableOpacity style={styles.slide} activeOpacity={0.9} onPress={() => setVideoUri(item.url)}>
+        <TouchableOpacity style={[styles.slide, { width: SCREEN_WIDTH }]} activeOpacity={0.9} onPress={() => setVideoUri(item.url)}>
           {item.thumbnail_url
             ? <Image source={{ uri: item.thumbnail_url }} style={styles.slideImage} resizeMode="contain" />
             : <View style={[styles.slideImage, styles.darkSlide]} />}
@@ -107,7 +107,7 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
 
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
         {/* Hero gallery */}
-        <View style={styles.heroWrap}>
+        <View style={[styles.heroWrap, { width: SCREEN_WIDTH }]}>
           {mediaItems.length > 0 ? (
             <>
               <FlatList
@@ -120,7 +120,7 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
                 showsHorizontalScrollIndicator={false}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
-                style={styles.gallery}
+                style={[styles.gallery, { width: SCREEN_WIDTH }]}
               />
               {/* Dot indicator */}
               {mediaItems.length > 1 && (
@@ -261,7 +261,7 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
           {videoUri && (
             <Video
               source={{ uri: videoUri }}
-              style={styles.videoPlayer}
+              style={[styles.videoPlayer, { width: SCREEN_WIDTH, height: SCREEN_WIDTH * (9 / 16) }]}
               controls
               resizeMode="contain"
               paused={false}
@@ -276,9 +276,9 @@ const RestaurantDetailScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
-  heroWrap: { width: SCREEN_WIDTH, height: HERO_HEIGHT, position: 'relative' },
-  gallery: { width: SCREEN_WIDTH, height: HERO_HEIGHT },
-  slide: { width: SCREEN_WIDTH, height: HERO_HEIGHT, backgroundColor: '#111' },
+  heroWrap: { height: HERO_HEIGHT, position: 'relative' },
+  gallery: { height: HERO_HEIGHT },
+  slide: { height: HERO_HEIGHT, backgroundColor: '#111' },
   slideImage: { width: '100%', height: '100%' },
   darkSlide: { backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   heroPlaceholder: { backgroundColor: '#2D3748', justifyContent: 'center', alignItems: 'center' },
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center', alignItems: 'center',
   },
-  videoPlayer: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * (9 / 16) },
+  videoPlayer: { },
 });
 
 export default RestaurantDetailScreen;
