@@ -3,7 +3,7 @@ import { resetDailyCredits } from './services/subscription.service';
 import { checkAllStockThresholds } from './services/stock.service';
 import { query, withTransaction } from './db';
 import { NotificationService } from './services/notification.service';
-import { emitToUser } from './socket';
+import { emitToUser, emitToAdmin } from './socket';
 import { redis, keys } from './redis';
 import { haversineMetres } from './services/distance.service';
 
@@ -288,6 +288,48 @@ export const initCrons = () => {
             if (expired.length > 0) console.log(`[CRON] Auto no-show marked for ${expired.length} bookings`);
         } catch (err) {
             console.error('[CRON] Auto no-show cron failed:', err);
+        }
+    });
+
+    // Every 15 mins — SLA breach escalation
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            // Find tickets past sla_deadline that aren't resolved/closed
+            const { rows: breached } = await query(`
+                SELECT id, subject, priority
+                FROM support_tickets
+                WHERE sla_deadline < NOW()
+                  AND status NOT IN ('resolved', 'closed')
+                  AND priority != 'critical'
+            `);
+
+            if (breached.length === 0) return;
+
+            const priorityUp: Record<string, string> = {
+                normal: 'high',
+                high: 'critical',
+                low: 'normal',
+            };
+
+            for (const ticket of breached) {
+                const newPriority = priorityUp[ticket.priority] ?? ticket.priority;
+                if (newPriority === ticket.priority) continue;
+
+                await query(
+                    `UPDATE support_tickets SET priority = $1, updated_at = NOW() WHERE id = $2`,
+                    [newPriority, ticket.id]
+                );
+
+                emitToAdmin('ticket_sla_breach', {
+                    ticketId: ticket.id,
+                    subject: ticket.subject,
+                    newPriority,
+                });
+            }
+
+            console.log(`[CRON] SLA escalation: ${breached.length} ticket(s) escalated`);
+        } catch (err) {
+            console.error('[CRON] SLA breach escalation failed:', err);
         }
     });
 

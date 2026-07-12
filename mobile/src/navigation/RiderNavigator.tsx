@@ -11,6 +11,7 @@ import RiderDocumentsScreen from '../screens/RiderDocumentsScreen';
 import RiderMissionsScreen from '../screens/RiderMissionsScreen';
 import RiderNotificationsScreen from '../screens/RiderNotificationsScreen';
 import RiderHelpScreen from '../screens/RiderHelpScreen';
+import RiderSupportScreen from '../screens/RiderSupportScreen';
 import RiderScorecardScreen from '../screens/RiderScorecardScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import VerificationPendingScreen from '../screens/VerificationPendingScreen';
@@ -45,6 +46,7 @@ const RiderNavigator = () => {
           <Stack.Screen name="RiderMissions" component={RiderMissionsScreen} />
           <Stack.Screen name="RiderNotifications" component={RiderNotificationsScreen} />
           <Stack.Screen name="RiderHelp" component={RiderHelpScreen} />
+          <Stack.Screen name="RiderSupport" component={RiderSupportScreen} />
           <Stack.Screen name="RiderScorecard" component={RiderScorecardScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         </>

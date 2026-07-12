@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import {
   ArrowLeft, MessageCircle, Phone, Search,
-  ChevronDown, ChevronUp, Headphones,
+  ChevronDown, ChevronUp, Headphones, TicketCheck,
 } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -261,6 +261,18 @@ const RiderHelpScreen = ({ navigation }: any) => {
               <View style={{ flex: 1 }}>
                 <Text style={styles.contactBtnTitle}>Call Rider Support</Text>
                 <Text style={styles.contactBtnSub}>7 AM – 11 PM, all days</Text>
+              </View>
+            </BouncingButton>
+
+            <BouncingButton
+              style={[styles.contactBtn, { backgroundColor: R.ink }]}
+              onPress={() => navigation.navigate('RiderSupport')}
+              activeOpacity={0.85}
+            >
+              <TicketCheck size={18} color={R.white} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.contactBtnTitle}>Raise a Support Ticket</Text>
+                <Text style={styles.contactBtnSub}>Track your issue with written evidence</Text>
               </View>
             </BouncingButton>
           </View>
