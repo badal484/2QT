@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { SkeletonList } from "../components/ui/Skeleton";
 
 const EMPTY_FORM = {
   code: "",
@@ -115,7 +116,7 @@ export function PromoCodesTab() {
     setConfirmId(null);
   };
 
-  if (loading) return <div className="p-8 text-center text-zinc-500 font-medium animate-pulse">Loading Promo Codes...</div>;
+  if (loading) return <SkeletonList rows={6} />;
 
   return (
     <div className="space-y-6">

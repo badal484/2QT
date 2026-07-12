@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { SkeletonList } from "../components/ui/Skeleton";
 
 export function MenuTab() {
   const [items, setItems] = useState<any[]>([]);
@@ -259,11 +260,7 @@ export function MenuTab() {
 
   const renderContent = () => {
     if (loading) {
-      return (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-          {[1,2,3,4,5,6].map(i => <div key={i} className="aspect-[3/4] bg-white/[0.04] rounded-[28px] animate-pulse" />)}
-        </div>
-      );
+      return <SkeletonList rows={6} />;
     }
     if (filtered.length === 0) {
       return (

@@ -6,6 +6,7 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
 import { LayoutGrid, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, Upload, X, AlertCircle, CheckCircle2 } from "lucide-react";
+import { SkeletonList } from "../components/ui/Skeleton";
 
 interface Category {
   id: string;
@@ -380,9 +381,7 @@ export const CategoriesTab = () => {
 
       {/* List */}
       {loading ? (
-        <div className="space-y-3">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-20 bg-gray-800 rounded-2xl animate-pulse" />)}
-        </div>
+        <SkeletonList rows={4} />
       ) : categories.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
           <LayoutGrid size={48} className="mx-auto mb-4 opacity-30" />

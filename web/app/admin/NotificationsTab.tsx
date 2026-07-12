@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Bell, Edit3, Save, X, RefreshCw, Send, CheckCircle2, XCircle, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Search, Zap, Plus, Trash2, Clock } from "lucide-react";
+import { SkeletonList, SkeletonTableRow } from "../components/ui/Skeleton";
 import { toast } from "sonner";
 import { api } from "../lib/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -352,7 +353,7 @@ function LogPanel() {
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-zinc-600 text-sm">Loading…</div>
+        <SkeletonList rows={5} item={<SkeletonTableRow />} />
       ) : filtered.length === 0 ? (
         <div className="py-12 text-center text-zinc-600 text-sm">No notifications found</div>
       ) : (
@@ -709,9 +710,7 @@ function TriggerRulesPanel() {
 
       {/* Rules list */}
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 bg-zinc-900 rounded-xl animate-pulse" />)}
-        </div>
+        <SkeletonList rows={4} />
       ) : triggers.length === 0 ? (
         <div className="py-12 text-center text-zinc-600 text-sm">No trigger rules yet. Click "New Rule" to create one.</div>
       ) : (
@@ -822,11 +821,7 @@ export function NotificationsTab() {
       {subTab === "templates" && (
         <div>
           {loadingTmpls ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-32 bg-zinc-900 rounded-xl animate-pulse" />
-              ))}
-            </div>
+            <SkeletonList rows={6} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {templates.map(t => (

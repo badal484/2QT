@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, X, Trash2, MapPin } from "lucide-react";
+import { SkeletonList } from "../components/ui/Skeleton";
 import dynamic from "next/dynamic";
 import { api } from "../lib/api";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -153,7 +154,7 @@ export function KitchensTab() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">{[1,2].map(i => <div key={i} className="h-32 bg-white/[0.04] backdrop-blur-xl rounded-2xl animate-pulse" />)}</div>
+        <SkeletonList rows={2} />
       ) : adding || editing ? (
         <div className="bg-[#0b0b13] border border-white/10 rounded-2xl p-6 mb-8 relative">
           <button onClick={() => { setAdding(false); setEditing(null); }} className="absolute top-4 right-4 p-2 bg-white/[0.05] rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-colors">

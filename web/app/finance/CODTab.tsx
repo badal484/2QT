@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, CheckCircle2, AlertCircle, Wallet, X, ChevronRight, Banknote, Smartphone } from "lucide-react";
+import { SkeletonList } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -194,9 +195,7 @@ export function CODTab() {
               </div>
 
               {submissionsLoading ? (
-                <div className="flex items-center justify-center h-16">
-                  <RefreshCw className="w-4 h-4 text-white/20 animate-spin" />
-                </div>
+                <SkeletonList rows={2} />
               ) : (
                 <div className="space-y-2">
                   {submissions.map((s: any) => (
@@ -259,9 +258,7 @@ export function CODTab() {
           )}
 
           {loading ? (
-            <div className="flex items-center justify-center h-40">
-              <RefreshCw className="w-5 h-5 text-white/20 animate-spin" />
-            </div>
+            <SkeletonList rows={4} />
           ) : riderGroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 gap-3">
               <CheckCircle2 className="w-10 h-10 text-emerald-500/40" />

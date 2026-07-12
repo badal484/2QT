@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { SkeletonList } from "../components/ui/Skeleton";
 
 const EMPTY_BANNER = {
   title: "", subtitle: "", tag_text: "", image_url: "",
@@ -224,7 +225,7 @@ export function MarketingTab() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-zinc-500 font-medium animate-pulse">Loading Banners...</div>;
+  if (loading) return <SkeletonList rows={6} />;
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in">

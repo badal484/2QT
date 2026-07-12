@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
+import { SkeletonList } from "../components/ui/Skeleton";
 import dynamic from "next/dynamic";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -214,7 +215,7 @@ export function ZonesTab() {
       )}
 
       {loading ? (
-        <div className="space-y-4">{[1,2].map(i => <div key={i} className="h-32 bg-white/[0.04] rounded-2xl animate-pulse" />)}</div>
+        <SkeletonList rows={2} />
       ) : (
         <div className="space-y-4">
           {zones.map(zone => (

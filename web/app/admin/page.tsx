@@ -13,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
+import { SkeletonList, SkeletonStatCard, SkeletonOrderCard } from "../components/ui/Skeleton";
 import { socket } from "../lib/socket";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -208,7 +209,7 @@ function OverviewTab() {
 
         {/* 2x2 Stat Grid */}
         <div className="lg:col-span-6 grid grid-cols-2 gap-6">
-          {loading ? [1,2,3,4].map(i => <div key={i} className="bg-white/[0.02] rounded-[20px] animate-pulse" />) : statCards.map((s, i) => (
+          {loading ? <SkeletonStatCard /> : statCards.map((s, i) => (
             <div key={i} className="bg-[#11111a] rounded-[20px] border border-white/[0.05] p-5 flex flex-col justify-between shadow-xl group">
               <div className="flex justify-between items-start mb-2">
                 <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center`}>
@@ -393,7 +394,7 @@ function OrdersTab() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="h-32 bg-white/[0.04] backdrop-blur-xl rounded-[28px] animate-pulse" />)}</div>
+        <SkeletonList rows={3} item={<SkeletonOrderCard />} />
       ) : orders.length === 0 ? (
         <div className="text-center py-24 text-zinc-300 font-black uppercase tracking-widest text-sm">No live orders right now</div>
       ) : (
@@ -549,7 +550,7 @@ function ScheduledTab() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="h-24 bg-white/[0.04] backdrop-blur-xl rounded-3xl animate-pulse" />)}</div>
+        <SkeletonList rows={3} />
       ) : orders.length === 0 ? (
         <div className="py-20 text-center bg-white/[0.02] backdrop-blur-lg rounded-[40px] border border-white/10 border-dashed">
           <Calendar className="w-12 h-12 text-zinc-200 mx-auto mb-4" />
@@ -703,7 +704,7 @@ function CustomersTab() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-20 bg-white/[0.04] backdrop-blur-xl rounded-2xl animate-pulse" />)}</div>
+        <SkeletonList rows={3} />
       ) : users.length === 0 ? (
         <div className="py-20 text-center bg-white/[0.02] backdrop-blur-lg rounded-[40px] border border-white/10 border-dashed">
           <p className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest">No users found</p>
@@ -842,7 +843,7 @@ function FleetTab({ onOpenRider }: { onOpenRider?: (id: string) => void }) {
             <div className="w-2 h-2 rounded-full bg-swish-green animate-pulse" /> Active Riders
           </h3>
           {loading ? (
-            <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-32 bg-white/[0.04] backdrop-blur-xl rounded-[24px] animate-pulse" />)}</div>
+            <SkeletonList rows={2} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {onlineRiders.map(r => {
@@ -973,7 +974,7 @@ function InventoryTab() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-6">{[1,2,3].map(i => <div key={i} className="h-32 bg-white/[0.04] backdrop-blur-xl rounded-3xl animate-pulse" />)}</div>
+        <SkeletonList rows={3} />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map(item => (
@@ -1285,7 +1286,7 @@ function SupportTab() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 bg-white/[0.04] backdrop-blur-xl rounded-[32px] animate-pulse" />)}</div>
+        <SkeletonList rows={3} />
       ) : tickets.length === 0 ? (
         <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[32px] p-16 text-center shadow-2xl shadow-black/40">
           <div className="flex items-center justify-center mb-4"><CheckCircle2 className="w-14 h-14 text-green-400" /></div>
@@ -1373,7 +1374,7 @@ function PayoutsTab() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">{[1, 2].map(i => <div key={i} className="h-24 bg-white/[0.04] backdrop-blur-xl rounded-3xl animate-pulse" />)}</div>
+        <SkeletonList rows={2} />
       ) : payouts.length === 0 ? (
         <div className="py-20 text-center bg-white/[0.02] backdrop-blur-lg rounded-[40px] border border-white/10 border-dashed">
           <Wallet className="w-12 h-12 text-zinc-200 mx-auto mb-4" />
@@ -1494,9 +1495,7 @@ function SettingsTab() {
 
   const label = (key: string) => key.replace(/^feature_/, "").replace(/_/g, " ");
 
-  if (loading) return (
-    <div className="space-y-4">{[1,2,3,4,5].map(i => <div key={i} className="h-16 bg-white/[0.04] rounded-2xl animate-pulse" />)}</div>
-  );
+  if (loading) return <SkeletonList rows={5} />;
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -1788,11 +1787,7 @@ function RiderApplicationsTab() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-48 bg-white/[0.02] backdrop-blur-3xl border border-white/5 rounded-[32px] animate-pulse" />
-          ))}
-        </div>
+        <SkeletonList rows={4} />
       ) : apps.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 bg-white/[0.01] border border-white/5 rounded-[40px] backdrop-blur-2xl">
           <div className="w-24 h-24 bg-white/[0.02] rounded-[32px] flex items-center justify-center mb-6">

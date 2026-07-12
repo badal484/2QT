@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, CheckCircle, XCircle, Clock, Banknote, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { SkeletonList } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -219,9 +220,7 @@ export function ComplaintsTab() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-40">
-          <Loader2 className="animate-spin text-zinc-300" size={28}/>
-        </div>
+        <SkeletonList rows={4} />
       ) : complaints.length === 0 ? (
         <div className="text-center py-16 text-zinc-400">
           <AlertTriangle size={32} className="mx-auto mb-3 opacity-30"/>
