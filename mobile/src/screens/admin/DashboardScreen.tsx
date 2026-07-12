@@ -26,8 +26,6 @@ import {
   Trophy,
 } from 'lucide-react-native';
 
-const { width } = Dimensions.get('window');
-
 const MetricCard = ({ title, value, trend, icon: Icon, color }: any) => (
   <View style={[styles.metricCard, { borderColor: '#f3f4f6' }]}>
     <View style={styles.metricHeader}>
