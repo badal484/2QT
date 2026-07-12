@@ -399,7 +399,9 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
           maxLength={100}
           returnKeyType="next"
         />
-        <Text style={styles.charCount}>{subject.length}/100</Text>
+        <Text style={styles.charCount}>
+          {subject.length}/100{subject.trim().length > 0 && subject.trim().length < 3 ? '  ·  min 3 chars' : ''}
+        </Text>
 
         {/* Description */}
         <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
@@ -416,7 +418,9 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
           textAlignVertical="top"
           maxLength={1000}
         />
-        <Text style={styles.charCount}>{message.length}/1000</Text>
+        <Text style={styles.charCount}>
+          {message.length}/1000{message.trim().length > 0 && message.trim().length < 5 ? '  ·  min 5 chars' : ''}
+        </Text>
 
         {/* Tip box */}
         <View style={styles.tipBox}>
