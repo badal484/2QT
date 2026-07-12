@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { TWO_QT } from '../config/constants';
-import { emitToAdmin, emitToUser } from '../socket';
+import { emitToAdmin, emitToUser, emitToSupport } from '../socket';
 import { scheduleTriggerSend, cancelTriggerJobs } from '../services/trigger.service';
 import { redis, keys } from '../redis';
 import { processWalletRefund } from '../services/refund.service';
@@ -356,6 +356,7 @@ router.post('/support/tickets/:id/reply', authenticate, async (req: AuthRequest,
         }
 
         emitToAdmin('ticket_customer_reply', { ticketId: id });
+        emitToSupport('ticket_message', { ticketId: id });
 
         res.json({ message: msgRows[0] });
     } catch (err) {

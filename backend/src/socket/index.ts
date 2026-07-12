@@ -64,6 +64,10 @@ export const initSocket = (server: any) => {
             socket.join(`restaurant:${user.restaurantId}`);
         }
 
+        if (user.role === 'support' || user.role === 'super_admin') {
+            socket.join('support');
+        }
+
         if (user.role === 'rider' || user.role === 'rider_captain' || user.role === 'super_admin') {
             socket.join('riders');
             if (user.zoneId) socket.join(`riders:${user.zoneId}`);
@@ -173,4 +177,8 @@ export const emitToPartner = (partnerId: string, event: string, data: any) => {
 
 export const emitToRestaurant = (restaurantId: string, event: string, data: any) => {
     if (io) io.to(`restaurant:${restaurantId}`).emit(event, data);
+};
+
+export const emitToSupport = (event: string, data: any) => {
+    if (io) io.to('support').emit(event, data);
 };
