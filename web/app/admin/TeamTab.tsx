@@ -20,15 +20,15 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; icon
 };
 
 const ROLE_LOGIN_URL: Record<string, string> = {
-  finance:         "2-qt.vercel.app/finance",
-  admin:           "2-qt.vercel.app/admin",
-  super_admin:     "2-qt.vercel.app/admin",
-  chef:            "2-qt.vercel.app/kitchen",
-  kitchen_manager: "2-qt.vercel.app/kitchen",
+  finance:         "twoqt.vercel.app/finance",
+  admin:           "twoqt.vercel.app/admin",
+  super_admin:     "twoqt.vercel.app/admin",
+  chef:            "twoqt.vercel.app/kitchen",
+  kitchen_manager: "twoqt.vercel.app/kitchen",
   rider:           "Rider mobile app",
   rider_captain:   "Rider mobile app",
-  dine_in_staff:   "2-qt.vercel.app/restaurant",
-  support:         "2-qt.vercel.app/support",
+  dine_in_staff:   "twoqt.vercel.app/restaurant",
+  support:         "twoqt.vercel.app/support",
 };
 
 function AddUserModal({ open, onAdd, onClose, kitchens }: any) {
@@ -98,7 +98,7 @@ function AddUserModal({ open, onAdd, onClose, kitchens }: any) {
                 className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-brand-primary/50 placeholder:text-white/20"
               />
             </div>
-            <p className="text-xs text-white/30 mt-1.5">They'll log in via <span className="text-white/50 font-mono">{ROLE_LOGIN_URL[role] ?? "2-qt.vercel.app/login"}</span></p>
+            <p className="text-xs text-white/30 mt-1.5">They'll log in via <span className="text-white/50 font-mono">{ROLE_LOGIN_URL[role] ?? "twoqt.vercel.app/login"}</span></p>
           </div>
           <div>
             <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Role</label>
