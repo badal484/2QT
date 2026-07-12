@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Plus, MessageSquare, Clock, CheckCircle2,
   ChevronDown, ChevronUp, TicketCheck, Send, AlertTriangle,
-  Package,
+  Package, Banknote, User, Shield, Smartphone,
 } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,7 +83,7 @@ interface EarningsBreakdown {
 // ── Rider categories ──────────────────────────────────────────────────────────
 const RIDER_CATEGORIES = [
   {
-    key: 'earnings', label: 'Earnings Issue', icon: '💰',
+    key: 'earnings', label: 'Earnings Issue', Icon: Banknote,
     ticket_type: 'earnings',
     sub_types: [
       { key: 'surge_not_applied',     label: 'Surge Not Applied' },
@@ -94,7 +94,7 @@ const RIDER_CATEGORIES = [
     ],
   },
   {
-    key: 'order', label: 'Order Problem', icon: '📦',
+    key: 'order', label: 'Order Problem', Icon: Package,
     ticket_type: 'order_issue',
     sub_types: [
       { key: 'customer_unreachable', label: 'Customer Unreachable' },
@@ -105,7 +105,7 @@ const RIDER_CATEGORIES = [
     ],
   },
   {
-    key: 'customer', label: 'Customer Issue', icon: '👤',
+    key: 'customer', label: 'Customer Issue', Icon: User,
     ticket_type: 'customer_issue',
     sub_types: [
       { key: 'customer_abusive', label: 'Abusive Customer' },
@@ -113,7 +113,7 @@ const RIDER_CATEGORIES = [
     ],
   },
   {
-    key: 'safety', label: 'Safety', icon: '🛡️',
+    key: 'safety', label: 'Safety', Icon: Shield,
     ticket_type: 'safety',
     sub_types: [
       { key: 'vehicle_breakdown', label: 'Vehicle Breakdown' },
@@ -121,12 +121,12 @@ const RIDER_CATEGORIES = [
     ],
   },
   {
-    key: 'app', label: 'App Issue', icon: '📱',
+    key: 'app', label: 'App Issue', Icon: Smartphone,
     ticket_type: 'app_issue',
     sub_types: [{ key: 'app_issue', label: 'App Not Working' }],
   },
   {
-    key: 'other', label: 'Other', icon: '💬',
+    key: 'other', label: 'Other', Icon: MessageSquare,
     ticket_type: 'general',
     sub_types: [{ key: 'general', label: 'General Query' }],
   },
@@ -615,7 +615,7 @@ const NewRiderTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
               onPress={() => handleCategoryChange(cat.key)}
               activeOpacity={0.8}
             >
-              <Text style={styles.catEmoji}>{cat.icon}</Text>
+              <cat.Icon size={15} color={categoryKey === cat.key ? colors.primary : colors.inkMuted} />
               <Text style={[styles.catLabel, categoryKey === cat.key && styles.catLabelActive]}>
                 {cat.label}
               </Text>
@@ -982,7 +982,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: colors.border, marginRight: 8,
   },
   catChipActive: { backgroundColor: colors.primaryTint, borderColor: colors.primary },
-  catEmoji: { fontSize: 14 },
   catLabel: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted },
   catLabelActive: { color: colors.primary },
   subChip: {
