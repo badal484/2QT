@@ -2,6 +2,7 @@ import { Package, RotateCcw, ArrowLeft, Bike, AlertTriangle, Download, Star, Che
 import React, { useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable } from 'react-native';
+import { SkeletonScreenList, SkeletonOrderCard, ScreenError } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ENV } from '../config/env';
@@ -109,19 +110,30 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   });
 
   if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.loadingText}>Loading orders…</Text>
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 12, 36) }]}>
+        <BouncingButton style={styles.backBtn} onPress={() => { ReactNativeHapticFeedback.trigger("impactLight", hapticOptions); navigation.goBack(); }}>
+          <ArrowLeft size={20} color="#1A1A2E" />
+        </BouncingButton>
+        <View style={{ flex: 1, marginLeft: 14 }}>
+          <Text style={styles.headerTitle}>Your Orders</Text>
+        </View>
+      </View>
+      <SkeletonScreenList item={<SkeletonOrderCard />} />
     </View>
   );
 
   if (isError) return (
-    <View style={styles.loadingContainer}>
-      <Package size={40} color="#D1D5DB" />
-      <Text style={[styles.loadingText, { marginTop: 16, color: '#EF4444' }]}>Failed to load orders</Text>
-      <TouchableOpacity onPress={() => refetch()} style={[styles.browseBtn, { marginTop: 20 }]}>
-        <Text style={styles.browseBtnText}>Retry</Text>
-      </TouchableOpacity>
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 12, 36) }]}>
+        <BouncingButton style={styles.backBtn} onPress={() => { ReactNativeHapticFeedback.trigger("impactLight", hapticOptions); navigation.goBack(); }}>
+          <ArrowLeft size={20} color="#1A1A2E" />
+        </BouncingButton>
+        <View style={{ flex: 1, marginLeft: 14 }}>
+          <Text style={styles.headerTitle}>Your Orders</Text>
+        </View>
+      </View>
+      <ScreenError onRetry={refetch} />
     </View>
   );
 

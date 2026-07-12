@@ -2,7 +2,19 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "./lib/api";
+
+const webQueryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60 * 1000,
+      retry: 1,
+      placeholderData: (prev: any) => prev,
+    },
+  },
+});
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -159,11 +171,13 @@ export const useCart = () => useContext(CartContext);
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <CartProvider>
-        {children}
-        <Toaster position="top-center" richColors />
-      </CartProvider>
-    </AuthProvider>
+    <QueryClientProvider client={webQueryClient}>
+      <AuthProvider>
+        <CartProvider>
+          {children}
+          <Toaster position="top-center" richColors />
+        </CartProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

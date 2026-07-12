@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { SkeletonScreenList, SkeletonOrderCard } from '../components/ui';
 
 const BatchViewScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
@@ -16,8 +17,14 @@ const BatchViewScreen = ({ navigation }: any) => {
   });
 
   if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Production Batches</Text>
+        <TouchableOpacity style={styles.newBatchBtn} onPress={() => navigation.navigate('CreateBatch')}>
+          <Text style={styles.newBatchText}>NEW BATCH</Text>
+        </TouchableOpacity>
+      </View>
+      <SkeletonScreenList item={<SkeletonOrderCard />} />
     </View>
   );
 

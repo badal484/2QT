@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
+import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { Check, Plus } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -32,8 +33,12 @@ const MorningPrepScreen = () => {
   };
 
   if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Morning Prep</Text>
+        <Text style={styles.headerSub}>Daily Checklist</Text>
+      </View>
+      <SkeletonScreenList item={<SkeletonListItem />} />
     </View>
   );
 

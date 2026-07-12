@@ -4,6 +4,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, StyleSheet, RefreshControl,
 } from 'react-native';
+import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Plus, MessageSquare, Clock, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, TicketCheck } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -202,8 +203,8 @@ const MyTicketsTab = () => {
   }, [queryClient]);
 
   if (isLoading) return (
-    <View style={{ flex: 1, alignItems: 'center', paddingTop: 60 }}>
-      <ActivityIndicator color={colors.primary} size="large" />
+    <View style={{ flex: 1 }}>
+      <SkeletonScreenList item={<SkeletonListItem />} />
     </View>
   );
 

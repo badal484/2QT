@@ -1,7 +1,8 @@
 import { ArrowLeft, Star, Crown, Pizza } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, ActivityIndicator, StyleSheet, AppState } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, AppState } from 'react-native';
+import { SkeletonScreenList, SkeletonStatCard } from '../components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -30,8 +31,13 @@ const LoyaltyScreen = ({ navigation }: any) => {
 
 
   if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 16, 48) }]}>
+        <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft size={24} color="#1A1A2E" />
+        </BouncingButton>
+      </View>
+      <SkeletonScreenList item={<SkeletonStatCard />} count={4} />
     </View>
   );
 

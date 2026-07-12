@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
   Image, Alert, StyleSheet, StatusBar, TextInput,
 } from 'react-native';
+import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
@@ -100,8 +101,16 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
   const photoToShow = idPhotoUri || idPhotoUrl;
 
   if (isLoading) return (
-    <View style={s.loadWrap}>
-      <ActivityIndicator size="large" color={R.orange} />
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
+      <View style={s.header}>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <ArrowLeft size={20} color={R.ink} />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>My Documents</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      <SkeletonScreenList item={<SkeletonListItem />} />
     </View>
   );
 
