@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
-import { emitToUser, emitToAdmin } from '../socket';
+import { emitToUser, emitToAdmin, emitToSupport } from '../socket';
 import { NotificationService } from '../services/notification.service';
 
 const router = Router();
@@ -153,6 +153,9 @@ router.post('/tickets/:id/reply', supportAccess, supportRole, async (req: AuthRe
         } else {
             await query('UPDATE support_tickets SET updated_at = NOW() WHERE id = $1', [id]);
         }
+
+        // Notify all support agents viewing this ticket
+        emitToSupport('ticket_message', { ticketId: id });
 
         // Notify the ticket owner
         const userId = ticket.customer_id || ticket.rider_id;

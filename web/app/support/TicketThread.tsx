@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Send, User, Shield, AlertTriangle, Clock, RefreshCw, ChevronDown } from "lucide-react";
 import { api } from "../lib/api";
+import { socket } from "../lib/socket";
 import { toast } from "sonner";
 import { SkeletonList, SkeletonListRow } from "../components/ui/Skeleton";
 import { ScreenError } from "../components/ui/ScreenError";
@@ -110,6 +111,16 @@ export function TicketThread({ ticketId, onClose }: Props) {
   }, [ticketId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Real-time: reload thread when any agent or the user posts a new message
+  useEffect(() => {
+    socket.connect();
+    const handler = (data: { ticketId: string }) => {
+      if (data?.ticketId === ticketId) load();
+    };
+    socket.on("ticket_message", handler);
+    return () => { socket.off("ticket_message", handler); };
+  }, [ticketId, load]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -403,8 +414,8 @@ export function TicketThread({ ticketId, onClose }: Props) {
           <textarea
             value={reply}
             onChange={e => setReply(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendReply(); }}
-            placeholder="Type a reply... (Cmd+Enter to send)"
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+            placeholder="Type a reply... (Enter to send, Shift+Enter for new line)"
             rows={2}
             className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-sky-500/50 placeholder:text-white/20 resize-none"
           />
