@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Animated, useWindowDimensions } from 'react-native';
 import { ChefHat, Bike, ArrowRight, X } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 import { fontFamily } from '../../theme/typography';
 import { BouncingButton } from './BouncingButton';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Props {
   visible: boolean;
@@ -16,8 +14,11 @@ interface Props {
 }
 
 export const ActiveOrdersBottomSheet = ({ visible, orders, onClose, onSelectOrder }: Props) => {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const [showModal, setShowModal] = useState(visible);
-  const slideAnim = React.useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const slideAnimRef = React.useRef<Animated.Value | null>(null);
+  if (slideAnimRef.current === null) slideAnimRef.current = new Animated.Value(SCREEN_HEIGHT);
+  const slideAnim = slideAnimRef.current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
