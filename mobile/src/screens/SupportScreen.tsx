@@ -310,7 +310,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
     setSubType('');
   };
 
-  const canSubmit = subject.trim().length > 3 && message.trim().length > 10;
+  const canSubmit = subject.trim().length >= 3 && message.trim().length >= 5;
 
   const handleSubmit = () => {
     if (!canSubmit || mutation.isPending) return;
