@@ -15,7 +15,6 @@ import { Toast } from './src/components/ui/Toast';
 if (!__DEV__) {
   console.log = () => {};
   console.warn = () => {};
-  console.error = () => {};
 }
 
 const queryClient = new QueryClient({

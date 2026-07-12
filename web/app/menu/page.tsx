@@ -1607,7 +1607,7 @@ export default function MenuPage() {
             className={`fixed left-1/2 -translate-x-1/2 z-[150] pointer-events-none transition-all duration-300 ${cartItems.length > 0 ? 'bottom-28' : 'bottom-6'}`}
           >
             <a
-              href="/orders"
+              href={`/orders/${activeOrder.id}`}
               className="pointer-events-auto flex items-center gap-3 bg-brand-dark text-white px-5 py-3 rounded-full shadow-2xl shadow-black/40 hover:bg-black transition-colors"
             >
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />

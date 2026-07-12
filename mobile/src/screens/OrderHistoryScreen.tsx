@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable } from 'react-native';
 import { SkeletonScreenList, SkeletonOrderCard, ScreenError } from '../components/ui';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ENV } from '../config/env';
 import { useDispatch } from 'react-redux';
@@ -39,10 +39,6 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState<Set<string>>(new Set());
   const [reorderLoading, setReorderLoading] = useState<Set<string>>(new Set());
-  const [allOrders, setAllOrders] = useState<any[]>([]);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const LIMIT = 20;
 
   const openInvoice = async (orderId: string) => {
@@ -67,33 +63,35 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     );
   };
 
-  const { isLoading, isError, refetch } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['order-history'],
-    queryFn: async () => {
-      const res = await api.get(`/orders/mine?limit=${LIMIT}&offset=0`);
-      const fetched: any[] = res.orders || [];
-      setAllOrders(fetched);
-      setOffset(LIMIT);
-      setHasMore(fetched.length === LIMIT);
+    queryFn: async ({ pageParam }) => {
+      const res = await api.get(`/orders/mine?limit=${LIMIT}&offset=${pageParam}`);
       return res;
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const fetched = lastPage.orders || [];
+      if (fetched.length < LIMIT) return undefined;
+      return allPages.length * LIMIT;
     },
     staleTime: 0,
     refetchOnMount: 'always',
   });
 
-  const loadMore = async () => {
-    if (!hasMore || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const res = await api.get(`/orders/mine?limit=${LIMIT}&offset=${offset}`);
-      const fetched: any[] = res.orders || [];
-      setAllOrders(prev => [...prev, ...fetched]);
-      setOffset(prev => prev + LIMIT);
-      setHasMore(fetched.length === LIMIT);
-    } catch {
-      Alert.alert('Error', 'Could not load more orders.');
-    } finally {
-      setLoadingMore(false);
+  const allOrders = data ? data.pages.flatMap((page: any) => page.orders || []) : [];
+
+  const loadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
   };
 
@@ -260,9 +258,9 @@ const OrderHistoryScreen = ({ navigation }: any) => {
           </View>
         )}
 
-        {hasMore && allOrders.length > 0 && (
-          <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore} activeOpacity={0.7}>
-            {loadingMore
+        {hasNextPage && allOrders.length > 0 && (
+          <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={isFetchingNextPage} activeOpacity={0.7}>
+            {isFetchingNextPage
               ? <ActivityIndicator size="small" color={colors.primary} />
               : <Text style={styles.loadMoreText}>Load more orders</Text>}
           </TouchableOpacity>
