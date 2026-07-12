@@ -112,14 +112,18 @@ export function TicketThread({ ticketId, onClose }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Real-time: reload thread when any agent or the user posts a new message
+  // Real-time: socket (instant) + 10-second poll fallback (catches missed events)
   useEffect(() => {
     socket.connect();
     const handler = (data: { ticketId: string }) => {
       if (data?.ticketId === ticketId) load();
     };
     socket.on("ticket_message", handler);
-    return () => { socket.off("ticket_message", handler); };
+    const poll = setInterval(load, 10000);
+    return () => {
+      socket.off("ticket_message", handler);
+      clearInterval(poll);
+    };
   }, [ticketId, load]);
 
   useEffect(() => {
