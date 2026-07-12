@@ -23,7 +23,7 @@ export function navigateTo(name: string, params?: Record<string, any>) {
 
 // Maps FCM notification data → screen name + params
 export function navigateFromNotification(data: Record<string, string>) {
-  const { type, orderId, screen, bookingId } = data;
+  const { type, orderId, screen, bookingId, ticketId } = data;
 
   // Explicit screen override from payload (for trigger rules)
   if (screen) {
@@ -35,6 +35,8 @@ export function navigateFromNotification(data: Record<string, string>) {
       OrderHistory: { name: 'OrderHistory' },
       RateOrder: { name: 'RateOrder', params: orderId ? { orderId } : undefined },
       TableBookingDetail: { name: 'TableBookingDetail', params: bookingId ? { bookingId } : undefined },
+      SupportTicketDetail: { name: 'Support', params: ticketId ? { ticketId } : undefined },
+      RiderSupportTicketDetail: { name: 'RiderSupport', params: ticketId ? { ticketId } : undefined },
     };
     const target = screenMap[screen];
     if (target) { navigateTo(target.name, target.params); return; }
@@ -64,6 +66,16 @@ export function navigateFromNotification(data: Record<string, string>) {
     case 'cart_abandoned':
       navigateTo('Cart');
       break;
+    case 'ticket_replied': {
+      const state = require('../store/index').store.getState();
+      const role = state.auth.user?.role;
+      if (role === 'rider' || role === 'rider_captain') {
+        navigateTo('RiderSupport', ticketId ? { ticketId } : undefined);
+      } else {
+        navigateTo('Support', ticketId ? { ticketId } : undefined);
+      }
+      break;
+    }
     case 'birthday':
     case 'winback':
     case 'flash_sale':

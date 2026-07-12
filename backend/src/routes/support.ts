@@ -159,13 +159,14 @@ router.post('/tickets/:id/reply', supportAccess, supportRole, async (req: AuthRe
 
         // Notify the ticket owner
         const userId = ticket.customer_id || ticket.rider_id;
+        const isRider = !!ticket.rider_id;
         if (userId) {
             emitToUser(userId, 'ticket_replied', { ticketId: id, message: message.trim() });
             NotificationService.send('broadcast_message', {
                 userId,
                 title: 'Support Team Replied',
                 body: message.trim().substring(0, 80),
-                screen: 'SupportTicketDetail',
+                screen: isRider ? 'RiderSupportTicketDetail' : 'SupportTicketDetail',
                 ticketId: id,
             }).catch(() => {});
         }
