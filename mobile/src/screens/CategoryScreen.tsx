@@ -15,6 +15,7 @@ import { NetworkImage } from '../components/NetworkImage';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { shadows } from '../theme/shadows';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
@@ -325,108 +326,108 @@ const CategoryScreen = ({ route, navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, marginTop: 40 },
   emptyTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 6 },
   emptySub: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted },
   
   // Hero Header
-  headerContainer: { backgroundColor: '#FFFFFF', paddingBottom: 16 },
+  headerContainer: { backgroundColor: colors.surface, paddingBottom: 16, ...shadows.soft, zIndex: 10 },
   heroImageContainer: { width: '100%', height: 260, position: 'relative' },
   heroImage: { width: '100%', height: '100%', borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, backgroundColor: 'transparent' }, // Placeholder for actual gradient if needed
+  heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, backgroundColor: 'rgba(0,0,0,0.1)' },
   heroTextFallback: { fontSize: 32, fontFamily: fontFamily.black, color: colors.ink, position: 'absolute', bottom: 40, left: 24 },
   
   floatingBackBtn: {
     position: 'absolute', left: 16, width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4
+    backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center',
+    ...shadows.medium,
   },
   floatingSearchBtn: {
     position: 'absolute', right: 16, width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4
+    backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center',
+    ...shadows.medium,
   },
 
   // Search
   searchRow: { paddingHorizontal: spacing.lg, marginTop: 16 },
   searchBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, 
-    borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceMuted, 
+    borderRadius: 16, paddingHorizontal: 16, height: 48,
   },
   searchInput: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, padding: 0 },
 
   // Subcategories
   subcategoryScroll: { paddingHorizontal: spacing.lg, paddingVertical: 16, gap: 12 },
-  subcategoryPill: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  subcategoryPill: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   subcategoryPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   subcategoryText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.inkMuted },
   subcategoryTextActive: { color: colors.white },
 
   // Dietary Filters
   dietaryRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: 10, marginTop: 4, marginBottom: 16 },
-  dietaryPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 6 },
-  dietaryPillActive: { backgroundColor: 'rgba(34, 197, 94, 0.05)', borderColor: '#22C55E' },
+  dietaryPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: 8, ...shadows.soft },
+  dietaryPillActive: { backgroundColor: colors.successTint, borderColor: colors.success },
   dietaryIcon: { width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   dietaryIconInner: { width: 6, height: 6, borderRadius: 3 },
-  dietaryText: { fontSize: 12, fontFamily: fontFamily.bold, color: colors.ink },
+  dietaryText: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink },
 
   // 2-Column Grid
-  columnWrapper: { paddingHorizontal: 12, justifyContent: 'flex-start', marginBottom: 16 },
+  columnWrapper: { paddingHorizontal: 12, justifyContent: 'flex-start', marginBottom: 20 },
   gridCard: { backgroundColor: 'transparent' },
-  gridCardImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F9FAFB', position: 'relative', marginBottom: 8 },
+  gridCardImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 20, overflow: 'hidden', backgroundColor: colors.surfaceMuted, position: 'relative', marginBottom: 12, ...shadows.soft },
   gridCardImage: { width: '100%', height: '100%' },
   cardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   
-  vegBadgeFloat: { position: 'absolute', top: 8, left: 8, width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  vegBadgeFloat: { position: 'absolute', top: 8, left: 8, width: 16, height: 16, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
   vegDot: { width: 8, height: 8, borderRadius: 4 },
   
   gridCardInfo: { paddingHorizontal: 4 },
-  cardName: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2, lineHeight: 18 },
-  cardDesc: { fontSize: 11, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 14, marginBottom: 4 },
-  cardPrice: { fontSize: 14, fontFamily: fontFamily.black, color: colors.ink },
+  cardName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
+  cardDesc: { fontSize: 12, color: colors.inkFaint, fontFamily: fontFamily.medium, lineHeight: 16, marginBottom: 6 },
+  cardPrice: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink },
   
   gridAddBtnFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
   qtyControl: {
-    flexDirection: 'row', backgroundColor: '#FC4603', borderRadius: 16,
-    alignItems: 'center', justifyContent: 'space-between', height: 32,
-    shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4
+    flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'space-between', height: 36,
+    ...shadows.medium,
   },
-  qtyBtn: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
+  qtyBtn: { width: 34, height: 36, alignItems: 'center', justifyContent: 'center' },
   qtyBtnText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
-  qtyValue: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
+  qtyValue: { color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold },
   addBtn: {
-    backgroundColor: '#FC4603', borderRadius: 16, height: 32,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 16, shadowOffset: { width: 0, height: 2 }, elevation: 4,
+    backgroundColor: colors.surface, borderRadius: 16, height: 36,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderStrong,
+    ...shadows.medium,
     position: 'relative'
   },
-  addBtnText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
-  customiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F3F4F6' },
-  customiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#FC4603', textTransform: 'uppercase' },
+  addBtnText: { color: colors.primaryDark, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
+  customiseBadge: { position: 'absolute', top: -10, backgroundColor: colors.white, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  customiseText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.primary, textTransform: 'uppercase' },
   
-  soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
+  soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' },
+  soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
 
-  bestsellerOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  bestsellerOverlayText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
-  newOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  newOverlayText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  tagChip: { backgroundColor: '#F9FAFB', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 0 },
-  tagChipText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
+  bestsellerOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: colors.warningTint, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  bestsellerOverlayText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
+  newOverlay: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  newOverlayText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  tagChip: { backgroundColor: colors.surfaceMuted, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 0 },
+  tagChipText: { fontSize: 10, fontFamily: fontFamily.bold, color: colors.inkMuted },
 
   // Floating cart
   floatingCart: {
-    position: 'absolute', left: 12, right: 12, zIndex: 999,
-    backgroundColor: colors.primary, borderRadius: 16,
-    paddingVertical: 10, paddingHorizontal: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4,
+    position: 'absolute', left: 16, right: 16, zIndex: 999,
+    backgroundColor: colors.primaryDark, borderRadius: 20,
+    paddingVertical: 14, paddingHorizontal: 16,
+    ...shadows.strong,
   },
   floatingCartBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cartCount: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: fontFamily.extrabold, letterSpacing: 1, textTransform: 'uppercase' },
+  cartCount: { color: colors.white, opacity: 0.9, fontSize: 12, fontFamily: fontFamily.extrabold, letterSpacing: 1, textTransform: 'uppercase' },
   cartTotal: { color: colors.white, fontSize: 18, fontFamily: fontFamily.black, letterSpacing: -0.5 },
-  viewCartText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 13 },
+  viewCartText: { color: colors.white, fontFamily: fontFamily.extrabold, fontSize: 14 },
 });
 
 export default CategoryScreen;
