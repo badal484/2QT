@@ -1,22 +1,30 @@
 export const colors = {
   primary: '#FC4603',
-  primaryDark: '#D95A2D',
-  primaryTint: '#FFF0E8',
+  primaryDark: '#D93D00',
+  primaryTint: '#FFF1ED',
+  
+  // Premium Orange Gradient stops
+  primaryGradStart: '#FF6422',
+  primaryGradEnd: '#E83E00',
 
   accent: '#FC4603',
-  accentTint: '#FFF0E8',
+  accentTint: '#FFF1ED',
 
-  background: '#FAF8F4',
+  // Backgrounds
+  background: '#F8F9FA', // Cooler, pristine gray-white
   surface: '#FFFFFF',
-  surfaceMuted: '#F3F0EA',
+  surfaceMuted: '#F1F3F5',
+  
+  // Ink / Text
+  ink: '#111827', // Deep slate for high contrast
+  inkMuted: '#4B5563', // Slate gray
+  inkFaint: '#9CA3AF', // Lighter slate
 
-  ink: '#1A1F1C',
-  inkMuted: '#6B7570',
-  inkFaint: '#9CA3A0',
+  // Borders
+  border: '#E5E7EB',
+  borderStrong: '#D1D5DB',
 
-  border: '#E6E2DA',
-  borderStrong: '#D6D1C6',
-
+  // Semantic
   success: '#10B981',
   successTint: '#D1FAE5',
   warning: '#F59E0B',
@@ -24,7 +32,9 @@ export const colors = {
   danger: '#EF4444',
   dangerTint: '#FEE2E2',
 
-  overlay: 'rgba(26, 31, 28, 0.6)',
+  // Utilities
+  overlay: 'rgba(17, 24, 39, 0.65)',
+  glass: 'rgba(255, 255, 255, 0.85)',
   white: '#FFFFFF',
   black: '#000000',
 } as const;

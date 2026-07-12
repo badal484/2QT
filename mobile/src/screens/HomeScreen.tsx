@@ -19,6 +19,7 @@ import { EmptyState, SkeletonRow, ActiveOrdersBottomSheet } from '../components/
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { radius, spacing } from '../theme/spacing';
+import { shadows } from '../theme/shadows';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentDeviceToken } from '../services/push';
 
@@ -787,11 +788,13 @@ const HomeScreen = ({ navigation }: any) => {
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: '#F1F5F9', // Light flat grey
-              borderRadius: 12,
-              paddingLeft: 12,
-              paddingRight: 6,
-              height: 46,
+              backgroundColor: colors.surfaceMuted, // Premium muted surface
+              borderRadius: 16,
+              paddingLeft: 16,
+              paddingRight: 8,
+              height: 48,
+              borderWidth: 1,
+              borderColor: colors.border,
             }}>
               <Search size={16} color={colors.inkMuted} style={{ marginRight: 6, flexShrink: 0 }} />
               <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
@@ -1526,9 +1529,9 @@ const ebS = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: colors.background },
   minimalHeader: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -1636,32 +1639,32 @@ const styles = StyleSheet.create({
   categorySectionCount: { fontSize: 12, fontFamily: fontFamily.semibold, color: colors.inkMuted },
 
   // Grid row (2 cards per row)
-  homeGridRow: { flexDirection: 'row', paddingHorizontal: 12, gap: 12, marginBottom: 16 },
-  homeGridCard: { flex: 1, backgroundColor: '#FFFFFF', marginBottom: 2 },
-  homeGridImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F9FAFB', position: 'relative', marginBottom: 8 },
+  homeGridRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 16, marginBottom: 20 },
+  homeGridCard: { flex: 1, backgroundColor: 'transparent' },
+  homeGridImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 20, overflow: 'hidden', backgroundColor: colors.surfaceMuted, position: 'relative', marginBottom: 12, ...shadows.soft },
   homeGridImage: { width: '100%', height: '100%' },
   homeGridImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  homeGridVegBadge: { position: 'absolute', top: 8, left: 8, width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  homeGridVegBadge: { position: 'absolute', top: 8, left: 8, width: 16, height: 16, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
   homeGridVegDot: { width: 8, height: 8, borderRadius: 4 },
-  homeGridBestsellerBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
-  homeGridBestsellerText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
-  homeGridNewBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
-  homeGridNewText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
-  homeGridSoldOut: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  homeGridSoldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
+  homeGridBestsellerBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: colors.warningTint, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  homeGridBestsellerText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
+  homeGridNewBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  homeGridNewText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
+  homeGridSoldOut: { ...StyleSheet.absoluteFill, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' },
+  homeGridSoldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
   homeGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
-  homeGridQtyControl: { flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 16, alignItems: 'center', justifyContent: 'space-between', height: 32, shadowColor: colors.primary, shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  homeGridQtyBtn: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
+  homeGridQtyControl: { flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 16, alignItems: 'center', justifyContent: 'space-between', height: 36, ...shadows.medium },
+  homeGridQtyBtn: { width: 34, height: 36, alignItems: 'center', justifyContent: 'center' },
   homeGridQtyBtnText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
-  homeGridQtyValue: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
-  homeGridAddBtn: { backgroundColor: '#FFFFFF', borderRadius: 16, height: 32, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4, position: 'relative' },
-  homeGridAddBtnText: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
-  homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
-  homeGridCustomiseText: { fontSize: 8, fontFamily: fontFamily.bold, color: colors.primary, textTransform: 'uppercase' },
+  homeGridQtyValue: { color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold },
+  homeGridAddBtn: { backgroundColor: colors.surface, borderRadius: 16, height: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderStrong, ...shadows.medium, position: 'relative' },
+  homeGridAddBtnText: { color: colors.primaryDark, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
+  homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: colors.white, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  homeGridCustomiseText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.primary, textTransform: 'uppercase' },
   homeGridInfo: { paddingHorizontal: 4 },
-  homeGridName: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2, lineHeight: 18 },
-  homeGridDesc: { fontSize: 11, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 14, marginBottom: 4 },
-  homeGridPrice: { fontSize: 14, fontFamily: fontFamily.black, color: colors.ink },
+  homeGridName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
+  homeGridDesc: { fontSize: 12, color: colors.inkFaint, fontFamily: fontFamily.medium, lineHeight: 16, marginBottom: 6 },
+  homeGridPrice: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink },
   homeGridTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   homeGridTagChip: { backgroundColor: '#F9FAFB', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 0 },
   homeGridTagText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
@@ -2546,6 +2549,7 @@ const ClosedBottomSheet = ({
     setNotifyLoading(false);
   }, [kitchenId, notifyRegistered]);
 
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const headerHeight = Math.max(insets.top + 8, 12) + 116;
   const sheetHeight = SCREEN_HEIGHT - headerHeight;
 
