@@ -293,12 +293,22 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
           {/* Delivery OTP */}
           {status === 'out_for_delivery' && o?.delivery_otp && (
             <View style={styles.otpCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.otpLabel}>YOUR DELIVERY CODE</Text>
-                <Text style={styles.otpCode}>{o.delivery_otp}</Text>
-                <Text style={styles.otpHint}>Share this with your delivery partner</Text>
+              <View style={styles.otpInstructRow}>
+                <ShieldCheck size={15} color="#059669" />
+                <Text style={styles.otpInstructTitle}>Before sharing this code</Text>
               </View>
-              <ShieldCheck size={28} color={colors.primary} />
+              <Text style={styles.otpInstructBody}>
+                Open your package with the rider present and check all items. Sharing this code confirms your order was delivered correctly.
+              </Text>
+              <View style={styles.otpDivider} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={styles.otpLabel}>YOUR DELIVERY CODE</Text>
+                  <Text style={styles.otpCode}>{o.delivery_otp}</Text>
+                  <Text style={styles.otpHint}>Share only after checking your items</Text>
+                </View>
+                <ShieldCheck size={28} color={colors.primary} />
+              </View>
             </View>
           )}
 
@@ -548,6 +558,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4', borderRadius: 16, padding: 16, marginVertical: 12,
     borderWidth: 1.5, borderColor: '#BBF7D0',
   },
+  otpInstructRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  otpInstructTitle: { fontSize: 12, fontFamily: fontFamily.extrabold, color: '#059669' },
+  otpInstructBody: { fontSize: 12, fontFamily: fontFamily.regular, color: '#065F46', lineHeight: 18 },
+  otpDivider: { height: 1, backgroundColor: '#BBF7D0', marginVertical: 12 },
   otpLabel: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#059669', letterSpacing: 1.5, marginBottom: 4 },
   otpCode: { fontSize: 34, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: 8 },
   otpHint: { fontSize: 11, fontFamily: fontFamily.regular, color: colors.inkMuted, marginTop: 4 },
