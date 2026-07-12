@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TextInput,
@@ -15,6 +15,7 @@ import {
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
+import { getSocket } from '../socket/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -272,6 +273,19 @@ const RiderTicketCard = ({ ticket, idx }: { ticket: Ticket; idx: number }) => {
     },
     onError: () => Alert.alert('Error', 'Could not send reply. Please try again.'),
   });
+
+  // Real-time: refetch when support agent replies
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const handler = (data: { ticketId: string }) => {
+      if (data?.ticketId === ticket.id) {
+        queryClient.invalidateQueries({ queryKey: ['rider-ticket-thread', ticket.id] });
+      }
+    };
+    socket.on('ticket_replied', handler);
+    return () => { socket.off('ticket_replied', handler); };
+  }, [ticket.id, queryClient]);
 
   const messages: TicketMessage[] = threadData?.messages ?? [];
   const canReply = !isTerminal(ticket.status);
