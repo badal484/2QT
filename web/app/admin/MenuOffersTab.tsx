@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { Tag, Plus, Trash2, ToggleLeft, ToggleRight, X, Edit3, Globe, MapPin, Search } from "lucide-react";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { SkeletonList } from "../components/ui/Skeleton";
 
 // ── Target search + multi-select ──────────────────────────────────────────────
 interface TargetResult { id: string; name: string; sub?: string }
@@ -312,7 +313,7 @@ export function MenuOffersTab() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 bg-white/[0.04] rounded-2xl animate-pulse" />)}</div>
+        <SkeletonList rows={3} />
       ) : offers.length === 0 ? (
         <div className="py-24 text-center border border-white/10 border-dashed rounded-2xl">
           <Tag className="w-10 h-10 text-zinc-600 mx-auto mb-4" />

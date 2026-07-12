@@ -9,6 +9,7 @@ import {
   Search, Filter, ExternalLink, RefreshCw, ShieldCheck,
   AlertTriangle, ChevronDown,
 } from "lucide-react";
+import { SkeletonList } from "../components/ui/Skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 
 type DocStatus = "pending" | "approved" | "rejected";
@@ -188,9 +189,7 @@ export function RiderDocumentsTab({ onOpenRider }: { onOpenRider?: (riderId: str
 
       {/* List */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-        </div>
+        <SkeletonList rows={4} />
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 bg-white/3 rounded-2xl border border-white/8">
           <ShieldCheck size={36} className="text-zinc-600 mb-3" />

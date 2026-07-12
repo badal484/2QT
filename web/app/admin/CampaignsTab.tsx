@@ -4,6 +4,7 @@ import { Zap, Clock, Gift, RotateCcw, Cake, TrendingUp, Star, ToggleLeft, Toggle
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
+import { SkeletonList } from "../components/ui/Skeleton";
 
 const TYPE_META: Record<string, { label: string; color: string; icon: any; desc: string }> = {
   welcome:      { label: "Welcome",      color: "orange", icon: Gift,       desc: "First-time user discount" },
@@ -548,9 +549,7 @@ export function CampaignsTab() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-40">
-          <Loader2 className="animate-spin text-zinc-300" size={28}/>
-        </div>
+        <SkeletonList rows={4} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {campaigns.map(c => (

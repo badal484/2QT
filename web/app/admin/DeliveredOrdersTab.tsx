@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { RefreshCw, Camera, Package, CheckCircle2 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { SkeletonList, SkeletonOrderCard } from "../components/ui/Skeleton";
 
 export function DeliveredOrdersTab() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -73,11 +74,7 @@ export function DeliveredOrdersTab() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-28 bg-white/[0.02] rounded-2xl animate-pulse border border-white/5" />
-          ))}
-        </div>
+        <SkeletonList rows={3} item={<SkeletonOrderCard />} />
       ) : shown.length === 0 ? (
         <div className="py-24 flex flex-col items-center justify-center bg-white/[0.01] border border-white/5 rounded-[32px]">
           <CheckCircle2 className="w-12 h-12 text-emerald-500 mb-4" />

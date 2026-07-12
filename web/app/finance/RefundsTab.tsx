@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Wallet, Building2, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, IndianRupee } from "lucide-react";
+import { SkeletonList, SkeletonTableRow } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -177,7 +178,7 @@ export function RefundsTab() {
 
       {/* Refund list */}
       {loading ? (
-        <div className="py-16 text-center text-zinc-500 animate-pulse font-medium">Loading refunds…</div>
+        <SkeletonList rows={5} item={<SkeletonTableRow />} />
       ) : refunds.length === 0 ? (
         <div className="py-20 text-center">
           <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3 opacity-50" />
