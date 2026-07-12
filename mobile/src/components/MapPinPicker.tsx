@@ -1,9 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Animated, Platform
+  Animated
 } from 'react-native';
-import MapView, { PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { ArrowLeft, Navigation, MapPin, Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Geolocation from '@react-native-community/geolocation';
@@ -72,18 +72,31 @@ export const MapPinPicker: React.FC<Props> = ({
 
   useEffect(() => {
     Geolocation.requestAuthorization();
+
+    // Stage 1: fast network/WiFi fix — centers map immediately (low accuracy)
     Geolocation.getCurrentPosition(
       pos => {
         const { latitude, longitude } = pos.coords;
-        mapRef.current?.animateToRegion({
-          latitude, longitude, latitudeDelta: 0.005, longitudeDelta: 0.005
-        }, 800);
+        mapRef.current?.animateToRegion(
+          { latitude, longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 800
+        );
         geocodeAndSet(latitude, longitude);
       },
-      () => {
-        geocodeAndSet(initialLat, initialLng);
+      () => geocodeAndSet(initialLat, initialLng),
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 },
+    );
+
+    // Stage 2: high-accuracy GPS refinement (takes 5-15s on Android but precise)
+    Geolocation.getCurrentPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords;
+        mapRef.current?.animateToRegion(
+          { latitude, longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 600
+        );
+        geocodeAndSet(latitude, longitude);
       },
-      { enableHighAccuracy: Platform.OS === 'ios', timeout: 10000, maximumAge: 30000 },
+      () => {}, // silently ignore — Stage 1 already showing something
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -125,7 +138,7 @@ export const MapPinPicker: React.FC<Props> = ({
           latitude: initialLat, longitude: initialLng, latitudeDelta: 0.005, longitudeDelta: 0.005
         }, 800);
       },
-      { enableHighAccuracy: Platform.OS === 'ios', timeout: 10000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   }, [geocodeAndSet, initialLat, initialLng]);
 
