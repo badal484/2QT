@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal,
   ActivityIndicator, Alert, Image, TextInput, FlatList,
 } from 'react-native';
+import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { ZoomIn } from 'react-native-reanimated';
@@ -227,7 +228,14 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
   if (isLoading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={colors.primary} style={{ flex: 1 }} />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ChevronLeft size={22} color={colors.ink} strokeWidth={2} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Booking Detail</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <SkeletonScreenList item={<SkeletonListItem />} />
       </View>
     );
   }

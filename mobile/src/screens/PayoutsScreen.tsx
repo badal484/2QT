@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, ActivityIndicator,
   Alert, StatusBar, StyleSheet, TextInput,
 } from 'react-native';
+import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
@@ -71,8 +72,18 @@ const PayoutsScreen = ({ navigation }: any) => {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: R.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={R.orange} />
+      <View style={{ flex: 1, backgroundColor: R.bg }}>
+        <StatusBar barStyle="dark-content" backgroundColor={R.white} />
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+              <ArrowLeft size={20} color={R.ink} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Payouts</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <SkeletonScreenList item={<SkeletonListItem />} />
+        </SafeAreaView>
       </View>
     );
   }

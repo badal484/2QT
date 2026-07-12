@@ -21,10 +21,11 @@ if (!__DEV__) {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,   // 5 min — don't refetch on every focus
-      gcTime: 30 * 60 * 1000,      // 30 min in memory
+      staleTime: 5 * 60 * 1000,        // 5 min — don't refetch on every focus
+      gcTime: 30 * 60 * 1000,           // 30 min in memory
       retry: 1,
       retryDelay: 1000,
+      placeholderData: (prev: any) => prev, // show stale data instantly on re-visit, never blank
     },
   },
 });

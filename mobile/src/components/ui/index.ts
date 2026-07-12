@@ -8,3 +8,4 @@ export * from './ProgressBar';
 export * from './StatCard';
 export * from './BouncingButton';
 export * from './ActiveOrdersBottomSheet';
+export * from './ScreenError';

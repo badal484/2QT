@@ -2,6 +2,7 @@ import { ArrowLeft, CreditCard, Plus, History } from 'lucide-react-native';
 import React from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, ActivityIndicator, Alert, StyleSheet, Modal, TextInput } from 'react-native';
+import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import RazorpayCheckout from 'react-native-razorpay';
@@ -118,8 +119,8 @@ const WalletScreen = ({ navigation }: any) => {
   });
 
   if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
+    <View style={styles.container}>
+      <SkeletonScreenList item={<SkeletonListItem />} />
     </View>
   );
 

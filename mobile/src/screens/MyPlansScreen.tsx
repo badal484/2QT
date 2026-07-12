@@ -1,7 +1,8 @@
 import { ArrowLeft, Calendar } from 'lucide-react-native';
 import React from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 
@@ -12,8 +13,15 @@ const MyPlansScreen = ({ navigation }: any) => {
   });
 
   if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft size={24} color="#1A1A2E" />
+        </BouncingButton>
+        <Text style={styles.headerTitle}>My Subscriptions</Text>
+        <View style={{ width: 48 }} />
+      </View>
+      <SkeletonScreenList item={<SkeletonListItem />} />
     </View>
   );
 

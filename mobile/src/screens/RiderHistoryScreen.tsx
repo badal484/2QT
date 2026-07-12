@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ArrowLeft, Package, IndianRupee, CheckCircle2, XCircle, Navigation } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SkeletonScreenList, SkeletonOrderCard, ScreenError } from '../components/ui';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
@@ -66,18 +67,34 @@ const RiderHistoryScreen = ({ navigation }: any) => {
   const groups = groupByDate(shown);
 
   if (isLoading) return (
-    <View style={s.loadingWrap}>
-      <ActivityIndicator size="large" color={R.orange} />
+    <View style={s.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <View style={s.header}>
+          <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <ArrowLeft size={20} color={R.ink} />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Order History</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <SkeletonScreenList item={<SkeletonOrderCard />} />
+      </SafeAreaView>
     </View>
   );
 
   if (isError) return (
-    <View style={s.loadingWrap}>
-      <Package size={40} color={R.border} />
-      <Text style={[s.emptyTitle, { marginTop: 16 }]}>Couldn't load history</Text>
-      <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 12, backgroundColor: R.orange, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }} activeOpacity={0.85}>
-        <Text style={{ color: R.white, fontWeight: '700', fontSize: 14 }}>Try Again</Text>
-      </TouchableOpacity>
+    <View style={s.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <View style={s.header}>
+          <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <ArrowLeft size={20} color={R.ink} />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Order History</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <ScreenError onRetry={refetch} />
+      </SafeAreaView>
     </View>
   );
 

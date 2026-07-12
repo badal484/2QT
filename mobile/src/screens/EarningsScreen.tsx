@@ -1,12 +1,13 @@
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity,
   StatusBar, StyleSheet,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ArrowLeft, Wallet, Trophy, Banknote, CalendarDays } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SkeletonScreenList, SkeletonStatCard, ScreenError } from '../components/ui';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
@@ -25,18 +26,34 @@ const EarningsScreen = ({ navigation }: any) => {
   });
 
   if (isLoading) return (
-    <View style={s.loadWrap}>
-      <ActivityIndicator size="large" color={R.orange} />
+    <View style={s.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={R.bg} />
+      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <ArrowLeft size={20} color={R.ink} />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Earnings</Text>
+        <TouchableOpacity style={s.payoutBtn} onPress={() => navigation.navigate('Payouts')} activeOpacity={0.7}>
+          <Banknote size={18} color={R.orange} />
+        </TouchableOpacity>
+      </View>
+      <SkeletonScreenList item={<SkeletonStatCard />} count={4} />
     </View>
   );
 
   if (isError) return (
-    <View style={s.loadWrap}>
-      <Wallet size={40} color="#E5E7EB" />
-      <Text style={{ fontSize: 16, fontWeight: '700', color: R.ink, marginTop: 16 }}>Couldn't load earnings</Text>
-      <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 12, backgroundColor: R.orange, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }} activeOpacity={0.85}>
-        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>Try Again</Text>
-      </TouchableOpacity>
+    <View style={s.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={R.bg} />
+      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <ArrowLeft size={20} color={R.ink} />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Earnings</Text>
+        <TouchableOpacity style={s.payoutBtn} onPress={() => navigation.navigate('Payouts')} activeOpacity={0.7}>
+          <Banknote size={18} color={R.orange} />
+        </TouchableOpacity>
+      </View>
+      <ScreenError onRetry={refetch} />
     </View>
   );
 

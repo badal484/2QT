@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ArrowLeft, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react-native';
@@ -60,8 +61,14 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
   });
 
   if (isLoading) return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#FF6B35" />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft size={24} color="#1A1A2E" />
+        </BouncingButton>
+        <Text style={styles.headerTitle}>Renew Membership</Text>
+      </View>
+      <SkeletonScreenList item={<SkeletonListItem />} />
     </View>
   );
 
