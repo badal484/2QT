@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SkeletonDashboard, ScreenError } from '../../components/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';

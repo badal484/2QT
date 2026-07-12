@@ -14,9 +14,8 @@ import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { ChefHat, Bike, ShoppingBag } from 'lucide-react-native';
 
-const { width, height } = Dimensions.get('window');
-
 const SplashScreen = () => {
+  const { width, height } = useWindowDimensions();
   const logoScale = useSharedValue(0.3);
   const logoOpacity = useSharedValue(0);
   const subtitleOpacity = useSharedValue(0);

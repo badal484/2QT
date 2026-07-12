@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Dimensions
+  TextInput, ActivityIndicator, useWindowDimensions
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
@@ -17,11 +17,11 @@ import { fontFamily } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const COLUMN_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - 16) / 2;
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
 const CategoryScreen = ({ route, navigation }: any) => {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const COLUMN_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - 16) / 2;
   const { categorySlug, categoryName, categoryImage, categoryBannerUrl } = route.params as {
     categorySlug: string;
     categoryName: string;
@@ -108,7 +108,7 @@ const CategoryScreen = ({ route, navigation }: any) => {
 
     return (
       <BouncingButton
-        style={[styles.gridCard, { marginLeft: isEven ? 0 : 16 }]}
+        style={[styles.gridCard, { width: COLUMN_WIDTH, marginLeft: isEven ? 0 : 16 }]}
         activeOpacity={0.93}
         onPress={() => {
           if (item.available) {
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
 
   // 2-Column Grid
   columnWrapper: { paddingHorizontal: 12, justifyContent: 'flex-start', marginBottom: 16 },
-  gridCard: { width: COLUMN_WIDTH, backgroundColor: 'transparent' },
+  gridCard: { backgroundColor: 'transparent' },
   gridCardImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F9FAFB', position: 'relative', marginBottom: 8 },
   gridCardImage: { width: '100%', height: '100%' },
   cardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },

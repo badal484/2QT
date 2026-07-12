@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, Dimensions, Alert, Image
+  StatusBar, useWindowDimensions, Alert, Image
 } from 'react-native';
 import Svg, { Path, Rect, Circle, Text as SvgText, Line, Ellipse } from 'react-native-svg';
 import { useDispatch, useSelector } from 'react-redux';
@@ -18,8 +18,7 @@ import { api } from '../api/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const HERO_H = Math.round(SCREEN_W * 0.82);
+
 
 const PremiumBag = () => (
   <View style={{ width: 180, height: 240, alignItems: 'center', justifyContent: 'center' }}>
@@ -40,6 +39,7 @@ function haptic() {
 }
 
 const ItemDetailScreen = ({ route, navigation }: any) => {
+  const { width: SCREEN_W } = useWindowDimensions();
   const { item } = route.params;
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
@@ -137,7 +137,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
         bounces={false}
       >
         {/* ── Hero image ── */}
-        <View style={s.heroBox}>
+        <View style={[s.heroBox, { width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }]}>
           {item.photo_url ? (
             <NetworkImage uri={item.photo_url} style={s.heroImg} />
           ) : (
@@ -312,7 +312,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
               contentContainerStyle={s.promoRow}
             >
               {promos.map((promo, idx) => (
-                <View key={promo.id ?? idx} style={s.promoCard}>
+                <View key={promo.id ?? idx} style={[s.promoCard, { width: SCREEN_W - 64 }]}>
                   <View style={s.promoIconBox}>
                     <Text style={s.promoIconText}>%</Text>
                   </View>
@@ -435,7 +435,7 @@ const s = StyleSheet.create({
   },
 
   scroll: { flex: 1 },
-  heroBox: { width: SCREEN_W, height: Math.round(SCREEN_W * 0.82), backgroundColor: '#F9FAFB' },
+  heroBox: { backgroundColor: '#F9FAFB' },
   heroImg: { width: '100%', height: '100%' },
   heroPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   heroEmoji: { fontSize: 70 },
@@ -700,7 +700,6 @@ const s = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    width: SCREEN_W - 64,
     borderWidth: 1,
     borderColor: '#C8E6C9',
   },

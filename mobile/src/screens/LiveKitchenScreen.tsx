@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import { ArrowLeft, Play, ShieldCheck, Thermometer, Info, ChevronRight, UserCircle, Droplets, Utensils, X } from 'lucide-react-native';
 import Animated, { FadeInDown, BounceIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -11,7 +11,6 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { RootState } from '../store';
 
-const { width, height } = Dimensions.get('window');
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
 const sampleVideo = require('./sample.mp4');
