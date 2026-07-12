@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Animated
+  Animated, Platform
 } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { ArrowLeft, Navigation, MapPin, Search } from 'lucide-react-native';
@@ -83,7 +83,7 @@ export const MapPinPicker: React.FC<Props> = ({
       () => {
         geocodeAndSet(initialLat, initialLng);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      { enableHighAccuracy: Platform.OS === 'ios', timeout: 10000, maximumAge: 30000 },
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -125,7 +125,7 @@ export const MapPinPicker: React.FC<Props> = ({
           latitude: initialLat, longitude: initialLng, latitudeDelta: 0.005, longitudeDelta: 0.005
         }, 800);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      { enableHighAccuracy: Platform.OS === 'ios', timeout: 10000, maximumAge: 0 },
     );
   }, [geocodeAndSet, initialLat, initialLng]);
 
