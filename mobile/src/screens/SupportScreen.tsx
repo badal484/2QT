@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Plus, MessageSquare, Clock, CheckCircle2,
   ChevronDown, ChevronUp, TicketCheck, Send,
+  Package, CreditCard, Bike, User,
 } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,7 +49,7 @@ interface TicketMessage {
 // ── Categories ────────────────────────────────────────────────────────────────
 const CATEGORIES = [
   {
-    key: 'order_issue', label: 'Order Issue', icon: '📦',
+    key: 'order_issue', label: 'Order Issue', Icon: Package,
     ticket_type: 'order_complaint',
     sub_types: [
       { key: 'missing_item',       label: 'Missing Item' },
@@ -60,12 +61,12 @@ const CATEGORIES = [
     ],
   },
   {
-    key: 'payment', label: 'Payment', icon: '💳',
+    key: 'payment', label: 'Payment', Icon: CreditCard,
     ticket_type: 'payment_issue',
     sub_types: [],
   },
   {
-    key: 'delivery', label: 'Delivery', icon: '🚴',
+    key: 'delivery', label: 'Delivery', Icon: Bike,
     ticket_type: 'delivery_issue',
     sub_types: [
       { key: 'late_delivery',    label: 'Late Delivery' },
@@ -74,12 +75,12 @@ const CATEGORIES = [
     ],
   },
   {
-    key: 'account', label: 'My Account', icon: '👤',
+    key: 'account', label: 'My Account', Icon: User,
     ticket_type: 'account',
     sub_types: [],
   },
   {
-    key: 'other', label: 'Other', icon: '💬',
+    key: 'other', label: 'Other', Icon: MessageSquare,
     ticket_type: 'general',
     sub_types: [],
   },
@@ -353,7 +354,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
               onPress={() => handleCategoryChange(cat.key)}
               activeOpacity={0.8}
             >
-              <Text style={styles.catEmoji}>{cat.icon}</Text>
+              <cat.Icon size={15} color={categoryKey === cat.key ? colors.primary : colors.inkMuted} />
               <Text style={[styles.catLabel, categoryKey === cat.key && styles.catLabelActive]}>
                 {cat.label}
               </Text>
@@ -425,7 +426,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
         {/* Tip box */}
         <View style={styles.tipBox}>
           <Text style={styles.tipText}>
-            💡 Including your Order ID speeds up the resolution. Find it in Order History.
+            Including your Order ID speeds up the resolution. Find it in Order History.
           </Text>
         </View>
 
@@ -617,7 +618,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: colors.border, marginRight: 8,
   },
   catChipActive: { backgroundColor: colors.primaryTint, borderColor: colors.primary },
-  catEmoji: { fontSize: 14 },
   catLabel: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted },
   catLabelActive: { color: colors.primary },
   subChip: {
