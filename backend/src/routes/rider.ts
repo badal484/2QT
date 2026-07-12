@@ -13,6 +13,7 @@ import { getAppSetting, getAppSettingInt } from '../utils/appSettings';
 import { pushService } from '../services/push.service';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import { PRIORITY_SLA } from './support';
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || '',
@@ -1778,6 +1779,280 @@ router.patch('/bank-account', authenticate, requireRole('rider', 'rider_captain'
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Failed to save bank account' });
+    }
+});
+
+// ─── Rider Support Tickets ────────────────────────────────────────────────────
+
+router.post('/support/tickets', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { subject, message, ticket_type, sub_type, linked_order_id, linked_payout_id, suggested_refund_paise } = req.body;
+
+    try {
+        const sla = PRIORITY_SLA[sub_type ?? ''] ?? PRIORITY_SLA['general'];
+        const priority = sla.priority;
+        const slaDeadline = new Date(Date.now() + sla.hours * 3600 * 1000).toISOString();
+
+        const { rows } = await query(`
+            INSERT INTO support_tickets
+              (rider_id, customer_id, user_type, ticket_type, sub_type, subject, description,
+               priority, sla_deadline, linked_order_id, linked_payout_id,
+               suggested_refund_paise, refund_eligible, issue_type)
+            VALUES ($1, NULL, 'rider', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $4)
+            RETURNING *
+        `, [
+            riderId,
+            ticket_type ?? 'general',
+            sub_type ?? null,
+            subject,
+            message,
+            priority,
+            slaDeadline,
+            linked_order_id ?? null,
+            linked_payout_id ?? null,
+            suggested_refund_paise ?? 0,
+            (suggested_refund_paise ?? 0) > 0,
+        ]);
+
+        const ticket = rows[0];
+
+        await query(
+            `INSERT INTO ticket_messages (ticket_id, sender_id, sender_type, message)
+             VALUES ($1, $2, 'user', $3)`,
+            [ticket.id, riderId, message]
+        );
+
+        emitToAdmin('new_ticket', { ticket });
+
+        res.json({ ticket });
+    } catch (err) {
+        console.error('[rider/support/tickets POST]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.get('/support/tickets', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    try {
+        const { rows } = await query(`
+            SELECT st.*,
+                   (SELECT tm.message FROM ticket_messages tm
+                    WHERE tm.ticket_id = st.id
+                    ORDER BY tm.created_at DESC LIMIT 1) AS latest_message,
+                   (SELECT tm.created_at FROM ticket_messages tm
+                    WHERE tm.ticket_id = st.id
+                    ORDER BY tm.created_at DESC LIMIT 1) AS latest_message_at
+            FROM support_tickets st
+            WHERE st.rider_id = $1
+            ORDER BY st.created_at DESC
+        `, [riderId]);
+        res.json({ tickets: rows });
+    } catch (err) {
+        console.error('[rider/support/tickets GET]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.get('/support/tickets/:id', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { id } = req.params;
+    try {
+        const { rows: tickets } = await query(
+            'SELECT * FROM support_tickets WHERE id = $1 AND rider_id = $2',
+            [id, riderId]
+        );
+        if (!tickets[0]) return res.status(404).json({ error: 'TICKET_NOT_FOUND' });
+
+        const { rows: messages } = await query(
+            `SELECT tm.*, u.name AS sender_name
+             FROM ticket_messages tm
+             LEFT JOIN users u ON u.id = tm.sender_id
+             WHERE tm.ticket_id = $1
+             ORDER BY tm.created_at ASC`,
+            [id]
+        );
+
+        res.json({ ticket: tickets[0], messages });
+    } catch (err) {
+        console.error('[rider/support/tickets/:id GET]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.post('/support/tickets/:id/reply', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { id } = req.params;
+    const { message } = req.body;
+
+    if (!message?.trim()) return res.status(400).json({ error: 'message required' });
+
+    try {
+        const { rows: tickets } = await query(
+            'SELECT status FROM support_tickets WHERE id = $1 AND rider_id = $2',
+            [id, riderId]
+        );
+        if (!tickets[0]) return res.status(404).json({ error: 'TICKET_NOT_FOUND' });
+        if (['resolved', 'closed'].includes(tickets[0].status)) {
+            return res.status(400).json({ error: 'TICKET_CLOSED' });
+        }
+
+        const { rows: msgRows } = await query(
+            `INSERT INTO ticket_messages (ticket_id, sender_id, sender_type, message)
+             VALUES ($1, $2, 'user', $3) RETURNING *`,
+            [id, riderId, message.trim()]
+        );
+
+        if (tickets[0].status === 'awaiting_user') {
+            await query(
+                `UPDATE support_tickets SET status = 'open', updated_at = NOW() WHERE id = $1`,
+                [id]
+            );
+        } else {
+            await query('UPDATE support_tickets SET updated_at = NOW() WHERE id = $1', [id]);
+        }
+
+        emitToAdmin('ticket_rider_reply', { ticketId: id });
+
+        res.json({ message: msgRows[0] });
+    } catch (err) {
+        console.error('[rider/support/tickets/:id/reply POST]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Per-order earnings breakdown ─────────────────────────────────────────────
+
+router.get('/orders/:id/earnings-breakdown', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { id } = req.params;
+    try {
+        const { rows } = await query(`
+            SELECT o.id, o.display_id, o.total_amount_paise, o.tip_paise,
+                   o.delivered_at, o.distance_km, o.payment_method,
+                   z.rider_base_pay_paise, z.rider_free_km, z.rider_per_km_paise,
+                   z.surge_enabled, z.surge_multiplier, z.surge_expires_at
+            FROM orders o JOIN zones z ON z.id = o.zone_id
+            WHERE o.id = $1 AND o.rider_id = $2 AND o.status = 'delivered'
+        `, [id, riderId]);
+
+        if (!rows[0]) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        const order = rows[0];
+
+        const distanceKm: number = order.distance_km != null ? parseFloat(order.distance_km) : 0;
+        const shortTripPaise: number = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
+        const perKmPaise: number = order.rider_per_km_paise ?? 500;
+        const freeKm: number = parseFloat(order.rider_free_km ?? '2');
+
+        const baseEarnings = distanceKm <= freeKm
+            ? shortTripPaise
+            : Math.floor(distanceKm * perKmPaise);
+
+        const surgeActive = order.surge_enabled && parseFloat(order.surge_multiplier ?? '1') > 1
+            && (!order.surge_expires_at || new Date(order.surge_expires_at) > new Date(order.delivered_at));
+        const surgeMultiplier = surgeActive ? parseFloat(order.surge_multiplier) : 1;
+        const platformFee = Math.floor(baseEarnings * 0.1);
+        const surgedBase = Math.floor(baseEarnings * surgeMultiplier);
+        const tipPaise = parseInt(order.tip_paise ?? '0');
+        const netEarnings = surgedBase + tipPaise - platformFee;
+
+        const formula = distanceKm <= freeKm
+            ? `flat rate ₹${(shortTripPaise / 100).toFixed(0)} (≤${freeKm}km)`
+            : `${distanceKm}km × ₹${(perKmPaise / 100).toFixed(0)}/km = ₹${(baseEarnings / 100).toFixed(0)}`;
+
+        res.json({
+            orderId: order.id,
+            displayId: order.display_id,
+            breakdown: {
+                distanceKm,
+                thresholdKm: freeKm,
+                formula,
+                baseEarningsPaise: baseEarnings,
+                surgeActive,
+                surgeMultiplier,
+                surgedBasePaise: surgedBase,
+                tipPaise,
+                platformFeePaise: platformFee,
+                netEarningsPaise: netEarnings,
+            },
+        });
+    } catch (err) {
+        console.error('[rider/earnings-breakdown]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── Complaints against me ────────────────────────────────────────────────────
+
+router.get('/complaints-against-me', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    try {
+        const { rows } = await query(`
+            SELECT c.id, c.type, c.description, c.status, c.created_at,
+                   o.display_id as order_display_id, o.delivered_at,
+                   c.refund_scope, c.refund_amount_paise, c.admin_note
+            FROM order_complaints c
+            JOIN orders o ON o.id = c.order_id
+            WHERE o.rider_id = $1
+            ORDER BY c.created_at DESC
+            LIMIT 50
+        `, [riderId]);
+        res.json({ complaints: rows });
+    } catch (err) {
+        console.error('[rider/complaints-against-me]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.post('/complaints-against-me/:complaintId/respond', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    const { complaintId } = req.params;
+    const { message } = req.body;
+
+    if (!message?.trim()) return res.status(400).json({ error: 'message required' });
+
+    try {
+        // Verify the complaint belongs to an order by this rider
+        const { rows: compRows } = await query(`
+            SELECT c.id, c.order_id, o.display_id
+            FROM order_complaints c
+            JOIN orders o ON o.id = c.order_id
+            WHERE c.id = $1 AND o.rider_id = $2
+        `, [complaintId, riderId]);
+
+        if (!compRows[0]) return res.status(404).json({ error: 'COMPLAINT_NOT_FOUND' });
+        const comp = compRows[0];
+
+        const slaDeadline = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
+
+        const { rows: ticketRows } = await query(`
+            INSERT INTO support_tickets
+              (rider_id, customer_id, user_type, ticket_type, sub_type, subject, description,
+               priority, sla_deadline, linked_order_id, issue_type)
+            VALUES ($1, NULL, 'rider', 'dispute', 'false_complaint',
+                    $2, $3, 'high', $4, $5, 'false_complaint')
+            RETURNING id
+        `, [
+            riderId,
+            `Dispute: complaint #${comp.display_id}`,
+            message.trim(),
+            slaDeadline,
+            comp.order_id,
+        ]);
+
+        const ticketId = ticketRows[0].id;
+
+        await query(
+            `INSERT INTO ticket_messages (ticket_id, sender_id, sender_type, message)
+             VALUES ($1, $2, 'user', $3)`,
+            [ticketId, riderId, message.trim()]
+        );
+
+        emitToAdmin('rider_dispute', { ticketId, complaintId });
+
+        res.json({ ticketId });
+    } catch (err) {
+        console.error('[rider/complaints-against-me/:id/respond]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });
 
