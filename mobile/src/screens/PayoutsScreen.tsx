@@ -381,21 +381,26 @@ const PayoutsScreen = ({ navigation }: any) => {
           ) : (
             <View style={styles.historyList}>
               {data.payouts.map((p: any) => {
-                const isPaid = p.status === 'paid';
-                const isAuto = p.payout_mode === 'auto';
-                const method = p.payout_method || 'upi';
+                const isPaid   = p.status === 'paid';
+                const isFailed = p.status === 'failed';
+                const isAuto   = p.payout_mode === 'auto';
+                const method   = p.payout_method || 'upi';
+                const iconColor = isPaid ? R.green : isFailed ? '#EF4444' : R.orange;
+                const iconBg    = isPaid ? R.greenLight : isFailed ? '#FEF2F2' : R.orangeLight;
+                const badgeColor = isPaid ? R.green : isFailed ? '#EF4444' : R.orange;
+                const badgeBg    = isPaid ? R.greenLight : isFailed ? '#FEE2E2' : R.orangeLight;
                 return (
                   <View key={p.id} style={styles.payoutRow}>
-                    <View style={[styles.payoutIcon, { backgroundColor: isPaid ? R.greenLight : R.orangeLight }]}>
-                      <Shield size={16} color={isPaid ? R.green : R.orange} />
+                    <View style={[styles.payoutIcon, { backgroundColor: iconBg }]}>
+                      <Shield size={16} color={iconColor} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.payoutDate}>
                         {new Date(p.week_start || p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                        <View style={[styles.badge, isPaid ? styles.badgePaid : styles.badgePending]}>
-                          <Text style={[styles.badgeText, { color: isPaid ? R.green : R.orange }]}>
+                        <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+                          <Text style={[styles.badgeText, { color: badgeColor }]}>
                             {p.status.toUpperCase()}
                           </Text>
                         </View>
@@ -413,8 +418,15 @@ const PayoutsScreen = ({ navigation }: any) => {
                           <Text style={styles.utrText}>UTR: {p.utr_number}</Text>
                         )}
                       </View>
+                      {isFailed && p.failure_reason && (
+                        <Text style={{ color: '#EF4444', fontSize: 10, marginTop: 4 }} numberOfLines={2}>
+                          {p.failure_reason}
+                        </Text>
+                      )}
                     </View>
-                    <Text style={styles.payoutAmt}>₹{(p.net_amount_paise / 100).toFixed(0)}</Text>
+                    <Text style={[styles.payoutAmt, isFailed && { color: '#EF4444' }]}>
+                      ₹{(p.net_amount_paise / 100).toFixed(0)}
+                    </Text>
                   </View>
                 );
               })}
@@ -522,8 +534,6 @@ const styles = StyleSheet.create({
   payoutIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   payoutDate: { color: R.ink, fontWeight: '800', fontSize: 15 },
   badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  badgePaid: { backgroundColor: R.greenLight },
-  badgePending: { backgroundColor: R.orangeLight },
   badgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   badgeTextMuted: { fontSize: 9, fontWeight: '700', color: R.gray, letterSpacing: 0.5 },
   utrText: { color: R.muted, fontSize: 10, fontWeight: '600', fontFamily: 'monospace', alignSelf: 'center' },

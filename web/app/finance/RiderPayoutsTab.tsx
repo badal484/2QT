@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, CheckCircle2, Bike, X, ChevronDown, ChevronUp } from "lucide-react";
+import { RefreshCw, CheckCircle2, Bike, X, ChevronDown, ChevronUp, AlertTriangle, RotateCcw } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
@@ -94,8 +94,9 @@ export function RiderPayoutsTab() {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [riders, setRiders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"pending" | "paid" | "riders">("pending");
+  const [view, setView] = useState<"pending" | "paid" | "failed" | "riders">("pending");
   const [markPaying, setMarkPaying] = useState<any>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,6 +118,20 @@ export function RiderPayoutsTab() {
   useEffect(() => { load(); }, [load]);
 
   useSocketRefresh(["rider_payout_updated", "order_status_update"], load);
+
+  const handleRetry = async (id: string) => {
+    setRetrying(id);
+    try {
+      await api.post(`/finance/rider-payouts/${id}/retry`, {});
+      toast.success("Reset to pending — use Mark Paid to reprocess");
+      setView("pending");
+      await load();
+    } catch {
+      toast.error("Failed to retry");
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   const handleMarkPaid = async (id: string, paymentReference: string, notes: string) => {
     try {
@@ -153,13 +168,15 @@ export function RiderPayoutsTab() {
       </div>
 
       {/* View tabs */}
-      <div className="flex gap-2">
-        {(["pending", "paid", "riders"] as const).map(v => (
+      <div className="flex gap-2 flex-wrap">
+        {(["pending", "paid", "failed", "riders"] as const).map(v => (
           <button
             key={v}
             onClick={() => setView(v)}
             className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-colors ${
-              view === v ? "bg-indigo-500 text-white" : "bg-white/5 text-white/40 hover:text-white hover:bg-white/10"
+              view === v
+                ? v === "failed" ? "bg-red-500/80 text-white" : "bg-indigo-500 text-white"
+                : "bg-white/5 text-white/40 hover:text-white hover:bg-white/10"
             }`}
           >
             {v === "riders" ? "All Riders" : v}
@@ -174,6 +191,16 @@ export function RiderPayoutsTab() {
             <div className="text-xs text-white/30">{payouts.length} payout requests</div>
           </div>
           <div className="text-2xl font-black text-indigo-400">{fmt(totalPending)}</div>
+        </div>
+      )}
+
+      {view === "failed" && payouts.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-5 py-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+          <div>
+            <div className="text-sm font-bold text-red-400">{payouts.length} failed payout{payouts.length !== 1 ? "s" : ""}</div>
+            <div className="text-xs text-white/30">Retry to reset to pending, then Mark Paid to reprocess</div>
+          </div>
         </div>
       )}
 
@@ -210,17 +237,24 @@ export function RiderPayoutsTab() {
       ) : (
         <div className="space-y-3">
           {payouts.map((p: any) => (
-            <div key={p.id} className="bg-[#0d0d1a] border border-white/[0.07] rounded-2xl p-4">
+            <div
+              key={p.id}
+              className={`bg-[#0d0d1a] rounded-2xl p-4 border ${
+                view === "failed" ? "border-red-500/20" : "border-white/[0.07]"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-black text-white">{p.rider_name}</div>
                   <div className="text-xs text-white/30">{p.rider_phone}</div>
                   <div className="text-xs text-white/30 mt-1">
-                    Week: {new Date(p.week_start).toLocaleDateString("en-IN")} → {new Date(p.week_end).toLocaleDateString("en-IN")}
+                    {new Date(p.week_start).toLocaleDateString("en-IN")} → {new Date(p.week_end).toLocaleDateString("en-IN")}
                   </div>
                 </div>
                 <div className="text-right flex flex-col items-end gap-2">
-                  <div className="text-xl font-black text-indigo-400">{fmt(parseInt(p.net_amount_paise))}</div>
+                  <div className={`text-xl font-black ${view === "failed" ? "text-red-400" : "text-indigo-400"}`}>
+                    {fmt(parseInt(p.net_amount_paise))}
+                  </div>
                   {p.upi_id && <div className="text-xs font-mono text-white/30">{p.upi_id}</div>}
                   {view === "pending" && (
                     <button
@@ -233,14 +267,34 @@ export function RiderPayoutsTab() {
                   {view === "paid" && (
                     <div className="flex items-center gap-1 text-emerald-400">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span className="text-xs font-bold">{p.paid_at ? new Date(p.paid_at).toLocaleDateString("en-IN") : "Paid"}</span>
+                      <span className="text-xs font-bold">
+                        {p.payout_mode === "auto" ? "Auto · " : ""}
+                        {p.paid_at ? new Date(p.paid_at).toLocaleDateString("en-IN") : "Paid"}
+                      </span>
                     </div>
+                  )}
+                  {view === "failed" && (
+                    <button
+                      onClick={() => handleRetry(p.id)}
+                      disabled={retrying === p.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                    >
+                      <RotateCcw className={`w-3 h-3 ${retrying === p.id ? "animate-spin" : ""}`} />
+                      Retry
+                    </button>
                   )}
                 </div>
               </div>
-              {p.payment_reference && (
+              {view === "failed" && p.failure_reason && (
+                <div className="mt-3 pt-3 border-t border-red-500/10 flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
+                  <span className="text-xs text-red-400/70">{p.failure_reason}</span>
+                </div>
+              )}
+              {view === "paid" && p.payment_reference && (
                 <div className="mt-3 pt-3 border-t border-white/[0.05] text-xs text-white/30">
                   Ref: <span className="font-mono text-white/50">{p.payment_reference}</span>
+                  {p.utr_number && <span className="ml-3">UTR: <span className="font-mono text-white/50">{p.utr_number}</span></span>}
                 </div>
               )}
             </div>

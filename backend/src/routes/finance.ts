@@ -429,6 +429,26 @@ router.post('/rider-payouts/:id/mark-paid', financeAccess, financeRole, async (r
   }
 });
 
+// Retry a failed rider payout — resets to pending so finance can mark-paid again
+router.post('/rider-payouts/:id/retry', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await query(`
+      UPDATE weekly_payouts
+      SET status = 'pending', failure_reason = NULL, razorpay_payout_id = NULL,
+          utr_number = NULL, paid_at = NULL, updated_at = NOW()
+      WHERE id = $1 AND status = 'failed'
+      RETURNING rider_id, net_amount_paise
+    `, [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Payout not found or not in failed state' });
+    emitToAll('rider_payout_updated', { action: 'retry', payoutId: id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[finance/rider-payouts/retry]', err);
+    res.status(500).json({ error: 'Failed to retry payout' });
+  }
+});
+
 // ─── Kitchen Payouts ──────────────────────────────────────────────────────────
 
 router.get('/kitchen-payouts', financeAccess, financeRole, async (req: AuthRequest, res) => {
