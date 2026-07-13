@@ -192,7 +192,7 @@ const RootNavigator = () => {
         <CustomerNavigator />
       ) : (activeRole === 'rider' || activeRole === 'rider_captain') ? (
         <RiderNavigator />
-      ) : (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff'].includes(activeRole)) ? (
+      ) : (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff', 'packer'].includes(activeRole)) ? (
         <KitchenNavigator />
       ) : (activeRole === 'partner') ? (
         <PartnerNavigator />
