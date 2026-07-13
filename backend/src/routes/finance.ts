@@ -6,6 +6,7 @@ import type { AuthRequest } from '../middleware/auth';
 import { emitToAll, emitToUser, emitToKitchen, emitToAdmin, emitToPartner } from '../socket';
 import { processWalletRefund, processBankRefund } from '../services/refund.service';
 import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
+import { NotificationService } from '../services/notification.service';
 
 const router = Router();
 const financeAccess = authenticate, financeRole = requireRole('finance', 'super_admin');
@@ -414,6 +415,13 @@ router.post('/rider-payouts/:id/mark-paid', financeAccess, financeRole, async (r
 
     emitToUser(payout.rider_id, 'earnings_updated', { payoutId: id, amountPaise: payout.net_amount_paise, status: 'paid' });
     emitToAll('rider_payout_updated', { action: 'paid', payoutId: id });
+
+    NotificationService.send('rider_payout', {
+      userId: payout.rider_id,
+      amount: (payout.net_amount_paise / 100).toFixed(0),
+      upiId: payout.upi_id || 'your account',
+    }).catch(e => console.error('[finance/rider-payout/notify]', e.message));
+
     res.json({ success: true, payout: rows[0], autoTransferred: autoMode, autoSkipReason });
   } catch (err) {
     console.error('[finance/rider-payouts/mark-paid]', err);
@@ -550,6 +558,19 @@ router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async 
 
     emitToKitchen(kp.kitchen_id, 'kitchen_payout_updated', { payoutId: id, amountPaise: kp.net_payout_paise, status: 'paid' });
     emitToAll('kitchen_payout_updated', { action: 'paid', payoutId: id, kitchenId: kp.kitchen_id });
+
+    // Notify kitchen manager/chef via push (best-effort — notifies all staff for this kitchen)
+    query(
+      `SELECT id FROM users WHERE kitchen_id = $1 AND role IN ('chef','kitchen_manager','partner_kitchen') AND is_active = TRUE LIMIT 5`,
+      [kp.kitchen_id]
+    ).then(({ rows: staff }) => Promise.all(
+      staff.map(s => NotificationService.send('kitchen_payout', {
+        userId: s.id,
+        amount: (kp.net_payout_paise / 100).toFixed(0),
+        upiId: kp.upi_id || 'your account',
+      }))
+    )).catch(e => console.error('[finance/kitchen-payout/notify]', e.message));
+
     res.json({ success: true, payout: rows[0], autoTransferred: autoMode, autoSkipReason });
   } catch (err) {
     console.error('[finance/kitchen-payouts/mark-paid]', err);

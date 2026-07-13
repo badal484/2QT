@@ -120,8 +120,18 @@ export function RiderPayoutsTab() {
 
   const handleMarkPaid = async (id: string, paymentReference: string, notes: string) => {
     try {
-      await api.post(`/finance/rider-payouts/${id}/mark-paid`, { paymentReference, notes });
-      toast.success("Payout marked as paid");
+      const res = await api.post(`/finance/rider-payouts/${id}/mark-paid`, { paymentReference, notes });
+      if (res.autoTransferred) {
+        toast.success(`Auto-transferred via Razorpay${res.payout?.utr_number ? ` · UTR ${res.payout.utr_number}` : ''}`);
+      } else if (res.autoSkipReason === 'rider_has_no_upi') {
+        toast.warning("Marked paid — rider has no UPI on file, transfer must be done manually");
+      } else if (res.autoSkipReason === 'razorpay_not_configured') {
+        toast.warning("Marked paid — Razorpay not configured, transfer done manually");
+      } else if (res.autoSkipReason) {
+        toast.warning(`Marked paid — auto-transfer failed: ${res.autoSkipReason}`);
+      } else {
+        toast.success("Payout marked as paid");
+      }
       await load();
     } catch {
       toast.error("Failed to mark paid");
@@ -177,12 +187,16 @@ export function RiderPayoutsTab() {
             <div key={r.id} className="bg-[#0d0d1a] border border-white/[0.07] rounded-xl px-4 py-3 flex items-center justify-between">
               <div>
                 <div className="font-bold text-white text-sm">{r.name}</div>
-                <div className="text-xs text-white/30">{r.phone} · {r.total_deliveries} deliveries (7d)</div>
+                <div className="text-xs text-white/30">{r.phone} · {r.total_deliveries} deliveries · {fmt(parseInt(r.total_earned_paise))} earned (7d)</div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-black text-white">{fmt(parseInt(r.total_earned_paise))}</div>
-                {parseInt(r.pending_paise) > 0 && (
-                  <div className="text-xs font-bold text-indigo-400">{fmt(parseInt(r.pending_paise))} pending</div>
+                {parseInt(r.pending_paise) > 0 ? (
+                  <>
+                    <div className="text-sm font-black text-indigo-400">{fmt(parseInt(r.pending_paise))}</div>
+                    <div className="text-xs text-white/30">pending payout</div>
+                  </>
+                ) : (
+                  <div className="text-xs text-emerald-400 font-bold">All settled</div>
                 )}
               </div>
             </div>
