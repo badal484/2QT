@@ -230,7 +230,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         <CartProvider>
           {children}
-          <Toaster position="top-center" richColors />
+          <Toaster position="top-right" richColors />
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>
