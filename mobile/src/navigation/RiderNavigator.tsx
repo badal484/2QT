@@ -6,6 +6,7 @@ import DeliveryOTPScreen from '../screens/DeliveryOTPScreen';
 import DoorPaymentScreen from '../screens/DoorPaymentScreen';
 import CashSubmitScreen from '../screens/CashSubmitScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import RiderOnboardingScreen from '../screens/RiderOnboardingScreen';
 import PayoutsScreen from '../screens/PayoutsScreen';
 import RiderDocumentsScreen from '../screens/RiderDocumentsScreen';
 import RiderMissionsScreen from '../screens/RiderMissionsScreen';
@@ -28,9 +29,16 @@ const RiderNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}>
       {!onboardingComplete ? (
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        <>
+          <Stack.Screen name="RiderOnboarding" component={RiderOnboardingScreen} />
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="RiderDocuments" component={RiderDocumentsScreen} />
+        </>
       ) : !isVerified ? (
-        <Stack.Screen name="VerificationPending" component={VerificationPendingScreen} />
+        <>
+          <Stack.Screen name="VerificationPending" component={VerificationPendingScreen} />
+          <Stack.Screen name="RiderDocuments" component={RiderDocumentsScreen} />
+        </>
       ) : (
         <>
           {/* Tab root — always the base */}

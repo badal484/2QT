@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View, TextInput, ActivityIndicator } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useMutation } from '@tanstack/react-query';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -24,13 +24,17 @@ const OnboardingScreen = ({ navigation }: any) => {
   const updateMutation = useMutation({
     mutationFn: async (newName: string) => {
       const res = await api.patch('/customers/profile', { name: newName });
-      await api.post('/auth/onboarding/complete', {});
+      // Riders complete onboarding after uploading documents — don't mark complete here
+      if (!isRider) await api.post('/auth/onboarding/complete', {});
       return res;
     },
     onSuccess: (data: any) => {
-      dispatch(updateUser({ ...data.user, onboarding_complete: true }));
       const role = data?.user?.role || user?.role || 'customer';
-      if (role === 'customer' || role === 'buyer') {
+      if (role === 'rider' || role === 'rider_captain') {
+        dispatch(updateUser(data.user));
+        navigation.navigate('RiderDocuments');
+      } else {
+        dispatch(updateUser({ ...data.user, onboarding_complete: true }));
         navigation.replace('Home');
       }
     },

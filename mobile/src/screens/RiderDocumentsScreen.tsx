@@ -5,6 +5,9 @@ import {
 } from 'react-native';
 import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDispatch, useSelector } from 'react-redux';
+import { updateUser } from '../store/slices/authSlice';
+import { RootState } from '../store';
 import { api } from '../api/client';
 import {
   ArrowLeft, FileText, Car, CreditCard, Upload,
@@ -34,6 +37,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 const RiderDocumentsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.auth.user);
+  // If onboarding_complete is still false, this screen was reached during initial onboarding
+  const isOnboarding = !(user?.onboarding_complete ?? false);
 
   const { data: doc, isLoading } = useQuery({
     queryKey: ['rider-documents'],
@@ -56,9 +63,19 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
 
   const saveMutation = useMutation({
     mutationFn: (payload: any) => api.patch('/riders/documents', payload),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['rider-documents'] });
-      Alert.alert('Submitted', 'Your documents have been sent for review.');
+      if (isOnboarding) {
+        try {
+          await api.post('/auth/onboarding/complete', {});
+          dispatch(updateUser({ onboarding_complete: true }));
+          // RiderNavigator re-renders: is_verified=true → tabs, false → VerificationPendingScreen
+        } catch {
+          Alert.alert('Error', 'Documents saved but could not complete setup. Please try again.');
+        }
+      } else {
+        Alert.alert('Submitted', 'Your documents have been sent for review.');
+      }
     },
     onError: () => Alert.alert('Error', 'Could not save documents. Please try again.'),
   });
