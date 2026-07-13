@@ -13,20 +13,25 @@ router.post('/razorpay', async (req, res) => {
     const signature = req.headers['x-razorpay-signature'] as string;
     const body = req.body;
 
-    if (process.env.NODE_ENV !== 'development' || (signature && signature !== 'MOCK_SIG')) {
-        const rawBody = (req as any).rawBody;
-        if (!rawBody) {
-            console.error('[WEBHOOK] rawBody missing — check express.json verify callback');
-            return res.status(400).send('Invalid Signature');
-        }
-        const expectedSignature = crypto
-            .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET || '')
-            .update(rawBody)
-            .digest('hex');
-
-        if (expectedSignature !== signature) {
-            return res.status(400).send('Invalid Signature');
-        }
+    // Signature verification is ALWAYS enforced — no dev bypass.
+    // Use Razorpay's test webhooks in development; never skip this check.
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+        console.error('[WEBHOOK] RAZORPAY_WEBHOOK_SECRET not set — rejecting all webhook requests');
+        return res.status(500).send('Webhook secret not configured');
+    }
+    const rawBody = (req as any).rawBody;
+    if (!rawBody) {
+        console.error('[WEBHOOK] rawBody missing — check express.json verify callback');
+        return res.status(400).send('Invalid Signature');
+    }
+    const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(rawBody)
+        .digest('hex');
+    if (expectedSignature !== signature) {
+        console.warn('[WEBHOOK] Signature mismatch — possible spoofed request');
+        return res.status(400).send('Invalid Signature');
     }
 
     const { event, payload } = body;
@@ -394,6 +399,18 @@ router.post('/razorpay', async (req, res) => {
                     reason: failureReason,
                     rzpPayoutId,
                 });
+                // Notify kitchen staff via push
+                query(
+                    `SELECT id FROM users WHERE kitchen_id = $1 AND role IN ('chef','kitchen_manager','partner_kitchen') AND is_active = TRUE LIMIT 5`,
+                    [kitchen_id]
+                ).then(({ rows: staff }) => Promise.all(
+                    staff.map((s: any) => NotificationService.send('broadcast_message', {
+                        userId: s.id,
+                        title: 'Payout Failed',
+                        body: `Your ₹${(net_payout_paise / 100).toFixed(0)} payout could not be transferred: ${failureReason}. Finance will retry shortly.`,
+                        screen: 'Payouts',
+                    }))
+                )).catch(e => console.error('[webhook kitchen-payout-fail/notify]', e.message));
                 console.error(`[webhook ${event}] kitchen=${kitchen_id} pout=${rzpPayoutId} reason=${failureReason}`);
             }
         } catch (err) {

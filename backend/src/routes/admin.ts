@@ -736,6 +736,8 @@ router.post('/riders/:id/suspend', authenticate, requireRole('super_admin', 'adm
         );
         emitToUser(id, 'user_updated', { is_suspended: true, is_active: false, suspension_reason: reason || 'Suspended by admin' });
         logSystemEvent('RIDER_SUSPENDED', `Admin ${adminId} suspended rider ${id}. Reason: ${reason}`, 'warning', { riderId: id, adminId, reason });
+        const { rows: actorRows } = await query('SELECT name, role FROM users WHERE id = $1', [adminId]);
+        ActivityLogService.log({ userId: adminId, userName: actorRows[0]?.name || 'Admin', userRole: actorRows[0]?.role || req.user!.role, actionType: 'RIDER_SUSPENDED', entityType: 'USER', entityId: id, details: { reason: reason || 'Suspended by admin' } });
         res.json({ success: true });
     } catch (err) {
         console.error('[admin/riders/suspend]', err);
@@ -754,6 +756,8 @@ router.post('/riders/:id/reactivate', authenticate, requireRole('super_admin', '
         );
         emitToUser(id, 'user_updated', { is_suspended: false, is_active: true });
         logSystemEvent('RIDER_REACTIVATED', `Admin ${adminId} reactivated rider ${id}`, 'info', { riderId: id, adminId });
+        const { rows: actorRows } = await query('SELECT name, role FROM users WHERE id = $1', [adminId]);
+        ActivityLogService.log({ userId: adminId, userName: actorRows[0]?.name || 'Admin', userRole: actorRows[0]?.role || req.user!.role, actionType: 'RIDER_REACTIVATED', entityType: 'USER', entityId: id, details: {} });
         res.json({ success: true });
     } catch (err) {
         console.error('[admin/riders/reactivate]', err);

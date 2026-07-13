@@ -240,6 +240,73 @@ export const initCrons = () => {
         }
     });
 
+    // Monday 11:00 AM IST (05:30 UTC) - Weekly kitchen payout generation
+    cron.schedule('30 5 * * 1', async () => {
+        try {
+            console.log('[CRON] Starting weekly kitchen payout generation...');
+
+            const now = new Date();
+            // Previous week: Mon–Sun in IST (UTC+5:30)
+            const todayMonday = new Date(now);
+            todayMonday.setUTCDate(now.getUTCDate() - ((now.getUTCDay() + 6) % 7));
+            todayMonday.setUTCHours(0, 0, 0, 0);
+            const lastMonday = new Date(todayMonday);
+            lastMonday.setUTCDate(todayMonday.getUTCDate() - 7);
+            const lastSunday = new Date(todayMonday);
+            lastSunday.setUTCDate(todayMonday.getUTCDate() - 1);
+            const periodStart = lastMonday.toISOString().slice(0, 10);
+            const periodEnd   = lastSunday.toISOString().slice(0, 10);
+
+            const { rows: kitchens } = await query(`
+                SELECT id, name FROM kitchens WHERE is_partner = TRUE AND is_active = TRUE
+            `);
+
+            let generated = 0;
+            for (const k of kitchens) {
+                try {
+                    const { rows: stats } = await query(`
+                        SELECT
+                            COUNT(*)                                       AS orders_count,
+                            COALESCE(SUM(subtotal_paise), 0)              AS gross_sales_paise,
+                            COALESCE(SUM(commission_paise), 0)            AS commission_paise,
+                            COALESCE(SUM(kitchen_payout_paise), 0)        AS net_payout_paise
+                        FROM orders
+                        WHERE kitchen_id = $1
+                          AND status = 'delivered'
+                          AND DATE(updated_at AT TIME ZONE 'Asia/Kolkata') BETWEEN $2 AND $3
+                    `, [k.id, periodStart, periodEnd]);
+
+                    const netPayout = parseInt(stats[0].net_payout_paise);
+                    if (netPayout < 100) continue; // skip if less than ₹1
+
+                    const { rows: inserted } = await query(`
+                        INSERT INTO kitchen_payouts
+                          (kitchen_id, period_start, period_end, gross_sales_paise, commission_paise,
+                           net_payout_paise, orders_count, status)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+                        ON CONFLICT DO NOTHING
+                        RETURNING id
+                    `, [k.id, periodStart, periodEnd,
+                        parseInt(stats[0].gross_sales_paise),
+                        parseInt(stats[0].commission_paise),
+                        netPayout,
+                        parseInt(stats[0].orders_count)]);
+
+                    if (inserted.length) {
+                        generated++;
+                        console.log(`[CRON] Kitchen payout generated for ${k.name}: ₹${(netPayout / 100).toFixed(0)}`);
+                    }
+                } catch (innerErr) {
+                    console.error(`[CRON] Kitchen payout failed for ${k.id}:`, innerErr);
+                }
+            }
+
+            console.log(`[CRON] Kitchen payouts done: ${generated}/${kitchens.length} generated`);
+        } catch (err) {
+            console.error('[CRON] Weekly kitchen payout cron failed:', err);
+        }
+    });
+
     // Every 15 mins - Auto mark no-show for confirmed bookings whose slot has ended
     cron.schedule('*/15 * * * *', async () => {
         try {

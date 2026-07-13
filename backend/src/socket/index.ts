@@ -4,7 +4,8 @@ import jwt from 'jsonwebtoken';
 import { redisPub, redisSub, redis, keys } from '../redis';
 import { query } from '../db';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set');
 
 export let io: Server;
 
@@ -27,11 +28,11 @@ export const initSocket = (server: any) => {
             // Refresh kitchen_id/zone_id from DB — JWT payload may be stale
             // (e.g. admin assigned a zone/kitchen after the user last logged in)
             try {
-                const { rows } = await query('SELECT kitchen_id, zone_id, restaurant_id FROM users WHERE id = $1', [decoded.userId]);
+                const { rows } = await query('SELECT kitchen_id, zone_id, dine_in_restaurant_id FROM users WHERE id = $1', [decoded.userId]);
                 if (rows[0]) {
                     decoded.kitchenId = rows[0].kitchen_id ?? decoded.kitchenId;
                     decoded.zoneId = rows[0].zone_id ?? decoded.zoneId;
-                    decoded.restaurantId = rows[0].restaurant_id ?? decoded.restaurantId;
+                    decoded.restaurantId = rows[0].dine_in_restaurant_id ?? decoded.restaurantId;
                 }
             } catch { /* non-critical — fall back to JWT payload values */ }
             (socket as any).user = decoded;

@@ -7,6 +7,7 @@ import { emitToAll, emitToUser, emitToKitchen, emitToAdmin, emitToPartner } from
 import { processWalletRefund, processBankRefund } from '../services/refund.service';
 import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
 import { NotificationService } from '../services/notification.service';
+import { ActivityLogService } from '../services/activity.service';
 
 const router = Router();
 const financeAccess = authenticate, financeRole = requireRole('finance', 'super_admin');
@@ -373,6 +374,8 @@ router.post('/rider-payouts/:id/approve', financeAccess, financeRole, async (req
     `, [id, req.user!.userId]);
     if (!rows.length) return res.status(404).json({ error: 'Payout not found or not in pending state' });
     emitToAll('rider_payout_updated', { action: 'approved', payoutId: id });
+    const { rows: actorRows } = await query('SELECT name FROM users WHERE id = $1', [req.user!.userId]);
+    ActivityLogService.log({ userId: req.user!.userId, userName: actorRows[0]?.name || 'Finance', userRole: req.user!.role, actionType: 'PAYOUT_APPROVED', entityType: 'RIDER_PAYOUT', entityId: String(id), details: { riderId: rows[0].rider_id, amountPaise: parseInt(rows[0].net_amount_paise) } });
     res.json({ success: true });
   } catch (err) {
     console.error('[finance/rider-payouts/approve]', err);
@@ -442,6 +445,8 @@ router.post('/rider-payouts/:id/pay', financeAccess, financeRole, async (req: Au
       upiId: payout.upi_id || 'your account',
     }).catch(e => console.error('[finance/rider-payout/notify]', e.message));
 
+    const { rows: actorRows2 } = await query('SELECT name FROM users WHERE id = $1', [req.user!.userId]);
+    ActivityLogService.log({ userId: req.user!.userId, userName: actorRows2[0]?.name || 'Finance', userRole: req.user!.role, actionType: autoMode ? 'PAYOUT_AUTO_TRANSFERRED' : 'PAYOUT_MANUALLY_MARKED_PAID', entityType: 'RIDER_PAYOUT', entityId: String(id), details: { riderId: payout.rider_id, amountPaise: payout.net_amount_paise, autoSkipReason } });
     res.json({ success: true, payout: rows[0], autoTransferred: autoMode, autoSkipReason });
   } catch (err) {
     console.error('[finance/rider-payouts/pay]', err);
@@ -625,6 +630,8 @@ router.post('/kitchen-payouts/:id/approve', financeAccess, financeRole, async (r
     `, [id, req.user!.userId]);
     if (!rows.length) return res.status(404).json({ error: 'Payout not found or not in pending state' });
     emitToAll('kitchen_payout_updated', { action: 'approved', payoutId: id });
+    const { rows: actorRows } = await query('SELECT name FROM users WHERE id = $1', [req.user!.userId]);
+    ActivityLogService.log({ userId: req.user!.userId, userName: actorRows[0]?.name || 'Finance', userRole: req.user!.role, actionType: 'PAYOUT_APPROVED', entityType: 'KITCHEN_PAYOUT', entityId: String(id), details: { kitchenId: rows[0].kitchen_id, amountPaise: parseInt(rows[0].net_payout_paise) } });
     res.json({ success: true });
   } catch (err) {
     console.error('[finance/kitchen-payouts/approve]', err);
@@ -699,6 +706,8 @@ router.post('/kitchen-payouts/:id/pay', financeAccess, financeRole, async (req: 
       }))
     )).catch(e => console.error('[finance/kitchen-payout/notify]', e.message));
 
+    const { rows: actorRowsK } = await query('SELECT name FROM users WHERE id = $1', [req.user!.userId]);
+    ActivityLogService.log({ userId: req.user!.userId, userName: actorRowsK[0]?.name || 'Finance', userRole: req.user!.role, actionType: autoMode ? 'PAYOUT_AUTO_TRANSFERRED' : 'PAYOUT_MANUALLY_MARKED_PAID', entityType: 'KITCHEN_PAYOUT', entityId: String(id), details: { kitchenId: kp.kitchen_id, amountPaise: kp.net_payout_paise, autoSkipReason } });
     res.json({ success: true, payout: rows[0], autoTransferred: autoMode, autoSkipReason });
   } catch (err) {
     console.error('[finance/kitchen-payouts/pay]', err);

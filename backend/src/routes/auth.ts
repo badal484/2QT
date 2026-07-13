@@ -10,8 +10,10 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import axios from 'axios';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set');
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+if (!JWT_REFRESH_SECRET) throw new Error('JWT_REFRESH_SECRET environment variable is not set');
 
 const phoneSchema = z.string().regex(/^91\d{10}$/);
 
@@ -24,6 +26,19 @@ const getMemOtp  = (phone: string): string | null => {
     return e.otp;
 };
 const delMemOtp  = (phone: string) => memOtp.delete(phone);
+
+// In-memory OTP rate limit — fallback when Redis is down so the limit always applies
+const memOtpCounts = new Map<string, { count: number; resetsAt: number }>();
+const memOtpIncr = (phone: string): number => {
+    const now = Date.now();
+    const entry = memOtpCounts.get(phone);
+    if (!entry || entry.resetsAt < now) {
+        memOtpCounts.set(phone, { count: 1, resetsAt: now + 600_000 });
+        return 1;
+    }
+    entry.count++;
+    return entry.count;
+};
 
 router.post('/send-otp', async (req, res) => {
     try {
@@ -55,7 +70,7 @@ router.post('/send-otp', async (req, res) => {
         console.error('[SEND_OTP] Redis slow/down — OTP stored in memory only:', redisErr.message);
     }
 
-    // Rate limit check (count only, OTP already logged above so you can always find it)
+    // Rate limit check — always enforced; Redis is primary, in-memory map is fallback
     let attempts = 0;
     try {
         attempts = await Promise.race([
@@ -63,12 +78,14 @@ router.post('/send-otp', async (req, res) => {
             new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 3000)),
         ]) as number;
         if (attempts === 1) await redis.expire(keys.otpAttempts(normalizedPhone), 600).catch(() => {});
-        console.log('[SEND_OTP] Rate limit count:', attempts);
+        console.log('[SEND_OTP] Rate limit count (Redis):', attempts);
     } catch (redisErr: any) {
-        console.error('[SEND_OTP] Redis error on rate-limit check:', redisErr.message);
+        // Redis unavailable — use in-memory counter so the limit still applies
+        attempts = memOtpIncr(normalizedPhone);
+        console.error('[SEND_OTP] Redis down — using in-memory rate limit, count:', attempts);
     }
-    if (attempts > 100) {
-        return res.status(429).json({ error: 'TOO_MANY_OTP', message: 'Too many OTP requests, please try again in 10 minutes.' });
+    if (attempts > 5) {
+        return res.status(429).json({ error: 'TOO_MANY_OTP', message: 'Too many OTP requests. Please wait 10 minutes.' });
     }
 
     let smsSent = false;

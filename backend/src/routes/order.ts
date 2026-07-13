@@ -165,12 +165,22 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
         return res.status(400).json({ error: 'ALREADY_REFUNDED' });
     }
 
-    // ── Cancel the order + reverse all side-effects in one transaction ────────
+    const walletPortion  = order.wallet_deduction_paise || 0;
+    const gatewayPortion = order.gateway_amount_paise   || 0;
+    const needsRefund    = walletPortion > 0 || (order.payment_status === 'paid' && gatewayPortion > 0);
+
+    // ── Cancel + set refund_pending atomically ────────────────────────────────
+    // Setting refund_pending INSIDE the transaction means if refund processing
+    // later fails, the row is already in a state a cron can retry rather than
+    // stuck in 'paid' with a cancelled order.
     await withTransaction(async (client) => {
-        await client.query(
-            "UPDATE orders SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = 'User cancelled' WHERE id = $1",
-            [id]
-        );
+        await client.query(`
+            UPDATE orders
+            SET status = 'cancelled', cancelled_at = NOW(),
+                cancellation_reason = 'User cancelled',
+                payment_status = CASE WHEN $2 THEN 'refund_pending' ELSE payment_status END
+            WHERE id = $1
+        `, [id, needsRefund]);
 
         // Reverse loyalty points
         const { rows: earnedPts } = await client.query(
@@ -198,11 +208,10 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
         }
     });
 
-    // ── Refund logic (after cancel transaction completes) ─────────────────────
+    // ── Refund logic (order is now cancelled + refund_pending in DB) ──────────
+    // If any step below fails, payment_status stays 'refund_pending' and can be
+    // retried by finance or a future cron — customer money is never silently lost.
 
-    // Always refund the wallet portion — even for COD orders where the
-    // gateway amount hasn't been paid yet, the wallet deduction already happened.
-    const walletPortion = order.wallet_deduction_paise || 0;
     if (walletPortion > 0) {
         await processWalletRefund({
             orderId: id,
@@ -213,8 +222,6 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
         });
     }
 
-    // Refund the gateway (Razorpay) portion if payment was captured
-    const gatewayPortion = order.gateway_amount_paise || 0;
     if (order.payment_status === 'paid' && gatewayPortion > 0) {
         const canBankRefund = refundType === 'bank' && !!order.gateway_payment_id;
         if (canBankRefund) {
@@ -228,7 +235,6 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
                     razorpayPaymentId: order.gateway_payment_id,
                 });
             } catch (rzpErr: any) {
-                // Razorpay unavailable — fall back to instant wallet credit
                 console.error('[cancel/bank-refund-fallback]', rzpErr.message);
                 await processWalletRefund({
                     orderId: id,
@@ -249,9 +255,7 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
         }
     }
 
-    // Fix Bug: mixed wallet+gateway or COD+wallet cancel can leave payment_status='partially_refunded'
-    // because each refund call compares its own slice to total_amount_paise and sees a partial.
-    // A self-cancel is always a full refund of what was actually paid, so override here.
+    // Mark fully refunded — overrides partial states from individual refund calls
     await query(
         "UPDATE orders SET payment_status = 'refunded' WHERE id = $1 AND payment_status IN ('paid', 'cod_pending', 'partially_refunded', 'refund_pending')",
         [id]
@@ -325,7 +329,7 @@ router.post('/:id/feedback', authenticate, async (req: AuthRequest, res) => {
 router.get('/:id/tracking', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { rows } = await query(`
-        SELECT o.status, o.rider_id, o.display_id, o.delivery_otp,
+        SELECT o.status, o.rider_id, o.customer_id, o.kitchen_id, o.display_id, o.delivery_otp,
                k.name as kitchen_name, k.address as kitchen_address, k.lat as kitchen_lat, k.lng as kitchen_lng,
                a.address_text as delivery_address, a.lat as delivery_lat, a.lng as delivery_lng
         FROM orders o
@@ -333,9 +337,15 @@ router.get('/:id/tracking', authenticate, async (req: AuthRequest, res) => {
         LEFT JOIN addresses a ON o.address_id = a.id
         WHERE o.id = $1
     `, [id]);
-    
+
     if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
     const order = rows[0];
+
+    // Customers can only track their own orders; kitchen/rider/admin are unrestricted
+    const role = req.user!.role;
+    if (role === 'customer' && order.customer_id !== req.user!.userId) {
+        return res.status(403).json({ error: 'FORBIDDEN' });
+    }
 
     let riderLocation = null;
     if (order.rider_id) {

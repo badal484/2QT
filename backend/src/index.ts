@@ -30,6 +30,7 @@ process.on('unhandledRejection', (err: any) => {
     console.error(err.name, err.message);
 });
 
+
 const app = express();
 const server = http.createServer(app);
 
@@ -87,9 +88,16 @@ function bullBoardAuth(req: express.Request, res: express.Response, next: expres
 
 app.use('/admin/queues', bullBoardAuth, bullBoardAdapter.getRouter());
 
-// Health Check
-app.get('/api/v1/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health Check — verifies DB connectivity so load balancers get honest status
+app.get('/api/v1/health', async (req, res) => {
+    try {
+        const { query } = await import('./db');
+        await query('SELECT 1');
+        res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+    } catch (err) {
+        console.error('[HEALTH] DB check failed:', err);
+        res.status(503).json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() });
+    }
 });
 
 // Routes
@@ -121,6 +129,23 @@ const start = async () => {
         server.listen(PORT as number, '0.0.0.0', () => {
             console.log(`Server running on port ${PORT} (0.0.0.0)`);
         });
+
+        // Graceful shutdown — registered here so `server` is in scope
+        const shutdown = (signal: string) => {
+            console.log(`[${signal}] Graceful shutdown initiated...`);
+            server.close(() => {
+                console.log(`[${signal}] HTTP server closed. Exiting.`);
+                process.exit(0);
+            });
+            // Force exit if shutdown takes longer than 30s (stuck requests)
+            setTimeout(() => {
+                console.error(`[${signal}] Forced exit after 30s`);
+                process.exit(1);
+            }, 30_000);
+        };
+        process.on('SIGTERM', () => shutdown('SIGTERM'));
+        process.on('SIGINT',  () => shutdown('SIGINT'));
+
     } catch (err) {
         console.error('Failed to start server:', err);
         process.exit(1);
