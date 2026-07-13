@@ -40,7 +40,12 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
 router.patch('/device-token', authenticate, async (req: AuthRequest, res: Response) => {
     const { token } = req.body as { token: string };
     if (!token) return res.status(400).json({ error: 'token required' });
+
+    // Strict Deduplication: guarantee this token is bound to exactly ONE active user.
+    // This prevents duplicate/cross-app notifications when a single device has logged into multiple accounts.
+    await query('UPDATE users SET device_token = NULL WHERE device_token = $1 AND id != $2', [token, req.user!.userId]);
     await query('UPDATE users SET device_token = $1 WHERE id = $2', [token, req.user!.userId]);
+    
     res.json({ success: true });
 });
 
