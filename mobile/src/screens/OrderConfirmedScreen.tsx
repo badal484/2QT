@@ -238,8 +238,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               let Icon = ShoppingBag;
               let title = 'Order Confirmed';
               let sub = 'Restaurant has received your order';
-              if (status === 'preparing') { Icon = ChefHat; title = 'Preparing Food'; sub = 'The kitchen is preparing your order'; }
-              else if (status === 'packing') { Icon = Package; title = 'Packing Your Order'; sub = 'Almost ready — being packed right now'; }
+              if (status === 'preparing' || status === 'packing') { Icon = ChefHat; title = 'Preparing Food'; sub = 'The kitchen is preparing your order'; }
               else if (status === 'ready_for_pickup') { Icon = Package; title = 'Ready for Pickup'; sub = 'Waiting for delivery partner'; }
               else if (status === 'delivered') { Icon = CircleCheck; title = 'Order Delivered'; sub = 'Enjoy your meal!'; }
               

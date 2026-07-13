@@ -66,7 +66,7 @@ type HeroEntry = { icon: React.FC<{ className?: string }>; iconClass: string; bg
 const STATUS_HERO: Record<string, HeroEntry> = {
   confirmed:        { icon: ShoppingBag,  iconClass: "text-blue-500",   bg: "from-blue-50 to-indigo-100",   heading: "Order Confirmed!",  sub: "We have received your order"   },
   preparing:        { icon: ChefHat,      iconClass: "text-amber-500",  bg: "from-amber-50 to-orange-100",  heading: "Being Prepared",    sub: "Chef is cooking your meal"     },
-  packing:          { icon: Package,      iconClass: "text-orange-500", bg: "from-orange-50 to-amber-100",  heading: "Packing Your Order", sub: "Almost ready — being packed now" },
+  packing:          { icon: ChefHat,      iconClass: "text-amber-500",  bg: "from-amber-50 to-orange-100",  heading: "Being Prepared",    sub: "Chef is cooking your meal"     },
   ready_for_pickup: { icon: Package,      iconClass: "text-purple-500", bg: "from-purple-50 to-violet-100", heading: "Ready for Pickup",  sub: "Looking for a rider near you"  },
   delivered:        { icon: CheckCircle2, iconClass: "text-green-500",  bg: "from-green-50 to-emerald-100", heading: "Delivered!",        sub: "Enjoy your meal"               },
   cancelled:        { icon: XCircle,      iconClass: "text-red-500",    bg: "from-red-50 to-rose-100",      heading: "Order Cancelled",   sub: "Refund will go to your wallet" },
