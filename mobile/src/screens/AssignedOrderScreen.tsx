@@ -44,8 +44,6 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const [showUnreachableModal, setShowUnreachableModal] = useState(false);
   const [showSosModal, setShowSosModal] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
-  const [sosHolding, setSosHolding] = useState(false);
-  const sosHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentLocationRef = useRef({ lat: 0, lng: 0 });
   const queryClient = useQueryClient();
 
@@ -177,15 +175,6 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     );
   };
 
-  // SOS hold-to-activate (2 seconds)
-  const onSosHoldStart = () => {
-    setSosHolding(true);
-    sosHoldTimer.current = setTimeout(() => { setSosHolding(false); setShowSosModal(true); }, 2000);
-  };
-  const onSosHoldEnd = () => {
-    setSosHolding(false);
-    if (sosHoldTimer.current) clearTimeout(sosHoldTimer.current);
-  };
 
   const destinationName = goingToKitchen ? (order.kitchen_name || 'Kitchen') : (order.customer_name || 'Customer');
   const destinationAddress = goingToKitchen
@@ -222,15 +211,14 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
                 {currentStatus.replace(/_/g, ' ')}
               </Text>
             </View>
-            {/* SOS hold button */}
+            {/* SOS button */}
             <TouchableOpacity
-              style={[s.sosBtn, sosHolding && s.sosBtnHolding]}
-              onPressIn={onSosHoldStart}
-              onPressOut={onSosHoldEnd}
+              style={s.sosBtn}
+              onPress={() => setShowSosModal(true)}
               activeOpacity={0.85}
             >
-              <ShieldAlert size={14} color={sosHolding ? R.white : R.red} />
-              <Text style={[s.sosBtnLabel, sosHolding && { color: R.white }]}>SOS</Text>
+              <ShieldAlert size={14} color={R.red} />
+              <Text style={s.sosBtnLabel}>SOS</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -496,7 +484,6 @@ const s = StyleSheet.create({
     backgroundColor: R.redLight, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: R.red, gap: 2,
   },
-  sosBtnHolding: { backgroundColor: R.red },
   sosBtnLabel: { fontSize: 8, fontWeight: '800', color: R.red, letterSpacing: 0.5 },
 
   stepRow: { flexDirection: 'row', alignItems: 'center' },

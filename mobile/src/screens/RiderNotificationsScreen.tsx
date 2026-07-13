@@ -19,8 +19,8 @@ const R = {
   red: '#EF4444', redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
   purple: '#8B5CF6', purpleLight: 'rgba(139,92,246,0.1)',
-  ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  ink: '#1C1C1E', gray: '#6E6E73', muted: '#8E8E93',
+  border: '#E5E5EA', bg: '#F2F2F7', white: '#FFFFFF',
 };
 
 const getIcon = (type: string, read: boolean) => {
@@ -75,11 +75,52 @@ const RiderNotificationsScreen = ({ navigation }: any) => {
     setRefreshing(false);
   }, [queryClient]);
 
-  const notifications: any[] = data?.notifications ?? [];
-  const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+function groupNotifications(notifs: any[]) {
+  const grouped: any[] = [];
+  const map = new Map();
+
+  for (const n of notifs) {
+    let key = n.id;
+    try {
+      const d = n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : {};
+      if (d.ticketId) {
+        key = `ticket_${d.ticketId}`;
+      } else if (n.title?.includes('Support Team Replied') || n.type === 'support_message') {
+        key = `support_replies`;
+      }
+    } catch {}
+
+    if (key === n.id) {
+      grouped.push({ ...n, _count: 1, _groupedIds: [] });
+    } else {
+      if (map.has(key)) {
+        const existing = map.get(key);
+        existing._count += 1;
+        if (!n.is_read) {
+          existing.is_read = false;
+          existing._groupedIds.push(n.id);
+        }
+      } else {
+        const newGroup = { ...n, _count: 1, _groupedIds: !n.is_read ? [n.id] : [] };
+        grouped.push(newGroup);
+        map.set(key, newGroup);
+      }
+    }
+  }
+  return grouped;
+}
+
+  const rawNotifications: any[] = data?.notifications ?? [];
+  const groupedNotifications = React.useMemo(() => groupNotifications(rawNotifications), [rawNotifications]);
+  const unreadCount = groupedNotifications.filter((n: any) => !n.is_read).length;
 
   const handlePress = (n: any) => {
-    if (!n.is_read) readMutation.mutate(n.id);
+    if (!n.is_read) {
+      readMutation.mutate(n.id);
+      if (n._groupedIds?.length > 0) {
+        n._groupedIds.forEach((id: string) => readMutation.mutate(id));
+      }
+    }
     try {
       const d = n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : {};
       const t = n.type ?? '';
@@ -89,8 +130,9 @@ const RiderNotificationsScreen = ({ navigation }: any) => {
         navigation.navigate('Payouts');
       } else if (t.includes('mission') || t.includes('bonus')) {
         navigation.navigate('RiderMissions');
+      } else if (t === 'support_message' || d.ticketId || n.title?.includes('Support')) {
+        navigation.navigate('RiderSupport', { ticketId: d.ticketId });
       }
-      // suspend/reactivate — no navigation, just reading is enough
     } catch (e) { console.error('[notification-nav]', e); }
   };
 
@@ -126,7 +168,7 @@ const RiderNotificationsScreen = ({ navigation }: any) => {
           <View style={styles.loader}>
             <ActivityIndicator color={R.orange} size="large" />
           </View>
-        ) : notifications.length === 0 ? (
+        ) : groupedNotifications.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <Bell size={40} color={R.orange} />
@@ -141,7 +183,7 @@ const RiderNotificationsScreen = ({ navigation }: any) => {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={R.orange} />}
           >
-            {notifications.map((n: any, i: number) => {
+            {groupedNotifications.map((n: any, i: number) => {
               const { icon, bg } = getIcon(n.type, n.is_read);
               return (
                 <Animated.View key={n.id} entering={FadeInDown.delay(i * 30).duration(200)}>
@@ -156,7 +198,7 @@ const RiderNotificationsScreen = ({ navigation }: any) => {
                     <View style={styles.body}>
                       <View style={styles.titleRow}>
                         <Text style={[styles.title, !n.is_read && styles.titleUnread]} numberOfLines={1}>
-                          {n.title}
+                          {n.title} {n._count > 1 ? `(${n._count} new)` : ''}
                         </Text>
                         <Text style={[styles.time, !n.is_read && styles.timeUnread]}>
                           {relativeTime(n.created_at)}
@@ -232,10 +274,10 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1, justifyContent: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
-  title: { fontSize: 14, fontWeight: '700', color: R.ink, flex: 1, marginRight: 8 },
-  titleUnread: { fontWeight: '900', color: R.ink },
+  title: { fontSize: 14, fontWeight: '600', color: R.ink, flex: 1, marginRight: 8 },
+  titleUnread: { fontWeight: '700', color: R.ink },
   time: { fontSize: 11, fontWeight: '500', color: R.muted },
-  timeUnread: { color: R.orange, fontWeight: '700' },
-  message: { fontSize: 13, fontWeight: '500', color: R.gray, lineHeight: 19 },
-  messageUnread: { color: R.ink, fontWeight: '600' },
+  timeUnread: { color: R.orange, fontWeight: '600' },
+  message: { fontSize: 13, fontWeight: '400', color: R.gray, lineHeight: 19 },
+  messageUnread: { color: R.ink, fontWeight: '500' },
 });

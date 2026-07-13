@@ -152,7 +152,28 @@ async function handleInlineReply(detail: any) {
   if (replyText && ticketId) {
     try {
       const { api } = require('../api/client');
-      await api.post(`/support/tickets/${ticketId}/reply`, { message: replyText });
+      const { persistor } = require('../store');
+      
+      // Wait for Redux persist to finish rehydrating the token from AsyncStorage
+      await new Promise(resolve => {
+        if (persistor.getState().bootstrapped) {
+          resolve(true);
+        } else {
+          const unsubscribe = persistor.subscribe(() => {
+            if (persistor.getState().bootstrapped) {
+              unsubscribe();
+              resolve(true);
+            }
+          });
+        }
+      });
+
+      const isRider = data.screen === 'RiderSupportTicketDetail';
+      const endpoint = isRider 
+        ? `/riders/support/tickets/${ticketId}/reply` 
+        : `/customers/support/tickets/${ticketId}/reply`;
+        
+      await api.post(endpoint, { message: replyText });
       
       // Acknowledge the reply by updating the notification thread
       const displayed = await _notifee.getDisplayedNotifications();
