@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ShieldAlert, CheckCircle2, RefreshCw, Clock, Phone, MapPin, AlertOctagon } from "lucide-react";
+import { ShieldAlert, CheckCircle2, RefreshCw, Clock, Phone, MapPin, AlertOctagon, Navigation } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 
@@ -26,6 +26,7 @@ export function SOSAlertsTab() {
   const [resolving, setResolving] = useState<string | null>(null);
   const [noteModal, setNoteModal] = useState<{ id: string } | null>(null);
   const [note, setNote] = useState("");
+  const [liveLocLoading, setLiveLocLoading] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -177,9 +178,9 @@ export function SOSAlertsTab() {
                         <p className="text-sm font-bold text-zinc-300 mt-0.5">{alert.order_display_id}</p>
                       </div>
                     )}
-                    {alert.lat && alert.lng && (
-                      <div>
-                        <p className="text-xs text-zinc-500 uppercase tracking-wide font-semibold">Location</p>
+                    <div>
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide font-semibold">Location</p>
+                      {alert.lat && alert.lng ? (
                         <a
                           href={`https://www.google.com/maps?q=${alert.lat},${alert.lng}`}
                           target="_blank"
@@ -189,8 +190,31 @@ export function SOSAlertsTab() {
                           <MapPin className="w-3 h-3" />
                           View on Maps
                         </a>
-                      </div>
-                    )}
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            setLiveLocLoading(alert.id);
+                            try {
+                              const d = await api.get(`/admin/riders/${alert.rider_id}/live-location`);
+                              if (d.location?.lat && d.location?.lng) {
+                                window.open(`https://www.google.com/maps?q=${d.location.lat},${d.location.lng}`, "_blank");
+                              } else {
+                                toast.error("No live location available — rider GPS may be off");
+                              }
+                            } catch {
+                              toast.error("Could not fetch live location");
+                            } finally {
+                              setLiveLocLoading(null);
+                            }
+                          }}
+                          disabled={liveLocLoading === alert.id}
+                          className="text-sm font-bold text-orange-400 hover:underline mt-0.5 flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Navigation className="w-3 h-3" />
+                          {liveLocLoading === alert.id ? "Fetching…" : "Live Location"}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {alert.resolution_note && (

@@ -120,12 +120,24 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
 
 
   const sosMutation = useMutation({
-    mutationFn: (alertType: string) => api.post('/riders/sos', {
-      alertType,
-      orderId: order.id,
-      lat: currentLocationRef.current.lat || null,
-      lng: currentLocationRef.current.lng || null,
-    }),
+    mutationFn: async (alertType: string) => {
+      // Try a fresh GPS fix first; fall back to cached watchPosition value
+      let { lat, lng } = currentLocationRef.current;
+      try {
+        const pos = await new Promise<any>((resolve, reject) =>
+          Geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 4000, maximumAge: 5000 })
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+        currentLocationRef.current = { lat, lng };
+      } catch { /* GPS unavailable — use cached or send null */ }
+      return api.post('/riders/sos', {
+        alertType,
+        orderId: order.id,
+        lat: lat || null,
+        lng: lng || null,
+      });
+    },
     onSuccess: (_, alertType) => {
       setShowSosModal(false);
       if (alertType === 'emergency') {

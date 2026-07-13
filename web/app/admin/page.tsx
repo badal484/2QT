@@ -1807,10 +1807,14 @@ function RiderApplicationsTab() {
                 
                 <div className="flex items-start justify-between mb-8 z-10">
                   <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 rounded-[20px] bg-gradient-to-br from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center shadow-inner">
-                      <span className="font-black text-2xl text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400">
-                        {displayName[0]}
-                      </span>
+                    <div className="w-16 h-16 rounded-[20px] bg-gradient-to-br from-zinc-800 to-zinc-900 border border-white/10 flex items-center justify-center shadow-inner overflow-hidden">
+                      {app.photo_url ? (
+                        <img src={app.photo_url} alt={displayName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="font-black text-2xl text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400">
+                          {displayName[0]}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <h3 className="text-white font-bold text-2xl tracking-tight mb-1">{displayName}</h3>

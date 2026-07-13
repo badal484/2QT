@@ -458,34 +458,59 @@ const RiderHomeScreen = ({ navigation }: any) => {
             <Text style={styles.zoneTitle}>Report to your delivery zone</Text>
           </View>
           {nearestZone ? (
-            <>
-              <Text style={styles.zoneKitchen}>{nearestZone.kitchen_name || nearestZone.name}</Text>
-              <Text style={styles.zoneAddress} numberOfLines={2}>{nearestZone.kitchen_address || 'Kitchen location'}</Text>
-              <View style={styles.zoneDistRow}>
-                <Navigation size={13} color={S.muted} />
-                <Text style={styles.zoneDist}>
-                  {nearestZone.dist < 1
-                    ? `${Math.round(nearestZone.dist * 1000)} m away`
-                    : `${nearestZone.dist.toFixed(1)} km away`}
+            nearestZone.dist > 200 ? (
+              // Zone is very far — rider is in a region without a configured zone
+              <>
+                <Text style={styles.zoneKitchen}>No zone assigned nearby</Text>
+                <Text style={styles.zoneAddress}>
+                  Your delivery zone has not been set up in your area yet.
                 </Text>
-                {nearestZone.dist <= parseFloat(nearestZone.radius_km) + 1 && (
-                  <View style={styles.inRangeBadge}>
-                    <Text style={styles.inRangeText}>In range</Text>
-                  </View>
-                )}
-              </View>
-              <TouchableOpacity
-                style={styles.navigateBtn}
-                onPress={() => openMaps(nearestZone)}
-                activeOpacity={0.85}
-              >
-                <Navigation size={16} color={S.white} />
-                <Text style={styles.navigateBtnText}>Navigate to Zone</Text>
-              </TouchableOpacity>
-              <Text style={styles.zoneHint}>
-                You will be auto-assigned once you enter the zone boundary.
-              </Text>
-            </>
+                <View style={styles.zoneDistRow}>
+                  <Navigation size={13} color={S.muted} />
+                  <Text style={styles.zoneDist}>Nearest zone: {nearestZone.dist.toFixed(0)} km away</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.navigateBtn, { backgroundColor: S.ink }]}
+                  onPress={() => Linking.openURL('https://wa.me/919999999999?text=Hi%2C%20I%20am%20a%20rider%20and%20my%20delivery%20zone%20has%20not%20been%20set%20up.')}
+                  activeOpacity={0.85}
+                >
+                  <MapPin size={16} color={S.white} />
+                  <Text style={styles.navigateBtnText}>Contact Fleet Manager</Text>
+                </TouchableOpacity>
+                <Text style={styles.zoneHint}>
+                  Ask your fleet manager to assign you to a delivery zone.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.zoneKitchen}>{nearestZone.kitchen_name || nearestZone.name}</Text>
+                <Text style={styles.zoneAddress} numberOfLines={2}>{nearestZone.kitchen_address || 'Kitchen location'}</Text>
+                <View style={styles.zoneDistRow}>
+                  <Navigation size={13} color={S.muted} />
+                  <Text style={styles.zoneDist}>
+                    {nearestZone.dist < 1
+                      ? `${Math.round(nearestZone.dist * 1000)} m away`
+                      : `${nearestZone.dist.toFixed(1)} km away`}
+                  </Text>
+                  {nearestZone.dist <= parseFloat(nearestZone.radius_km) + 1 && (
+                    <View style={styles.inRangeBadge}>
+                      <Text style={styles.inRangeText}>In range</Text>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={styles.navigateBtn}
+                  onPress={() => openMaps(nearestZone)}
+                  activeOpacity={0.85}
+                >
+                  <Navigation size={16} color={S.white} />
+                  <Text style={styles.navigateBtnText}>Navigate to Zone</Text>
+                </TouchableOpacity>
+                <Text style={styles.zoneHint}>
+                  You will be auto-assigned once you enter the zone boundary.
+                </Text>
+              </>
+            )
           ) : (
             <Text style={styles.zoneDist}>Loading zone info…</Text>
           )}

@@ -22,6 +22,7 @@ interface RiderDoc {
   vehicle_type: string;
   license_number: string;
   id_photo_url: string | null;
+  profile_photo_url: string | null;
   status: string;
   doc_review_status: DocStatus;
   doc_review_reason: string | null;
@@ -211,15 +212,17 @@ export function RiderDocumentsTab({ onOpenRider }: { onOpenRider?: (riderId: str
                   className="bg-zinc-900/60 border border-white/8 rounded-2xl p-5"
                 >
                   <div className="flex items-start gap-4">
-                    {/* Photo thumbnail */}
+                    {/* Profile photo avatar */}
                     <div
-                      className="w-16 h-16 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 overflow-hidden cursor-pointer hover:border-white/30 transition-all"
-                      onClick={() => doc.id_photo_url && setLightboxUrl(doc.id_photo_url)}
+                      className="w-16 h-16 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 overflow-hidden"
+                      title="Rider profile photo"
                     >
-                      {doc.id_photo_url ? (
-                        <img src={doc.id_photo_url} alt="ID" className="w-full h-full object-cover" />
+                      {doc.profile_photo_url ? (
+                        <img src={doc.profile_photo_url} alt={doc.rider_name} className="w-full h-full object-cover" />
                       ) : (
-                        <FileText size={24} className="text-zinc-600" />
+                        <span className="text-2xl font-black text-zinc-500">
+                          {doc.rider_name?.[0]?.toUpperCase() ?? "?"}
+                        </span>
                       )}
                     </div>
 
@@ -274,6 +277,14 @@ export function RiderDocumentsTab({ onOpenRider }: { onOpenRider?: (riderId: str
                       {doc.id_photo_url && (
                         <button
                           onClick={() => setLightboxUrl(doc.id_photo_url!)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-zinc-400 hover:text-white text-xs font-bold transition-all"
+                        >
+                          <ExternalLink size={12} /> View ID Doc
+                        </button>
+                      )}
+                      {doc.profile_photo_url && (
+                        <button
+                          onClick={() => setLightboxUrl(doc.profile_photo_url!)}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-zinc-400 hover:text-white text-xs font-bold transition-all"
                         >
                           <ExternalLink size={12} /> View Photo
