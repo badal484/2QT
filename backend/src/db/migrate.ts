@@ -21,6 +21,8 @@ const ALREADY_EXISTS = new Set([
     '55P04', // unsafe_new_enum_value_usage — ALTER TYPE ADD VALUE committed but CREATE FUNCTION
              // in the same batch sees the value as unsafe; a follow-up migration re-runs
              // the function with the value now fully committed.
+    '22P02', // invalid_text_representation — enum value referenced in SQL doesn't exist yet;
+             // a follow-up migration adds the value first, then recreates the function.
 ]);
 
 async function migrate() {
