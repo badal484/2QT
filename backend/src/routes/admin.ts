@@ -424,7 +424,7 @@ router.post('/users/:id/verify', authenticate, requireRole('super_admin', 'admin
 
 router.get('/rider-applications', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(`
-        SELECT a.*, u.name, u.phone 
+        SELECT a.*, u.name, u.phone, u.photo_url
         FROM rider_applications a
         JOIN users u ON a.user_id = u.id
         ORDER BY a.created_at DESC
@@ -465,6 +465,17 @@ router.post('/rider-applications/:id/:action', authenticate, requireRole('super_
         res.json({ success: true, action });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Live GPS location of a specific rider from Redis (for SOS context)
+router.get('/riders/:id/live-location', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const locRaw = await redis.get(keys.riderLocation(req.params.id as string)).catch(() => null);
+        if (!locRaw) return res.json({ location: null });
+        res.json({ location: JSON.parse(locRaw) });
+    } catch (err) {
+        res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });
 
@@ -644,6 +655,7 @@ router.get('/riders/documents', authenticate, requireRole('super_admin', 'admin'
                    ra.status, ra.doc_review_status, ra.doc_review_reason,
                    ra.doc_reviewed_at, ra.created_at, ra.updated_at,
                    u.name as rider_name, u.phone as rider_phone,
+                   u.photo_url as profile_photo_url,
                    u.is_verified, u.is_suspended
             FROM rider_applications ra
             JOIN users u ON ra.user_id = u.id
