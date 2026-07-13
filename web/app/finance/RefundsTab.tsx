@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Wallet, Building2, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, IndianRupee } from "lucide-react";
+import { Wallet, Building2, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, IndianRupee, MessageSquare } from "lucide-react";
 import { SkeletonList, SkeletonTableRow } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -20,6 +20,8 @@ interface Refund {
   reason: string;
   status: RefundStatus;
   complaint_type?: string;
+  ticket_id?: string | null;
+  ticket_subject?: string | null;
   initiated_by_name?: string;
   approved_by_name?: string;
   razorpay_payment_id?: string;
@@ -201,6 +203,12 @@ export function RefundsTab() {
                     {r.complaint_type && (
                       <span className="text-xs bg-purple-500/15 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
                         Complaint: {r.complaint_type.replace(/_/g, " ")}
+                      </span>
+                    )}
+                    {r.ticket_id && (
+                      <span className="inline-flex items-center gap-1 text-xs bg-sky-500/10 text-sky-400 border border-sky-500/25 px-2 py-0.5 rounded-full font-bold"
+                        title={r.ticket_subject || "Support ticket"}>
+                        <MessageSquare className="w-3 h-3" /> From Support
                       </span>
                     )}
                     <span className="text-xs text-zinc-600">{timeAgo(r.created_at)}</span>

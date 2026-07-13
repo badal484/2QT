@@ -826,13 +826,15 @@ router.get('/refunds', financeAccess, financeRole, async (req: AuthRequest, res)
           cu.phone AS customer_phone,
           ib.name  AS initiated_by_name,
           ab.name  AS approved_by_name,
-          comp.type AS complaint_type
+          comp.type AS complaint_type,
+          st.subject AS ticket_subject
         FROM refunds r
         JOIN orders o   ON o.id = r.order_id
         JOIN users cu   ON cu.id = r.customer_id
         LEFT JOIN users ib   ON ib.id = r.initiated_by
         LEFT JOIN users ab   ON ab.id = r.approved_by
         LEFT JOIN order_complaints comp ON comp.id = r.complaint_id
+        LEFT JOIN support_tickets st ON st.id = r.ticket_id
         ${where}
         ORDER BY r.created_at DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
