@@ -27,6 +27,7 @@ import {
   BarChart3,
   IndianRupee,
   ShoppingBag,
+  ClipboardCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -37,6 +38,7 @@ import { socket } from "../lib/socket";
 import dynamic from "next/dynamic";
 import { PackerTab } from "../components/kitchen/PackerTab";
 import { ShiftHandoverModal } from "../components/kitchen/ShiftHandoverModal";
+import { MorningPrepModal } from "../components/kitchen/MorningPrepModal";
 
 const DispatchMap = dynamic(() => import("../components/DispatchMap"), {
   ssr: false,
@@ -287,6 +289,7 @@ export default function KitchenPage() {
   const [kitchenName, setKitchenName] = useState<string | null>(null);
   const [view, setView] = useState<"kds" | "dispatch" | "manage" | "analytics" | "packer">("kds");
   const [showHandover, setShowHandover] = useState(false);
+  const [showMorningPrep, setShowMorningPrep] = useState(false);
   const [mobileKdsCol, setMobileKdsCol] = useState<KdsColId>("confirmed");
 
   // Dispatch
@@ -639,6 +642,10 @@ export default function KitchenPage() {
 
             <button onClick={fetchOrders} className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/[0.05] border border-white/[0.1] flex items-center justify-center hover:bg-white/[0.1] transition-all">
               <RefreshCw className={`w-4 h-4 text-zinc-300 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button onClick={() => setShowMorningPrep(true)} className="hidden sm:flex px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 items-center justify-center hover:bg-orange-500/20 transition-all gap-2">
+              <ClipboardCheck className="w-4 h-4 text-orange-400" />
+              <span className="text-xs font-black uppercase tracking-widest text-orange-400">Prep</span>
             </button>
             <button onClick={() => setShowHandover(true)} className="hidden sm:flex px-3 py-1.5 rounded-xl bg-violet-500/10 border border-violet-500/20 items-center justify-center hover:bg-violet-500/20 transition-all gap-2">
               <Timer className="w-4 h-4 text-violet-400" />
@@ -1421,6 +1428,12 @@ export default function KitchenPage() {
       <AnimatePresence>
         {showHandover && (
           <ShiftHandoverModal onClose={() => setShowHandover(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showMorningPrep && (
+          <MorningPrepModal onClose={() => setShowMorningPrep(false)} />
         )}
       </AnimatePresence>
     </div>

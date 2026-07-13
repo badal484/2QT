@@ -13,10 +13,12 @@ import {
   Package, CheckCircle2, ChevronRight,
   LogOut, Bike, Phone, Wallet, Clock, TrendingUp,
   ArrowRight, Zap, MapPin, Navigation, Lock,
-  ChefHat, Home, Trophy, Banknote,
+  ChefHat, Home, Trophy, Banknote, Target, FileText,
 } from "lucide-react";
 import CashSubmitTab from "../../components/rider/CashSubmitTab";
 import { DoorPaymentModal } from "../../components/rider/DoorPaymentModal";
+import { RiderMissionsTab } from "../../components/rider/RiderMissionsTab";
+import { RiderDocumentsModal } from "../../components/rider/RiderDocumentsModal";
 
 const RiderLiveMap = dynamic(() => import("../../components/RiderLiveMap"), {
   ssr: false,
@@ -127,8 +129,9 @@ export default function RiderPage() {
   const [countdown,       setCountdown]       = useState(15);
   const [verifyOtpFor,    setVerifyOtpFor]    = useState<string | null>(null);
   const [otpInput,        setOtpInput]        = useState("");
-  const [activeTab,       setActiveTab]       = useState<"deliveries" | "earnings" | "history" | "cash">("deliveries");
+  const [activeTab,       setActiveTab]       = useState<"deliveries" | "earnings" | "history" | "cash" | "missions">("deliveries");
   const [doorPaymentFor,  setDoorPaymentFor]  = useState<Order | null>(null);
+  const [showDocs,        setShowDocs]        = useState(false);
   const [riderLoc,        setRiderLoc]        = useState<{ lat: number; lng: number } | null>(null);
   const [todayEarnings,   setTodayEarnings]   = useState<any>(null);
   const [riderStats,      setRiderStats]      = useState<any>(null);
@@ -487,6 +490,10 @@ export default function RiderPage() {
                 </button>
               );
             })()}
+            <button onClick={() => setShowDocs(true)}
+              className="w-10 h-10 rounded-2xl bg-zinc-900/80 backdrop-blur-xl border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+              <FileText className="w-4 h-4" />
+            </button>
             <button onClick={logout}
               className="w-10 h-10 rounded-2xl bg-zinc-900/80 backdrop-blur-xl border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
               <LogOut className="w-4 h-4" />
@@ -708,6 +715,14 @@ export default function RiderPage() {
             <CashSubmitTab />
           </motion.div>
         )}
+
+        {/* ─ Missions tab ─ */}
+        {activeTab === "missions" && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="pt-2 px-4 h-full">
+            <h2 className="text-2xl font-black text-white mb-4">Missions</h2>
+            <RiderMissionsTab />
+          </motion.div>
+        )}
       </main>
 
       {/* ── Incoming Order Bottom Sheet ──────────────────────────────────────── */}
@@ -856,11 +871,17 @@ export default function RiderPage() {
         )}
       </AnimatePresence>
 
+      {/* ── Documents Modal ────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showDocs && <RiderDocumentsModal onClose={() => setShowDocs(false)} />}
+      </AnimatePresence>
+
       {/* ── Bottom Tab Bar ───────────────────────────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 z-20 pb-safe-bottom">
         <div className="mx-4 mb-4 bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-3xl px-2 py-2 flex items-center justify-around shadow-2xl">
           {[
             { key: "deliveries", icon: Package, label: "Orders" },
+            { key: "missions",   icon: Target,  label: "Missions" },
             { key: "earnings",   icon: Wallet,  label: "Earnings" },
             { key: "cash",       icon: Banknote,label: "Cash" },
             { key: "history",    icon: Clock,   label: "History" },
