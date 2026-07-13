@@ -89,7 +89,7 @@ export function navigateFromNotification(data: Record<string, string>) {
       const role = state.auth.user?.role;
       if (role === 'rider' || role === 'rider_captain') {
         navigateTo('RiderTabs');
-      } else if (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff'].includes(role)) {
+      } else if (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff', 'packer'].includes(role)) {
         navigateTo('KitchenTabs');
       } else if (role === 'partner') {
         navigateTo('PartnerDashboard');

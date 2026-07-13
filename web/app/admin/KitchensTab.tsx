@@ -27,7 +27,7 @@ export function KitchensTab() {
   const [form, setForm] = useState<any>({});
 
   const [staffKitchenId, setStaffKitchenId] = useState<string | null>(null);
-  const [staffForm, setStaffForm] = useState({ name: "", phone: "" });
+  const [staffForm, setStaffForm] = useState({ name: "", phone: "", role: "chef" });
   const [staffList, setStaffList] = useState<any[]>([]);
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean, action: 'delete_kitchen' | 'remove_chef' | null, id: string | null }>({ isOpen: false, action: null, id: null });
 
@@ -97,8 +97,8 @@ export function KitchensTab() {
     e.preventDefault();
     try {
       await api.post(`/admin/kitchens/${staffKitchenId}/staff`, staffForm);
-      toast.success("Chef assigned!");
-      setStaffForm({ name: "", phone: "" });
+      toast.success(`${staffForm.role === 'packer' ? 'Packer' : 'Chef'} assigned!`);
+      setStaffForm({ name: "", phone: "", role: "chef" });
       loadStaff(staffKitchenId!);
     } catch (err: any) {
       toast.error(err.message || "Failed to add chef");
@@ -274,24 +274,34 @@ export function KitchensTab() {
                   </div>
 
                   <div className="space-y-2 mb-4">
-                    {staffList.length === 0 ? <div className="text-xs text-zinc-500">No chefs assigned yet.</div> : staffList.map(s => (
+                    {staffList.length === 0 ? <div className="text-xs text-zinc-500">No staff assigned yet.</div> : staffList.map(s => (
                       <div key={s.id} className="flex justify-between items-center bg-white/[0.02] border border-white/5 p-3 rounded-xl">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${s.is_online ? 'bg-green-500' : 'bg-zinc-600'}`}/>
                           <span className="text-sm font-bold text-white">{s.name}</span>
-                          <span className="text-xs text-zinc-400 ml-2">{s.phone}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${s.role === 'packer' ? 'bg-amber-500/20 text-amber-400' : 'bg-brand-primary/20 text-brand-primary'}`}>
+                            {s.role === 'packer' ? 'Packer' : 'Chef'}
+                          </span>
+                          <span className="text-xs text-zinc-500">{s.phone}</span>
                         </div>
                         <button onClick={() => removeStaff(s.id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 className="w-4 h-4"/></button>
                       </div>
                     ))}
                   </div>
 
-                  <form onSubmit={addStaff} className="flex gap-2">
-                    <input type="text" placeholder="Chef Name" required value={staffForm.name} onChange={e=>setStaffForm({...staffForm, name: e.target.value})}
-                      className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
+                  <form onSubmit={addStaff} className="flex gap-2 flex-wrap">
+                    <input type="text" placeholder={staffForm.role === 'packer' ? 'Packer Name' : 'Chef Name'} required value={staffForm.name} onChange={e=>setStaffForm({...staffForm, name: e.target.value})}
+                      className="flex-1 min-w-[120px] bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
                     <input type="tel" placeholder="10-digit mobile number" required value={staffForm.phone} onChange={e=>setStaffForm({...staffForm, phone: e.target.value})}
-                      className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
-                    <button type="submit" className="bg-brand-primary text-white px-4 py-2 rounded-xl text-xs font-bold">Add Chef</button>
+                      className="flex-1 min-w-[140px] bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
+                    <select value={staffForm.role} onChange={e=>setStaffForm({...staffForm, role: e.target.value})}
+                      className="bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                      <option value="chef">Chef</option>
+                      <option value="packer">Packer</option>
+                    </select>
+                    <button type="submit" className="bg-brand-primary text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap">
+                      Add {staffForm.role === 'packer' ? 'Packer' : 'Chef'}
+                    </button>
                   </form>
                 </div>
               )}

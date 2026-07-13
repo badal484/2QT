@@ -140,29 +140,29 @@ router.patch('/menu/:itemId/availability', authenticate, requireRole('chef', 'ki
     res.json({ success: true });
 });
 
-router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin', 'packer'), async (req: AuthRequest, res) => {
     let rows: any[] = [];
-    
+
     if (req.user!.role === 'super_admin') {
         const result = await query(
             `SELECT o.*, u.name as customer_name, k.name as kitchen_name
              FROM orders o
              JOIN users u ON o.customer_id = u.id
              JOIN kitchens k ON o.kitchen_id = k.id
-             WHERE o.status IN ('confirmed', 'preparing', 'ready_for_pickup')
+             WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
              ORDER BY o.created_at ASC`
         );
         rows = result.rows;
     } else {
         const kitchenId = await getKitchenId(req, res);
         if (!kitchenId) return;
-        
+
         const result = await query(
             `SELECT o.*, u.name as customer_name, k.name as kitchen_name
              FROM orders o
              JOIN users u ON o.customer_id = u.id
              JOIN kitchens k ON o.kitchen_id = k.id
-             WHERE o.kitchen_id = $1 AND o.status IN ('confirmed', 'preparing', 'ready_for_pickup')
+             WHERE o.kitchen_id = $1 AND o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
              ORDER BY o.created_at ASC`,
             [kitchenId]
         );
@@ -264,6 +264,65 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
     } catch (err: any) {
         res.status(400).json({ error: 'INVALID_TRANSITION', message: err.message });
     }
+});
+
+// ─── Packer endpoints ─────────────────────────────────────────────────────────
+
+// Orders awaiting packing — packer's primary queue
+router.get('/packer/orders', authenticate, requireRole('packer', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+    const { rows } = await query(
+        `SELECT o.*, u.name as customer_name
+         FROM orders o
+         JOIN users u ON o.customer_id = u.id
+         WHERE o.kitchen_id = $1 AND o.status = 'packing'
+         ORDER BY o.updated_at ASC`,
+        [kitchenId]
+    );
+    for (const order of rows) {
+        const { rows: items } = await query(
+            `SELECT oi.menu_item_name as name, oi.quantity, oi.special_instructions
+             FROM order_items oi WHERE oi.order_id = $1`,
+            [order.id]
+        );
+        order.items = items;
+    }
+    res.json({ orders: rows });
+});
+
+// Packer marks order as packed → triggers rider assignment
+router.post('/orders/:id/packed', authenticate, requireRole('packer', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { rows } = await query(
+        `UPDATE orders SET status = 'ready_for_pickup', packed_by_id = $1, packed_at = NOW()
+         WHERE id = $2 AND status = 'packing'
+         RETURNING id, display_id, customer_id, kitchen_id, zone_id`,
+        [req.user!.userId, id]
+    );
+    if (!rows[0]) return res.status(400).json({ error: 'ORDER_NOT_IN_PACKING' });
+    const order = rows[0];
+
+    emitToUser(order.customer_id, 'order_status_update', { orderId: id, status: 'ready_for_pickup' });
+    emitToOrder(id, 'order_status_update', { orderId: id, status: 'ready_for_pickup' });
+    emitToKitchen(order.kitchen_id, 'order_updated', { orderId: id, status: 'ready_for_pickup' });
+    emitToAdmin('order_status_update', { orderId: id, status: 'ready_for_pickup', display_id: order.display_id });
+
+    // Rider escalation safety net
+    const { notificationsQueue } = require('../jobs/queues');
+    notificationsQueue.add('rider_escalation', {
+        orderId: id, displayId: order.display_id,
+        kitchenId: order.kitchen_id, zoneId: order.zone_id,
+    }, { delay: 3 * 60 * 1000 }).catch(() => {});
+
+    autoAssignOrder(id).catch(() => {});
+
+    NotificationService.send('order_ready', {
+        userId: order.customer_id,
+        vars: { displayId: order.display_id, orderId: id },
+    }).catch(() => {});
+
+    res.json({ success: true });
 });
 
 router.get('/inventory', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
