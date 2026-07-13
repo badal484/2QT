@@ -76,7 +76,7 @@ export const useLocation = () => {
     Geolocation.getCurrentPosition(onSuccess, onError, {
       enableHighAccuracy: false,
       timeout: 5000,
-      maximumAge: 60000,
+      maximumAge: 10000,
     });
 
     // Stage 2: GPS refinement — Android network location is often 200-500m off.

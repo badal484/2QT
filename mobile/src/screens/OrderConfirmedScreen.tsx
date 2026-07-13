@@ -302,9 +302,9 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               </Text>
               <View style={styles.otpDivider} />
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View>
+                <View style={{ flexShrink: 1, paddingRight: 10 }}>
                   <Text style={styles.otpLabel}>YOUR DELIVERY CODE</Text>
-                  <Text style={styles.otpCode}>{o.delivery_otp}</Text>
+                  <Text style={styles.otpCode} numberOfLines={1} adjustsFontSizeToFit>{o.delivery_otp}</Text>
                   <Text style={styles.otpHint}>Share only after checking your items</Text>
                 </View>
                 <ShieldCheck size={28} color={colors.primary} />
@@ -344,9 +344,9 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                   <UserCircle size={26} color={o?.rider_name ? colors.primary : colors.inkFaint} />
                 )}
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, flexShrink: 1 }}>
                 <Text style={styles.riderMeta}>{o?.rider_name ? 'DELIVERY PARTNER' : 'FINDING PARTNER'}</Text>
-                <Text style={[styles.riderName, !o?.rider_name && { color: colors.inkMuted, fontSize: 15 }]}>
+                <Text style={[styles.riderName, !o?.rider_name && { color: colors.inkMuted, fontSize: 15 }]} numberOfLines={1}>
                   {o?.rider_name || 'Assigning...'}
                 </Text>
               </View>
@@ -368,9 +368,9 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
                 <View style={styles.addressIconBox}>
                   <MapPin size={15} color={colors.accent} />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, flexShrink: 1 }}>
                   <Text style={styles.addressLabel}>DELIVERY ADDRESS</Text>
-                  <Text style={styles.addressText}>{o.delivery_address_text || o.address_text || '—'}</Text>
+                  <Text style={styles.addressText} numberOfLines={3}>{o.delivery_address_text || o.address_text || '—'}</Text>
                   {(o.delivery_address_label || o.label) && (
                     <View style={styles.labelPill}>
                       <Text style={styles.labelPillText}>
@@ -558,7 +558,6 @@ const styles = StyleSheet.create({
 
   // OTP
   otpCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: '#F0FDF4', borderRadius: 16, padding: 16, marginVertical: 12,
     borderWidth: 1.5, borderColor: '#BBF7D0',
   },
