@@ -421,7 +421,7 @@ router.post('/:id/verify-final-payment', authenticate, async (req: AuthRequest, 
         const loyaltyPoints = Math.floor(grandTotal / 1000);
         if (loyaltyPoints > 0) {
             await query(
-                "INSERT INTO loyalty_transactions (customer_id, points, type) VALUES ($1,$2,'earn')",
+                "INSERT INTO loyalty_transactions (customer_id, points, type, expires_at) VALUES ($1,$2,'earn', NOW() + INTERVAL '1 year')",
                 [b.customer_id, loyaltyPoints]
             );
         }
@@ -985,7 +985,7 @@ router.post('/:id/pay', authenticate, async (req: AuthRequest, res) => {
             const loyaltyPoints = Math.floor(grandTotal / 1000);
             if (loyaltyPoints > 0) {
                 await query(
-                    "INSERT INTO loyalty_transactions (customer_id, points, type) VALUES ($1,$2,'earn')",
+                    "INSERT INTO loyalty_transactions (customer_id, points, type, expires_at) VALUES ($1,$2,'earn', NOW() + INTERVAL '1 year')",
                     [customerId, loyaltyPoints]
                 );
             }
@@ -1080,7 +1080,7 @@ router.post('/:id/mark-paid', authenticate, async (req: AuthRequest, res) => {
         const loyaltyPoints = Math.floor(grandTotal / 1000);
         if (loyaltyPoints > 0) {
             await query(
-                "INSERT INTO loyalty_transactions (customer_id, points, type) VALUES ($1,$2,'earn')",
+                "INSERT INTO loyalty_transactions (customer_id, points, type, expires_at) VALUES ($1,$2,'earn', NOW() + INTERVAL '1 year')",
                 [b.customer_id, loyaltyPoints]
             );
         }

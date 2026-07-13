@@ -71,7 +71,7 @@ router.post('/razorpay', async (req, res) => {
                     const pts = Math.floor(b.grand_total_paise / 1000);
                     if (pts > 0) {
                         await query(
-                            "INSERT INTO loyalty_transactions (customer_id, points, type) VALUES ($1,$2,'earn')",
+                            "INSERT INTO loyalty_transactions (customer_id, points, type, expires_at) VALUES ($1,$2,'earn', NOW() + INTERVAL '1 year')",
                             [b.customer_id, pts]
                         ).catch(() => {});
                     }

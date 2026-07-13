@@ -225,7 +225,7 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
             if (pointsToAward > 0) {
                 await client.query(`
                     INSERT INTO loyalty_transactions (customer_id, points, type, order_id, expires_at)
-                    VALUES ($1, $2, 'earn', $3, NOW() + interval '180 days')
+                    VALUES ($1, $2, 'earn', $3, NOW() + INTERVAL '1 year')
                 `, [order.customer_id, pointsToAward, order.id]);
             }
 
