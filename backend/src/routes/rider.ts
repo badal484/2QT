@@ -1001,11 +1001,12 @@ router.post('/payouts/request', authenticate, requireRole('rider', 'rider_captai
             await client.query(`
                 INSERT INTO weekly_payouts
                   (rider_id, week_start, week_end, gross_earnings_paise, net_amount_paise, status, upi_id, payout_method)
-                VALUES ($1, CURRENT_DATE, CURRENT_DATE, $2, $2, 'pending', $3, 'upi')
+                VALUES ($1, CURRENT_DATE, CURRENT_DATE, $2, $2, 'pending', $3,
+                        COALESCE((SELECT payout_method FROM users WHERE id = $1), 'upi'))
             `, [riderId, amountPaise, upiId || null]);
         });
 
-        emitToUser(riderId, 'earnings_updated', { pendingAmountPaise: amountPaise });
+        emitToUser(riderId, 'earnings_updated', { inFlightPaise: amountPaise });
         res.json({ success: true });
     } catch (err: any) {
         let errorType = 'SERVER_ERROR';
