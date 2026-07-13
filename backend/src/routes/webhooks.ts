@@ -362,6 +362,12 @@ router.post('/razorpay', async (req, res) => {
                     reason: failureReason,
                     rzpPayoutId,
                 });
+                NotificationService.send('broadcast_message', {
+                    userId: rider_id,
+                    title: 'Payout Failed',
+                    body: `Your ₹${(net_amount_paise / 100).toFixed(0)} payout could not be transferred: ${failureReason}. Finance will retry shortly.`,
+                    screen: 'Payouts',
+                }).catch(() => {});
                 console.error(`[webhook ${event}] rider=${rider_id} pout=${rzpPayoutId} reason=${failureReason}`);
                 return res.json({ status: 'ok' });
             }
