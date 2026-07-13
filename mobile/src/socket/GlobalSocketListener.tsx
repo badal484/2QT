@@ -67,6 +67,19 @@ export const GlobalSocketListener: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['earnings'] });
     };
 
+    const handleDocumentReview = () => {
+      // Rider's document status changed (approved/rejected) — refresh profile so status badge updates
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+    };
+
+    const handleRefundCompleted = () => {
+      // Bank refund landed — refresh wallet and order so customer sees updated balance
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order'] });
+    };
+
     const handleLoyaltyUpdate = () => {
       queryClient.invalidateQueries({ queryKey: ['loyalty'] });
     };
@@ -127,6 +140,8 @@ export const GlobalSocketListener: React.FC = () => {
     socket.on('wallet_updated', handleWalletUpdate);
     socket.on('earnings_updated', handleEarningsUpdate);
     socket.on('payout_failed', handlePayoutFailed);
+    socket.on('document_review', handleDocumentReview);
+    socket.on('refund_completed', handleRefundCompleted);
     socket.on('loyalty_updated', handleLoyaltyUpdate);
     socket.on('subscription_updated', handleSubscriptionUpdate);
 
@@ -154,6 +169,8 @@ export const GlobalSocketListener: React.FC = () => {
       socket.off('wallet_updated', handleWalletUpdate);
       socket.off('earnings_updated', handleEarningsUpdate);
       socket.off('payout_failed', handlePayoutFailed);
+      socket.off('document_review', handleDocumentReview);
+      socket.off('refund_completed', handleRefundCompleted);
       socket.off('loyalty_updated', handleLoyaltyUpdate);
       socket.off('subscription_updated', handleSubscriptionUpdate);
 

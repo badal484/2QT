@@ -1993,11 +1993,40 @@ export default function AdminPage() {
       setActiveTab("SOS Alerts");
     });
 
+    socket.on("critical_alert", (data) => {
+      toast.error(`Critical Alert: ${data.type || 'System Alert'}`, {
+        description: data.message || 'A critical system event requires attention.',
+        duration: 15000,
+        icon: <AlertTriangle className="w-4 h-4 text-red-400" />,
+      });
+      setRefreshKey(prev => prev + 1);
+    });
+
+    socket.on("kitchen_complaint_spike", (data) => {
+      toast.warning(`Complaint Spike: ${data.kitchenName || 'Kitchen'}`, {
+        description: `${data.count || 'Multiple'} complaints received. Check kitchen performance.`,
+        duration: 10000,
+      });
+      setRefreshKey(prev => prev + 1);
+    });
+
+    socket.on("order_needs_manual_assignment", (data) => {
+      toast.warning(`Order needs manual assignment`, {
+        description: `Order #${data.displayId || data.orderId} has no available rider. Assign manually.`,
+        duration: 20000,
+        icon: <AlertTriangle className="w-4 h-4 text-amber-400" />,
+      });
+      setRefreshKey(prev => prev + 1);
+    });
+
     return () => {
       socket.off("new_order");
       socket.off("order_status_update");
       socket.off("new_ticket");
       socket.off("sos_alert");
+      socket.off("critical_alert");
+      socket.off("kitchen_complaint_spike");
+      socket.off("order_needs_manual_assignment");
       socket.disconnect();
     };
   }, [user, router]);

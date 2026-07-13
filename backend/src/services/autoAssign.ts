@@ -1,6 +1,6 @@
 import { query } from '../db';
 import { redis, keys } from '../redis';
-import { emitToUser, emitToRiders, emitToAdmin } from '../socket';
+import { emitToUser, emitToRiders, emitToAdmin, emitToKitchen } from '../socket';
 import { getAppSettingInt } from '../utils/appSettings';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -163,13 +163,16 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
 
         if (!riderId) {
             console.log(`[AUTO-ASSIGN] No eligible riders for ${order.display_id} (attempt ${attempt}) — alerting admin`);
-            emitToAdmin('order_needs_manual_assignment', {
+            const payload = {
                 orderId,
                 displayId: order.display_id,
                 zoneId: order.zone_id,
                 attempt,
                 message: `No available rider found for ${order.display_id}. Manual assignment needed.`,
-            });
+            };
+            emitToAdmin('order_needs_manual_assignment', payload);
+            // Also emit to kitchen room so kitchen_manager web page receives it
+            if (order.kitchen_id) emitToKitchen(order.kitchen_id, 'order_needs_manual_assignment', payload);
             if (attempt >= 2) {
                 // Absolute last resort — broadcast to all online riders in zone
                 console.log(`[AUTO-ASSIGN] Last resort broadcast for ${order.display_id}`);
