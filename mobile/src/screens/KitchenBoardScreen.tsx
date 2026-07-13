@@ -303,17 +303,17 @@ const KitchenBoardScreen = ({ navigation }: any) => {
             )}
           </View>
 
-          {/* Cooking / Packing / Ready */}
+          {/* Cooking / Ready (packing orders are handled by packer — not shown here) */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>IN KITCHEN</Text>
 
-            {[...cooking, ...packing, ...ready].length === 0 ? (
+            {[...cooking, ...ready].length === 0 ? (
               <View style={styles.emptyCard}>
                 <ChefHat size={22} color={G.muted} strokeWidth={1.5} />
                 <Text style={styles.emptyText}>Kitchen floor clear</Text>
               </View>
             ) : (
-              [...cooking, ...packing, ...ready].map((order: any) => {
+              [...cooking, ...ready].map((order: any) => {
                 const isReady = order.status === 'ready_for_pickup';
                 const isPacking = order.status === 'packing';
                 const pillColor = isReady ? G.green : isPacking ? '#F59E0B' : G.amber;
