@@ -159,7 +159,7 @@ function TemplateCard({ tmpl, onSaved }: { tmpl: NotifTemplate; onSaved: () => v
 // ─── Broadcast sub-tab ────────────────────────────────────────────────────────
 
 function BroadcastPanel() {
-  const [segment, setSegment] = useState<"all" | "zone" | "active_last_7">("all");
+  const [segment, setSegment] = useState<"all" | "zone" | "active_last_7" | "riders" | "kitchens">("all");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -211,14 +211,14 @@ function BroadcastPanel() {
     <div className="max-w-xl space-y-4">
       <div>
         <label className="text-xs text-zinc-500 mb-1.5 block">Audience</label>
-        <div className="flex gap-2">
-          {(["all", "zone", "active_last_7"] as const).map(s => (
+        <div className="flex gap-2 flex-wrap">
+          {(["all", "zone", "active_last_7", "riders", "kitchens"] as const).map(s => (
             <button
               key={s}
               onClick={() => setSegment(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${segment === s ? "bg-white text-black" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
             >
-              {s === "all" ? "All Customers" : s === "zone" ? "By Zone" : "Active (7d)"}
+              {s === "all" ? "All Customers" : s === "zone" ? "By Zone" : s === "active_last_7" ? "Active (7d)" : s === "riders" ? "Riders" : "Kitchen Partners"}
             </button>
           ))}
         </div>
