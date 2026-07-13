@@ -204,18 +204,34 @@ router.get('/cod/history', financeAccess, financeRole, async (req: AuthRequest, 
 router.get('/cash-submissions', financeAccess, financeRole, async (req: AuthRequest, res) => {
   try {
     const { status = 'pending' } = req.query as { status?: string };
-    const { rows } = await query(`
-      SELECT
-        cs.id, cs.total_amount_paise, cs.order_count, cs.method, cs.utr_number,
-        cs.status, cs.submitted_at, cs.confirmed_at, cs.notes,
-        u.id  AS rider_id,  u.name  AS rider_name,  u.phone AS rider_phone,
-        cb.name AS confirmed_by_name
-      FROM cash_submissions cs
-      JOIN users u  ON cs.rider_id = u.id
-      LEFT JOIN users cb ON cs.confirmed_by = cb.id
-      WHERE cs.status = $1
-      ORDER BY cs.submitted_at DESC
-    `, [status]);
+    // For pending submissions, deduplicate on the fly: only show the newest per rider.
+    // This handles any pre-existing duplicate rows until the DB cleanup migration runs.
+    const sql = status === 'pending'
+      ? `SELECT
+           cs.id, cs.total_amount_paise, cs.order_count, cs.method, cs.utr_number,
+           cs.status, cs.submitted_at, cs.confirmed_at, cs.notes,
+           u.id  AS rider_id,  u.name  AS rider_name,  u.phone AS rider_phone,
+           cb.name AS confirmed_by_name
+         FROM (
+           SELECT DISTINCT ON (rider_id) *
+           FROM cash_submissions
+           WHERE status = 'pending'
+           ORDER BY rider_id, submitted_at DESC
+         ) cs
+         JOIN users u  ON cs.rider_id = u.id
+         LEFT JOIN users cb ON cs.confirmed_by = cb.id
+         ORDER BY cs.submitted_at DESC`
+      : `SELECT
+           cs.id, cs.total_amount_paise, cs.order_count, cs.method, cs.utr_number,
+           cs.status, cs.submitted_at, cs.confirmed_at, cs.notes,
+           u.id  AS rider_id,  u.name  AS rider_name,  u.phone AS rider_phone,
+           cb.name AS confirmed_by_name
+         FROM cash_submissions cs
+         JOIN users u  ON cs.rider_id = u.id
+         LEFT JOIN users cb ON cs.confirmed_by = cb.id
+         WHERE cs.status = $1
+         ORDER BY cs.submitted_at DESC`;
+    const { rows } = await query(sql, status === 'pending' ? [] : [status]);
     res.json({ submissions: rows });
   } catch (err) {
     console.error('[finance/cash-submissions GET]', err);
