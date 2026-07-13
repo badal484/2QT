@@ -650,21 +650,26 @@ router.get('/earnings/today', authenticate, requireRole('rider', 'rider_captain'
 router.get('/payouts', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
     try {
-        const [payoutsRes, earningsRes, paidRes, profileRes, todayRes] = await Promise.all([
+        const [payoutsRes, earningsRes, paidRes, pendingRes, profileRes, todayRes] = await Promise.all([
             query('SELECT * FROM weekly_payouts WHERE rider_id = $1 ORDER BY week_start DESC', [riderId]),
             query('SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]),
             query(`SELECT COALESCE(SUM(net_amount_paise), 0) as paid FROM weekly_payouts WHERE rider_id = $1 AND status = 'paid'`, [riderId]),
+            query(`SELECT COALESCE(SUM(net_amount_paise), 0) as pending FROM weekly_payouts WHERE rider_id = $1 AND status = 'pending'`, [riderId]),
             query('SELECT upi_id, bank_account_number, bank_ifsc, bank_account_name, payout_method FROM users WHERE id = $1', [riderId]),
             query('SELECT deliveries_count, total_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE', [riderId]),
         ]);
 
-        const pendingAmountPaise = Math.max(0, parseInt(earningsRes.rows[0].total) - parseInt(paidRes.rows[0].paid));
+        const availableAmountPaise = Math.max(0,
+            parseInt(earningsRes.rows[0].total) - parseInt(paidRes.rows[0].paid) - parseInt(pendingRes.rows[0].pending)
+        );
+        const pendingAmountPaise = availableAmountPaise; // kept for backward compat field name
         const today = todayRes.rows[0] || { deliveries_count: 0, total_paise: 0 };
         const profile = profileRes.rows[0] || {};
 
         res.json({
             payouts: payoutsRes.rows,
             pendingAmountPaise,
+            inFlightPaise: parseInt(pendingRes.rows[0].pending), // requested but not yet paid by finance
             storedUpiId: profile.upi_id || null,
             bankAccountNumber: profile.bank_account_number || null,
             bankIfsc: profile.bank_ifsc || null,

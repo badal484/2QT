@@ -317,11 +317,14 @@ router.get('/rider-payouts', financeAccess, financeRole, async (req: AuthRequest
       SELECT
         wp.*,
         u.name AS rider_name, u.phone AS rider_phone,
-        rde.deliveries_count AS this_week_deliveries
+        (
+          SELECT COALESCE(SUM(rde.deliveries_count), 0)
+          FROM rider_daily_earnings rde
+          WHERE rde.rider_id = wp.rider_id
+            AND rde.date BETWEEN wp.week_start AND wp.week_end
+        ) AS this_week_deliveries
       FROM weekly_payouts wp
       JOIN users u ON wp.rider_id = u.id
-      LEFT JOIN rider_daily_earnings rde ON rde.rider_id = wp.rider_id
-        AND rde.date = wp.week_end
       WHERE wp.status = $1
       ORDER BY wp.created_at DESC
     `, [status]);
@@ -374,9 +377,13 @@ router.post('/rider-payouts/:id/mark-paid', financeAccess, financeRole, async (r
     let rzpPayoutId: string | null = paymentReference || null;
     let utrNumber: string | null = null;
     let autoMode = false;
+    let autoSkipReason: string | null = null;
 
-    // Auto-fire Razorpay if configured and rider has a UPI
-    if (isAutoPayConfigured() && payout.upi_id) {
+    if (!isAutoPayConfigured()) {
+      autoSkipReason = 'razorpay_not_configured';
+    } else if (!payout.upi_id) {
+      autoSkipReason = 'rider_has_no_upi';
+    } else {
       try {
         const fundAccountId = await ensureRiderFundAccount({
           id: payout.rider_id, name: payout.rider_name,
@@ -393,7 +400,7 @@ router.post('/rider-payouts/:id/mark-paid', financeAccess, financeRole, async (r
         autoMode = true;
       } catch (rzpErr: any) {
         console.error('[finance/rider-payout/auto-pay]', rzpErr.message);
-        // Fall through — still mark paid manually
+        autoSkipReason = rzpErr.message;
       }
     }
 
@@ -407,7 +414,7 @@ router.post('/rider-payouts/:id/mark-paid', financeAccess, financeRole, async (r
 
     emitToUser(payout.rider_id, 'earnings_updated', { payoutId: id, amountPaise: payout.net_amount_paise, status: 'paid' });
     emitToAll('rider_payout_updated', { action: 'paid', payoutId: id });
-    res.json({ success: true, payout: rows[0], autoTransferred: autoMode });
+    res.json({ success: true, payout: rows[0], autoTransferred: autoMode, autoSkipReason });
   } catch (err) {
     console.error('[finance/rider-payouts/mark-paid]', err);
     res.status(500).json({ error: 'Failed to mark paid' });
@@ -506,9 +513,13 @@ router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async 
     let rzpPayoutId: string | null = upiReference || null;
     let utrNumber: string | null = null;
     let autoMode = false;
+    let autoSkipReason: string | null = null;
 
-    // Auto-fire Razorpay if configured and kitchen has UPI
-    if (isAutoPayConfigured() && kp.upi_id) {
+    if (!isAutoPayConfigured()) {
+      autoSkipReason = 'razorpay_not_configured';
+    } else if (!kp.upi_id) {
+      autoSkipReason = 'kitchen_has_no_upi';
+    } else {
       try {
         const fundAccountId = await ensureKitchenFundAccount({
           id: kp.kitchen_id, name: kp.kitchen_name,
@@ -525,7 +536,7 @@ router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async 
         autoMode = true;
       } catch (rzpErr: any) {
         console.error('[finance/kitchen-payout/auto-pay]', rzpErr.message);
-        // Fall through — still mark paid manually
+        autoSkipReason = rzpErr.message;
       }
     }
 
@@ -539,7 +550,7 @@ router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async 
 
     emitToKitchen(kp.kitchen_id, 'kitchen_payout_updated', { payoutId: id, amountPaise: kp.net_payout_paise, status: 'paid' });
     emitToAll('kitchen_payout_updated', { action: 'paid', payoutId: id, kitchenId: kp.kitchen_id });
-    res.json({ success: true, payout: rows[0], autoTransferred: autoMode });
+    res.json({ success: true, payout: rows[0], autoTransferred: autoMode, autoSkipReason });
   } catch (err) {
     console.error('[finance/kitchen-payouts/mark-paid]', err);
     res.status(500).json({ error: 'Failed to mark paid' });
