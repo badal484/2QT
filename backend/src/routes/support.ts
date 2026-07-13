@@ -306,6 +306,99 @@ router.patch('/tickets/:id/priority', supportAccess, supportRole, async (req: Au
     }
 });
 
+// ─── PATCH /support/tickets/:id/link-order ────────────────────────────────────
+
+router.patch('/tickets/:id/link-order', supportAccess, supportRole, async (req: AuthRequest, res) => {
+    try {
+        const { id } = req.params;
+        const { orderDisplayId } = req.body as { orderDisplayId: string };
+
+        if (!orderDisplayId?.trim()) return res.status(400).json({ error: 'orderDisplayId required' });
+
+        const { rows: orders } = await query(
+            'SELECT id FROM orders WHERE display_id = $1',
+            [orderDisplayId.trim().toUpperCase()]
+        );
+        if (!orders[0]) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+
+        await query(
+            'UPDATE support_tickets SET linked_order_id = $1, updated_at = NOW() WHERE id = $2',
+            [orders[0].id, id]
+        );
+
+        res.json({ success: true, orderId: orders[0].id });
+    } catch (err) {
+        console.error('[support/tickets/:id/link-order]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ─── POST /support/tickets/:id/escalate-to-finance ────────────────────────────
+
+router.post('/tickets/:id/escalate-to-finance', supportAccess, supportRole, async (req: AuthRequest, res) => {
+    try {
+        const { id } = req.params;
+        const { amountPaise, note } = req.body as {
+            amountPaise: number;
+            note?: string;
+        };
+        const agentId = req.user!.userId;
+
+        if (!amountPaise || amountPaise <= 0) return res.status(400).json({ error: 'amountPaise must be > 0' });
+
+        // Fetch ticket + linked order details
+        const { rows: tickets } = await query(
+            `SELECT st.customer_id, st.rider_id, st.linked_order_id, st.escalated_to,
+                    o.gateway_payment_id, o.customer_id AS order_customer_id
+             FROM support_tickets st
+             LEFT JOIN orders o ON o.id = st.linked_order_id
+             WHERE st.id = $1`,
+            [id]
+        );
+        if (!tickets[0]) return res.status(404).json({ error: 'TICKET_NOT_FOUND' });
+        const ticket = tickets[0];
+
+        if (!ticket.linked_order_id) return res.status(400).json({ error: 'No order linked to this ticket' });
+        if (ticket.escalated_to === 'finance') return res.status(409).json({ error: 'Already escalated to finance' });
+
+        const customerId = ticket.customer_id || ticket.order_customer_id;
+        const reason = note?.trim() || 'Escalated by support team';
+
+        // Create a pending refund record — visible immediately in Finance > Refunds
+        const { rows: refundRows } = await query(
+            `INSERT INTO refunds (order_id, customer_id, ticket_id, amount_paise, refund_type, reason, initiated_by)
+             VALUES ($1, $2, $3, $4, 'wallet', $5, $6)
+             RETURNING id`,
+            [ticket.linked_order_id, customerId, id, amountPaise, reason, agentId]
+        );
+
+        // Update ticket
+        await query(
+            `UPDATE support_tickets
+             SET status = 'escalated', escalated_to = 'finance',
+                 refund_eligible = true, suggested_refund_paise = $1, updated_at = NOW()
+             WHERE id = $2`,
+            [amountPaise, id]
+        );
+
+        // System message visible in the thread
+        const rupees = (amountPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 });
+        const sysMsg = `Escalated to Finance team. Refund of ₹${rupees} requested.${note?.trim() ? ` Note: ${note.trim()}` : ''}`;
+        await query(
+            `INSERT INTO ticket_messages (ticket_id, sender_id, sender_type, message)
+             VALUES ($1, $2, 'system', $3)`,
+            [id, agentId, sysMsg]
+        );
+
+        emitToSupport('ticket_message', { ticketId: id });
+
+        res.json({ success: true, refundId: refundRows[0].id });
+    } catch (err) {
+        console.error('[support/tickets/:id/escalate-to-finance]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
 // ─── GET /support/sos-alerts ──────────────────────────────────────────────────
 
 router.get('/sos-alerts', supportAccess, supportRole, async (req: AuthRequest, res) => {

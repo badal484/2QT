@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Send, User, Shield, AlertTriangle, Clock, RefreshCw, ChevronDown } from "lucide-react";
+import { X, Send, User, Shield, AlertTriangle, Clock, RefreshCw, ChevronDown, ShoppingBag, Link2, IndianRupee, ArrowUpRight } from "lucide-react";
 import { api } from "../lib/api";
 import { socket } from "../lib/socket";
 import { toast } from "sonner";
@@ -21,10 +21,13 @@ interface Ticket {
   sla_deadline: string;
   assigned_to: string | null;
   assigned_to_name: string | null;
+  linked_order_id: string | null;
   order_display_id: string | null;
   order_total_paise: number | null;
+  order_payment_method: string | null;
   refund_eligible: boolean;
   suggested_refund_paise: number;
+  escalated_to: string | null;
   auto_resolved: boolean;
   abuse_flag: boolean;
   resolution: string | null;
@@ -66,6 +69,10 @@ const STATUS_OPTIONS = [
 
 const PRIORITY_OPTIONS = ["low", "normal", "high", "critical"];
 
+function paise(p: number) {
+  return `₹${(p / 100).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
 function slaCountdown(deadline: string) {
   const diff = new Date(deadline).getTime() - Date.now();
   if (diff <= 0) return { text: "SLA Breached", className: "text-red-400" };
@@ -100,6 +107,17 @@ export function TicketThread({ ticketId, onClose }: Props) {
   const statusRef = useRef<HTMLDivElement>(null);
   const priorityRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Link order state
+  const [showLinkOrder, setShowLinkOrder] = useState(false);
+  const [linkOrderId, setLinkOrderId] = useState("");
+  const [linkingOrder, setLinkingOrder] = useState(false);
+
+  // Escalate to finance state
+  const [showEscalate, setShowEscalate] = useState(false);
+  const [escalateAmount, setEscalateAmount] = useState("");
+  const [escalateNote, setEscalateNote] = useState("");
+  const [escalating, setEscalating] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -218,6 +236,46 @@ export function TicketThread({ ticketId, onClose }: Props) {
     }
   };
 
+  const linkOrder = async () => {
+    if (!linkOrderId.trim()) return;
+    setLinkingOrder(true);
+    try {
+      await api.patch(`/support/tickets/${ticketId}/link-order`, { orderDisplayId: linkOrderId.trim() });
+      toast.success("Order linked to ticket");
+      setShowLinkOrder(false);
+      setLinkOrderId("");
+      load();
+    } catch (e: any) {
+      toast.error(e.message === "ORDER_NOT_FOUND" ? "Order not found — check the ID" : (e.message || "Failed to link order"));
+    } finally {
+      setLinkingOrder(false);
+    }
+  };
+
+  const escalateToFinance = async () => {
+    const amountPaise = Math.round(parseFloat(escalateAmount) * 100);
+    if (!escalateAmount || isNaN(amountPaise) || amountPaise <= 0) {
+      toast.error("Enter a valid refund amount");
+      return;
+    }
+    setEscalating(true);
+    try {
+      await api.post(`/support/tickets/${ticketId}/escalate-to-finance`, {
+        amountPaise,
+        note: escalateNote.trim() || undefined,
+      });
+      toast.success("Escalated to Finance — refund request created");
+      setShowEscalate(false);
+      setEscalateAmount("");
+      setEscalateNote("");
+      load();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to escalate");
+    } finally {
+      setEscalating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col h-full bg-[#0a0a14] border-l border-white/[0.05]">
@@ -247,6 +305,10 @@ export function TicketThread({ ticketId, onClose }: Props) {
     ? "text-purple-400 bg-purple-500/10 border-purple-500/30"
     : "text-green-400 bg-green-500/10 border-green-500/30";
 
+  const isTerminal = ticket.status === "resolved" || ticket.status === "closed";
+  const alreadyEscalatedToFinance = ticket.escalated_to === "finance";
+  const canEscalate = !!ticket.order_display_id && !alreadyEscalatedToFinance && !isTerminal;
+
   return (
     <div className="flex flex-col h-full bg-[#0a0a14] border-l border-white/[0.05]">
       {/* Header */}
@@ -271,11 +333,15 @@ export function TicketThread({ ticketId, onClose }: Props) {
                   Auto-resolved
                 </span>
               )}
+              {alreadyEscalatedToFinance && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                  <ArrowUpRight className="w-3 h-3" /> Finance
+                </span>
+              )}
             </div>
             <h3 className="text-sm font-bold text-white truncate">{ticket.subject}</h3>
             <p className="text-xs text-zinc-500 mt-0.5">
               {ticket.user_name} · {ticket.user_phone}
-              {ticket.order_display_id && <> · Order <span className="text-zinc-400 font-mono">#{ticket.order_display_id}</span></>}
             </p>
           </div>
           <button onClick={onClose} className="text-white/40 hover:text-white/80 shrink-0">
@@ -298,8 +364,69 @@ export function TicketThread({ ticketId, onClose }: Props) {
         </div>
       </div>
 
+      {/* ── Order card ─────────────────────────────────────────────────────────── */}
+      {ticket.order_display_id ? (
+        <div className="mx-5 my-3 flex items-center gap-3 bg-white/[0.04] border border-white/[0.07] rounded-xl px-4 py-3">
+          <ShoppingBag className="w-4 h-4 text-zinc-500 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-zinc-500 mb-0.5">Linked Order</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-bold text-white font-mono">#{ticket.order_display_id}</span>
+              {ticket.order_total_paise != null && (
+                <span className="text-sm font-semibold text-emerald-400">{paise(ticket.order_total_paise)}</span>
+              )}
+              {ticket.order_payment_method && (
+                <span className="text-xs bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded-full capitalize">
+                  {ticket.order_payment_method.replace(/_/g, " ")}
+                </span>
+              )}
+              {alreadyEscalatedToFinance && ticket.suggested_refund_paise > 0 && (
+                <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                  Refund: {paise(ticket.suggested_refund_paise)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* No order linked — show link UI */
+        <div className="mx-5 my-3">
+          {!showLinkOrder ? (
+            <button
+              onClick={() => setShowLinkOrder(true)}
+              className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 border border-dashed border-white/10 hover:border-white/20 rounded-xl px-4 py-2.5 w-full transition-all"
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              Link an order to this ticket
+            </button>
+          ) : (
+            <div className="flex gap-2 items-center bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2">
+              <Link2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              <input
+                autoFocus
+                value={linkOrderId}
+                onChange={e => setLinkOrderId(e.target.value.toUpperCase())}
+                onKeyDown={e => { if (e.key === "Enter") linkOrder(); if (e.key === "Escape") setShowLinkOrder(false); }}
+                placeholder="Order ID (e.g. A1B2C)"
+                className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/20 font-mono"
+              />
+              <button
+                onClick={linkOrder}
+                disabled={linkingOrder || !linkOrderId.trim()}
+                className="text-xs font-bold text-sky-400 hover:text-sky-300 disabled:opacity-40 shrink-0"
+              >
+                {linkingOrder ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Link"}
+              </button>
+              <button onClick={() => setShowLinkOrder(false)} className="text-zinc-600 hover:text-zinc-400">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action bar */}
-      <div className="px-5 py-3 border-b border-white/[0.05] flex items-center gap-2 flex-wrap">
+      <div className="px-5 py-3 border-t border-b border-white/[0.05] flex items-center gap-2 flex-wrap">
         {/* Status dropdown */}
         <div className="relative" ref={statusRef}>
           <button
@@ -362,9 +489,29 @@ export function TicketThread({ ticketId, onClose }: Props) {
         >
           <Shield className="w-3 h-3" /> Assign to Me
         </button>
+
+        {/* Escalate to Finance */}
+        {canEscalate && (
+          <button
+            onClick={() => {
+              setShowEscalate(e => !e);
+              setShowResolutionInput(false);
+              // Pre-fill amount from order total or suggested refund
+              if (!escalateAmount) {
+                const suggested = ticket.suggested_refund_paise > 0
+                  ? ticket.suggested_refund_paise
+                  : ticket.order_total_paise;
+                if (suggested) setEscalateAmount((suggested / 100).toString());
+              }
+            }}
+            className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ml-auto"
+          >
+            <IndianRupee className="w-3 h-3" /> Escalate to Finance
+          </button>
+        )}
       </div>
 
-      {/* Resolution input (shown when resolving) */}
+      {/* Resolution input */}
       {showResolutionInput && (
         <div className="px-5 py-3 border-b border-white/[0.05] bg-emerald-500/5 space-y-2">
           <p className="text-xs font-semibold text-emerald-400">Add resolution note (optional)</p>
@@ -384,6 +531,54 @@ export function TicketThread({ ticketId, onClose }: Props) {
             </button>
             <button
               onClick={() => { setShowResolutionInput(false); setResolutionText(""); }}
+              className="px-4 py-1.5 bg-white/5 hover:bg-white/10 text-white/50 text-xs font-bold rounded-lg transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Escalate to Finance panel */}
+      {showEscalate && (
+        <div className="px-5 py-3 border-b border-white/[0.05] bg-amber-500/5 space-y-3">
+          <p className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
+            <IndianRupee className="w-3.5 h-3.5" /> Escalate to Finance — Refund Request
+          </p>
+          <p className="text-xs text-zinc-500">
+            This creates a pending refund in the Finance queue. The finance team will approve and process it.
+          </p>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">₹</span>
+              <input
+                type="number"
+                min="1"
+                value={escalateAmount}
+                onChange={e => setEscalateAmount(e.target.value)}
+                placeholder="Refund amount"
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-7 pr-3 py-2 text-sm text-white outline-none focus:border-amber-500/50 placeholder:text-white/20"
+              />
+            </div>
+          </div>
+          <textarea
+            value={escalateNote}
+            onChange={e => setEscalateNote(e.target.value)}
+            placeholder="Reason / note for finance team (optional)"
+            rows={2}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-amber-500/50 placeholder:text-white/20 resize-none"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={escalateToFinance}
+              disabled={escalating || !escalateAmount}
+              className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black text-xs font-bold rounded-lg transition-all flex items-center gap-1.5"
+            >
+              {escalating ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ArrowUpRight className="w-3 h-3" />}
+              Confirm Escalation
+            </button>
+            <button
+              onClick={() => { setShowEscalate(false); setEscalateAmount(""); setEscalateNote(""); }}
               className="px-4 py-1.5 bg-white/5 hover:bg-white/10 text-white/50 text-xs font-bold rounded-lg transition-all"
             >
               Cancel
