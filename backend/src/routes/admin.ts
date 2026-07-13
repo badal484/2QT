@@ -1143,7 +1143,8 @@ router.post('/inventory', authenticate, requireRole('super_admin', 'admin'), asy
 
 router.patch('/inventory/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const idOrName = decodeURIComponent(req.params.id as string);
-    const current_stock = parseInt(req.body.current_stock as any, 10);
+    const current_stock = parseInt(String(req.body.current_stock ?? ''), 10);
+    if (isNaN(current_stock)) return res.status(400).json({ error: 'INVALID_STOCK', message: 'current_stock must be a number' });
     try {
         // Try updating by name first (since GET returns name as id)
         const { rowCount } = await query('UPDATE ingredients SET current_stock_grams = $1 WHERE name = $2', [current_stock, idOrName]);

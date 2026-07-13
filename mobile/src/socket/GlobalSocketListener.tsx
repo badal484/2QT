@@ -62,6 +62,11 @@ export const GlobalSocketListener: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['riderPayouts'] });
     };
 
+    const handlePayoutFailed = () => {
+      queryClient.invalidateQueries({ queryKey: ['riderPayouts'] });
+      queryClient.invalidateQueries({ queryKey: ['earnings'] });
+    };
+
     const handleLoyaltyUpdate = () => {
       queryClient.invalidateQueries({ queryKey: ['loyalty'] });
     };
@@ -121,6 +126,7 @@ export const GlobalSocketListener: React.FC = () => {
 
     socket.on('wallet_updated', handleWalletUpdate);
     socket.on('earnings_updated', handleEarningsUpdate);
+    socket.on('payout_failed', handlePayoutFailed);
     socket.on('loyalty_updated', handleLoyaltyUpdate);
     socket.on('subscription_updated', handleSubscriptionUpdate);
 
@@ -147,6 +153,7 @@ export const GlobalSocketListener: React.FC = () => {
 
       socket.off('wallet_updated', handleWalletUpdate);
       socket.off('earnings_updated', handleEarningsUpdate);
+      socket.off('payout_failed', handlePayoutFailed);
       socket.off('loyalty_updated', handleLoyaltyUpdate);
       socket.off('subscription_updated', handleSubscriptionUpdate);
 

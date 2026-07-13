@@ -894,15 +894,15 @@ router.get('/transactions', financeAccess, financeRole, async (req: AuthRequest,
         ${where}
         ORDER BY o.created_at DESC
         LIMIT $${p} OFFSET $${p + 1}
-      `, [...params, parseInt(limit), parseInt(offset)]),
+      `, [...params, parseInt(limit) || 50, parseInt(offset) || 0]),
       query(`SELECT COUNT(*) FROM orders o ${where}`, params),
     ]);
 
     res.json({
       transactions: dataResult.rows,
       total: parseInt(countResult.rows[0].count),
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: parseInt(limit) || 50,
+      offset: parseInt(offset) || 0,
     });
   } catch (err) {
     console.error('[finance/transactions]', err);
@@ -1099,7 +1099,7 @@ router.get('/refunds', financeAccess, financeRole, async (req: AuthRequest, res)
         ${where}
         ORDER BY r.created_at DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-      `, [...params, parseInt(limit), parseInt(offset)]),
+      `, [...params, parseInt(limit) || 50, parseInt(offset) || 0]),
       query(`
         SELECT
           COUNT(*) FILTER (WHERE status = 'pending')    AS pending,

@@ -683,7 +683,7 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
 
 // Customer registers their FCM token to be notified when the kitchen resumes
 // Called from the mobile "Notify me when open" button
-router.post('/pause-notify', authenticate, async (req: AuthRequest, res) => {
+router.post('/pause-notify', authenticate, requireRole('chef', 'kitchen_manager', 'partner_kitchen', 'packer', 'super_admin'), async (req: AuthRequest, res) => {
     const { kitchenId, fcmToken } = req.body;
     if (!kitchenId || !fcmToken) return res.status(400).json({ error: 'MISSING_FIELDS' });
 
