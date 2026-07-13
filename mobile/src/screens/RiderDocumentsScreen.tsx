@@ -10,8 +10,8 @@ import { updateUser } from '../store/slices/authSlice';
 import { RootState } from '../store';
 import { api } from '../api/client';
 import {
-  ArrowLeft, FileText, Car, CreditCard, Upload,
-  CheckCircle, Clock, XCircle, Camera, MapPin,
+  ArrowLeft, Car, CreditCard, Upload,
+  CheckCircle, Clock, XCircle, Camera, MapPin, User,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
@@ -47,6 +47,10 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
     queryFn: () => api.get('/riders/documents'),
   });
 
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(user?.photo_url || null);
+  const [profilePhotoUri, setProfilePhotoUri] = useState<string | null>(null);
+  const [isUploadingProfile, setIsUploadingProfile] = useState(false);
+
   const [vehicleType, setVehicleType] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [idPhotoUrl, setIdPhotoUrl] = useState<string | null>(null);
@@ -65,11 +69,13 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
     mutationFn: (payload: any) => api.patch('/riders/documents', payload),
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['rider-documents'] });
+      if (profilePhotoUrl && profilePhotoUrl !== user?.photo_url) {
+        dispatch(updateUser({ photo_url: profilePhotoUrl }));
+      }
       if (isOnboarding) {
         try {
           await api.post('/auth/onboarding/complete', {});
           dispatch(updateUser({ onboarding_complete: true }));
-          // RiderNavigator re-renders: is_verified=true → tabs, false → VerificationPendingScreen
         } catch {
           Alert.alert('Error', 'Documents saved but could not complete setup. Please try again.');
         }
@@ -80,37 +86,62 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
     onError: () => Alert.alert('Error', 'Could not save documents. Please try again.'),
   });
 
-  const pickPhoto = async (useCamera: boolean) => {
+  const pickPhoto = async (type: 'profile' | 'document', useCamera: boolean) => {
     const result = useCamera
       ? await launchCamera({ mediaType: 'photo', quality: 0.8 })
       : await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
     if (result.didCancel || !result.assets?.[0]) return;
     const asset = result.assets[0];
-    setIdPhotoUri(asset.uri ?? null);
-    setIdPhotoUrl(null);
-    setIsUploading(true);
-    try {
-      const uploaded = await uploadToImageKit(asset, 'rider_docs');
-      setIdPhotoUrl(uploaded.url);
-    } catch {
-      Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
-      setIdPhotoUri(null);
-    } finally {
-      setIsUploading(false);
+
+    if (type === 'profile') {
+      setProfilePhotoUri(asset.uri ?? null);
+      setProfilePhotoUrl(null);
+      setIsUploadingProfile(true);
+      try {
+        const uploaded = await uploadToImageKit(asset, 'rider_profiles');
+        setProfilePhotoUrl(uploaded.url);
+      } catch {
+        Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
+        setProfilePhotoUri(null);
+      } finally {
+        setIsUploadingProfile(false);
+      }
+    } else {
+      setIdPhotoUri(asset.uri ?? null);
+      setIdPhotoUrl(null);
+      setIsUploading(true);
+      try {
+        const uploaded = await uploadToImageKit(asset, 'rider_docs');
+        setIdPhotoUrl(uploaded.url);
+      } catch {
+        Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
+        setIdPhotoUri(null);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
-  const showPhotoPicker = () => {
+  const showProfilePhotoPicker = () => {
+    Alert.alert('Profile Photo', 'This photo will be shown to customers during delivery', [
+      { text: 'Take Selfie', onPress: () => pickPhoto('profile', true) },
+      { text: 'Choose from Gallery', onPress: () => pickPhoto('profile', false) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const showDocumentPhotoPicker = () => {
     Alert.alert('Upload ID Document', 'Choose source', [
-      { text: 'Camera', onPress: () => pickPhoto(true) },
-      { text: 'Gallery', onPress: () => pickPhoto(false) },
+      { text: 'Camera', onPress: () => pickPhoto('document', true) },
+      { text: 'Gallery', onPress: () => pickPhoto('document', false) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
   const handleSave = () => {
+    if (!profilePhotoUrl) { Alert.alert('Required', 'Please upload your profile photo. Customers will see this during delivery.'); return; }
     if (!vehicleType) { Alert.alert('Required', 'Please select your vehicle type.'); return; }
-    saveMutation.mutate({ vehicleType, licenseNumber, idPhotoUrl });
+    saveMutation.mutate({ vehicleType, licenseNumber, idPhotoUrl, profilePhotoUrl });
   };
 
   const status = doc?.status ?? null;
@@ -160,6 +191,47 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
             </View>
           </View>
         )}
+
+        {/* Profile photo — shown to customers during delivery */}
+        <Text style={s.sectionLabel}>
+          Profile Photo <Text style={s.requiredBadge}>REQUIRED</Text>
+        </Text>
+        <Text style={s.sectionHint}>This photo is shown to customers when you're assigned their order.</Text>
+        <TouchableOpacity style={s.profilePhotoWrap} onPress={showProfilePhotoPicker} activeOpacity={0.85}>
+          {profilePhotoUri || profilePhotoUrl ? (
+            <>
+              <Image source={{ uri: profilePhotoUri || profilePhotoUrl! }} style={s.profilePhoto} />
+              {isUploadingProfile && (
+                <View style={s.profilePhotoOverlay}>
+                  <ActivityIndicator color={R.orange} />
+                </View>
+              )}
+              {profilePhotoUrl && !isUploadingProfile && (
+                <View style={s.profilePhotoBadge}>
+                  <CheckCircle size={12} color={R.green} />
+                  <Text style={s.profilePhotoBadgeText}>Uploaded</Text>
+                </View>
+              )}
+              <View style={s.profilePhotoEdit}>
+                <Camera size={14} color={R.white} />
+              </View>
+            </>
+          ) : (
+            <View style={s.profilePhotoPlaceholder}>
+              {isUploadingProfile ? (
+                <ActivityIndicator color={R.orange} />
+              ) : (
+                <>
+                  <View style={s.profilePhotoIconWrap}>
+                    <User size={32} color={R.orange} />
+                  </View>
+                  <Text style={s.profilePhotoTitle}>Upload Profile Photo</Text>
+                  <Text style={s.profilePhotoSub}>Take a selfie or choose from gallery</Text>
+                </>
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
 
         {/* Vehicle type */}
         <Text style={s.sectionLabel}>Vehicle Type</Text>
@@ -211,13 +283,13 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
                 <Text style={s.uploadedText}>Uploaded</Text>
               </View>
             )}
-            <TouchableOpacity style={s.reuploadBtn} onPress={showPhotoPicker} activeOpacity={0.85}>
+            <TouchableOpacity style={s.reuploadBtn} onPress={showDocumentPhotoPicker} activeOpacity={0.85}>
               <Upload size={13} color={R.white} />
               <Text style={s.reuploadBtnText}>Re-upload</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={s.uploadArea} onPress={showPhotoPicker} activeOpacity={0.85}>
+          <TouchableOpacity style={s.uploadArea} onPress={showDocumentPhotoPicker} activeOpacity={0.85}>
             {isUploading ? (
               <ActivityIndicator color={R.orange} />
             ) : (
@@ -240,9 +312,9 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
 
         {/* Save button */}
         <TouchableOpacity
-          style={[s.saveBtn, (saveMutation.isPending || isUploading) && s.saveBtnDisabled]}
+          style={[s.saveBtn, (saveMutation.isPending || isUploading || isUploadingProfile) && s.saveBtnDisabled]}
           onPress={handleSave}
-          disabled={saveMutation.isPending || isUploading}
+          disabled={saveMutation.isPending || isUploading || isUploadingProfile}
           activeOpacity={0.9}
         >
           {saveMutation.isPending
@@ -280,8 +352,42 @@ const s = StyleSheet.create({
 
   sectionLabel: {
     fontSize: 12, fontWeight: '700', color: R.muted, textTransform: 'uppercase',
-    letterSpacing: 0.8, marginBottom: 10, marginTop: 20,
+    letterSpacing: 0.8, marginBottom: 6, marginTop: 20,
   },
+  requiredBadge: {
+    color: R.orange, fontSize: 9, fontWeight: '900', letterSpacing: 1,
+  },
+  sectionHint: {
+    color: R.muted, fontSize: 12, lineHeight: 17, marginBottom: 10,
+  },
+  profilePhotoWrap: {
+    width: 120, height: 120, borderRadius: 60, alignSelf: 'center',
+    overflow: 'hidden', marginBottom: 8, position: 'relative',
+  },
+  profilePhoto: { width: 120, height: 120, borderRadius: 60 },
+  profilePhotoOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.75)', alignItems: 'center', justifyContent: 'center',
+  },
+  profilePhotoBadge: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    backgroundColor: R.greenLight, paddingVertical: 4,
+  },
+  profilePhotoBadgeText: { color: R.green, fontSize: 10, fontWeight: '700' },
+  profilePhotoEdit: {
+    position: 'absolute', top: 6, right: 6,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center',
+  },
+  profilePhotoPlaceholder: {
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: R.orangeLight, borderWidth: 2, borderColor: R.orange,
+    borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4,
+  },
+  profilePhotoIconWrap: { alignItems: 'center', justifyContent: 'center' },
+  profilePhotoTitle: { color: R.ink, fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  profilePhotoSub: { color: R.muted, fontSize: 9, textAlign: 'center', paddingHorizontal: 8 },
 
   vehicleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   vehicleChip: {

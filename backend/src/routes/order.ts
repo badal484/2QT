@@ -65,6 +65,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
         `SELECT o.*,
                 r.name as rider_name,
                 r.phone as rider_phone,
+                r.photo_url as rider_photo_url,
                 a.address_text as delivery_address_text,
                 a.label as delivery_address_label,
                 CASE
