@@ -40,7 +40,13 @@ const STEPS = [
   { key: 'delivered',        label: 'Delivered', Icon: CircleCheck },
 ];
 const STATUS_ORDER = ['confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered'];
-const stepIndex = (s: string) => { const i = STATUS_ORDER.indexOf(s); return i === -1 ? 0 : i; };
+// packing is an internal kitchen stage between preparing and ready_for_pickup;
+// show it as the "Preparing" step so the customer sees correct progress.
+const stepIndex = (s: string) => {
+  const normalized = s === 'packing' ? 'preparing' : s;
+  const i = STATUS_ORDER.indexOf(normalized);
+  return i === -1 ? 0 : i;
+};
 
 const ProgressTracker = ({ status }: { status: string }) => {
   const cur = stepIndex(status);
@@ -233,6 +239,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               let title = 'Order Confirmed';
               let sub = 'Restaurant has received your order';
               if (status === 'preparing') { Icon = ChefHat; title = 'Preparing Food'; sub = 'The kitchen is preparing your order'; }
+              else if (status === 'packing') { Icon = Package; title = 'Packing Your Order'; sub = 'Almost ready — being packed right now'; }
               else if (status === 'ready_for_pickup') { Icon = Package; title = 'Ready for Pickup'; sub = 'Waiting for delivery partner'; }
               else if (status === 'delivered') { Icon = CircleCheck; title = 'Order Delivered'; sub = 'Enjoy your meal!'; }
               

@@ -29,12 +29,12 @@ const TABS = [
 ];
 
 const STATUS_LABEL: Record<string, string> = {
-  confirmed: "Confirmed", preparing: "Preparing", ready_for_pickup: "Ready",
+  confirmed: "Confirmed", preparing: "Preparing", packing: "Packing", ready_for_pickup: "Ready",
   out_for_delivery: "On the Way", delivered: "Delivered", cancelled: "Cancelled",
 };
 const STATUS_COLOR: Record<string, string> = {
   confirmed: "bg-blue-50 text-blue-600", preparing: "bg-amber-50 text-amber-600",
-  ready_for_pickup: "bg-purple-50 text-purple-600", out_for_delivery: "bg-brand-primary/10 text-brand-primary",
+  packing: "bg-orange-50 text-orange-600", ready_for_pickup: "bg-purple-50 text-purple-600", out_for_delivery: "bg-brand-primary/10 text-brand-primary",
   delivered: "bg-zinc-100 text-zinc-500", cancelled: "bg-red-50 text-red-600",
 };
 

@@ -11,7 +11,7 @@ import {
   ArrowLeft, Phone, Navigation, Package,
   CreditCard, ChevronRight, Info,
   UserX, X, MapPin, Check,
-  ShieldAlert, RefreshCw, DoorOpen, RotateCcw,
+  ShieldAlert, RefreshCw, DoorOpen, RotateCcw, Wrench,
 } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
 
@@ -43,6 +43,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const [currentStatus, setCurrentStatus] = useState(order.status);
   const [showUnreachableModal, setShowUnreachableModal] = useState(false);
   const [showSosModal, setShowSosModal] = useState(false);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
   const currentLocationRef = useRef({ lat: 0, lng: 0 });
   const queryClient = useQueryClient();
@@ -104,6 +105,29 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
       setCurrentStatus(data.status || currentStatus);
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
     },
+  });
+
+  const breakdownMutation = useMutation({
+    mutationFn: async () => {
+      let { lat, lng } = currentLocationRef.current;
+      try {
+        const pos = await new Promise<any>((resolve, reject) =>
+          Geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 4000, maximumAge: 5000 })
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+        currentLocationRef.current = { lat, lng };
+      } catch {}
+      return api.post(`/riders/orders/${order.id}/report-breakdown`, { lat: lat || null, lng: lng || null });
+    },
+    onSuccess: () => {
+      setShowBreakdownModal(false);
+      Alert.alert('Breakdown Reported', 'The dispatcher has been notified and will assign a new rider. You can go offline now.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+    },
+    onError: () => Alert.alert('Error', 'Could not report breakdown. Please call support.'),
   });
 
   const unreachableMutation = useMutation({
@@ -365,6 +389,14 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         )}
 
+        {/* Bike breakdown */}
+        {isOutForDelivery && (
+          <TouchableOpacity style={s.dangerBtn} onPress={() => setShowBreakdownModal(true)} activeOpacity={0.8}>
+            <Wrench size={16} color={R.red} />
+            <Text style={s.dangerBtnText}>Bike Breakdown</Text>
+          </TouchableOpacity>
+        )}
+
 
 
       </ScrollView>
@@ -403,6 +435,37 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
                 <ChevronRight size={16} color={opt.color} />
               </TouchableOpacity>
             ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bike Breakdown Modal */}
+      <Modal visible={showBreakdownModal} transparent animationType="slide" onRequestClose={() => setShowBreakdownModal(false)}>
+        <View style={s.overlay}>
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <View style={s.sheetHeader}>
+              <View style={s.sosTitleRow}>
+                <Wrench size={20} color={R.red} />
+                <Text style={[s.sheetTitle, { color: R.red }]}>Bike Breakdown</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowBreakdownModal(false)}>
+                <X size={22} color={R.muted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.sheetSub}>
+              This will release the order back to the dispatcher so a new rider can be assigned. Your location will be shared with ops.
+            </Text>
+            <TouchableOpacity
+              style={[s.submitBtn, breakdownMutation.isPending && { opacity: 0.6 }]}
+              onPress={() => breakdownMutation.mutate()}
+              disabled={breakdownMutation.isPending}
+              activeOpacity={0.85}
+            >
+              {breakdownMutation.isPending
+                ? <ActivityIndicator color={R.white} />
+                : <Text style={s.submitBtnText}>Confirm — Report Breakdown</Text>}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

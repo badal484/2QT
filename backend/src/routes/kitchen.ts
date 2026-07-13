@@ -8,6 +8,7 @@ import { haversineMetres } from '../services/distance.service';
 import { autoAssignOrder } from '../services/autoAssign';
 import { redis, keys } from '../redis';
 import { sendFCM } from '../services/fcm.service';
+import { pushService } from '../services/push.service';
 
 async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> {
     if (req.user!.kitchenId) return req.user!.kitchenId;
@@ -143,14 +144,27 @@ router.patch('/menu/:itemId/availability', authenticate, requireRole('chef', 'ki
 router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin', 'packer'), async (req: AuthRequest, res) => {
     let rows: any[] = [];
 
+    const ITEMS_AGG = `
+        COALESCE(json_agg(json_build_object(
+            'name',                 oi.menu_item_name,
+            'quantity',             oi.quantity,
+            'price_paise',          oi.price_paise,
+            'station',              COALESCE(m.category, oi.station),
+            'customizations',       oi.customizations,
+            'special_instructions', oi.special_instructions
+        ) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items`;
+
     if (req.user!.role === 'super_admin') {
         const result = await query(
-            `SELECT o.*, u.name as customer_name, k.name as kitchen_name
+            `SELECT o.*, u.name AS customer_name, k.name AS kitchen_name, ${ITEMS_AGG}
              FROM orders o
              JOIN users u ON o.customer_id = u.id
              JOIN kitchens k ON o.kitchen_id = k.id
+             LEFT JOIN order_items oi ON oi.order_id = o.id
+             LEFT JOIN menu_items m ON oi.menu_item_id = m.id
              WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
                AND o.created_at > NOW() - INTERVAL '48 hours'
+             GROUP BY o.id, u.id, k.id
              ORDER BY o.created_at ASC`
         );
         rows = result.rows;
@@ -159,37 +173,23 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
         if (!kitchenId) return;
 
         const result = await query(
-            `SELECT o.*, u.name as customer_name, k.name as kitchen_name
+            `SELECT o.*, u.name AS customer_name, k.name AS kitchen_name, ${ITEMS_AGG}
              FROM orders o
              JOIN users u ON o.customer_id = u.id
              JOIN kitchens k ON o.kitchen_id = k.id
+             LEFT JOIN order_items oi ON oi.order_id = o.id
+             LEFT JOIN menu_items m ON oi.menu_item_id = m.id
              WHERE o.kitchen_id = $1 AND o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
                AND o.created_at > NOW() - INTERVAL '48 hours'
+             GROUP BY o.id, u.id, k.id
              ORDER BY o.created_at ASC`,
             [kitchenId]
         );
         rows = result.rows;
     }
 
-    for (const order of rows) {
-        const { rows: items } = await query(
-            `SELECT oi.menu_item_name as name, oi.quantity, oi.price_paise, COALESCE(m.category, oi.station) as station, oi.customizations, oi.special_instructions 
-             FROM order_items oi
-             LEFT JOIN menu_items m ON oi.menu_item_id = m.id
-             WHERE oi.order_id = $1`,
-            [order.id]
-        );
-        order.items = items;
-    }
-
-    let kitchenName = null;
-    if (req.user!.role !== 'super_admin') {
-        const kitchenId = await getKitchenId(req, res);
-        if (kitchenId) {
-            const knRows = await query('SELECT name FROM kitchens WHERE id = $1', [kitchenId]);
-            kitchenName = knRows.rows[0]?.name || null;
-        }
-    }
+    // kitchen_name is already in every row from the GROUP BY query above
+    const kitchenName = rows[0]?.kitchen_name ?? null;
 
     res.json({ orders: rows, kitchen_name: kitchenName });
 });
@@ -199,17 +199,23 @@ router.post('/orders/:id/claim', authenticate, requireRole('chef', 'kitchen_mana
     const chefId = req.user!.userId;
 
     const { rowCount, rows } = await query(
-        'UPDATE orders SET status = \'preparing\', claimed_by_chef_id = $1, claimed_at = NOW() WHERE id = $2 AND status = \'confirmed\' AND claimed_by_chef_id IS NULL RETURNING kitchen_id',
+        `UPDATE orders SET status = 'preparing', claimed_by_chef_id = $1, claimed_at = NOW()
+         WHERE id = $2 AND status = 'confirmed' AND claimed_by_chef_id IS NULL
+         RETURNING kitchen_id, customer_id, display_id`,
         [chefId, id]
     );
 
     if (rowCount === 0) return res.status(400).json({ error: 'ORDER_ALREADY_CLAIMED' });
 
-    const kitchenId = rows[0]?.kitchen_id;
-    if (kitchenId) {
-        emitToKitchen(kitchenId, 'order_updated', { orderId: id, status: 'preparing' });
-        emitToAdmin('order_status_update', { orderId: id, status: 'preparing' });
-    }
+    const { kitchen_id: kitchenId, customer_id, display_id } = rows[0];
+    emitToKitchen(kitchenId, 'order_updated', { orderId: id, status: 'preparing' });
+    emitToUser(customer_id, 'order_status_update', { orderId: id, status: 'preparing' });
+    emitToOrder(id, 'order_status_update', { orderId: id, status: 'preparing' });
+    emitToAdmin('order_status_update', { orderId: id, status: 'preparing' });
+    NotificationService.send('order_preparing', {
+        userId: customer_id,
+        vars: { displayId: display_id, orderId: id },
+    }).catch(() => {});
     
     res.json({ success: true });
 });
@@ -236,6 +242,9 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         let notificationType: string | null = null;
         if (status === 'preparing') {
             notificationType = 'order_preparing';
+        }
+        if (status === 'packing') {
+            notificationType = 'order_packing';
         }
         if (status === 'ready_for_pickup') {
             notificationType = 'order_ready';
@@ -275,21 +284,20 @@ router.get('/packer/orders', authenticate, requireRole('packer', 'kitchen_manage
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
     const { rows } = await query(
-        `SELECT o.*, u.name as customer_name
+        `SELECT o.*, u.name AS customer_name,
+                COALESCE(json_agg(json_build_object(
+                    'name',                 oi.menu_item_name,
+                    'quantity',             oi.quantity,
+                    'special_instructions', oi.special_instructions
+                ) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
          FROM orders o
          JOIN users u ON o.customer_id = u.id
+         LEFT JOIN order_items oi ON oi.order_id = o.id
          WHERE o.kitchen_id = $1 AND o.status = 'packing'
+         GROUP BY o.id, u.id
          ORDER BY o.updated_at ASC`,
         [kitchenId]
     );
-    for (const order of rows) {
-        const { rows: items } = await query(
-            `SELECT oi.menu_item_name as name, oi.quantity, oi.special_instructions
-             FROM order_items oi WHERE oi.order_id = $1`,
-            [order.id]
-        );
-        order.items = items;
-    }
     res.json({ orders: rows });
 });
 
@@ -616,6 +624,55 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
     }
 });
 
+// ─── Dispatch: force-reassign a live delivery to a new rider ─────────────────
+// Used when a rider's bike breaks down mid-delivery (out_for_delivery).
+// Resets the order to ready_for_pickup with no rider so the normal dispatch
+// flow can pick it up immediately.
+router.post('/orders/:id/force-reassign', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+    const kitchenId = await getKitchenId(req, res);
+    if (!kitchenId) return;
+
+    const { id } = req.params;
+    const { reason = 'vehicle_breakdown' } = req.body;
+
+    try {
+        const { rows } = await query(
+            `UPDATE orders
+             SET status = 'ready_for_pickup', rider_id = NULL
+             WHERE id = $1 AND kitchen_id = $2 AND status = 'out_for_delivery'
+             RETURNING id, display_id, rider_id AS old_rider_id, customer_id`,
+            [id, kitchenId]
+        );
+        if (!rows[0]) return res.status(400).json({ error: 'ORDER_NOT_REASSIGNABLE', message: 'Order is not currently out for delivery at your kitchen.' });
+
+        const { display_id, customer_id } = rows[0];
+
+        // Notify customer of the delay
+        emitToUser(customer_id, 'order_status_update', {
+            orderId: id,
+            status: 'ready_for_pickup',
+            message: 'We are finding a new rider for your order. Sorry for the inconvenience!',
+            riderAssigned: false,
+        });
+
+        // Push notification to customer
+        pushService.sendToUser(customer_id, {
+            title: 'Slight delay on your order',
+            body: `We're finding a new rider for ${display_id}. Sorry for the wait!`,
+            data: { orderId: id, type: 'breakdown_delay' },
+        }).catch(() => {});
+
+        // Refresh dispatch panel — order now appears in unassigned list automatically
+        emitToKitchen(kitchenId, 'order_updated', { orderId: id, needsRider: true, reason });
+        emitToAdmin('order_status_update', { orderId: id, display_id, status: 'ready_for_pickup', reason });
+
+        res.json({ success: true, message: 'Order returned to dispatch queue. Assign a new rider.' });
+    } catch (err: any) {
+        console.error('[force-reassign]', err);
+        res.status(500).json({ error: 'REASSIGN_FAILED', message: err.message });
+    }
+});
+
 // ─── Dispatch: get unassigned ready orders for dispatch panel ─────────────────
 router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
@@ -626,22 +683,20 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
             SELECT o.id, o.display_id, o.status, o.created_at,
                    u.name AS customer_name, u.phone AS customer_phone,
                    a.address_text AS delivery_address, a.lat AS customer_lat, a.lng AS customer_lng,
-                   k.name AS kitchen_name
+                   k.name AS kitchen_name,
+                   COALESCE(json_agg(json_build_object(
+                       'menu_item_name', oi.menu_item_name,
+                       'quantity',       oi.quantity
+                   ) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
             FROM orders o
             JOIN users u ON o.customer_id = u.id
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
+            LEFT JOIN order_items oi ON oi.order_id = o.id
             WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL AND o.kitchen_id = $1
+            GROUP BY o.id, u.id, a.id, k.id
             ORDER BY o.created_at ASC
         `, [kitchenId]);
-
-        for (const order of rows) {
-            const { rows: items } = await query(
-                'SELECT menu_item_name, quantity FROM order_items WHERE order_id = $1',
-                [order.id]
-            );
-            order.items = items;
-        }
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'max_batch_size'");
         const maxBatchSize = settings.length > 0 ? parseInt(settings[0].value, 10) || 1 : 1;

@@ -79,7 +79,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     queryKey: ['rider-active-order'],
     queryFn: () => api.get('/riders/orders/active'),
     enabled: isOnline,
-    refetchInterval: isOnline ? 8000 : false,
+    refetchInterval: isOnline ? 30000 : false, // socket events handle real-time; poll as fallback
   });
 
   // No zone = rider is online but zone_id is not yet assigned
