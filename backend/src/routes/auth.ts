@@ -207,8 +207,10 @@ router.post('/verify-otp', async (req, res) => {
     if (appRole === 'chef') {
         // Kitchen app: only pre-authorized accounts (role='chef' set by admin) can log in.
         // Never auto-promote an arbitrary phone number to chef.
+        // Cast role::text so the IN list never throws "invalid enum value" if new roles
+        // are added in code before the corresponding enum migration is deployed.
         const { rows: chefRows } = await query(
-            `SELECT id FROM users WHERE phone = $1 AND role IN ('chef', 'kitchen_manager', 'partner_kitchen', 'dine_in_staff', 'packer')`,
+            `SELECT id FROM users WHERE phone = $1 AND role::text IN ('chef', 'kitchen_manager', 'partner_kitchen', 'dine_in_staff', 'packer')`,
             [normalizedPhone]
         );
         if (chefRows.length === 0) {
