@@ -254,8 +254,8 @@ router.post('/verify-otp', async (req, res) => {
     if (walletCreated > 0) {
         // 1. Initial Loyalty Points
         await query(`
-            INSERT INTO loyalty_transactions (customer_id, points, type)
-            VALUES ($1, 500, 'earn')
+            INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
+            VALUES ($1, 500, 'earn', NOW() + INTERVAL '1 year')
         `, [user.id]);
 
         // 2. Referral Logic

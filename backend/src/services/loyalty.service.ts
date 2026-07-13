@@ -8,8 +8,8 @@ export const earnPoints = async (customerId: string, orderId: string, amountPais
     await withTransaction(async (client) => {
         // Log transaction
         await client.query(`
-            INSERT INTO loyalty_transactions (customer_id, order_id, points, type)
-            VALUES ($1, $2, $3, 'earn')
+            INSERT INTO loyalty_transactions (customer_id, order_id, points, type, expires_at)
+            VALUES ($1, $2, $3, 'earn', NOW() + INTERVAL '1 year')
         `, [customerId, orderId, points]);
 
         // Note: The actual balance should be calculated via a view or updated here
@@ -23,7 +23,8 @@ export const redeemPoints = async (customerId: string, pointsToRedeem: number): 
     return await withTransaction(async (client) => {
         const { rows: balanceRes } = await client.query(`
             SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN points ELSE -points END), 0) as total_points
-            FROM loyalty_transactions WHERE customer_id = $1
+            FROM loyalty_transactions
+            WHERE customer_id = $1 AND (expires_at IS NULL OR expires_at > NOW())
         `, [customerId]);
 
         const currentPoints = parseInt(balanceRes[0].total_points);

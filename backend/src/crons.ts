@@ -308,6 +308,54 @@ export const initCrons = () => {
         }
     });
 
+    // Daily 09:00 AM IST (03:30 UTC) - Warn customers whose loyalty points expire within 7 days
+    cron.schedule('30 3 * * *', async () => {
+        try {
+            // Find distinct customers with earn points expiring in 1–7 days
+            const { rows: expiring } = await query(`
+                SELECT
+                    lt.customer_id,
+                    SUM(lt.points) AS expiring_points,
+                    MIN(lt.expires_at) AS earliest_expiry
+                FROM loyalty_transactions lt
+                WHERE lt.type = 'earn'
+                  AND lt.expires_at > NOW()
+                  AND lt.expires_at <= NOW() + INTERVAL '7 days'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM loyalty_transactions lt2
+                      WHERE lt2.customer_id = lt.customer_id
+                        AND lt2.type = 'expiry_warned'
+                        AND lt2.expires_at::date = lt.expires_at::date
+                  )
+                GROUP BY lt.customer_id
+            `);
+
+            for (const row of expiring) {
+                const daysLeft = Math.ceil(
+                    (new Date(row.earliest_expiry).getTime() - Date.now()) / 86_400_000
+                );
+                await NotificationService.send('broadcast_message', {
+                    userId: row.customer_id,
+                    title: 'Your loyalty points are expiring soon!',
+                    body: `${row.expiring_points} points expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Use them before they're gone!`,
+                    screen: 'Loyalty',
+                }).catch(() => {});
+
+                // Mark warned so we don't spam the same customer again this expiry cycle
+                await query(`
+                    INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
+                    VALUES ($1, 0, 'expiry_warned', $2)
+                `, [row.customer_id, row.earliest_expiry]);
+            }
+
+            if (expiring.length) {
+                console.log(`[CRON] Loyalty expiry warnings sent: ${expiring.length} customers`);
+            }
+        } catch (err) {
+            console.error('[CRON] Loyalty expiry warning cron failed:', err);
+        }
+    });
+
     // Every 15 mins - Auto mark no-show for confirmed bookings whose slot has ended
     cron.schedule('*/15 * * * *', async () => {
         try {

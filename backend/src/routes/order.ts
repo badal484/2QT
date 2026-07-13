@@ -304,8 +304,8 @@ router.post('/:id/feedback', authenticate, async (req: AuthRequest, res) => {
 
         // SYSTEMATIC INTEGRATION: Loyalty Reward for leaving feedback
         await query(`
-            INSERT INTO loyalty_transactions (customer_id, points, type)
-            VALUES ($1, 10, 'earn')
+            INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
+            VALUES ($1, 10, 'earn', NOW() + INTERVAL '1 year')
         `, [req.user!.userId]);
 
         // SYSTEMATIC INTEGRATION: Critical Alert for bad feedback
