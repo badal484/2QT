@@ -66,6 +66,9 @@ export function navigateFromNotification(data: Record<string, string>) {
     case 'cart_abandoned':
       navigateTo('Cart');
       break;
+    case 'rider_at_door':
+      if (orderId) navigateTo('OrderConfirmed', { orderId });
+      break;
     case 'ticket_replied': {
       const state = require('../store/index').store.getState();
       const role = state.auth.user?.role;

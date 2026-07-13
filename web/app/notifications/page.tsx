@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, Bell, CheckCheck, Package, Bike, X, Trash2, Loader2, Gift, Wallet, Star } from "lucide-react";
 import { api } from "../lib/api";
+import { socket } from "../lib/socket";
 import { useAuth } from "../providers";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
@@ -72,6 +73,14 @@ export default function NotificationsPage() {
     if (!authLoading && !user) { router.push("/login?redirect=/notifications"); return; }
     if (user) load();
   }, [user, authLoading, router, load]);
+
+  // Real-time: refresh list when a new notification arrives via socket
+  useEffect(() => {
+    if (!user) return;
+    socket.connect();
+    socket.on("new_notification", load);
+    return () => { socket.off("new_notification", load); };
+  }, [user, load]);
 
   const markRead = async (id: string) => {
     try {

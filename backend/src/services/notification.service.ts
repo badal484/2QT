@@ -10,7 +10,8 @@ export type NotifType =
     | 'order_out_for_delivery' | 'order_delivered' | 'order_cancelled'
     | 'rider_payout' | 'kitchen_payout' | 'low_subscription_meals'
     | 'rider_verified' | 'cash_submitted' | 'broadcast_message' | 'chat_message'
-    | 'low_stock_alert' | 'rider_guarantee_payout' | 'renewal_reminder' | 'generic_sms';
+    | 'low_stock_alert' | 'rider_guarantee_payout' | 'renewal_reminder' | 'generic_sms'
+    | 'rider_at_door';
 
 const PROMO_TYPES   = new Set(['broadcast_message', 'winback', 'birthday', 'flash_sale', 'renewal_reminder']);
 const PAYOUT_TYPES  = new Set(['rider_payout', 'kitchen_payout', 'rider_guarantee_payout']);
@@ -33,6 +34,7 @@ const FALLBACK_TEMPLATES: Record<string, { title_template: string; body_template
     cash_submitted:         { title_template: 'Cash Submission', body_template: 'Rider {{riderName}} submitted ₹{{amount}} cash for Order #{{displayId}}.', channels: ['push'] },
     generic_sms:            { title_template: '{{title}}', body_template: '{{message}}', channels: ['whatsapp'] },
     chat_message:           { title_template: '{{title}}', body_template: '{{senderName}}: {{message}}', channels: ['push'] },
+    rider_at_door:          { title_template: '🏍️ Your rider is at the door!', body_template: 'Your rider is waiting outside. Please come to the door — order #{{displayId}} is here!', channels: ['push', 'whatsapp'] },
 };
 
 // ─── Template cache ───────────────────────────────────────────────────────────
