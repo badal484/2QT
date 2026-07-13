@@ -42,6 +42,7 @@ export const initCrons = () => {
             await query(`
                 INSERT INTO daily_financial_log (date, total_revenue_paise, total_expenses_paise, net_profit_paise)
                 VALUES (CURRENT_DATE - interval '1 day', $1, $2, $3)
+                ON CONFLICT (date) DO NOTHING
             `, [totals[0].revenue, totals[0].cost, totals[0].revenue - totals[0].cost]);
 
         } catch (err) {
