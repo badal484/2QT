@@ -72,13 +72,33 @@ export const useLocation = () => {
       isFetchingRef.current = false;
     };
 
-    // iOS high accuracy is fast. Android high accuracy indoors can take 20s+. 
-    // We use false for Android to get an instant network-based fix.
+    // Stage 1: fast network/WiFi fix — responds immediately, lower accuracy
     Geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: Platform.OS === 'ios', 
-      timeout: 15000, 
-      maximumAge: 10000,
+      enableHighAccuracy: false,
+      timeout: 5000,
+      maximumAge: 60000,
     });
+
+    // Stage 2: GPS refinement — Android network location is often 200-500m off.
+    // Fires independently and silently updates once satellite GPS locks in.
+    if (Platform.OS === 'android') {
+      Geolocation.getCurrentPosition(
+        (position: any) => {
+          const { latitude, longitude } = position.coords;
+          reverseGeocodeDetailed(latitude, longitude)
+            .then(result => {
+              setLocation({ latitude, longitude, addressText: result.name, addressFull: result.address });
+            })
+            .catch(() => {
+              setLocation(prev =>
+                prev ? { ...prev, latitude, longitude } : { latitude, longitude, addressText: '', addressFull: '' }
+              );
+            });
+        },
+        () => {}, // stage 1 already gave a fix — silently ignore GPS failure
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+      );
+    }
   }, []);
 
   return { location, loadingLocation, locationError, fetchLocation };

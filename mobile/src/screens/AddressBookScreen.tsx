@@ -58,6 +58,8 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const mapRef = useRef<MapView>(null);
   // Ref prevents stale closure in onRegionChangeComplete
   const isDraggingRef = useRef(false);
+  // Tracks whether user has manually moved the map — prevents GPS stage 2 from overriding their pin
+  const userDraggedRef = useRef(false);
 
   const { location, loadingLocation, fetchLocation } = useLocation();
 
@@ -69,9 +71,9 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     if (!initialLat && !initialLng) fetchLocation();
   }, []);
 
-  // When GPS resolves, animate map to it then run a fresh geocode for the full address
+  // When GPS resolves, animate map to it — but not if the user already manually moved the pin
   useEffect(() => {
-    if (location && !initialLat) {
+    if (location && !initialLat && !userDraggedRef.current) {
       mapRef.current?.animateToRegion({
         latitude: location.latitude,
         longitude: location.longitude,
@@ -88,6 +90,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
 
   // onPanDrag fires ONLY on real user touch-drags — NOT on programmatic animateToRegion
   const onPanDrag = () => {
+    userDraggedRef.current = true; // prevent GPS stage 2 from re-centering their pin
     if (!isDraggingRef.current) {
       isDraggingRef.current = true;
       setIsDragging(true);
@@ -310,6 +313,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           <BouncingButton
             style={[styles.locateBtn, { bottom: 16 }]}
             onPress={() => {
+              userDraggedRef.current = false; // allow GPS to re-center when user explicitly asks
               ReactNativeHapticFeedback.trigger('impactMedium');
               fetchLocation();
             }}
