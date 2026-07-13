@@ -233,8 +233,12 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         const order = rows[0];
 
         // 1. WebSocket Updates
-        emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });
-        emitToOrder(id, 'order_status_update', { orderId: id, status });
+        // 'packing' is an internal kitchen stage — the customer stays on "Preparing Food"
+        // and only gets notified when the order is truly ready_for_pickup.
+        if (status !== 'packing') {
+            emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });
+            emitToOrder(id, 'order_status_update', { orderId: id, status });
+        }
         emitToKitchen(order.kitchen_id, 'order_updated', { orderId: id, status });
         emitToAdmin('order_status_update', { orderId: id, status, display_id: order.display_id });
 
@@ -243,9 +247,7 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         if (status === 'preparing') {
             notificationType = 'order_preparing';
         }
-        if (status === 'packing') {
-            notificationType = 'order_packing';
-        }
+        // No push for 'packing' — customer doesn't need to know about internal kitchen stages
         if (status === 'ready_for_pickup') {
             notificationType = 'order_ready';
 
