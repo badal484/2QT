@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView,
+  View, Text, StyleSheet, ScrollView,
   ActivityIndicator, Alert, Linking, Image
 } from 'react-native';
 import {
@@ -338,7 +338,11 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
               ]}
             >
               <View style={[styles.riderAvatar, o?.rider_name && { backgroundColor: '#E8F5E9' }]}>
-                <UserCircle size={26} color={o?.rider_name ? colors.primary : colors.inkFaint} />
+                {o?.rider_photo_url ? (
+                  <Image source={{ uri: o.rider_photo_url }} style={styles.riderAvatarPhoto} />
+                ) : (
+                  <UserCircle size={26} color={o?.rider_name ? colors.primary : colors.inkFaint} />
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.riderMeta}>{o?.rider_name ? 'DELIVERY PARTNER' : 'FINDING PARTNER'}</Text>
@@ -577,7 +581,8 @@ const styles = StyleSheet.create({
   riderCardAssigned: { borderColor: colors.primary, borderWidth: 1.5 },
   riderCardPulse:    { backgroundColor: '#F0FDF4', borderColor: colors.primary, borderWidth: 2 },
   riderCallBtn:      { backgroundColor: colors.primary, borderColor: colors.primary },
-  riderAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  riderAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', marginRight: 14, overflow: 'hidden' },
+  riderAvatarPhoto: { width: 52, height: 52, borderRadius: 26 },
   riderMeta: { fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.inkFaint, letterSpacing: 1 },
   riderName: { fontSize: 17, fontFamily: fontFamily.extrabold, color: colors.ink, marginTop: 2 },
   riderAction: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },

@@ -99,9 +99,13 @@ router.get('/documents', authenticate, async (req: AuthRequest, res) => {
 // PATCH /documents — upsert rider application (create or update); resets to pending on re-submit
 router.patch('/documents', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
-    const { vehicleType, licenseNumber, idPhotoUrl } = req.body;
+    const { vehicleType, licenseNumber, idPhotoUrl, profilePhotoUrl } = req.body;
     if (!vehicleType) return res.status(400).json({ error: 'MISSING_FIELDS', message: 'Vehicle type is required.' });
+    if (!profilePhotoUrl) return res.status(400).json({ error: 'MISSING_FIELDS', message: 'Profile photo is required.' });
     try {
+        // Store rider's face photo on users table so it is visible to customers on order tracking
+        await query('UPDATE users SET photo_url = $1 WHERE id = $2', [profilePhotoUrl, userId]);
+
         const { rows } = await query(`
             INSERT INTO rider_applications (user_id, vehicle_type, license_number, id_photo_url, status)
             VALUES ($1, $2, $3, $4, 'pending')
