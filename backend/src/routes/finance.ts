@@ -361,6 +361,95 @@ router.get('/rider-payouts/all-riders', financeAccess, financeRole, async (req: 
   }
 });
 
+// ─── Step 1: Approve rider payout (pending → approved, no money moves) ───────
+router.post('/rider-payouts/:id/approve', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await query(`
+      UPDATE weekly_payouts
+      SET status = 'approved', approved_by = $2, updated_at = NOW()
+      WHERE id = $1 AND status = 'pending'
+      RETURNING id, rider_id, net_amount_paise
+    `, [id, req.user!.userId]);
+    if (!rows.length) return res.status(404).json({ error: 'Payout not found or not in pending state' });
+    emitToAll('rider_payout_updated', { action: 'approved', payoutId: id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[finance/rider-payouts/approve]', err);
+    res.status(500).json({ error: 'Failed to approve payout' });
+  }
+});
+
+// ─── Step 2: Pay rider payout (approved → paid, money moves) ─────────────────
+router.post('/rider-payouts/:id/pay', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { paymentReference, notes } = req.body as { paymentReference?: string; notes?: string };
+  try {
+    const { rows: payoutRows } = await query(`
+      SELECT wp.*, u.name AS rider_name, u.phone AS rider_phone,
+             u.upi_id, u.razorpay_contact_id, u.razorpay_fund_account_id
+      FROM weekly_payouts wp
+      JOIN users u ON wp.rider_id = u.id
+      WHERE wp.id = $1 AND wp.status = 'approved'
+    `, [id]);
+    if (!payoutRows.length) return res.status(404).json({ error: 'Payout not found or not approved yet' });
+    const payout = payoutRows[0];
+
+    let rzpPayoutId: string | null = paymentReference || null;
+    let utrNumber: string | null = null;
+    let autoMode = false;
+    let autoSkipReason: string | null = null;
+
+    if (!isAutoPayConfigured()) {
+      autoSkipReason = 'razorpay_not_configured';
+    } else if (!payout.upi_id) {
+      autoSkipReason = 'rider_has_no_upi';
+    } else {
+      try {
+        const fundAccountId = await ensureRiderFundAccount({
+          id: payout.rider_id, name: payout.rider_name,
+          phone: payout.rider_phone, upi_id: payout.upi_id,
+          razorpay_contact_id: payout.razorpay_contact_id,
+          razorpay_fund_account_id: payout.razorpay_fund_account_id,
+        });
+        const result = await firePayout(
+          fundAccountId, payout.net_amount_paise,
+          `2QT Rider Payout`, `2QT-R-${id.slice(0, 8)}`
+        );
+        rzpPayoutId = result.payoutId;
+        utrNumber = result.utr;
+        autoMode = true;
+      } catch (rzpErr: any) {
+        console.error('[finance/rider-payout/pay/auto]', rzpErr.message);
+        autoSkipReason = rzpErr.message;
+      }
+    }
+
+    const { rows } = await query(`
+      UPDATE weekly_payouts
+      SET status = 'paid', paid_at = NOW(),
+          payment_reference = $2, notes = $3, razorpay_payout_id = $4,
+          utr_number = $5, payout_mode = $6, updated_at = NOW()
+      WHERE id = $1 RETURNING *
+    `, [id, rzpPayoutId, notes || null, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual']);
+
+    emitToUser(payout.rider_id, 'earnings_updated', { payoutId: id, amountPaise: payout.net_amount_paise, status: 'paid' });
+    emitToAll('rider_payout_updated', { action: 'paid', payoutId: id });
+
+    NotificationService.send('rider_payout', {
+      userId: payout.rider_id,
+      amount: (payout.net_amount_paise / 100).toFixed(0),
+      upiId: payout.upi_id || 'your account',
+    }).catch(e => console.error('[finance/rider-payout/notify]', e.message));
+
+    res.json({ success: true, payout: rows[0], autoTransferred: autoMode, autoSkipReason });
+  } catch (err) {
+    console.error('[finance/rider-payouts/pay]', err);
+    res.status(500).json({ error: 'Failed to process payment' });
+  }
+});
+
+// ─── Legacy mark-paid (approve + pay in one step, kept for backward compat) ───
 router.post('/rider-payouts/:id/mark-paid', financeAccess, financeRole, async (req: AuthRequest, res) => {
   const { id } = req.params;
   const { paymentReference, notes } = req.body as { paymentReference?: string; notes?: string };
@@ -524,6 +613,100 @@ router.post('/kitchen-payouts/generate', financeAccess, financeRole, async (req:
   }
 });
 
+// ─── Step 1: Approve kitchen payout (pending → approved, no money moves) ─────
+router.post('/kitchen-payouts/:id/approve', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await query(`
+      UPDATE kitchen_payouts
+      SET status = 'approved', approved_by = $2, updated_at = NOW()
+      WHERE id = $1 AND status = 'pending'
+      RETURNING id, kitchen_id, net_payout_paise
+    `, [id, req.user!.userId]);
+    if (!rows.length) return res.status(404).json({ error: 'Payout not found or not in pending state' });
+    emitToAll('kitchen_payout_updated', { action: 'approved', payoutId: id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[finance/kitchen-payouts/approve]', err);
+    res.status(500).json({ error: 'Failed to approve payout' });
+  }
+});
+
+// ─── Step 2: Pay kitchen payout (approved → paid, money moves) ───────────────
+router.post('/kitchen-payouts/:id/pay', financeAccess, financeRole, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { upiReference, bankReference, notes } = req.body as { upiReference?: string; bankReference?: string; notes?: string };
+  try {
+    const { rows: kpRows } = await query(`
+      SELECT kp.*, k.name AS kitchen_name, k.upi_id, k.contact_phone,
+             k.razorpay_contact_id, k.razorpay_fund_account_id
+      FROM kitchen_payouts kp
+      JOIN kitchens k ON kp.kitchen_id = k.id
+      WHERE kp.id = $1 AND kp.status = 'approved'
+    `, [id]);
+    if (!kpRows.length) return res.status(404).json({ error: 'Payout not found or not approved yet' });
+    const kp = kpRows[0];
+
+    let rzpPayoutId: string | null = upiReference || null;
+    let utrNumber: string | null = null;
+    let autoMode = false;
+    let autoSkipReason: string | null = null;
+
+    if (!isAutoPayConfigured()) {
+      autoSkipReason = 'razorpay_not_configured';
+    } else if (!kp.upi_id) {
+      autoSkipReason = 'kitchen_has_no_upi';
+    } else {
+      try {
+        const fundAccountId = await ensureKitchenFundAccount({
+          id: kp.kitchen_id, name: kp.kitchen_name,
+          upi_id: kp.upi_id, contact_phone: kp.contact_phone,
+          razorpay_contact_id: kp.razorpay_contact_id,
+          razorpay_fund_account_id: kp.razorpay_fund_account_id,
+        });
+        const result = await firePayout(
+          fundAccountId, kp.net_payout_paise,
+          `2QT Kitchen Payout`, `2QT-K-${id.slice(0, 8)}`
+        );
+        rzpPayoutId = result.payoutId;
+        utrNumber = result.utr;
+        autoMode = true;
+      } catch (rzpErr: any) {
+        console.error('[finance/kitchen-payout/pay/auto]', rzpErr.message);
+        autoSkipReason = rzpErr.message;
+      }
+    }
+
+    const { rows } = await query(`
+      UPDATE kitchen_payouts
+      SET status = 'paid', paid_at = NOW(),
+          razorpay_payout_id = $2, utr_number = $3,
+          payout_mode = $4, notes = $5, bank_reference = $6, updated_at = NOW()
+      WHERE id = $1 RETURNING *
+    `, [id, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual', notes || null, bankReference || null]);
+
+    emitToKitchen(kp.kitchen_id, 'kitchen_payout_updated', { payoutId: id, amountPaise: kp.net_payout_paise, status: 'paid' });
+    emitToAll('kitchen_payout_updated', { action: 'paid', payoutId: id, kitchenId: kp.kitchen_id });
+
+    query(
+      `SELECT id FROM users WHERE kitchen_id = $1 AND role IN ('chef','kitchen_manager','partner_kitchen') AND is_active = TRUE LIMIT 5`,
+      [kp.kitchen_id]
+    ).then(({ rows: staff }) => Promise.all(
+      staff.map(s => NotificationService.send('kitchen_payout', {
+        userId: s.id,
+        amount: (kp.net_payout_paise / 100).toFixed(0),
+        upiId: kp.upi_id || 'your account',
+      }))
+    )).catch(e => console.error('[finance/kitchen-payout/notify]', e.message));
+
+    res.json({ success: true, payout: rows[0], autoTransferred: autoMode, autoSkipReason });
+  } catch (err) {
+    console.error('[finance/kitchen-payouts/pay]', err);
+    res.status(500).json({ error: 'Failed to process payment' });
+  }
+});
+
+// ─── Legacy mark-paid (approve + pay in one step, kept for backward compat) ───
 router.post('/kitchen-payouts/:id/mark-paid', financeAccess, financeRole, async (req: AuthRequest, res) => {
   const { id } = req.params;
   const { upiReference, bankReference, notes } = req.body as { upiReference?: string; bankReference?: string; notes?: string };
