@@ -14,6 +14,15 @@ import { pushService } from '../services/push.service';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { PRIORITY_SLA } from './support';
+import ImageKit from '@imagekit/nodejs';
+import multer from 'multer';
+
+const imagekit = new ImageKit({
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY || '',
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY || '',
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || '',
+});
+const upload = multer({ storage: multer.memoryStorage() });
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || '',
@@ -1694,6 +1703,23 @@ router.patch('/documents', authenticate, requireRole('rider', 'rider_captain', '
     } catch (err) {
         console.error('[patch-documents]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// POST /riders/upload — upload a file to ImageKit (rider-side, e.g. ID photos)
+router.post('/upload', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), upload.single('image'), async (req: AuthRequest, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const folder = (req.body.folder as string) || 'rider_docs';
+        const response = await imagekit.files.upload({
+            file: req.file.buffer.toString('base64'),
+            fileName: req.file.originalname,
+            folder: `/${folder}`,
+        } as any);
+        res.json({ url: (response as any).url });
+    } catch (err: any) {
+        console.error('[rider/upload]', err);
+        res.status(500).json({ error: 'Upload failed', message: err.message });
     }
 });
 
