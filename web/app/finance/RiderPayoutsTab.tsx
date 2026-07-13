@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, CheckCircle2, Bike, X, ChevronDown, ChevronUp, AlertTriangle, RotateCcw } from "lucide-react";
+import { RefreshCw, CheckCircle2, X, AlertTriangle, RotateCcw, ShieldCheck, Banknote } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
 
-function MarkPaidModal({ open, payout, onConfirm, onClose }: any) {
+function PayModal({ open, payout, onConfirm, onClose }: any) {
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,36 +34,39 @@ function MarkPaidModal({ open, payout, onConfirm, onClose }: any) {
         className="w-full max-w-md bg-[#0f0f1c] border border-white/10 rounded-2xl p-6 space-y-5"
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-black text-white">Mark Rider Paid</h3>
+          <h3 className="text-lg font-black text-white">Transfer Payment</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10">
             <X className="w-4 h-4 text-white/60" />
           </button>
         </div>
 
-        <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 space-y-2">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 space-y-2">
           <div className="text-lg font-black text-white">{payout.rider_name}</div>
           <div className="text-sm text-white/40">{payout.rider_phone}</div>
           <div className="flex justify-between mt-2">
-            <span className="text-xs text-white/40">Net payout</span>
-            <span className="text-xl font-black text-indigo-400">{fmt(payout.net_amount_paise)}</span>
+            <span className="text-xs text-white/40">Amount</span>
+            <span className="text-xl font-black text-emerald-400">{fmt(payout.net_amount_paise)}</span>
           </div>
           {payout.upi_id && (
             <div className="flex justify-between">
-              <span className="text-xs text-white/40">UPI ID</span>
+              <span className="text-xs text-white/40">UPI</span>
               <span className="text-xs font-mono text-white/70">{payout.upi_id}</span>
             </div>
+          )}
+          {!payout.upi_id && (
+            <div className="text-xs text-amber-400 font-semibold">⚠ No UPI on file — transfer manually then enter reference below</div>
           )}
         </div>
 
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Payment Reference</label>
+            <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Payment Reference (optional if auto)</label>
             <input
               type="text"
               value={ref}
               onChange={e => setRef(e.target.value)}
               placeholder="UPI transaction ID / bank ref"
-              className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 placeholder:text-white/20"
+              className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 placeholder:text-white/20"
             />
           </div>
           <div>
@@ -73,7 +76,7 @@ function MarkPaidModal({ open, payout, onConfirm, onClose }: any) {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Any notes..."
-              className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 placeholder:text-white/20"
+              className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 placeholder:text-white/20"
             />
           </div>
         </div>
@@ -81,21 +84,24 @@ function MarkPaidModal({ open, payout, onConfirm, onClose }: any) {
         <button
           onClick={confirm}
           disabled={loading}
-          className="w-full py-3.5 rounded-xl bg-indigo-500 text-white font-black text-sm hover:bg-indigo-400 transition-colors disabled:opacity-50"
+          className="w-full py-3.5 rounded-xl bg-emerald-500 text-white font-black text-sm hover:bg-emerald-400 transition-colors disabled:opacity-50"
         >
-          {loading ? "Processing..." : `Confirm Payment — ${fmt(payout.net_amount_paise)}`}
+          {loading ? "Transferring..." : `Transfer ${fmt(payout.net_amount_paise)}`}
         </button>
       </motion.div>
     </div>
   );
 }
 
+type View = "pending" | "approved" | "paid" | "failed" | "riders";
+
 export function RiderPayoutsTab() {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [riders, setRiders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"pending" | "paid" | "failed" | "riders">("pending");
-  const [markPaying, setMarkPaying] = useState<any>(null);
+  const [view, setView] = useState<View>("pending");
+  const [paying, setPaying] = useState<any>(null);
+  const [approving, setApproving] = useState<string | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -116,14 +122,42 @@ export function RiderPayoutsTab() {
   }, [view]);
 
   useEffect(() => { load(); }, [load]);
+  useSocketRefresh(["rider_payout_updated"], load);
 
-  useSocketRefresh(["rider_payout_updated", "order_status_update"], load);
+  const handleApprove = async (id: string) => {
+    setApproving(id);
+    try {
+      await api.post(`/finance/rider-payouts/${id}/approve`, {});
+      toast.success("Payout approved — move to Approved tab to transfer");
+      await load();
+    } catch {
+      toast.error("Failed to approve");
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const handlePay = async (id: string, paymentReference: string, notes: string) => {
+    const res = await api.post(`/finance/rider-payouts/${id}/pay`, { paymentReference, notes });
+    if (res.autoTransferred) {
+      toast.success(`Transferred via Razorpay${res.payout?.utr_number ? ` · UTR ${res.payout.utr_number}` : ""}`);
+    } else if (res.autoSkipReason === "rider_has_no_upi") {
+      toast.warning("Marked paid — no UPI on file, ensure manual transfer was done");
+    } else if (res.autoSkipReason === "razorpay_not_configured") {
+      toast.warning("Marked paid — Razorpay not configured, ensure manual transfer was done");
+    } else if (res.autoSkipReason) {
+      toast.warning(`Marked paid — auto-transfer failed: ${res.autoSkipReason}`);
+    } else {
+      toast.success("Payment recorded");
+    }
+    await load();
+  };
 
   const handleRetry = async (id: string) => {
     setRetrying(id);
     try {
       await api.post(`/finance/rider-payouts/${id}/retry`, {});
-      toast.success("Reset to pending — use Mark Paid to reprocess");
+      toast.success("Reset to pending — approve and pay to reprocess");
       setView("pending");
       await load();
     } catch {
@@ -133,53 +167,53 @@ export function RiderPayoutsTab() {
     }
   };
 
-  const handleMarkPaid = async (id: string, paymentReference: string, notes: string) => {
-    try {
-      const res = await api.post(`/finance/rider-payouts/${id}/mark-paid`, { paymentReference, notes });
-      if (res.autoTransferred) {
-        toast.success(`Auto-transferred via Razorpay${res.payout?.utr_number ? ` · UTR ${res.payout.utr_number}` : ''}`);
-      } else if (res.autoSkipReason === 'rider_has_no_upi') {
-        toast.warning("Marked paid — rider has no UPI on file, transfer must be done manually");
-      } else if (res.autoSkipReason === 'razorpay_not_configured') {
-        toast.warning("Marked paid — Razorpay not configured, transfer done manually");
-      } else if (res.autoSkipReason) {
-        toast.warning(`Marked paid — auto-transfer failed: ${res.autoSkipReason}`);
-      } else {
-        toast.success("Payout marked as paid");
-      }
-      await load();
-    } catch {
-      toast.error("Failed to mark paid");
-    }
-  };
+  const totalPending = view === "pending" ? payouts.reduce((s, p) => s + parseInt(p.net_amount_paise), 0) : 0;
+  const totalApproved = view === "approved" ? payouts.reduce((s, p) => s + parseInt(p.net_amount_paise), 0) : 0;
 
-  const totalPending = payouts.reduce((s, p) => s + parseInt(p.net_amount_paise), 0);
+  const TAB_LABELS: Record<View, string> = {
+    pending: "Pending Review",
+    approved: "Approved",
+    paid: "Paid",
+    failed: "Failed",
+    riders: "All Riders",
+  };
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-white">Rider Payouts</h2>
-          <p className="text-white/40 text-sm mt-0.5">Weekly payout management</p>
+          <p className="text-white/40 text-sm mt-0.5">Review → Approve → Transfer</p>
         </div>
         <button onClick={load} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10">
           <RefreshCw className={`w-4 h-4 text-white/60 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
 
-      {/* View tabs */}
+      {/* Two-step flow legend */}
+      <div className="flex items-center gap-3 text-xs text-white/30 bg-white/[0.03] rounded-xl px-4 py-3">
+        <span className="font-bold text-indigo-400">1. Review</span>
+        <span>→</span>
+        <span className="font-bold text-indigo-400">Approve</span>
+        <span>→</span>
+        <span className="font-bold text-emerald-400">2. Transfer money</span>
+        <span className="ml-auto">No money moves until step 2</span>
+      </div>
+
       <div className="flex gap-2 flex-wrap">
-        {(["pending", "paid", "failed", "riders"] as const).map(v => (
+        {(["pending", "approved", "paid", "failed", "riders"] as View[]).map(v => (
           <button
             key={v}
             onClick={() => setView(v)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
               view === v
-                ? v === "failed" ? "bg-red-500/80 text-white" : "bg-indigo-500 text-white"
+                ? v === "failed" ? "bg-red-500/80 text-white"
+                  : v === "approved" ? "bg-emerald-500 text-white"
+                  : "bg-indigo-500 text-white"
                 : "bg-white/5 text-white/40 hover:text-white hover:bg-white/10"
             }`}
           >
-            {v === "riders" ? "All Riders" : v}
+            {TAB_LABELS[v]}
           </button>
         ))}
       </div>
@@ -187,10 +221,20 @@ export function RiderPayoutsTab() {
       {view === "pending" && totalPending > 0 && (
         <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl px-5 py-4 flex items-center justify-between">
           <div>
-            <div className="text-sm font-bold text-indigo-400">Total Pending</div>
-            <div className="text-xs text-white/30">{payouts.length} payout requests</div>
+            <div className="text-sm font-bold text-indigo-400">Awaiting Review</div>
+            <div className="text-xs text-white/30">{payouts.length} requests — approve each before transferring</div>
           </div>
           <div className="text-2xl font-black text-indigo-400">{fmt(totalPending)}</div>
+        </div>
+      )}
+
+      {view === "approved" && totalApproved > 0 && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-5 py-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-bold text-emerald-400">Ready to Transfer</div>
+            <div className="text-xs text-white/30">{payouts.length} approved — click Transfer to send money</div>
+          </div>
+          <div className="text-2xl font-black text-emerald-400">{fmt(totalApproved)}</div>
         </div>
       )}
 
@@ -199,7 +243,7 @@ export function RiderPayoutsTab() {
           <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
           <div>
             <div className="text-sm font-bold text-red-400">{payouts.length} failed payout{payouts.length !== 1 ? "s" : ""}</div>
-            <div className="text-xs text-white/30">Retry to reset to pending, then Mark Paid to reprocess</div>
+            <div className="text-xs text-white/30">Retry to reset to pending, then approve and transfer again</div>
           </div>
         </div>
       )}
@@ -232,7 +276,7 @@ export function RiderPayoutsTab() {
       ) : payouts.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-40 gap-3">
           <CheckCircle2 className="w-10 h-10 text-emerald-500/40" />
-          <p className="text-white/30 text-sm">No {view} payouts.</p>
+          <p className="text-white/30 text-sm">No {TAB_LABELS[view].toLowerCase()} payouts.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -240,7 +284,9 @@ export function RiderPayoutsTab() {
             <div
               key={p.id}
               className={`bg-[#0d0d1a] rounded-2xl p-4 border ${
-                view === "failed" ? "border-red-500/20" : "border-white/[0.07]"
+                view === "failed" ? "border-red-500/20"
+                : view === "approved" ? "border-emerald-500/20"
+                : "border-white/[0.07]"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -251,19 +297,38 @@ export function RiderPayoutsTab() {
                     {new Date(p.week_start).toLocaleDateString("en-IN")} → {new Date(p.week_end).toLocaleDateString("en-IN")}
                   </div>
                 </div>
+
                 <div className="text-right flex flex-col items-end gap-2">
-                  <div className={`text-xl font-black ${view === "failed" ? "text-red-400" : "text-indigo-400"}`}>
+                  <div className={`text-xl font-black ${
+                    view === "failed" ? "text-red-400"
+                    : view === "approved" ? "text-emerald-400"
+                    : "text-indigo-400"
+                  }`}>
                     {fmt(parseInt(p.net_amount_paise))}
                   </div>
                   {p.upi_id && <div className="text-xs font-mono text-white/30">{p.upi_id}</div>}
+
                   {view === "pending" && (
                     <button
-                      onClick={() => setMarkPaying(p)}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-xs font-bold hover:bg-indigo-400 transition-colors"
+                      onClick={() => handleApprove(p.id)}
+                      disabled={approving === p.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-xs font-bold hover:bg-indigo-400 transition-colors disabled:opacity-50"
                     >
-                      Mark Paid
+                      <ShieldCheck className={`w-3 h-3 ${approving === p.id ? "animate-pulse" : ""}`} />
+                      {approving === p.id ? "Approving..." : "Approve"}
                     </button>
                   )}
+
+                  {view === "approved" && (
+                    <button
+                      onClick={() => setPaying(p)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-400 transition-colors"
+                    >
+                      <Banknote className="w-3 h-3" />
+                      Transfer
+                    </button>
+                  )}
+
                   {view === "paid" && (
                     <div className="flex items-center gap-1 text-emerald-400">
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -273,6 +338,7 @@ export function RiderPayoutsTab() {
                       </span>
                     </div>
                   )}
+
                   {view === "failed" && (
                     <button
                       onClick={() => handleRetry(p.id)}
@@ -285,16 +351,18 @@ export function RiderPayoutsTab() {
                   )}
                 </div>
               </div>
+
               {view === "failed" && p.failure_reason && (
                 <div className="mt-3 pt-3 border-t border-red-500/10 flex items-start gap-2">
                   <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
                   <span className="text-xs text-red-400/70">{p.failure_reason}</span>
                 </div>
               )}
-              {view === "paid" && p.payment_reference && (
-                <div className="mt-3 pt-3 border-t border-white/[0.05] text-xs text-white/30">
-                  Ref: <span className="font-mono text-white/50">{p.payment_reference}</span>
-                  {p.utr_number && <span className="ml-3">UTR: <span className="font-mono text-white/50">{p.utr_number}</span></span>}
+
+              {view === "paid" && (p.payment_reference || p.utr_number) && (
+                <div className="mt-3 pt-3 border-t border-white/[0.05] text-xs text-white/30 flex gap-4">
+                  {p.payment_reference && <span>Ref: <span className="font-mono text-white/50">{p.payment_reference}</span></span>}
+                  {p.utr_number && <span>UTR: <span className="font-mono text-white/50">{p.utr_number}</span></span>}
                 </div>
               )}
             </div>
@@ -303,12 +371,12 @@ export function RiderPayoutsTab() {
       )}
 
       <AnimatePresence>
-        {markPaying && (
-          <MarkPaidModal
-            open={!!markPaying}
-            payout={markPaying}
-            onConfirm={handleMarkPaid}
-            onClose={() => setMarkPaying(null)}
+        {paying && (
+          <PayModal
+            open={!!paying}
+            payout={paying}
+            onConfirm={handlePay}
+            onClose={() => setPaying(null)}
           />
         )}
       </AnimatePresence>
