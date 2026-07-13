@@ -15,7 +15,6 @@ import { initSocket } from './socket';
 import { initCrons } from './crons';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
-import { authenticate, requireRole } from './middleware/auth';
 import apiRouter from './routes';
 import { notificationsQueue, invoicesQueue, emailsQueue } from './jobs/queues';
 
@@ -41,12 +40,12 @@ if (process.env.SENTRY_DSN) {
 
 // Middleware
 app.use(compression({ level: 6, threshold: 1024 })); // gzip responses > 1KB
-// Bull Board UI needs inline scripts/styles — skip helmet for the queue monitor path only
-app.use('/admin/queues', (req, res, next) => {
+app.use(helmet({ crossOriginResourcePolicy: false }));
+// CSP removal must come AFTER helmet so it overrides what helmet just set
+app.use('/admin/queues', (_req, res, next) => {
     res.removeHeader('Content-Security-Policy');
     next();
 });
-app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors());
 app.use((req, res, next) => {
     res.setHeader('Connection', 'keep-alive');
@@ -61,7 +60,10 @@ app.use(express.json({
 app.use('/public', express.static('public', { maxAge: '7d' }));
 app.use(generalLimiter);
 
-// ─── Bull Board (queue monitor) — /admin/queues — super_admin only ────────────
+// ─── Bull Board (queue monitor) — /admin/queues ───────────────────────────────
+// Protected by HTTP Basic Auth — browser shows native dialog and replays
+// credentials for every subsequent asset request (JWT Bearer won't work here).
+// Set BULL_BOARD_PASSWORD in .env; defaults to 'admin' for local dev only.
 const bullBoardAdapter = new ExpressAdapter();
 bullBoardAdapter.setBasePath('/admin/queues');
 createBullBoard({
@@ -72,7 +74,18 @@ createBullBoard({
     ],
     serverAdapter: bullBoardAdapter,
 });
-app.use('/admin/queues', authenticate as any, requireRole('super_admin', 'admin') as any, bullBoardAdapter.getRouter());
+
+function bullBoardAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const auth = req.headers.authorization;
+    if (auth?.startsWith('Basic ')) {
+        const [, pass] = Buffer.from(auth.slice(6), 'base64').toString().split(':');
+        if (pass === (process.env.BULL_BOARD_PASSWORD || 'admin')) return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="Queue Monitor"');
+    res.status(401).send('Authentication required');
+}
+
+app.use('/admin/queues', bullBoardAuth, bullBoardAdapter.getRouter());
 
 // Health Check
 app.get('/api/v1/health', (req, res) => {
