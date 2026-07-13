@@ -23,7 +23,7 @@ export function PackerTab({
 }) {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
 
-  const preparingOrders = useMemo(() => orders.filter(o => o.status === "preparing"), [orders]);
+  const preparingOrders = useMemo(() => orders.filter(o => o.status === "packing"), [orders]);
 
   const toggleItem = (orderId: string, itemIdx: number) => {
     const key = `${orderId}-${itemIdx}`;
@@ -39,7 +39,7 @@ export function PackerTab({
       <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
         <Package className="w-16 h-16 mb-4 opacity-50" />
         <h2 className="text-xl font-black">No Orders to Pack</h2>
-        <p className="text-sm font-semibold mt-1">Waiting for chef to confirm new orders.</p>
+        <p className="text-sm font-semibold mt-1">Waiting for chef to finish cooking and send orders here.</p>
       </div>
     );
   }

@@ -66,7 +66,7 @@ interface OrderItem {
 interface Order {
   id: string;
   display_id: string;
-  status: "confirmed" | "preparing" | "ready_for_pickup" | "out_for_delivery" | "delivered";
+  status: "confirmed" | "preparing" | "packing" | "ready_for_pickup" | "out_for_delivery" | "delivered";
   customer_name: string;
   kitchen_name?: string;
   items: OrderItem[];
@@ -254,11 +254,11 @@ function KdsColumn({ col, orders, updatingId, updateStatus }: {
                 {order.status === "preparing" && (
                   <div className="p-4 sm:p-5 pt-3">
                     <button
-                      onClick={() => updateStatus(order.id, "ready_for_pickup")}
+                      onClick={() => updateStatus(order.id, "packing")}
                       disabled={updatingId === order.id}
                       className={`w-full py-2.5 sm:py-3 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${col.buttonColor}`}
                     >
-                      {updatingId === order.id ? <Loader2 className="w-5 h-5 animate-spin" /> : "MARK READY"}
+                      {updatingId === order.id ? <Loader2 className="w-5 h-5 animate-spin" /> : "SEND TO PACKER"}
                     </button>
                   </div>
                 )}
