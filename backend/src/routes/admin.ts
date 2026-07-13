@@ -535,7 +535,7 @@ router.post('/orders/:id/assign', authenticate, requireRole('super_admin', 'admi
     const { rows: oRows } = await query('UPDATE orders SET rider_id = $1, status = \'out_for_delivery\' WHERE id = $2 RETURNING customer_id', [riderId, id]);
     if (oRows[0]) {
         emitToUser(oRows[0].customer_id, 'order_status_update', { orderId: id, status: 'out_for_delivery' });
-        emitToUser(riderId, 'order_assigned', { orderId: id });
+        emitToUser(riderId, 'order_auto_assigned', { orderId: id });
     }
     emitToAdmin('order_status_update', { orderId: id, status: 'out_for_delivery' });
     res.json({ success: true });

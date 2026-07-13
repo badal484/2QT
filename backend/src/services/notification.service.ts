@@ -34,7 +34,9 @@ const FALLBACK_TEMPLATES: Record<string, { title_template: string; body_template
     cash_submitted:         { title_template: 'Cash Submission', body_template: 'Rider {{riderName}} submitted ₹{{amount}} cash for Order #{{displayId}}.', channels: ['push'] },
     generic_sms:            { title_template: '{{title}}', body_template: '{{message}}', channels: ['whatsapp'] },
     chat_message:           { title_template: '{{title}}', body_template: '{{senderName}}: {{message}}', channels: ['push'] },
-    rider_at_door:          { title_template: '🏍️ Your rider is at the door!', body_template: 'Your rider is waiting outside. Please come to the door — order #{{displayId}} is here!', channels: ['push', 'whatsapp'] },
+    rider_at_door:          { title_template: 'Your rider is at the door!', body_template: 'Your rider is waiting outside. Please come to the door — order #{{displayId}} is here!', channels: ['push', 'whatsapp'] },
+    low_stock_alert:        { title_template: 'Low Stock Alert', body_template: '{{itemName}} is running low — only {{remaining}} left. Restock soon.', channels: ['push'] },
+    rider_guarantee_payout: { title_template: 'Earnings Top-Up Added', body_template: '₹{{amount}} guarantee top-up has been added to your earnings for today.', channels: ['push'] },
 };
 
 // ─── Template cache ───────────────────────────────────────────────────────────

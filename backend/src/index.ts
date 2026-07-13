@@ -13,6 +13,7 @@ import { ExpressAdapter } from '@bull-board/express';
 import { connectRedis } from './redis';
 import { initSocket } from './socket';
 import { initCrons } from './crons';
+import { initCrons as initCronsExt } from './crons/index';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 import apiRouter from './routes';
@@ -125,6 +126,7 @@ const start = async () => {
         console.log('Socket.io initialized.');
 
         initCrons();
+        initCronsExt();
 
         server.listen(PORT as number, '0.0.0.0', () => {
             console.log(`Server running on port ${PORT} (0.0.0.0)`);

@@ -84,6 +84,10 @@ async function updateMissionProgress(riderId: string): Promise<void> {
 router.post('/apply', authenticate, async (req: AuthRequest, res) => {
     const { vehicleType, licenseNumber, idPhotoUrl } = req.body;
     const userId = req.user!.userId;
+    const staffRoles = ['super_admin', 'admin', 'finance', 'support', 'chef', 'kitchen_manager', 'partner_kitchen', 'packer', 'rider', 'rider_captain', 'dine_in_staff', 'partner'];
+    if (staffRoles.includes(req.user!.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'Staff accounts cannot apply as riders' });
+    }
 
     try {
         // Check if already applied
