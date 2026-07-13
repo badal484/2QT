@@ -138,6 +138,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   const cooking = orders?.orders?.filter((o: any) =>
     ['preparing', 'at_kitchen'].includes(o.status)
   ) || [];
+  const packing = orders?.orders?.filter((o: any) => o.status === 'packing') || [];
   const ready = orders?.orders?.filter((o: any) => o.status === 'ready_for_pickup') || [];
 
   return (
@@ -196,6 +197,10 @@ const KitchenBoardScreen = ({ navigation }: any) => {
             <View style={[styles.statCard, styles.statMiddle]}>
               <Text style={[styles.statNum, cooking.length > 0 && { color: G.amber }]}>{cooking.length}</Text>
               <Text style={styles.statLabel}>COOKING</Text>
+            </View>
+            <View style={[styles.statCard, styles.statMiddle]}>
+              <Text style={[styles.statNum, packing.length > 0 && { color: '#F59E0B' }]}>{packing.length}</Text>
+              <Text style={styles.statLabel}>PACKING</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={[styles.statNum, ready.length > 0 && { color: G.green }]}>{ready.length}</Text>

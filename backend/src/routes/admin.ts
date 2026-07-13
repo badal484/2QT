@@ -321,24 +321,25 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
                         WHERE u.is_active = true AND u.role = 'customer'
                         AND EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id AND o.created_at > NOW() - INTERVAL '7 days')`;
         } else if (audience === 'riders') {
-            queryStr = 'SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = $1';
-            params.push('rider');
+            queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role IN ('rider', 'rider_captain')`;
+            if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
+        } else if (audience === 'kitchens' || audience === 'partners') {
+            queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role IN ('chef', 'kitchen_manager', 'partner_kitchen')`;
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
         } else if (audience === 'customers') {
             if (zoneId) {
-                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = $1 AND (u.zone_id = $2 OR a.zone_id = $2)`;
-                params.push('customer', zoneId);
-            } else {
-                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = $1`;
-                params.push('customer');
-            }
-        } else {
-            // "all" or "zone"
-            if (zoneId) {
-                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true`;
+                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
+            }
+        } else {
+            // "all" or "zone" — default to CUSTOMERS ONLY
+            if (zoneId) {
+                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                params.push(zoneId);
+            } else {
+                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
             }
         }
 
@@ -1558,30 +1559,33 @@ router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin')
 
 router.get('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { rows } = await query('SELECT id, name, phone, is_online FROM users WHERE kitchen_id = $1 AND role = $2', [id, 'chef']);
+    const { rows } = await query(
+        `SELECT id, name, phone, role, is_online FROM users WHERE kitchen_id = $1 AND role IN ('chef', 'packer', 'kitchen_manager') ORDER BY role, name`,
+        [id]
+    );
     res.json({ staff: rows });
 });
 
 router.post('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { phone: rawPhone, name } = req.body;
-    // Normalize to 91XXXXXXXXXX format (same as OTP flow)
+    const { phone: rawPhone, name, role: rawRole } = req.body;
+    const role = ['chef', 'packer'].includes(rawRole) ? rawRole : 'chef';
     let phone = (rawPhone || '').replace(/\D/g, '');
     if (phone.length === 10) phone = '91' + phone;
     if (!phone || phone.length !== 12) return res.status(400).json({ error: 'INVALID_PHONE', message: 'Enter a valid 10-digit mobile number.' });
     try {
         const { rows: existing } = await query('SELECT id FROM users WHERE phone = $1', [phone]);
         if (existing.length > 0) {
-            await query('UPDATE users SET role = $1, kitchen_id = $2, is_active = true WHERE phone = $3', ['chef', id, phone]);
+            await query('UPDATE users SET role = $1, kitchen_id = $2, is_active = true WHERE phone = $3', [role, id, phone]);
             emitToAll('kitchen_updated', { action: 'staff_add', kitchenId: id });
-            res.json({ success: true, message: 'Existing user promoted to chef' });
+            res.json({ success: true, message: `Existing user set as ${role}` });
         } else {
-            await query(`
-                INSERT INTO users (name, phone, role, kitchen_id, is_active, onboarding_complete)
-                VALUES ($1, $2, 'chef', $3, true, true)
-            `, [name || 'Chef', phone, id]);
+            await query(
+                `INSERT INTO users (name, phone, role, kitchen_id, is_active, onboarding_complete) VALUES ($1, $2, $3, $4, true, true)`,
+                [name || (role === 'packer' ? 'Packer' : 'Chef'), phone, role, id]
+            );
             emitToAll('kitchen_updated', { action: 'staff_add', kitchenId: id });
-            res.json({ success: true, message: 'New chef account created' });
+            res.json({ success: true, message: `New ${role} account created` });
         }
     } catch (err: any) {
         res.status(500).json({ error: 'Failed to add staff', details: err.message });
