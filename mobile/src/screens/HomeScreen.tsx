@@ -1590,7 +1590,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
   vegDot: { width: 6, height: 6, borderRadius: 3 },
-  cardName: { fontSize: 17, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 6, lineHeight: 22 },
+  cardName: { fontSize: 17, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 6, lineHeight: 22 },
   cardPrice: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 8 },
   cardDesc: { fontSize: 14, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 18 },
 
@@ -1662,7 +1662,7 @@ const styles = StyleSheet.create({
   homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: colors.white, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
   homeGridCustomiseText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.primary, textTransform: 'uppercase' },
   homeGridInfo: { paddingHorizontal: 4 },
-  homeGridName: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
+  homeGridName: { fontSize: 15, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
   homeGridDesc: { fontSize: 12, color: colors.inkFaint, fontFamily: fontFamily.medium, lineHeight: 16, marginBottom: 6 },
   homeGridPrice: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink },
   homeGridTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },

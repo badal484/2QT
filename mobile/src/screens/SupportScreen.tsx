@@ -139,8 +139,8 @@ const MessageBubble = ({ msg }: { msg: TicketMessage }) => {
 };
 
 // ── Ticket card with message thread ──────────────────────────────────────────
-const TicketCard = ({ ticket, idx }: { ticket: Ticket; idx: number }) => {
-  const [expanded, setExpanded] = useState(false);
+const TicketCard = ({ ticket, idx, initiallyExpanded }: { ticket: Ticket; idx: number; initiallyExpanded?: boolean }) => {
+  const [expanded, setExpanded] = useState(initiallyExpanded || false);
   const [replyText, setReplyText] = useState('');
   const queryClient = useQueryClient();
   const meta = getMeta(ticket.status);
@@ -460,7 +460,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
 };
 
 // ── My Tickets tab ────────────────────────────────────────────────────────────
-const MyTicketsTab = () => {
+const MyTicketsTab = ({ initialExpandedId }: { initialExpandedId?: string }) => {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -513,17 +513,18 @@ const MyTicketsTab = () => {
       }
     >
       {tickets.map((t, i) => (
-        <TicketCard key={t.id} ticket={t} idx={i} />
+        <TicketCard key={t.id} ticket={t} idx={i} initiallyExpanded={t.id === initialExpandedId} />
       ))}
     </ScrollView>
   );
 };
 
 // ── Screen ────────────────────────────────────────────────────────────────────
-const SupportScreen = ({ navigation }: any) => {
+const SupportScreen = ({ route, navigation }: any) => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'new' | 'mine'>('new');
+  const ticketId = route?.params?.ticketId;
+  const [tab, setTab] = useState<'new' | 'mine'>(ticketId ? 'mine' : 'new');
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -573,7 +574,7 @@ const SupportScreen = ({ navigation }: any) => {
             }}
           />
         )
-        : <MyTicketsTab />
+        : <MyTicketsTab initialExpandedId={ticketId} />
       }
     </View>
   );

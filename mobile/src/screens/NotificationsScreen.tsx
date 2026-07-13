@@ -6,7 +6,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Bell, CheckCheck, Package, Bike,
-  Sparkles, Wallet, CheckCircle2, XCircle,
+  Sparkles, Wallet, CheckCircle2, XCircle, MessageCircle,
 } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,19 +46,58 @@ const TYPE_META: Record<string, { Icon: any; iconColor: string; bg: string; acce
   order:   { Icon: Package,      iconColor: colors.primary, bg: colors.primaryTint, accentColor: colors.primary },
   rider:   { Icon: Bike,         iconColor: '#3B82F6', bg: '#EFF6FF', accentColor: '#3B82F6' },
   pickup:  { Icon: Bike,         iconColor: '#3B82F6', bg: '#EFF6FF', accentColor: '#3B82F6' },
+  support: { Icon: MessageCircle, iconColor: '#3B82F6', bg: '#EFF6FF', accentColor: '#3B82F6' },
 };
 
 const FALLBACK_META = { Icon: Bell, iconColor: colors.primary, bg: colors.primaryTint, accentColor: colors.primary };
 const READ_META     = { Icon: Bell, iconColor: colors.inkFaint, bg: colors.surfaceMuted, accentColor: 'transparent' };
 
-function getTypeMeta(type: string, read: boolean) {
+function getTypeMeta(type: string, read: boolean, title?: string) {
   if (read) return READ_META;
-  const key = Object.keys(TYPE_META).find(k => type?.toLowerCase().includes(k));
+  const t = (type || '').toLowerCase();
+  const tt = (title || '').toLowerCase();
+  if (tt.includes('support')) return TYPE_META.support;
+  const key = Object.keys(TYPE_META).find(k => t.includes(k));
   return key ? TYPE_META[key] : FALLBACK_META;
 }
 
+function groupNotifications(notifs: any[]) {
+  const grouped: any[] = [];
+  const map = new Map();
+
+  for (const n of notifs) {
+    let key = n.id;
+    try {
+      const d = n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : {};
+      if (d.ticketId) {
+        key = `ticket_${d.ticketId}`;
+      } else if (n.title?.includes('Support Team Replied') || n.type === 'support_message') {
+        key = `support_replies`;
+      }
+    } catch {}
+
+    if (key === n.id) {
+      grouped.push({ ...n, _count: 1, _groupedIds: [] });
+    } else {
+      if (map.has(key)) {
+        const existing = map.get(key);
+        existing._count += 1;
+        if (!n.is_read) {
+          existing.is_read = false;
+          existing._groupedIds.push(n.id);
+        }
+      } else {
+        const newGroup = { ...n, _count: 1, _groupedIds: !n.is_read ? [n.id] : [] };
+        grouped.push(newGroup);
+        map.set(key, newGroup);
+      }
+    }
+  }
+  return grouped;
+}
+
 function NotifCard({ n, onPress }: { n: any; onPress: () => void }) {
-  const meta = getTypeMeta(n.type, n.is_read);
+  const meta = getTypeMeta(n.type, n.is_read, n.title);
   const { Icon, iconColor, bg, accentColor } = meta;
 
   return (
@@ -80,7 +119,7 @@ function NotifCard({ n, onPress }: { n: any; onPress: () => void }) {
             style={[styles.title, !n.is_read && styles.titleUnread]}
             numberOfLines={1}
           >
-            {stripEmoji(n.title)}
+            {stripEmoji(n.title)} {n._count > 1 ? `(${n._count} new)` : ''}
           </Text>
           <Text style={[styles.time, !n.is_read && styles.timeUnread]}>
             {relativeTime(n.created_at)}
@@ -129,9 +168,10 @@ const NotificationsScreen = ({ navigation }: any) => {
     setRefreshing(false);
   }, [queryClient]);
 
-  const notifications: any[] = data?.notifications ?? [];
-  const unread  = notifications.filter((n: any) => !n.is_read);
-  const earlier = notifications.filter((n: any) => n.is_read);
+  const rawNotifications: any[] = data?.notifications ?? [];
+  const groupedNotifications = React.useMemo(() => groupNotifications(rawNotifications), [rawNotifications]);
+  const unread  = groupedNotifications.filter((n: any) => !n.is_read);
+  const earlier = groupedNotifications.filter((n: any) => n.is_read);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -170,7 +210,7 @@ const NotificationsScreen = ({ navigation }: any) => {
         <View style={{ padding: 16, gap: 12 }}>
           {Array.from({ length: 5 }).map((_, i) => <SkeletonListItem key={i} />)}
         </View>
-      ) : notifications.length === 0 ? (
+      ) : groupedNotifications.length === 0 ? (
         <View style={styles.empty}>
           <View style={styles.emptyIcon}>
             <Bell size={36} color={colors.primary} />
@@ -200,6 +240,9 @@ const NotificationsScreen = ({ navigation }: any) => {
                     onPress={() => {
                       haptic();
                       readMutation.mutate(n.id);
+                      if (n._groupedIds?.length > 0) {
+                        n._groupedIds.forEach((id: string) => readMutation.mutate(id));
+                      }
                       deepLink(n, navigation);
                     }}
                   />
@@ -231,13 +274,25 @@ const NotificationsScreen = ({ navigation }: any) => {
 function deepLink(n: any, navigation: any) {
   try {
     const d = n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : {};
-    if (n.type?.includes('table_booking') || n.type === 'booking_reminder') {
+    
+    // Support messages deep link
+    if (n.type === 'support_message' || d.ticketId || n.title?.includes('Support')) {
+      navigation.navigate('Support', { ticketId: d.ticketId });
+    }
+    // Table booking
+    else if (n.type?.includes('table_booking') || n.type === 'booking_reminder') {
       navigation.navigate('MyTableBookings');
-    } else if (n.type?.includes('wallet') || n.type?.includes('reward')) {
+    } 
+    // Wallet
+    else if (n.type?.includes('wallet') || n.type?.includes('reward')) {
       navigation.navigate('Wallet');
-    } else if (n.type?.includes('promo')) {
+    } 
+    // Promos
+    else if (n.type?.includes('promo')) {
       navigation.navigate('Home');
-    } else if (d.orderId) {
+    } 
+    // Orders
+    else if (d.orderId) {
       navigation.navigate('OrderConfirmed', { orderId: d.orderId });
     }
   } catch {}
@@ -303,16 +358,13 @@ const styles = StyleSheet.create({
     marginLeft: 12, marginVertical: 14, marginRight: 12,
   },
   body: { flex: 1, paddingVertical: 14, paddingRight: 32 },
-  titleRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 4,
-  },
-  title: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.inkMuted, flex: 1, marginRight: 8 },
-  titleUnread: { fontFamily: fontFamily.bold, color: colors.ink },
-  time: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkFaint },
-  timeUnread: { color: colors.primary, fontFamily: fontFamily.semibold },
-  message: { fontSize: 13, fontFamily: fontFamily.regular, color: colors.inkFaint, lineHeight: 19 },
-  messageUnread: { color: colors.inkMuted, fontFamily: fontFamily.medium },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
+  title: { fontSize: 14, fontWeight: '600', color: colors.ink, flex: 1, marginRight: 8 },
+  titleUnread: { fontWeight: '700', color: colors.ink },
+  time: { fontSize: 11, fontWeight: '500', color: colors.inkFaint },
+  timeUnread: { color: colors.primary, fontWeight: '600' },
+  message: { fontSize: 13, fontWeight: '400', color: colors.inkMuted, lineHeight: 19 },
+  messageUnread: { color: colors.ink, fontWeight: '500', fontFamily: fontFamily.medium },
   dot: {
     position: 'absolute', top: 14, right: 12,
     width: 8, height: 8, borderRadius: 4,

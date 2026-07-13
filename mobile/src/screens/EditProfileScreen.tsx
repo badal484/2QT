@@ -9,7 +9,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
 import { setAuth } from '../store/slices/authSlice';
-import { ArrowLeft, Camera, User, Mail, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, User, ShieldCheck, ChevronRight } from 'lucide-react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { uploadToImageKit } from '../utils/imageKit';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,8 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
-  ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  ink: '#1C1C1E', gray: '#8E8E93', muted: '#C7C7CC',
+  border: '#E5E5EA', bg: '#F2F2F7', white: '#FFFFFF',
 };
 
 const EditProfileScreen = ({ navigation }: any) => {
@@ -31,6 +31,7 @@ const EditProfileScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
 
   const isRider = user?.role === 'rider' || user?.role === 'rider_captain';
+  const accent = isRider ? R.orange : R.green;
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => api.patch('/customers/profile', data),
@@ -41,7 +42,7 @@ const EditProfileScreen = ({ navigation }: any) => {
         refreshToken,
       }));
       queryClient.invalidateQueries({ queryKey: ['me'] });
-      Alert.alert('Saved!', 'Your profile has been updated.');
+      Alert.alert('Saved', 'Your profile has been updated successfully.');
       navigation.goBack();
     },
     onError: (err: any) => {
@@ -64,7 +65,6 @@ const EditProfileScreen = ({ navigation }: any) => {
       try {
         const uploadResult = await uploadToImageKit(result.assets[0]);
         setPhotoUrl(uploadResult.url);
-        Alert.alert('Photo ready', 'Tap Save Changes to apply.');
       } catch (err: any) {
         Alert.alert('Upload Failed', err.message);
       } finally {
@@ -73,21 +73,20 @@ const EditProfileScreen = ({ navigation }: any) => {
     }
   };
 
-  const accent = isRider ? R.orange : R.green;
-  const accentLight = isRider ? R.orangeLight : R.greenLight;
+  const hasChanges = name !== user?.name || email !== user?.email || photoUrl !== user?.photo_url;
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={R.white} />
+      <StatusBar barStyle="dark-content" backgroundColor={R.bg} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
-        {/* Header */}
+        {/* Premium Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
-            <ArrowLeft size={20} color={R.ink} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn} activeOpacity={0.7}>
+            <ArrowLeft size={22} color={R.ink} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
-          <View style={{ width: 40 }} />
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.headerBtn} />
         </View>
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -97,90 +96,89 @@ const EditProfileScreen = ({ navigation }: any) => {
             keyboardShouldPersistTaps="handled"
           >
 
-            {/* Avatar */}
+            {/* Avatar Section */}
             <View style={styles.avatarSection}>
-              <View style={styles.avatarWrap}>
-                <View style={[styles.avatarCircle, { borderColor: accentLight }]}>
-                  {isUploading ? (
-                    <ActivityIndicator color={accent} />
-                  ) : photoUrl ? (
+              <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8} style={styles.avatarWrap}>
+                <View style={styles.avatarCircle}>
+                  {photoUrl ? (
                     <Image source={{ uri: photoUrl }} style={styles.avatarImage} />
                   ) : (
-                    <User size={48} color={R.muted} />
+                    <User size={40} color={R.muted} />
+                  )}
+                  {isUploading && (
+                    <View style={styles.uploadOverlay}>
+                      <ActivityIndicator color={R.white} />
+                    </View>
                   )}
                 </View>
-                <TouchableOpacity
-                  style={[styles.cameraBtn, { backgroundColor: accent }]}
-                  onPress={handlePickImage}
-                  disabled={isUploading}
-                  activeOpacity={0.85}
-                >
-                  <Camera size={16} color={R.white} />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.avatarHint}>Tap to change photo</Text>
+                <Text style={[styles.editPhotoText, { color: accent }]}>Edit Photo</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Form */}
-            <View style={styles.form}>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Full Name</Text>
-                <View style={styles.inputWrap}>
-                  <User size={18} color={R.muted} />
-                  <TextInput
-                    style={styles.input}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Your full name"
-                    placeholderTextColor={R.muted}
-                  />
-                </View>
+            {/* Grouped Form Fields */}
+            <View style={styles.formGroup}>
+              {/* Name Field */}
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Your full name"
+                  placeholderTextColor={R.muted}
+                />
               </View>
+              <View style={styles.divider} />
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Email Address</Text>
-                <View style={styles.inputWrap}>
-                  <Mail size={18} color={R.muted} />
-                  <TextInput
-                    style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="email@example.com"
-                    placeholderTextColor={R.muted}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
+              {/* Email Field */}
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Email address"
+                  placeholderTextColor={R.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
               </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Mobile Number</Text>
-                <View style={[styles.inputWrap, styles.inputDisabled]}>
-                  <ShieldCheck size={18} color={R.green} />
-                  <Text style={styles.phoneText}>+{user?.phone}</Text>
-                  <View style={styles.verifiedBadge}>
-                    <Text style={styles.verifiedText}>Verified</Text>
-                  </View>
-                </View>
-              </View>
-
             </View>
 
-            {/* Save */}
-            <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: accent }, updateMutation.isPending && { opacity: 0.7 }]}
-              onPress={handleSave}
-              disabled={updateMutation.isPending}
-              activeOpacity={0.88}
-            >
-              {updateMutation.isPending
-                ? <ActivityIndicator color={R.white} />
-                : <Text style={styles.saveBtnText}>Save Changes</Text>
-              }
-            </TouchableOpacity>
+            {/* Read-only / Verified Section */}
+            <View style={styles.formGroup}>
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Phone</Text>
+                <Text style={styles.readOnlyText}>+{user?.phone}</Text>
+                <View style={styles.verifiedBadge}>
+                  <ShieldCheck size={14} color={R.green} />
+                  <Text style={styles.verifiedText}>Verified</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.footerNote}>
+              Phone numbers cannot be changed directly. Please contact support if you need to update your verified number.
+            </Text>
 
           </ScrollView>
+
+          {/* Sticky Save Button (only visible if changes made) */}
+          {hasChanges && (
+            <View style={styles.stickyFooter}>
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: accent }, updateMutation.isPending && { opacity: 0.7 }]}
+                onPress={handleSave}
+                disabled={updateMutation.isPending}
+                activeOpacity={0.9}
+              >
+                {updateMutation.isPending
+                  ? <ActivityIndicator color={R.white} />
+                  : <Text style={styles.saveBtnText}>Save Changes</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          )}
+
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -192,57 +190,79 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
-    backgroundColor: R.white, borderBottomWidth: 1, borderBottomColor: R.border,
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: R.bg,
   },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: R.bg, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: R.border,
+  headerBtn: {
+    width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: R.ink },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: R.ink, letterSpacing: -0.4 },
 
-  scrollContent: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 48, gap: 24 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 },
 
-  avatarSection: { alignItems: 'center', marginBottom: 8 },
-  avatarWrap: { position: 'relative' },
+  avatarSection: { alignItems: 'center', marginBottom: 32 },
+  avatarWrap: { alignItems: 'center' },
   avatarCircle: {
-    width: 100, height: 100, borderRadius: 50,
-    backgroundColor: R.white, borderWidth: 3,
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: R.white,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3,
+    marginBottom: 12,
   },
   avatarImage: { width: '100%', height: '100%' },
-  cameraBtn: {
-    position: 'absolute', right: -4, bottom: -4,
-    width: 34, height: 34, borderRadius: 10,
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: R.white,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, elevation: 3,
   },
-  avatarHint: { marginTop: 12, color: R.muted, fontSize: 12, fontWeight: '600' },
+  editPhotoText: { fontSize: 15, fontWeight: '500' },
 
-  form: { gap: 16 },
-  fieldGroup: { gap: 6 },
-  fieldLabel: { color: R.muted, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginLeft: 4 },
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: R.white, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
-    borderWidth: 1, borderColor: R.border,
+  formGroup: {
+    backgroundColor: R.white,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 24,
   },
-  inputDisabled: { backgroundColor: R.bg, opacity: 0.75 },
-  input: { flex: 1, fontSize: 16, fontWeight: '600', color: R.ink },
-  phoneText: { flex: 1, fontSize: 16, fontWeight: '600', color: R.gray },
+  fieldRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, minHeight: 52,
+  },
+  fieldLabel: {
+    width: 80, fontSize: 15, fontWeight: '400', color: R.ink,
+  },
+  input: {
+    flex: 1, fontSize: 15, fontWeight: '400', color: R.ink,
+    paddingVertical: 14,
+  },
+  readOnlyText: {
+    flex: 1, fontSize: 15, fontWeight: '400', color: R.gray,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth, backgroundColor: R.border,
+    marginLeft: 16,
+  },
   verifiedBadge: {
-    backgroundColor: R.greenLight, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: R.greenLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
   },
-  verifiedText: { color: R.green, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' },
+  verifiedText: { color: R.green, fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
 
-  saveBtn: {
-    borderRadius: 16, paddingVertical: 17, alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, elevation: 6,
+  footerNote: {
+    fontSize: 13, color: R.gray, lineHeight: 18,
+    paddingHorizontal: 8, marginTop: -8, textAlign: 'center',
   },
-  saveBtnText: { color: R.white, fontSize: 15, fontWeight: '900', letterSpacing: 0.3 },
+
+  stickyFooter: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 16, paddingBottom: 32, paddingTop: 16,
+    backgroundColor: 'rgba(242, 242, 247, 0.9)', // Match R.bg with opacity
+  },
+  saveBtn: {
+    borderRadius: 14, paddingVertical: 16, alignItems: 'center',
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6,
+  },
+  saveBtnText: { color: R.white, fontSize: 16, fontWeight: '600' },
 });
 
 export default EditProfileScreen;
+

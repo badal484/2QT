@@ -249,8 +249,8 @@ const EarningsBreakdownCard = ({ data }: { data: EarningsBreakdown }) => {
 };
 
 // ── Rider ticket card ─────────────────────────────────────────────────────────
-const RiderTicketCard = ({ ticket, idx }: { ticket: Ticket; idx: number }) => {
-  const [expanded, setExpanded] = useState(false);
+const TicketCard = ({ ticket, idx, initiallyExpanded }: { ticket: Ticket; idx: number; initiallyExpanded?: boolean }) => {
+  const [expanded, setExpanded] = useState(initiallyExpanded || false);
   const [replyText, setReplyText] = useState('');
   const queryClient = useQueryClient();
   const meta = getMeta(ticket.status);
@@ -541,7 +541,7 @@ const OrderPicker = ({
 };
 
 // ── New Ticket form ──────────────────────────────────────────────────────────
-const NewRiderTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
+const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
   const [categoryKey, setCategoryKey] = useState('earnings');
   const [subType, setSubType] = useState<string>('');
   const [subject, setSubject] = useState('');
@@ -755,7 +755,7 @@ const NewRiderTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
 };
 
 // ── My Tickets tab ────────────────────────────────────────────────────────────
-const MyRiderTicketsTab = () => {
+const MyTicketsTab = ({ initialExpandedId }: { initialExpandedId?: string }) => {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -804,7 +804,7 @@ const MyRiderTicketsTab = () => {
       }
     >
       {tickets.map((t, i) => (
-        <RiderTicketCard key={t.id} ticket={t} idx={i} />
+        <TicketCard key={t.id} ticket={t} idx={i} initiallyExpanded={t.id === initialExpandedId} />
       ))}
     </ScrollView>
   );
@@ -871,12 +871,11 @@ const ComplaintsTab = () => {
 };
 
 // ── Screen ────────────────────────────────────────────────────────────────────
-type MainTab = 'new' | 'mine' | 'complaints';
-
-const RiderSupportScreen = ({ navigation }: any) => {
+const RiderSupportScreen = ({ route, navigation }: any) => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const [mainTab, setMainTab] = useState<MainTab>('new');
+  const ticketId = route?.params?.ticketId;
+  const [tab, setTab] = useState<'new' | 'mine' | 'complaints'>(ticketId ? 'mine' : 'new');
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -896,49 +895,49 @@ const RiderSupportScreen = ({ navigation }: any) => {
       {/* Tabs */}
       <View style={styles.tabRow}>
         <BouncingButton
-          style={[styles.tabBtn, mainTab === 'new' && styles.tabBtnActive]}
-          onPress={() => { haptic(); setMainTab('new'); }}
+          style={[styles.tabBtn, tab === 'new' && styles.tabBtnActive]}
+          onPress={() => { haptic(); setTab('new'); }}
           activeOpacity={0.8}
         >
-          <Plus size={13} color={mainTab === 'new' ? colors.primary : colors.inkMuted} />
-          <Text style={[styles.tabText, mainTab === 'new' && styles.tabTextActive]}>New</Text>
+          <Plus size={13} color={tab === 'new' ? colors.primary : colors.inkMuted} />
+          <Text style={[styles.tabText, tab === 'new' && styles.tabTextActive]}>New</Text>
         </BouncingButton>
         <BouncingButton
-          style={[styles.tabBtn, mainTab === 'mine' && styles.tabBtnActive]}
+          style={[styles.tabBtn, tab === 'mine' && styles.tabBtnActive]}
           onPress={() => {
             haptic();
-            setMainTab('mine');
+            setTab('mine');
             queryClient.invalidateQueries({ queryKey: ['rider-support-tickets'] });
           }}
           activeOpacity={0.8}
         >
-          <MessageSquare size={13} color={mainTab === 'mine' ? colors.primary : colors.inkMuted} />
-          <Text style={[styles.tabText, mainTab === 'mine' && styles.tabTextActive]}>My Tickets</Text>
+          <MessageSquare size={13} color={tab === 'mine' ? colors.primary : colors.inkMuted} />
+          <Text style={[styles.tabText, tab === 'mine' && styles.tabTextActive]}>My Tickets</Text>
         </BouncingButton>
         <BouncingButton
-          style={[styles.tabBtn, mainTab === 'complaints' && styles.tabBtnActive]}
+          style={[styles.tabBtn, tab === 'complaints' && styles.tabBtnActive]}
           onPress={() => {
             haptic();
-            setMainTab('complaints');
+            setTab('complaints');
             queryClient.invalidateQueries({ queryKey: ['rider-complaints'] });
           }}
           activeOpacity={0.8}
         >
-          <AlertTriangle size={13} color={mainTab === 'complaints' ? colors.primary : colors.inkMuted} />
-          <Text style={[styles.tabText, mainTab === 'complaints' && styles.tabTextActive]}>Complaints</Text>
+          <AlertTriangle size={13} color={tab === 'complaints' ? colors.primary : colors.inkMuted} />
+          <Text style={[styles.tabText, tab === 'complaints' && styles.tabTextActive]}>Complaints</Text>
         </BouncingButton>
       </View>
 
-      {mainTab === 'new' && (
-        <NewRiderTicketTab
+      {tab === 'new' && (
+        <NewTicketTab
           onSuccess={() => {
-            setMainTab('mine');
+            setTab('mine');
             queryClient.invalidateQueries({ queryKey: ['rider-support-tickets'] });
           }}
         />
       )}
-      {mainTab === 'mine' && <MyRiderTicketsTab />}
-      {mainTab === 'complaints' && <ComplaintsTab />}
+      {tab === 'mine' && <MyTicketsTab initialExpandedId={ticketId} />}
+      {tab === 'complaints' && <ComplaintsTab />}
     </View>
   );
 };

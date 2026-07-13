@@ -11,18 +11,18 @@ export const colors = {
   accentTint: '#FFF1ED',
 
   // Backgrounds
-  background: '#F8F9FA', // Cooler, pristine gray-white
+  background: '#F2F2F7', // iOS Grouped Background
   surface: '#FFFFFF',
-  surfaceMuted: '#F1F3F5',
+  surfaceMuted: '#E5E5EA', // Slightly darker than surface for distinction
   
   // Ink / Text
-  ink: '#111827', // Deep slate for high contrast
-  inkMuted: '#4B5563', // Slate gray
-  inkFaint: '#9CA3AF', // Lighter slate
+  ink: '#2C2C2E', // Distinctly softer than black, premium luxury slate
+  inkMuted: '#8E8E93', // Much softer secondary text
+  inkFaint: '#AEAEB2', // Tertiary text
 
   // Borders
-  border: '#E5E7EB',
-  borderStrong: '#D1D5DB',
+  border: '#E5E5EA',
+  borderStrong: '#C7C7CC',
 
   // Semantic
   success: '#10B981',
