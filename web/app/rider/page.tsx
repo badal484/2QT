@@ -13,8 +13,10 @@ import {
   Package, CheckCircle2, ChevronRight,
   LogOut, Bike, Phone, Wallet, Clock, TrendingUp,
   ArrowRight, Zap, MapPin, Navigation, Lock,
-  ChefHat, Home, Trophy,
+  ChefHat, Home, Trophy, Banknote,
 } from "lucide-react";
+import CashSubmitTab from "../../components/rider/CashSubmitTab";
+import { DoorPaymentModal } from "../../components/rider/DoorPaymentModal";
 
 const RiderLiveMap = dynamic(() => import("../../components/RiderLiveMap"), {
   ssr: false,
@@ -37,6 +39,7 @@ interface Order {
   kitchen_name?: string;
   kitchen_address?: string;
   total_amount_paise: number;
+  payment_method?: string;
   items?: { menu_item_name: string; quantity: number }[];
 }
 
@@ -124,7 +127,8 @@ export default function RiderPage() {
   const [countdown,       setCountdown]       = useState(15);
   const [verifyOtpFor,    setVerifyOtpFor]    = useState<string | null>(null);
   const [otpInput,        setOtpInput]        = useState("");
-  const [activeTab,       setActiveTab]       = useState<"deliveries" | "earnings" | "history">("deliveries");
+  const [activeTab,       setActiveTab]       = useState<"deliveries" | "earnings" | "history" | "cash">("deliveries");
+  const [doorPaymentFor,  setDoorPaymentFor]  = useState<Order | null>(null);
   const [riderLoc,        setRiderLoc]        = useState<{ lat: number; lng: number } | null>(null);
   const [todayEarnings,   setTodayEarnings]   = useState<any>(null);
   const [riderStats,      setRiderStats]      = useState<any>(null);
@@ -582,9 +586,17 @@ export default function RiderPage() {
                   index={0}
                   isVerifying={verifyOtpFor === activeOrder.id}
                   swipeErrorKey={swipeErrorMap[activeOrder.id] ?? 0}
+                  onDoorPayment={(o) => setDoorPaymentFor(o)}
                   onUpdate={(id, status) => {
-                    if (status === "delivered") setVerifyOtpFor(id);
-                    else updateStatus(id, status);
+                    if (status === "delivered") {
+                      if (activeOrder.payment_method === "cod") {
+                        setDoorPaymentFor(activeOrder);
+                      } else {
+                        setVerifyOtpFor(id);
+                      }
+                    } else {
+                      updateStatus(id, status);
+                    }
                   }}
                 />
               </div>
@@ -686,6 +698,14 @@ export default function RiderPage() {
                 </div>
               </motion.div>
             ))}
+          </motion.div>
+        )}
+
+        {/* ─ Cash tab ─ */}
+        {activeTab === "cash" && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="pt-2 h-full">
+            <h2 className="text-2xl font-black text-white px-4 mb-4">Cash Submission</h2>
+            <CashSubmitTab />
           </motion.div>
         )}
       </main>
@@ -813,6 +833,22 @@ export default function RiderPage() {
         )}
       </AnimatePresence>
 
+      {/* ── Door Payment Modal ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {doorPaymentFor && (
+          <DoorPaymentModal
+            orderId={doorPaymentFor.id}
+            amountPaise={doorPaymentFor.total_amount_paise}
+            onComplete={() => {
+              setDoorPaymentFor(null);
+              // After recording door payment, proceed to OTP delivery step
+              setVerifyOtpFor(doorPaymentFor.id);
+            }}
+            onCancel={() => setDoorPaymentFor(null)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ── Earnings flash ───────────────────────────────────────────────────── */}
       <AnimatePresence>
         {earningsFlash && (
@@ -826,6 +862,7 @@ export default function RiderPage() {
           {[
             { key: "deliveries", icon: Package, label: "Orders" },
             { key: "earnings",   icon: Wallet,  label: "Earnings" },
+            { key: "cash",       icon: Banknote,label: "Cash" },
             { key: "history",    icon: Clock,   label: "History" },
           ].map(({ key, icon: Icon, label }) => (
             <button key={key} onClick={() => setActiveTab(key as any)}
@@ -850,12 +887,13 @@ export default function RiderPage() {
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-function OrderCard({ order, onUpdate, isVerifying, index, swipeErrorKey }: {
+function OrderCard({ order, onUpdate, isVerifying, index, swipeErrorKey, onDoorPayment }: {
   order: Order;
   onUpdate: (id: string, s: "out_for_delivery" | "delivered") => void;
   isVerifying: boolean;
   index: number;
   swipeErrorKey?: number;
+  onDoorPayment?: (order: Order) => void;
 }) {
   const isPending = order.status === "confirmed" || order.status === "preparing";
   const isReady   = order.status === "ready_for_pickup" || (order.status as any) === "ready";

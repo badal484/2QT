@@ -1147,7 +1147,7 @@ function BroadcastTab() {
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Audience</label>
             <div className="flex gap-2 mb-4">
-              {["all", "customers", "riders"].map(t => (
+              {["all", "customers", "riders", "kitchens"].map(t => (
                 <button
                   type="button"
                   key={t}

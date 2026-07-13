@@ -35,6 +35,8 @@ import { toast } from "sonner";
 import { useAuth } from "../providers";
 import { socket } from "../lib/socket";
 import dynamic from "next/dynamic";
+import { PackerTab } from "../components/kitchen/PackerTab";
+import { ShiftHandoverModal } from "../components/kitchen/ShiftHandoverModal";
 
 const DispatchMap = dynamic(() => import("../components/DispatchMap"), {
   ssr: false,
@@ -283,7 +285,8 @@ export default function KitchenPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [kitchenName, setKitchenName] = useState<string | null>(null);
-  const [view, setView] = useState<"kds" | "dispatch" | "manage" | "analytics">("kds");
+  const [view, setView] = useState<"kds" | "dispatch" | "manage" | "analytics" | "packer">("kds");
+  const [showHandover, setShowHandover] = useState(false);
   const [mobileKdsCol, setMobileKdsCol] = useState<KdsColId>("confirmed");
 
   // Dispatch
@@ -325,7 +328,7 @@ export default function KitchenPage() {
     if (authLoading) return;
     if (!user) {
       router.push("/login");
-    } else if (!["chef", "kitchen_manager", "super_admin"].includes(user.role)) {
+    } else if (!["chef", "kitchen_manager", "super_admin", "packer"].includes(user.role)) {
       router.push("/menu");
     }
   }, [user, authLoading, router]);
@@ -637,6 +640,10 @@ export default function KitchenPage() {
             <button onClick={fetchOrders} className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/[0.05] border border-white/[0.1] flex items-center justify-center hover:bg-white/[0.1] transition-all">
               <RefreshCw className={`w-4 h-4 text-zinc-300 ${loading ? "animate-spin" : ""}`} />
             </button>
+            <button onClick={() => setShowHandover(true)} className="hidden sm:flex px-3 py-1.5 rounded-xl bg-violet-500/10 border border-violet-500/20 items-center justify-center hover:bg-violet-500/20 transition-all gap-2">
+              <Timer className="w-4 h-4 text-violet-400" />
+              <span className="text-xs font-black uppercase tracking-widest text-violet-400">Handover</span>
+            </button>
             <button onClick={() => { logout(); router.push("/"); }} className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center hover:bg-red-500/20 transition-all">
               <LogOut className="w-4 h-4 text-red-500" />
             </button>
@@ -650,6 +657,13 @@ export default function KitchenPage() {
             className={`px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black uppercase tracking-widest transition-all whitespace-nowrap ${view === "kds" ? "bg-green-500 text-black shadow-[0_0_16px_rgba(34,197,94,0.4)]" : "text-zinc-400 hover:text-white bg-white/5"}`}
           >
             KDS
+          </button>
+
+          <button
+            onClick={() => setView("packer")}
+            className={`px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black uppercase tracking-widest transition-all flex items-center gap-1.5 whitespace-nowrap ${view === "packer" ? "bg-emerald-500 text-black shadow-[0_0_16px_rgba(16,185,129,0.4)]" : "text-zinc-400 hover:text-white bg-white/5"}`}
+          >
+            <Package className="w-3.5 h-3.5" /> Packer
           </button>
 
           {["kitchen_manager", "super_admin"].includes(user?.role ?? "") && (
@@ -1393,7 +1407,22 @@ export default function KitchenPage() {
             </>
           )
         )}
+        {/* ════════════════════════ PACKER VIEW ══════════════════════════════ */}
+        {view === "packer" && (
+          <PackerTab
+            orders={orders}
+            updateStatus={updateStatus}
+            updatingId={updatingId}
+          />
+        )}
+
       </main>
+
+      <AnimatePresence>
+        {showHandover && (
+          <ShiftHandoverModal onClose={() => setShowHandover(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
