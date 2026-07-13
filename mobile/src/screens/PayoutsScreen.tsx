@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
   ArrowLeft, CheckCircle, AlertCircle,
-  Pencil, Building2, Smartphone, Banknote, Shield, IndianRupee
+  Pencil, Building2, Smartphone, Banknote, Shield, IndianRupee, Zap,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -27,6 +27,8 @@ const PayoutsScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<PayoutTab>('bank');
   const [editing, setEditing] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [withdrawAmt, setWithdrawAmt] = useState('');
 
   // Bank fields
   const [accountNumber, setAccountNumber] = useState('');
@@ -58,6 +60,47 @@ const PayoutsScreen = ({ navigation }: any) => {
     },
     onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message || 'Could not save bank account'),
   });
+
+  const withdrawMutation = useMutation({
+    mutationFn: (amountPaise: number) =>
+      api.post('/riders/payouts/request', { amountPaise }),
+    onSuccess: () => {
+      setShowWithdraw(false);
+      setWithdrawAmt('');
+      queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
+      Alert.alert('Request Sent', 'Your withdrawal request has been submitted. Finance will process it shortly.');
+    },
+    onError: (err: any) => {
+      const code = err?.response?.data?.error || err?.message;
+      if (code === 'ALREADY_REQUESTED_TODAY') {
+        Alert.alert('Already Requested', 'You can only make one withdrawal request per day.');
+      } else if (code === 'INSUFFICIENT_BALANCE') {
+        Alert.alert('Insufficient Balance', 'You don\'t have enough balance for this amount.');
+      } else {
+        Alert.alert('Error', 'Could not submit withdrawal request. Try again.');
+      }
+    },
+  });
+
+  const handleWithdraw = () => {
+    const paise = Math.round(parseFloat(withdrawAmt) * 100);
+    if (!withdrawAmt || isNaN(paise) || paise < 10000) {
+      Alert.alert('Minimum ₹100', 'Enter an amount of at least ₹100 to withdraw.');
+      return;
+    }
+    if (paise > (data?.withdrawablePaise || 0)) {
+      Alert.alert('Exceeds Balance', 'Amount cannot exceed your available balance.');
+      return;
+    }
+    Alert.alert(
+      'Confirm Withdrawal',
+      `Request ₹${(paise / 100).toFixed(0)} to your ${data?.payoutMethod === 'bank' ? 'bank account' : 'UPI ID'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', onPress: () => withdrawMutation.mutate(paise) },
+      ]
+    );
+  };
 
   const saveUpiMutation = useMutation({
     mutationFn: (data: { upiId: string }) => api.patch('/riders/upi', data),
@@ -181,6 +224,64 @@ const PayoutsScreen = ({ navigation }: any) => {
                   ₹{(inFlightPaise / 100).toFixed(0)} processing — awaiting finance approval
                 </Text>
               </View>
+            )}
+
+            {/* Instant withdrawal */}
+            {withdrawablePaise >= 10000 && inFlightPaise === 0 && (
+              showWithdraw ? (
+                <View style={styles.withdrawForm}>
+                  <Text style={styles.withdrawLabel}>Enter amount (min ₹100)</Text>
+                  <View style={styles.withdrawInputRow}>
+                    <Text style={styles.withdrawRupee}>₹</Text>
+                    <TextInput
+                      style={styles.withdrawInput}
+                      value={withdrawAmt}
+                      onChangeText={setWithdrawAmt}
+                      keyboardType="numeric"
+                      placeholder={(withdrawablePaise / 100).toFixed(0)}
+                      placeholderTextColor={R.muted}
+                      autoFocus
+                    />
+                    <TouchableOpacity
+                      onPress={() => setWithdrawAmt((withdrawablePaise / 100).toFixed(0))}
+                      style={styles.maxBtn}
+                    >
+                      <Text style={styles.maxBtnText}>MAX</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.withdrawCancelBtn]}
+                      onPress={() => { setShowWithdraw(false); setWithdrawAmt(''); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.withdrawCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.withdrawConfirmBtn, withdrawMutation.isPending && { opacity: 0.6 }]}
+                      onPress={handleWithdraw}
+                      disabled={withdrawMutation.isPending}
+                      activeOpacity={0.85}
+                    >
+                      {withdrawMutation.isPending
+                        ? <ActivityIndicator size="small" color={R.white} />
+                        : <Text style={styles.withdrawConfirmText}>Request</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.withdrawNowBtn}
+                  onPress={() => {
+                    setWithdrawAmt((withdrawablePaise / 100).toFixed(0));
+                    setShowWithdraw(true);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Zap size={15} color={R.white} />
+                  <Text style={styles.withdrawNowText}>Withdraw Now</Text>
+                </TouchableOpacity>
+              )
             )}
 
             <View style={styles.scheduleRow}>
@@ -545,6 +646,43 @@ const styles = StyleSheet.create({
   },
   emptyText: { color: R.ink, fontWeight: '700', fontSize: 15 },
   emptyHint: { color: R.gray, fontSize: 12 },
+
+  withdrawNowBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: R.green, borderRadius: 14, paddingVertical: 14, marginBottom: 16,
+  },
+  withdrawNowText: { color: R.white, fontWeight: '800', fontSize: 15 },
+
+  withdrawForm: {
+    backgroundColor: R.bg, borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: R.border, marginBottom: 16,
+  },
+  withdrawLabel: { color: R.gray, fontSize: 12, fontWeight: '600', marginBottom: 10 },
+  withdrawInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: R.white, borderRadius: 10, paddingHorizontal: 12,
+    borderWidth: 1, borderColor: R.border,
+  },
+  withdrawRupee: { color: R.ink, fontSize: 20, fontWeight: '800', marginRight: 4 },
+  withdrawInput: {
+    flex: 1, fontSize: 24, fontWeight: '900', color: R.ink,
+    paddingVertical: 12,
+  },
+  maxBtn: {
+    backgroundColor: R.orangeLight, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  maxBtnText: { color: R.orange, fontSize: 11, fontWeight: '800' },
+  withdrawCancelBtn: {
+    flex: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center',
+    backgroundColor: R.white, borderWidth: 1, borderColor: R.border,
+  },
+  withdrawCancelText: { color: R.ink, fontWeight: '700', fontSize: 14 },
+  withdrawConfirmBtn: {
+    flex: 2, borderRadius: 10, paddingVertical: 13, alignItems: 'center',
+    backgroundColor: R.green,
+  },
+  withdrawConfirmText: { color: R.white, fontWeight: '800', fontSize: 14 },
 });
 
 export default PayoutsScreen;
