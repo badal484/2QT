@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../../lib/api";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Banknote, Building2, Smartphone, ShieldCheck, CheckCircle2, Clock, Info, Loader2 } from "lucide-react";
 
 type Method = "physical" | "razorpay";
@@ -36,6 +36,7 @@ export default function CashSubmitTab() {
   const totalPaise = data?.totalPaise || 0;
   const overLimit = data?.overLimit || false;
   const totalRupees = (totalPaise / 100).toFixed(0);
+  const pendingSubmission = data?.pendingSubmission || null;
 
   const handlePhysicalSubmit = async () => {
     if (!orders.length) return;
@@ -47,7 +48,12 @@ export default function CashSubmitTab() {
       });
       setSubmitted(true);
     } catch (e: any) {
-      toast.error(e.message || "Could not submit. Try again.");
+      if (e.response?.status === 409) {
+        // Backend rejected duplicate — refresh so the pending submission UI appears
+        await fetchData();
+      } else {
+        toast.error(e.response?.data?.error || e.message || "Could not submit. Try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -119,6 +125,29 @@ export default function CashSubmitTab() {
       <div className="flex flex-col items-center justify-center flex-1 py-12">
         <Loader2 className="w-8 h-8 text-brand-primary animate-spin" />
       </div>
+    );
+  }
+
+  // Already submitted — show awaiting confirmation UI (prevents re-submission on refresh)
+  if (!submitted && pendingSubmission) {
+    const submittedRupees = (parseInt(pendingSubmission.total_amount_paise) / 100).toFixed(0);
+    const submittedAt = new Date(pendingSubmission.submitted_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+    return (
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-12 px-6 text-center">
+        <div className="w-24 h-24 rounded-full border-2 bg-amber-500/10 border-amber-500/30 text-amber-400 flex items-center justify-center mb-6">
+          <Clock className="w-12 h-12" />
+        </div>
+        <h2 className="text-2xl font-black text-white mb-2">Already Submitted</h2>
+        <p className="text-5xl font-black text-amber-400 mb-4">₹{submittedRupees}</p>
+        <p className="text-zinc-400 text-sm mb-2 max-w-xs">
+          You submitted {pendingSubmission.order_count} order{pendingSubmission.order_count !== 1 ? "s" : ""} at {submittedAt}.
+          Please hand over the cash at the finance desk.
+        </p>
+        <p className="text-zinc-500 text-xs mb-6 max-w-xs">Your badge will clear once finance confirms receipt.</p>
+        <div className="bg-zinc-900 rounded-full px-4 py-2 border border-white/10">
+          <span className="text-xs font-bold uppercase tracking-widest text-amber-400">Pending Finance Confirmation</span>
+        </div>
+      </motion.div>
     );
   }
 
