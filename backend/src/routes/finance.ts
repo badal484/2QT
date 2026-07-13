@@ -3,6 +3,7 @@ import { query } from '../db';
 import pool from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
+import { generalLimiter } from '../middleware/rateLimiter';
 import { emitToAll, emitToUser, emitToKitchen, emitToAdmin, emitToPartner } from '../socket';
 import { processWalletRefund, processBankRefund } from '../services/refund.service';
 import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
@@ -974,7 +975,7 @@ router.get('/partners/applications', financeAccess, financeRole, async (req: Aut
   }
 });
 
-router.post('/partners/applications', async (req, res) => {
+router.post('/partners/applications', generalLimiter, async (req, res) => {
   // Public endpoint — from the website "Partner with us" form
   const { restaurantName, ownerName, phone, email, address, city, cuisineType, fssaiNumber, expectedDailyOrders, upiId } = req.body;
   if (!restaurantName || !ownerName || !phone || !email || !address || !city) {

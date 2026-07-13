@@ -284,7 +284,7 @@ export const initCrons = () => {
                           (kitchen_id, period_start, period_end, gross_sales_paise, commission_paise,
                            net_payout_paise, orders_count, status)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-                        ON CONFLICT DO NOTHING
+                        ON CONFLICT (kitchen_id, period_start, period_end) DO NOTHING
                         RETURNING id
                     `, [k.id, periodStart, periodEnd,
                         parseInt(stats[0].gross_sales_paise),
@@ -506,7 +506,7 @@ export const initCrons = () => {
                             `, [bestRiderId, order.id]);
 
                             if ((rowCount ?? 0) > 0) {
-                                emitToUser(bestRiderId, 'order_assigned', {
+                                emitToUser(bestRiderId, 'order_auto_assigned', {
                                     orderId: order.id,
                                     displayId: order.display_id,
                                     assignedBy: 'system',

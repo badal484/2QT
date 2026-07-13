@@ -59,6 +59,8 @@ export const initSocket = (server: any) => {
 
         if (user.role === 'partner') {
             socket.join(`partner:${user.userId}`);
+            // Partner also needs restaurant room to receive dine-in real-time events
+            if (user.restaurantId) socket.join(`restaurant:${user.restaurantId}`);
         }
 
         if (user.role === 'dine_in_staff' && user.restaurantId) {

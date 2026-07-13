@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { query } from '../db';
 import { redis, keys } from '../redis';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import axios from 'axios';
 
 const router = Router();
@@ -455,13 +455,7 @@ router.post('/kitchen-pin', async (req, res) => {
     }
 });
 
-router.post('/update-role', authenticate, async (req: AuthRequest, res) => {
-    // In production, this should be super_admin only
-    // In development, we allow it for easy testing
-    if (process.env.NODE_ENV !== 'development' && req.user!.role !== 'super_admin') {
-        return res.status(403).json({ error: 'FORBIDDEN' });
-    }
-
+router.post('/update-role', authenticate, requireRole('super_admin'), async (req: AuthRequest, res) => {
     const { role, userId } = req.body;
     const targetUserId = userId || req.user!.userId;
 
