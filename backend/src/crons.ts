@@ -27,16 +27,25 @@ export const initCrons = () => {
             // 1. Check Stock
             await checkAllStockThresholds();
 
-            // 2. Generate Daily Financial Log
-            // This is a simple version - real one would sum all payments/expenses
+            // 2. Generate Daily Financial Log for yesterday
+            // Revenue from orders table (not joined to items to avoid row multiplication).
+            // Cost from order_items × quantity × unit cost (LEFT JOIN handles deleted menu items).
             const { rows: totals } = await query(`
-                SELECT 
-                    COALESCE(SUM(total_amount_paise), 0) as revenue,
-                    COALESCE(SUM(cost_price_paise), 0) as cost
-                FROM orders o
-                JOIN order_items oi ON o.id = oi.order_id
-                JOIN menu_items mi ON oi.menu_item_id = mi.id
-                WHERE o.status = 'delivered' AND o.created_at >= CURRENT_DATE - interval '1 day'
+                SELECT
+                    (SELECT COALESCE(SUM(total_amount_paise), 0)
+                     FROM orders
+                     WHERE status = 'delivered'
+                       AND updated_at >= CURRENT_DATE - INTERVAL '1 day'
+                       AND updated_at <  CURRENT_DATE
+                    ) AS revenue,
+                    (SELECT COALESCE(SUM(COALESCE(mi.cost_price_paise, 0) * oi.quantity), 0)
+                     FROM orders o
+                     LEFT JOIN order_items oi ON oi.order_id = o.id
+                     LEFT JOIN menu_items  mi ON mi.id = oi.menu_item_id
+                     WHERE o.status = 'delivered'
+                       AND o.updated_at >= CURRENT_DATE - INTERVAL '1 day'
+                       AND o.updated_at <  CURRENT_DATE
+                    ) AS cost
             `);
 
             await query(`
@@ -52,9 +61,13 @@ export const initCrons = () => {
 
     // Every 5 mins - Check for unassigned orders
     cron.schedule('*/5 * * * *', async () => {
-        const { rows } = await query("SELECT count(*) FROM orders WHERE status = 'confirmed' AND created_at < NOW() - interval '10 minutes'");
-        if (parseInt(rows[0].count) > 0) {
-            console.log(`[ALERT] There are ${rows[0].count} unassigned orders older than 10 mins!`);
+        try {
+            const { rows } = await query("SELECT count(*) FROM orders WHERE status = 'confirmed' AND created_at < NOW() - interval '10 minutes'");
+            if (parseInt(rows[0].count) > 0) {
+                console.log(`[ALERT] There are ${rows[0].count} unassigned orders older than 10 mins!`);
+            }
+        } catch (err) {
+            console.error('[CRON] Unassigned order check failed:', err);
         }
     });
 
