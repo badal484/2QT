@@ -18,6 +18,9 @@ const ALREADY_EXISTS = new Set([
     '42P16', // invalid_table_definition (CREATE UNIQUE INDEX duplicate)
     '23505', // unique_violation (e.g. unique index can't be built due to existing dupes — treat as done)
     '42704', // undefined_object (DROP of something already gone — harmless)
+    '55P04', // unsafe_new_enum_value_usage — ALTER TYPE ADD VALUE committed but CREATE FUNCTION
+             // in the same batch sees the value as unsafe; a follow-up migration re-runs
+             // the function with the value now fully committed.
 ]);
 
 async function migrate() {
