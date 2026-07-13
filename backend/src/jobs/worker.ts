@@ -1,7 +1,7 @@
 // Single consolidated BullMQ worker — processes all 2qt queues
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { NotificationService, NotifType } from '../services/notification.service';
+import { NotificationService, NotifType, deliverNotification } from '../services/notification.service';
 import { generateInvoicePDF } from '../services/invoice.service';
 import { query } from '../db';
 
@@ -66,7 +66,14 @@ const notifWorker = new Worker('2qt:notifications', async (job: Job) => {
     }
 
     // Single notification
-    await NotificationService.send(type, data);
+    // _queuedOptions = enqueued via sendNotification() with SendOptions format
+    // Otherwise it's a legacy flat-format job (e.g. rider_guarantee_payout from cron)
+    if (data._queuedOptions) {
+        const { _queuedOptions, ...opts } = data;
+        await deliverNotification(type, opts);
+    } else {
+        await NotificationService.send(type, data);
+    }
 }, {
     connection,
     concurrency: 10,

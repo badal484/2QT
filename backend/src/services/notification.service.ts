@@ -87,7 +87,15 @@ export interface SendOptions {
     imageUrl?: string;
 }
 
+// Enqueues a notification job — HTTP handlers should call this so responses are not blocked.
+// The BullMQ worker picks up the job and calls deliverNotification() with 3 retries + backoff.
 export async function sendNotification(type: NotifType, options: SendOptions): Promise<void> {
+    const { notificationsQueue } = require('../jobs/queues');
+    await (notificationsQueue as any).add(type, { ...options, _queuedOptions: true });
+}
+
+// Actual delivery — called by the worker. Do NOT call from HTTP handlers (blocks response).
+export async function deliverNotification(type: NotifType, options: SendOptions): Promise<void> {
     const { userId, phone, vars = {}, dedupeKey, overrideChannels, imageUrl } = options;
 
     // 1. Resolve user
@@ -259,12 +267,13 @@ async function sendSMS(phone: string, message: string) {
     }
 }
 
-// ─── Legacy class wrapper — keeps old call sites working ─────────────────────
+// ─── Legacy class wrapper — keeps flat-data call sites (routes, workers) working ──
 
 export class NotificationService {
     static async send(type: NotifType, data: any) {
         const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl, screen, bookingId, ticketId, senderName, timestamp } = data;
-        await sendNotification(type, {
+        // Calls deliverNotification directly — no re-queueing (used by the worker itself)
+        await deliverNotification(type, {
             userId: userId || undefined,
             phone: phone || undefined,
             vars: {
