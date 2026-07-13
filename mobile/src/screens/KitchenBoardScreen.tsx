@@ -95,6 +95,12 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     onError: () => Alert.alert('Error', 'Could not update order status.'),
   });
 
+  const packMutation = useMutation({
+    mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/packed`, {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
+    onError: () => Alert.alert('Error', 'Could not mark order as packed.'),
+  });
+
   const { data: preTickets = [] } = useQuery({
     queryKey: ['board-dine-in-tickets', 'pre'],
     queryFn: () => api.get('/kitchen/dine-in/tickets?type=pre'),
@@ -285,32 +291,34 @@ const KitchenBoardScreen = ({ navigation }: any) => {
             )}
           </View>
 
-          {/* Cooking */}
+          {/* Cooking / Packing / Ready */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>IN KITCHEN</Text>
 
-            {[...cooking, ...ready].length === 0 ? (
+            {[...cooking, ...packing, ...ready].length === 0 ? (
               <View style={styles.emptyCard}>
                 <ChefHat size={22} color={G.muted} strokeWidth={1.5} />
                 <Text style={styles.emptyText}>Kitchen floor clear</Text>
               </View>
             ) : (
-              [...cooking, ...ready].map((order: any) => {
+              [...cooking, ...packing, ...ready].map((order: any) => {
                 const isReady = order.status === 'ready_for_pickup';
+                const isPacking = order.status === 'packing';
+                const pillColor = isReady ? G.green : isPacking ? '#F59E0B' : G.amber;
+                const pillBg = isReady ? G.greenBg : isPacking ? 'rgba(245,158,11,0.12)' : G.amberBg;
+                const pillBorder = isReady ? G.greenBorder : isPacking ? 'rgba(245,158,11,0.3)' : G.amberBorder;
+                const pillLabel = isReady ? 'READY FOR PICKUP' : isPacking ? 'AT PACKING' : 'COOKING';
+                const canMarkPacked = isPacking && (user?.role === 'kitchen_manager' || user?.role === 'super_admin');
+
                 return (
                   <View key={order.id} style={[styles.activeCard, isReady && styles.activeCardReady]}>
                     {/* Top row */}
                     <View style={styles.activeTop}>
                       <View>
                         <Text style={styles.activeId}>{order.display_id}</Text>
-                        <View style={[styles.statusPill, {
-                          backgroundColor: isReady ? G.greenBg : G.amberBg,
-                          borderColor: isReady ? G.greenBorder : G.amberBorder,
-                        }]}>
-                          <View style={[styles.statusDot, { backgroundColor: isReady ? G.green : G.amber }]} />
-                          <Text style={[styles.statusPillText, { color: isReady ? G.green : G.amber }]}>
-                            {isReady ? 'READY FOR PICKUP' : 'COOKING'}
-                          </Text>
+                        <View style={[styles.statusPill, { backgroundColor: pillBg, borderColor: pillBorder }]}>
+                          <View style={[styles.statusDot, { backgroundColor: pillColor }]} />
+                          <Text style={[styles.statusPillText, { color: pillColor }]}>{pillLabel}</Text>
                         </View>
                       </View>
                       <View style={styles.ageChipDark}>
@@ -344,13 +352,27 @@ const KitchenBoardScreen = ({ navigation }: any) => {
                       <View style={styles.waitingBar}>
                         <Text style={styles.waitingText}>WAITING FOR RIDER PICKUP</Text>
                       </View>
+                    ) : isPacking ? (
+                      canMarkPacked ? (
+                        <TouchableOpacity
+                          style={styles.readyBtn}
+                          onPress={() => packMutation.mutate(order.id)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.readyBtnText}>MARK PACKED</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.waitingBar}>
+                          <Text style={styles.waitingText}>PACKING IN PROGRESS</Text>
+                        </View>
+                      )
                     ) : (
                       <TouchableOpacity
                         style={styles.readyBtn}
-                        onPress={() => updateStatusMutation.mutate({ orderId: order.id, status: 'ready_for_pickup' })}
+                        onPress={() => updateStatusMutation.mutate({ orderId: order.id, status: 'packing' })}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.readyBtnText}>MARK READY</Text>
+                        <Text style={styles.readyBtnText}>SEND TO PACKING</Text>
                       </TouchableOpacity>
                     )}
                   </View>
