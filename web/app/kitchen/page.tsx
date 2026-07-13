@@ -367,6 +367,13 @@ export default function KitchenPage() {
       fetchOrders();
       new Audio("/notification.mp3").play().catch(() => {});
     });
+    socket.on("critical_alert", (data: any) => {
+      toast.error(`Critical Alert: ${data.type}`, {
+        description: data.message,
+        duration: Infinity,
+      });
+      try { playDispatchAlarm(); } catch {}
+    });
     socket.on("order_cancelled", ({ orderId }: { orderId: string }) => {
       setOrders(prev => prev.filter(o => o.id !== orderId));
     });
@@ -374,6 +381,7 @@ export default function KitchenPage() {
     socket.on("order_status_update", fetchOrders);
     return () => {
       socket.off("new_order");
+      socket.off("critical_alert");
       socket.off("order_cancelled");
       socket.off("order_updated", fetchOrders);
       socket.off("order_status_update", fetchOrders);

@@ -150,7 +150,7 @@ export const initCrons = () => {
     cron.schedule('*/5 * * * *', async () => {
         console.log('[CRON] Checking for orders with no rider...');
         const { rows: stuckOrders } = await query(`
-            SELECT id, display_id FROM orders 
+            SELECT id, display_id, kitchen_id FROM orders 
             WHERE status = 'ready_for_pickup'
             AND rider_id IS NULL
             AND created_at < NOW() - INTERVAL '10 minutes'
@@ -158,12 +158,15 @@ export const initCrons = () => {
 
         for (const order of stuckOrders) {
             console.log(`[ALERT] Order ${order.display_id} has no rider for 10+ mins!`);
-            emitToAdmin('critical_alert', {
+            const payload = {
                 type: 'NO_RIDER',
                 orderId: order.id,
                 displayId: order.display_id,
                 message: 'No rider assigned for 10+ minutes'
-            });
+            };
+            if (order.kitchen_id) {
+                emitToKitchen(order.kitchen_id, 'critical_alert', payload);
+            }
         }
     });
 

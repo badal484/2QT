@@ -46,9 +46,9 @@ const getGpsCoords = (): Promise<{ latitude: number; longitude: number } | null>
       () => Geolocation.getCurrentPosition(
         (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
         () => resolve(null),
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 300000 },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 },
       ),
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 30000 },
     );
   });
 
@@ -115,23 +115,25 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
     [dispatch],
   );
 
-  const runGpsZoneCheck = useCallback(async (isSilent: boolean) => {
+  const runGpsZoneCheck = useCallback(async (isSilent: boolean): Promise<boolean> => {
     try {
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) {
         if (!isSilent) dispatch(setNoLocation());
-        return;
+        return false;
       }
       const coords = await getGpsCoords();
       if (!coords) {
         if (!isSilent) dispatch(setNoLocation());
-        return;
+        return false;
       }
       dispatch(setGlobalLocation({ ...coords, addressText: 'Detecting...' }));
       const addressText = await reverseGeocode(coords.latitude, coords.longitude);
       await runServiceabilityCheck(coords, addressText);
+      return true;
     } catch {
       if (!isSilent) dispatch(setNetworkError());
+      return false;
     }
   }, [dispatch, runServiceabilityCheck]);
 
@@ -177,15 +179,13 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
             });
           }
         } else {
-          // Have saved addressId but no GPS coords — run GPS in background.
-          // Use isSilent=true so GPS failures don't override the 'checking' state
-          // with an error screen (user has a real address, error is confusing).
-          await runGpsZoneCheck(/* isSilent= */ true);
-
-          // If GPS failed silently, status stays 'checking' indefinitely.
-          // Resolve it to network_error so user sees a retry option.
-          // Check: if serviceabilityStatus is still 'checking' after GPS attempt, something failed.
-          // We dispatch network_error here as a safe fallback.
+          // Have saved addressId but no GPS coords — run GPS silently.
+          // isSilent=true so GPS denial doesn't override 'checking' with an error screen
+          // when the user has a real saved address.
+          const gpsOk = await runGpsZoneCheck(/* isSilent= */ true);
+          // If GPS failed entirely (denied, timed out, no signal), we'd be stuck on
+          // 'checking' forever. Surface a retry option instead.
+          if (!gpsOk) dispatch(setNetworkError());
         }
         await minimumSplashTime;
         setIsBooted(true);
@@ -226,7 +226,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
           });
         },
         () => {},
-        { enableHighAccuracy: true, distanceFilter: 50, maximumAge: 10000 }
+        { enableHighAccuracy: true, distanceFilter: 50, maximumAge: 10000, timeout: 30000 }
       );
     };
 

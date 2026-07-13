@@ -41,6 +41,7 @@ const DeliveredOrdersTab = dynamic(() => import("./DeliveredOrdersTab").then(m =
 const RiderDocumentsTab = dynamic(() => import("./RiderDocumentsTab").then(m => ({ default: m.RiderDocumentsTab })), { ssr: false });
 const RiderDetailDrawer = dynamic(() => import("./RiderDetailDrawer").then(m => ({ default: m.RiderDetailDrawer })), { ssr: false });
 const SOSAlertsTab = dynamic(() => import("./SOSAlertsTab").then(m => ({ default: m.SOSAlertsTab })), { ssr: false });
+const RatingsTab = dynamic(() => import("./RatingsTab").then(m => ({ default: m.RatingsTab })), { ssr: false });
 const MissionsTab = dynamic(() => import("./MissionsTab").then(m => ({ default: m.MissionsTab })), { ssr: false });
 const ZoneCapacityTab = dynamic(() => import("./ZoneCapacityTab").then(m => ({ default: m.ZoneCapacityTab })), { ssr: false });
 
@@ -1927,6 +1928,7 @@ const TABS = [
   { name: "Marketing",       icon: Camera,           component: MarketingTab },
   // Customers
   { name: "Customers",       icon: Users,            component: CustomersTab },
+  { name: "Ratings",         icon: Star,             component: RatingsTab },
   { name: "Support",         icon: LifeBuoy,         component: SupportTab },
   { name: "Complaints",      icon: AlertTriangle,    component: ComplaintsTab },
   // Platform

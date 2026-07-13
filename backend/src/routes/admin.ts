@@ -157,15 +157,32 @@ router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), asyn
 });
 
 router.get('/feedback', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const { rows: avg } = await query('SELECT AVG(rating) as average, COUNT(*) as total FROM order_feedback');
-    const { rows: recent } = await query(`
-        SELECT f.*, o.display_id as order_display_id, k.name as kitchen_name
-        FROM order_feedback f
-        JOIN orders o ON f.order_id = o.id
-        JOIN kitchens k ON o.kitchen_id = k.id
-        ORDER BY f.created_at DESC LIMIT 20
+    const { rows: avg } = await query(`
+        SELECT
+            AVG(rating)::numeric(3,1)          as avg_food,
+            AVG(delivery_rating)::numeric(3,1) as avg_delivery,
+            COUNT(*)                           as total
+        FROM order_feedback
     `);
-    res.json({ feedbacks: recent, averageRating: parseFloat(avg[0].average || '0').toFixed(1), totalCount: parseInt(avg[0].total) });
+    const { rows: recent } = await query(`
+        SELECT f.rating, f.delivery_rating, f.comment, f.created_at,
+               o.display_id as order_display_id,
+               k.name       as kitchen_name,
+               u.name       as customer_name,
+               u.phone      as customer_phone
+        FROM order_feedback f
+        JOIN orders  o ON f.order_id   = o.id
+        JOIN kitchens k ON o.kitchen_id = k.id
+        JOIN users   u ON f.customer_id = u.id
+        ORDER BY f.created_at DESC
+        LIMIT 100
+    `);
+    res.json({
+        feedbacks: recent,
+        averageRating:         parseFloat(avg[0].avg_food     || '0').toFixed(1),
+        averageDeliveryRating: parseFloat(avg[0].avg_delivery || '0').toFixed(1),
+        totalCount:            parseInt(avg[0].total),
+    });
 });
 
 router.get('/stats/growth', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
