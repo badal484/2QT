@@ -17,6 +17,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@bull-board/api": "^8.1.2",
+    "@bull-board/express": "^8.1.2",
     "@imagekit/nodejs": "^7.6.3",
     "@sentry/node": "^7.120.4",
     "@socket.io/redis-adapter": "^8.3.0",
