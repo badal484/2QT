@@ -85,7 +85,13 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   const claimMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/claim`, {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
-    onError: () => Alert.alert('Error', 'Could not accept this order. It may have been claimed already.'),
+    onError: (err: any) => {
+      const msg =
+        err?.message === 'Insufficient permissions'
+          ? 'Your account role cannot claim orders. Ask your kitchen manager.'
+          : 'Could not accept this order. It may have been claimed already.';
+      Alert.alert('Error', msg);
+    },
   });
 
   const updateStatusMutation = useMutation({

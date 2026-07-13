@@ -150,6 +150,7 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
              JOIN users u ON o.customer_id = u.id
              JOIN kitchens k ON o.kitchen_id = k.id
              WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
+               AND o.created_at > NOW() - INTERVAL '48 hours'
              ORDER BY o.created_at ASC`
         );
         rows = result.rows;
@@ -163,6 +164,7 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
              JOIN users u ON o.customer_id = u.id
              JOIN kitchens k ON o.kitchen_id = k.id
              WHERE o.kitchen_id = $1 AND o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
+               AND o.created_at > NOW() - INTERVAL '48 hours'
              ORDER BY o.created_at ASC`,
             [kitchenId]
         );
@@ -192,7 +194,7 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
     res.json({ orders: rows, kitchen_name: kitchenName });
 });
 
-router.post('/orders/:id/claim', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
+router.post('/orders/:id/claim', authenticate, requireRole('chef', 'kitchen_manager', 'partner_kitchen', 'super_admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const chefId = req.user!.userId;
 
