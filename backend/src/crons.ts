@@ -180,7 +180,7 @@ export const initCrons = () => {
                 JOIN rider_daily_earnings rde ON rde.rider_id = u.id
                 LEFT JOIN (
                     SELECT rider_id, SUM(net_amount_paise) AS settled_paise
-                    FROM weekly_payouts WHERE status IN ('paid', 'pending')
+                    FROM weekly_payouts WHERE status IN ('paid', 'pending', 'approved')
                     GROUP BY rider_id
                 ) settled ON settled.rider_id = u.id
                 WHERE u.role IN ('rider', 'rider_captain')
