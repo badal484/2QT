@@ -1142,7 +1142,7 @@ router.post('/submit-cash-to-finance', authenticate, requireRole('rider', 'rider
 router.get('/cash-in-hand', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
     try {
-        const [limitPaise, rawUpi, { rows }] = await Promise.all([
+        const [limitPaise, rawUpi, { rows }, { rows: pendingRows }] = await Promise.all([
             getAppSettingInt('cod_cash_limit_paise', 200_000),
             getAppSetting('company_upi_id', '"badal90603@okaxis"'),
             query(`
@@ -1154,6 +1154,12 @@ router.get('/cash-in-hand', authenticate, requireRole('rider', 'rider_captain', 
                   AND cod_cash_collected = FALSE
                 ORDER BY delivered_at DESC NULLS LAST
             `, [riderId]),
+            query(`
+                SELECT id, total_amount_paise, order_count, method, submitted_at
+                FROM cash_submissions
+                WHERE rider_id = $1 AND status = 'pending'
+                ORDER BY submitted_at DESC LIMIT 1
+            `, [riderId]),
         ]);
         const totalPaise = rows.reduce((s: number, o: any) => s + parseInt(o.total_amount_paise, 10), 0);
         // app_settings stores strings as JSON strings (e.g. '"value"') — strip surrounding quotes if present
@@ -1164,6 +1170,7 @@ router.get('/cash-in-hand', authenticate, requireRole('rider', 'rider_captain', 
             overLimit: totalPaise >= limitPaise,
             limitPaise,
             upiId,
+            pendingSubmission: pendingRows[0] || null,
         });
     } catch (err) {
         console.error('[rider/cash-in-hand]', err);
@@ -1186,6 +1193,23 @@ router.post('/submit-all-cash', authenticate, requireRole('rider', 'rider_captai
     // UTR is optional — finance verifies via their own UPI app
 
     try {
+        // Deduplication: reject if rider already has a pending submission awaiting finance
+        const { rows: existing } = await query(
+            `SELECT id, total_amount_paise, order_count, submitted_at FROM cash_submissions
+             WHERE rider_id = $1 AND status = 'pending'
+             ORDER BY submitted_at DESC LIMIT 1`,
+            [riderId]
+        );
+        if (existing.length) {
+            return res.status(409).json({
+                error: 'You already have a pending submission awaiting finance confirmation.',
+                submissionId: existing[0].id,
+                totalPaise: existing[0].total_amount_paise,
+                orderCount: existing[0].order_count,
+                submittedAt: existing[0].submitted_at,
+            });
+        }
+
         const placeholders = orderIds.map((_, i) => `$${i + 2}`).join(',');
         const { rows: orders } = await query(`
             SELECT id, total_amount_paise, display_id, cod_cash_collected
@@ -1258,6 +1282,18 @@ router.post('/submit-all-cash', authenticate, requireRole('rider', 'rider_captai
 router.post('/create-cash-order', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
     try {
+        // Deduplication: block if a pending submission already exists
+        const { rows: existingRows } = await query(
+            `SELECT id FROM cash_submissions WHERE rider_id = $1 AND status = 'pending' LIMIT 1`,
+            [riderId]
+        );
+        if (existingRows.length) {
+            return res.status(409).json({
+                error: 'You already have a pending submission awaiting finance confirmation.',
+                submissionId: existingRows[0].id,
+            });
+        }
+
         const { rows: orderRows } = await query(`
             SELECT id, total_amount_paise, display_id
             FROM orders
