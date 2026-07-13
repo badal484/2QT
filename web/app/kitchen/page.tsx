@@ -338,10 +338,6 @@ export default function KitchenPage() {
     }
   }, [user, authLoading, router]);
 
-  useEffect(() => {
-    const id = setInterval(() => {}, 60000);
-    return () => clearInterval(id);
-  }, []);
 
   const fetchOrders = useCallback(async () => {
     try {

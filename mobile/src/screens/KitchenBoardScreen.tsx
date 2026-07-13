@@ -79,7 +79,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   const { data: orders, isLoading } = useQuery({
     queryKey: ['kitchen-orders'],
     queryFn: () => api.get('/kitchen/orders'),
-    refetchInterval: 30000,
+    refetchInterval: 300000, // 5-min safety net; socket events drive real-time updates
   });
 
   const claimMutation = useMutation({
@@ -110,13 +110,13 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   const { data: preTickets = [] } = useQuery({
     queryKey: ['board-dine-in-tickets', 'pre'],
     queryFn: () => api.get('/kitchen/dine-in/tickets?type=pre'),
-    refetchInterval: 30000,
+    refetchInterval: 120000,
   });
 
   const { data: postTickets = [] } = useQuery({
     queryKey: ['board-dine-in-tickets', 'post'],
     queryFn: () => api.get('/kitchen/dine-in/tickets?type=post'),
-    refetchInterval: 30000,
+    refetchInterval: 120000,
   });
 
   const markDineInItemMutation = useMutation({

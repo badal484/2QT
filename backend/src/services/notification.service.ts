@@ -6,7 +6,7 @@ import { pushService } from './push.service'; // web-push VAPID for browser
 import { emitToUser } from '../socket';
 
 export type NotifType =
-    | 'order_confirmed' | 'order_preparing' | 'order_ready'
+    | 'order_confirmed' | 'order_preparing' | 'order_packing' | 'order_ready'
     | 'order_out_for_delivery' | 'order_delivered' | 'order_cancelled'
     | 'rider_payout' | 'kitchen_payout' | 'low_subscription_meals'
     | 'rider_verified' | 'cash_submitted' | 'broadcast_message' | 'chat_message'
@@ -22,6 +22,7 @@ const TEMPLATE_CACHE_TTL = 300; // 5 min
 const FALLBACK_TEMPLATES: Record<string, { title_template: string; body_template: string; channels: string[] }> = {
     order_confirmed:        { title_template: 'Order Confirmed! 🎉', body_template: 'Your order #{{displayId}} is confirmed — ~{{minutes}} mins.', channels: ['push', 'whatsapp'] },
     order_preparing:        { title_template: 'Chefs are cooking! 👨‍🍳', body_template: 'Your meal is being freshly prepared right now.', channels: ['push'] },
+    order_packing:          { title_template: 'Packing your order! 📦', body_template: 'Your food is cooked and being packed right now.', channels: ['push'] },
     order_ready:            { title_template: 'Order Ready! 🛵', body_template: 'Your order is packed and a rider is on the way.', channels: ['push', 'whatsapp'] },
     order_out_for_delivery: { title_template: '{{riderName}} is heading to you! 🛵', body_template: 'Your rider is on the way. OTP: {{otp}} — share only at door.', channels: ['push', 'whatsapp'] },
     order_delivered:        { title_template: 'Delivered! 🎉', body_template: 'Your order has been delivered. Rate your experience!', channels: ['push', 'whatsapp'] },

@@ -358,7 +358,7 @@ function OrdersTab() {
   };
 
   const forceStatus = async (id: string, currentStatus: string) => {
-    const statusSteps = ["confirmed", "preparing", "ready_for_pickup", "out_for_delivery", "delivered"];
+    const statusSteps = ["confirmed", "preparing", "packing", "ready_for_pickup", "out_for_delivery", "delivered"];
     const idx = statusSteps.indexOf(currentStatus);
     if (idx === -1 || idx === statusSteps.length - 1) return;
     const nextStatus = statusSteps[idx + 1];
@@ -372,10 +372,11 @@ function OrdersTab() {
   };
 
 
-  const statusSteps = ["confirmed", "preparing", "ready_for_pickup", "out_for_delivery", "delivered"];
+  const statusSteps = ["confirmed", "preparing", "packing", "ready_for_pickup", "out_for_delivery", "delivered"];
   const statusColor: Record<string, string> = {
     confirmed: "text-amber-500 bg-amber-500/10",
     preparing: "text-swish-green bg-swish-green/10",
+    packing: "text-orange-400 bg-orange-500/10",
     ready_for_pickup: "text-blue-400 bg-blue-500/10",
     out_for_delivery: "text-purple-400 bg-purple-500/10",
     delivered: "text-zinc-400 bg-white/[0.04] backdrop-blur-xl",
