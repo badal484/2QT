@@ -1594,7 +1594,7 @@ router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin')
 router.get('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { rows } = await query(
-        `SELECT id, name, phone, role, is_online FROM users WHERE kitchen_id = $1 AND role IN ('chef', 'packer', 'kitchen_manager') ORDER BY role, name`,
+        `SELECT id, name, phone, role, is_online FROM users WHERE kitchen_id = $1 AND role::text IN ('chef', 'packer', 'kitchen_manager') ORDER BY role, name`,
         [id]
     );
     res.json({ staff: rows });
