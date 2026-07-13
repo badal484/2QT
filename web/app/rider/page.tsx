@@ -13,12 +13,13 @@ import {
   Package, CheckCircle2, ChevronRight,
   LogOut, Bike, Phone, Wallet, Clock, TrendingUp,
   ArrowRight, Zap, MapPin, Navigation, Lock,
-  ChefHat, Home, Trophy, Banknote, Target, FileText,
+  ChefHat, Home, Trophy, Banknote, Target, FileText, Headset,
 } from "lucide-react";
-import CashSubmitTab from "../../components/rider/CashSubmitTab";
-import { DoorPaymentModal } from "../../components/rider/DoorPaymentModal";
-import { RiderMissionsTab } from "../../components/rider/RiderMissionsTab";
-import { RiderDocumentsModal } from "../../components/rider/RiderDocumentsModal";
+import CashSubmitTab from "../components/rider/CashSubmitTab";
+import { DoorPaymentModal } from "../components/rider/DoorPaymentModal";
+import { RiderMissionsTab } from "../components/rider/RiderMissionsTab";
+import { RiderDocumentsModal } from "../components/rider/RiderDocumentsModal";
+import { RiderSupportModal } from "../components/rider/RiderSupportModal";
 
 const RiderLiveMap = dynamic(() => import("../../components/RiderLiveMap"), {
   ssr: false,
@@ -132,6 +133,7 @@ export default function RiderPage() {
   const [activeTab,       setActiveTab]       = useState<"deliveries" | "earnings" | "history" | "cash" | "missions">("deliveries");
   const [doorPaymentFor,  setDoorPaymentFor]  = useState<Order | null>(null);
   const [showDocs,        setShowDocs]        = useState(false);
+  const [showSupport,     setShowSupport]     = useState(false);
   const [riderLoc,        setRiderLoc]        = useState<{ lat: number; lng: number } | null>(null);
   const [todayEarnings,   setTodayEarnings]   = useState<any>(null);
   const [riderStats,      setRiderStats]      = useState<any>(null);
@@ -490,6 +492,10 @@ export default function RiderPage() {
                 </button>
               );
             })()}
+            <button onClick={() => setShowSupport(true)}
+              className="w-10 h-10 rounded-2xl bg-zinc-900/80 backdrop-blur-xl border border-white/10 flex items-center justify-center text-blue-400 hover:text-blue-500 hover:bg-white/5 transition-colors">
+              <Headset className="w-4 h-4" />
+            </button>
             <button onClick={() => setShowDocs(true)}
               className="w-10 h-10 rounded-2xl bg-zinc-900/80 backdrop-blur-xl border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
               <FileText className="w-4 h-4" />
@@ -871,9 +877,12 @@ export default function RiderPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Documents Modal ────────────────────────────────────────────────────── */}
+      {/* ── Documents & Support Modals ───────────────────────────────────────── */}
       <AnimatePresence>
         {showDocs && <RiderDocumentsModal onClose={() => setShowDocs(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showSupport && <RiderSupportModal onClose={() => setShowSupport(false)} />}
       </AnimatePresence>
 
       {/* ── Bottom Tab Bar ───────────────────────────────────────────────────── */}
