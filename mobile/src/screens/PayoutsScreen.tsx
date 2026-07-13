@@ -88,9 +88,10 @@ const PayoutsScreen = ({ navigation }: any) => {
     );
   }
 
-  const pendingPaise = data?.pendingAmountPaise || 0;
-  const todayPaise   = data?.todayEarningsPaise || 0;
-  const todayOrders  = data?.todayDeliveries || 0;
+  const withdrawablePaise = data?.withdrawablePaise || 0;
+  const inFlightPaise     = data?.inFlightPaise || 0;
+  const todayPaise        = data?.todayEarningsPaise || 0;
+  const todayOrders       = data?.todayDeliveries || 0;
   const payoutMethod = data?.payoutMethod || 'upi';
 
   const storedUpi    = data?.storedUpiId as string | null;
@@ -168,10 +169,19 @@ const PayoutsScreen = ({ navigation }: any) => {
             </View>
           </View>
 
-          {/* Pending balance */}
+          {/* Balance card */}
           <View style={[styles.card, { paddingVertical: 24 }]}>
-            <Text style={styles.balLabel}>Total Pending Balance</Text>
-            <Text style={styles.balAmount}>₹{(pendingPaise / 100).toFixed(0)}</Text>
+            <Text style={styles.balLabel}>Available to Withdraw</Text>
+            <Text style={styles.balAmount}>₹{(withdrawablePaise / 100).toFixed(0)}</Text>
+
+            {inFlightPaise > 0 && (
+              <View style={[styles.inFlightBanner]}>
+                <AlertCircle size={13} color={R.amber} />
+                <Text style={styles.inFlightText}>
+                  ₹{(inFlightPaise / 100).toFixed(0)} processing — awaiting finance approval
+                </Text>
+              </View>
+            )}
 
             <View style={styles.scheduleRow}>
               {autoPayActive ? (
@@ -448,7 +458,13 @@ const styles = StyleSheet.create({
   },
   
   balLabel: { color: R.gray, fontSize: 13, fontWeight: '600' },
-  balAmount: { color: R.ink, fontSize: 44, fontWeight: '900', letterSpacing: -1.5, marginTop: 4, marginBottom: 20 },
+  balAmount: { color: R.ink, fontSize: 44, fontWeight: '900', letterSpacing: -1.5, marginTop: 4, marginBottom: 12 },
+  inFlightBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: R.amberLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7,
+    marginBottom: 16,
+  },
+  inFlightText: { color: R.amber, fontSize: 12, fontWeight: '600', flex: 1 },
   scheduleRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingTop: 16, borderTopWidth: 1, borderTopColor: R.border,

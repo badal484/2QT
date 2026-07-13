@@ -659,17 +659,17 @@ router.get('/payouts', authenticate, requireRole('rider', 'rider_captain', 'supe
             query('SELECT deliveries_count, total_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE', [riderId]),
         ]);
 
-        const availableAmountPaise = Math.max(0,
-            parseInt(earningsRes.rows[0].total) - parseInt(paidRes.rows[0].paid) - parseInt(pendingRes.rows[0].pending)
-        );
-        const pendingAmountPaise = availableAmountPaise; // kept for backward compat field name
+        const totalEarned = parseInt(earningsRes.rows[0].total);
+        const totalPaid = parseInt(paidRes.rows[0].paid);
+        const inFlightPaise = parseInt(pendingRes.rows[0].pending);
+        const withdrawablePaise = Math.max(0, totalEarned - totalPaid - inFlightPaise);
         const today = todayRes.rows[0] || { deliveries_count: 0, total_paise: 0 };
         const profile = profileRes.rows[0] || {};
 
         res.json({
             payouts: payoutsRes.rows,
-            pendingAmountPaise,
-            inFlightPaise: parseInt(pendingRes.rows[0].pending), // requested but not yet paid by finance
+            withdrawablePaise,    // what the rider can request right now
+            inFlightPaise,        // requested and awaiting finance approval
             storedUpiId: profile.upi_id || null,
             bankAccountNumber: profile.bank_account_number || null,
             bankIfsc: profile.bank_ifsc || null,

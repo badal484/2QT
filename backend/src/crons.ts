@@ -174,18 +174,18 @@ export const initCrons = () => {
                     u.bank_ifsc,
                     u.bank_account_name,
                     u.payout_method,
-                    COALESCE(SUM(rde.total_paise), 0)::int AS total_earned_paise,
-                    COALESCE(paid.paid_paise, 0)::int       AS paid_paise
+                    COALESCE(SUM(rde.total_paise), 0)::int        AS total_earned_paise,
+                    COALESCE(settled.settled_paise, 0)::int        AS settled_paise
                 FROM users u
                 JOIN rider_daily_earnings rde ON rde.rider_id = u.id
                 LEFT JOIN (
-                    SELECT rider_id, SUM(net_amount_paise) AS paid_paise
-                    FROM weekly_payouts WHERE status = 'paid'
+                    SELECT rider_id, SUM(net_amount_paise) AS settled_paise
+                    FROM weekly_payouts WHERE status IN ('paid', 'pending')
                     GROUP BY rider_id
-                ) paid ON paid.rider_id = u.id
+                ) settled ON settled.rider_id = u.id
                 WHERE u.role IN ('rider', 'rider_captain')
-                GROUP BY u.id, u.upi_id, u.bank_account_number, u.bank_ifsc, u.bank_account_name, u.payout_method, paid.paid_paise
-                HAVING COALESCE(SUM(rde.total_paise), 0) - COALESCE(paid.paid_paise, 0) >= 10000
+                GROUP BY u.id, u.upi_id, u.bank_account_number, u.bank_ifsc, u.bank_account_name, u.payout_method, settled.settled_paise
+                HAVING COALESCE(SUM(rde.total_paise), 0) - COALESCE(settled.settled_paise, 0) >= 10000
             `);
 
             if (riders.length === 0) {
@@ -204,7 +204,7 @@ export const initCrons = () => {
             const weekEnd = sunday.toISOString().slice(0, 10);
 
             for (const r of riders) {
-                const pending = r.total_earned_paise - r.paid_paise;
+                const pending = r.total_earned_paise - r.settled_paise;
                 const hasPayoutMethod = r.payout_method === 'bank'
                     ? !!(r.bank_account_number && r.bank_ifsc)
                     : !!r.upi_id;
