@@ -81,6 +81,46 @@ async function updateMissionProgress(riderId: string): Promise<void> {
     }
 }
 
+// GET /documents — returns rider's application record (flat, not nested)
+router.get('/documents', authenticate, async (req: AuthRequest, res) => {
+    const userId = req.user!.userId;
+    try {
+        const { rows } = await query(
+            'SELECT * FROM rider_applications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+            [userId]
+        );
+        res.json(rows[0] || null);
+    } catch (err) {
+        console.error('[documents GET]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// PATCH /documents — upsert rider application (create or update); resets to pending on re-submit
+router.patch('/documents', authenticate, async (req: AuthRequest, res) => {
+    const userId = req.user!.userId;
+    const { vehicleType, licenseNumber, idPhotoUrl } = req.body;
+    if (!vehicleType) return res.status(400).json({ error: 'MISSING_FIELDS', message: 'Vehicle type is required.' });
+    try {
+        const { rows } = await query(`
+            INSERT INTO rider_applications (user_id, vehicle_type, license_number, id_photo_url, status)
+            VALUES ($1, $2, $3, $4, 'pending')
+            ON CONFLICT (user_id) DO UPDATE SET
+                vehicle_type = EXCLUDED.vehicle_type,
+                license_number = EXCLUDED.license_number,
+                id_photo_url = COALESCE(EXCLUDED.id_photo_url, rider_applications.id_photo_url),
+                status = 'pending',
+                rejection_reason = NULL,
+                updated_at = NOW()
+            RETURNING *
+        `, [userId, vehicleType, licenseNumber || '', idPhotoUrl || null]);
+        res.json(rows[0]);
+    } catch (err) {
+        console.error('[documents PATCH]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
 router.post('/apply', authenticate, async (req: AuthRequest, res) => {
     const { vehicleType, licenseNumber, idPhotoUrl } = req.body;
     const userId = req.user!.userId;
