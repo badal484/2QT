@@ -346,7 +346,7 @@ router.get('/rider-payouts/all-riders', financeAccess, financeRole, async (req: 
           (SELECT SUM(net_amount_paise) FROM weekly_payouts WHERE rider_id = u.id AND status = 'paid'), 0
         ) AS total_paid_paise,
         COALESCE(
-          (SELECT SUM(net_amount_paise) FROM weekly_payouts WHERE rider_id = u.id AND status = 'pending'), 0
+          (SELECT SUM(net_amount_paise) FROM weekly_payouts WHERE rider_id = u.id AND status IN ('pending','approved')), 0
         ) AS pending_paise
       FROM users u
       LEFT JOIN rider_daily_earnings rde ON rde.rider_id = u.id
@@ -367,7 +367,7 @@ router.post('/rider-payouts/:id/approve', financeAccess, financeRole, async (req
   try {
     const { rows } = await query(`
       UPDATE weekly_payouts
-      SET status = 'approved', approved_by = $2, updated_at = NOW()
+      SET status = 'approved', approved_by = $2, approved_at = NOW(), updated_at = NOW()
       WHERE id = $1 AND status = 'pending'
       RETURNING id, rider_id, net_amount_paise
     `, [id, req.user!.userId]);
@@ -619,7 +619,7 @@ router.post('/kitchen-payouts/:id/approve', financeAccess, financeRole, async (r
   try {
     const { rows } = await query(`
       UPDATE kitchen_payouts
-      SET status = 'approved', approved_by = $2, updated_at = NOW()
+      SET status = 'approved', approved_by = $2, approved_at = NOW(), updated_at = NOW()
       WHERE id = $1 AND status = 'pending'
       RETURNING id, kitchen_id, net_payout_paise
     `, [id, req.user!.userId]);
@@ -635,7 +635,7 @@ router.post('/kitchen-payouts/:id/approve', financeAccess, financeRole, async (r
 // ─── Step 2: Pay kitchen payout (approved → paid, money moves) ───────────────
 router.post('/kitchen-payouts/:id/pay', financeAccess, financeRole, async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const { upiReference, bankReference, notes } = req.body as { upiReference?: string; bankReference?: string; notes?: string };
+  const { paymentReference, notes } = req.body as { paymentReference?: string; notes?: string };
   try {
     const { rows: kpRows } = await query(`
       SELECT kp.*, k.name AS kitchen_name, k.upi_id, k.contact_phone,
@@ -647,7 +647,7 @@ router.post('/kitchen-payouts/:id/pay', financeAccess, financeRole, async (req: 
     if (!kpRows.length) return res.status(404).json({ error: 'Payout not found or not approved yet' });
     const kp = kpRows[0];
 
-    let rzpPayoutId: string | null = upiReference || null;
+    let rzpPayoutId: string | null = paymentReference || null;
     let utrNumber: string | null = null;
     let autoMode = false;
     let autoSkipReason: string | null = null;
@@ -683,7 +683,7 @@ router.post('/kitchen-payouts/:id/pay', financeAccess, financeRole, async (req: 
           razorpay_payout_id = $2, utr_number = $3,
           payout_mode = $4, notes = $5, bank_reference = $6, updated_at = NOW()
       WHERE id = $1 RETURNING *
-    `, [id, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual', notes || null, bankReference || null]);
+    `, [id, rzpPayoutId, utrNumber, autoMode ? 'auto' : 'manual', notes || null, paymentReference || null]);
 
     emitToKitchen(kp.kitchen_id, 'kitchen_payout_updated', { payoutId: id, amountPaise: kp.net_payout_paise, status: 'paid' });
     emitToAll('kitchen_payout_updated', { action: 'paid', payoutId: id, kitchenId: kp.kitchen_id });

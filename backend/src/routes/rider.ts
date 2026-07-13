@@ -654,8 +654,8 @@ router.get('/payouts', authenticate, requireRole('rider', 'rider_captain', 'supe
             query(`SELECT * FROM weekly_payouts WHERE rider_id = $1 ORDER BY week_start DESC LIMIT 50`, [riderId]),
             query('SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]),
             query(`SELECT
-                COALESCE(SUM(net_amount_paise) FILTER (WHERE status = 'paid'),    0) AS paid,
-                COALESCE(SUM(net_amount_paise) FILTER (WHERE status = 'pending'), 0) AS in_flight
+                COALESCE(SUM(net_amount_paise) FILTER (WHERE status = 'paid'),                      0) AS paid,
+                COALESCE(SUM(net_amount_paise) FILTER (WHERE status IN ('pending', 'approved')),    0) AS in_flight
                FROM weekly_payouts WHERE rider_id = $1`, [riderId]),
             query('SELECT upi_id, bank_account_number, bank_ifsc, bank_account_name, payout_method, COALESCE(pending_deductions_paise,0) as deductions FROM users WHERE id = $1', [riderId]),
             query('SELECT deliveries_count, total_paise FROM rider_daily_earnings WHERE rider_id = $1 AND date = CURRENT_DATE', [riderId]),
@@ -985,7 +985,7 @@ router.post('/payouts/request', authenticate, requireRole('rider', 'rider_captai
             const { rows: earningsRes } = await client.query(
                 'SELECT COALESCE(SUM(total_paise), 0) as total FROM rider_daily_earnings WHERE rider_id = $1', [riderId]);
             const { rows: settledRes } = await client.query(
-                `SELECT COALESCE(SUM(net_amount_paise), 0) as settled FROM weekly_payouts WHERE rider_id = $1 AND status IN ('paid','pending')`, [riderId]);
+                `SELECT COALESCE(SUM(net_amount_paise), 0) as settled FROM weekly_payouts WHERE rider_id = $1 AND status IN ('paid','pending','approved')`, [riderId]);
             const { rows: deductRes } = await client.query(
                 'SELECT COALESCE(pending_deductions_paise, 0) as deductions FROM users WHERE id = $1', [riderId]);
 
