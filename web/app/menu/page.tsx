@@ -18,6 +18,7 @@ import PushNotifier from "../../components/PushNotifier";
 import { NotificationBell } from "../../components/NotificationBell";
 import { useHaptics } from "../../hooks/useHaptics";
 import { Toaster, toast } from "sonner";
+import { CustomizationModal } from "../components/CustomizationModal";
 
 const MapPicker = dynamic(() => import('../../components/MapPicker'), { 
   ssr: false, 
@@ -110,6 +111,7 @@ export default function MenuPage() {
   const [serviceable, setServiceable] = useState<boolean | null>(null);
   const [payMethod, setPayMethod] = useState<"online" | "cod">("online");
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [customizationItem, setCustomizationItem] = useState<MenuItem | null>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [useLoyalty, setUseLoyalty] = useState(false);
   const [promoCode, setPromoCode] = useState("");
@@ -311,7 +313,12 @@ export default function MenuPage() {
     const timer = setTimeout(() => {
       api.post("/payments/create-order", {
         addressId: deliveryAddress.id,
-        items: cartItems.map(i => ({ menuItemId: i.id, quantity: i.quantity })),
+        items: cartItems.map(i => ({ 
+          menuItemId: i.id, 
+          quantity: i.quantity,
+          customizations: (i as any).customizations,
+          instructions: (i as any).instructions 
+        })),
         promoCode: promoApplied || undefined,
         useWallet,
         useLoyalty,
@@ -348,6 +355,14 @@ export default function MenuPage() {
   );
 
   const qty = (id: string) => cartItems.find(i => i.id === id)?.quantity ?? 0;
+
+  const handleAddWithCheck = (item: MenuItem) => {
+    if ((item as any).customization_groups?.length > 0) {
+      setCustomizationItem(item);
+    } else {
+      addItem(item);
+    }
+  };
 
   const fetchAddress = async () => {
     if (!user) return;
@@ -433,7 +448,12 @@ export default function MenuPage() {
       const res = await api.post("/payments/create-order", {
           addressId: deliveryAddress.id,
           paymentMethod: method,
-          items: cartItems.map(i => ({ menuItemId: i.id, quantity: i.quantity })),
+          items: cartItems.map(i => ({ 
+            menuItemId: i.id, 
+            quantity: i.quantity,
+            customizations: (i as any).customizations,
+            instructions: (i as any).instructions
+          })),
           promoCode: promoApplied || undefined,
           useWallet,
           useLoyalty,
@@ -927,7 +947,7 @@ export default function MenuPage() {
                     <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-[90%] z-10" onClick={e => e.stopPropagation()}>
                       {qty(item.id) === 0 ? (
                         <button
-                          onClick={() => addItem(item)}
+                          onClick={() => handleAddWithCheck(item)}
                           className="w-full bg-white text-brand-primary border border-brand-primary/20 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-[0_8px_20px_-6px_rgba(255,107,53,0.3)] hover:bg-brand-primary hover:text-white hover:border-brand-primary transition-all active:scale-95"
                         >
                           ADD
@@ -938,7 +958,7 @@ export default function MenuPage() {
                             <Minus className="w-4 h-4" />
                           </button>
                           <span className="text-xs font-black">{qty(item.id)}</span>
-                          <button onClick={() => addItem(item)} className="w-8 h-8 flex items-center justify-center hover:bg-black/20 rounded-lg transition-colors">
+                          <button onClick={() => handleAddWithCheck(item)} className="w-8 h-8 flex items-center justify-center hover:bg-black/20 rounded-lg transition-colors">
                             <Plus className="w-4 h-4" />
                           </button>
                         </div>
@@ -991,8 +1011,8 @@ export default function MenuPage() {
                   <div key={item.id} className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-black/5 shadow-sm">
                     <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-black/5 shrink-0">
                       <Image 
-                        src={getDishImage(item.name, item.category, (item as any).photo_url)} 
-                        alt={item.name} 
+                        src={getDishImage(item.name!, item.category!, (item as any).photo_url)}
+                        alt={item.name!}
                         fill 
                         sizes="80px"
                         className="object-cover" 
@@ -1000,13 +1020,18 @@ export default function MenuPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                        <p className="text-base font-bold text-brand-dark truncate mb-1">{item.name}</p>
-                       <p className="text-sm font-bold text-brand-primary mb-3">₹{item.price_paise / 100}</p>
+                       {(item as any).customizations?.length > 0 && (
+                         <p className="text-xs text-brand-dark/60 font-medium mb-1 line-clamp-2">
+                           {(item as any).customizations.map((c: any) => c.option).join(', ')}
+                         </p>
+                       )}
+                       <p className="text-sm font-bold text-brand-primary mb-3">₹{(item.price_paise ?? 0) / 100}</p>
                        <div className="flex items-center gap-3">
-                          <button onClick={() => removeItem(item.id)} className="w-8 h-8 rounded-lg bg-black/5 flex items-center justify-center hover:text-red-500 transition-colors">
+                          <button onClick={() => removeItem(item.id!)} className="w-8 h-8 rounded-lg bg-black/5 flex items-center justify-center hover:text-red-500 transition-colors">
                              <Minus className="w-4 h-4" />
                           </button>
                           <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                          <button onClick={() => addItem(item)} className="w-8 h-8 rounded-lg bg-brand-primary/10 text-brand-primary flex items-center justify-center hover:bg-brand-primary hover:text-white transition-colors">
+                          <button onClick={() => handleAddWithCheck(item as any)} className="w-8 h-8 rounded-lg bg-brand-primary/10 text-brand-primary flex items-center justify-center hover:bg-brand-primary hover:text-white transition-colors">
                              <Plus className="w-4 h-4" />
                           </button>
                        </div>
@@ -1347,6 +1372,16 @@ export default function MenuPage() {
         )}
       </AnimatePresence>
 
+      <CustomizationModal 
+        isOpen={!!customizationItem} 
+        onClose={() => setCustomizationItem(null)} 
+        item={customizationItem}
+        onAddToCart={(customizations, instructions) => {
+          addItem({ ...customizationItem!, customizations, instructions } as any);
+          setIsCartOpen(true);
+        }}
+      />
+
       {/* Item Details Modal */}
       <AnimatePresence>
         {selectedItem && (
@@ -1398,7 +1433,15 @@ export default function MenuPage() {
                 <div className="pt-6 border-t border-black/5">
                   {qty(selectedItem.id) === 0 ? (
                     <button
-                      onClick={() => { addItem(selectedItem); setSelectedItem(null); setIsCartOpen(true); }}
+                      onClick={() => { 
+                        setSelectedItem(null);
+                        if ((selectedItem as any).customization_groups?.length > 0) {
+                          setCustomizationItem(selectedItem);
+                        } else {
+                          addItem(selectedItem);
+                          setIsCartOpen(true);
+                        }
+                      }}
                       className="w-full bg-brand-primary text-white py-4 rounded-2xl text-lg font-bold flex items-center justify-center gap-2 hover:bg-brand-primary-dark transition-all shadow-lg shadow-brand-primary/30"
                     >
                       <Plus className="w-5 h-5" /> Add to Order
@@ -1410,7 +1453,7 @@ export default function MenuPage() {
                           <Minus className="w-5 h-5" />
                         </button>
                         <span className="text-center font-bold text-xl">{qty(selectedItem.id)}</span>
-                        <button onClick={() => addItem(selectedItem)} className="w-12 h-12 rounded-xl bg-brand-primary shadow-sm flex items-center justify-center text-white hover:bg-brand-primary-dark transition-colors">
+                        <button onClick={() => handleAddWithCheck(selectedItem)} className="w-12 h-12 rounded-xl bg-brand-primary shadow-sm flex items-center justify-center text-white hover:bg-brand-primary-dark transition-colors">
                           <Plus className="w-5 h-5" />
                         </button>
                       </div>

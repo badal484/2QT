@@ -28,6 +28,7 @@ import {
   IndianRupee,
   ShoppingBag,
   ClipboardCheck,
+  Coffee,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -39,6 +40,7 @@ import dynamic from "next/dynamic";
 import { PackerTab } from "../components/kitchen/PackerTab";
 import { ShiftHandoverModal } from "../components/kitchen/ShiftHandoverModal";
 import { MorningPrepModal } from "../components/kitchen/MorningPrepModal";
+import { DineInTab } from "../components/kitchen/DineInTab";
 
 const DispatchMap = dynamic(() => import("../components/DispatchMap"), {
   ssr: false,
@@ -287,7 +289,7 @@ export default function KitchenPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [kitchenName, setKitchenName] = useState<string | null>(null);
-  const [view, setView] = useState<"kds" | "dispatch" | "manage" | "analytics" | "packer">("kds");
+  const [view, setView] = useState<"kds" | "dispatch" | "manage" | "analytics" | "packer" | "dine-in">("kds");
   const [showHandover, setShowHandover] = useState(false);
   const [showMorningPrep, setShowMorningPrep] = useState(false);
   const [mobileKdsCol, setMobileKdsCol] = useState<KdsColId>("confirmed");
@@ -671,6 +673,13 @@ export default function KitchenPage() {
             className={`px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black uppercase tracking-widest transition-all flex items-center gap-1.5 whitespace-nowrap ${view === "packer" ? "bg-emerald-500 text-black shadow-[0_0_16px_rgba(16,185,129,0.4)]" : "text-zinc-400 hover:text-white bg-white/5"}`}
           >
             <Package className="w-3.5 h-3.5" /> Packer
+          </button>
+
+          <button
+            onClick={() => setView("dine-in")}
+            className={`px-4 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-black uppercase tracking-widest transition-all flex items-center gap-1.5 whitespace-nowrap ${view === "dine-in" ? "bg-amber-500 text-black shadow-[0_0_16px_rgba(245,158,11,0.4)]" : "text-zinc-400 hover:text-white bg-white/5"}`}
+          >
+            <Coffee className="w-3.5 h-3.5" /> Dine-In POS
           </button>
 
           {["kitchen_manager", "super_admin"].includes(user?.role ?? "") && (
@@ -1421,6 +1430,13 @@ export default function KitchenPage() {
             updateStatus={updateStatus}
             updatingId={updatingId}
           />
+        )}
+
+        {/* ════════════════════════ DINE-IN VIEW ══════════════════════════════ */}
+        {view === "dine-in" && (
+          <div className="flex-1 p-4 sm:p-6 pb-24">
+            <DineInTab restaurantId={kitchenName || undefined} />
+          </div>
         )}
 
       </main>
