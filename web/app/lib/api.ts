@@ -178,6 +178,19 @@ class ApiClient {
     return data;
   }
 
+  async firebaseLogin(idToken: string, referralCode?: string, name?: string, appRole?: string) {
+    const data = await this.request('/auth/firebase-login', {
+      method: 'POST',
+      body: JSON.stringify({ idToken, referralCode, name, appRole }),
+    });
+    if (data?.accessToken) {
+      localStorage.setItem('2qt_token', data.accessToken);
+      localStorage.setItem('2qt_refresh_token', data.refreshToken);
+      localStorage.setItem('2qt_user', JSON.stringify(data.user));
+    }
+    return data;
+  }
+
   async logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('2qt_token');
