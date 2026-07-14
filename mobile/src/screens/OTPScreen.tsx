@@ -272,20 +272,17 @@ const styles = StyleSheet.create({
   resendLabel: {
     color: colors.inkMuted,
     fontFamily: fontFamily.medium,
+    fontSize: 14,
   },
   timerText: {
     color: colors.inkFaint,
-    fontFamily: fontFamily.extrabold,
-    textTransform: 'uppercase',
-    fontSize: 10,
-    letterSpacing: 1,
+    fontFamily: fontFamily.bold,
+    fontSize: 14,
   },
   resendBtnText: {
     color: colors.primary,
     fontFamily: fontFamily.extrabold,
-    textTransform: 'uppercase',
-    fontSize: 10,
-    letterSpacing: 1,
+    fontSize: 14,
   },
   changePhoneBtn: {
     marginTop: spacing.xxxl,
