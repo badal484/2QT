@@ -65,11 +65,6 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     queryFn: () => api.get('/kitchen/menu'),
   });
 
-  const pauseMutation = useMutation({
-    mutationFn: (paused: boolean) => api.patch('/kitchen/status', { paused, reason: 'Chef paused.' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] }),
-  });
-
   const toggleItemMutation = useMutation({
     mutationFn: ({ itemId, available }: { itemId: string; available: boolean }) =>
       api.patch(`/kitchen/menu/${itemId}/availability`, { available }),
@@ -176,18 +171,6 @@ const KitchenBoardScreen = ({ navigation }: any) => {
             ) : null}
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={[styles.pill, {
-                backgroundColor: paused ? G.greenBg : G.redBg,
-                borderColor: paused ? G.greenBorder : G.redBorder,
-              }]}
-              onPress={() => pauseMutation.mutate(!paused)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.pillText, { color: paused ? G.green : G.red }]}>
-                {paused ? 'RESUME' : 'PAUSE'}
-              </Text>
-            </TouchableOpacity>
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('ShiftHandover')}>
               <ClipboardCheck size={20} color={G.muted} />
             </TouchableOpacity>
