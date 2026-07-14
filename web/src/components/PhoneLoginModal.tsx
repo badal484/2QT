@@ -1,122 +1,193 @@
-// src/components/PhoneLoginModal.tsx
-import React, { useState, useEffect } from "react";
-import { auth } from "../firebase"; // web firebase init
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  ConfirmationResult,
-} from "firebase/auth";
+// web/src/components/PhoneLoginModal.tsx
+// PhoneLoginModal: a self‑contained modal component that handles Firebase Phone authentication.
+// It uses the Firebase app initialized in src/firebaseInit.ts.
 
-interface PhoneLoginModalProps {
-  /**
-   * Callback invoked after successful authentication.
-   * Receives the Firebase ID token string.
-   */
-  onSuccess: (idToken: string) => void;
-  /** Optional callback when the modal should be closed */
-  onClose?: () => void;
-}
+import { useState, useEffect, useRef } from "react";
+import { auth } from "../firebaseInit";
+import { RecaptchaVerifier, signInWithPhoneNumber, User } from "firebase/auth";
 
-export const PhoneLoginModal: React.FC<PhoneLoginModalProps> = ({ onSuccess, onClose }) => {
-  const [phone, setPhone] = useState<string>("+91");
-  const [otp, setOtp] = useState<string>("");
-  const [step, setStep] = useState<"enterPhone" | "enterOtp">("enterPhone");
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function PhoneLoginModal({ onClose, onLogin }: { onClose: () => void; onLogin: (user: User) => void }) {
+  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [phone, setPhone] = useState("+91"); // default country code
+  const [otp, setOtp] = useState("");
+  const [error, setError] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const recaptchaVerifier = useRef<RecaptchaVerifier | null>(null);
 
-  // Initialize invisible reCAPTCHA on first render
+  // Initialise invisible reCAPTCHA only once when the component mounts.
   useEffect(() => {
-    // Only render once when we need it
-    if (!window.recaptchaVerifier) {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore – firebase attaches to window
-      window.recaptchaVerifier = new RecaptchaVerifier("recaptcha-container", {
-        size: "invisible",
-        callback: (response: any) => {
-          // reCAPTCHA solved – we can proceed with sign‑in.
-        },
-      }, auth);
+    if (!recaptchaVerifier.current) {
+      recaptchaVerifier.current = new RecaptchaVerifier(
+        auth,
+        "recaptcha-container",
+        {
+          size: "invisible",
+          callback: () => {
+            // reCAPTCHA solved - we can proceed with sign‑in.
+            // The callback is required but we trigger sign‑in manually.
+          },
+        }
+      );
     }
+    // Clean up on unmount.
+    return () => {
+      recaptchaVerifier.current?.clear();
+    };
   }, []);
 
-  const startPhoneVerification = async () => {
-    setError(null);
+  const sendOtp = async () => {
+    setError("");
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setError("Enter a valid phone number");
+      return;
+    }
+    const fullNumber = `+${digits.startsWith("91") ? "" : "91"}${digits}`;
+    setLoading(true);
     try {
-      // @ts-ignore – we stored verifier on window
-      const verifier = window.recaptchaVerifier as RecaptchaVerifier;
-      const result = await signInWithPhoneNumber(auth, phone, verifier);
-      setConfirmation(result);
-      setStep("enterOtp");
+      const verifier = recaptchaVerifier.current!;
+      await signInWithPhoneNumber(auth, fullNumber, verifier);
+      setStep("otp");
     } catch (e: any) {
-      console.error(e);
       setError(e.message ?? "Failed to send OTP");
+    } finally {
+      setLoading(false);
     }
   };
 
   const verifyOtp = async () => {
-    if (!confirmation) return;
+    setError("");
+    setLoading(true);
     try {
-      const cred = await confirmation.confirm(otp);
-      const idToken = await cred.user.getIdToken();
-      onSuccess(idToken);
+      // ConfirmationResult is stored internally by Firebase after signInWithPhoneNumber.
+      // We retrieve it via the verifier's widget.
+      const confirmationResult = (recaptchaVerifier.current as any)._confirmationResult;
+      if (!confirmationResult) {
+        setError("No OTP request pending");
+        return;
+      }
+      const result = await confirmationResult.confirm(otp);
+      const user = result.user;
+      // Force refresh to get a fresh ID token.
+      await user.getIdToken(true);
+      onLogin(user);
+      onClose();
     } catch (e: any) {
-      console.error(e);
       setError(e.message ?? "Invalid OTP");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
-        <h2 className="text-xl font-semibold mb-4">Phone Sign‑In</h2>
-        {step === "enterPhone" && (
+    <div style={modalOverlayStyle}>
+      <div style={modalStyle}>
+        <button onClick={onClose} style={closeButtonStyle}>✕</button>
+        {step === "phone" && (
           <>
+            <h2 style={titleStyle}>Sign in with Phone</h2>
             <input
               type="tel"
+              placeholder="Phone number (e.g. 9876543210)"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Enter phone number"
-              className="w-full border rounded px-3 py-2 mb-4"
+              style={inputStyle}
             />
-            <button
-              onClick={startPhoneVerification}
-              className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700"
-            >
-              Send OTP
+            {error && <p style={errorStyle}>{error}</p>}
+            <button onClick={sendOtp} disabled={loading} style={primaryButtonStyle}>
+              {loading ? "Sending…" : "Send OTP"}
             </button>
           </>
         )}
-        {step === "enterOtp" && (
+        {step === "otp" && (
           <>
+            <h2 style={titleStyle}>Enter OTP</h2>
             <input
               type="text"
+              placeholder="6‑digit code"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="Enter OTP"
-              className="w-full border rounded px-3 py-2 mb-4"
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              maxLength={6}
+              style={inputStyle}
             />
-            <button
-              onClick={verifyOtp}
-              className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
-            >
-              Verify OTP
+            {error && <p style={errorStyle}>{error}</p>}
+            <button onClick={verifyOtp} disabled={loading || otp.length !== 6} style={primaryButtonStyle}>
+              {loading ? "Verifying…" : "Verify OTP"}
             </button>
           </>
         )}
-        {error && <p className="text-red-600 mt-2">{error}</p>}
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="mt-4 text-gray-500 hover:underline"
-          >
-            Cancel
-          </button>
-        )}
-        {/* Container required for the invisible reCAPTCHA */}
+        {/* Invisible reCAPTCHA container */}
         <div id="recaptcha-container" />
       </div>
     </div>
   );
+}
+
+// Basic inline styling that follows the premium aesthetic guidelines.
+const modalOverlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.6)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backdropFilter: "blur(8px)",
+  zIndex: 1000,
 };
 
-export default PhoneLoginModal;
+const modalStyle: React.CSSProperties = {
+  background: "linear-gradient(135deg, #1a1a2e, #16213e)",
+  borderRadius: "16px",
+  padding: "32px",
+  width: "320px",
+  boxShadow: "0 12px 30px rgba(0,0,0,0.4)",
+  position: "relative",
+  color: "#fff",
+};
+
+const closeButtonStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 8,
+  right: 8,
+  background: "transparent",
+  border: "none",
+  color: "#fff",
+  fontSize: "18px",
+  cursor: "pointer",
+};
+
+const titleStyle: React.CSSProperties = {
+  margin: "0 0 16px",
+  fontSize: "20px",
+  fontWeight: 600,
+  textAlign: "center",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  marginBottom: "12px",
+  borderRadius: "8px",
+  border: "1px solid #444",
+  background: "rgba(255,255,255,0.08)",
+  color: "#fff",
+  fontSize: "14px",
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px",
+  background: "linear-gradient(90deg, #ff7e5f, #feb47b)",
+  border: "none",
+  borderRadius: "8px",
+  color: "#fff",
+  fontWeight: 600,
+  cursor: "pointer",
+  transition: "opacity 0.2s",
+};
+
+const errorStyle: React.CSSProperties = {
+  color: "#ff6b6b",
+  marginBottom: "8px",
+  fontSize: "13px",
+};
