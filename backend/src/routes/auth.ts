@@ -244,7 +244,7 @@ router.post('/verify-otp', async (req, res) => {
     roleUpdate += zoneUpdateKeys;
 
     const { rows } = await query(
-        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete`,
+        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete, email, photo_url`,
         [normalizedPhone, name || '2QT User', insertRole, insertVerified]
     );
 
@@ -571,7 +571,7 @@ router.post('/firebase-login', async (req, res) => {
         roleUpdate += zoneUpdateKeys;
 
         const { rows } = await query(
-            `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true, is_verified = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete`,
+            `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true, is_verified = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete, email, photo_url`,
             [normalizedPhone, name || '2QT User', insertRole, insertVerified]
         );
 
