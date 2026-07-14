@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, CheckCircle2, AlertCircle, Wallet, X, ChevronRight, Banknote, Smartphone } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertCircle, Wallet, X, Banknote, Smartphone, TrendingUp } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -81,6 +81,8 @@ export function CODTab() {
   const [confirmRider, setConfirmRider] = useState<any>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [confirmedSubmissions, setConfirmedSubmissions] = useState<any[]>([]);
+  const [historyFilter, setHistoryFilter] = useState<"all" | "collections" | "submissions">("all");
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -111,8 +113,12 @@ export function CODTab() {
 
   const loadHistory = async () => {
     try {
-      const res = await api.get("/finance/cod/history?limit=30");
-      setHistory(res.collections || []);
+      const [collectionsRes, submissionsRes] = await Promise.all([
+        api.get("/finance/cod/history?limit=100"),
+        api.get("/finance/cash-submissions?status=confirmed"),
+      ]);
+      setHistory(collectionsRes.collections || []);
+      setConfirmedSubmissions(submissionsRes.submissions || []);
     } catch {
       toast.error("Failed to load history");
     }
@@ -325,28 +331,97 @@ export function CODTab() {
             </div>
           )}
         </>
-      ) : (
-        <div className="space-y-3">
-          <h3 className="text-sm font-bold text-white/60 uppercase tracking-wider">Collection History</h3>
-          {history.length === 0 ? (
-            <p className="text-white/30 text-sm py-8 text-center">No collections recorded yet.</p>
-          ) : history.map((c: any) => (
-            <div key={c.id} className="bg-[#0d0d1a] border border-white/[0.07] rounded-xl px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-white">{c.rider_name}</span>
-                  {c.order_display_id && <span className="text-xs text-white/30 font-mono">#{c.order_display_id}</span>}
+      ) : (() => {
+        const collectionTotal = history.reduce((s, c) => s + parseInt(c.amount_paise), 0);
+        const submissionTotal = confirmedSubmissions.reduce((s, c) => s + parseInt(c.total_amount_paise), 0);
+        const grandTotal = collectionTotal + submissionTotal;
+        const visibleCollections = historyFilter !== "submissions" ? history : [];
+        const visibleSubmissions = historyFilter !== "collections" ? confirmedSubmissions : [];
+        const allEntries = [
+          ...visibleCollections.map(c => ({ ...c, _type: "collection", _ts: new Date(c.created_at).getTime() })),
+          ...visibleSubmissions.map(s => ({ ...s, _type: "submission", _ts: new Date(s.confirmed_at || s.submitted_at).getTime() })),
+        ].sort((a, b) => b._ts - a._ts);
+
+        return (
+          <div className="space-y-4">
+            {/* Reconciliation summary */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Order Collections", value: collectionTotal, color: "text-emerald-400", count: history.length },
+                { label: "Bulk Submissions", value: submissionTotal, color: "text-blue-400", count: confirmedSubmissions.length },
+                { label: "Grand Total", value: grandTotal, color: "text-white", count: history.length + confirmedSubmissions.length },
+              ].map(s => (
+                <div key={s.label} className="bg-white/5 border border-white/[0.07] rounded-2xl p-4">
+                  <div className="text-xs text-white/40 font-semibold mb-1">{s.label}</div>
+                  <div className={`text-xl font-black ${s.color}`}>{fmt(s.value)}</div>
+                  <div className="text-xs text-white/30 mt-0.5">{s.count} entries</div>
                 </div>
-                <div className="text-xs text-white/30 mt-0.5">
-                  Collected by {c.collected_by_name} · {new Date(c.created_at).toLocaleString("en-IN")}
-                </div>
-                {c.notes && <div className="text-xs text-white/40 mt-0.5">{c.notes}</div>}
-              </div>
-              <span className="text-base font-black text-emerald-400">{fmt(c.amount_paise)}</span>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+
+            {/* Filter tabs */}
+            <div className="flex gap-2">
+              {(["all", "collections", "submissions"] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setHistoryFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors capitalize ${
+                    historyFilter === f ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+              <TrendingUp className="w-4 h-4 text-white/20 ml-auto self-center" />
+            </div>
+
+            {allEntries.length === 0 ? (
+              <p className="text-white/30 text-sm py-8 text-center">No records yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {allEntries.map((entry: any) => entry._type === "collection" ? (
+                  <div key={`c-${entry.id}`} className="bg-[#0d0d1a] border border-white/[0.07] rounded-xl px-4 py-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                      <Banknote className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">{entry.rider_name}</span>
+                        {entry.order_display_id && <span className="text-xs text-white/30 font-mono">#{entry.order_display_id}</span>}
+                        <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">COLLECT</span>
+                      </div>
+                      <div className="text-xs text-white/30 mt-0.5 truncate">
+                        by {entry.collected_by_name} · {new Date(entry.created_at).toLocaleString("en-IN")}
+                        {entry.notes && ` · ${entry.notes}`}
+                      </div>
+                    </div>
+                    <span className="text-base font-black text-emerald-400 shrink-0">{fmt(entry.amount_paise)}</span>
+                  </div>
+                ) : (
+                  <div key={`s-${entry.id}`} className="bg-[#0d0d1a] border border-white/[0.07] rounded-xl px-4 py-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                      {entry.method === "upi_transfer"
+                        ? <Smartphone className="w-4 h-4 text-blue-400" />
+                        : <Wallet className="w-4 h-4 text-blue-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">{entry.rider_name}</span>
+                        <span className="text-[10px] font-black bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">BULK</span>
+                        {entry.utr_number && <span className="text-xs text-white/30 font-mono">UTR {entry.utr_number}</span>}
+                      </div>
+                      <div className="text-xs text-white/30 mt-0.5 truncate">
+                        {entry.order_count} orders · {entry.method === "upi_transfer" ? "UPI" : "Cash"} · confirmed by {entry.confirmed_by_name} · {new Date(entry.confirmed_at || entry.submitted_at).toLocaleString("en-IN")}
+                      </div>
+                    </div>
+                    <span className="text-base font-black text-blue-400 shrink-0">{fmt(parseInt(entry.total_amount_paise))}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <AnimatePresence>
         {confirmRider && (
