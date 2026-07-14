@@ -20,6 +20,68 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
+/** Grid card that re-renders only when its own cart qty changes */
+const CategoryGridCard = React.memo(({ item, index, columnWidth, kitchenPaused, navigation, dispatch, triggerHaptic, onAdd }: any) => {
+  const cartQty = useSelector((state: RootState) => {
+    const ci = state.cart.items.find(i => i.menuItemId === item.id);
+    return ci?.quantity ?? 0;
+  });
+  const vegColor = item.is_egg ? '#EAB308' : (item.is_veg ? '#22C55E' : colors.danger);
+  const unavailable = !item.available || kitchenPaused;
+  const isEven = index % 2 === 0;
+  return (
+    <BouncingButton
+      style={[styles.gridCard, { width: columnWidth, marginLeft: isEven ? 0 : 16 }]}
+      activeOpacity={0.93}
+      onPress={() => { if (item.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item }); } }}
+    >
+      <View style={styles.gridCardImageContainer}>
+        {item.photo_url
+          ? <NetworkImage uri={item.photo_url} style={styles.gridCardImage} />
+          : <View style={[styles.gridCardImage, styles.cardImagePlaceholder]}><ChefHat size={32} color={colors.inkFaint} /></View>}
+        <View style={[styles.vegBadgeFloat, { borderColor: vegColor }]}>
+          <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
+        </View>
+        {item.is_bestseller && <View style={styles.bestsellerOverlay}><Text style={styles.bestsellerOverlayText}>★ Bestseller</Text></View>}
+        {!item.is_bestseller && item.is_new && <View style={styles.newOverlay}><Text style={styles.newOverlayText}>+ New</Text></View>}
+        {unavailable && <View style={styles.soldOutOverlay}><Text style={styles.soldOutText}>Sold Out</Text></View>}
+        {!unavailable && (
+          <View style={styles.gridAddBtnFloat}>
+            {cartQty > 0 ? (
+              <View style={styles.qtyControl}>
+                <BouncingButton onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty - 1 })); }} style={styles.qtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
+                  <Text style={styles.qtyBtnText}>−</Text>
+                </BouncingButton>
+                <Text style={styles.qtyValue}>{cartQty}</Text>
+                <BouncingButton onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty + 1 })); }} style={styles.qtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                  <Text style={styles.qtyBtnText}>+</Text>
+                </BouncingButton>
+              </View>
+            ) : (
+              <BouncingButton style={styles.addBtn} onPress={() => onAdd(item)} activeOpacity={0.85}>
+                <Text style={styles.addBtnText}>ADD</Text>
+                <View style={styles.customiseBadge}><Text style={styles.customiseText}>Customise</Text></View>
+              </BouncingButton>
+            )}
+          </View>
+        )}
+      </View>
+      <View style={styles.gridCardInfo}>
+        <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+        {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
+        <Text style={styles.cardPrice}>₹{item.price_paise / 100}</Text>
+        {item.tags?.length > 0 && (
+          <View style={styles.tagRow}>
+            {item.tags.slice(0, 2).map((tag: string) => (
+              <View key={tag} style={styles.tagChip}><Text style={styles.tagChipText}>{tag}</Text></View>
+            ))}
+          </View>
+        )}
+      </View>
+    </BouncingButton>
+  );
+});
+
 const CategoryScreen = ({ route, navigation }: any) => {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
   const COLUMN_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - 16) / 2;
@@ -98,110 +160,21 @@ const CategoryScreen = ({ route, navigation }: any) => {
     }));
   }, [dispatch, triggerHaptic]);
 
-  // Swish-style Vertical Grid Card
-  const renderItem = useCallback(({ item, index }: { item: any, index: number }) => {
-    const cartItem = cartItems.find((ci: any) => ci.menuItemId === item.id);
-    const vegColor = item.is_egg ? '#EAB308' : (item.is_veg ? '#22C55E' : colors.danger);
-    const unavailable = !item.available || menuData?.kitchenPaused;
+  const renderItem = useCallback(({ item, index }: { item: any, index: number }) => (
+    <CategoryGridCard
+      item={item}
+      index={index}
+      columnWidth={COLUMN_WIDTH}
+      kitchenPaused={!!menuData?.kitchenPaused}
+      navigation={navigation}
+      dispatch={dispatch}
+      triggerHaptic={triggerHaptic}
+      onAdd={handleAddToCart}
+    />
+  ), [COLUMN_WIDTH, menuData?.kitchenPaused, navigation, dispatch, triggerHaptic, handleAddToCart]);
 
-    // We only add margin to the left item in the pair to create the gap
-    const isEven = index % 2 === 0;
-
-    return (
-      <BouncingButton
-        style={[styles.gridCard, { width: COLUMN_WIDTH, marginLeft: isEven ? 0 : 16 }]}
-        activeOpacity={0.93}
-        onPress={() => {
-          if (item.available) {
-            triggerHaptic();
-            navigation.navigate('ItemDetail', { item });
-          }
-        }}
-      >
-        <View style={styles.gridCardImageContainer}>
-          {item.photo_url ? (
-            <NetworkImage uri={item.photo_url} style={styles.gridCardImage} />
-          ) : (
-            <View style={[styles.gridCardImage, styles.cardImagePlaceholder]}>
-              <ChefHat size={32} color={colors.inkFaint} />
-            </View>
-          )}
-
-          {/* Veg badge — top left */}
-          <View style={[styles.vegBadgeFloat, { borderColor: vegColor }]}>
-            <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
-          </View>
-
-          {/* Bestseller badge — top right */}
-          {item.is_bestseller && (
-            <View style={styles.bestsellerOverlay}>
-              <Text style={styles.bestsellerOverlayText}>★ Bestseller</Text>
-            </View>
-          )}
-          {!item.is_bestseller && item.is_new && (
-            <View style={styles.newOverlay}>
-              <Text style={styles.newOverlayText}>+ New</Text>
-            </View>
-          )}
-
-          {unavailable && (
-            <View style={styles.soldOutOverlay}>
-              <Text style={styles.soldOutText}>Sold Out</Text>
-            </View>
-          )}
-
-          {!unavailable && (
-            <View style={styles.gridAddBtnFloat}>
-              {cartItem ? (
-                <View style={styles.qtyControl}>
-                  <BouncingButton
-                    onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity - 1 })); }}
-                    style={styles.qtyBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
-                  >
-                    <Text style={styles.qtyBtnText}>−</Text>
-                  </BouncingButton>
-                  <Text style={styles.qtyValue}>{cartItem.quantity}</Text>
-                  <BouncingButton
-                    onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity + 1 })); }}
-                    style={styles.qtyBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                  >
-                    <Text style={styles.qtyBtnText}>+</Text>
-                  </BouncingButton>
-                </View>
-              ) : (
-                <BouncingButton style={styles.addBtn} onPress={() => handleAddToCart(item)} activeOpacity={0.85}>
-                  <Text style={styles.addBtnText}>ADD</Text>
-                  <View style={styles.customiseBadge}>
-                    <Text style={styles.customiseText}>Customise</Text>
-                  </View>
-                </BouncingButton>
-              )}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.gridCardInfo}>
-          <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-          {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
-          <Text style={styles.cardPrice}>₹{item.price_paise / 100}</Text>
-          {item.tags?.length > 0 && (
-            <View style={styles.tagRow}>
-              {item.tags.slice(0, 2).map((tag: string) => (
-                <View key={tag} style={styles.tagChip}>
-                  <Text style={styles.tagChipText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-      </BouncingButton>
-    );
-  }, [cartItems, menuData?.kitchenPaused, handleAddToCart, triggerHaptic, dispatch, navigation]);
-
-  const totalCartQty = cartItems.reduce((acc, i) => acc + i.quantity, 0);
-  const cartTotal = cartItems.reduce((acc, i) => acc + i.quantity * i.pricePaise, 0);
+  const totalCartQty = useMemo(() => cartItems.reduce((acc, i) => acc + i.quantity, 0), [cartItems]);
+  const cartTotal = useMemo(() => cartItems.reduce((acc, i) => acc + i.quantity * i.pricePaise, 0), [cartItems]);
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
