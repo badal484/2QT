@@ -369,6 +369,57 @@ export const initCrons = () => {
         }
     });
 
+    // Daily 00:30 UTC (6 AM IST) - Expire loyalty points and notify customers
+    // Balance queries already filter expires_at > NOW() so no balance update needed.
+    // This cron fires post-expiry notifications and creates sentinel 'expire' records
+    // (points=0) so we don't notify the same batch twice.
+    cron.schedule('30 0 * * *', async () => {
+        try {
+            const { rows: justExpired } = await query(`
+                SELECT
+                    lt.customer_id,
+                    SUM(lt.points) AS expired_points,
+                    lt.expires_at::date AS expiry_date
+                FROM loyalty_transactions lt
+                WHERE lt.type = 'earn'
+                  AND lt.expires_at <= NOW()
+                  AND lt.expires_at > NOW() - INTERVAL '25 hours'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM loyalty_transactions lt2
+                      WHERE lt2.customer_id = lt.customer_id
+                        AND lt2.type = 'expire'
+                        AND lt2.expires_at::date = lt.expires_at::date
+                  )
+                GROUP BY lt.customer_id, lt.expires_at::date
+            `);
+
+            for (const row of justExpired) {
+                // Sentinel record — prevents duplicate processing, balance unaffected (points=0)
+                await query(`
+                    INSERT INTO loyalty_transactions (customer_id, points, type, description, expires_at)
+                    VALUES ($1, 0, 'expire', $2, $3)
+                `, [
+                    row.customer_id,
+                    `${row.expired_points} loyalty points expired`,
+                    row.expiry_date,
+                ]);
+
+                await NotificationService.send('broadcast_message', {
+                    userId: row.customer_id,
+                    title: 'Loyalty points expired',
+                    body: `${row.expired_points} points expired. Earn more with your next order!`,
+                    screen: 'Loyalty',
+                }).catch(() => {});
+            }
+
+            if (justExpired.length) {
+                console.log(`[CRON] Loyalty expiry notifications sent: ${justExpired.length} customers`);
+            }
+        } catch (err) {
+            console.error('[CRON] Loyalty expiry cron failed:', err);
+        }
+    });
+
     // Every 15 mins - Auto mark no-show for confirmed bookings whose slot has ended
     cron.schedule('*/15 * * * *', async () => {
         try {
