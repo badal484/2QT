@@ -8,6 +8,15 @@ let serviceAccount: any = null;
 
 if (serviceAccountEnv) {
   try {
+    console.log('--- FIREBASE ADMIN DIAGNOSTICS (Raw Env Var):');
+    const maskedEnv = serviceAccountEnv.replace(/"private_key"\s*:\s*"([^"]+)"/g, (match, key) => {
+      if (key.length > 60) {
+        return `"private_key": "${key.slice(0, 30)}...[MASKED]...${key.slice(-30)}"`;
+      }
+      return match;
+    });
+    console.log(maskedEnv);
+
     serviceAccount = JSON.parse(serviceAccountEnv);
     if (serviceAccount && typeof serviceAccount.private_key === 'string') {
       console.log('--- FIREBASE ADMIN DIAGNOSTICS:');
