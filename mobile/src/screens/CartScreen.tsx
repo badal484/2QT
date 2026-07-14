@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { isKitchenOpen, formatTime12h } from '../utils/kitchenHours';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Image,
   ActivityIndicator, Alert, StyleSheet,
 } from 'react-native';
+import FastImage from 'react-native-fast-image';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor, FadeIn, FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -67,6 +68,68 @@ const toggleStyles = StyleSheet.create({
   },
 });
 
+const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) => {
+  const dispatch = useDispatch();
+  return (
+    <View>
+      <View style={styles.itemRow}>
+        <View style={styles.itemImgBox}>
+          {item.photoUrl ? (
+            <FastImage source={{ uri: item.photoUrl, priority: FastImage.priority.normal }} style={styles.itemImg} resizeMode={FastImage.resizeMode.cover} />
+          ) : (
+            <View style={[styles.itemImg, styles.itemImgPlaceholder]}>
+              <ChefHat size={22} color={colors.inkFaint} />
+            </View>
+          )}
+        </View>
+        <View style={styles.itemMeta}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+            <View style={[styles.vegBadgeMini, { borderColor: item.isVeg ? '#22C55E' : colors.danger }]}>
+              <View style={[styles.vegDotMini, { backgroundColor: item.isVeg ? '#22C55E' : colors.danger }]} />
+            </View>
+            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+          </View>
+          {item.customizations && item.customizations.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 6 }}>
+              {item.customizations.map((c: any, idx: number) => (
+                <View key={idx} style={{
+                  flexDirection: 'row', alignItems: 'center', flexShrink: 1,
+                  backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB',
+                  borderRadius: 8, padding: 4, paddingRight: 8,
+                }}>
+                  {!!c.photo_url && (
+                    <FastImage source={{ uri: c.photo_url, priority: FastImage.priority.low }} style={{ width: 18, height: 18, borderRadius: 4, marginRight: 6, backgroundColor: '#f1f1f1' }} resizeMode={FastImage.resizeMode.cover} />
+                  )}
+                  <Text style={{ fontSize: 10, fontFamily: fontFamily.medium, color: colors.inkMuted, flexShrink: 1 }} numberOfLines={1}>
+                    {c.group}: <Text style={{ fontFamily: fontFamily.bold, color: colors.ink }}>{c.option}</Text>
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
+        </View>
+        <View style={styles.qtyRow}>
+          <BouncingButton
+            style={styles.qtyBtn}
+            onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
+          >
+            <Text style={styles.qtyBtnText}>−</Text>
+          </BouncingButton>
+          <Text style={styles.qtyNum}>{item.quantity}</Text>
+          <BouncingButton
+            style={[styles.qtyBtn, styles.qtyBtnActive]}
+            onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
+          >
+            <Text style={[styles.qtyBtnText, styles.qtyBtnActiveText]}>+</Text>
+          </BouncingButton>
+        </View>
+      </View>
+      {!isLast && <View style={styles.cardDivider} />}
+    </View>
+  );
+});
+
 const CartScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
@@ -127,7 +190,7 @@ const CartScreen = ({ navigation }: any) => {
       .slice(0, 6);
   }, [menuData?.items, items]);
 
-  const fallbackSubtotal = items.reduce((s, i) => s + i.quantity * i.pricePaise, 0);
+  const fallbackSubtotal = useMemo(() => items.reduce((s, i) => s + i.quantity * i.pricePaise, 0), [items]);
   const { data: pricingData, isFetching: pricingFetching } = useQuery({
     queryKey: ['your-order-pricing', items, addressId, appliedPromoCode, effectiveZoneId],
     queryFn: () =>
@@ -183,7 +246,7 @@ const CartScreen = ({ navigation }: any) => {
   const kitchenOpen = isKitchenOpen(menuData?.openingTime, menuData?.closingTime);
   const kitchenPaused = !!menuData?.kitchenPaused;
   const openLabel = menuData?.openingTime ? formatTime12h(menuData.openingTime) : '10:00 AM';
-  const totalItemCount = items.reduce((s, i) => s + i.quantity, 0);
+  const totalItemCount = useMemo(() => items.reduce((s, i) => s + i.quantity, 0), [items]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -229,62 +292,7 @@ const CartScreen = ({ navigation }: any) => {
         {/* Cart Items Card */}
         <Animated.View entering={FadeInDown.delay(30).duration(300)} style={styles.card}>
           {items.map((item, index) => (
-            <View key={item.menuItemId}>
-              <View style={styles.itemRow}>
-                <View style={styles.itemImgBox}>
-                  {item.photoUrl ? (
-                    <Image source={{ uri: item.photoUrl }} style={styles.itemImg} />
-                  ) : (
-                    <View style={[styles.itemImg, styles.itemImgPlaceholder]}>
-                      <ChefHat size={22} color={colors.inkFaint} />
-                    </View>
-                  )}
-                </View>
-                <View style={styles.itemMeta}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                    <View style={[styles.vegBadgeMini, { borderColor: item.isVeg ? '#22C55E' : colors.danger }]}>
-                      <View style={[styles.vegDotMini, { backgroundColor: item.isVeg ? '#22C55E' : colors.danger }]} />
-                    </View>
-                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                  </View>
-                  {item.customizations && item.customizations.length > 0 && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 6 }}>
-                      {item.customizations.map((c, idx) => (
-                        <View key={idx} style={{ 
-                          flexDirection: 'row', alignItems: 'center', flexShrink: 1,
-                          backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', 
-                          borderRadius: 8, padding: 4, paddingRight: 8 
-                        }}>
-                          {!!c.photo_url && (
-                            <Image source={{ uri: c.photo_url }} style={{ width: 18, height: 18, borderRadius: 4, marginRight: 6, backgroundColor: '#f1f1f1' }} />
-                          )}
-                          <Text style={{ fontSize: 10, fontFamily: fontFamily.medium, color: colors.inkMuted, flexShrink: 1 }} numberOfLines={1}>
-                            {c.group}: <Text style={{ fontFamily: fontFamily.bold, color: colors.ink }}>{c.option}</Text>
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                  <Text style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
-                </View>
-                <View style={styles.qtyRow}>
-                  <BouncingButton
-                    style={styles.qtyBtn}
-                    onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
-                  >
-                    <Text style={styles.qtyBtnText}>−</Text>
-                  </BouncingButton>
-                  <Text style={styles.qtyNum}>{item.quantity}</Text>
-                  <BouncingButton
-                    style={[styles.qtyBtn, styles.qtyBtnActive]}
-                    onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
-                  >
-                    <Text style={[styles.qtyBtnText, styles.qtyBtnActiveText]}>+</Text>
-                  </BouncingButton>
-                </View>
-              </View>
-              {index < items.length - 1 && <View style={styles.cardDivider} />}
-            </View>
+            <CartItem key={item.menuItemId} item={item} isLast={index === items.length - 1} />
           ))}
         </Animated.View>
 
