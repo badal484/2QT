@@ -9,6 +9,9 @@ let serviceAccount: any = null;
 if (serviceAccountEnv) {
   try {
     serviceAccount = JSON.parse(serviceAccountEnv);
+    if (serviceAccount && typeof serviceAccount.private_key === 'string') {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
   } catch (err: any) {
     console.error('--- FIREBASE ADMIN: Failed to parse service account JSON string:', err.message);
   }
