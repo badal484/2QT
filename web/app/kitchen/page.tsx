@@ -361,9 +361,16 @@ export default function KitchenPage() {
     socket.connect();
     socket.on("new_order", () => {
       fetchOrders();
-      new Audio("/notification.mp3").play().catch(() => {});
+      // Play notification sound for new order
+      try {
+        new Audio("https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg").play();
+      } catch {}
     });
     socket.on("critical_alert", (data: any) => {
+      // Play alert sound (use a short beep or custom audio file)
+      try {
+        new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play();
+      } catch {}
       toast.error(`Critical Alert: ${data.type}`, {
         description: data.message,
         duration: Infinity,

@@ -11,6 +11,7 @@ import { logout } from '../store/slices/authSlice';
 import { RootState } from '../store';
 import { ChefHat, LogOut, ClipboardCheck, Zap, Clock } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
+import { Audio } from 'expo-av';
 
 const G = {
   bg: '#070707',
@@ -135,7 +136,13 @@ const KitchenBoardScreen = ({ navigation }: any) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
       Alert.alert('Rider Arrived', `${data.riderName || 'Rider'} is at the kitchen for order pickup.`);
     };
-    socket.on('new_order', onOrderUpdate);
+    socket.on('new_order', async () => {
+  try {
+    const { sound } = await Audio.Sound.createAsync({ uri: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg' });
+    await sound.playAsync();
+  } catch {}
+  onOrderUpdate();
+});
     socket.on('order_updated', onOrderUpdate);
     socket.on('table_order', onDineInUpdate);
     socket.on('table_booking_updated', onDineInUpdate);
