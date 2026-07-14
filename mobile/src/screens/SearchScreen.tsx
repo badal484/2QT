@@ -1,7 +1,7 @@
 import { ArrowLeft, ChefHat, Search, SearchX, Utensils, X } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TextInput, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import Animated, { FadeIn, BounceIn } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
 import { useQuery } from '@tanstack/react-query';
@@ -11,21 +11,84 @@ import { RootState } from '../store';
 import { addItem, setQuantity } from '../store/slices/cartSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/** Search result row — subscribes to its own cart quantity so only it re-renders on cart change */
+const SearchResultCard = React.memo(({ item, dispatch, navigation, saveSearch, query }: any) => {
+  const cartQty = useSelector((state: RootState) => {
+    const ci = state.cart.items.find(i => i.menuItemId === item.id);
+    return ci?.quantity ?? 0;
+  });
+  return (
+    <BouncingButton
+      activeOpacity={0.9}
+      onPress={() => { saveSearch(query); navigation.navigate('ItemDetail', { item }); }}
+      style={styles.itemCard}
+    >
+      <View style={styles.itemImageWrapper}>
+        {item.photo_url
+          ? <NetworkImage uri={item.photo_url} style={styles.itemImage} fallbackText={item.name[0]} />
+          : <View style={styles.itemPlaceholder}><ChefHat size={32} color="#FF6B35" /></View>}
+      </View>
+      <View style={styles.itemDetails}>
+        <View>
+          <View style={styles.itemNameRow}>
+            <View style={[styles.vegIndicator, { borderColor: item.is_veg ? '#22C55E' : '#EF4444' }]}>
+              <View style={[styles.vegDot, { backgroundColor: item.is_veg ? '#22C55E' : '#EF4444' }]} />
+            </View>
+            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+          </View>
+          <Text style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
+        </View>
+        <View style={styles.itemFooter}>
+          {cartQty > 0 ? (
+            <View style={styles.quantityControl}>
+              <BouncingButton onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty - 1 }))}>
+                <Text style={styles.quantityBtnText}>−</Text>
+              </BouncingButton>
+              <Text style={styles.quantityValueText}>{cartQty}</Text>
+              <BouncingButton onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty + 1 }))}>
+                <Text style={styles.quantityBtnText}>+</Text>
+              </BouncingButton>
+            </View>
+          ) : (
+            <BouncingButton
+              style={styles.addButton}
+              onPress={() => dispatch(addItem({ menuItemId: item.id, name: item.name, pricePaise: item.price_paise, quantity: 1, photoUrl: item.photo_url, isVeg: item.is_veg, kitchenId: item.kitchen_id }))}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </BouncingButton>
+          )}
+        </View>
+      </View>
+    </BouncingButton>
+  );
+});
+
 const SearchScreen = ({ navigation }: any) => {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [vegOnly, setVegOnly] = useState(false);
   const { zoneId } = useSelector((state: RootState) => state.cart);
   const { user } = useSelector((state: RootState) => state.auth);
-  const cartItems = useSelector((state: RootState) => state.cart.items);
   const dispatch = useDispatch();
 
+  // 300ms debounce — avoids firing API on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const effectiveZoneId = zoneId || user?.zoneId;
+
   const { data: searchResults, isLoading } = useQuery({
-    queryKey: ['search', query, zoneId || user?.zoneId],
-    queryFn: () => api.get(`/menu/search?q=${encodeURIComponent(query)}&zoneId=${zoneId || user?.zoneId}`),
-    enabled: query.length > 2 && !!(zoneId || user?.zoneId),
+    queryKey: ['search', debouncedQuery, effectiveZoneId],
+    queryFn: () => api.get(`/menu/search?q=${encodeURIComponent(debouncedQuery)}&zoneId=${effectiveZoneId}`),
+    enabled: debouncedQuery.length > 2 && !!effectiveZoneId,
   });
 
-  const filteredResults = searchResults?.results?.filter((item: any) => vegOnly ? item.is_veg : true) || [];
+  const filteredResults = useMemo(
+    () => searchResults?.results?.filter((item: any) => vegOnly ? item.is_veg : true) ?? [],
+    [searchResults?.results, vegOnly],
+  );
 
   const [recentSearches, setRecentSearches] = React.useState<string[]>([]);
 
@@ -93,7 +156,7 @@ const SearchScreen = ({ navigation }: any) => {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.scrollView}>
         {isLoading ? (
           <View style={styles.loadingWrapper}>
             <ActivityIndicator color="#FF6B35" />
@@ -135,74 +198,26 @@ const SearchScreen = ({ navigation }: any) => {
             <Text style={styles.emptySub}>We couldn't find anything matching "{query}". Try something else?</Text>
           </Animated.View>
         ) : (
-          <View style={styles.resultsContainer}>
-            {filteredResults.map((item: any) => {
-              const cartItem = cartItems.find(ci => ci.menuItemId === item.id);
-              return (
-                <BouncingButton 
-                  key={item.id}
-                  activeOpacity={0.9}
-                  onPress={() => {
-                    saveSearch(query);
-                    navigation.navigate('ItemDetail', { item });
-                  }}
-                  style={styles.itemCard}
-                >
-                  <View style={styles.itemImageWrapper}>
-                    {item.photo_url ? (
-                      <NetworkImage uri={item.photo_url} style={styles.itemImage} fallbackText={item.name[0]} />
-                    ) : (
-                      <View style={styles.itemPlaceholder}>
-                        <ChefHat size={32} color="#FF6B35" />
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.itemDetails}>
-                    <View>
-                      <View style={styles.itemNameRow}>
-                        <View style={[styles.vegIndicator, { borderColor: item.is_veg ? '#22C55E' : '#EF4444' }]}>
-                          <View style={[styles.vegDot, { backgroundColor: item.is_veg ? '#22C55E' : '#EF4444' }]} />
-                        </View>
-                        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                      </View>
-                      <Text style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
-                    </View>
-                    
-                    <View style={styles.itemFooter}>
-                      {cartItem ? (
-                        <View style={styles.quantityControl}>
-                          <BouncingButton onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity - 1 }))}>
-                            <Text style={styles.quantityBtnText}>−</Text>
-                          </BouncingButton>
-                          <Text style={styles.quantityValueText}>{cartItem.quantity}</Text>
-                          <BouncingButton onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartItem.quantity + 1 }))}>
-                            <Text style={styles.quantityBtnText}>+</Text>
-                          </BouncingButton>
-                        </View>
-                      ) : (
-                        <BouncingButton 
-                          style={styles.addButton}
-                          onPress={() => dispatch(addItem({ 
-                            menuItemId: item.id, 
-                            name: item.name, 
-                            pricePaise: item.price_paise, 
-                            quantity: 1,
-                            photoUrl: item.photo_url,
-                            isVeg: item.is_veg,
-                            kitchenId: item.kitchen_id
-                          }))}
-                        >
-                          <Text style={styles.addButtonText}>Add</Text>
-                        </BouncingButton>
-                      )}
-                    </View>
-                  </View>
-                </BouncingButton>
-              );
-            })}
-          </View>
+          <FlatList
+            data={filteredResults}
+            keyExtractor={(item: any) => item.id}
+            renderItem={({ item }) => (
+              <SearchResultCard
+                item={item}
+                dispatch={dispatch}
+                navigation={navigation}
+                saveSearch={saveSearch}
+                query={query}
+              />
+            )}
+            contentContainerStyle={styles.resultsContainer}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={10}
+            windowSize={5}
+            removeClippedSubviews={true}
+          />
         )}
-      </ScrollView>
+      </View>
     </View>
   );
 };

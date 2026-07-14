@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { query } from '../db';
+import { query, withTransaction } from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
-import { emitToUser, emitToAdmin, emitToSupport } from '../socket';
+import { emitToUser, emitToAdmin, emitToSupport, emitToKitchen } from '../socket';
 import { NotificationService } from '../services/notification.service';
+import { pushService } from '../services/push.service';
 
 const router = Router();
 const supportAccess = authenticate, supportRole = requireRole('support', 'super_admin');
@@ -490,6 +491,83 @@ router.get('/agents', supportAccess, supportRole, async (req: AuthRequest, res) 
         res.json({ agents: rows });
     } catch (err) {
         console.error('[support/agents]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// POST /support/orders/:id/handle-breakdown — Support manually records a breakdown and releases the order
+router.post('/orders/:id/handle-breakdown', supportAccess, supportRole, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const agentId = req.user!.userId;
+    const { lat, lng, note } = req.body as { lat?: number; lng?: number; note?: string };
+
+    try {
+        // Find the active order
+        const { rows: orderRows } = await query(
+            `SELECT rider_id, display_id, kitchen_id, customer_id, status FROM orders WHERE id = $1`,
+            [id]
+        );
+        const order = orderRows[0];
+        if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        
+        const originalRiderId = order.rider_id;
+        if (!originalRiderId) {
+            return res.status(400).json({ error: 'NO_RIDER_ASSIGNED', message: 'Order does not have an assigned rider.' });
+        }
+
+        await withTransaction(async (client) => {
+            // Update order status back to ready_for_pickup and clear rider
+            const updateRes = await client.query(
+                `UPDATE orders SET status = 'ready_for_pickup', rider_id = NULL WHERE id = $1`,
+                [id]
+            );
+            if (updateRes.rowCount === 0) {
+                throw new Error('ORDER_UPDATE_FAILED');
+            }
+
+            // Log event for acceptance rate / audit purposes
+            await client.query(
+                `INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, 'breakdown') ON CONFLICT DO NOTHING`,
+                [originalRiderId, id]
+            );
+
+            // Log the SOS alert as resolved directly since support is handling it
+            await client.query(
+                `INSERT INTO sos_alerts (rider_id, order_id, alert_type, lat, lng, status, resolved_at, resolved_by, resolution_note) 
+                 VALUES ($1, $2, 'vehicle_breakdown', $3, $4, 'resolved', NOW(), $5, $6)`,
+                [originalRiderId, id, lat || null, lng || null, agentId, note || 'Resolved by support breakdown handler']
+            );
+        });
+
+        // Notify admin ops panel / dispatcher
+        emitToAdmin('order_status_update', { 
+            orderId: id, 
+            display_id: order.display_id, 
+            status: 'ready_for_pickup', 
+            reason: 'breakdown',
+            note: note || 'Support reported breakdown'
+        });
+
+        // Notify customer of the delay
+        emitToUser(order.customer_id, 'order_status_update', {
+            orderId: id,
+            status: 'ready_for_pickup',
+            message: 'Your rider had a vehicle issue. We are assigning a new rider and will update you shortly.',
+            riderAssigned: false,
+        });
+
+        // Wake up kitchen dispatch panel — order reappears in unassigned list
+        emitToKitchen(order.kitchen_id, 'order_updated', { orderId: id, needsRider: true, reason: 'breakdown' });
+
+        // Push notification to customer
+        pushService.sendNotificationToUser(order.customer_id, {
+            title: 'Slight delay on your order',
+            body: `We're finding a new rider for ${order.display_id}. Sorry for the wait!`,
+        }).catch(() => {});
+
+        res.json({ success: true, message: 'Breakdown processed. Order released back to pool.' });
+    } catch (err) {
+        console.error('[support/orders/:id/handle-breakdown]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });

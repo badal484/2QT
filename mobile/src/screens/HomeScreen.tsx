@@ -29,6 +29,209 @@ const hapticOptions = {
   ignoreAndroidSystemSettings: false,
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Memoized sub-components — each subscribes only to the data it needs via
+// useSelector, so they re-render only when THEIR specific data changes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Cycles through item name placeholders in isolation — no HomeScreen re-render */
+const AnimatedSearchPlaceholder = React.memo(({ names }: { names: string[] }) => {
+  const [idx, setIdx] = React.useState(0);
+  React.useEffect(() => {
+    if (names.length < 2) return;
+    const id = setInterval(() => setIdx(i => (i + 1) % names.length), 2500);
+    return () => clearInterval(id);
+  }, [names.length]);
+  const textStyle = { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted } as const;
+  if (!names.length) return <Text style={textStyle}>Search for food...</Text>;
+  return (
+    <>
+      <Text style={textStyle}>Search{' '}</Text>
+      <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
+        <Animated.Text
+          key={idx}
+          entering={FadeInDown.duration(350)}
+          exiting={FadeOutUp.duration(350)}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={textStyle}
+        >
+          "{names[idx]}"
+        </Animated.Text>
+      </View>
+    </>
+  );
+});
+
+/** One card in the "Highlights" horizontal strip — re-renders only when its cart qty changes */
+const CatPreviewCard = React.memo(({ mi, kitchenPaused, navigation, dispatch, triggerHaptic, onAddToCartWithCheck }: any) => {
+  const cartQty = useSelector((state: RootState) => {
+    const ci = state.cart.items.find(i => i.menuItemId === mi.id);
+    return ci?.quantity ?? 0;
+  });
+  const vegColor = mi.is_egg ? '#EAB308' : (mi.is_veg ? '#22C55E' : colors.danger);
+  const unavailable = !mi.available || kitchenPaused;
+  return (
+    <TouchableOpacity
+      style={styles.catPreviewCard}
+      activeOpacity={0.92}
+      onPress={() => { triggerHaptic(); navigation.navigate('ItemDetail', { item: mi }); }}
+    >
+      <View style={styles.catPreviewImgBox}>
+        {mi.photo_url
+          ? <NetworkImage uri={mi.photo_url} style={styles.catPreviewImg} />
+          : <View style={[styles.catPreviewImg, styles.catPreviewImgPlaceholder]}><ChefHat size={30} color={colors.inkFaint} /></View>}
+        <View style={styles.catPreviewCatPill}>
+          <Text style={styles.catPreviewCatText} numberOfLines={1}>{mi.category}</Text>
+        </View>
+        {mi.is_bestseller && (
+          <View style={styles.catPreviewBestBadge}><Text style={styles.catPreviewBestText}>★ Bestseller</Text></View>
+        )}
+        {unavailable && (
+          <View style={styles.catPreviewSoldOut}><Text style={styles.catPreviewSoldOutText}>Sold Out</Text></View>
+        )}
+        {!unavailable && (
+          <View style={styles.catPreviewAddFloat}>
+            {cartQty > 0 ? (
+              <View style={styles.catPreviewQty}>
+                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartQty - 1 })); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} activeOpacity={0.7}>
+                  <Text style={styles.catPreviewQtyBtn}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.catPreviewQtyVal}>{cartQty}</Text>
+                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartQty + 1 })); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} activeOpacity={0.7}>
+                  <Text style={styles.catPreviewQtyBtn}>+</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.catPreviewAddBtn} onPress={() => onAddToCartWithCheck(mi)} activeOpacity={0.8}>
+                <Text style={styles.catPreviewAddText}>ADD</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+      <View style={styles.catPreviewInfo}>
+        <View style={styles.catPreviewNameRow}>
+          <View style={[styles.catPreviewVegBadge, { borderColor: vegColor }]}>
+            <View style={[styles.catPreviewVegDot, { backgroundColor: vegColor }]} />
+          </View>
+          <Text style={styles.catPreviewName} numberOfLines={2}>{mi.name}</Text>
+        </View>
+        {mi.applied_offer && (
+          <View style={styles.itemOfferTag}>
+            <Text style={styles.itemOfferTagText}>
+              {mi.applied_offer.discount_type === 'flat'
+                ? `₹${(mi.applied_offer.discount_flat_paise || 0) / 100} OFF`
+                : `${Math.round(parseFloat(mi.applied_offer.discount_percent || '0'))}% OFF`}
+            </Text>
+          </View>
+        )}
+        <View style={styles.catPreviewPriceRow}>
+          <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
+          {mi.original_price_paise > mi.price_paise && (
+            <Text style={styles.catPreviewStrikePrice}>₹{mi.original_price_paise / 100}</Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+/** Wrapper for the horizontal "Highlights" strip — stable props prevent re-renders on cart change */
+const CategoryPreviewSection = React.memo(({ items, kitchenPaused, navigation, dispatch, triggerHaptic, onAddToCartWithCheck }: any) => (
+  <View style={styles.catPreviewWrap}>
+    <View style={styles.catPreviewHeadingRow}>
+      <View style={styles.catPreviewHeadingAccent} />
+      <Text style={styles.catPreviewHeading}>Highlights</Text>
+    </View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catPreviewScroll}>
+      {items.map((mi: any) => (
+        <CatPreviewCard
+          key={mi.id}
+          mi={mi}
+          kitchenPaused={kitchenPaused}
+          navigation={navigation}
+          dispatch={dispatch}
+          triggerHaptic={triggerHaptic}
+          onAddToCartWithCheck={onAddToCartWithCheck}
+        />
+      ))}
+    </ScrollView>
+  </View>
+));
+
+/** Single menu item grid card — re-renders only when its own cart quantity changes */
+const MenuGridCard = React.memo(({ menuItem, kitchenPaused, navigation, dispatch, triggerHaptic, onAddToCartWithCheck }: any) => {
+  const cartQty = useSelector((state: RootState) => {
+    const ci = state.cart.items.find(i => i.menuItemId === menuItem.id);
+    return ci?.quantity ?? 0;
+  });
+  const vegColor = menuItem.is_egg ? '#EAB308' : (menuItem.is_veg ? '#22C55E' : colors.danger);
+  const unavailable = !menuItem.available || kitchenPaused;
+  return (
+    <TouchableOpacity style={styles.homeGridCard} activeOpacity={0.92}
+      onPress={() => { if (menuItem.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item: menuItem }); } }}>
+      <View style={styles.homeGridImageContainer}>
+        {menuItem.photo_url
+          ? <NetworkImage uri={menuItem.photo_url} style={styles.homeGridImage} />
+          : <View style={[styles.homeGridImage, styles.homeGridImagePlaceholder]}><ChefHat size={28} color={colors.inkFaint} /></View>}
+        <View style={[styles.homeGridVegBadge, { borderColor: vegColor }]}>
+          <View style={[styles.homeGridVegDot, { backgroundColor: vegColor }]} />
+        </View>
+        {menuItem.is_bestseller && <View style={styles.homeGridBestsellerBadge}><Text style={styles.homeGridBestsellerText}>★ Bestseller</Text></View>}
+        {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text style={styles.homeGridNewText}>+ New</Text></View>}
+        {unavailable && <View style={styles.homeGridSoldOut}><Text style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
+        {!unavailable && (
+          <View style={styles.homeGridAddFloat}>
+            {cartQty > 0 ? (
+              <View style={styles.homeGridQtyControl}>
+                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartQty - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} activeOpacity={0.7}>
+                  <Text style={styles.homeGridQtyBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.homeGridQtyValue}>{cartQty}</Text>
+                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartQty + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} activeOpacity={0.7}>
+                  <Text style={styles.homeGridQtyBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.homeGridAddBtn} onPress={() => onAddToCartWithCheck(menuItem)} activeOpacity={0.8}>
+                <Text style={styles.homeGridAddBtnText}>ADD</Text>
+                <View style={styles.homeGridCustomiseBadge}><Text style={styles.homeGridCustomiseText}>Customise</Text></View>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+      <View style={styles.homeGridInfo}>
+        <Text style={styles.homeGridName} numberOfLines={2}>{menuItem.name}</Text>
+        {menuItem.description ? <Text style={styles.homeGridDesc} numberOfLines={2}>{menuItem.description}</Text> : null}
+        {menuItem.applied_offer && (
+          <View style={styles.itemOfferBadge}>
+            <Text style={styles.itemOfferBadgeText}>
+              {menuItem.applied_offer.discount_type === 'flat'
+                ? `₹${(menuItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
+                : `${Math.round(parseFloat(menuItem.applied_offer.discount_percent || '0'))}% OFF`}
+            </Text>
+          </View>
+        )}
+        <View style={styles.homeGridPriceRow}>
+          <Text style={styles.homeGridPrice}>₹{menuItem.price_paise / 100}</Text>
+          {menuItem.original_price_paise > menuItem.price_paise && (
+            <Text style={styles.homeGridStrikePrice}>₹{menuItem.original_price_paise / 100}</Text>
+          )}
+        </View>
+        {menuItem.tags?.length > 0 && (
+          <View style={styles.homeGridTagRow}>
+            {menuItem.tags.slice(0, 2).map((tag: string) => (
+              <View key={tag} style={styles.homeGridTagChip}><Text style={styles.homeGridTagText}>{tag}</Text></View>
+            ))}
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 const HomeScreen = ({ navigation }: any) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const { user } = useSelector((state: RootState) => state.auth);
@@ -40,9 +243,12 @@ const HomeScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
+  // Stable ref so handleAddToCart doesn't need cartItems in its dep array
+  const cartItemsRef = useRef(cartItems);
+  cartItemsRef.current = cartItems;
+
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [phIndex, setPhIndex] = useState(0);
   const [closedSheetDismissed, setClosedSheetDismissed] = useState(false);
   const [activeCustomizationItem, setActiveCustomizationItem] = useState<any>(null);
   const [showActiveOrdersModal, setShowActiveOrdersModal] = useState(false);
@@ -276,14 +482,6 @@ const HomeScreen = ({ navigation }: any) => {
     return items.filter((i: any) => i.available).map((i: any) => i.name as string).slice(0, 12);
   }, [enrichedItems]);
 
-  useEffect(() => {
-    if (placeholderNames.length < 2) return;
-    const id = setInterval(() => {
-      setPhIndex(i => (i + 1) % placeholderNames.length);
-    }, 2500);
-    return () => clearInterval(id);
-  }, [placeholderNames.length]);
-
   // Debounce search — filter runs 300ms after user stops typing, not on every keystroke
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -352,7 +550,8 @@ const HomeScreen = ({ navigation }: any) => {
   );
 
   const handleAddToCart = useCallback((item: any, customizations: any[], customExtraPaise: number, instructions: string) => {
-    if (cartItems.length > 0 && cartItems[0].kitchenId !== item.kitchen_id) {
+    const currentCart = cartItemsRef.current;
+    if (currentCart.length > 0 && currentCart[0].kitchenId !== item.kitchen_id) {
       Alert.alert(
         'Different Kitchen',
         'Your cart contains items from another kitchen. Do you want to clear the cart and add this item?',
@@ -397,7 +596,7 @@ const HomeScreen = ({ navigation }: any) => {
         }),
       );
     }
-  }, [cartItems, dispatch, triggerHaptic]);
+  }, [dispatch, triggerHaptic]); // cartItems removed — read from cartItemsRef.current instead
 
   const handleAddToCartWithCheck = useCallback((item: any) => {
     if (item.customization_groups?.length > 0) {
@@ -473,123 +672,21 @@ const HomeScreen = ({ navigation }: any) => {
     return result;
   }, [sections]);
 
+  // renderItem is now stable — cart changes are handled inside memoized leaf components
   const renderItem = useCallback(({ item }: { item: any }) => {
     if (item.type === 'category-preview') {
       return (
-        <View style={styles.catPreviewWrap}>
-          {/* Heading */}
-          <View style={styles.catPreviewHeadingRow}>
-            <View style={styles.catPreviewHeadingAccent} />
-            <Text style={styles.catPreviewHeading}>Highlights</Text>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catPreviewScroll}>
-            {item.items.map((mi: any) => {
-              const ci = cartItems.find((c: any) => c.menuItemId === mi.id);
-              const vegColor = mi.is_egg ? '#EAB308' : (mi.is_veg ? '#22C55E' : colors.danger);
-              const unavailable = !mi.available || menuData?.kitchenPaused;
-              return (
-                <TouchableOpacity
-                  key={mi.id}
-                  style={styles.catPreviewCard}
-                  activeOpacity={0.92}
-                  onPress={() => { triggerHaptic(); navigation.navigate('ItemDetail', { item: mi }); }}
-                >
-                  {/* ── Image block ── */}
-                  <View style={styles.catPreviewImgBox}>
-                    {mi.photo_url
-                      ? <NetworkImage uri={mi.photo_url} style={styles.catPreviewImg} />
-                      : <View style={[styles.catPreviewImg, styles.catPreviewImgPlaceholder]}>
-                          <ChefHat size={30} color={colors.inkFaint} />
-                        </View>}
-
-                    {/* Category pill over image */}
-                    <View style={styles.catPreviewCatPill}>
-                      <Text style={styles.catPreviewCatText} numberOfLines={1}>{mi.category}</Text>
-                    </View>
-
-                    {/* Bestseller badge */}
-                    {mi.is_bestseller && (
-                      <View style={styles.catPreviewBestBadge}>
-                        <Text style={styles.catPreviewBestText}>★ Bestseller</Text>
-                      </View>
-                    )}
-
-                    {/* Sold out overlay */}
-                    {unavailable && (
-                      <View style={styles.catPreviewSoldOut}>
-                        <Text style={styles.catPreviewSoldOutText}>Sold Out</Text>
-                      </View>
-                    )}
-
-                    {/* ADD / qty — floats at bottom-right of image */}
-                    {!unavailable && (
-                      <View style={styles.catPreviewAddFloat}>
-                        {ci ? (
-                          <View style={styles.catPreviewQty}>
-                            <TouchableOpacity
-                              onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: ci.quantity - 1 })); }}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={styles.catPreviewQtyBtn}>−</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.catPreviewQtyVal}>{ci.quantity}</Text>
-                            <TouchableOpacity
-                              onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: ci.quantity + 1 })); }}
-                              hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={styles.catPreviewQtyBtn}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
-                          <TouchableOpacity style={styles.catPreviewAddBtn} onPress={() => handleAddToCartWithCheck(mi)} activeOpacity={0.8}>
-                            <Text style={styles.catPreviewAddText}>ADD</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
-                  </View>
-
-                  {/* ── Info block ── */}
-                  <View style={styles.catPreviewInfo}>
-                    <View style={styles.catPreviewNameRow}>
-                      <View style={[styles.catPreviewVegBadge, { borderColor: vegColor }]}>
-                        <View style={[styles.catPreviewVegDot, { backgroundColor: vegColor }]} />
-                      </View>
-                      <Text style={styles.catPreviewName} numberOfLines={2}>{mi.name}</Text>
-                    </View>
-                    {mi.applied_offer && (
-                      <View style={styles.itemOfferTag}>
-                        <Text style={styles.itemOfferTagText}>
-                          {mi.applied_offer.discount_type === 'flat'
-                            ? `₹${(mi.applied_offer.discount_flat_paise || 0) / 100} OFF`
-                            : `${Math.round(parseFloat(mi.applied_offer.discount_percent || '0'))}% OFF`}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
-                      {mi.original_price_paise > mi.price_paise && (
-                        <Text style={{ fontSize: 12, color: colors.inkFaint, textDecorationLine: 'line-through', marginLeft: 6 }}>
-                          ₹{mi.original_price_paise / 100}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+        <CategoryPreviewSection
+          items={item.items}
+          kitchenPaused={!!menuData?.kitchenPaused}
+          navigation={navigation}
+          dispatch={dispatch}
+          triggerHaptic={triggerHaptic}
+          onAddToCartWithCheck={handleAddToCartWithCheck}
+        />
       );
     }
-
-    if (item.type === 'explore-header') {
-      return <ExploreMenuBanner />;
-    }
-
+    if (item.type === 'explore-header') return <ExploreMenuBanner />;
     if (item.type === 'section-header') {
       return (
         <View style={styles.categorySectionHeader}>
@@ -598,87 +695,35 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
       );
     }
-
-    // Local helper — not a hook, just a closure over renderItem's deps
-    const renderCard = (menuItem: any) => {
-      const cartItem = cartItems.find((ci: any) => ci.menuItemId === menuItem.id);
-      const vegColor = menuItem.is_egg ? '#EAB308' : (menuItem.is_veg ? '#22C55E' : colors.danger);
-      const unavailable = !menuItem.available || menuData?.kitchenPaused;
-      return (
-        <TouchableOpacity key={menuItem.id} style={styles.homeGridCard} activeOpacity={0.92}
-          onPress={() => { if (menuItem.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item: menuItem }); } }}>
-          <View style={styles.homeGridImageContainer}>
-            {menuItem.photo_url
-              ? <NetworkImage uri={menuItem.photo_url} style={styles.homeGridImage} />
-              : <View style={[styles.homeGridImage, styles.homeGridImagePlaceholder]}><ChefHat size={28} color={colors.inkFaint} /></View>}
-            <View style={[styles.homeGridVegBadge, { borderColor: vegColor }]}>
-              <View style={[styles.homeGridVegDot, { backgroundColor: vegColor }]} />
-            </View>
-            {menuItem.is_bestseller && <View style={styles.homeGridBestsellerBadge}><Text style={styles.homeGridBestsellerText}>★ Bestseller</Text></View>}
-            {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text style={styles.homeGridNewText}>+ New</Text></View>}
-            {unavailable && <View style={styles.homeGridSoldOut}><Text style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
-            {!unavailable && (
-              <View style={styles.homeGridAddFloat}>
-                {cartItem ? (
-                  <View style={styles.homeGridQtyControl}>
-                    <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} activeOpacity={0.7}>
-                      <Text style={styles.homeGridQtyBtnText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.homeGridQtyValue}>{cartItem.quantity}</Text>
-                    <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartItem.quantity + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} activeOpacity={0.7}>
-                      <Text style={styles.homeGridQtyBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity style={styles.homeGridAddBtn} onPress={() => handleAddToCartWithCheck(menuItem)} activeOpacity={0.8}>
-                    <Text style={styles.homeGridAddBtnText}>ADD</Text>
-                    <View style={styles.homeGridCustomiseBadge}><Text style={styles.homeGridCustomiseText}>Customise</Text></View>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-          <View style={styles.homeGridInfo}>
-            <Text style={styles.homeGridName} numberOfLines={2}>{menuItem.name}</Text>
-            {menuItem.description ? <Text style={styles.homeGridDesc} numberOfLines={2}>{menuItem.description}</Text> : null}
-            {menuItem.applied_offer && (
-              <View style={styles.itemOfferBadge}>
-                <Text style={styles.itemOfferBadgeText}>
-                  {menuItem.applied_offer.discount_type === 'flat'
-                    ? `₹${(menuItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
-                    : `${Math.round(parseFloat(menuItem.applied_offer.discount_percent || '0'))}% OFF`}
-                </Text>
-              </View>
-            )}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              <Text style={styles.homeGridPrice}>₹{menuItem.price_paise / 100}</Text>
-              {menuItem.original_price_paise > menuItem.price_paise && (
-                <Text style={{ fontSize: 13, color: colors.inkFaint, textDecorationLine: 'line-through', marginLeft: 6 }}>
-                  ₹{menuItem.original_price_paise / 100}
-                </Text>
-              )}
-            </View>
-            {menuItem.tags?.length > 0 && (
-              <View style={styles.homeGridTagRow}>
-                {menuItem.tags.slice(0, 2).map((tag: string) => (
-                  <View key={tag} style={styles.homeGridTagChip}><Text style={styles.homeGridTagText}>{tag}</Text></View>
-                ))}
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      );
-    };
-
     return (
       <View style={styles.homeGridRow}>
-        {renderCard(item.left)}
-        {item.right ? renderCard(item.right) : <View style={styles.homeGridCard} />}
+        <MenuGridCard
+          menuItem={item.left}
+          kitchenPaused={!!menuData?.kitchenPaused}
+          navigation={navigation}
+          dispatch={dispatch}
+          triggerHaptic={triggerHaptic}
+          onAddToCartWithCheck={handleAddToCartWithCheck}
+        />
+        {item.right
+          ? <MenuGridCard
+              menuItem={item.right}
+              kitchenPaused={!!menuData?.kitchenPaused}
+              navigation={navigation}
+              dispatch={dispatch}
+              triggerHaptic={triggerHaptic}
+              onAddToCartWithCheck={handleAddToCartWithCheck}
+            />
+          : <View style={styles.homeGridCard} />
+        }
       </View>
     );
-  }, [cartItems, menuData?.kitchenPaused, handleAddToCart, triggerHaptic, dispatch, navigation]);
+  }, [menuData?.kitchenPaused, handleAddToCartWithCheck, triggerHaptic, dispatch, navigation]);
 
-  const totalCartQty = cartItems.reduce((acc, i) => acc + i.quantity, 0);
+  const totalCartQty = useMemo(
+    () => cartItems.reduce((acc, i) => acc + i.quantity, 0),
+    [cartItems],
+  );
 
   const pillBottomAnim = useSharedValue(Math.max(insets.bottom, 16) + 16);
   React.useEffect(() => {
@@ -817,53 +862,11 @@ const HomeScreen = ({ navigation }: any) => {
                   onChangeText={setSearchQuery}
                 />
                 {searchQuery === '' && (
-                  <View 
+                  <View
                     pointerEvents="none"
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      height: '100%',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      zIndex: 1
-                    }}
+                    style={{ position: 'absolute', left: 0, right: 0, height: '100%', flexDirection: 'row', alignItems: 'center', zIndex: 1 }}
                   >
-                    {placeholderNames.length > 0 ? (
-                      <>
-                        <Text style={{
-                          fontSize: 13,
-                          fontFamily: fontFamily.medium,
-                          color: colors.inkMuted,
-                        }}>
-                          Search{" "}
-                        </Text>
-                        <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
-                          <Animated.Text
-                            key={phIndex}
-                            entering={FadeInDown.duration(350)}
-                            exiting={FadeOutUp.duration(350)}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                            style={{
-                              fontSize: 13,
-                              fontFamily: fontFamily.medium,
-                              color: colors.inkMuted,
-                            }}
-                          >
-                            "{placeholderNames[phIndex]}"
-                          </Animated.Text>
-                        </View>
-                      </>
-                    ) : (
-                      <Text style={{
-                        fontSize: 13,
-                        fontFamily: fontFamily.medium,
-                        color: colors.inkMuted,
-                      }}>
-                        Search for food...
-                      </Text>
-                    )}
+                    <AnimatedSearchPlaceholder names={placeholderNames} />
                   </View>
                 )}
               </View>
@@ -2487,6 +2490,10 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginTop: 2,
   },
+  catPreviewPriceRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  catPreviewStrikePrice: { fontSize: 12, color: colors.inkFaint, textDecorationLine: 'line-through', marginLeft: 6 },
+  homeGridPriceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  homeGridStrikePrice: { fontSize: 13, color: colors.inkFaint, textDecorationLine: 'line-through', marginLeft: 6 },
   // ────────────────────────────────────────────────────────────────
   categoryStripUnderline: {
     position: 'absolute',

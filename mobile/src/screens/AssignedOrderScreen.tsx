@@ -11,7 +11,7 @@ import {
   ArrowLeft, Phone, Navigation, Package,
   CreditCard, ChevronRight, Info,
   UserX, X, MapPin, Check,
-  ShieldAlert, RefreshCw, DoorOpen, RotateCcw, Wrench,
+  ShieldAlert, RefreshCw, DoorOpen, RotateCcw, Wrench, MessageCircle,
 } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
 
@@ -107,28 +107,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     },
   });
 
-  const breakdownMutation = useMutation({
-    mutationFn: async () => {
-      let { lat, lng } = currentLocationRef.current;
-      try {
-        const pos = await new Promise<any>((resolve, reject) =>
-          Geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 4000, maximumAge: 5000 })
-        );
-        lat = pos.coords.latitude;
-        lng = pos.coords.longitude;
-        currentLocationRef.current = { lat, lng };
-      } catch {}
-      return api.post(`/riders/orders/${order.id}/report-breakdown`, { lat: lat || null, lng: lng || null });
-    },
-    onSuccess: () => {
-      setShowBreakdownModal(false);
-      Alert.alert('Breakdown Reported', 'The dispatcher has been notified and will assign a new rider. You can go offline now.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
-    },
-    onError: () => Alert.alert('Error', 'Could not report breakdown. Please call support.'),
-  });
+
 
   const unreachableMutation = useMutation({
     mutationFn: (action: 'retry' | 'leave_at_door' | 'return') =>
@@ -447,24 +426,39 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
             <View style={s.sheetHeader}>
               <View style={s.sosTitleRow}>
                 <Wrench size={20} color={R.red} />
-                <Text style={[s.sheetTitle, { color: R.red }]}>Bike Breakdown</Text>
+                <Text style={[s.sheetTitle, { color: R.red }]}>Vehicle Breakdown</Text>
               </View>
               <TouchableOpacity onPress={() => setShowBreakdownModal(false)}>
                 <X size={22} color={R.muted} />
               </TouchableOpacity>
             </View>
             <Text style={s.sheetSub}>
-              This will release the order back to the dispatcher so a new rider can be assigned. Your location will be shared with ops.
+              For safety and security, in-flight order breakdowns must be reported to the Support Team. An agent will verify the status and reassign the order to a new rider.
             </Text>
+            
             <TouchableOpacity
-              style={[s.submitBtn, breakdownMutation.isPending && { opacity: 0.6 }]}
-              onPress={() => breakdownMutation.mutate()}
-              disabled={breakdownMutation.isPending}
+              style={s.callSupportBtn}
+              onPress={() => {
+                Linking.openURL('tel:919999999999');
+                setShowBreakdownModal(false);
+              }}
               activeOpacity={0.85}
             >
-              {breakdownMutation.isPending
-                ? <ActivityIndicator color={R.white} />
-                : <Text style={s.submitBtnText}>Confirm — Report Breakdown</Text>}
+              <Phone size={18} color={R.white} />
+              <Text style={s.callSupportBtnText}>Call Support Now</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.whatsappSupportBtn}
+              onPress={() => {
+                const msg = encodeURIComponent(`Hi, my bike broke down during delivery of Order #${order.display_id}. Please help reassign it.`);
+                Linking.openURL(`https://wa.me/919999999999?text=${msg}`);
+                setShowBreakdownModal(false);
+              }}
+              activeOpacity={0.85}
+            >
+              <MessageCircle size={18} color={R.white} />
+              <Text style={s.whatsappSupportBtnText}>Chat on WhatsApp</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -678,6 +672,36 @@ const s = StyleSheet.create({
     alignItems: 'center', marginTop: 4,
   },
   submitBtnText: { color: R.white, fontSize: 15, fontWeight: '800' },
+  callSupportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: R.green,
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  callSupportBtnText: {
+    color: R.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  whatsappSupportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#25D366',
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginTop: 12,
+  },
+  whatsappSupportBtnText: {
+    color: R.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
 
   // Footer
   footer: {
