@@ -18,7 +18,7 @@ import {
   BarChart2,
   Sparkles,
 } from 'lucide-react-native';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Image, StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -36,7 +36,7 @@ const hapticOptions = {
   ignoreAndroidSystemSettings: false,
 };
 
-const MinimalListItem = ({ icon, title, value, onPress, subtitle, color = "#1A1A2E", isDestructive = false }: any) => (
+const MinimalListItem = React.memo(({ icon, title, value, onPress, subtitle, color = "#1A1A2E", isDestructive = false }: any) => (
   <BouncingButton 
     activeOpacity={0.7}
     style={styles.minimalListItem}
@@ -61,7 +61,7 @@ const MinimalListItem = ({ icon, title, value, onPress, subtitle, color = "#1A1A
       <ChevronRight size={16} color="#E5E7EB" />
     </View>
   </BouncingButton>
-);
+));
 
 const ProfileScreen = ({ navigation }: any) => {
   const { user } = useSelector((state: RootState) => state.auth);
@@ -91,12 +91,12 @@ const ProfileScreen = ({ navigation }: any) => {
     enabled: isRider
   });
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     ReactNativeHapticFeedback.trigger("impactHeavy", hapticOptions);
     Alert.alert('Logout', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Sign Out', 
+      {
+        text: 'Sign Out',
         style: 'destructive',
         onPress: () => {
           dispatch(logout());
@@ -104,7 +104,7 @@ const ProfileScreen = ({ navigation }: any) => {
         }
       }
     ]);
-  };
+  }, [dispatch]);
 
   return (
     <View style={styles.container}>

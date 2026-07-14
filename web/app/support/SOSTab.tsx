@@ -94,6 +94,29 @@ function ResolveModal({ alert, onClose, onResolved }: {
 
 export default function SOSTab() {
   const [resolvingAlert, setResolvingAlert] = useState<SOSAlert | null>(null);
+  const [breakdownLoadingId, setBreakdownLoadingId] = useState<string | null>(null);
+
+  const handleBreakdown = async (alert: SOSAlert) => {
+    if (!alert.order_id) return;
+    if (!window.confirm(`Are you sure you want to mark this rider as broke down? This will release Order #${alert.order_display_id} back to the dispatcher pool and resolve this alert.`)) {
+      return;
+    }
+    
+    setBreakdownLoadingId(alert.id);
+    try {
+      await api.post(`/support/orders/${alert.order_id}/handle-breakdown`, { 
+        lat: alert.lat, 
+        lng: alert.lng, 
+        note: `Vehicle breakdown processed from SOS alert dashboard.` 
+      });
+      toast.success("Order released back to dispatch pool!");
+      refetch();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to process breakdown");
+    } finally {
+      setBreakdownLoadingId(null);
+    }
+  };
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["support-sos"],
@@ -196,12 +219,23 @@ export default function SOSTab() {
                           <span>{timeAgo(alert.created_at)}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setResolvingAlert(alert)}
-                        className="shrink-0 px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-xl transition-all whitespace-nowrap"
-                      >
-                        Resolve
-                      </button>
+                      <div className="flex gap-2 shrink-0">
+                        {alert.alert_type === 'vehicle_breakdown' && alert.order_id && (
+                          <button
+                            onClick={() => handleBreakdown(alert)}
+                            disabled={breakdownLoadingId === alert.id}
+                            className="px-4 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-xs font-bold rounded-xl transition-all whitespace-nowrap disabled:opacity-50"
+                          >
+                            {breakdownLoadingId === alert.id ? "Processing..." : "Process Breakdown"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setResolvingAlert(alert)}
+                          className="px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-xl transition-all whitespace-nowrap"
+                        >
+                          Resolve
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
