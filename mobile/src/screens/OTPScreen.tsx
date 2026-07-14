@@ -9,6 +9,7 @@ import { connectSocket } from '../socket/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { radius, spacing } from '../theme/spacing';
+import { getConfirmationResult } from '../utils/firebaseAuthHelper';
 
 const OTPScreen = ({ route, navigation }: any) => {
   const { phone, referralCode, devOtp, devRole, lat, lng } = route.params;
@@ -54,7 +55,22 @@ const OTPScreen = ({ route, navigation }: any) => {
   };
 
   const verifyMutation = useMutation({
-    mutationFn: (code: string) => api.post('/auth/verify-otp', { phone, otp: code, referralCode, appRole: devRole, lat, lng }),
+    mutationFn: async (code: string) => {
+      if (!devOtp) {
+        const confirmation = getConfirmationResult();
+        if (!confirmation) {
+          throw new Error('No Firebase verification session found. Please try again.');
+        }
+        const credential = await confirmation.confirm(code);
+        if (!credential || !credential.user) {
+          throw new Error('Verification failed. User credentials not found.');
+        }
+        const idToken = await credential.user.getIdToken();
+        return api.post('/auth/firebase-login', { idToken, referralCode, appRole: devRole, lat, lng });
+      } else {
+        return api.post('/auth/verify-otp', { phone, otp: code, referralCode, appRole: devRole, lat, lng });
+      }
+    },
     onSuccess: (data) => {
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
       connectSocket(data.accessToken);

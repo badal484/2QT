@@ -10,6 +10,8 @@ import { Button, TextField } from '../components/ui';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { radius, spacing } from '../theme/spacing';
+import auth from '@react-native-firebase/auth';
+import { setConfirmationResult } from '../utils/firebaseAuthHelper';
 
 const { RoleModule } = NativeModules;
 const BUILD_ROLE = RoleModule?.BUILD_ROLE || 'customer';
@@ -25,6 +27,7 @@ const LoginScreen = ({ navigation }: any) => {
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [devRole, setDevRole] = useState(BUILD_ROLE);
+  const [firebaseLoading, setFirebaseLoading] = useState(false);
   // Use location already detected by AppBootManager during the splash screen
   // instead of triggering a new GPS request (which races against OTP submission)
   const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
@@ -46,9 +49,34 @@ const LoginScreen = ({ navigation }: any) => {
     },
   });
 
-  const handleSendOTP = () => {
-    if (phone.length === 10) {
-      mutation.mutate('91' + phone);
+  const handleSendOTP = async () => {
+    if (phone.length !== 10) return;
+    const digits = '91' + phone;
+    const isDevNumber = ["910000000000", "912222222222", "913333333333"].includes(digits);
+
+    if (isDevNumber) {
+      mutation.mutate(digits);
+    } else {
+      setFirebaseLoading(true);
+      try {
+        const formattedPhone = '+91' + phone;
+        const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+        setConfirmationResult(confirmation);
+        
+        navigation.navigate('OTP', {
+          phone: digits,
+          referralCode: referralCode.trim().toUpperCase(),
+          devOtp: '',
+          devRole: devRole === 'kitchen' ? 'chef' : devRole,
+          lat: globalLocation?.latitude,
+          lng: globalLocation?.longitude,
+        });
+      } catch (err: any) {
+        console.error('Firebase Auth sendOtp error:', err);
+        Alert.alert('Error', err.message || 'Could not send OTP. Check your connection.');
+      } finally {
+        setFirebaseLoading(false);
+      }
     }
   };
 
@@ -97,7 +125,7 @@ const LoginScreen = ({ navigation }: any) => {
           <Button
             label="Send Verification Code"
             onPress={handleSendOTP}
-            loading={mutation.isPending}
+            loading={mutation.isPending || firebaseLoading}
             style={[styles.actionBtn, { backgroundColor: branding.color, shadowColor: branding.color }]}
           />
         ) : (
