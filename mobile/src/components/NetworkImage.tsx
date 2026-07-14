@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Image, Text, StyleSheet, ImageStyle, StyleProp } from 'react-native';
+import { View, Text, StyleSheet, ImageStyle, StyleProp } from 'react-native';
+import FastImage from 'react-native-fast-image';
 
 interface Props {
   uri: string;
@@ -7,6 +8,7 @@ interface Props {
   fallbackText?: string;
   width?: number;
   height?: number;
+  priority?: 'low' | 'normal' | 'high';
 }
 
 const buildImageKitUrl = (uri: string, width?: number, height?: number): string => {
@@ -18,7 +20,13 @@ const buildImageKitUrl = (uri: string, width?: number, height?: number): string 
   return uri.includes('?') ? `${uri}&tr=${tr}` : `${uri}?tr=${tr}`;
 };
 
-export const NetworkImage: React.FC<Props> = React.memo(({ uri, style, fallbackText = 'V', width, height }) => {
+const PRIORITY_MAP = {
+  low: FastImage.priority.low,
+  normal: FastImage.priority.normal,
+  high: FastImage.priority.high,
+} as const;
+
+export const NetworkImage: React.FC<Props> = React.memo(({ uri, style, fallbackText = 'V', width, height, priority = 'normal' }) => {
   const [error, setError] = useState(false);
 
   if (error || !uri) {
@@ -32,10 +40,10 @@ export const NetworkImage: React.FC<Props> = React.memo(({ uri, style, fallbackT
   const optimizedUri = buildImageKitUrl(uri, width, height);
 
   return (
-    <Image
-      source={{ uri: optimizedUri, cache: 'force-cache' }}
-      style={style}
-      resizeMode="cover"
+    <FastImage
+      source={{ uri: optimizedUri, priority: PRIORITY_MAP[priority] }}
+      style={style as any}
+      resizeMode={FastImage.resizeMode.cover}
       onError={() => setError(true)}
     />
   );

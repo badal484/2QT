@@ -96,14 +96,14 @@ function groupNotifications(notifs: any[]) {
   return grouped;
 }
 
-function NotifCard({ n, onPress }: { n: any; onPress: () => void }) {
+const NotifCard = React.memo(function NotifCard({ n, onPress }: { n: any; onPress: (n: any) => void }) {
   const meta = getTypeMeta(n.type, n.is_read, n.title);
   const { Icon, iconColor, bg, accentColor } = meta;
 
   return (
     <BouncingButton
       style={[styles.card, !n.is_read && styles.cardUnread]}
-      onPress={onPress}
+      onPress={() => onPress(n)}
       activeOpacity={0.85}
     >
       {/* Left accent stripe for unread */}
@@ -137,7 +137,7 @@ function NotifCard({ n, onPress }: { n: any; onPress: () => void }) {
       {!n.is_read && <View style={[styles.dot, { backgroundColor: accentColor }]} />}
     </BouncingButton>
   );
-}
+});
 
 const NotificationsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
@@ -167,6 +167,17 @@ const NotificationsScreen = ({ navigation }: any) => {
     await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     setRefreshing(false);
   }, [queryClient]);
+
+  const handleNotifPress = useCallback((n: any) => {
+    if (!n.is_read) {
+      haptic();
+      readMutation.mutate(n.id);
+      if (n._groupedIds?.length > 0) {
+        n._groupedIds.forEach((id: string) => readMutation.mutate(id));
+      }
+    }
+    deepLink(n, navigation);
+  }, [readMutation, navigation]);
 
   const rawNotifications: any[] = data?.notifications ?? [];
   const groupedNotifications = React.useMemo(() => groupNotifications(rawNotifications), [rawNotifications]);
@@ -235,17 +246,7 @@ const NotificationsScreen = ({ navigation }: any) => {
               <Text style={styles.sectionLabel}>UNREAD</Text>
               {unread.map((n: any, i: number) => (
                 <Animated.View key={n.id} entering={FadeInDown.delay(i * 30).duration(200)}>
-                  <NotifCard
-                    n={n}
-                    onPress={() => {
-                      haptic();
-                      readMutation.mutate(n.id);
-                      if (n._groupedIds?.length > 0) {
-                        n._groupedIds.forEach((id: string) => readMutation.mutate(id));
-                      }
-                      deepLink(n, navigation);
-                    }}
-                  />
+                  <NotifCard n={n} onPress={handleNotifPress} />
                 </Animated.View>
               ))}
             </>
@@ -257,10 +258,7 @@ const NotificationsScreen = ({ navigation }: any) => {
               <Text style={[styles.sectionLabel, unread.length > 0 && { marginTop: 20 }]}>EARLIER</Text>
               {earlier.map((n: any, i: number) => (
                 <Animated.View key={n.id} entering={FadeInDown.delay(i * 20).duration(200)}>
-                  <NotifCard
-                    n={n}
-                    onPress={() => deepLink(n, navigation)}
-                  />
+                  <NotifCard n={n} onPress={handleNotifPress} />
                 </Animated.View>
               ))}
             </>

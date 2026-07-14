@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -38,6 +38,60 @@ function haptic() {
   });
 }
 
+const RelatedItemCard = React.memo(({ ri, onAdd, dispatch, navigation }: any) => {
+  const riCart = useSelector((state: RootState) => state.cart.items.find(ci => ci.menuItemId === ri.id));
+  const riVeg = ri.is_egg ? '#EAB308' : ri.is_veg ? '#22C55E' : '#EF4444';
+  return (
+    <BouncingButton
+      style={s.relatedCard}
+      activeOpacity={0.92}
+      onPress={() => navigation.replace('ItemDetail', { item: ri })}
+    >
+      <View style={s.relatedImgBox}>
+        {ri.photo_url ? (
+          <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
+        ) : (
+          <View style={[s.relatedImg, s.heroPlaceholder]}>
+            <Text style={{ fontSize: 24 }}>🍽️</Text>
+          </View>
+        )}
+        {ri.is_bestseller && (
+          <View style={s.relatedBadge}>
+            <Text style={s.relatedBadgeText}>★ Bestseller</Text>
+          </View>
+        )}
+      </View>
+      {ri.available && !riCart ? (
+        <BouncingButton style={s.relatedAddBtn} onPress={() => { haptic(); onAdd(ri); }} activeOpacity={0.85}>
+          <Text style={s.relatedAddText}>ADD</Text>
+        </BouncingButton>
+      ) : ri.available && riCart ? (
+        <View style={s.relatedQtyBox}>
+          <BouncingButton hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }}>
+            <Text style={s.relatedQtyBtn}>−</Text>
+          </BouncingButton>
+          <Text style={s.relatedQtyVal}>{riCart.quantity}</Text>
+          <BouncingButton hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }}>
+            <Text style={s.relatedQtyBtn}>+</Text>
+          </BouncingButton>
+        </View>
+      ) : null}
+      <View style={s.relatedMeta}>
+        <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
+          <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
+        </View>
+        {ri.tags?.[0] && (
+          <View style={[s.servePill, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+            <Text style={[s.servePillText, { fontSize: 9 }]}>{ri.tags[0]}</Text>
+          </View>
+        )}
+      </View>
+      <Text style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
+      <Text style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
+    </BouncingButton>
+  );
+});
+
 const ItemDetailScreen = ({ route, navigation }: any) => {
   const { width: SCREEN_W } = useWindowDimensions();
   const { item } = route.params;
@@ -46,8 +100,17 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   const queryClient = useQueryClient();
 
   const cartItems = useSelector((state: RootState) => state.cart.items);
+  const cartItemsRef = useRef(cartItems);
+  cartItemsRef.current = cartItems;
+
   const cartItem = useSelector((state: RootState) =>
     state.cart.items.find(ci => ci.menuItemId === item.id),
+  );
+  const cartCount = useSelector((state: RootState) =>
+    state.cart.items.reduce((sum, ci) => sum + ci.quantity, 0),
+  );
+  const cartTotal = useSelector((state: RootState) =>
+    state.cart.items.reduce((sum, ci) => sum + (ci.pricePaise / 100) * ci.quantity, 0),
   );
   const zoneId = useSelector((state: RootState) => state.cart.zoneId);
   const activeZoneId = useSelector((state: RootState) => state.app.activeZoneId);
@@ -57,9 +120,12 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   const [activeCustomizationItem, setActiveCustomizationItem] = useState<any>(null);
 
   const menuData = queryClient.getQueryData<any>(['menu', effectiveZoneId]);
-  const relatedItems: any[] = (menuData?.items ?? [])
-    .filter((i: any) => i.category === item.category && i.id !== item.id && i.available)
-    .slice(0, 6);
+  const relatedItems: any[] = useMemo(() =>
+    (menuData?.items ?? [])
+      .filter((i: any) => i.category === item.category && i.id !== item.id && i.available)
+      .slice(0, 6),
+    [menuData?.items, item.category, item.id],
+  );
 
   const { data: promosData } = useQuery({
     queryKey: ['promos-active'],
@@ -72,8 +138,6 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   const price = item.price_paise / 100;
   const qty = cartItem?.quantity ?? 0;
   const totalPrice = price * (qty || 1);
-  const cartCount = cartItems.reduce((sum, ci) => sum + ci.quantity, 0);
-  const cartTotal = cartItems.reduce((sum, ci) => sum + (ci.pricePaise / 100) * ci.quantity, 0);
 
   const serveTag = (item.tags as string[] | undefined)?.find(t =>
     /serves|ml|g\b|kg/i.test(t),
