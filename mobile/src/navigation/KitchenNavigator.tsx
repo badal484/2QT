@@ -18,20 +18,20 @@ const Stack = createNativeStackNavigator();
 const TAB_OPTIONS = {
   headerShown: false,
   tabBarStyle: {
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
     height: 70,
     paddingBottom: 12,
-    paddingTop: 12,
+    paddingTop: 10,
   },
   tabBarActiveTintColor: '#00D084',
-  tabBarInactiveTintColor: 'rgba(255,255,255,0.3)',
+  tabBarInactiveTintColor: '#9CA3AF',
   tabBarLabelStyle: {
     fontSize: 10,
-    fontWeight: '900' as const,
+    fontWeight: '700' as const,
     textTransform: 'uppercase' as const,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 };
 
@@ -45,34 +45,34 @@ const MainKitchenTabs = () => {
         <Tab.Screen
           name="Board"
           component={KitchenBoardScreen}
-          options={{ tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} /> }}
+          options={{ tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} strokeWidth={2} /> }}
         />
       )}
       {!isDineInStaff && (
         <Tab.Screen
           name="Manage"
           component={KitchenManageScreen}
-          options={{ tabBarIcon: ({ color }) => <Settings size={22} color={color} /> }}
+          options={{ tabBarIcon: ({ color }) => <Settings size={22} color={color} strokeWidth={2} /> }}
         />
       )}
       {!isDineInStaff && (
         <Tab.Screen
           name="Stock"
           component={StockScreen}
-          options={{ tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} /> }}
+          options={{ tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} strokeWidth={2} /> }}
         />
       )}
       {!isDineInStaff && (
         <Tab.Screen
           name="Ratings"
           component={FeedbackScreen}
-          options={{ tabBarIcon: ({ color }) => <Star size={22} color={color} /> }}
+          options={{ tabBarIcon: ({ color }) => <Star size={22} color={color} strokeWidth={2} /> }}
         />
       )}
       <Tab.Screen
         name="Dine-in"
         component={KitchenDineInScreen}
-        options={{ tabBarIcon: ({ color }) => <UtensilsCrossed size={22} color={color} /> }}
+        options={{ tabBarIcon: ({ color }) => <UtensilsCrossed size={22} color={color} strokeWidth={2} /> }}
       />
     </Tab.Navigator>
   );
