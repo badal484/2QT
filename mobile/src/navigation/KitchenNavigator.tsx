@@ -11,36 +11,38 @@ import ShiftHandoverScreen from '../screens/ShiftHandoverScreen';
 import KitchenDineInScreen from '../screens/KitchenDineInScreen';
 import PackerScreen from '../screens/PackerScreen';
 import { ClipboardList, BarChart3, Star, UtensilsCrossed, Settings } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const TAB_OPTIONS = {
-  headerShown: false,
-  tabBarStyle: {
-    backgroundColor: '#000000',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-    height: 70,
-    paddingBottom: 12,
-    paddingTop: 10,
-  },
-  tabBarActiveTintColor: '#00D084',
-  tabBarInactiveTintColor: '#9CA3AF',
-  tabBarLabelStyle: {
-    fontSize: 10,
-    fontWeight: '700' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-  },
-};
-
 const MainKitchenTabs = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const isDineInStaff = user?.role === 'dine_in_staff';
+  const insets = useSafeAreaInsets();
+
+  const tabOptions = {
+    headerShown: false,
+    tabBarStyle: {
+      backgroundColor: '#000000',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.05)',
+      height: 60 + (insets.bottom > 0 ? insets.bottom : 10),
+      paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
+      paddingTop: 10,
+    },
+    tabBarActiveTintColor: '#00D084',
+    tabBarInactiveTintColor: '#9CA3AF',
+    tabBarLabelStyle: {
+      fontSize: 10,
+      fontWeight: '700' as const,
+      textTransform: 'uppercase' as const,
+      letterSpacing: 0.5,
+    },
+  };
 
   return (
-    <Tab.Navigator screenOptions={TAB_OPTIONS}>
+    <Tab.Navigator screenOptions={tabOptions}>
       {!isDineInStaff && (
         <Tab.Screen
           name="Board"
