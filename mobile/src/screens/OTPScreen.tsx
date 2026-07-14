@@ -98,6 +98,10 @@ const OTPScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const handlePressBoxes = () => {
+    inputRef.current?.focus();
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -107,11 +111,40 @@ const OTPScreen = ({ route, navigation }: any) => {
           +{phone.slice(0, 2)} {phone.slice(2, 7)} {phone.slice(7)}
         </Text>
 
+        {/* Premium 6-Box OTP Input */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={handlePressBoxes}
+          style={styles.otpContainer}
+        >
+          {Array(6)
+            .fill(0)
+            .map((_, index) => {
+              const digit = otp[index] || '';
+              const isFocused = otp.length === index;
+              const hasDigit = digit !== '';
+
+              return (
+                <View
+                  key={index}
+                  style={[
+                    styles.otpBox,
+                    hasDigit && styles.otpBoxFilled,
+                    isFocused && styles.otpBoxFocused,
+                    verifyMutation.isPending && styles.otpBoxDisabled,
+                  ]}
+                >
+                  <Text style={styles.otpBoxText}>{digit}</Text>
+                  {isFocused && <View style={styles.cursor} />}
+                </View>
+              );
+            })}
+        </TouchableOpacity>
+
+        {/* Hidden TextInput for native keyboard */}
         <TextInput
           ref={inputRef}
-          style={[styles.otpInput, verifyMutation.isPending && styles.otpInputBusy]}
-          placeholder="000000"
-          placeholderTextColor={colors.border}
+          style={styles.hiddenInput}
           keyboardType="numeric"
           maxLength={6}
           value={otp}
@@ -172,23 +205,61 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     letterSpacing: 1,
   },
-  otpInput: {
+  otpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     width: '100%',
-    height: 76,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.xl,
+    paddingHorizontal: spacing.sm,
     marginTop: spacing.xxxl,
-    textAlign: 'center',
-    fontSize: 32,
+    marginBottom: spacing.xl,
+  },
+  otpBox: {
+    width: 44,
+    height: 56,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  otpBoxFilled: {
+    borderColor: colors.primary,
+  },
+  otpBoxFocused: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  otpBoxDisabled: {
+    backgroundColor: colors.surfaceMuted,
+    opacity: 0.6,
+  },
+  otpBoxText: {
+    fontSize: 22,
     fontFamily: fontFamily.black,
-    letterSpacing: 10,
     color: colors.ink,
   },
-  otpInputBusy: {
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
+  cursor: {
+    position: 'absolute',
+    bottom: 12,
+    width: 12,
+    height: 2,
+    backgroundColor: colors.primary,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0.01,
   },
   spinner: {
     marginTop: spacing.xl,
