@@ -1569,75 +1569,7 @@ router.post('/orders/:id/report-issue', authenticate, requireRole('rider', 'ride
     }
 });
 
-// ─── Bike Breakdown (mid-delivery) ────────────────────────────────────────────
-// Rider reports their bike broke down while carrying an out_for_delivery order.
-// Resets the order to ready_for_pickup with no rider so dispatcher can reassign.
-router.post('/orders/:id/report-breakdown', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
-    const riderId = req.user!.userId;
-    const { lat, lng } = req.body;
 
-    try {
-        const { rows } = await query(
-            `UPDATE orders
-             SET status = 'ready_for_pickup', rider_id = NULL
-             WHERE id = $1 AND rider_id = $2 AND status = 'out_for_delivery'
-             RETURNING id, display_id, kitchen_id, customer_id`,
-            [id, riderId]
-        );
-        if (!rows[0]) return res.status(400).json({ error: 'ORDER_NOT_ASSIGNABLE', message: 'Order not found or not currently out for delivery with you.' });
-
-        const { display_id, kitchen_id, customer_id } = rows[0];
-
-        // Log the event for acceptance rate / audit purposes
-        query(
-            `INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, 'breakdown') ON CONFLICT DO NOTHING`,
-            [riderId, id]
-        ).catch(() => {});
-
-        // Auto-fire an SOS alert so ops team is aware
-        const { rows: riderInfo } = await query('SELECT name, phone FROM users WHERE id = $1', [riderId]);
-        query(
-            `INSERT INTO sos_alerts (rider_id, order_id, alert_type, lat, lng) VALUES ($1, $2, 'vehicle_breakdown', $3, $4)`,
-            [riderId, id, lat || null, lng || null]
-        ).catch(() => {});
-
-        // Notify admin ops panel
-        emitToAdmin('sos_alert', {
-            riderId,
-            riderName: riderInfo[0]?.name,
-            riderPhone: riderInfo[0]?.phone,
-            orderId: id,
-            alertType: 'vehicle_breakdown',
-            lat, lng,
-            createdAt: new Date().toISOString(),
-        });
-
-        // Notify customer of the delay
-        emitToUser(customer_id, 'order_status_update', {
-            orderId: id,
-            status: 'ready_for_pickup',
-            message: 'Your rider had a vehicle issue. We are assigning a new rider and will update you shortly.',
-            riderAssigned: false,
-        });
-
-        // Wake up kitchen dispatch panel — order reappears in unassigned list
-        emitToKitchen(kitchen_id, 'order_updated', { orderId: id, needsRider: true, reason: 'breakdown' });
-        emitToAdmin('order_status_update', { orderId: id, display_id, status: 'ready_for_pickup', reason: 'breakdown' });
-
-        // Push notification to customer
-        pushService.sendToUser(customer_id, {
-            title: 'Slight delay on your order',
-            body: `We're finding a new rider for ${display_id}. Sorry for the wait!`,
-            data: { orderId: id, type: 'breakdown_delay' },
-        }).catch(() => {});
-
-        res.json({ success: true, message: 'Breakdown reported. Dispatcher will assign a new rider.' });
-    } catch (err) {
-        console.error('[report-breakdown]', err);
-        res.status(500).json({ error: 'SERVER_ERROR' });
-    }
-});
 
 // ─── Kitchen Arrival ──────────────────────────────────────────────────────────
 router.post('/orders/:id/arrived-at-kitchen', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {

@@ -6,6 +6,20 @@ import { ENV } from '../config/env';
 const BASE_URL = ENV.API_URL;
 export const APP_VERSION = ENV.APP_VERSION;
 
+// Cache the store reference after first successful require to avoid
+// the cost of require() on every API call.
+let _cachedStore: any = null;
+const getStore = () => {
+  if (_cachedStore && typeof _cachedStore.getState === 'function') return _cachedStore;
+  try {
+    const m = require('../store');
+    _cachedStore = m.store || m.default || m;
+    return _cachedStore;
+  } catch (e) {
+    console.error('--- CLIENT: FAILED TO REQUIRE STORE:', e);
+    return null;
+  }
+};
 
 interface RequestOptions {
   method?: string;
@@ -14,13 +28,7 @@ interface RequestOptions {
 }
 
 const request = async (path: string, options: RequestOptions = {}): Promise<any> => {
-  let store;
-  try {
-    const storeModule = require('../store');
-    store = storeModule.store || storeModule.default || storeModule;
-  } catch (e) {
-    console.error('--- CLIENT: FAILED TO REQUIRE STORE:', e);
-  }
+  const store = getStore();
 
   if (!store || typeof store.getState !== 'function') {
     console.error('--- CLIENT: STORE NOT FOUND OR INVALID', store);

@@ -1,7 +1,7 @@
 import { Package, RotateCcw, ArrowLeft, Bike, AlertTriangle, Download, Star, ChevronRight } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable } from 'react-native';
 import { SkeletonScreenList, SkeletonOrderCard, ScreenError } from '../components/ui';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -37,12 +37,12 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
-  const [invoiceLoading, setInvoiceLoading] = useState<Set<string>>(new Set());
-  const [reorderLoading, setReorderLoading] = useState<Set<string>>(new Set());
+  const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
+  const [reorderLoadingId, setReorderLoadingId] = useState<string | null>(null);
   const LIMIT = 20;
 
-  const openInvoice = async (orderId: string) => {
-    setInvoiceLoading(prev => new Set(prev).add(orderId));
+  const handleOpenInvoice = useCallback(async (orderId: string) => {
+    setInvoiceLoadingId(orderId);
     try {
       const res = await api.get(`/orders/${orderId}/invoice`);
       const url = res.invoiceUrl?.startsWith('http')
@@ -52,16 +52,55 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     } catch {
       Alert.alert('Error', 'Could not generate invoice. Please try again.');
     } finally {
-      setInvoiceLoading(prev => { const s = new Set(prev); s.delete(orderId); return s; });
+      setInvoiceLoadingId(null);
     }
-  };
+  }, []);
 
-  const callSupport = () => {
+  const callSupport = useCallback(() => {
     ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
     Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() =>
       Alert.alert('Call Support', `Please call us at +${SUPPORT_PHONE}`)
     );
-  };
+  }, []);
+
+  const handleTrack = useCallback((orderId: string) => {
+    navigation.navigate('OrderConfirmed', { orderId });
+  }, [navigation]);
+
+  const handleCancel = useCallback((orderId: string) => {
+    ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
+    setCancelTargetId(orderId);
+  }, []);
+
+  const handleRate = useCallback((orderId: string) => {
+    navigation.navigate('RateOrder', { orderId });
+  }, [navigation]);
+
+  const handleReorder = useCallback(async (order: any) => {
+    ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
+    setReorderLoadingId(order.id);
+    try {
+      const cached: any = queryClient.getQueryData(['menu', order.zone_id]);
+      const menu = cached ?? await api.get(`/menu?zoneId=${order.zone_id}`);
+      const currentItems = menu.items || [];
+      const availableItems = order.items.filter((oldItem: any) =>
+        currentItems.find((ci: any) => ci.id === oldItem.menu_item_id && ci.available)
+      );
+      if (availableItems.length === 0) { Alert.alert('Unavailable', 'None of the items are available today.'); return; }
+      Alert.alert('Reorder', 'Add these items to your cart?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Add to Cart', onPress: () => {
+          availableItems.forEach((item: any) => {
+            const menuItem = currentItems.find((ci: any) => ci.id === item.menu_item_id);
+            dispatch(addItem({ menuItemId: item.menu_item_id, name: item.menu_item_name, pricePaise: menuItem.price_paise, quantity: item.quantity, photoUrl: menuItem.photo_url, isVeg: menuItem.is_veg, kitchenId: order.kitchen_id }));
+          });
+          if (availableItems.length < order.items.length) Alert.alert('Partial Reorder', 'Some items were sold out and skipped.');
+          navigation.navigate('Cart');
+        }},
+      ]);
+    } catch { Alert.alert('Error', 'Could not validate menu. Please try again.'); }
+    finally { setReorderLoadingId(null); }
+  }, [dispatch, navigation, queryClient]);
 
   const {
     data,
@@ -135,8 +174,59 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     </View>
   );
 
-  const delivered = allOrders.filter(o => o.status === 'delivered');
-  const active    = allOrders.filter(o => !['delivered', 'cancelled'].includes(o.status));
+  const active = useMemo(() => allOrders.filter((o: any) => !['delivered', 'cancelled'].includes(o.status)), [allOrders]);
+  const past   = useMemo(() => allOrders.filter((o: any) => ['delivered', 'cancelled'].includes(o.status)), [allOrders]);
+  const deliveredCount = useMemo(() => allOrders.filter((o: any) => o.status === 'delivered').length, [allOrders]);
+
+  const listData = useMemo(() => {
+    const items: any[] = [];
+    if (active.length > 0) {
+      items.push({ type: 'header', label: 'Active', key: 'h-active' });
+      active.forEach((order: any, i: number) => items.push({ type: 'order', order, delay: i * 60, key: order.id }));
+    }
+    if (past.length > 0) {
+      items.push({ type: 'header', label: 'Past Orders', key: 'h-past' });
+      past.forEach((order: any, i: number) => items.push({ type: 'order', order, delay: i * 50, key: order.id }));
+    }
+    if (allOrders.length === 0) items.push({ type: 'empty', key: 'empty' });
+    return items;
+  }, [active, past, allOrders.length]);
+
+  const renderOrderItem = useCallback(({ item }: { item: any }) => {
+    if (item.type === 'header') {
+      return <View style={styles.sectionHeaderWrap}><Text style={styles.sectionLabel}>{item.label}</Text></View>;
+    }
+    if (item.type === 'empty') {
+      return (
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconWrapper}><Package size={36} color={colors.primary} /></View>
+          <Text style={styles.emptyTitle}>No orders yet</Text>
+          <Text style={styles.emptySubText}>Your delicious journey is just one tap away.</Text>
+          <BouncingButton style={styles.browseBtn} onPress={() => navigation.navigate('Home')}>
+            <Text style={styles.browseBtnText}>Browse Menu</Text>
+          </BouncingButton>
+        </View>
+      );
+    }
+    const { order, delay } = item;
+    return (
+      <View style={styles.orderItemWrap}>
+        <Animated.View entering={FadeInDown.delay(delay)}>
+          <OrderCard
+            order={order}
+            onTrack={handleTrack}
+            onCancel={handleCancel}
+            onInvoice={handleOpenInvoice}
+            onSupport={callSupport}
+            onRate={handleRate}
+            onReorder={handleReorder}
+            invoiceLoading={invoiceLoadingId === order.id}
+            reorderLoading={reorderLoadingId === order.id}
+          />
+        </Animated.View>
+      </View>
+    );
+  }, [handleTrack, handleCancel, handleOpenInvoice, callSupport, handleRate, handleReorder, invoiceLoadingId, reorderLoadingId, navigation]);
 
   return (
     <View style={styles.container}>
@@ -147,125 +237,27 @@ const OrderHistoryScreen = ({ navigation }: any) => {
         </BouncingButton>
         <View style={{ flex: 1, marginLeft: 14 }}>
           <Text style={styles.headerTitle}>Your Orders</Text>
-          <Text style={styles.headerSub}>{allOrders.length} orders · {delivered.length} delivered</Text>
+          <Text style={styles.headerSub}>{allOrders.length} orders · {deliveredCount} delivered</Text>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-
-        {/* Active orders strip */}
-        {active.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Active</Text>
-            {active.map((order, index) => (
-              <Animated.View key={order.id} entering={FadeInDown.delay(index * 60)}>
-                <OrderCard
-                  order={order}
-                  onTrack={() => navigation.navigate('OrderConfirmed', { orderId: order.id })}
-                  onCancel={() => { ReactNativeHapticFeedback.trigger("impactLight", hapticOptions); setCancelTargetId(order.id); }}
-                  onInvoice={() => openInvoice(order.id)}
-                  onSupport={callSupport}
-                  onRate={() => navigation.navigate('RateOrder', { orderId: order.id })}
-                  onReorder={async () => {
-                    ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-                    setReorderLoading(prev => new Set(prev).add(order.id));
-                    try {
-                      const cached: any = queryClient.getQueryData(['menu', order.zone_id]);
-                      const menu = cached ?? await api.get(`/menu?zoneId=${order.zone_id}`);
-                      const currentItems = menu.items || [];
-                      const availableItems = order.items.filter((oldItem: any) =>
-                        currentItems.find((ci: any) => ci.id === oldItem.menu_item_id && ci.available)
-                      );
-                      if (availableItems.length === 0) { Alert.alert('Unavailable', 'None of the items are available today.'); return; }
-                      Alert.alert('Reorder', 'Add these items to your cart?', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Add to Cart', onPress: () => {
-                          availableItems.forEach((item: any) => {
-                            const menuItem = currentItems.find((ci: any) => ci.id === item.menu_item_id);
-                            dispatch(addItem({ menuItemId: item.menu_item_id, name: item.menu_item_name, pricePaise: menuItem.price_paise, quantity: item.quantity, photoUrl: menuItem.photo_url, isVeg: menuItem.is_veg, kitchenId: order.kitchen_id }));
-                          });
-                          if (availableItems.length < order.items.length) Alert.alert('Partial Reorder', 'Some items were sold out and skipped.');
-                          navigation.navigate('Cart');
-                        }},
-                      ]);
-                    } catch { Alert.alert('Error', 'Could not validate menu. Please try again.'); }
-                    finally { setReorderLoading(prev => { const s = new Set(prev); s.delete(order.id); return s; }); }
-                  }}
-                  invoiceLoading={invoiceLoading.has(order.id)}
-                  reorderLoading={reorderLoading.has(order.id)}
-                />
-              </Animated.View>
-            ))}
-          </View>
-        )}
-
-        {/* Past orders */}
-        {allOrders.filter(o => ['delivered', 'cancelled'].includes(o.status)).length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Past Orders</Text>
-            {allOrders.filter(o => ['delivered', 'cancelled'].includes(o.status)).map((order, index) => (
-              <Animated.View key={order.id} entering={FadeInDown.delay(index * 50)}>
-                <OrderCard
-                  order={order}
-                  onTrack={() => navigation.navigate('OrderConfirmed', { orderId: order.id })}
-                  onCancel={() => { ReactNativeHapticFeedback.trigger("impactLight", hapticOptions); setCancelTargetId(order.id); }}
-                  onInvoice={() => openInvoice(order.id)}
-                  onSupport={callSupport}
-                  onRate={() => navigation.navigate('RateOrder', { orderId: order.id })}
-                  onReorder={async () => {
-                    ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-                    setReorderLoading(prev => new Set(prev).add(order.id));
-                    try {
-                      const cached: any = queryClient.getQueryData(['menu', order.zone_id]);
-                      const menu = cached ?? await api.get(`/menu?zoneId=${order.zone_id}`);
-                      const currentItems = menu.items || [];
-                      const availableItems = order.items.filter((oldItem: any) =>
-                        currentItems.find((ci: any) => ci.id === oldItem.menu_item_id && ci.available)
-                      );
-                      if (availableItems.length === 0) { Alert.alert('Unavailable', 'None of the items are available today.'); return; }
-                      Alert.alert('Reorder', 'Add these items to your cart?', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Add to Cart', onPress: () => {
-                          availableItems.forEach((item: any) => {
-                            const menuItem = currentItems.find((ci: any) => ci.id === item.menu_item_id);
-                            dispatch(addItem({ menuItemId: item.menu_item_id, name: item.menu_item_name, pricePaise: menuItem.price_paise, quantity: item.quantity, photoUrl: menuItem.photo_url, isVeg: menuItem.is_veg, kitchenId: order.kitchen_id }));
-                          });
-                          if (availableItems.length < order.items.length) Alert.alert('Partial Reorder', 'Some items were sold out and skipped.');
-                          navigation.navigate('Cart');
-                        }},
-                      ]);
-                    } catch { Alert.alert('Error', 'Could not validate menu. Please try again.'); }
-                    finally { setReorderLoading(prev => { const s = new Set(prev); s.delete(order.id); return s; }); }
-                  }}
-                  invoiceLoading={invoiceLoading.has(order.id)}
-                  reorderLoading={reorderLoading.has(order.id)}
-                />
-              </Animated.View>
-            ))}
-          </View>
-        )}
-
-        {allOrders.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconWrapper}>
-              <Package size={36} color={colors.primary} />
-            </View>
-            <Text style={styles.emptyTitle}>No orders yet</Text>
-            <Text style={styles.emptySubText}>Your delicious journey is just one tap away.</Text>
-            <BouncingButton style={styles.browseBtn} onPress={() => navigation.navigate('Home')}>
-              <Text style={styles.browseBtnText}>Browse Menu</Text>
-            </BouncingButton>
-          </View>
-        )}
-
-        {hasNextPage && allOrders.length > 0 && (
+      <FlatList
+        data={listData}
+        keyExtractor={(item: any) => item.key}
+        renderItem={renderOrderItem}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={8}
+        windowSize={5}
+        removeClippedSubviews={true}
+        ListFooterComponent={hasNextPage && allOrders.length > 0 ? (
           <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={isFetchingNextPage} activeOpacity={0.7}>
             {isFetchingNextPage
               ? <ActivityIndicator size="small" color={colors.primary} />
               : <Text style={styles.loadMoreText}>Load more orders</Text>}
           </TouchableOpacity>
-        )}
-      </ScrollView>
+        ) : null}
+      />
 
       {/* Cancel Modal */}
       <Modal visible={!!cancelTargetId} transparent animationType="fade" onRequestClose={() => setCancelTargetId(null)}>
@@ -296,7 +288,7 @@ const OrderHistoryScreen = ({ navigation }: any) => {
 };
 
 /* ─── Order Card Component ─── */
-const OrderCard = ({ order, onTrack, onCancel, onInvoice, onSupport, onRate, onReorder, invoiceLoading, reorderLoading }: any) => {
+const OrderCard = React.memo(({ order, onTrack, onCancel, onInvoice, onSupport, onRate, onReorder, invoiceLoading, reorderLoading }: any) => {
   const meta = getStatusMeta(order.status);
   const isDelivered = order.status === 'delivered';
   const isCancelled = order.status === 'cancelled';
@@ -365,11 +357,11 @@ const OrderCard = ({ order, onTrack, onCancel, onInvoice, onSupport, onRate, onR
         {isActive && (
           <>
             {['pending_payment', 'confirmed'].includes(order.status) && (
-              <BouncingButton style={card.cancelBtn} onPress={onCancel}>
+              <BouncingButton style={card.cancelBtn} onPress={() => onCancel(order.id)}>
                 <Text style={card.cancelBtnText}>Cancel</Text>
               </BouncingButton>
             )}
-            <BouncingButton style={card.trackBtn} onPress={onTrack}>
+            <BouncingButton style={card.trackBtn} onPress={() => onTrack(order.id)}>
               <Bike size={14} color="#fff" />
               <Text style={card.trackBtnText}>Track Order</Text>
               <ChevronRight size={14} color="#fff" />
@@ -379,13 +371,13 @@ const OrderCard = ({ order, onTrack, onCancel, onInvoice, onSupport, onRate, onR
 
         {isDelivered && (
           <>
-            <BouncingButton style={card.iconBtn} onPress={onInvoice} disabled={invoiceLoading}>
+            <BouncingButton style={card.iconBtn} onPress={() => onInvoice(order.id)} disabled={invoiceLoading}>
               {invoiceLoading
                 ? <ActivityIndicator size="small" color={colors.primary} />
                 : <Download size={16} color={colors.primary} />}
             </BouncingButton>
             {!order.has_feedback && (
-              <BouncingButton style={[card.iconBtn, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]} onPress={onRate}>
+              <BouncingButton style={[card.iconBtn, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]} onPress={() => onRate(order.id)}>
                 <Star size={16} color="#D97706" />
               </BouncingButton>
             )}
@@ -393,7 +385,7 @@ const OrderCard = ({ order, onTrack, onCancel, onInvoice, onSupport, onRate, onR
               <AlertTriangle size={13} color="#DC2626" />
               <Text style={card.supportBtnText}>Help</Text>
             </BouncingButton>
-            <BouncingButton style={card.reorderBtn} onPress={onReorder} disabled={reorderLoading}>
+            <BouncingButton style={card.reorderBtn} onPress={() => onReorder(order)} disabled={reorderLoading}>
               {reorderLoading
                 ? <ActivityIndicator size="small" color="#1A1A2E" />
                 : <RotateCcw size={13} color="#1A1A2E" />}
@@ -403,7 +395,7 @@ const OrderCard = ({ order, onTrack, onCancel, onInvoice, onSupport, onRate, onR
         )}
 
         {isCancelled && (
-          <BouncingButton style={[card.reorderBtn, { flex: 1 }]} onPress={onReorder} disabled={reorderLoading}>
+          <BouncingButton style={[card.reorderBtn, { flex: 1 }]} onPress={() => onReorder(order)} disabled={reorderLoading}>
             {reorderLoading
               ? <ActivityIndicator size="small" color="#1A1A2E" />
               : <RotateCcw size={13} color="#1A1A2E" />}
@@ -413,7 +405,7 @@ const OrderCard = ({ order, onTrack, onCancel, onInvoice, onSupport, onRate, onR
       </View>
     </View>
   );
-};
+});
 
 /* ─── Styles ─── */
 const styles = StyleSheet.create({
@@ -437,6 +429,8 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
 
   section: { paddingHorizontal: 16, paddingTop: 20 },
+  sectionHeaderWrap: { paddingHorizontal: 16, paddingTop: 20 },
+  orderItemWrap: { paddingHorizontal: 16 },
   sectionLabel: { fontSize: 11, fontFamily: fontFamily.black, color: '#9CA3AF', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 },
 
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 32 },
