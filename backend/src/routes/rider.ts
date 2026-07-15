@@ -520,6 +520,10 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         let baseEarnings = 0;
         let netEarnings = 0;
         let platformFee = 0;
+        const surgeActive = order.surge_enabled && parseFloat(order.surge_multiplier ?? '1') > 1
+            && (!order.surge_expires_at || new Date(order.surge_expires_at) > new Date());
+        const surgeMultiplier = surgeActive ? parseFloat(order.surge_multiplier) : 1;
+        const tipPaise = parseInt(order.rider_tip_paise || '0', 10);
         const bonusPaise = tipPaise;
         
         if (order.payment_model === 'salary') {
