@@ -33,10 +33,6 @@
         android:name="com.google.firebase.messaging.default_notification_color"
         android:resource="@color/notification_color" />
 
-      <service
-        android:name=".LocationForegroundService"
-        android:foregroundServiceType="location"
-        android:exported="false" />
 
       <activity
         android:name=".MainActivity"
