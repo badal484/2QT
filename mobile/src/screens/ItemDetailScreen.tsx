@@ -143,15 +143,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
     /serves|ml|g\b|kg/i.test(t),
   ) ?? item.tags?.[0];
 
-  const handleAddWithCheck = (itemToAdd: any) => {
-    if (itemToAdd.customization_groups?.length > 0) {
-      setActiveCustomizationItem(itemToAdd);
-    } else {
-      handleAdd(itemToAdd, [], '');
-    }
-  };
-
-  const handleAdd = (itemToAdd: any, customizations: any[] = [], instructions: string = '') => {
+  const handleAdd = useCallback((itemToAdd: any, customizations: any[] = [], instructions: string = '') => {
     const doAdd = () =>
       dispatch(
         addItem({
@@ -166,22 +158,24 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
           instructions: instructions || undefined,
         }),
       );
-    if (cartItems.length > 0 && cartItems[0].kitchenId !== itemToAdd.kitchen_id) {
+    const current = cartItemsRef.current;
+    if (current.length > 0 && current[0].kitchenId !== itemToAdd.kitchen_id) {
       Alert.alert('Replace cart?', 'Your cart has items from a different kitchen.', [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Replace',
-          style: 'destructive',
-          onPress: () => {
-            dispatch(clearCart());
-            doAdd();
-          },
-        },
+        { text: 'Replace', style: 'destructive', onPress: () => { dispatch(clearCart()); doAdd(); } },
       ]);
     } else {
       doAdd();
     }
-  };
+  }, [dispatch]);
+
+  const handleAddWithCheck = useCallback((itemToAdd: any) => {
+    if (itemToAdd.customization_groups?.length > 0) {
+      setActiveCustomizationItem(itemToAdd);
+    } else {
+      handleAdd(itemToAdd, [], '');
+    }
+  }, [handleAdd]);
 
   return (
     <View style={s.root}>
@@ -270,75 +264,15 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={s.relatedRow}
               >
-                {relatedItems.map(ri => {
-                  const riCart = cartItems.find(ci => ci.menuItemId === ri.id);
-                  const riVeg = ri.is_egg ? '#EAB308' : ri.is_veg ? '#22C55E' : '#EF4444';
-                  return (
-                    <BouncingButton
-                      key={ri.id}
-                      style={s.relatedCard}
-                      activeOpacity={0.92}
-                      onPress={() => navigation.replace('ItemDetail', { item: ri })}
-                    >
-                      <View style={s.relatedImgBox}>
-                        {ri.photo_url ? (
-                          <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
-                        ) : (
-                          <View style={[s.relatedImg, s.heroPlaceholder]}>
-                            <Text style={{ fontSize: 24 }}>🍽️</Text>
-                          </View>
-                        )}
-                        {ri.is_bestseller && (
-                          <View style={s.relatedBadge}>
-                            <Text style={s.relatedBadgeText}>★ Bestseller</Text>
-                          </View>
-                        )}
-                      </View>
-                      
-                      {/* Floating Add/Qty Button */}
-                      {ri.available && !riCart ? (
-                        <BouncingButton
-                          style={s.relatedAddBtn}
-                          onPress={() => {
-                            haptic();
-                            handleAddWithCheck(ri);
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={s.relatedAddText}>ADD</Text>
-                        </BouncingButton>
-                      ) : ri.available && riCart ? (
-                        <View style={s.relatedQtyBox}>
-                          <BouncingButton
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }}
-                          >
-                            <Text style={s.relatedQtyBtn}>−</Text>
-                          </BouncingButton>
-                          <Text style={s.relatedQtyVal}>{riCart.quantity}</Text>
-                          <BouncingButton
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }}
-                          >
-                            <Text style={s.relatedQtyBtn}>+</Text>
-                          </BouncingButton>
-                        </View>
-                      ) : null}
-                      <View style={s.relatedMeta}>
-                        <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
-                          <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
-                        </View>
-                        {ri.tags?.[0] && (
-                          <View style={[s.servePill, { paddingHorizontal: 6, paddingVertical: 2 }]}>
-                            <Text style={[s.servePillText, { fontSize: 9 }]}>{ri.tags[0]}</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
-                      <Text style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
-                    </BouncingButton>
-                  );
-                })}
+                {relatedItems.map(ri => (
+                  <RelatedItemCard
+                    key={ri.id}
+                    ri={ri}
+                    onAdd={handleAddWithCheck}
+                    dispatch={dispatch}
+                    navigation={navigation}
+                  />
+                ))}
               </ScrollView>
             </View>
           </>
