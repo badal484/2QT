@@ -350,12 +350,30 @@ router.post('/refresh', async (req, res) => {
             [decoded.userId]
         );
         const user = userRes.rows[0];
-        if (!user) {
-            console.log(`[REFRESH] User ${decoded.userId} not found in DB`);
+        if (!user || !user.is_active) {
+            console.log(`[REFRESH] User ${decoded.userId} not found or deactivated`);
             return res.status(401).json({ error: 'INVALID_TOKEN' });
         }
-        if (!user.is_active) {
-            console.log(`[REFRESH] User ${decoded.userId} is deactivated`);
+
+        // Fetch and verify refresh token hashes from DB
+        const { rows: dbTokens } = await query(
+            'SELECT token_hash, revoked_at FROM refresh_tokens WHERE user_id = $1 AND expires_at > NOW()',
+            [decoded.userId]
+        );
+        
+        let tokenMatch = false;
+        for (const tokenRow of dbTokens) {
+            if (tokenRow.revoked_at === null) {
+                const match = await bcrypt.compare(refreshToken, tokenRow.token_hash);
+                if (match) {
+                    tokenMatch = true;
+                    break;
+                }
+            }
+        }
+
+        if (!tokenMatch) {
+            console.log(`[REFRESH] Token hash not matched or revoked for user ${decoded.userId}`);
             return res.status(401).json({ error: 'INVALID_TOKEN' });
         }
 

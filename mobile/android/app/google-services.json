@@ -61,6 +61,25 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1613467594:android:fbe8b7193efbc44aa04933",
+        "android_client_info": {
+          "package_name": "com.veltomobile.admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaLm5vOs9lw9QsF6v89HrNNbYiD5rqKg0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
