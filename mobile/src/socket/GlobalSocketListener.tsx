@@ -1,6 +1,21 @@
 import React, { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from './client';
+import Sound from 'react-native-sound';
+
+Sound.setCategory('Playback');
+
+let alertSound: Sound | null = null;
+try {
+  alertSound = new Sound(require('../audio/alert.mp3'), (error) => {
+    if (error) {
+      console.log('failed to load the sound', error);
+      alertSound = null;
+    }
+  });
+} catch (e) {
+  console.log('Error initializing sound', e);
+}
 
 export const GlobalSocketListener: React.FC = () => {
   const queryClient = useQueryClient();
@@ -17,6 +32,17 @@ export const GlobalSocketListener: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['scheduledOrders'] });
       // Rider active order — keeps rider home screen in sync when status changes
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+    };
+
+    const handleNewOrder = () => {
+      if (alertSound) {
+        alertSound.play((success) => {
+          if (!success) {
+            alertSound?.reset();
+          }
+        });
+      }
+      handleOrderUpdate();
     };
 
     // ── Menu, categories, offers ──────────────────────────────────────────────
@@ -124,7 +150,7 @@ export const GlobalSocketListener: React.FC = () => {
     };
 
     // ── Bind ──────────────────────────────────────────────────────────────────
-    socket.on('new_order', handleOrderUpdate);
+    socket.on('new_order', handleNewOrder);
     socket.on('order_status_update', handleOrderUpdate);
     socket.on('order_cancelled', handleOrderUpdate);
     socket.on('order_updated', handleOrderUpdate);
@@ -153,7 +179,7 @@ export const GlobalSocketListener: React.FC = () => {
     socket.on('connect', handleReconnect);
 
     return () => {
-      socket.off('new_order', handleOrderUpdate);
+      socket.off('new_order', handleNewOrder);
       socket.off('order_status_update', handleOrderUpdate);
       socket.off('order_cancelled', handleOrderUpdate);
       socket.off('order_updated', handleOrderUpdate);
