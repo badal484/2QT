@@ -9,16 +9,24 @@ export function useSocketRefresh(events: string[], onRefresh: () => void) {
   useEffect(() => {
     socket.connect();
 
-    const handler = () => onRefreshRef.current();
+    const handler = (event: string) => {
+      if (event === 'new_order') {
+        try {
+          const audio = new Audio('/alert.mp3');
+          audio.play().catch(() => {});
+        } catch (e) {}
+      }
+      onRefreshRef.current();
+    };
 
     // Re-fetch on reconnect so missed events during disconnect don't leave stale UI
     const handleReconnect = () => onRefreshRef.current();
 
-    events.forEach(event => socket.on(event, handler));
+    events.forEach(event => socket.on(event, () => handler(event)));
     socket.on('connect', handleReconnect);
 
     return () => {
-      events.forEach(event => socket.off(event, handler));
+      events.forEach(event => socket.off(event));
       socket.off('connect', handleReconnect);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
