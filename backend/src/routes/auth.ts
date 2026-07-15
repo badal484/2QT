@@ -111,12 +111,13 @@ router.post('/send-otp', async (req, res) => {
         console.log('[OTP_FALLBACK] No MSG91 key — returning OTP in response body');
     }
 
-    // Return OTP in response only when SMS delivery is not configured/working
-    // so the frontend can auto-fill it during development / testing
+    // Return OTP in response ONLY in non-production environments when SMS is not configured.
+    // In production, devOtp is NEVER exposed — even if MSG91 is misconfigured.
+    const exposeDevOtp = !smsSent && process.env.NODE_ENV !== 'production';
     res.json({
         sent: true,
         phone: normalizedPhone,
-        ...(!smsSent && { devOtp: otp }),
+        ...(exposeDevOtp && { devOtp: otp }),
     });
     } catch (err: any) {
         console.error('[SEND_OTP] Unhandled error:', err.message, err.stack);

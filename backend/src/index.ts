@@ -48,7 +48,22 @@ app.use('/admin/queues', (_req, res, next) => {
     res.removeHeader('Content-Security-Policy');
     next();
 });
-app.use(cors());
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, server-to-server, curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        callback(new Error(`CORS: origin '${origin}' is not allowed`));
+    },
+    credentials: true,
+}));
 app.use((req, res, next) => {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Keep-Alive', 'timeout=60');
