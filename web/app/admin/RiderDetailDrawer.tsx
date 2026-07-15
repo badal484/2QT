@@ -18,6 +18,9 @@ interface RiderDetail {
     is_verified: boolean; is_online: boolean; is_active: boolean;
     is_suspended: boolean; suspension_reason: string | null;
     suspended_at: string | null; created_at: string;
+    payment_model: 'per_order' | 'salary';
+    monthly_salary_paise: number | null;
+    fuel_allowance_per_km_paise: number | null;
   };
   stats: { totalEarningsPaise: number; totalDeliveries: number; totalPaidPaise: number };
   earnings: Array<{ date: string; deliveries_count: string; total_paise: string; base_earnings_paise: string; bonus_earnings_paise: string }>;
@@ -76,6 +79,12 @@ export function RiderDetailDrawer({ riderId, onClose }: { riderId: string; onClo
   const [showSuspendForm, setShowSuspendForm] = useState(false);
   const [podLightbox, setPodLightbox] = useState<string | null>(null);
 
+  // Contract form state
+  const [isEditingContract, setIsEditingContract] = useState(false);
+  const [contractForm, setContractForm] = useState<{ payment_model: string; monthly_salary_rupees: string; fuel_allowance_rupees: string }>({
+    payment_model: 'per_order', monthly_salary_rupees: '0', fuel_allowance_rupees: '0'
+  });
+
   const { data, isLoading } = useQuery<RiderDetail>({
     queryKey: ["rider-detail", riderId],
     queryFn: () => api.get(`/admin/riders/${riderId}`),
@@ -98,6 +107,16 @@ export function RiderDetailDrawer({ riderId, onClose }: { riderId: string; onClo
       api.patch(`/admin/riders/${riderId}/documents/review`, { action, reason }),
     onSuccess: (_, vars) => { toast.success(vars.action === "approve" ? "Documents approved!" : "Documents rejected."); qc.invalidateQueries({ queryKey: ["rider-detail", riderId] }); },
     onError: () => toast.error("Action failed."),
+  });
+
+  const contractMutation = useMutation({
+    mutationFn: (data: any) => api.patch(`/admin/riders/${riderId}/contract`, data),
+    onSuccess: () => {
+      toast.success("Contract updated.");
+      setIsEditingContract(false);
+      qc.invalidateQueries({ queryKey: ["rider-detail", riderId] });
+    },
+    onError: () => toast.error("Failed to update contract."),
   });
 
   const r = data?.rider;
@@ -267,6 +286,101 @@ export function RiderDetailDrawer({ riderId, onClose }: { riderId: string; onClo
                         <span className="text-sm text-white font-semibold">{row.value}</span>
                       </div>
                     ))}
+                  </div>
+
+                  {/* Contract Card */}
+                  <div className="bg-white/4 border border-white/8 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs text-zinc-400 font-bold uppercase tracking-wide">Employment Contract</p>
+                      {!isEditingContract && (
+                        <button onClick={() => {
+                          setContractForm({
+                            payment_model: r?.payment_model || 'per_order',
+                            monthly_salary_rupees: String((r?.monthly_salary_paise || 0) / 100),
+                            fuel_allowance_rupees: String((r?.fuel_allowance_per_km_paise || 0) / 100),
+                          });
+                          setIsEditingContract(true);
+                        }} className="text-xs text-blue-400 font-bold hover:text-blue-300">Edit</button>
+                      )}
+                    </div>
+                    
+                    {isEditingContract ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-zinc-500 mb-1 block">Payment Model</label>
+                          <select 
+                            value={contractForm.payment_model}
+                            onChange={e => setContractForm(s => ({ ...s, payment_model: e.target.value }))}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white"
+                          >
+                            <option value="per_order">Gig (Per Order)</option>
+                            <option value="salary">Salaried (Fixed Monthly)</option>
+                          </select>
+                        </div>
+                        {contractForm.payment_model === 'salary' && (
+                          <div className="flex gap-3">
+                            <div className="flex-1">
+                              <label className="text-xs text-zinc-500 mb-1 block">Monthly Salary (₹)</label>
+                              <input 
+                                type="number" 
+                                value={contractForm.monthly_salary_rupees}
+                                onChange={e => setContractForm(s => ({ ...s, monthly_salary_rupees: e.target.value }))}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-xs text-zinc-500 mb-1 block">Fuel / KM (₹)</label>
+                              <input 
+                                type="number" 
+                                value={contractForm.fuel_allowance_rupees}
+                                onChange={e => setContractForm(s => ({ ...s, fuel_allowance_rupees: e.target.value }))}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex gap-2 pt-2">
+                          <button 
+                            onClick={() => setIsEditingContract(false)}
+                            className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:bg-white/10"
+                          >
+                            Cancel
+                          </button>
+                          <button 
+                            onClick={() => contractMutation.mutate({
+                              payment_model: contractForm.payment_model,
+                              monthly_salary_paise: parseInt(contractForm.monthly_salary_rupees) * 100 || 0,
+                              fuel_allowance_per_km_paise: parseInt(contractForm.fuel_allowance_rupees) * 100 || 0
+                            })}
+                            disabled={contractMutation.isPending}
+                            className="flex-1 px-3 py-2 rounded-xl bg-orange-500/20 border border-orange-500/30 text-xs font-bold text-orange-400 hover:bg-orange-500/30"
+                          >
+                            {contractMutation.isPending ? 'Saving...' : 'Save Contract'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-zinc-500">Model</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${r?.payment_model === 'salary' ? 'bg-blue-500/10 text-blue-400' : 'bg-green-500/10 text-green-400'}`}>
+                            {r?.payment_model === 'salary' ? 'Salaried' : 'Gig (Per Order)'}
+                          </span>
+                        </div>
+                        {r?.payment_model === 'salary' && (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-zinc-500">Monthly Salary</span>
+                              <span className="text-sm text-white font-bold">₹{((r?.monthly_salary_paise || 0) / 100).toFixed(0)} / mo</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-zinc-500">Fuel Allowance</span>
+                              <span className="text-sm text-white font-bold">₹{((r?.fuel_allowance_per_km_paise || 0) / 100).toFixed(1)} / km</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

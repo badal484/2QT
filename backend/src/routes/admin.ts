@@ -723,7 +723,8 @@ router.get('/riders/:id', authenticate, requireRole('super_admin', 'admin'), asy
     try {
         const [profileRes, earningsRes, ordersRes, docsRes, payoutsRes] = await Promise.all([
             query(`SELECT u.id, u.name, u.phone, u.is_verified, u.is_online, u.is_active,
-                          u.is_suspended, u.suspension_reason, u.suspended_at, u.created_at
+                          u.is_suspended, u.suspension_reason, u.suspended_at, u.created_at,
+                          u.payment_model, u.monthly_salary_paise, u.fuel_allowance_per_km_paise
                    FROM users u WHERE u.id = $1 AND u.role IN ('rider', 'rider_captain')`, [id]),
             query(`SELECT date, deliveries_count, total_paise, base_earnings_paise, bonus_earnings_paise, cash_collected_paise
                    FROM rider_daily_earnings WHERE rider_id = $1 ORDER BY date DESC LIMIT 30`, [id]),
@@ -748,6 +749,34 @@ router.get('/riders/:id', authenticate, requireRole('super_admin', 'admin'), asy
         });
     } catch (err) {
         console.error('[admin/riders/:id]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.patch('/riders/:id/contract', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    const { payment_model, monthly_salary_paise, fuel_allowance_per_km_paise } = req.body;
+    
+    if (!['per_order', 'salary'].includes(payment_model)) {
+        return res.status(400).json({ error: 'INVALID_PAYMENT_MODEL' });
+    }
+
+    try {
+        const { rows } = await query(
+            `UPDATE users 
+             SET payment_model = $1, 
+                 monthly_salary_paise = $2, 
+                 fuel_allowance_per_km_paise = $3 
+             WHERE id = $4 AND role IN ('rider', 'rider_captain')
+             RETURNING id`,
+            [payment_model, monthly_salary_paise || 0, fuel_allowance_per_km_paise || 0, id]
+        );
+        
+        if (!rows.length) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[admin/riders/contract]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });

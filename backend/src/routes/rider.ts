@@ -470,6 +470,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
 
     const { rows: orders } = await query(`
         SELECT o.*,
+               u.payment_model, u.fuel_allowance_per_km_paise,
                k.lat as kitchen_lat, k.lng as kitchen_lng,
                a.lat as address_lat, a.lng as address_lng,
                z.rider_base_pay_paise, z.rider_per_km_paise, z.rider_free_km,
@@ -478,6 +479,7 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         JOIN kitchens k ON o.kitchen_id = k.id
         LEFT JOIN addresses a ON o.address_id = a.id
         LEFT JOIN zones z ON o.zone_id = z.id
+        JOIN users u ON u.id = o.rider_id
         WHERE o.id = $1 AND o.rider_id = $2
     `, [orderId, riderId]);
     const order = orders[0];
@@ -515,17 +517,24 @@ router.post('/verify-otp', authenticate, requireRole('rider', 'rider_captain', '
         const shortTripPaise = order.rider_base_pay_paise ?? TWO_QT.RIDER.BASE_EARNINGS_PER_DELIVERY_PAISE;
         const perKmPaise = order.rider_per_km_paise ?? 500;
         const freeKm = parseFloat(order.rider_free_km ?? '2');
-        // New model: ≤ threshold → flat rate; > threshold → per-km × full distance
-        const baseEarnings = distanceKm <= freeKm
-            ? shortTripPaise
-            : Math.floor(distanceKm * perKmPaise);
-        const surgeActive = order.surge_enabled && parseFloat(order.surge_multiplier ?? '1') > 1
-            && (!order.surge_expires_at || new Date(order.surge_expires_at) > new Date());
-        const surgeMultiplier = surgeActive ? parseFloat(order.surge_multiplier) : 1;
-        const tipPaise = parseInt(order.rider_tip_paise || '0', 10);
-        const platformFee = Math.floor(baseEarnings * 0.1); // 10% platform commission
+        let baseEarnings = 0;
+        let netEarnings = 0;
+        let platformFee = 0;
         const bonusPaise = tipPaise;
-        const netEarnings = Math.floor(baseEarnings * surgeMultiplier) + bonusPaise - platformFee;
+        
+        if (order.payment_model === 'salary') {
+            // Salary model: only fuel allowance based on distance
+            const fuelPaisePerKm = order.fuel_allowance_per_km_paise || 0;
+            baseEarnings = Math.floor(distanceKm * fuelPaisePerKm);
+            netEarnings = baseEarnings + bonusPaise;
+        } else {
+            // Gig model: Base pay + per km + surge
+            baseEarnings = distanceKm <= freeKm
+                ? shortTripPaise
+                : Math.floor(distanceKm * perKmPaise);
+            platformFee = Math.floor(baseEarnings * 0.1); // 10% platform commission
+            netEarnings = Math.floor(baseEarnings * surgeMultiplier) + bonusPaise - platformFee;
+        }
 
         console.log("[VERIFY-OTP] Updating earnings...", { netEarnings, tipPaise, baseEarnings });
         await client.query(`
@@ -2063,8 +2072,10 @@ router.get('/orders/:id/earnings-breakdown', authenticate, requireRole('rider', 
             SELECT o.id, o.display_id, o.total_amount_paise, o.tip_paise,
                    o.delivered_at, o.distance_km, o.payment_method,
                    z.rider_base_pay_paise, z.rider_free_km, z.rider_per_km_paise,
-                   z.surge_enabled, z.surge_multiplier, z.surge_expires_at
+                   z.surge_enabled, z.surge_multiplier, z.surge_expires_at,
+                   u.payment_model, u.fuel_allowance_per_km_paise
             FROM orders o JOIN zones z ON z.id = o.zone_id
+            JOIN users u ON u.id = o.rider_id
             WHERE o.id = $1 AND o.rider_id = $2 AND o.status = 'delivered'
         `, [id, riderId]);
 
@@ -2076,21 +2087,33 @@ router.get('/orders/:id/earnings-breakdown', authenticate, requireRole('rider', 
         const perKmPaise: number = order.rider_per_km_paise ?? 500;
         const freeKm: number = parseFloat(order.rider_free_km ?? '2');
 
-        const baseEarnings = distanceKm <= freeKm
-            ? shortTripPaise
-            : Math.floor(distanceKm * perKmPaise);
-
+        let baseEarnings = 0;
+        let platformFee = 0;
+        let surgedBase = 0;
         const surgeActive = order.surge_enabled && parseFloat(order.surge_multiplier ?? '1') > 1
             && (!order.surge_expires_at || new Date(order.surge_expires_at) > new Date(order.delivered_at));
         const surgeMultiplier = surgeActive ? parseFloat(order.surge_multiplier) : 1;
-        const platformFee = Math.floor(baseEarnings * 0.1);
-        const surgedBase = Math.floor(baseEarnings * surgeMultiplier);
         const tipPaise = parseInt(order.tip_paise ?? '0');
-        const netEarnings = surgedBase + tipPaise - platformFee;
+        let formula = '';
 
-        const formula = distanceKm <= freeKm
-            ? `flat rate ₹${(shortTripPaise / 100).toFixed(0)} (≤${freeKm}km)`
-            : `${distanceKm}km × ₹${(perKmPaise / 100).toFixed(0)}/km = ₹${(baseEarnings / 100).toFixed(0)}`;
+        if (order.payment_model === 'salary') {
+            const fuelPaise = order.fuel_allowance_per_km_paise || 0;
+            baseEarnings = Math.floor(distanceKm * fuelPaise);
+            surgedBase = baseEarnings; // No surge on fuel allowance
+            platformFee = 0;
+            formula = `${distanceKm}km × ₹${(fuelPaise / 100).toFixed(2)}/km (Fuel Allowance)`;
+        } else {
+            baseEarnings = distanceKm <= freeKm
+                ? shortTripPaise
+                : Math.floor(distanceKm * perKmPaise);
+            platformFee = Math.floor(baseEarnings * 0.1);
+            surgedBase = Math.floor(baseEarnings * surgeMultiplier);
+            formula = distanceKm <= freeKm
+                ? `flat rate ₹${(shortTripPaise / 100).toFixed(0)} (≤${freeKm}km)`
+                : `${distanceKm}km × ₹${(perKmPaise / 100).toFixed(0)}/km = ₹${(baseEarnings / 100).toFixed(0)}`;
+        }
+
+        const netEarnings = surgedBase + tipPaise - platformFee;
 
         res.json({
             orderId: order.id,
