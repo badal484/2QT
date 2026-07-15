@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { Router } from 'express';
 import crypto from 'crypto';
 import { z } from 'zod';
@@ -128,7 +128,7 @@ router.post('/send-otp', async (req, res) => {
 router.post('/verify-otp', async (req, res) => {
     try {
         const { phone, otp, referralCode, name, appRole, lat, lng } = req.body;
-        let normalizedPhone = phone.replace(/\D/g, '');
+        let normalizedPhone = String(phone).replace(/\D/g, '');
         if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
         
         // Check memory first (works even when Redis is down), then Redis
@@ -251,12 +251,13 @@ router.post('/verify-otp', async (req, res) => {
 
     const user = rows[0];
 
-    // Initialize wallet and award Welcome Bonus if new
-    const { rowCount: walletCreated } = await query('INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, 0) ON CONFLICT (customer_id) DO NOTHING', [user.id]);
-    
-    // Systematic Welcome Bonus & Referral Linking
-    if (walletCreated > 0) {
-        // 1. Initial Loyalty Points
+    // If new user, create wallet & add sign-up bonus
+    const { rowCount: walletCreated } = await query(
+        'INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, 0) ON CONFLICT (customer_id) DO NOTHING',
+        [user.id]
+    );
+    if ((walletCreated ?? 0) > 0) {
+        // Loyalty Bonus
         await query(`
             INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
             VALUES ($1, 500, 'earn', NOW() + INTERVAL '1 year')
@@ -362,16 +363,9 @@ router.post('/refresh', async (req, res) => {
             [decoded.userId]
         );
         
-        let tokenMatch = false;
-        for (const tokenRow of dbTokens) {
-            if (tokenRow.revoked_at === null) {
-                const match = await bcrypt.compare(refreshToken, tokenRow.token_hash);
-                if (match) {
-                    tokenMatch = true;
-                    break;
-                }
-            }
-        }
+        const validTokens = dbTokens.filter((t: any) => t.revoked_at === null);
+        const matches = await Promise.all(validTokens.map((t: any) => bcrypt.compare(refreshToken, t.token_hash)));
+        const tokenMatch = matches.includes(true);
 
         if (!tokenMatch) {
             console.log(`[REFRESH] Token hash not matched or revoked for user ${decoded.userId}`);
@@ -406,7 +400,7 @@ router.delete('/logout', authenticate, async (req: AuthRequest, res) => {
 
 router.post('/kitchen-pin', async (req, res) => {
     const { pin } = req.body;
-    if (pin.length !== 4) return res.status(400).json({ error: 'INVALID_PIN' });
+    if (String(pin).length !== 4) return res.status(400).json({ error: 'INVALID_PIN' });
 
     try {
         // 1. Get all kitchens with PINs
@@ -443,7 +437,7 @@ router.post('/kitchen-pin', async (req, res) => {
 
         // Ensure a user record exists for this kitchen/chef
         // Generate a deterministic phone number based on kitchen ID for the chef account
-        const chefPhone = '91' + kitchen.id.replace(/\D/g, '').slice(0, 10).padEnd(10, '0');
+        const chefPhone = '91' + String(kitchen.id).replace(/\D/g, '').slice(0, 10).padEnd(10, '0');
         
         const { rows: users } = await query(
             'INSERT INTO users (phone, name, role, kitchen_id) VALUES ($1, $2, \'chef\', $3) ON CONFLICT (phone) DO UPDATE SET kitchen_id = $3 RETURNING id',
@@ -511,7 +505,7 @@ router.post('/firebase-login', async (req, res) => {
             return res.status(400).json({ error: 'NO_PHONE_IN_TOKEN', message: 'Phone number not found in Firebase token' });
         }
 
-        let normalizedPhone = phone.replace(/\D/g, '');
+        let normalizedPhone = String(phone).replace(/\D/g, '');
         if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
 
         if (!phoneSchema.safeParse(normalizedPhone).success) {
@@ -599,7 +593,7 @@ router.post('/firebase-login', async (req, res) => {
         // Initialize wallet and award Welcome Bonus if new
         const { rowCount: walletCreated } = await query('INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, 0) ON CONFLICT (customer_id) DO NOTHING', [user.id]);
         
-        if (walletCreated > 0) {
+        if ((walletCreated ?? 0) > 0) {
             await query(`
                 INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
                 VALUES ($1, 500, 'earn', NOW() + INTERVAL '1 year')
