@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { Router } from 'express';
 import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
@@ -21,7 +21,7 @@ const imagekit = new ImageKit({
     publicKey: process.env.IMAGEKIT_PUBLIC_KEY || '',
     privateKey: process.env.IMAGEKIT_PRIVATE_KEY || '',
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || '',
-});
+} as any);
 const upload = multer({ storage: multer.memoryStorage() });
 
 const razorpay = new Razorpay({
@@ -308,7 +308,7 @@ router.post('/offline', authenticate, requireRole('rider', 'rider_captain', 'sup
 // Rider opts out of an auto-assigned order within the 30s window
 router.post('/orders/:id/mark-unavailable', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
     const riderId = req.user!.userId;
-    const { id: orderId } = req.params;
+    const orderId = req.params.id as string;
     try {
         await unassignAndReassign(orderId, riderId);
         res.json({ ok: true });
@@ -380,8 +380,9 @@ router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain',
     }
 });
 
+// Status updates (accepting, out_for_delivery, delivered)
 router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { status } = req.body;
     const riderId = req.user!.userId;
 
@@ -917,7 +918,7 @@ router.get('/orders/history', authenticate, requireRole('rider', 'rider_captain'
 });
 
 router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const riderId = req.user!.userId;
 
     try {
@@ -965,7 +966,7 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
 });
 
 router.post('/orders/:id/unclaim', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const riderId = req.user!.userId;
 
     try {
@@ -1079,7 +1080,7 @@ router.post('/payouts/request', authenticate, requireRole('rider', 'rider_captai
 // Creates a Razorpay payment link for COD UPI collection.
 // Returns short_url used as the QR value — payment is verified via webhook, not rider's word.
 router.post('/orders/:orderId/upi-payment-link', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
-    const { orderId } = req.params;
+    const orderId = req.params.orderId as string;
     const riderId = req.user!.userId;
     try {
         const { rows } = await query(
@@ -1108,7 +1109,7 @@ router.post('/orders/:orderId/upi-payment-link', authenticate, requireRole('ride
             reference_id: orderId,   // used in webhook to find the order
             notify: { sms: false, email: false },
             reminder_enable: false,
-        });
+        } as any) as any;
 
         const result = { short_url: link.short_url, amount: order.total_amount_paise };
         redis.set(cacheKey, JSON.stringify(result), { EX: 1800 }).catch(() => {});

@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { Router } from 'express';
 import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
@@ -195,7 +195,7 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
 });
 
 router.post('/orders/:id/claim', authenticate, requireRole('chef', 'kitchen_manager', 'partner_kitchen', 'super_admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const chefId = req.user!.userId;
 
     const { rowCount, rows } = await query(
@@ -221,7 +221,7 @@ router.post('/orders/:id/claim', authenticate, requireRole('chef', 'kitchen_mana
 });
 
 router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { status } = req.body;
 
     try {
@@ -305,7 +305,7 @@ router.get('/packer/orders', authenticate, requireRole('packer', 'kitchen_manage
 
 // Packer marks order as packed → triggers rider assignment
 router.post('/orders/:id/packed', authenticate, requireRole('packer', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { rows } = await query(
         `UPDATE orders SET status = 'ready_for_pickup', packed_by_id = $1, packed_at = NOW()
          WHERE id = $2 AND status = 'packing'
@@ -563,7 +563,7 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
 
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { riderId } = req.body;
     if (!riderId) return res.status(400).json({ error: 'MISSING_RIDER_ID' });
 
@@ -634,7 +634,7 @@ router.post('/orders/:id/force-reassign', authenticate, requireRole('kitchen_man
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
 
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { reason = 'vehicle_breakdown' } = req.body;
 
     try {
@@ -658,10 +658,9 @@ router.post('/orders/:id/force-reassign', authenticate, requireRole('kitchen_man
         });
 
         // Push notification to customer
-        pushService.sendToUser(customer_id, {
+        pushService.sendNotificationToUser(customer_id, {
             title: 'Slight delay on your order',
-            body: `We're finding a new rider for ${display_id}. Sorry for the wait!`,
-            data: { orderId: id, type: 'breakdown_delay' },
+            body: `We're finding a new rider for ${display_id}. Sorry for the wait!`
         }).catch(() => {});
 
         // Refresh dispatch panel — order now appears in unassigned list automatically
