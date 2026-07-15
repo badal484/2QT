@@ -8,6 +8,8 @@ import { api } from '../api/client';
 import { ArrowLeft, Wallet, Trophy, Banknote, CalendarDays } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonScreenList, SkeletonStatCard, ScreenError } from '../components/ui';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
@@ -19,6 +21,8 @@ const R = {
 
 const EarningsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const isSalaried = user?.payment_model === 'salary';
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['rider-earnings-history'],
@@ -92,7 +96,7 @@ const EarningsScreen = ({ navigation }: any) => {
         {/* Premium Dark Hero Card */}
         <View style={s.heroCard}>
           <View style={s.heroTop}>
-            <Text style={s.heroLabel}>Total Earnings</Text>
+            <Text style={s.heroLabel}>{isSalaried ? 'Total Fuel Earnings' : 'Total Earnings'}</Text>
             <Wallet size={16} color={R.orange} />
           </View>
           <Text style={s.heroAmount}>₹{(totalPaise / 100).toFixed(2)}</Text>
@@ -110,6 +114,13 @@ const EarningsScreen = ({ navigation }: any) => {
               <Text style={s.heroStatLbl}>Active Days</Text>
             </View>
           </View>
+          {isSalaried && (
+            <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#3F4643' }}>
+              <Text style={{ color: R.white, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
+                + Fixed Monthly Salary: ₹{((user?.monthly_salary_paise || 0) / 100).toFixed(0)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Minimalist Chart */}

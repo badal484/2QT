@@ -16,6 +16,9 @@ interface AuthState {
     is_online?: boolean;
     online_since?: string | null;
     is_verified?: boolean;
+    payment_model?: 'per_order' | 'salary';
+    monthly_salary_paise?: number;
+    fuel_allowance_per_km_paise?: number;
   };
   accessToken: null | string;
   refreshToken: null | string;
