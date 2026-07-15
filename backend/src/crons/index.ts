@@ -271,6 +271,86 @@ export const initCrons = () => {
         console.log('[CRON] Daily kitchen payouts done');
     });
 
+    // ── Monthly Salaried Rider Payout on the 1st of every month at 9:00 AM ──
+    cron.schedule('0 9 1 * *', async () => {
+        console.log('[CRON] Running monthly salaried rider payouts...');
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+        const { rows: salariedRiders } = await query(`
+            SELECT u.id, u.name, u.phone, u.upi_id,
+                   u.razorpay_contact_id, u.razorpay_fund_account_id,
+                   COALESCE(u.pending_deductions_paise, 0) AS pending_deductions,
+                   u.monthly_salary_paise
+            FROM users u
+            WHERE u.role = 'rider'
+              AND u.is_active = TRUE
+              AND u.payment_model = 'salary'
+              AND COALESCE(u.monthly_salary_paise, 0) > 0
+        `);
+
+        for (const rider of salariedRiders) {
+            try {
+                const salaryPaise = parseInt(rider.monthly_salary_paise);
+                const deductions = parseInt(rider.pending_deductions);
+                const complaintDeduction = Math.min(deductions, salaryPaise);
+                const netPaise = Math.max(0, salaryPaise - complaintDeduction);
+
+                if (netPaise <= 0) {
+                    console.log(`[CRON] Salaried Rider ${rider.name}: fully absorbed by deductions`);
+                    await query(
+                        `UPDATE users SET pending_deductions_paise = pending_deductions_paise - $1 WHERE id = $2`,
+                        [complaintDeduction, rider.id]
+                    );
+                    continue;
+                }
+
+                const mode = (isAutoPayConfigured() && rider.upi_id) ? 'auto' : 'manual';
+                const { rows: pr } = await query(`
+                    INSERT INTO weekly_payouts
+                      (rider_id, week_start, week_end, net_amount_paise,
+                       status, payout_mode, complaint_deduction_paise, upi_id)
+                    VALUES ($1, $2, $2, $3, 'processing', $4, $5, $6)
+                    RETURNING id
+                `, [rider.id, today, netPaise, mode, complaintDeduction, rider.upi_id || null]);
+                const payoutRowId = pr[0].id;
+
+                if (mode === 'auto') {
+                    const fundAccountId = await ensureRiderFundAccount(rider);
+                    const result = await firePayout(
+                        fundAccountId,
+                        netPaise,
+                        `2QT Salary ${today.substring(0,7)}`,
+                        `2QT-S-${rider.id.slice(0, 8)}-${today}`
+                    );
+                    await query(`
+                        UPDATE weekly_payouts
+                        SET status = 'paid', paid_at = NOW(),
+                            razorpay_payout_id = $1, utr_number = $2
+                        WHERE id = $3
+                    `, [result.payoutId, result.utr, payoutRowId]);
+                    console.log(`[CRON] Salaried Rider ${rider.name}: ₹${netPaise / 100} paid (${result.payoutId})`);
+                } else {
+                    await query(`UPDATE weekly_payouts SET status = 'pending' WHERE id = $1`, [payoutRowId]);
+                    console.log(`[CRON] Salaried Rider ${rider.name}: ₹${netPaise / 100} pending (no UPI stored)`);
+                }
+
+                if (complaintDeduction > 0) {
+                    await query(
+                        `UPDATE users SET pending_deductions_paise = pending_deductions_paise - $1 WHERE id = $2`,
+                        [complaintDeduction, rider.id]
+                    );
+                }
+            } catch (err: any) {
+                console.error(`[CRON_ERROR] Salaried rider payout failed for ${rider.name}:`, err.message);
+                await query(
+                    `UPDATE weekly_payouts SET status = 'failed' WHERE rider_id = $1 AND week_start = $2`,
+                    [rider.id, today]
+                ).catch(() => {});
+            }
+        }
+        console.log('[CRON] Monthly salaried rider payouts done');
+    });
+
     // ── Daily rider auto-payout at 11:45 PM (after 11:30 PM guarantee top-up) ─
     cron.schedule('45 23 * * *', async () => {
         console.log('[CRON] Running daily rider auto-payouts...');
