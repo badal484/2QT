@@ -9,6 +9,8 @@ module.exports = {
     extend: {
       fontFamily: {
         serif: ['var(--font-playfair)', 'serif'],
+        display: ['"Space Grotesk"', 'sans-serif'],
+        sans: ['"Inter"', 'sans-serif'],
       },
       keyframes: {
         gradientShift: {
