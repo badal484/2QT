@@ -13,7 +13,7 @@ export function PreLaunchTab() {
   const loadData = async () => {
     try {
       const [configRes, regsRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/prelaunch/config`).then(r => r.json()),
+        api.get('/prelaunch/config'),
         api.get('/prelaunch/registrations')
       ]);
       setIsPrelaunch(configRes.isPrelaunch);
