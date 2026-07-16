@@ -1,163 +1,137 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Send, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Hero } from './components/Hero';
+import { PhoneAuth } from './components/PhoneAuth';
+import { SurveyWizard, SurveyData } from './components/SurveyWizard';
+import { ThankYou } from './components/ThankYou';
+import { LiveCounter } from './components/LiveCounter';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 export default function PreLaunchPage() {
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', cuisine: '' });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || (!formData.email && !formData.phone)) {
-      toast.error('Please provide your name and an email or phone number.');
-      return;
+  // Read referral code from URL if present
+  const [referredBy, setReferredBy] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const ref = urlParams.get('ref');
+      if (ref) setReferredBy(ref);
     }
+  }, []);
 
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+  const [phone, setPhone] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // FOMO Toasts
+  useEffect(() => {
+    if (step !== 0) return;
+    
+    const colleges = ["St. Xavier's", "Presidency", "Jadavpur", "Christ University", "SRM", "VIT"];
+    
+    const interval = setInterval(() => {
+      const r = Math.random();
+      if (r > 0.6) {
+        const college = colleges[Math.floor(Math.random() * colleges.length)];
+        toast(`Someone from ${college} just claimed a reward.`, {
+          icon: '🔥',
+          position: 'bottom-left',
+          duration: 4000,
+          style: { background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '16px', color: '#111', fontWeight: 600 }
+        });
+      }
+    }, 12000);
+    
+    return () => clearInterval(interval);
+  }, [step]);
+
+  const handlePhoneVerified = (verifiedPhone: string) => {
+    setPhone(verifiedPhone);
+    setStep(2);
+  };
+
+  const handleSurveyComplete = async (data: SurveyData) => {
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/proxy/prelaunch/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          surveyResponses: { cuisine: formData.cuisine }
+          name: data.name,
+          email: '', // Not strictly collecting email right now, phone is main
+          phone: phone,
+          surveyResponses: data,
+          referredBy: referredBy || undefined,
+          source: 'waitlist_v2'
         })
       });
 
+      const json = await res.json();
       if (res.ok) {
-        setIsSuccess(true);
-        toast.success('You have successfully joined the waitlist!');
+        setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
+        setStep(3);
       } else {
-        throw new Error('Failed to join');
+        throw new Error(json.error || 'Failed to submit');
       }
-    } catch (err) {
+    } catch (e: any) {
       toast.error('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center"
-        >
-          <motion.div 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring' }}
-            className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6"
-          >
-            <CheckCircle2 size={40} />
-          </motion.div>
-          <h1 className="text-3xl font-bold text-zinc-900 mb-4">You're on the list!</h1>
-          <p className="text-zinc-600 mb-8">
-            Thank you for joining the 2QT waitlist. We will notify you as soon as we launch!
-          </p>
-          <button 
-            onClick={() => window.location.href = '/'}
-            className="w-full py-4 rounded-xl font-bold text-white bg-brand-primary"
-          >
-            Return Home
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
+  const variants = {
+    enter: { opacity: 0, y: 20 },
+    center: { opacity: 1, y: 0 },
+    exit: { opacity: 0, scale: 0.95, filter: 'blur(10px)' },
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decorations */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-primary/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-brand-accent/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-luxury-bg text-luxury-text relative font-sans overflow-x-hidden">
+      
+      {/* Global Background Layer */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 w-full h-[500px] bg-gradient-to-b from-brand-accent/5 to-transparent" />
+      </div>
 
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-8 md:p-12 rounded-3xl shadow-xl max-w-lg w-full relative z-10"
-      >
-        <div className="text-center mb-8">
-          <div className="inline-block px-4 py-1.5 rounded-full bg-brand-primary/10 text-brand-primary font-semibold text-sm mb-4">
-            COMING SOON
-          </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-zinc-900 mb-4 tracking-tight">
-            2QT
-          </h1>
-          <p className="text-zinc-500 text-lg">
-            A premium food delivery experience is cooking. Join the exclusive waitlist to get early access and launch offers.
-          </p>
-        </div>
+      <AnimatePresence mode="wait">
+        {step === 0 && (
+          <motion.div key="hero" initial="enter" animate="center" exit="exit" variants={variants} className="w-full">
+            <Hero onStart={() => setStep(1)} />
+            <LiveCounter />
+          </motion.div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-zinc-700 mb-1.5">Full Name</label>
-            <input 
-              type="text"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all outline-none"
-              placeholder="John Doe"
-            />
-          </div>
+        {step === 1 && (
+          <motion.div key="phone" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 bg-zinc-50/50">
+            <PhoneAuth onVerified={handlePhoneVerified} />
+          </motion.div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-zinc-700 mb-1.5">Email Address</label>
-              <input 
-                type="email"
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all outline-none"
-                placeholder="john@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-zinc-700 mb-1.5">Phone Number</label>
-              <input 
-                type="tel"
-                value={formData.phone}
-                onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all outline-none"
-                placeholder="+91 9000000000"
-              />
-            </div>
-          </div>
+        {step === 2 && (
+          <motion.div key="survey" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 md:p-8 bg-zinc-50/50">
+            {isSubmitting ? (
+              <div className="flex flex-col items-center justify-center">
+                <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
+                <p className="text-zinc-500 font-medium">Securing your launch reward...</p>
+              </div>
+            ) : (
+              <SurveyWizard onComplete={handleSurveyComplete} />
+            )}
+          </motion.div>
+        )}
 
-          <div>
-            <label className="block text-sm font-semibold text-zinc-700 mb-1.5">Favorite Cuisine?</label>
-            <select 
-              value={formData.cuisine}
-              onChange={e => setFormData({ ...formData, cuisine: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all outline-none"
-            >
-              <option value="">Select one...</option>
-              <option value="Indian">Indian</option>
-              <option value="Chinese">Chinese</option>
-              <option value="Italian">Italian</option>
-              <option value="Fast Food">Fast Food</option>
-              <option value="Healthy">Healthy / Salads</option>
-            </select>
-          </div>
+        {step === 3 && (
+          <motion.div key="thankyou" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 bg-zinc-50/50">
+            <ThankYou referralCode={referralCode} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <button 
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-4 mt-6 rounded-xl font-bold text-white bg-brand-primary hover:bg-brand-primary-dark transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
-          >
-            {isSubmitting ? 'Joining...' : 'Join Waitlist'}
-            <Send size={18} />
-          </button>
-        </form>
-      </motion.div>
     </div>
   );
 }
