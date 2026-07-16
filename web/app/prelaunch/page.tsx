@@ -62,7 +62,6 @@ export default function PreLaunchPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: data.name,
-          email: '', // Not strictly collecting email right now, phone is main
           phone: phone,
           surveyResponses: data,
           referredBy: referredBy || undefined,
