@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 
 interface TimeLeft {
   days: number;
@@ -39,42 +40,59 @@ export function Countdown() {
   if (!mounted) return null;
 
   return (
-    <section className="py-24 bg-zinc-900 text-white relative overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+    <section className="py-24 bg-zinc-950 relative overflow-hidden">
       
-      <div className="container mx-auto px-6 relative z-10">
-        <div className="max-w-4xl mx-auto flex flex-col items-center">
-          <motion.h2 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-4xl md:text-5xl font-extrabold tracking-tight mb-12 text-center"
-          >
-            The clock is ticking.
-          </motion.h2>
+      {/* Background ambient blobs */}
+      <div className="absolute inset-0 pointer-events-none opacity-30">
+        <div className="absolute top-1/2 left-1/4 w-[400px] h-[400px] bg-brand-primary/20 rounded-full blur-[100px] -translate-y-1/2" />
+      </div>
 
-          <div className="flex gap-4 md:gap-8 justify-center items-center w-full max-w-2xl">
-            {Object.entries(timeLeft).map(([label, value], i) => (
-              <motion.div 
-                key={label}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="flex flex-col items-center"
-              >
-                <div className="w-20 h-24 md:w-28 md:h-32 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center justify-center shadow-2xl relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50" />
-                  <span className="text-4xl md:text-6xl font-black tabular-nums tracking-tighter text-white drop-shadow-md relative z-10">
-                    {value.toString().padStart(2, '0')}
-                  </span>
-                </div>
-                <span className="mt-4 text-xs md:text-sm font-bold uppercase tracking-widest text-zinc-400">
-                  {label}
+      <div className="container mx-auto px-6 max-w-4xl relative z-10 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-sm font-bold uppercase tracking-widest mb-8"
+        >
+          <Sparkles className="w-4 h-4" />
+          The Wait is Almost Over
+        </motion.div>
+        
+        <motion.h2 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1 }}
+          className="text-4xl md:text-5xl font-extrabold font-serif text-white tracking-tight mb-16"
+        >
+          Something delicious is cooking.
+        </motion.h2>
+
+        <div className="flex flex-wrap justify-center gap-4 md:gap-8">
+          {[
+            { label: 'Days', value: timeLeft.days },
+            { label: 'Hours', value: timeLeft.hours },
+            { label: 'Minutes', value: timeLeft.minutes },
+            { label: 'Seconds', value: timeLeft.seconds }
+          ].map((item, i) => (
+            <motion.div
+              key={item.label}
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              whileInView={{ opacity: 1, scale: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 + (i * 0.1), type: 'spring' }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-20 h-24 md:w-32 md:h-36 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-[2rem] flex items-center justify-center mb-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+                <span className="text-4xl md:text-6xl font-black font-serif text-white tracking-tighter tabular-nums drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+                  {item.value.toString().padStart(2, '0')}
                 </span>
-              </motion.div>
-            ))}
-          </div>
+              </div>
+              <span className="text-sm md:text-base font-bold text-zinc-400 uppercase tracking-widest">
+                {item.label}
+              </span>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>
