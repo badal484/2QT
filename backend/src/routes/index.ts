@@ -28,6 +28,7 @@ import tableBookingsRoutes from './table-bookings';
 import partnerRoutes from './partner';
 import missionsRoutes from './missions';
 import supportRoutes from './support';
+import prelaunchRoutes from './prelaunch';
 // ... other routes
 
 import { ActivityLogService } from '../services/activity.service';
@@ -124,6 +125,7 @@ router.use('/table-bookings', tableBookingsRoutes);
 router.use('/partner', partnerRoutes);
 router.use('/missions', missionsRoutes);
 router.use('/support', supportRoutes);
+router.use('/prelaunch', prelaunchRoutes);
 // ...
 
 export default router;
