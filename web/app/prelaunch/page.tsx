@@ -43,7 +43,7 @@ export default function PreLaunchPage() {
           icon: '🔥',
           position: 'bottom-left',
           duration: 4000,
-          style: { background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '16px', color: '#111', fontWeight: 600 }
+          style: { background: 'rgba(20, 20, 25, 0.8)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', color: '#fff', fontWeight: 600 }
         });
       }
     }, 12000);
@@ -100,10 +100,18 @@ export default function PreLaunchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-zinc-900 relative font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#05050A] text-zinc-100 relative font-sans overflow-x-hidden selection:bg-brand-primary selection:text-white">
       
       {/* Global Background Layer */}
-      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#FAFAFA]"></div>
+      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#05050A]">
+        {/* Animated Cinematic Glow */}
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-[20%] -right-[10%] w-[70vw] h-[70vw] bg-brand-primary/20 rounded-full blur-[120px]"
+        />
+        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]"></div>
+      </div>
 
       <AnimatePresence mode="wait">
         {step === 0 && (
@@ -123,7 +131,7 @@ export default function PreLaunchPage() {
             {isSubmitting ? (
               <div className="flex flex-col items-center justify-center">
                 <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
-                <p className="text-zinc-500 font-bold text-sm">Securing your launch reward...</p>
+                <p className="text-zinc-400 font-bold text-sm">Securing your launch reward...</p>
               </div>
             ) : (
               <SurveyWizard onComplete={handleSurveyComplete} />
