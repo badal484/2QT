@@ -49,27 +49,38 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     }, 1000);
   };
 
-  const sendOtp = async (phoneNumber: string) => {
+  const sendOtp = async (phoneNumber: string, isResend = false) => {
     setIsLoading(true);
     try {
       const auth = getAuth(app);
-      // Always create a fresh verifier — reusing a solved/consumed one causes failures
-      if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.clear(); } catch {}
-        window.recaptchaVerifier = null;
+      if (isResend && window.recaptchaVerifier) {
+        // Reset the widget token — don't destroy/recreate on same container
+        try {
+          const widgetId = await window.recaptchaVerifier.render();
+          window.grecaptcha?.reset(widgetId);
+        } catch {
+          // Widget reset failed; fall back to fresh instance
+          try { window.recaptchaVerifier.clear(); } catch {}
+          window.recaptchaVerifier = null;
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+        }
+      } else {
+        // Initial send — always create a fresh verifier
+        if (window.recaptchaVerifier) {
+          try { window.recaptchaVerifier.clear(); } catch {}
+          window.recaptchaVerifier = null;
+        }
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
       }
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
       const confirmation = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, window.recaptchaVerifier);
       setConfirmationResult(confirmation);
       startCooldown();
       return true;
     } catch (error: any) {
-      const code = error?.code || 'unknown';
-      console.error('OTP send failed:', code, error?.message);
+      const code = error?.code || error?.message || 'unknown';
+      console.error('OTP send failed:', error);
       toast.error(`Failed to send OTP (${code})`);
-      try {
-        if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); }
-      } catch {}
+      try { if (window.recaptchaVerifier) window.recaptchaVerifier.clear(); } catch {}
       window.recaptchaVerifier = null;
       return false;
     } finally {
@@ -88,7 +99,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     if (resendCooldown > 0 || isLoading) return;
     setOtp(['', '', '', '', '', '']);
     setOtpError('');
-    const ok = await sendOtp(phone);
+    const ok = await sendOtp(phone, true);
     if (ok) toast.success('New code sent');
     setTimeout(() => inputRefs.current[0]?.focus(), 50);
   };
