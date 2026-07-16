@@ -88,7 +88,7 @@ export default function HomePage() {
             </div>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] tracking-tight mb-6">
               Extraordinary food,<br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-orange-400">delivered to you.</span>
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-brand-primary-dark">delivered to you.</span>
             </h1>
             <p className="text-lg md:text-xl text-black/60 font-medium max-w-md mb-10 leading-relaxed">
               Experience gourmet meals crafted by top chefs, delivered with uncompromising quality directly to your dining table.
