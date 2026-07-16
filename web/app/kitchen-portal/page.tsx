@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  TrendingUp, Wallet, IndianRupee, LogOut, RefreshCw,
-  Utensils, Clock, CheckCircle2, BarChart3, ChevronRight, X
+  TrendingUp, IndianRupee, LogOut, RefreshCw, Utensils
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { api } from "../lib/api";
@@ -26,7 +25,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
   const [devOtp, setDevOtp] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const sendOTP = async (e: React.FormEvent) => {
+  const sendOTP = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10) return toast.error("Enter a valid phone number");
@@ -44,7 +43,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh:
     } finally { setLoading(false); }
   };
 
-  const verifyOTP = async (e: React.FormEvent) => {
+  const verifyOTP = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (otp.length < 4) return toast.error("Enter the OTP");
     setLoading(true);
@@ -218,7 +217,7 @@ function PayoutRow({ payout }: { payout: any }) {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
+function Dashboard({ onLogout }: { user: any; onLogout: () => void }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<"earnings" | "orders" | "payouts">("earnings");
@@ -235,7 +234,11 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
 
   useEffect(() => { load(); }, [load]);
 
-  useSocketRefresh(["menu_updated", "inventory_updated", "kitchen_metrics_updated", "kitchen_payout_updated", "new_order"], load);
+  // new_order    → order placed, emitToKitchen
+  // order_updated → status progressed (delivered = earnings finalized), emitToKitchen
+  // order_cancelled → order voided, emitToKitchen
+  // kitchen_payout_updated → payout processed, emitToKitchen
+  useSocketRefresh(["new_order", "order_updated", "order_cancelled", "kitchen_payout_updated"], load);
 
   const kitchen = data?.kitchen;
   const commissionRate = parseFloat(kitchen?.commission_rate || "0.20");
