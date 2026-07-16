@@ -71,6 +71,7 @@ export default function PreLaunchPage() {
 
       const json = await res.json();
       if (res.ok) {
+        sessionStorage.removeItem('2qt_survey_progress');
         setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
         setStep(3);
       } else {
