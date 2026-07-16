@@ -121,14 +121,14 @@ export function SurveyWizard({ onComplete }: SurveyWizardProps) {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="text-sm font-bold text-zinc-400 tracking-widest uppercase">
+          <div className="text-sm font-bold text-zinc-500 tracking-widest uppercase">
             {currentIndex + 1} / {QUESTIONS.length}
           </div>
           <div className="w-10" /> {/* Spacer */}
         </div>
-        <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
+        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
           <motion.div 
-            className="h-full bg-zinc-900"
+            className="h-full bg-brand-primary shadow-[0_0_10px_rgba(255,107,53,0.8)]"
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
             transition={{ type: 'spring', stiffness: 50, damping: 15 }}
@@ -149,7 +149,7 @@ export function SurveyWizard({ onComplete }: SurveyWizardProps) {
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="absolute inset-0 flex flex-col"
           >
-            <h2 className="text-3xl md:text-5xl font-extrabold text-zinc-900 tracking-tight mb-8 leading-[1.1]">
+            <h2 className="text-3xl md:text-5xl font-extrabold font-serif text-white tracking-tight mb-8 leading-[1.1]">
               {q.title}
             </h2>
 
@@ -161,7 +161,7 @@ export function SurveyWizard({ onComplete }: SurveyWizardProps) {
                   placeholder={q.placeholder}
                   value={data[q.id as keyof SurveyData] || ''}
                   onChange={e => setData(prev => ({ ...prev, [q.id]: e.target.value }))}
-                  className="w-full text-2xl md:text-4xl font-medium text-zinc-900 bg-transparent border-b-2 border-zinc-200 py-4 placeholder:text-zinc-300 focus:border-zinc-900 outline-none transition-colors"
+                  className="w-full text-2xl md:text-4xl font-medium text-white bg-transparent border-b-2 border-white/20 py-4 placeholder:text-zinc-600 focus:border-brand-primary outline-none transition-colors"
                 />
               </div>
             )}
@@ -177,14 +177,14 @@ export function SurveyWizard({ onComplete }: SurveyWizardProps) {
                       className={cn(
                         "w-full text-left px-6 py-5 rounded-2xl border-2 transition-all flex items-center justify-between group",
                         isSelected 
-                          ? "border-zinc-900 bg-zinc-900 text-white" 
-                          : "border-zinc-100 bg-zinc-50 hover:border-zinc-300 text-zinc-700"
+                          ? "border-brand-primary bg-brand-primary/10 text-white shadow-[0_0_20px_rgba(255,107,53,0.15)]" 
+                          : "border-white/10 bg-white/5 hover:border-white/30 text-zinc-400 hover:text-white"
                       )}
                     >
                       <span className="text-lg md:text-xl font-semibold">{opt}</span>
                       <div className={cn(
                         "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors",
-                        isSelected ? "border-white" : "border-zinc-300 group-hover:border-zinc-400"
+                        isSelected ? "border-brand-primary bg-brand-primary" : "border-white/20 group-hover:border-white/40"
                       )}>
                         {isSelected && <Check className="w-4 h-4 text-white" />}
                       </div>
@@ -200,7 +200,7 @@ export function SurveyWizard({ onComplete }: SurveyWizardProps) {
                 <button 
                   onClick={handleNext}
                   disabled={!isCurrentValid}
-                  className="w-full flex items-center justify-center gap-2 bg-zinc-900 text-white py-4 rounded-2xl font-bold text-lg hover:bg-zinc-800 transition-all disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 bg-brand-primary text-white py-4 rounded-2xl font-bold text-lg hover:bg-brand-primary-dark transition-all disabled:opacity-50 disabled:grayscale"
                 >
                   {currentIndex === QUESTIONS.length - 1 ? 'Complete' : 'Continue'}
                   <ArrowRight className="w-5 h-5" />
@@ -218,8 +218,8 @@ export function SurveyWizard({ onComplete }: SurveyWizardProps) {
           onClick={handleNext}
           disabled={!isCurrentValid}
           className={cn(
-            "flex items-center gap-2 bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all",
-            !isCurrentValid ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0 hover:scale-105"
+            "flex items-center gap-2 bg-brand-primary text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all hover:bg-brand-primary-dark",
+            !isCurrentValid ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0 hover:scale-105 shadow-[0_0_20px_rgba(255,107,53,0.3)]"
           )}
         >
           {currentIndex === QUESTIONS.length - 1 ? 'Complete' : 'Press Enter ↵'}

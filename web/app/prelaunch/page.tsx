@@ -91,7 +91,7 @@ export default function PreLaunchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900 relative font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 relative font-sans overflow-x-hidden">
       
       {/* Global Background Layer */}
       <div className="fixed inset-0 pointer-events-none">
@@ -106,13 +106,13 @@ export default function PreLaunchPage() {
         )}
 
         {step === 1 && (
-          <motion.div key="phone" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 bg-zinc-50/50">
+          <motion.div key="phone" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
             <PhoneAuth onVerified={handlePhoneVerified} />
           </motion.div>
         )}
 
         {step === 2 && (
-          <motion.div key="survey" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 md:p-8 bg-zinc-50/50">
+          <motion.div key="survey" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 md:p-8">
             {isSubmitting ? (
               <div className="flex flex-col items-center justify-center">
                 <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
@@ -125,7 +125,7 @@ export default function PreLaunchPage() {
         )}
 
         {step === 3 && (
-          <motion.div key="thankyou" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 bg-zinc-50/50">
+          <motion.div key="thankyou" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
             <ThankYou referralCode={referralCode} />
           </motion.div>
         )}
