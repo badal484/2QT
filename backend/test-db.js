@@ -1,21 +1,13 @@
-const { Pool } = require('pg');
-
-async function test(ssl) {
-  try {
-    const pool = new Pool({
-      connectionString: "postgresql://postgres.kkftttimpfenlgtjafnj:Badal%404834@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true",
-      ssl: ssl
-    });
-    await pool.query('SELECT 1');
-    console.log('Success with ssl:', !!ssl);
-    await pool.end();
-  } catch (err) {
-    console.log('Failed with ssl:', !!ssl, err.message);
-  }
-}
-
+const { Client } = require('pg');
+const client = new Client({ connectionString: 'postgresql://postgres.kkftttimpfenlgtjafnj:badal483454@13.239.87.90:6543/postgres' });
 async function run() {
-  await test(false);
-  await test({ rejectUnauthorized: false });
+  await client.connect();
+  try {
+    const res = await client.query("ALTER TABLE pre_launch_registrations ADD COLUMN referral_code VARCHAR(255), ADD COLUMN referred_by VARCHAR(255);");
+    console.log("Success:", res);
+  } catch (e) {
+    console.log("Error:", e.message);
+  }
+  await client.end();
 }
 run();

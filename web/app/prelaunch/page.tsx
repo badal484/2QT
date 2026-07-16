@@ -24,6 +24,7 @@ export default function PreLaunchPage() {
 
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [phone, setPhone] = useState('');
+  const [idToken, setIdToken] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,8 +50,9 @@ export default function PreLaunchPage() {
     return () => clearInterval(interval);
   }, [step]);
 
-  const handlePhoneVerified = (verifiedPhone: string) => {
-    setPhone(verifiedPhone);
+  const handlePhoneVerified = (data: { phone: string, token: string }) => {
+    setPhone(data.phone);
+    setIdToken(data.token);
     setStep(2);
   };
 
@@ -62,7 +64,7 @@ export default function PreLaunchPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: data.name,
-          phone: phone,
+          idToken: idToken,
           surveyResponses: data,
           referredBy: referredBy || undefined,
           source: 'waitlist_v2'
