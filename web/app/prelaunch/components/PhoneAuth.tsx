@@ -11,7 +11,7 @@ declare global {
 }
 
 interface PhoneAuthProps {
-  onVerified: (data: { phone: string; token: string; name: string }) => void;
+  onVerified: (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string }) => void;
 }
 
 const RESEND_SECONDS = 30;
@@ -130,7 +130,32 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       const result = await confirmationResult.confirm(code);
       if (result.user) {
         const token = await result.user.getIdToken();
-        setPendingVerified({ phone: result.user.phoneNumber || phone, token });
+        const phoneNum = result.user.phoneNumber || phone;
+
+        // Check registration before asking for name — skip NAME for returning users
+        try {
+          const meRes = await fetch('/api/proxy/prelaunch/me', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: token }),
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            if (meData.registered) {
+              setStep('SUCCESS');
+              setTimeout(() => onVerified({
+                phone: phoneNum, token,
+                name: meData.name || '',
+                alreadyRegistered: true,
+                referralCode: meData.referral_code,
+              }), 1200);
+              return;
+            }
+          }
+        } catch {}
+
+        // New user — ask for name
+        setPendingVerified({ phone: phoneNum, token });
         setStep('NAME');
       } else {
         throw new Error('User not found');
