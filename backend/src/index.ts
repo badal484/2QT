@@ -55,9 +55,17 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, server-to-server, curl)
         if (!origin) return callback(null, true);
         if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        // Allow all Vercel preview deployments and tunnel tools
+        if (
+            origin.endsWith('.vercel.app') ||
+            origin.endsWith('.loca.lt') ||
+            origin.endsWith('.ngrok.io') ||
+            origin.endsWith('.ngrok-free.app')
+        ) {
             return callback(null, true);
         }
         callback(new Error(`CORS: origin '${origin}' is not allowed`));

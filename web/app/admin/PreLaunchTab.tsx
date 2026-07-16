@@ -440,7 +440,7 @@ export function PreLaunchTab() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-white/[0.05]">
-                {['Registered', 'Name', 'Phone', 'College', 'Budget', 'Reward'].map(h => (
+                {['Registered', 'Name', 'Phone', 'Person Type', 'Institution', 'Reward'].map(h => (
                   <th key={h} className="px-5 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
                 <th className="px-5 py-3" />
@@ -449,7 +449,7 @@ export function PreLaunchTab() {
             <tbody className="divide-y divide-white/[0.03]">
               {regs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-xs font-bold text-zinc-600 uppercase tracking-widest">
+                  <td colSpan={8} className="px-5 py-12 text-center text-xs font-bold text-zinc-600 uppercase tracking-widest">
                     {search ? 'No results found' : 'No registrations yet'}
                   </td>
                 </tr>
@@ -460,13 +460,13 @@ export function PreLaunchTab() {
                   </td>
                   <td className="px-5 py-3.5 text-sm font-semibold text-white whitespace-nowrap">{r.name}</td>
                   <td className="px-5 py-3.5 text-sm text-zinc-400 font-mono whitespace-nowrap">
-                    {r.phone ? `+${r.phone.slice(0,2)} ${r.phone.slice(2,7)} ${r.phone.slice(7)}` : '—'}
+                    {r.phone ? (() => { const p = r.phone.replace(/^\+/, ''); return `+${p.slice(0,2)} ${p.slice(2,7)} ${p.slice(7)}`; })() : '—'}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-zinc-400 max-w-[140px] truncate">
+                    {r.survey_responses?.personType || '—'}
                   </td>
                   <td className="px-5 py-3.5 text-sm text-zinc-400 max-w-[160px] truncate">
-                    {r.survey_responses?.college || '—'}
-                  </td>
-                  <td className="px-5 py-3.5 text-sm text-zinc-400 whitespace-nowrap">
-                    {r.survey_responses?.budget || '—'}
+                    {r.survey_responses?.institution || r.survey_responses?.college || '—'}
                   </td>
                   <td className="px-5 py-3.5">
                     {r.reward_credited ? (

@@ -25,6 +25,7 @@ export default function PreLaunchPage() {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [phone, setPhone] = useState('');
   const [idToken, setIdToken] = useState('');
+  const [userName, setUserName] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -50,9 +51,10 @@ export default function PreLaunchPage() {
     return () => clearInterval(interval);
   }, [step]);
 
-  const handlePhoneVerified = (data: { phone: string, token: string }) => {
+  const handlePhoneVerified = (data: { phone: string, token: string, name: string }) => {
     setPhone(data.phone);
     setIdToken(data.token);
+    setUserName(data.name);
     setStep(2);
   };
 
@@ -63,7 +65,7 @@ export default function PreLaunchPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: data.name,
+          name: userName,
           idToken: idToken,
           surveyResponses: data,
           referredBy: referredBy || undefined,
@@ -73,7 +75,7 @@ export default function PreLaunchPage() {
 
       const json = await res.json();
       if (res.ok) {
-        sessionStorage.removeItem('2qt_survey_progress');
+        sessionStorage.removeItem('2qt_survey_v2');
         setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
         setStep(3);
       } else {
