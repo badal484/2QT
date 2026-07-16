@@ -232,13 +232,24 @@ function Dashboard({ onLogout }: { user: any; onLogout: () => void }) {
     } finally { setLoading(false); }
   }, []);
 
+  // Silent refresh — used by socket events and the 5-second poll so no spinner flicker
+  const silentRefresh = useCallback(async () => {
+    try {
+      const res = await api.get("/kitchen/my-earnings");
+      setData(res);
+    } catch { /* ignore background errors */ }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
 
-  // new_order    → order placed, emitToKitchen
-  // order_updated → status progressed (delivered = earnings finalized), emitToKitchen
-  // order_cancelled → order voided, emitToKitchen
-  // kitchen_payout_updated → payout processed, emitToKitchen
-  useSocketRefresh(["new_order", "order_updated", "order_cancelled", "kitchen_payout_updated"], load);
+  // 5-second polling as safety net for missed socket events
+  useEffect(() => {
+    const id = setInterval(silentRefresh, 5000);
+    return () => clearInterval(id);
+  }, [silentRefresh]);
+
+  // Socket events for instant updates (socket fires, silentRefresh also catches it within 5s)
+  useSocketRefresh(["new_order", "order_updated", "order_cancelled", "kitchen_payout_updated"], silentRefresh);
 
   const kitchen = data?.kitchen;
   const commissionRate = parseFloat(kitchen?.commission_rate || "0.20");
