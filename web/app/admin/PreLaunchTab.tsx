@@ -384,25 +384,25 @@ export function PreLaunchTab() {
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-[#0e0e16] rounded-[20px] border border-white/[0.05] p-6 shadow-xl">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Budget Distribution</h3>
-            {stats.budget?.length ? (
-              <MiniBar data={stats.budget} colorClass="bg-brand-primary" />
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Spend Per Order</h3>
+            {stats.spendPerOrder?.length ? (
+              <MiniBar data={stats.spendPerOrder} colorClass="bg-brand-primary" />
             ) : (
               <p className="text-xs text-zinc-600 mt-4">No data yet</p>
             )}
           </div>
           <div className="bg-[#0e0e16] rounded-[20px] border border-white/[0.05] p-6 shadow-xl">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Meal Time Preference</h3>
-            {stats.mealTime?.length ? (
-              <MiniBar data={stats.mealTime} colorClass="bg-blue-500" />
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Meal Preference</h3>
+            {stats.mealPreference?.length ? (
+              <MiniBar data={stats.mealPreference} colorClass="bg-blue-500" />
             ) : (
               <p className="text-xs text-zinc-600 mt-4">No data yet</p>
             )}
           </div>
           <div className="bg-[#0e0e16] rounded-[20px] border border-white/[0.05] p-6 shadow-xl">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Top Colleges</h3>
-            {stats.topColleges?.length ? (
-              <MiniBar data={stats.topColleges.map((c: any) => ({ label: c.name, count: c.count }))} colorClass="bg-emerald-500" />
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Top Institutions</h3>
+            {stats.topInstitutions?.length ? (
+              <MiniBar data={stats.topInstitutions.map((c: any) => ({ label: c.name, count: c.count }))} colorClass="bg-emerald-500" />
             ) : (
               <p className="text-xs text-zinc-600 mt-4">No data yet</p>
             )}
