@@ -66,7 +66,6 @@ export function SurveyWizard({ onComplete }: SurveyWizardProps) {
   const handleNext = () => {
     if (currentIndex === QUESTIONS.length - 1) {
       onComplete(data as SurveyData);
-      sessionStorage.removeItem('2qt_survey_progress');
     } else {
       setDirection(1);
       setCurrentIndex(c => c + 1);
