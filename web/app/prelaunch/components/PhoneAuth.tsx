@@ -64,7 +64,9 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       startCooldown();
       return true;
     } catch (error: any) {
-      toast.error('Failed to send OTP. Please try again.');
+      const code = error?.code || 'unknown';
+      console.error('OTP send failed:', code, error?.message);
+      toast.error(`Failed to send OTP (${code})`);
       try {
         if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); }
       } catch {}
