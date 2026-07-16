@@ -1,48 +1,9 @@
-import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
-
-interface TimeLeft {
-  days: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-}
+import { Sparkles, CalendarDays } from 'lucide-react';
 
 export function Countdown() {
-  const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    // Set target date 14 days from now for demo purposes
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 14);
-    
-    const timer = setInterval(() => {
-      const difference = targetDate.getTime() - new Date().getTime();
-      
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60)
-        });
-      } else {
-        clearInterval(timer);
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  if (!mounted) return null;
-
   return (
     <section className="py-24 bg-zinc-950 relative overflow-hidden">
-      
-      {/* Background ambient blobs */}
       <div className="absolute inset-0 pointer-events-none opacity-30">
         <div className="absolute top-1/2 left-1/4 w-[400px] h-[400px] bg-brand-primary/20 rounded-full blur-[100px] -translate-y-1/2" />
       </div>
@@ -57,43 +18,39 @@ export function Countdown() {
           <Sparkles className="w-4 h-4" />
           The Wait is Almost Over
         </motion.div>
-        
-        <motion.h2 
+
+        <motion.h2
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
-          className="text-4xl md:text-5xl font-extrabold font-serif text-white tracking-tight mb-16"
+          className="text-4xl md:text-5xl font-extrabold font-serif text-white tracking-tight mb-6"
         >
           Something delicious is cooking.
         </motion.h2>
 
-        <div className="flex flex-wrap justify-center gap-4 md:gap-8">
-          {[
-            { label: 'Days', value: timeLeft.days },
-            { label: 'Hours', value: timeLeft.hours },
-            { label: 'Minutes', value: timeLeft.minutes },
-            { label: 'Seconds', value: timeLeft.seconds }
-          ].map((item, i) => (
-            <motion.div
-              key={item.label}
-              initial={{ opacity: 0, scale: 0.8, y: 20 }}
-              whileInView={{ opacity: 1, scale: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 + (i * 0.1), type: 'spring' }}
-              className="flex flex-col items-center"
-            >
-              <div className="w-20 h-24 md:w-32 md:h-36 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-[2rem] flex items-center justify-center mb-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
-                <span className="text-4xl md:text-6xl font-black font-serif text-white tracking-tighter tabular-nums drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
-                  {item.value.toString().padStart(2, '0')}
-                </span>
-              </div>
-              <span className="text-sm md:text-base font-bold text-zinc-400 uppercase tracking-widest">
-                {item.label}
-              </span>
-            </motion.div>
-          ))}
-        </div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.2, type: 'spring' }}
+          className="inline-flex items-center gap-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-8 py-5 shadow-[0_8px_32px_rgba(0,0,0,0.4)] mt-4"
+        >
+          <CalendarDays className="w-6 h-6 text-brand-primary" />
+          <span className="text-2xl md:text-3xl font-black text-white tracking-tight">
+            Launching in <span className="text-brand-primary">August 2026</span>
+          </span>
+        </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.3 }}
+          className="mt-8 text-zinc-500 font-medium"
+        >
+          Register now — your ₹100 reward is waiting when we open doors.
+        </motion.p>
       </div>
     </section>
   );
