@@ -214,21 +214,21 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
     <div className="w-full max-w-xl mx-auto flex flex-col" style={{ minHeight: '75vh' }}>
       
       {/* Glow ambient */}
-      <div className="absolute top-0 right-1/4 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
+      <div className="absolute top-0 right-1/4 w-40 h-40 bg-orange-50 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
       {/* Progress */}
       <div className="mb-8 flex-shrink-0 relative z-10">
         <div className="flex items-center justify-between mb-4">
           <button onClick={back} aria-label="Back"
-            className={cn('flex items-center justify-center w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-orange-400/50 transition-colors', currentIndex === 0 && 'opacity-0 pointer-events-none')}>
+            className={cn('flex items-center justify-center w-10 h-10 rounded-full bg-white border border-zinc-200 text-zinc-900 hover:bg-zinc-50 hover:border-orange-200 transition-colors shadow-sm', currentIndex === 0 && 'opacity-0 pointer-events-none')}>
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <span className="text-xs font-semibold text-white/50 tracking-widest uppercase">
-            Step {currentIndex + 1} <span className="text-white/30">/ {QUESTIONS.length}</span>
+          <span className="text-xs font-semibold text-zinc-400 tracking-widest uppercase">
+            Step {currentIndex + 1} <span className="text-zinc-300">/ {QUESTIONS.length}</span>
           </span>
           <div className="w-10" />
         </div>
-        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+        <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden border border-zinc-200/50">
           <motion.div
             className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
             animate={{ width: `${progress}%` }}
@@ -249,11 +249,11 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
           >
             {/* Title */}
             <div className="mb-6 flex-shrink-0 relative z-10">
-              <h2 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight leading-snug">
+              <h2 className="text-2xl md:text-3xl font-display font-bold text-zinc-900 tracking-tight leading-snug">
                 {q.title}
               </h2>
               {q.subtitle && (
-                <p className="mt-2 text-sm text-white/50">
+                <p className="mt-2 text-sm text-zinc-500 font-medium">
                   {q.subtitle}{q.maxSelect ? ` (max ${q.maxSelect})` : ''}
                 </p>
               )}
@@ -266,13 +266,14 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   placeholder={q.placeholder}
                   value={String(data[q.id] || '')}
                   onChange={e => setData(prev => ({ ...prev, [q.id]: e.target.value }))}
-                  className="w-full text-xl font-medium text-white bg-white/5 border border-white/10 rounded-2xl py-4 px-5 placeholder:text-white/30 focus:border-orange-400/70 focus:bg-white/10 outline-none transition-colors"
+                  className="w-full text-xl font-bold text-zinc-900 bg-white border-2 border-zinc-100 rounded-2xl py-4 px-6 placeholder:text-zinc-300 focus:border-orange-400/70 hover:border-zinc-200 outline-none transition-colors shadow-sm"
                 />
-                <p className="mt-3 text-xs text-white/40 ml-2">
+                <p className="mt-3 text-xs font-semibold text-zinc-400 ml-2">
                   {q.optional ? 'Optional — press Enter ↵ to skip' : 'Press Enter ↵ to continue'}
                 </p>
                 <button onClick={next} disabled={!valid}
-                  className="mt-6 w-full flex items-center justify-center gap-2 btn-glow text-white px-7 py-3.5 rounded-full font-semibold text-sm transition-all disabled:opacity-40 disabled:pointer-events-none">
+                  className="mt-6 w-full flex items-center justify-center gap-2 text-white px-7 py-4 rounded-full font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-40 disabled:pointer-events-none"
+                  style={{ background: 'linear-gradient(to right, #ff7a45, #ff5722)' }}>
                   {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -285,13 +286,13 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   const sel = data[q.id] === opt;
                   return (
                     <button key={opt} onClick={() => pickRadio(opt)}
-                      className={cn('w-full text-left px-5 py-4 rounded-2xl border transition-all flex items-center justify-between group card-hover select-none',
-                        sel ? 'border-orange-400/70 bg-white/10 shadow-[0_0_15px_rgba(255,106,26,0.15)]'
-                            : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20')}>
-                      <span className="text-sm md:text-base font-medium text-white/90">{opt}</span>
+                      className={cn('w-full text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none',
+                        sel ? 'border-orange-400 bg-orange-50 shadow-sm'
+                            : 'border-zinc-100 bg-white hover:border-zinc-200 hover:bg-zinc-50 shadow-sm')}>
+                      <span className={cn("text-sm md:text-base font-bold", sel ? "text-orange-600" : "text-zinc-700")}>{opt}</span>
                       <span className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        sel ? 'border-orange-400 bg-orange-400 text-white' : 'border-white/20 group-hover:border-white/40')}>
-                        {sel && <div className="w-2 h-2 rounded-full bg-[#07070a]" />}
+                        sel ? 'border-orange-500 bg-orange-500 text-white' : 'border-zinc-200 group-hover:border-zinc-300')}>
+                        {sel && <div className="w-2 h-2 rounded-full bg-white" />}
                       </span>
                     </button>
                   );
@@ -299,13 +300,13 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                 {hasOther && (
                   <>
                     <button onClick={() => pickRadio(OTHER)}
-                      className={cn('w-full text-left px-5 py-4 rounded-2xl border transition-all flex items-center justify-between group card-hover select-none',
-                        otherSelected ? 'border-orange-400/70 bg-white/10 shadow-[0_0_15px_rgba(255,106,26,0.15)]'
-                                      : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20')}>
-                      <span className="text-sm md:text-base font-medium text-white/90">Other (Please specify)</span>
+                      className={cn('w-full text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none',
+                        otherSelected ? 'border-orange-400 bg-orange-50 shadow-sm'
+                                      : 'border-zinc-100 bg-white hover:border-zinc-200 hover:bg-zinc-50 shadow-sm')}>
+                      <span className={cn("text-sm md:text-base font-bold", otherSelected ? "text-orange-600" : "text-zinc-700")}>Other (Please specify)</span>
                       <span className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        otherSelected ? 'border-orange-400 bg-orange-400 text-white' : 'border-white/20 group-hover:border-white/40')}>
-                        {otherSelected && <div className="w-2 h-2 rounded-full bg-[#07070a]" />}
+                        otherSelected ? 'border-orange-500 bg-orange-500 text-white' : 'border-zinc-200 group-hover:border-zinc-300')}>
+                        {otherSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                       </span>
                     </button>
                     {otherSelected && (
@@ -313,13 +314,14 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                         <input autoFocus type="text" placeholder="Please specify…"
                           value={otherInputs[q.id] || ''}
                           onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white text-sm outline-none focus:border-orange-400/70 focus:bg-white/10 transition-colors placeholder:text-white/30"
+                          className="w-full bg-white border-2 border-zinc-100 rounded-2xl px-6 py-4 text-zinc-900 text-sm font-bold outline-none focus:border-orange-400 hover:border-zinc-200 transition-colors placeholder:text-zinc-300 shadow-sm"
                         />
                       </motion.div>
                     )}
                     {otherSelected && (
                       <button onClick={next} disabled={!valid}
-                        className="mt-2 w-full flex items-center justify-center gap-2 btn-glow text-white px-6 py-3.5 rounded-full font-semibold text-sm transition-all disabled:opacity-40 disabled:pointer-events-none">
+                        className="mt-2 w-full flex items-center justify-center gap-2 text-white px-6 py-4 rounded-full font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-40 disabled:pointer-events-none"
+                        style={{ background: 'linear-gradient(to right, #ff7a45, #ff5722)' }}>
                         {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                       </button>
                     )}
@@ -337,14 +339,14 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                     const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
                     return (
                       <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
-                        className={cn('w-full text-left px-5 py-4 rounded-2xl border transition-all flex items-center justify-between group select-none flex-shrink-0',
-                          sel         ? 'border-orange-400/70 bg-white/10 shadow-[0_0_15px_rgba(255,106,26,0.15)]'
-                          : maxReached ? 'border-white/5 bg-black/20 text-white/20 cursor-not-allowed'
-                                       : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 card-hover')}>
-                        <span className={cn("text-sm md:text-base font-medium", sel ? "text-white" : maxReached ? "text-white/30" : "text-white/90")}>{opt}</span>
+                        className={cn('w-full text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 shadow-sm',
+                          sel         ? 'border-orange-400 bg-orange-50'
+                          : maxReached ? 'border-zinc-100 bg-zinc-50 text-zinc-300 cursor-not-allowed'
+                                       : 'border-zinc-100 bg-white hover:border-zinc-200 hover:bg-zinc-50')}>
+                        <span className={cn("text-sm md:text-base font-bold", sel ? "text-orange-600" : maxReached ? "text-zinc-300" : "text-zinc-700")}>{opt}</span>
                         <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          sel ? 'border-orange-400 bg-orange-400 text-white' : maxReached ? 'border-white/10' : 'border-white/20 group-hover:border-white/40')}>
-                          {sel && <Check className="w-3.5 h-3.5 text-[#07070a]" strokeWidth={4} />}
+                          sel ? 'border-orange-500 bg-orange-500 text-white' : maxReached ? 'border-zinc-100 bg-zinc-50' : 'border-zinc-200 group-hover:border-zinc-300')}>
+                          {sel && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
                         </span>
                       </button>
                     );
@@ -352,13 +354,13 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   {hasOther && (
                     <>
                       <button onClick={() => toggleCheck(OTHER)}
-                        className={cn('w-full text-left px-5 py-4 rounded-2xl border transition-all flex items-center justify-between group select-none flex-shrink-0',
-                          checkArr.includes(OTHER) ? 'border-orange-400/70 bg-white/10 shadow-[0_0_15px_rgba(255,106,26,0.15)]'
-                                                   : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 card-hover')}>
-                        <span className="text-sm md:text-base font-medium text-white/90">Other (Please specify)</span>
+                        className={cn('w-full text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 shadow-sm',
+                          checkArr.includes(OTHER) ? 'border-orange-400 bg-orange-50'
+                                                   : 'border-zinc-100 bg-white hover:border-zinc-200 hover:bg-zinc-50')}>
+                        <span className={cn("text-sm md:text-base font-bold", checkArr.includes(OTHER) ? "text-orange-600" : "text-zinc-700")}>Other (Please specify)</span>
                         <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          checkArr.includes(OTHER) ? 'border-orange-400 bg-orange-400 text-white' : 'border-white/20 group-hover:border-white/40')}>
-                          {checkArr.includes(OTHER) && <Check className="w-3.5 h-3.5 text-[#07070a]" strokeWidth={4} />}
+                          checkArr.includes(OTHER) ? 'border-orange-500 bg-orange-500 text-white' : 'border-zinc-200 group-hover:border-zinc-300')}>
+                          {checkArr.includes(OTHER) && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
                         </span>
                       </button>
                       {checkArr.includes(OTHER) && (
@@ -366,7 +368,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                           <input autoFocus type="text" placeholder="Please specify…"
                             value={otherInputs[q.id] || ''}
                             onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white text-sm outline-none focus:border-orange-400/70 focus:bg-white/10 transition-colors placeholder:text-white/30 flex-shrink-0"
+                            className="w-full bg-white border-2 border-zinc-100 rounded-2xl px-6 py-4 text-zinc-900 text-sm font-bold outline-none focus:border-orange-400 hover:border-zinc-200 transition-colors placeholder:text-zinc-300 shadow-sm flex-shrink-0"
                           />
                         </motion.div>
                       )}
@@ -377,7 +379,8 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                 <div className="flex-shrink-0 pt-4 pb-2">
                   <motion.button onClick={next} disabled={!valid}
                     animate={{ opacity: valid ? 1 : 0.4 }}
-                    className="w-full flex items-center justify-center gap-2 btn-glow text-white px-6 py-4 rounded-full font-semibold text-sm transition-all disabled:pointer-events-none">
+                    className="w-full flex items-center justify-center gap-2 text-white px-6 py-4 rounded-full font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:pointer-events-none"
+                    style={{ background: 'linear-gradient(to right, #ff7a45, #ff5722)' }}>
                     {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                   </motion.button>
                 </div>

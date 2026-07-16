@@ -100,13 +100,10 @@ export default function PreLaunchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07070a] text-white relative font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#FAFAFA] text-zinc-900 relative font-sans overflow-x-hidden">
       
       {/* Global Background Layer */}
-      <div className="fixed inset-0 grid-bg pointer-events-none -z-10"></div>
-      <div className="fixed -top-40 -left-32 w-[560px] h-[560px] bg-orange-600/25 rounded-full blur-[130px] blob pointer-events-none -z-10"></div>
-      <div className="fixed top-1/3 -right-40 w-[520px] h-[520px] bg-orange-500/15 rounded-full blur-[140px] blob pointer-events-none -z-10" style={{ animationDelay: '4s' }}></div>
-      <div className="fixed bottom-0 left-1/4 w-[460px] h-[460px] bg-orange-700/20 rounded-full blur-[130px] blob pointer-events-none -z-10" style={{ animationDelay: '8s' }}></div>
+      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#FAFAFA]"></div>
 
       <AnimatePresence mode="wait">
         {step === 0 && (
@@ -126,7 +123,7 @@ export default function PreLaunchPage() {
             {isSubmitting ? (
               <div className="flex flex-col items-center justify-center">
                 <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
-                <p className="text-white/70 font-display font-bold text-sm">Securing your launch reward...</p>
+                <p className="text-zinc-500 font-bold text-sm">Securing your launch reward...</p>
               </div>
             ) : (
               <SurveyWizard onComplete={handleSurveyComplete} />
