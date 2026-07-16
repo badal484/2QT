@@ -232,7 +232,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
             custom={direction} variants={variants}
             initial="enter" animate="center" exit="exit"
             transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0 flex flex-col overflow-y-auto pb-6"
+            className="absolute inset-0 flex flex-col"
           >
             {/* Title */}
             <div className="mb-5 flex-shrink-0">
@@ -248,7 +248,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
 
             {/* TEXT */}
             {q.type === 'text' && (
-              <div>
+              <div className="flex-1 overflow-y-auto pb-6">
                 <input autoFocus type="text"
                   placeholder={q.placeholder}
                   value={String(data[q.id] || '')}
@@ -267,7 +267,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
 
             {/* RADIO */}
             {isRadioType && (
-              <div className="flex flex-col gap-2">
+              <div className="flex-1 overflow-y-auto pb-6 flex flex-col gap-2">
                 {q.options?.map(opt => {
                   const sel = data[q.id] === opt;
                   return (
@@ -313,52 +313,59 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
               </div>
             )}
 
-            {/* CHECKBOX */}
+            {/* CHECKBOX — options scroll, Continue button pinned at bottom */}
             {isCheckType && (
-              <div className="flex flex-col gap-2">
-                {q.options?.map(opt => {
-                  const sel = checkArr.includes(opt);
-                  const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
-                  return (
-                    <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
-                      className={cn('w-full text-left px-4 py-3.5 rounded-2xl border transition-all flex items-center justify-between group select-none',
-                        sel         ? 'border-brand-primary bg-brand-primary/10 text-white shadow-[0_0_14px_rgba(255,107,53,0.1)]'
-                        : maxReached ? 'border-white/[0.04] bg-white/[0.02] text-zinc-700 cursor-not-allowed'
-                                     : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-zinc-400 hover:text-white')}>
-                      <span className="text-sm md:text-base font-semibold">{opt}</span>
-                      <span className={cn('w-[18px] h-[18px] rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        sel ? 'border-brand-primary bg-brand-primary' : 'border-white/20 group-hover:border-white/40')}>
-                        {sel && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
-                      </span>
-                    </button>
-                  );
-                })}
-                {hasOther && (
-                  <>
-                    <button onClick={() => toggleCheck(OTHER)}
-                      className={cn('w-full text-left px-4 py-3.5 rounded-2xl border transition-all flex items-center justify-between group select-none',
-                        checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary/10 text-white'
-                                                 : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-zinc-400 hover:text-white')}>
-                      <span className="text-sm md:text-base font-semibold">Other (Please specify)</span>
-                      <span className={cn('w-[18px] h-[18px] rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary' : 'border-white/20 group-hover:border-white/40')}>
-                        {checkArr.includes(OTHER) && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
-                      </span>
-                    </button>
-                    {checkArr.includes(OTHER) && (
-                      <input autoFocus type="text" placeholder="Please specify…"
-                        value={otherInputs[q.id] || ''}
-                        onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                        className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-brand-primary transition-colors placeholder:text-zinc-600"
-                      />
-                    )}
-                  </>
-                )}
-                <motion.button onClick={next} disabled={!valid}
-                  animate={{ opacity: valid ? 1 : 0.35 }}
-                  className="mt-2 flex items-center justify-center gap-2 bg-brand-primary text-white px-6 py-3.5 rounded-2xl font-bold text-sm transition-all disabled:cursor-not-allowed shadow-[0_0_20px_rgba(255,107,53,0.2)]">
-                  {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
-                </motion.button>
+              <div className="flex-1 flex flex-col min-h-0">
+                {/* Scrollable options */}
+                <div className="flex-1 overflow-y-auto flex flex-col gap-2 pb-2 min-h-0">
+                  {q.options?.map(opt => {
+                    const sel = checkArr.includes(opt);
+                    const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
+                    return (
+                      <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
+                        className={cn('w-full text-left px-4 py-3.5 rounded-2xl border transition-all flex items-center justify-between group select-none flex-shrink-0',
+                          sel         ? 'border-brand-primary bg-brand-primary/10 text-white shadow-[0_0_14px_rgba(255,107,53,0.1)]'
+                          : maxReached ? 'border-white/[0.04] bg-white/[0.02] text-zinc-700 cursor-not-allowed'
+                                       : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-zinc-400 hover:text-white')}>
+                        <span className="text-sm md:text-base font-semibold">{opt}</span>
+                        <span className={cn('w-[18px] h-[18px] rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                          sel ? 'border-brand-primary bg-brand-primary' : 'border-white/20 group-hover:border-white/40')}>
+                          {sel && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {hasOther && (
+                    <>
+                      <button onClick={() => toggleCheck(OTHER)}
+                        className={cn('w-full text-left px-4 py-3.5 rounded-2xl border transition-all flex items-center justify-between group select-none flex-shrink-0',
+                          checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary/10 text-white'
+                                                   : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-zinc-400 hover:text-white')}>
+                        <span className="text-sm md:text-base font-semibold">Other (Please specify)</span>
+                        <span className={cn('w-[18px] h-[18px] rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                          checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary' : 'border-white/20 group-hover:border-white/40')}>
+                          {checkArr.includes(OTHER) && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                        </span>
+                      </button>
+                      {checkArr.includes(OTHER) && (
+                        <input autoFocus type="text" placeholder="Please specify…"
+                          value={otherInputs[q.id] || ''}
+                          onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
+                          className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-brand-primary transition-colors placeholder:text-zinc-600 flex-shrink-0"
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Pinned Continue button — always visible */}
+                <div className="flex-shrink-0 pt-3 pb-1">
+                  <motion.button onClick={next} disabled={!valid}
+                    animate={{ opacity: valid ? 1 : 0.35 }}
+                    className="w-full flex items-center justify-center gap-2 bg-brand-primary text-white px-6 py-3.5 rounded-2xl font-bold text-sm transition-all disabled:cursor-not-allowed shadow-[0_0_20px_rgba(255,107,53,0.2)]">
+                    {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
+                  </motion.button>
+                </div>
               </div>
             )}
           </motion.div>
