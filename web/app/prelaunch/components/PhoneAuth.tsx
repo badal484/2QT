@@ -38,6 +38,15 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         console.error("Recaptcha Init Error", e);
       }
     }
+    
+    return () => {
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+          window.recaptchaVerifier = null;
+        } catch(e) {}
+      }
+    };
   }, []);
 
   const handleSendOtp = async (e: React.FormEvent) => {

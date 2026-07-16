@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { query } from '../db';
+import pool, { query } from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import { firebaseAdminAuth } from '../config/firebaseAdmin';
 
@@ -74,41 +74,56 @@ router.post('/register', async (req, res) => {
         if (phone.length === 10) phone = '91' + phone;
         if (!/^91\d{10}$/.test(phone)) return res.status(400).json({ error: 'INVALID_PHONE' });
 
-        // Upsert user
-        const { rows: uRows } = await query(
-            `INSERT INTO users (phone, name, role, is_verified)
-             VALUES ($1, $2, 'customer', true)
-             ON CONFLICT (phone) DO UPDATE SET is_active = true, is_verified = true
-             RETURNING id, name, phone, role, referral_code`,
-            [phone, name]
-        );
-        const user = uRows[0];
+        // Database Transaction for User, Referral, Wallet, and Loyalty creation
+        const client = await pool.connect();
+        let user;
+        try {
+            await client.query('BEGIN');
 
-        // Ensure referral code
-        if (!user.referral_code) {
-            const code = genReferralCode();
-            await query(`UPDATE users SET referral_code = $1 WHERE id = $2`, [code, user.id]);
-            user.referral_code = code;
-        }
+            // Upsert user
+            const { rows: uRows } = await client.query(
+                `INSERT INTO users (phone, name, role, is_verified)
+                 VALUES ($1, $2, 'customer', true)
+                 ON CONFLICT (phone) DO UPDATE SET is_active = true, is_verified = true
+                 RETURNING id, name, phone, role, referral_code`,
+                [phone, name]
+            );
+            user = uRows[0];
 
-        // Wallet + loyalty for brand-new users
-        const { rowCount: walletCreated } = await query(
-            `INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, 0) ON CONFLICT DO NOTHING`,
-            [user.id]
-        );
-        if ((walletCreated ?? 0) > 0) {
-            await query(
-                `INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
-                 VALUES ($1, 1000, 'earn', NOW() + INTERVAL '1 year')`,
+            // Ensure referral code
+            if (!user.referral_code) {
+                const code = genReferralCode();
+                await client.query(`UPDATE users SET referral_code = $1 WHERE id = $2`, [code, user.id]);
+                user.referral_code = code;
+            }
+
+            // Wallet + loyalty for brand-new users
+            const { rowCount: walletCreated } = await client.query(
+                `INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, 0) ON CONFLICT DO NOTHING`,
                 [user.id]
             );
+            
+            if ((walletCreated ?? 0) > 0) {
+                await client.query(
+                    `INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
+                     VALUES ($1, 1000, 'earn', NOW() + INTERVAL '1 year')`,
+                    [user.id]
+                );
 
-            if (referredBy) {
-                const { rows: refRows } = await query(`SELECT id FROM users WHERE referral_code = $1`, [referredBy]);
-                if (refRows[0]) {
-                    await query(`INSERT INTO referrals (referrer_id, referred_id, status) VALUES ($1,$2,'pending') ON CONFLICT DO NOTHING`, [refRows[0].id, user.id]);
+                if (referredBy) {
+                    const { rows: refRows } = await client.query(`SELECT id FROM users WHERE referral_code = $1`, [referredBy]);
+                    if (refRows[0]) {
+                        await client.query(`INSERT INTO referrals (referrer_id, referred_id, status) VALUES ($1,$2,'pending') ON CONFLICT DO NOTHING`, [refRows[0].id, user.id]);
+                    }
                 }
             }
+            
+            await client.query('COMMIT');
+        } catch (dbErr) {
+            await client.query('ROLLBACK');
+            throw dbErr; // Let the outer catch handle the response
+        } finally {
+            client.release();
         }
 
         // Upsert pre-launch registration (schema-safe: works with or without migration 121)

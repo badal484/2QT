@@ -954,7 +954,7 @@ router.post('/orders/:id/claim', authenticate, requireRole('rider', 'rider_capta
         });
 
         // Log claim event for acceptance rate tracking (non-fatal — table may not exist on older deployments)
-        query('INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [riderId, id, 'claimed']).catch(() => {});
+        await query('INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [riderId, id, 'claimed']).catch(() => {});
 
         // Notify customer — include rider info so buyer app updates immediately without waiting for next poll
         const { rows: orderRows } = await query(
@@ -1008,7 +1008,7 @@ router.post('/orders/:id/unclaim', authenticate, requireRole('rider', 'rider_cap
         });
 
         // Log skip/unclaim event for acceptance rate tracking (non-fatal)
-        query('INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [riderId, id, 'unclaimed']).catch(() => {});
+        await query('INSERT INTO rider_order_events (rider_id, order_id, event_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [riderId, id, 'unclaimed']).catch(() => {});
 
         // Notify kitchen dispatch panel immediately so it reappears in unassigned list
         if (kitchenId) emitToKitchen(kitchenId, 'order_updated', { orderId: id, riderDeclined: true });
