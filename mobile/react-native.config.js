@@ -16,5 +16,13 @@ module.exports = {
         },
       },
     },
+    'react-native-sound': {
+      platforms: {
+        android: {
+          cmakeListsPath: null,
+          libraryName: null,
+        },
+      },
+    },
   },
 };

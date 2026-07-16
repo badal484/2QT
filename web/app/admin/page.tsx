@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3, Users, ShoppingBag, TrendingUp, LayoutDashboard,
   Utensils, Settings, Search, ArrowUpRight, LogOut,
-  CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star,
+  CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star, Rocket,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
   LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare, ShieldCheck, ShieldAlert, Trophy, Layers
@@ -44,6 +44,7 @@ const SOSAlertsTab = dynamic(() => import("./SOSAlertsTab").then(m => ({ default
 const RatingsTab = dynamic(() => import("./RatingsTab").then(m => ({ default: m.RatingsTab })), { ssr: false });
 const MissionsTab = dynamic(() => import("./MissionsTab").then(m => ({ default: m.MissionsTab })), { ssr: false });
 const ZoneCapacityTab = dynamic(() => import("./ZoneCapacityTab").then(m => ({ default: m.ZoneCapacityTab })), { ssr: false });
+const PreLaunchTab = dynamic(() => import("./PreLaunchTab").then(m => ({ default: m.PreLaunchTab })), { ssr: false });
 
 // ─── Bar Chart ────────────────────────────────────────────────────────────────
 function BarChart({ data, colors }: { data: number[]; colors: string[] }) {
@@ -1927,6 +1928,7 @@ const TABS = [
   { name: "Promo Codes",     icon: Ticket,           component: PromoCodesTab },
   { name: "Menu Offers",     icon: Tag,              component: MenuOffersTab },
   { name: "Marketing",       icon: Camera,           component: MarketingTab },
+  { name: "Pre-Launch",      icon: Rocket,           component: PreLaunchTab },
   // Customers
   { name: "Customers",       icon: Users,            component: CustomersTab },
   { name: "Ratings",         icon: Star,             component: RatingsTab },
@@ -2064,7 +2066,7 @@ export default function AdminPage() {
             { section: "Core",           items: ["Overview", "Analytics"] },
             { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Deliveries", "Fleet", "Applications", "Rider Docs", "Rider Issues", "SOS Alerts"] },
             { section: "Restaurants",    items: ["Restaurants", "Kitchens", "Partners", "Menu", "Categories", "Inventory"] },
-            { section: "Growth",         items: ["Broadcast", "Campaigns", "Promo Codes", "Menu Offers", "Marketing"] },
+            { section: "Growth",         items: ["Broadcast", "Campaigns", "Promo Codes", "Menu Offers", "Marketing", "Pre-Launch"] },
             { section: "Customers",      items: ["Customers", "Support", "Complaints"] },
             { section: "Platform",       items: ["Zones", "Order Capacity", "Missions", "Delivery Pricing", "Kitchen Health", "Rider Payouts", "Notifications", "Activity Log", "Team", "Systems", "Settings"] },
           ].map(group => {
