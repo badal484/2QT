@@ -289,7 +289,7 @@ const AdminMissionsScreen = ({ navigation }: any) => {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-mission-templates'],
     queryFn: () => api.get('/missions/templates'),
-    refetchInterval: 30_000,
+    refetchInterval: 5000,
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-mission-templates'] });

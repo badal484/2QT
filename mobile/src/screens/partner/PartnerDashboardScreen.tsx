@@ -46,7 +46,7 @@ const PartnerDashboardScreen = ({ navigation }: any) => {
   const { data: todayData, isLoading: statsLoading } = useQuery({
     queryKey: ['partner-today'],
     queryFn: () => api.get('/partner/bookings/today') as Promise<{ bookings: any[]; summary: any }>,
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   });
   const stats = todayData?.summary;
   const todayBookings: any[] = todayData?.bookings || [];

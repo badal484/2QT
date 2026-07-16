@@ -39,7 +39,7 @@ const LiveOrdersScreen = ({ navigation }: any) => {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-live-orders'],
     queryFn: () => api.get('/admin/orders/live'),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const orders = data?.orders || [];

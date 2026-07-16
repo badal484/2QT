@@ -66,7 +66,7 @@ export default function ComplaintsTab() {
       const res = await api.get("/support/tickets?user_type=customer");
       return (res.tickets as Ticket[]).filter(t => t.ticket_type === "order_complaint");
     },
-    refetchInterval: 60_000,
+    refetchInterval: 5000,
   });
 
   useSocketRefresh(["new_ticket", "ticket_updated"], refetch);

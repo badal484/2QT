@@ -45,7 +45,7 @@ export function SOSAlertsTab() {
   // Auto-refresh active alerts every 15s
   useEffect(() => {
     if (filter !== "active") return;
-    const t = setInterval(load, 15000);
+    const t = setInterval(load, 5000);
     return () => clearInterval(t);
   }, [filter, load]);
 

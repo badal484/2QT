@@ -59,7 +59,7 @@ export default function QueueTab() {
       const res = await api.get("/support/tickets?status=open");
       return res.tickets as Ticket[];
     },
-    refetchInterval: 30_000,
+    refetchInterval: 5000,
   });
 
   useSocketRefresh(["new_ticket", "ticket_updated"], refetch);
