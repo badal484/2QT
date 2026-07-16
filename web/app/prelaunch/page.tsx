@@ -91,7 +91,7 @@ export default function PreLaunchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-luxury-bg text-luxury-text relative font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-white text-zinc-900 relative font-sans overflow-x-hidden">
       
       {/* Global Background Layer */}
       <div className="fixed inset-0 pointer-events-none">
