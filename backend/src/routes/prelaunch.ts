@@ -3,16 +3,22 @@ import { query } from '../db';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 
+import { firebaseAdminAuth } from '../config/firebaseAdmin';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+
 const router = express.Router();
 
 const registerSchema = z.object({
   name: z.string().min(2),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
+  idToken: z.string(),
   surveyResponses: z.record(z.any()).optional(),
   source: z.string().optional(),
   referredBy: z.string().optional()
 });
+
+const phoneSchema = z.string().regex(/^91\d{10}$/);
 
 function generateReferralCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -31,26 +37,115 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues });
   }
 
-  const { name, phone, email, surveyResponses, source, referredBy } = parsed.data;
-
-  if (!phone && !email) {
-    return res.status(400).json({ error: 'Either phone or email is required' });
-  }
-
-  const referralCode = generateReferralCode();
+  const { name, idToken, surveyResponses, source, referredBy } = parsed.data;
 
   try {
+    let decodedToken;
+    try {
+      decodedToken = await firebaseAdminAuth.verifyIdToken(idToken);
+    } catch (err: any) {
+      console.error('--- PRELAUNCH FIREBASE VERIFY ERROR:', err.message);
+      return res.status(401).json({ error: 'INVALID_TOKEN', message: 'Failed to verify Firebase ID Token: ' + err.message });
+    }
+
+    const phone = decodedToken.phone_number;
+    if (!phone) {
+      return res.status(400).json({ error: 'NO_PHONE_IN_TOKEN', message: 'Phone number not found in Firebase token' });
+    }
+
+    let normalizedPhone = String(phone).replace(/\D/g, '');
+    if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
+
+    if (!phoneSchema.safeParse(normalizedPhone).success) {
+      return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
+    }
+
+    // Upsert into users table
+    const { rows: userRows } = await query(
+        `INSERT INTO users (phone, name, role, is_verified) 
+         VALUES ($1, $2, 'customer', true) 
+         ON CONFLICT (phone) DO UPDATE SET is_active = true, is_verified = true 
+         RETURNING id, name, phone, role, referral_code`,
+        [normalizedPhone, name || '2QT User']
+    );
+
+    const user = userRows[0];
+    const referralCode = user.referral_code || generateReferralCode();
+
+    if (!user.referral_code) {
+        await query('UPDATE users SET referral_code = $1 WHERE id = $2', [referralCode, user.id]);
+    }
+
+    // Initialize wallet and award Pre-launch Bonus if new
+    const { rowCount: walletCreated } = await query('INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, 0) ON CONFLICT (customer_id) DO NOTHING', [user.id]);
+    
+    if ((walletCreated ?? 0) > 0) {
+        await query(`
+            INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
+            VALUES ($1, 1000, 'earn', NOW() + INTERVAL '1 year')
+        `, [user.id]);
+
+        if (referredBy) {
+            const { rows: referrers } = await query('SELECT id FROM users WHERE referral_code = $1', [referredBy]);
+            if (referrers[0]) {
+                const referrerId = referrers[0].id;
+                await query('UPDATE customer_wallet SET balance_paise = balance_paise + 5000 WHERE customer_id = $1', [user.id]);
+                await query(`
+                    INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
+                    VALUES ($1, 5000, 'credit', 'Referral Welcome Bonus', 5000)
+                `, [user.id]);
+
+                await query(`
+                    INSERT INTO referrals (referrer_id, referred_id, status)
+                    VALUES ($1, $2, 'pending')
+                    ON CONFLICT (referred_id) DO NOTHING
+                `, [referrerId, user.id]);
+            }
+        }
+    }
+
+    // Insert into pre_launch_registrations
     const result = await query(
-      `INSERT INTO pre_launch_registrations (name, phone, email, survey_responses, source, referral_code, referred_by)
+      `INSERT INTO pre_launch_registrations (user_id, name, phone, survey_responses, source, referral_code, referred_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, created_at, referral_code`,
-      [name, phone, email, surveyResponses, source || 'organic', referralCode, referredBy]
+      [user.id, name, normalizedPhone, surveyResponses, source || 'organic', referralCode, referredBy]
+    );
+
+    const JWT_SECRET = process.env.JWT_SECRET!;
+    const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
+    const jti = crypto.randomUUID();
+
+    const accessToken = jwt.sign(
+        { userId: user.id, role: user.role, jti },
+        JWT_SECRET,
+        { expiresIn: '2h' }
+    );
+
+    const refreshToken = jwt.sign(
+        { userId: user.id, jti },
+        JWT_REFRESH_SECRET,
+        { expiresIn: '7d' }
+    );
+
+    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    await query(
+        'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + interval \'7 days\')',
+        [user.id, tokenHash]
     );
 
     res.status(201).json({
       success: true,
       message: 'Registration successful',
-      data: result.rows[0]
+      data: result.rows[0],
+      user: {
+          id: user.id,
+          name: user.name,
+          phone: user.phone,
+          role: user.role,
+      },
+      accessToken,
+      refreshToken
     });
   } catch (error) {
     console.error('Pre-launch registration error:', error);

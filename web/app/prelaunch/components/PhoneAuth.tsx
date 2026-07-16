@@ -14,7 +14,7 @@ declare global {
 }
 
 interface PhoneAuthProps {
-  onVerified: (phone: string) => void;
+  onVerified: (data: { phone: string, token: string }) => void;
 }
 
 export function PhoneAuth({ onVerified }: PhoneAuthProps) {
@@ -73,9 +73,14 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     
     setIsLoading(true);
     try {
-      await confirmationResult.confirm(code);
-      setStep('SUCCESS');
-      setTimeout(() => onVerified(phone), 1500);
+      const result = await confirmationResult.confirm(code);
+      if (result.user) {
+        const token = await result.user.getIdToken();
+        setStep('SUCCESS');
+        setTimeout(() => onVerified({ phone: result.user.phoneNumber || phone, token }), 1500);
+      } else {
+        throw new Error('User not found');
+      }
     } catch (error: any) {
       console.error("Firebase Verify Error", error);
       toast.error('Invalid verification code');
