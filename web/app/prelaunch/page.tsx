@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Hero } from './components/Hero';
+import { Landing } from './components/Landing';
 import { PhoneAuth } from './components/PhoneAuth';
 import { SurveyWizard, SurveyData } from './components/SurveyWizard';
 import { ThankYou } from './components/ThankYou';
@@ -101,8 +101,7 @@ export default function PreLaunchPage() {
       <AnimatePresence mode="wait">
         {step === 0 && (
           <motion.div key="hero" initial="enter" animate="center" exit="exit" variants={variants} className="w-full">
-            <Hero onStart={() => setStep(1)} />
-            <LiveCounter />
+            <Landing onStart={() => setStep(1)} />
           </motion.div>
         )}
 
