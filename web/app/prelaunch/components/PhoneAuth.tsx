@@ -74,12 +74,10 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       const auth = getAuth(app);
 
       if (isResend) {
-        // Reset the token on the existing widget — don't destroy the container
         try {
           const id = await window.recaptchaVerifier.render();
           window.grecaptcha?.reset(id);
         } catch {
-          // Reset failed — rebuild from scratch
           try { window.recaptchaVerifier?.clear(); } catch {}
           window.recaptchaVerifier = null;
           buildVerifier();
@@ -96,7 +94,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       const msg = error?.code || error?.message || String(error);
       console.error('OTP send failed:', error);
       toast.error(`Failed to send OTP: ${msg}`);
-      // Rebuild verifier so next attempt starts clean
       try { window.recaptchaVerifier?.clear(); } catch {}
       window.recaptchaVerifier = null;
       try { buildVerifier(); } catch {}
@@ -132,7 +129,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         const token = await result.user.getIdToken();
         const phoneNum = result.user.phoneNumber || phone;
 
-        // Check registration before asking for name — skip NAME for returning users
         try {
           const meRes = await fetch('/api/proxy/prelaunch/me', {
             method: 'POST',
@@ -154,7 +150,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           }
         } catch {}
 
-        // New user — ask for name
         setPendingVerified({ phone: phoneNum, token });
         setStep('NAME');
       } else {
@@ -205,27 +200,29 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="w-full max-w-md mx-auto"
     >
-      <div className="bg-white border-4 border-brand-dark p-8 shadow-[8px_8px_0px_#1A1A1A] relative">
+      <div className="glass rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+        {/* Glow accent */}
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-orange-500/20 rounded-full blur-3xl pointer-events-none"></div>
 
         {/* ── PHONE ── */}
         {step === 'PHONE' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <h2 className="text-4xl font-black font-serif text-brand-dark tracking-tight mb-2 uppercase">Welcome.</h2>
-            <p className="text-brand-dark/70 font-bold mb-8 uppercase tracking-widest text-sm">Enter your phone number to secure your spot.</p>
-            <form onSubmit={handleSendOtp} className="space-y-6">
+            <h2 className="text-3xl font-display font-bold tracking-tight mb-2">Welcome.</h2>
+            <p className="text-white/55 mb-8 text-sm">Enter your phone number to secure your spot.</p>
+            <form onSubmit={handleSendOtp} className="space-y-6 relative z-10">
               <div className="relative flex items-center">
-                <div className="absolute left-4 text-brand-dark/50 font-bold text-xl pointer-events-none">+91</div>
+                <div className="absolute left-5 text-white/40 font-semibold pointer-events-none">+91</div>
                 <input
                   type="tel" autoFocus placeholder="00000 00000"
                   value={phone}
                   onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  className="w-full bg-[#FFF7ED] border-2 border-brand-dark py-4 pl-16 pr-4 text-xl font-black text-brand-dark tracking-wide outline-none transition-all focus:bg-white focus:border-brand-primary focus:shadow-[4px_4px_0px_#FF6B35]"
+                  className="w-full bg-white/5 border border-white/10 rounded-full py-3.5 pl-16 pr-5 text-lg font-medium text-white tracking-wide outline-none transition-colors focus:bg-white/10 focus:border-orange-400/70"
                 />
               </div>
               <button type="submit" disabled={phone.length < 10 || isLoading}
-                className="w-full group flex items-center justify-center gap-2 bg-brand-primary border-2 border-brand-dark shadow-[6px_6px_0px_#1A1A1A] text-white py-4 font-black text-lg uppercase tracking-wide hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_#1A1A1A] active:translate-x-[6px] active:translate-y-[6px] active:shadow-none transition-all disabled:opacity-50 disabled:pointer-events-none">
-                {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
-                  <><span>Continue</span><ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
+                className="w-full group flex items-center justify-center gap-2 btn-glow text-white py-3.5 rounded-full font-semibold text-sm transition-all disabled:opacity-50 disabled:pointer-events-none">
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  <><span>Continue</span><ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
                 )}
               </button>
             </form>
@@ -235,17 +232,16 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         {/* ── OTP ── */}
         {step === 'OTP' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <h2 className="text-4xl font-black font-serif text-brand-dark tracking-tight mb-2 uppercase">Verify.</h2>
-            <p className="text-brand-dark/70 font-bold mb-8 uppercase tracking-widest text-sm">
+            <h2 className="text-3xl font-display font-bold tracking-tight mb-2">Verify.</h2>
+            <p className="text-white/55 mb-8 text-sm">
               We sent a code to +91 {phone.slice(0, 5)} {phone.slice(5)}
             </p>
 
-            {/* OTP boxes with shake on error */}
             <motion.div
               key={shakeKey}
               animate={shakeKey > 0 ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : {}}
               transition={{ duration: 0.45, ease: 'easeInOut' }}
-              className="flex justify-between gap-2 mb-4"
+              className="flex justify-between gap-2 mb-4 relative z-10"
             >
               {otp.map((digit, i) => (
                 <input key={i}
@@ -256,17 +252,16 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   onKeyDown={e => handleKeyDown(i, e)}
                   disabled={isLoading}
                   className={cn(
-                    'w-12 h-14 md:w-14 md:h-16 text-center text-3xl font-black bg-[#FFF7ED] border-2 text-brand-dark outline-none transition-all focus:bg-white disabled:opacity-50',
+                    'w-10 h-12 md:w-12 md:h-14 text-center text-xl font-bold bg-white/5 border rounded-xl text-white outline-none transition-colors focus:bg-white/10 disabled:opacity-50',
                     otpError
-                      ? 'border-red-500 bg-red-50 focus:border-red-500 shadow-[4px_4px_0px_#EF4444]'
-                      : 'border-brand-dark focus:border-brand-primary focus:shadow-[4px_4px_0px_#FF6B35]'
+                      ? 'border-red-500/50 focus:border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                      : 'border-white/10 focus:border-orange-400/70'
                   )}
                 />
               ))}
             </motion.div>
 
-            {/* Inline error or spinner */}
-            <div className="min-h-[36px] flex items-center">
+            <div className="min-h-[36px] flex items-center relative z-10">
               {otpError ? (
                 <motion.p
                   initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
@@ -276,22 +271,21 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                 </motion.p>
               ) : isLoading ? (
                 <div className="w-full flex justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-brand-primary" />
+                  <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
                 </div>
               ) : null}
             </div>
 
-            {/* Resend link */}
-            <div className="mt-4 flex items-center justify-center">
+            <div className="mt-4 flex items-center justify-center relative z-10">
               {resendCooldown > 0 ? (
-                <p className="text-xs text-brand-dark/60 font-bold uppercase">
-                  Resend code in <span className="text-brand-dark tabular-nums">{resendCooldown}s</span>
+                <p className="text-xs text-white/40 font-medium">
+                  Resend code in <span className="text-white">{resendCooldown}s</span>
                 </p>
               ) : (
                 <button
                   onClick={handleResend}
                   disabled={isLoading}
-                  className="text-xs text-brand-dark/60 font-bold uppercase hover:text-brand-primary underline underline-offset-4 transition-colors disabled:opacity-40"
+                  className="text-xs text-white/40 font-medium hover:text-orange-400 underline underline-offset-4 transition-colors disabled:opacity-40"
                 >
                   Didn't receive a code? Resend
                 </button>
@@ -303,20 +297,20 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         {/* ── NAME ── */}
         {step === 'NAME' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <h2 className="text-4xl font-black font-serif text-brand-dark tracking-tight mb-2 uppercase">Almost there.</h2>
-            <p className="text-brand-dark/70 font-bold mb-8 uppercase tracking-widest text-sm">What should we call you?</p>
-            <div className="space-y-6">
+            <h2 className="text-3xl font-display font-bold tracking-tight mb-2">Almost there.</h2>
+            <p className="text-white/55 mb-8 text-sm">What should we call you?</p>
+            <div className="space-y-6 relative z-10">
               <input
                 type="text" autoFocus placeholder="Your full name"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && name.trim().length >= 2 && submitName()}
-                className="w-full bg-[#FFF7ED] border-2 border-brand-dark py-4 px-5 text-xl font-black text-brand-dark tracking-wide outline-none transition-all focus:bg-white focus:border-brand-primary focus:shadow-[4px_4px_0px_#FF6B35] placeholder:text-brand-dark/30 placeholder:font-bold"
+                className="w-full bg-white/5 border border-white/10 rounded-full py-3.5 px-5 text-lg font-medium text-white tracking-wide outline-none transition-colors focus:bg-white/10 focus:border-orange-400/70 placeholder:text-white/30"
               />
               <button onClick={submitName} disabled={name.trim().length < 2}
-                className="w-full group flex items-center justify-center gap-2 bg-brand-primary border-2 border-brand-dark shadow-[6px_6px_0px_#1A1A1A] text-white py-4 font-black text-lg uppercase tracking-wide hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_#1A1A1A] active:translate-x-[6px] active:translate-y-[6px] active:shadow-none transition-all disabled:opacity-50 disabled:pointer-events-none">
+                className="w-full group flex items-center justify-center gap-2 btn-glow text-white py-3.5 rounded-full font-semibold text-sm transition-all disabled:opacity-50 disabled:pointer-events-none">
                 <span>Continue</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </motion.div>
@@ -326,17 +320,17 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         {step === 'SUCCESS' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-8"
+            className="flex flex-col items-center justify-center py-8 relative z-10"
           >
             <motion.div
               initial={{ scale: 0 }} animate={{ scale: 1 }}
               transition={{ type: 'spring', delay: 0.1 }}
-              className="w-24 h-24 bg-brand-accent border-4 border-brand-dark text-brand-dark shadow-[6px_6px_0px_#1A1A1A] flex items-center justify-center mb-6 rotate-[2deg]"
+              className="w-20 h-20 glass rounded-full flex items-center justify-center mb-6 badge-ring"
             >
-              <CheckCircle2 className="w-12 h-12" />
+              <CheckCircle2 className="w-10 h-10 text-orange-400" />
             </motion.div>
-            <h2 className="text-4xl font-black font-serif text-brand-dark tracking-tight uppercase">Verified</h2>
-            <p className="text-brand-dark/70 font-bold uppercase mt-2 tracking-widest text-sm">Hi {name} 👋</p>
+            <h2 className="text-3xl font-display font-bold tracking-tight">Verified</h2>
+            <p className="text-white/55 mt-2 text-sm">Hi {name} 👋</p>
           </motion.div>
         )}
       </div>

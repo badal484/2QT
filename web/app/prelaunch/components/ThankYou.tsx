@@ -14,7 +14,7 @@ export function ThankYou({ referralCode }: ThankYouProps) {
 
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/prelaunch?ref=${referralCode}`
-    : `https://go2qt.com/prelaunch?ref=${referralCode}`;
+    : `https://2qt.in/prelaunch?ref=${referralCode}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -42,23 +42,26 @@ export function ThankYou({ referralCode }: ThankYouProps) {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full max-w-2xl mx-auto flex flex-col items-center text-center py-8"
+      className="w-full max-w-2xl mx-auto flex flex-col items-center text-center py-8 relative z-10"
     >
+      {/* Background Glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-80 h-80 bg-orange-500/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+
       {/* Success icon */}
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', delay: 0.1, stiffness: 200 }}
-        className="w-24 h-24 bg-brand-accent border-4 border-brand-dark flex items-center justify-center mb-8 shadow-[6px_6px_0px_#1A1A1A] rotate-[-2deg]"
+        className="w-20 h-20 glass rounded-full flex items-center justify-center mb-8 badge-ring shadow-[0_0_30px_rgba(255,106,26,0.3)]"
       >
-        <Gift className="w-12 h-12 text-brand-dark" />
+        <Gift className="w-10 h-10 text-orange-400" />
       </motion.div>
 
       <motion.h1
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="text-5xl md:text-7xl font-black font-serif text-brand-dark tracking-tight mb-3 uppercase"
+        className="text-4xl md:text-6xl font-display font-bold text-white tracking-tight mb-3"
       >
         You're on the list.
       </motion.h1>
@@ -67,7 +70,7 @@ export function ThankYou({ referralCode }: ThankYouProps) {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25 }}
-        className="text-lg md:text-xl text-brand-dark/80 font-bold mb-10 max-w-md uppercase tracking-wide"
+        className="text-lg md:text-xl text-white/70 font-medium mb-10 max-w-md"
       >
         Your spot is secured. We'll text you the moment 2QT goes live.
       </motion.p>
@@ -77,35 +80,35 @@ export function ThankYou({ referralCode }: ThankYouProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
-        className="w-full bg-white border-4 border-brand-dark p-8 shadow-[8px_8px_0px_#1A1A1A] mb-8"
+        className="w-full glass rounded-3xl p-8 md:p-10 shadow-2xl mb-8 relative overflow-hidden"
       >
         {/* Reward highlight */}
-        <div className="bg-brand-primary border-4 border-brand-dark p-6 mb-8 shadow-[4px_4px_0px_#1A1A1A] relative overflow-hidden rotate-[1deg]">
-          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(45deg, #1A1A1A 25%, transparent 25%, transparent 50%, #1A1A1A 50%, #1A1A1A 75%, transparent 75%, transparent)', backgroundSize: '10px 10px' }} />
-          <p className="text-white text-sm font-black uppercase tracking-widest mb-1 relative z-10">Your Launch Reward</p>
-          <p className="text-6xl font-black text-white font-serif tracking-tighter mb-1 relative z-10">₹100</p>
-          <p className="text-white/90 text-sm font-bold uppercase relative z-10">Added to your 2QT wallet on launch day</p>
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-8 mb-8 relative overflow-hidden text-center shadow-[0_10px_40px_rgba(255,106,26,0.4)] transform hover:scale-[1.02] transition-transform">
+          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,white_1px,transparent_1px)] [background-size:16px_16px]"></div>
+          <p className="text-white/90 text-sm font-semibold tracking-widest uppercase mb-2 relative z-10">Your Launch Reward</p>
+          <p className="text-7xl font-display font-bold text-white tracking-tighter mb-2 relative z-10 num-glow">₹100</p>
+          <p className="text-white/80 text-sm font-medium relative z-10">Added to your 2QT wallet on launch day</p>
         </div>
 
         {/* Launch date */}
-        <div className="flex items-center justify-center gap-2 text-brand-dark font-black uppercase mb-8 border-2 border-brand-dark bg-[#FFF7ED] py-3 px-4 shadow-[2px_2px_0px_#1A1A1A]">
-          <CalendarDays className="w-5 h-5 text-brand-primary" />
-          <span>Valid for <span className="text-brand-primary">7 days</span> from launch — <span className="text-brand-primary">August 2026</span></span>
+        <div className="flex items-center justify-center gap-2 text-white/80 font-medium mb-8 bg-white/5 border border-white/10 rounded-xl py-3 px-5">
+          <CalendarDays className="w-5 h-5 text-orange-400" />
+          <span>Valid for <span className="text-orange-300 font-semibold">7 days</span> from launch — <span className="text-orange-300 font-semibold">August 2026</span></span>
         </div>
 
         {/* Share section */}
-        <p className="text-sm font-black text-brand-dark uppercase tracking-widest mb-4">Spread the word</p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <p className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-4">Spread the word</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={handleCopy}
-            className="flex items-center justify-center gap-2 px-6 py-4 border-4 border-brand-dark bg-white text-brand-dark font-black uppercase tracking-wide hover:translate-x-[2px] hover:translate-y-[2px] shadow-[4px_4px_0px_#1A1A1A] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all text-sm"
+            className="flex items-center justify-center gap-2 px-6 py-4 glass rounded-full text-white font-semibold hover:bg-white/10 transition-colors text-sm border-white/10"
           >
-            {copied ? <CheckCircle2 className="w-5 h-5 text-brand-primary" /> : <Copy className="w-5 h-5" />}
+            {copied ? <CheckCircle2 className="w-5 h-5 text-orange-400" /> : <Copy className="w-5 h-5" />}
             {copied ? 'Copied!' : 'Copy Link'}
           </button>
           <button
             onClick={handleShare}
-            className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-primary border-4 border-brand-dark text-white font-black uppercase tracking-wide hover:translate-x-[2px] hover:translate-y-[2px] shadow-[4px_4px_0px_#1A1A1A] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all text-sm"
+            className="flex items-center justify-center gap-2 px-6 py-4 btn-glow rounded-full text-white font-semibold transition-all text-sm"
           >
             <Share2 className="w-5 h-5" />
             Share with Friends
@@ -117,7 +120,7 @@ export function ThankYou({ referralCode }: ThankYouProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="text-xs font-bold text-brand-dark/60 uppercase tracking-widest"
+        className="text-xs font-medium text-white/40"
       >
         Reward credited automatically when you log in after launch.
       </motion.p>
