@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Download, ToggleLeft, ToggleRight, QrCode, Users, Gift,
+  Download, ToggleLeft, ToggleRight, QrCode, Users,
   CheckCircle2, Search, ChevronLeft, ChevronRight, X,
-  Calendar, Wallet, RefreshCw, Settings2, ExternalLink,
+  Wallet, RefreshCw, Settings2, ExternalLink, Eye,
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { api } from '../lib/api';
@@ -82,7 +82,8 @@ export function PreLaunchTab() {
   const [page, setPage]     = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading]  = useState(true);
-  const [showQR, setShowQR]    = useState(false);
+  const [showQR, setShowQR]         = useState(false);
+  const [viewingReg, setViewingReg] = useState<any | null>(null);
   const [creditingId, setCreditingId] = useState<string | null>(null);
   const [rewardPaise, setRewardPaise] = useState('10000');
   const [validityDays, setValidityDays] = useState('7');
@@ -192,8 +193,9 @@ export function PreLaunchTab() {
 
   const exportCSV = async () => {
     try {
+      const token = localStorage.getItem('2qt_token');
       const blob = await fetch('/api/proxy/prelaunch/export', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('2qt_access_token')}` },
+        headers: { Authorization: `Bearer ${token}` },
       }).then(r => r.blob());
       const url  = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -480,16 +482,24 @@ export function PreLaunchTab() {
                     )}
                   </td>
                   <td className="px-5 py-3.5">
-                    {!r.reward_credited && (
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
                       <button
-                        onClick={() => manualCredit(r.id)}
-                        disabled={creditingId === r.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-zinc-400 hover:border-brand-primary/40 hover:text-brand-primary hover:bg-brand-primary/5 transition-all disabled:opacity-50 opacity-0 group-hover:opacity-100"
+                        onClick={() => setViewingReg(r)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-zinc-400 hover:border-blue-400/40 hover:text-blue-400 hover:bg-blue-400/5 transition-all"
                       >
-                        <Wallet className="w-3 h-3" />
-                        {creditingId === r.id ? '…' : 'Credit'}
+                        <Eye className="w-3 h-3" /> View
                       </button>
-                    )}
+                      {!r.reward_credited && (
+                        <button
+                          onClick={() => manualCredit(r.id)}
+                          disabled={creditingId === r.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-zinc-400 hover:border-brand-primary/40 hover:text-brand-primary hover:bg-brand-primary/5 transition-all disabled:opacity-50"
+                        >
+                          <Wallet className="w-3 h-3" />
+                          {creditingId === r.id ? '…' : 'Credit'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -520,6 +530,76 @@ export function PreLaunchTab() {
           </div>
         )}
       </div>
+
+      {/* ── Survey Detail Modal ── */}
+      <AnimatePresence>
+        {viewingReg && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setViewingReg(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-[#0e0e16] border border-white/10 rounded-[20px] shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+                <div>
+                  <p className="text-base font-bold text-white">{viewingReg.name}</p>
+                  <p className="text-xs text-zinc-500 font-mono mt-0.5">
+                    {viewingReg.phone ? (() => { const p = viewingReg.phone.replace(/^\+/, ''); return `+${p.slice(0,2)} ${p.slice(2,7)} ${p.slice(7)}`; })() : '—'}
+                  </p>
+                </div>
+                <button onClick={() => setViewingReg(null)} className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Survey answers */}
+              <div className="overflow-y-auto flex-1 px-6 py-4 space-y-3">
+                {viewingReg.survey_responses && Object.keys(viewingReg.survey_responses).length > 0 ? (
+                  ([
+                    { key: 'personType',        label: 'Who are you?' },
+                    { key: 'institution',       label: 'School / College / Coaching' },
+                    { key: 'stayType',          label: 'Where do you stay?' },
+                    { key: 'orderFrequency',    label: 'How often order online?' },
+                    { key: 'deliveryApps',      label: 'Delivery apps used' },
+                    { key: 'biggestProblems',   label: 'Biggest problems' },
+                    { key: 'spendPerOrder',     label: 'Spend per order' },
+                    { key: 'cuisines',          label: 'Favourite cuisines' },
+                    { key: 'mostOrderedDishes', label: 'Most ordered dishes' },
+                    { key: 'mealPreference',    label: 'Meal preference' },
+                    { key: 'orderTime',         label: 'Order time' },
+                    { key: 'waitTime',          label: 'Willing to wait' },
+                    { key: 'priorities',        label: 'Top priorities' },
+                    { key: 'wantedFeatures',    label: 'Wanted app features' },
+                    { key: 'convincingOffer',   label: 'Most convincing offer' },
+                    { key: 'chooseOver',        label: 'Would choose 2QT over others for' },
+                    { key: 'wishFeature',       label: 'Wish existed in Ranchi' },
+                    { key: 'earlyAccess',       label: 'Wants early access?' },
+                  ] as { key: string; label: string }[]).map(({ key, label }) => {
+                    const val = viewingReg.survey_responses[key];
+                    if (val === undefined || val === null || val === '') return null;
+                    const display = Array.isArray(val) ? val.join(', ') : String(val);
+                    if (!display) return null;
+                    return (
+                      <div key={key}>
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-0.5">{label}</p>
+                        <p className="text-sm text-zinc-200 font-medium">{display}</p>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-sm text-zinc-600 text-center py-8">No survey answers recorded</p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

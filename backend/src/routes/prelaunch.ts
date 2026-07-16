@@ -307,40 +307,48 @@ router.get('/admin/stats', authenticate, requireRole('super_admin', 'admin'), as
 
 router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
-        const baseExportSelect = `
-            SELECT r.phone, r.name,
-                   r.survey_responses->>'college'      AS college,
-                   r.survey_responses->>'year'         AS year,
-                   r.survey_responses->>'preference'   AS food_preference,
-                   r.survey_responses->>'cuisine'      AS favourite_cuisine,
-                   r.survey_responses->>'mostOrdered'  AS most_ordered,
-                   r.survey_responses->>'budget'       AS budget,
-                   r.survey_responses->>'frequency'    AS order_frequency,
-                   r.survey_responses->>'mealTime'     AS meal_time,
-                   r.survey_responses->>'biggestPain'  AS biggest_pain,
-                   r.survey_responses->>'tryNewBrand'  AS try_new_brand,
-                   r.survey_responses->>'referFriends' AS refer_friends,
-                   r.survey_responses->>'anythingElse' AS anything_else,
-                   r.source, r.referral_code, r.referred_by, r.created_at`;
-
-        let rows: any[];
-        try {
-            const result = await query(`${baseExportSelect}, r.reward_credited, r.reward_credited_at, r.reward_redeemed FROM pre_launch_registrations r ORDER BY r.created_at DESC`);
-            rows = result.rows;
-        } catch {
-            const result = await query(`${baseExportSelect} FROM pre_launch_registrations r ORDER BY r.created_at DESC`);
-            rows = result.rows;
-        }
+        const { rows } = await query(`
+            SELECT
+                r.created_at                                                         AS registered_at,
+                r.name,
+                r.phone,
+                r.source,
+                r.referral_code,
+                r.referred_by,
+                -- new survey fields (with old-key fallback)
+                COALESCE(r.survey_responses->>'personType',      r.survey_responses->>'college')    AS person_type,
+                COALESCE(r.survey_responses->>'institution',     r.survey_responses->>'college')    AS institution,
+                r.survey_responses->>'stayType'                                      AS stay_type,
+                COALESCE(r.survey_responses->>'orderFrequency',  r.survey_responses->>'frequency')  AS order_frequency,
+                r.survey_responses->>'deliveryApps'                                  AS delivery_apps,
+                r.survey_responses->>'biggestProblems'                               AS biggest_problems,
+                COALESCE(r.survey_responses->>'spendPerOrder',   r.survey_responses->>'budget')     AS spend_per_order,
+                r.survey_responses->>'cuisines'                                      AS cuisines,
+                r.survey_responses->>'mostOrderedDishes'                             AS most_ordered_dishes,
+                COALESCE(r.survey_responses->>'mealPreference',  r.survey_responses->>'mealTime')   AS meal_preference,
+                r.survey_responses->>'orderTime'                                     AS order_time,
+                r.survey_responses->>'waitTime'                                      AS wait_time,
+                r.survey_responses->>'priorities'                                    AS priorities,
+                r.survey_responses->>'wantedFeatures'                                AS wanted_features,
+                r.survey_responses->>'convincingOffer'                               AS convincing_offer,
+                r.survey_responses->>'chooseOver'                                    AS choose_over,
+                r.survey_responses->>'wishFeature'                                   AS wish_feature,
+                r.survey_responses->>'earlyAccess'                                   AS early_access,
+                COALESCE(r.reward_credited::text, 'false')                           AS reward_credited,
+                COALESCE(r.reward_credited_at::text, '')                             AS reward_credited_at,
+                COALESCE(r.reward_redeemed::text,  'false')                          AS reward_redeemed
+            FROM pre_launch_registrations r
+            ORDER BY r.created_at DESC
+        `);
 
         if (!rows.length) {
             res.setHeader('Content-Type', 'text/csv');
-            return res.send('No registrations yet.\n');
+            return res.send('registered_at,name,phone\nNo registrations yet.\n');
         }
 
+        const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
         const header  = Object.keys(rows[0]).join(',');
-        const csvRows = rows.map((r: any) =>
-            Object.values(r).map((v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
-        );
+        const csvRows = rows.map((r: any) => Object.values(r).map(escape).join(','));
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="prelaunch-${Date.now()}.csv"`);
         res.send([header, ...csvRows].join('\n'));
