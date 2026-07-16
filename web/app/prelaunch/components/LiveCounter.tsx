@@ -33,11 +33,11 @@ export function LiveCounter() {
       transition={{ delay: 1, duration: 0.8 }}
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
     >
-      <div className="glass shadow-[0_8px_30px_rgba(255,106,26,0.15)] rounded-full px-5 py-2.5 flex items-center gap-3">
-        <div className="w-2 h-2 rounded-full bg-orange-400 pulse-dot" />
-        <div className="flex items-center gap-1.5 text-sm font-bold text-white">
+      <div className="bg-white border border-zinc-100 shadow-lg rounded-full px-5 py-2.5 flex items-center gap-3">
+        <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+        <div className="flex items-center gap-1.5 text-sm font-bold text-zinc-900">
           <motion.span>{displayValue}</motion.span>
-          <span className="text-white/55 font-medium">/ 1,000 Rewards Claimed</span>
+          <span className="text-zinc-500 font-medium">/ 1,000 Rewards Claimed</span>
         </div>
       </div>
     </motion.div>
