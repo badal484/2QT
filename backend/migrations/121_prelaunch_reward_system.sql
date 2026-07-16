@@ -1,6 +1,16 @@
 -- Adds reward-tracking columns and wallet-credit config to the pre-launch system
 -- (pre_launch_registrations and app_config tables created by migrations 119/120)
 
+-- Remove duplicate phone rows before adding the unique constraint
+-- (keeps the most recent registration for each phone)
+DELETE FROM pre_launch_registrations
+WHERE id NOT IN (
+    SELECT DISTINCT ON (phone) id
+    FROM pre_launch_registrations
+    WHERE phone IS NOT NULL
+    ORDER BY phone, created_at DESC
+);
+
 -- phone must be unique so ON CONFLICT (phone) in prelaunch registration works
 CREATE UNIQUE INDEX IF NOT EXISTS uq_prelaunch_phone ON pre_launch_registrations(phone);
 
