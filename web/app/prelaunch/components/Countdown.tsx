@@ -25,14 +25,13 @@ export function Countdown({ onStart }: { onStart: () => void }) {
   const pad = (n: number, len = 2) => String(n).padStart(len, '0');
 
   return (
-    <section className="py-24 bg-white border-t border-[#F3F4F6]">
+    <section className="py-24 bg-[#FAFAFA] border-t border-zinc-100">
       <div className="max-w-4xl mx-auto px-5 text-center">
 
         <motion.p
           initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mb-3 text-xs font-bold uppercase tracking-widest"
-          style={{ color: '#FF5722' }}
+          className="mb-3 text-xs font-bold uppercase tracking-widest text-orange-500"
         >
           Launch Countdown
         </motion.p>
@@ -40,14 +39,14 @@ export function Countdown({ onStart }: { onStart: () => void }) {
         <motion.h2
           initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }} transition={{ delay: 0.07 }}
-          className="text-3xl sm:text-4xl font-black font-serif text-[#1C1C1E] tracking-tight mb-3"
+          className="text-3xl sm:text-4xl font-display font-bold text-zinc-900 tracking-tight mb-3"
         >
           Ranchi is about to eat better.
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }} transition={{ delay: 0.12 }}
-          className="text-[#6B7280] text-base mb-12"
+          className="text-zinc-500 font-medium text-base mb-12"
         >
           Opening our kitchen in Lalpur, Ranchi on August 1, 2026.
         </motion.p>
@@ -68,15 +67,12 @@ export function Countdown({ onStart }: { onStart: () => void }) {
           ].map(({ value, label }) => (
             <div
               key={label}
-              className="rounded-2xl border border-[#F3F4F6] bg-[#FFFBF7] py-5 px-2 text-center"
+              className="rounded-3xl border border-zinc-100 bg-white shadow-sm py-6 px-2 text-center"
             >
-              <p
-                className="text-3xl sm:text-5xl font-black font-serif tabular-nums"
-                style={{ color: '#FF5722' }}
-              >
+              <p className="text-3xl sm:text-5xl font-display font-bold tabular-nums text-orange-500">
                 {value}
               </p>
-              <p className="text-[10px] sm:text-xs text-[#9CA3AF] font-semibold uppercase tracking-wider mt-1.5">
+              <p className="text-[10px] sm:text-xs text-zinc-400 font-bold uppercase tracking-wider mt-2">
                 {label}
               </p>
             </div>
@@ -87,33 +83,31 @@ export function Countdown({ onStart }: { onStart: () => void }) {
         <motion.div
           initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }} transition={{ delay: 0.25 }}
-          className="max-w-md mx-auto rounded-3xl p-8 border border-orange-100 text-center"
-          style={{ background: '#FFF3E0' }}
+          className="max-w-md mx-auto rounded-[2rem] p-8 bg-white border border-zinc-100 shadow-md text-center relative overflow-hidden"
         >
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: '#FF5722' }}
-          >
-            <Gift className="w-6 h-6 text-white" />
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-50 rounded-full blur-2xl"></div>
+          
+          <div className="relative z-10 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5 bg-orange-50">
+            <Gift className="w-6 h-6 text-orange-500" />
           </div>
-          <h3 className="text-xl font-black font-serif text-[#1C1C1E] mb-2">
+          <h3 className="text-xl font-display font-bold text-zinc-900 mb-2 relative z-10">
             Secure your ₹100 reward
           </h3>
-          <p className="text-sm text-[#6B7280] mb-6 leading-relaxed">
+          <p className="text-sm text-zinc-500 mb-8 font-medium relative z-10">
             First 1,000 registrations get ₹100 free wallet credit the moment 2QT launches.
             No conditions. No minimum order.
           </p>
           <motion.button
             onClick={onStart}
-            whileHover={{ scale: 1.02, boxShadow: '0 12px 32px rgba(255,87,34,0.4)' }}
-            whileTap={{ scale: 0.97 }}
-            className="group w-full flex items-center justify-center gap-2 text-white font-bold py-4 rounded-2xl"
-            style={{ background: 'linear-gradient(135deg,#FF5722,#E64A19)', boxShadow: '0 6px 20px rgba(255,87,34,0.3)' }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="group relative z-10 w-full flex items-center justify-center gap-2 text-white font-bold py-4 rounded-full shadow-lg"
+            style={{ background: 'linear-gradient(to right, #ff7a45, #ff5722)' }}
           >
             Register for Early Access
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </motion.button>
-          <p className="mt-3 text-xs text-[#9CA3AF]">No spam. Free to join.</p>
+          <p className="mt-4 text-xs font-semibold text-zinc-400 relative z-10">No spam. Free to join.</p>
         </motion.div>
       </div>
     </section>
