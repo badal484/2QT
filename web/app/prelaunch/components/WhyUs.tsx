@@ -1,122 +1,139 @@
+'use client';
 import { motion } from 'framer-motion';
 import { ChefHat, Clock, IndianRupee, ShieldCheck, UtensilsCrossed } from 'lucide-react';
 
-const FEATURES = [
-  {
-    icon: UtensilsCrossed,
-    title: 'Our Own Kitchen',
-    desc: 'We operate from our own kitchen in Lalpur — not a marketplace of random cloud kitchens. Every dish comes from one place, under our full control.',
-    color: '#FF5722',
-    bg: '#FFF3E0',
-  },
-  {
-    icon: ChefHat,
-    title: 'Experienced Chefs',
-    desc: 'Our full-time professional chefs cook every order. Same team, same recipes, same quality — order after order, day after day.',
-    color: '#F59E0B',
-    bg: '#FFFBEB',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Hygiene You Can Trust',
-    desc: 'Because we run the kitchen ourselves, hygiene is non-negotiable. Daily sanitisation, fresh ingredients, and FSSAI-compliant practices — always.',
-    color: '#10B981',
-    bg: '#ECFDF5',
-  },
-  {
-    icon: Clock,
-    title: 'On-Time Delivery',
-    desc: 'We own the kitchen and the delivery. No third-party delays. Your food leaves hot and arrives on time — or we make it right.',
-    color: '#3B82F6',
-    bg: '#EFF6FF',
-  },
-  {
-    icon: IndianRupee,
-    title: 'Zero Hidden Charges',
-    desc: 'The bill is simple: food price + delivery fee + GST. No platform fee. No surge. No packaging charge. No convenience fee. Ever.',
-    color: '#8B5CF6',
-    bg: '#F5F3FF',
-  },
-];
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 80 } },
+};
 
 export function WhyUs() {
   return (
-    <section className="py-20 bg-white">
+    <section id="why-us" className="py-24 bg-white">
       <div className="max-w-5xl mx-auto px-5">
 
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="mb-12 text-center">
           <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-xs font-bold uppercase tracking-widest mb-3"
+            className="mb-3 text-xs font-bold uppercase tracking-widest"
             style={{ color: '#FF5722' }}
           >
             The 2QT Difference
           </motion.p>
           <motion.h2
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.07 }}
-            className="text-3xl sm:text-4xl font-black font-serif text-[#1C1C1E] tracking-tight"
+            initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ delay: 0.07 }}
+            className="text-3xl sm:text-4xl font-black font-serif tracking-tight text-[#1C1C1E]"
           >
             We cook it. We deliver it.<br />
             <span style={{ color: '#FF5722' }}>We own every bite.</span>
           </motion.h2>
           <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.12 }}
-            className="mt-3 text-[#6B7280] text-base max-w-xl mx-auto"
+            initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ delay: 0.12 }}
+            className="mt-3 max-w-xl mx-auto text-base text-[#6B7280]"
           >
             Most delivery apps are middlemen. 2QT is a restaurant that delivers —
             students are our focus, everyone in Lalpur is welcome.
           </motion.p>
         </div>
 
-        {/* Features grid: 3 top + 2 bottom */}
-        <div className="grid sm:grid-cols-3 gap-4 mb-4">
-          {FEATURES.slice(0, 3).map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-40px' }}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
-              className="rounded-2xl p-6 border border-[#F3F4F6] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-shadow"
-              style={{ background: '#FAFAFA' }}
-            >
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: f.bg }}>
-                <f.icon className="w-5 h-5" style={{ color: f.color }} />
-              </div>
-              <h3 className="font-bold text-[#1C1C1E] text-base mb-2">{f.title}</h3>
-              <p className="text-sm text-[#6B7280] leading-relaxed">{f.desc}</p>
-            </motion.div>
-          ))}
-        </div>
+        {/* Bento grid */}
+        <motion.div
+          initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }}
+          transition={{ staggerChildren: 0.1 }}
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        >
+          {/* Large hero card - Own Kitchen */}
+          <motion.div
+            variants={item}
+            whileHover={{ y: -4, boxShadow: '0 20px 50px rgba(255,87,34,0.15)' }}
+            className="sm:col-span-2 rounded-3xl p-8 flex flex-col justify-between min-h-[240px] cursor-default transition-shadow"
+            style={{ background: 'linear-gradient(135deg,#FF5722 0%,#E64A19 100%)' }}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+              <UtensilsCrossed className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-white mb-2">Our Own Kitchen</h3>
+              <p className="text-white/80 text-sm leading-relaxed max-w-sm">
+                We operate from our own kitchen in Lalpur — not a marketplace. Every dish comes
+                from one address, under our full control.
+              </p>
+            </div>
+          </motion.div>
 
-        <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-          {FEATURES.slice(3).map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-40px' }}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
-              className="rounded-2xl p-6 border border-[#F3F4F6] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-shadow"
-              style={{ background: '#FAFAFA' }}
-            >
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: f.bg }}>
-                <f.icon className="w-5 h-5" style={{ color: f.color }} />
-              </div>
-              <h3 className="font-bold text-[#1C1C1E] text-base mb-2">{f.title}</h3>
-              <p className="text-sm text-[#6B7280] leading-relaxed">{f.desc}</p>
-            </motion.div>
-          ))}
-        </div>
+          {/* Chefs card */}
+          <motion.div
+            variants={item}
+            whileHover={{ y: -4, boxShadow: '0 16px 40px rgba(0,0,0,0.08)' }}
+            className="rounded-3xl p-7 bg-[#FAFAFA] border border-[#F3F4F6] flex flex-col justify-between min-h-[240px] cursor-default transition-shadow"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center">
+              <ChefHat className="w-6 h-6 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1C1C1E] mb-1.5">Experienced Chefs</h3>
+              <p className="text-sm text-[#6B7280] leading-relaxed">
+                Full-time professional chefs. Same team, same recipes, consistent quality — every order.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Hygiene */}
+          <motion.div
+            variants={item}
+            whileHover={{ y: -4, boxShadow: '0 16px 40px rgba(0,0,0,0.08)' }}
+            className="rounded-3xl p-7 bg-[#FAFAFA] border border-[#F3F4F6] flex flex-col justify-between min-h-[200px] cursor-default transition-shadow"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center">
+              <ShieldCheck className="w-6 h-6 text-emerald-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1C1C1E] mb-1.5">Hygiene Guaranteed</h3>
+              <p className="text-sm text-[#6B7280] leading-relaxed">
+                We set our own hygiene standards and enforce them. Daily sanitisation, FSSAI compliant.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* On-Time */}
+          <motion.div
+            variants={item}
+            whileHover={{ y: -4, boxShadow: '0 16px 40px rgba(0,0,0,0.08)' }}
+            className="rounded-3xl p-7 bg-[#FAFAFA] border border-[#F3F4F6] flex flex-col justify-between min-h-[200px] cursor-default transition-shadow"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1C1C1E] mb-1.5">On-Time Delivery</h3>
+              <p className="text-sm text-[#6B7280] leading-relaxed">
+                We own the kitchen and the delivery. No third-party delays. Food arrives hot, on time.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Zero fees - accent card */}
+          <motion.div
+            variants={item}
+            whileHover={{ y: -4, boxShadow: '0 20px 50px rgba(255,87,34,0.12)' }}
+            className="rounded-3xl p-7 border border-orange-200 flex flex-col justify-between min-h-[200px] cursor-default transition-shadow"
+            style={{ background: '#FFF3E0' }}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center">
+              <IndianRupee className="w-6 h-6" style={{ color: '#FF5722' }} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1C1C1E] mb-1.5">Zero Hidden Charges</h3>
+              <p className="text-sm leading-relaxed" style={{ color: '#92400E' }}>
+                Food + delivery + GST. No platform fee, no surge, no packaging charge. Ever.
+              </p>
+            </div>
+          </motion.div>
+        </motion.div>
       </div>
     </section>
   );
