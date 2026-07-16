@@ -35,9 +35,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     if (!window.recaptchaVerifier) {
       try {
         window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
-        // Pre-render + pre-solve the invisible challenge in the background
-        // so it's already done when the user taps "Continue".
-        window.recaptchaVerifier.render().catch(() => {});
       } catch (e) { console.error('Recaptcha init error', e); }
     }
     return () => {
@@ -64,7 +61,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       const auth = getAuth(app);
       if (!window.recaptchaVerifier) {
         window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
-        await window.recaptchaVerifier.render().catch(() => {});
       }
       const confirmation = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, window.recaptchaVerifier);
       setConfirmationResult(confirmation);
