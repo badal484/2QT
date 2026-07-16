@@ -45,23 +45,23 @@ export function ThankYou({ referralCode }: ThankYouProps) {
       className="w-full max-w-2xl mx-auto flex flex-col items-center text-center py-8 relative z-10"
     >
       {/* Background Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-80 h-80 bg-orange-50 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-80 h-80 bg-brand-primary/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
 
       {/* Success icon */}
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', delay: 0.1, stiffness: 200 }}
-        className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-8 shadow-xl border border-zinc-100"
+        className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(255,90,31,0.3)] border border-white/20"
       >
-        <Gift className="w-12 h-12 text-orange-500" />
+        <Gift className="w-12 h-12 text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]" />
       </motion.div>
 
       <motion.h1
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="text-4xl md:text-6xl font-display font-bold text-zinc-900 tracking-tight mb-3"
+        className="text-4xl md:text-6xl font-display font-bold text-white tracking-tight mb-3 drop-shadow-md"
       >
         You're on the list.
       </motion.h1>
@@ -70,7 +70,7 @@ export function ThankYou({ referralCode }: ThankYouProps) {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25 }}
-        className="text-lg md:text-xl text-zinc-500 font-medium mb-10 max-w-md"
+        className="text-lg md:text-xl text-zinc-400 font-medium mb-10 max-w-md"
       >
         Your spot is secured. We'll text you the moment 2QT goes live.
       </motion.p>
@@ -80,7 +80,7 @@ export function ThankYou({ referralCode }: ThankYouProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
-        className="w-full bg-white rounded-[2.5rem] p-8 md:p-10 shadow-xl border border-zinc-100 mb-8 relative overflow-hidden"
+        className="w-full bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-8 md:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 mb-8 relative overflow-hidden"
       >
         {/* Reward highlight */}
         <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-3xl p-8 mb-8 relative overflow-hidden text-center shadow-lg transform hover:scale-[1.02] transition-transform">
@@ -91,25 +91,25 @@ export function ThankYou({ referralCode }: ThankYouProps) {
         </div>
 
         {/* Launch date */}
-        <div className="flex items-center justify-center gap-2 text-zinc-600 font-semibold mb-8 bg-zinc-50 border border-zinc-100 rounded-2xl py-4 px-6">
-          <CalendarDays className="w-5 h-5 text-orange-500" />
-          <span>Valid for <span className="text-orange-600 font-bold">7 days</span> from launch — <span className="text-orange-600 font-bold">August 2026</span></span>
+        <div className="flex items-center justify-center gap-2 text-zinc-300 font-semibold mb-8 bg-white/5 border border-white/10 rounded-2xl py-4 px-6 shadow-inner">
+          <CalendarDays className="w-5 h-5 text-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
+          <span>Valid for <span className="text-white font-bold">7 days</span> from launch — <span className="text-white font-bold">August 2026</span></span>
         </div>
 
         {/* Share section */}
-        <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4">Spread the word</p>
+        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Spread the word</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={handleCopy}
-            className="flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-zinc-100 rounded-full text-zinc-900 font-bold hover:bg-zinc-50 hover:border-zinc-200 transition-colors text-sm shadow-sm"
+            className="flex items-center justify-center gap-2 px-6 py-4 bg-white/5 border-2 border-white/20 rounded-full text-white font-bold hover:bg-white/10 hover:border-white/30 transition-all text-sm shadow-sm"
           >
-            {copied ? <CheckCircle2 className="w-5 h-5 text-orange-500" /> : <Copy className="w-5 h-5 text-zinc-500" />}
+            {copied ? <CheckCircle2 className="w-5 h-5 text-brand-primary" /> : <Copy className="w-5 h-5 text-zinc-400" />}
             {copied ? 'Copied!' : 'Copy Link'}
           </button>
           <button
             onClick={handleShare}
-            className="flex items-center justify-center gap-2 px-6 py-4 rounded-full text-white font-bold transition-all text-sm shadow-lg hover:shadow-xl"
-            style={{ background: 'linear-gradient(to right, #ff7a45, #ff5722)' }}
+            className="flex items-center justify-center gap-2 px-6 py-4 rounded-full text-white font-bold transition-all text-sm shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] border border-brand-primary/50"
+            style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}
           >
             <Share2 className="w-5 h-5" />
             Share with Friends
