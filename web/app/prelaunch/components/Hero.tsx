@@ -3,7 +3,7 @@ import { ArrowRight, ChevronDown, Sparkles } from 'lucide-react';
 
 export function Hero({ onStart }: { onStart: () => void }) {
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-zinc-950 selection:bg-brand-primary/20">
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-[#FFF7ED] selection:bg-brand-primary/20">
 
       {/* Noise texture overlay */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -31,10 +31,9 @@ export function Hero({ onStart }: { onStart: () => void }) {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-brand-primary/10 border border-brand-primary/25 shadow-[0_0_20px_rgba(255,107,53,0.08)] mb-7 backdrop-blur-md"
+          className="inline-flex items-center gap-2.5 px-4 py-2 bg-brand-primary text-white border-2 border-brand-dark mb-7 shadow-[4px_4px_0px_#1A1A1A] rotate-[-2deg]"
         >
-          <span className="flex h-1.5 w-1.5 rounded-full bg-brand-primary animate-pulse" />
-          <span className="text-xs font-bold tracking-[0.15em] text-brand-primary uppercase">Launching August 2026</span>
+          <span className="text-xs font-bold tracking-[0.15em] uppercase">Launching August 2026</span>
         </motion.div>
 
         {/* Headline */}
@@ -42,11 +41,11 @@ export function Hero({ onStart }: { onStart: () => void }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-          className="text-[clamp(3rem,10vw,6rem)] font-black font-serif text-white tracking-tighter leading-[1.02] mb-6"
+          className="text-[clamp(3rem,10vw,6rem)] font-black font-serif text-brand-dark tracking-tighter leading-[1.02] mb-6"
         >
           Campus food,{' '}
-          <span className="relative inline-block">
-            <span className="bg-gradient-to-r from-brand-primary via-brand-accent to-brand-primary bg-[length:200%] animate-[gradientShift_4s_ease_infinite] bg-clip-text text-transparent">
+          <span className="relative inline-block px-4 py-1 bg-brand-accent border-4 border-brand-dark shadow-[6px_6px_0px_#1A1A1A] rotate-[1deg] mt-2 lg:mt-0">
+            <span className="text-brand-dark">
               finally done right.
             </span>
           </span>
@@ -57,7 +56,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
-          className="text-lg md:text-xl text-zinc-400 font-medium mb-5 max-w-2xl leading-relaxed"
+          className="text-lg md:text-xl text-zinc-700 font-medium mb-5 max-w-2xl leading-relaxed"
         >
           No platform fees. Freshly cooked. Delivered to your campus gate.
           Built for students who deserve better than cold delivery.
@@ -68,12 +67,12 @@ export function Hero({ onStart }: { onStart: () => void }) {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.26, type: 'spring', stiffness: 200 }}
-          className="flex items-center gap-2.5 bg-white/[0.04] border border-white/10 rounded-2xl px-5 py-3 mb-10 shadow-inner"
+          className="flex items-center gap-2.5 bg-white border-2 border-brand-dark px-5 py-3 mb-10 shadow-[4px_4px_0px_#1A1A1A]"
         >
-          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-brand-primary/15 border border-brand-primary/20">
-            <Sparkles className="w-4 h-4 text-brand-primary" />
+          <div className="flex items-center justify-center w-8 h-8 bg-brand-accent border-2 border-brand-dark">
+            <Sparkles className="w-4 h-4 text-brand-dark" />
           </div>
-          <span className="text-sm font-bold text-zinc-200">
+          <span className="text-sm font-bold text-brand-dark">
             Register now → get{' '}
             <span className="text-brand-primary font-black">₹100 free</span>
             {' '}in your wallet on launch day
@@ -89,17 +88,15 @@ export function Hero({ onStart }: { onStart: () => void }) {
         >
           <button
             onClick={onStart}
-            className="group relative flex w-full sm:w-auto items-center justify-center gap-2.5 overflow-hidden rounded-2xl border border-brand-primary/40 bg-gradient-to-br from-brand-primary to-brand-primary-dark px-8 py-4 font-bold text-lg text-white shadow-[0_0_40px_rgba(255,107,53,0.25)] transition-all hover:shadow-[0_0_55px_rgba(255,107,53,0.4)] hover:scale-[1.02] active:scale-[0.98]"
+            className="group relative flex w-full sm:w-auto items-center justify-center gap-2.5 overflow-hidden border-2 border-brand-dark bg-brand-primary px-8 py-4 font-bold text-lg text-white shadow-[6px_6px_0px_#1A1A1A] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_#1A1A1A] active:translate-x-[6px] active:translate-y-[6px] active:shadow-none"
           >
-            {/* shimmer */}
-            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
             <span className="relative">Claim My ₹100 Reward</span>
             <ArrowRight className="relative w-5 h-5 transition-transform group-hover:translate-x-1" />
           </button>
 
           <button
             onClick={() => document.getElementById('showcase-section')?.scrollIntoView({ behavior: 'smooth' })}
-            className="flex w-full sm:w-auto items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-base text-zinc-400 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.07] hover:text-zinc-200 transition-all backdrop-blur-md"
+            className="flex w-full sm:w-auto items-center justify-center gap-2 px-8 py-4 font-bold text-base text-brand-dark bg-white border-2 border-brand-dark shadow-[6px_6px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_#1A1A1A] active:translate-x-[6px] active:translate-y-[6px] active:shadow-none transition-all"
           >
             See how it works
             <ChevronDown className="w-4 h-4" />
@@ -111,7 +108,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.55 }}
-          className="mt-8 text-xs text-zinc-600 font-medium"
+          className="mt-8 text-xs text-brand-dark/70 font-bold uppercase tracking-wider"
         >
           No spam. Just your reward, delivered the moment we launch.
         </motion.p>

@@ -100,11 +100,11 @@ export default function PreLaunchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 relative font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#FFF7ED] text-brand-dark relative font-sans overflow-x-hidden">
       
       {/* Global Background Layer */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 w-full h-[500px] bg-gradient-to-b from-brand-accent/5 to-transparent" />
+        <div className="absolute top-0 w-full h-[600px] bg-gradient-to-b from-brand-accent/30 to-transparent" />
       </div>
 
       <AnimatePresence mode="wait">
@@ -125,7 +125,7 @@ export default function PreLaunchPage() {
             {isSubmitting ? (
               <div className="flex flex-col items-center justify-center">
                 <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
-                <p className="text-zinc-500 font-medium">Securing your launch reward...</p>
+                <p className="text-brand-dark/70 font-bold uppercase tracking-widest text-sm">Securing your launch reward...</p>
               </div>
             ) : (
               <SurveyWizard onComplete={handleSurveyComplete} />
