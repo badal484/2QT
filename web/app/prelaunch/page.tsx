@@ -61,7 +61,7 @@ export default function PreLaunchPage() {
           </motion.div>
           <h1 className="text-3xl font-bold text-zinc-900 mb-4">You're on the list!</h1>
           <p className="text-zinc-600 mb-8">
-            Thank you for joining the Velto Food Palace waitlist. We will notify you as soon as we launch!
+            Thank you for joining the 2QT waitlist. We will notify you as soon as we launch!
           </p>
           <button 
             onClick={() => window.location.href = '/'}
@@ -90,7 +90,7 @@ export default function PreLaunchPage() {
             COMING SOON
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-zinc-900 mb-4 tracking-tight">
-            Velto Food Palace
+            2QT
           </h1>
           <p className="text-zinc-500 text-lg">
             A premium food delivery experience is cooking. Join the exclusive waitlist to get early access and launch offers.
