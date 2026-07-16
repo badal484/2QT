@@ -142,10 +142,12 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
     return true;
   }, [data, otherInputs, q, checkArr]);
 
-  function buildData(): SurveyData {
+  // Accept an optional snapshot so callers can pass freshly-computed data
+  // without waiting for React state to flush (avoids stale-closure bug).
+  function buildData(snapshot: Record<string, string | string[]> = data): SurveyData {
     const result: SurveyData = {};
     for (const question of QUESTIONS) {
-      const val = data[question.id];
+      const val = snapshot[question.id];
       const other = (otherInputs[question.id] || '').trim();
       if (question.type === 'text' || question.type === 'radio') {
         result[question.id] = String(val || '');
@@ -173,8 +175,20 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
   };
 
   const pickRadio = (val: string) => {
-    setData(prev => ({ ...prev, [q.id]: val }));
-    if (val !== OTHER) setTimeout(() => { setDirection(1); setCurrentIndex(i => i < QUESTIONS.length - 1 ? i + 1 : i); if (isLast) onComplete(buildData()); }, 320);
+    // Capture the updated data NOW (before setData flushes) so the
+    // setTimeout callback doesn't use a stale closure.
+    const updatedData = { ...data, [q.id]: val };
+    setData(updatedData);
+    if (val !== OTHER) {
+      setTimeout(() => {
+        if (isLast) {
+          onComplete(buildData(updatedData));
+        } else {
+          setDirection(1);
+          setCurrentIndex(i => i + 1);
+        }
+      }, 320);
+    }
   };
 
   const toggleCheck = (val: string) => {

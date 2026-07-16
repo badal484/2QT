@@ -190,6 +190,28 @@ router.post('/register', async (req, res) => {
     }
 });
 
+// Check if a Firebase-authenticated user already has a pre-launch registration.
+// Used by the frontend to skip the survey for returning visitors.
+router.post('/me', async (req, res) => {
+    const { idToken } = req.body;
+    if (!idToken) return res.json({ registered: false });
+    try {
+        const decoded = await firebaseAdminAuth.verifyIdToken(idToken);
+        const rawPhone = decoded.phone_number;
+        if (!rawPhone) return res.json({ registered: false });
+        let phone = String(rawPhone).replace(/\D/g, '');
+        if (phone.length === 10) phone = '91' + phone;
+        const { rows } = await query(
+            `SELECT referral_code FROM pre_launch_registrations WHERE phone = $1 OR phone = $2`,
+            [phone, '+' + phone]
+        );
+        if (rows[0]) return res.json({ registered: true, referral_code: rows[0].referral_code });
+        res.json({ registered: false });
+    } catch {
+        res.json({ registered: false });
+    }
+});
+
 // ── Admin ───────────────────────────────────────────────────────────────────
 
 router.get('/registrations', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
