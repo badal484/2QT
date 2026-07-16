@@ -79,14 +79,14 @@ const KitchenDineInScreen = () => {
   const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
     queryKey: ['kitchen-dine-in-today'],
     queryFn: () => api.get('/kitchen/dine-in/today'),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   });
 
   // Seated bookings needing bill
   const { data: billBookings = [], isLoading: billLoading } = useQuery({
     queryKey: ['kitchen-dine-in-bill'],
     queryFn: () => api.get('/kitchen/dine-in/bill'),
-    refetchInterval: 20000,
+    refetchInterval: 5000,
     enabled: activeTab === 'Bill',
   });
 

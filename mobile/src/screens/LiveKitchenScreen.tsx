@@ -32,7 +32,7 @@ const LiveKitchenScreen = ({ navigation }: any) => {
     queryKey: ['kitchen_metrics', zoneId],
     queryFn: () => api.get(`/menu/kitchen-metrics?zoneId=${zoneId}`),
     enabled: !!zoneId,
-    refetchInterval: 30000, // Refetch every 30s
+    refetchInterval: 5000, // Refetch every 30s
   });
 
   const metrics = metricsData?.metrics || {

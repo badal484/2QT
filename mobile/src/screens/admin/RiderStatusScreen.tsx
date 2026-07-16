@@ -23,7 +23,7 @@ const RiderStatusScreen = ({ navigation }: any) => {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-riders'],
     queryFn: () => api.get('/admin/riders'),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const riders = data?.riders || [];

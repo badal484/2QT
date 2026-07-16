@@ -37,7 +37,7 @@ const PartnerEarningsScreen = () => {
   const { data: earnings, isLoading } = useQuery({
     queryKey: ['partner-earnings'],
     queryFn: () => api.get('/partner/earnings') as Promise<any>,
-    refetchInterval: 60000,
+    refetchInterval: 5000,
   });
 
   const onRefresh = async () => {

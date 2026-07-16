@@ -329,7 +329,7 @@ const HomeScreen = ({ navigation }: any) => {
     // Poll every 15s only when an active order exists — saves battery + requests when idle
     refetchInterval: (query) => {
       const orders = (query.state.data as any)?.activeOrders;
-      return Array.isArray(orders) && orders.length > 0 ? 15000 : false;
+      return Array.isArray(orders) && orders.length > 0 ? 5000 : false;
     },
   });
   const activeOrders = activeOrdersData?.activeOrders?.filter((o: any) => !['cancelled_by_restaurant', 'refunded', 'pending_payment', 'payment_failed'].includes(o.status)) || [];

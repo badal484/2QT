@@ -335,7 +335,7 @@ export default function MenuPage() {
       .then((d: any) => setActiveOrder(d.activeOrders?.[0] ?? null))
       .catch(() => {});
     fetch();
-    const id = setInterval(fetch, 30_000);
+    const id = setInterval(fetch, 5000);
     return () => clearInterval(id);
   }, [user]);
 
