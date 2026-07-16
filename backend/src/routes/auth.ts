@@ -1,7 +1,7 @@
-
 import { Router } from 'express';
 import crypto from 'crypto';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { query } from '../db';
@@ -41,7 +41,15 @@ const memOtpIncr = (phone: string): number => {
     return entry.count;
 };
 
-router.post('/send-otp', async (req, res) => {
+const otpIpLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10, // Limit each IP to 10 OTP requests per windowMs
+    message: { error: 'TOO_MANY_OTP_IP', message: 'Too many OTP requests from this IP. Please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+router.post('/send-otp', otpIpLimiter, async (req, res) => {
     try {
     console.log('[SEND_OTP] Hit — body:', JSON.stringify(req.body));
     const { phone } = req.body;
