@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 
 export function Hero({ onStart }: { onStart: () => void }) {
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-white selection:bg-brand-primary/20">
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-zinc-950 selection:bg-brand-primary/20">
       
       {/* Background ambient blobs (GPU accelerated transforms) */}
       <motion.div 
@@ -28,17 +28,17 @@ export function Hero({ onStart }: { onStart: () => void }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-100 border border-zinc-200/60 shadow-sm mb-8"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 shadow-sm mb-8 backdrop-blur-md"
         >
           <span className="flex h-2 w-2 rounded-full bg-brand-primary animate-pulse" />
-          <span className="text-sm font-semibold tracking-wide text-zinc-800 uppercase">Coming Soon to Campus</span>
+          <span className="text-sm font-semibold tracking-wide text-zinc-300 uppercase">Coming Soon to Campus</span>
         </motion.div>
 
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="text-6xl md:text-8xl font-black text-zinc-900 tracking-tighter leading-[1.05] mb-8"
+          className="text-6xl md:text-8xl font-black font-serif text-white tracking-tighter leading-[1.05] mb-8"
         >
           Quality.<br className="md:hidden" /> Quantity.<br className="md:hidden" /> Taste.
         </motion.h1>
@@ -47,7 +47,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="text-xl md:text-2xl text-zinc-600 font-medium mb-12 max-w-2xl leading-relaxed"
+          className="text-xl md:text-2xl text-zinc-400 font-medium mb-12 max-w-2xl leading-relaxed"
         >
           Built for students. No platform fee. Freshly cooked. Delivered fast. 
           Join the exclusive waitlist to secure your launch reward.
@@ -61,7 +61,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
         >
           <button 
             onClick={onStart}
-            className="group relative flex w-full sm:w-auto items-center justify-center gap-3 bg-zinc-900 text-white px-8 py-5 rounded-2xl font-bold text-lg hover:bg-zinc-800 hover:scale-[1.02] active:scale-[0.98] transition-all overflow-hidden"
+            className="group relative flex w-full sm:w-auto items-center justify-center gap-3 bg-gradient-to-r from-brand-primary to-brand-primary-dark shadow-[0_0_30px_rgba(255,107,53,0.3)] text-white px-8 py-5 rounded-2xl font-bold text-lg hover:shadow-[0_0_40px_rgba(255,107,53,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all overflow-hidden border border-white/20"
           >
             <span className="relative z-10">Claim My Launch Reward</span>
             <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
@@ -74,7 +74,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
             onClick={() => {
               document.getElementById('showcase-section')?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="w-full sm:w-auto px-8 py-5 rounded-2xl font-bold text-lg text-zinc-600 bg-zinc-50 border border-zinc-200 hover:bg-zinc-100 transition-colors"
+            className="w-full sm:w-auto px-8 py-5 rounded-2xl font-bold text-lg text-zinc-300 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-md"
           >
             Learn More
           </button>

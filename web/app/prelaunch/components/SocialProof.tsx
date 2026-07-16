@@ -14,8 +14,9 @@ function AnimatedCounter({ value, duration = 2 }: { value: number, duration?: nu
 
 export function SocialProof() {
   return (
-    <section className="py-24 bg-zinc-50 relative overflow-hidden">
-      <div className="container mx-auto px-6 max-w-5xl">
+    <section className="py-24 bg-zinc-900 relative overflow-hidden border-t border-white/5 border-b">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-brand-primary/10 via-zinc-900 to-zinc-900" />
+      <div className="container mx-auto px-6 max-w-5xl relative z-10">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
           
           <div className="flex flex-col items-center text-center">
@@ -23,12 +24,12 @@ export function SocialProof() {
               initial={{ opacity: 0, scale: 0.5 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              className="text-5xl md:text-6xl font-black text-brand-primary mb-2 tracking-tighter"
+              className="text-5xl md:text-6xl font-black font-serif text-brand-primary mb-2 tracking-tighter drop-shadow-[0_0_15px_rgba(255,107,53,0.5)]"
             >
               <AnimatedCounter value={1000} />+
             </motion.div>
-            <p className="font-semibold text-zinc-900">Launch Rewards</p>
-            <p className="text-sm text-zinc-500 mt-1">Claimed so far</p>
+            <p className="font-semibold text-white tracking-wide">Launch Rewards</p>
+            <p className="text-sm text-zinc-400 mt-1">Claimed so far</p>
           </div>
 
           <div className="flex flex-col items-center text-center">
@@ -37,12 +38,12 @@ export function SocialProof() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1 }}
-              className="text-5xl md:text-6xl font-black text-zinc-900 mb-2 tracking-tighter"
+              className="text-5xl md:text-6xl font-black font-serif text-white mb-2 tracking-tighter"
             >
               100%
             </motion.div>
-            <p className="font-semibold text-zinc-900">Student Focused</p>
-            <p className="text-sm text-zinc-500 mt-1">Built for your budget</p>
+            <p className="font-semibold text-white tracking-wide">Student Focused</p>
+            <p className="text-sm text-zinc-400 mt-1">Built for your budget</p>
           </div>
 
           <div className="flex flex-col items-center text-center">
@@ -51,12 +52,12 @@ export function SocialProof() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
-              className="text-5xl md:text-6xl font-black text-zinc-900 mb-2 tracking-tighter"
+              className="text-5xl md:text-6xl font-black font-serif text-white mb-2 tracking-tighter"
             >
               <AnimatedCounter value={0} />
             </motion.div>
-            <p className="font-semibold text-zinc-900">Platform Fees</p>
-            <p className="text-sm text-zinc-500 mt-1">No hidden charges</p>
+            <p className="font-semibold text-white tracking-wide">Platform Fees</p>
+            <p className="text-sm text-zinc-400 mt-1">No hidden charges</p>
           </div>
 
           <div className="flex flex-col items-center text-center">
@@ -65,12 +66,12 @@ export function SocialProof() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.3 }}
-              className="text-5xl md:text-6xl font-black text-zinc-900 mb-2 tracking-tighter"
+              className="text-5xl md:text-6xl font-black font-serif text-white mb-2 tracking-tighter"
             >
               24/7
             </motion.div>
-            <p className="font-semibold text-zinc-900">Fresh Every Order</p>
-            <p className="text-sm text-zinc-500 mt-1">Premium Packaging</p>
+            <p className="font-semibold text-white tracking-wide">Fresh Every Order</p>
+            <p className="text-sm text-zinc-400 mt-1">Premium Packaging</p>
           </div>
 
         </div>

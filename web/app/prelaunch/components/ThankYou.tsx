@@ -38,66 +38,48 @@ export function ThankYou({ referralCode }: ThankYouProps) {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full max-w-md mx-auto text-center"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="w-full max-w-2xl mx-auto flex flex-col items-center text-center"
     >
-      <div className="bg-white/90 backdrop-blur-2xl border border-white p-8 rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.06)] relative overflow-hidden">
-        
-        {/* Subtle gradient glow in background */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-gradient-to-b from-brand-primary/10 to-transparent pointer-events-none" />
+      <div className="w-24 h-24 bg-brand-primary/10 border border-brand-primary/20 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(255,107,53,0.2)]">
+        <Gift className="w-12 h-12 text-brand-primary drop-shadow-[0_0_10px_rgba(255,107,53,0.5)]" />
+      </div>
 
-        <motion.div 
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', delay: 0.2, stiffness: 150, damping: 12 }}
-          className="relative w-24 h-24 mx-auto mb-6"
-        >
-          <div className="absolute inset-0 rounded-full bg-brand-primary/20 animate-ping" />
-          <div className="relative w-full h-full rounded-full bg-brand-primary text-white flex items-center justify-center shadow-lg shadow-brand-primary/30">
-            <CheckCircle2 className="w-12 h-12" />
-          </div>
-        </motion.div>
+      <h1 className="text-4xl md:text-6xl font-black font-serif text-white tracking-tight mb-4">
+        You're on the list.
+      </h1>
+      <p className="text-xl md:text-2xl text-zinc-400 mb-12">
+        Your reward is locked in. We'll text you when 2QT launches.
+      </p>
 
-        <h1 className="text-3xl font-extrabold text-zinc-900 tracking-tight mb-2">You're on the list.</h1>
-        <p className="text-zinc-600 font-medium mb-8">
-          Welcome to the club. Your exclusive launch reward has been reserved.
-        </p>
+      <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.5)] relative overflow-hidden">
+        <div className="bg-brand-primary text-white p-6 rounded-2xl mb-8 shadow-[0_0_20px_rgba(255,107,53,0.3)]">
+          <h3 className="text-xl font-bold font-serif mb-2">Exclusive Launch Box</h3>
+          <p className="text-white/80">Secured for your first order.</p>
+        </div>
 
-        <div className="bg-zinc-50 border border-zinc-100 rounded-2xl p-5 mb-8 text-left">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-brand-accent/30 text-brand-primary-dark flex items-center justify-center">
-              <Gift className="w-4 h-4" />
-            </div>
-            <h3 className="font-bold text-zinc-900">Unlock a Bigger Reward</h3>
-          </div>
-          <p className="text-sm text-zinc-600 mb-4 font-medium leading-relaxed">
-            Invite 3 friends to join the waitlist using your unique link and unlock a <strong className="text-zinc-900">Premium Welcome Kit</strong> on your first order.
-          </p>
+        <div className="border-t border-white/10 pt-8">
+          <h4 className="font-bold text-white mb-2 tracking-wide">SHARE WITH 3 FRIENDS TO UNLOCK:</h4>
+          <p className="text-brand-primary font-black font-serif text-2xl mb-6 drop-shadow-[0_0_10px_rgba(255,107,53,0.3)]">₹500 Wallet Credit</p>
           
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-white border border-zinc-200 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-800 truncate select-all">
-              {referralLink}
-            </div>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center max-w-md mx-auto">
             <button 
               onClick={handleCopy}
-              className="p-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors shrink-0"
-              title="Copy Link"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-colors"
             >
               {copied ? <CheckCircle2 className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+            <button 
+              onClick={handleShare}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-brand-primary text-white font-bold hover:bg-brand-primary-dark transition-colors shadow-[0_0_15px_rgba(255,107,53,0.4)]"
+            >
+              <Share2 className="w-5 h-5" />
+              Share Link
             </button>
           </div>
         </div>
-
-        <button 
-          onClick={handleShare}
-          className="w-full group flex items-center justify-center gap-2 bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-zinc-800 transition-transform active:scale-[0.98] shadow-lg shadow-zinc-900/20"
-        >
-          <Share2 className="w-5 h-5" />
-          Share with Friends
-        </button>
-
       </div>
     </motion.div>
   );
