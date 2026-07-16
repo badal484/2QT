@@ -118,7 +118,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
 
   const q = QUESTIONS[currentIndex];
   const isLast = currentIndex === QUESTIONS.length - 1;
-  const progress = (currentIndex / QUESTIONS.length) * 100;
+  const progress = ((currentIndex + 1) / QUESTIONS.length) * 100;
   const isRadioType = q.type === 'radio' || q.type === 'radio-other';
   const isCheckType = q.type === 'checkbox' || q.type === 'checkbox-other';
   const hasOther = q.type === 'radio-other' || q.type === 'checkbox-other';
@@ -142,8 +142,6 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
     return true;
   }, [data, otherInputs, q, checkArr]);
 
-  // Accept an optional snapshot so callers can pass freshly-computed data
-  // without waiting for React state to flush (avoids stale-closure bug).
   function buildData(snapshot: Record<string, string | string[]> = data): SurveyData {
     const result: SurveyData = {};
     for (const question of QUESTIONS) {
@@ -175,8 +173,6 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
   };
 
   const pickRadio = (val: string) => {
-    // Capture the updated data NOW (before setData flushes) so the
-    // setTimeout callback doesn't use a stale closure.
     const updatedData = { ...data, [q.id]: val };
     setData(updatedData);
     if (val !== OTHER) {
@@ -215,23 +211,26 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto flex flex-col" style={{ minHeight: '80vh' }}>
+    <div className="w-full max-w-xl mx-auto flex flex-col" style={{ minHeight: '75vh' }}>
+      
+      {/* Glow ambient */}
+      <div className="absolute top-0 right-1/4 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
       {/* Progress */}
-      <div className="mb-8 flex-shrink-0">
-        <div className="flex items-center justify-between mb-3">
+      <div className="mb-8 flex-shrink-0 relative z-10">
+        <div className="flex items-center justify-between mb-4">
           <button onClick={back} aria-label="Back"
-            className={cn('flex items-center justify-center w-10 h-10 border-2 border-brand-dark bg-white text-brand-dark shadow-[2px_2px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none active:bg-brand-primary active:text-white transition-all', currentIndex === 0 && 'opacity-0 pointer-events-none')}>
+            className={cn('flex items-center justify-center w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-orange-400/50 transition-colors', currentIndex === 0 && 'opacity-0 pointer-events-none')}>
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <span className="text-xs font-black text-brand-dark uppercase tracking-[0.16em]">
-            {currentIndex + 1} <span className="text-brand-dark/50">/ {QUESTIONS.length}</span>
+          <span className="text-xs font-semibold text-white/50 tracking-widest uppercase">
+            Step {currentIndex + 1} <span className="text-white/30">/ {QUESTIONS.length}</span>
           </span>
-          <div className="w-9" />
+          <div className="w-10" />
         </div>
-        <div className="h-2 w-full bg-white border-2 border-brand-dark overflow-hidden shadow-[2px_2px_0px_#1A1A1A]">
+        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
           <motion.div
-            className="h-full bg-brand-primary"
+            className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
             animate={{ width: `${progress}%` }}
             transition={{ type: 'spring', stiffness: 60, damping: 18 }}
           />
@@ -249,12 +248,12 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
             className="absolute inset-0 flex flex-col"
           >
             {/* Title */}
-            <div className="mb-5 flex-shrink-0">
-              <h2 className="text-2xl md:text-4xl font-black font-serif text-brand-dark tracking-tight uppercase leading-[1.15]">
+            <div className="mb-6 flex-shrink-0 relative z-10">
+              <h2 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight leading-snug">
                 {q.title}
               </h2>
               {q.subtitle && (
-                <p className="mt-2 text-sm font-bold text-brand-dark/70 uppercase tracking-widest">
+                <p className="mt-2 text-sm text-white/50">
                   {q.subtitle}{q.maxSelect ? ` (max ${q.maxSelect})` : ''}
                 </p>
               )}
@@ -262,18 +261,18 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
 
             {/* TEXT */}
             {q.type === 'text' && (
-              <div className="flex-1 overflow-y-auto pb-6">
+              <div className="flex-1 overflow-y-auto pb-6 relative z-10">
                 <input autoFocus type="text"
                   placeholder={q.placeholder}
                   value={String(data[q.id] || '')}
                   onChange={e => setData(prev => ({ ...prev, [q.id]: e.target.value }))}
-                  className="w-full text-xl md:text-2xl font-black text-brand-dark bg-transparent border-b-4 border-brand-dark py-3 placeholder:text-brand-dark/30 focus:border-brand-primary outline-none transition-colors caret-brand-primary"
+                  className="w-full text-xl font-medium text-white bg-white/5 border border-white/10 rounded-2xl py-4 px-5 placeholder:text-white/30 focus:border-orange-400/70 focus:bg-white/10 outline-none transition-colors"
                 />
-                <p className="mt-2 text-xs font-bold uppercase tracking-widest text-brand-dark/60">
-                  {q.optional ? 'Optional — press Enter ↵ or tap Continue' : 'Press Enter ↵ to continue'}
+                <p className="mt-3 text-xs text-white/40 ml-2">
+                  {q.optional ? 'Optional — press Enter ↵ to skip' : 'Press Enter ↵ to continue'}
                 </p>
                 <button onClick={next} disabled={!valid}
-                  className="mt-6 flex items-center gap-2 bg-brand-primary border-2 border-brand-dark shadow-[4px_4px_0px_#1A1A1A] text-white px-7 py-3.5 font-black uppercase text-sm disabled:opacity-40 transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px]">
+                  className="mt-6 w-full flex items-center justify-center gap-2 btn-glow text-white px-7 py-3.5 rounded-full font-semibold text-sm transition-all disabled:opacity-40 disabled:pointer-events-none">
                   {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -281,18 +280,18 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
 
             {/* RADIO */}
             {isRadioType && (
-              <div className="flex-1 overflow-y-auto pb-6 flex flex-col gap-2">
+              <div className="flex-1 overflow-y-auto pb-6 flex flex-col gap-3 relative z-10 p-1">
                 {q.options?.map(opt => {
                   const sel = data[q.id] === opt;
                   return (
                     <button key={opt} onClick={() => pickRadio(opt)}
-                      className={cn('w-full text-left px-4 py-3.5 border-4 transition-all flex items-center justify-between group select-none shadow-[4px_4px_0px_#1A1A1A] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]',
-                        sel ? 'border-brand-primary bg-brand-primary text-white'
-                            : 'border-brand-dark bg-white hover:bg-brand-primary/10 text-brand-dark')}>
-                      <span className="text-sm md:text-base font-black uppercase tracking-wide">{opt}</span>
-                      <span className={cn('w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        sel ? 'border-white bg-white text-brand-primary' : 'border-brand-dark group-hover:border-brand-primary')}>
-                        {sel && <Check className="w-4 h-4" strokeWidth={4} />}
+                      className={cn('w-full text-left px-5 py-4 rounded-2xl border transition-all flex items-center justify-between group card-hover select-none',
+                        sel ? 'border-orange-400/70 bg-white/10 shadow-[0_0_15px_rgba(255,106,26,0.15)]'
+                            : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20')}>
+                      <span className="text-sm md:text-base font-medium text-white/90">{opt}</span>
+                      <span className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                        sel ? 'border-orange-400 bg-orange-400 text-white' : 'border-white/20 group-hover:border-white/40')}>
+                        {sel && <div className="w-2 h-2 rounded-full bg-[#07070a]" />}
                       </span>
                     </button>
                   );
@@ -300,25 +299,27 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                 {hasOther && (
                   <>
                     <button onClick={() => pickRadio(OTHER)}
-                      className={cn('w-full text-left px-4 py-3.5 border-4 transition-all flex items-center justify-between group select-none shadow-[4px_4px_0px_#1A1A1A] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]',
-                        otherSelected ? 'border-brand-primary bg-brand-primary text-white'
-                                      : 'border-brand-dark bg-white hover:bg-brand-primary/10 text-brand-dark')}>
-                      <span className="text-sm md:text-base font-black uppercase tracking-wide">Other (Please specify)</span>
-                      <span className={cn('w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        otherSelected ? 'border-white bg-white text-brand-primary' : 'border-brand-dark group-hover:border-brand-primary')}>
-                        {otherSelected && <Check className="w-4 h-4" strokeWidth={4} />}
+                      className={cn('w-full text-left px-5 py-4 rounded-2xl border transition-all flex items-center justify-between group card-hover select-none',
+                        otherSelected ? 'border-orange-400/70 bg-white/10 shadow-[0_0_15px_rgba(255,106,26,0.15)]'
+                                      : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20')}>
+                      <span className="text-sm md:text-base font-medium text-white/90">Other (Please specify)</span>
+                      <span className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                        otherSelected ? 'border-orange-400 bg-orange-400 text-white' : 'border-white/20 group-hover:border-white/40')}>
+                        {otherSelected && <div className="w-2 h-2 rounded-full bg-[#07070a]" />}
                       </span>
                     </button>
                     {otherSelected && (
-                      <input autoFocus type="text" placeholder="Please specify…"
-                        value={otherInputs[q.id] || ''}
-                        onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                        className="w-full bg-[#FFF7ED] border-4 border-brand-dark px-4 py-3 text-brand-dark font-bold text-sm outline-none focus:border-brand-primary transition-colors placeholder:text-brand-dark/30 shadow-[4px_4px_0px_#1A1A1A]"
-                      />
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-2">
+                        <input autoFocus type="text" placeholder="Please specify…"
+                          value={otherInputs[q.id] || ''}
+                          onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white text-sm outline-none focus:border-orange-400/70 focus:bg-white/10 transition-colors placeholder:text-white/30"
+                        />
+                      </motion.div>
                     )}
                     {otherSelected && (
                       <button onClick={next} disabled={!valid}
-                        className="flex items-center justify-center gap-2 bg-brand-primary border-2 border-brand-dark shadow-[4px_4px_0px_#1A1A1A] text-white px-6 py-3 font-black uppercase text-sm disabled:opacity-40 transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px]">
+                        className="mt-2 w-full flex items-center justify-center gap-2 btn-glow text-white px-6 py-3.5 rounded-full font-semibold text-sm transition-all disabled:opacity-40 disabled:pointer-events-none">
                         {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                       </button>
                     )}
@@ -327,24 +328,23 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
               </div>
             )}
 
-            {/* CHECKBOX — options scroll, Continue button pinned at bottom */}
+            {/* CHECKBOX */}
             {isCheckType && (
-              <div className="flex-1 flex flex-col min-h-0">
-                {/* Scrollable options */}
-                <div className="flex-1 overflow-y-auto flex flex-col gap-2 pb-2 min-h-0">
+              <div className="flex-1 flex flex-col min-h-0 relative z-10">
+                <div className="flex-1 overflow-y-auto flex flex-col gap-3 pb-4 min-h-0 p-1">
                   {q.options?.map(opt => {
                     const sel = checkArr.includes(opt);
                     const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
                     return (
                       <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
-                        className={cn('w-full text-left px-4 py-3.5 border-4 transition-all flex items-center justify-between group select-none flex-shrink-0 shadow-[4px_4px_0px_#1A1A1A] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]',
-                          sel         ? 'border-brand-primary bg-brand-primary text-white'
-                          : maxReached ? 'border-brand-dark/20 bg-black/5 text-brand-dark/40 cursor-not-allowed shadow-none'
-                                       : 'border-brand-dark bg-white hover:bg-brand-primary/10 text-brand-dark')}>
-                        <span className="text-sm md:text-base font-black uppercase tracking-wide">{opt}</span>
-                        <span className={cn('w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          sel ? 'border-white bg-white text-brand-primary' : 'border-brand-dark group-hover:border-brand-primary')}>
-                          {sel && <Check className="w-4 h-4" strokeWidth={4} />}
+                        className={cn('w-full text-left px-5 py-4 rounded-2xl border transition-all flex items-center justify-between group select-none flex-shrink-0',
+                          sel         ? 'border-orange-400/70 bg-white/10 shadow-[0_0_15px_rgba(255,106,26,0.15)]'
+                          : maxReached ? 'border-white/5 bg-black/20 text-white/20 cursor-not-allowed'
+                                       : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 card-hover')}>
+                        <span className={cn("text-sm md:text-base font-medium", sel ? "text-white" : maxReached ? "text-white/30" : "text-white/90")}>{opt}</span>
+                        <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                          sel ? 'border-orange-400 bg-orange-400 text-white' : maxReached ? 'border-white/10' : 'border-white/20 group-hover:border-white/40')}>
+                          {sel && <Check className="w-3.5 h-3.5 text-[#07070a]" strokeWidth={4} />}
                         </span>
                       </button>
                     );
@@ -352,32 +352,33 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   {hasOther && (
                     <>
                       <button onClick={() => toggleCheck(OTHER)}
-                        className={cn('w-full text-left px-4 py-3.5 border-4 transition-all flex items-center justify-between group select-none flex-shrink-0 shadow-[4px_4px_0px_#1A1A1A] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]',
-                          checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary text-white'
-                                                   : 'border-brand-dark bg-white hover:bg-brand-primary/10 text-brand-dark')}>
-                        <span className="text-sm md:text-base font-black uppercase tracking-wide">Other (Please specify)</span>
-                        <span className={cn('w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          checkArr.includes(OTHER) ? 'border-white bg-white text-brand-primary' : 'border-brand-dark group-hover:border-brand-primary')}>
-                          {checkArr.includes(OTHER) && <Check className="w-4 h-4" strokeWidth={4} />}
+                        className={cn('w-full text-left px-5 py-4 rounded-2xl border transition-all flex items-center justify-between group select-none flex-shrink-0',
+                          checkArr.includes(OTHER) ? 'border-orange-400/70 bg-white/10 shadow-[0_0_15px_rgba(255,106,26,0.15)]'
+                                                   : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 card-hover')}>
+                        <span className="text-sm md:text-base font-medium text-white/90">Other (Please specify)</span>
+                        <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                          checkArr.includes(OTHER) ? 'border-orange-400 bg-orange-400 text-white' : 'border-white/20 group-hover:border-white/40')}>
+                          {checkArr.includes(OTHER) && <Check className="w-3.5 h-3.5 text-[#07070a]" strokeWidth={4} />}
                         </span>
                       </button>
                       {checkArr.includes(OTHER) && (
-                        <input autoFocus type="text" placeholder="Please specify…"
-                          value={otherInputs[q.id] || ''}
-                          onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                          className="w-full bg-[#FFF7ED] border-4 border-brand-dark px-4 py-3 text-brand-dark font-bold text-sm outline-none focus:border-brand-primary transition-colors placeholder:text-brand-dark/30 shadow-[4px_4px_0px_#1A1A1A] flex-shrink-0"
-                        />
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-1">
+                          <input autoFocus type="text" placeholder="Please specify…"
+                            value={otherInputs[q.id] || ''}
+                            onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white text-sm outline-none focus:border-orange-400/70 focus:bg-white/10 transition-colors placeholder:text-white/30 flex-shrink-0"
+                          />
+                        </motion.div>
                       )}
                     </>
                   )}
                 </div>
 
-                {/* Pinned Continue button — always visible */}
-                <div className="flex-shrink-0 pt-3 pb-1">
+                <div className="flex-shrink-0 pt-4 pb-2">
                   <motion.button onClick={next} disabled={!valid}
                     animate={{ opacity: valid ? 1 : 0.4 }}
-                    className="w-full flex items-center justify-center gap-2 bg-brand-primary border-4 border-brand-dark text-white px-6 py-4 font-black uppercase tracking-widest text-sm transition-all disabled:cursor-not-allowed shadow-[6px_6px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_#1A1A1A] active:translate-x-[6px] active:translate-y-[6px] active:shadow-none">
-                    {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-5 h-5" />
+                    className="w-full flex items-center justify-center gap-2 btn-glow text-white px-6 py-4 rounded-full font-semibold text-sm transition-all disabled:pointer-events-none">
+                    {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                   </motion.button>
                 </div>
               </div>
