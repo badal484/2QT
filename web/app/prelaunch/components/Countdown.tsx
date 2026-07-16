@@ -1,84 +1,58 @@
-import { motion } from 'framer-motion';
-import { CalendarDays, MapPin, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-export function Countdown() {
+export function Countdown({ onStart }: { onStart: () => void }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
+
+  useEffect(() => {
+    const target = new Date('2026-08-01T00:00:00');
+    const interval = setInterval(() => {
+      const now = new Date();
+      let diff = target.getTime() - now.getTime();
+      if (diff < 0) diff = 0;
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        mins: Math.floor((diff / (1000 * 60)) % 60),
+        secs: Math.floor((diff / 1000) % 60)
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <section className="py-24 bg-[#FFF7ED] relative overflow-hidden border-t-4 border-brand-dark">
-      <div className="absolute inset-0 pointer-events-none opacity-30">
-        <div className="absolute top-1/2 left-1/4 w-[400px] h-[400px] bg-brand-primary rounded-full blur-[120px] -translate-y-1/2" />
+    <section className="relative z-10 max-w-5xl mx-auto px-6 lg:px-10 py-24 text-center text-white">
+      <p className="text-xs font-bold tracking-[0.25em] text-orange-400 uppercase mb-3">T-Minus</p>
+      <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight mb-3">Touching down on campus</h2>
+      <p className="text-white/55 mb-12">August 1st, 2026 — mark your calendar, tell your roommates.</p>
+
+      <div className="grid grid-cols-4 gap-4 sm:gap-6 max-w-2xl mx-auto">
+        <div className="glass rounded-3xl py-7 px-2 badge-ring">
+          <p className="font-display text-4xl sm:text-6xl font-bold text-gradient num-glow">{String(timeLeft.days).padStart(3, '0')}</p>
+          <p className="text-[11px] sm:text-xs text-white/45 mt-2 uppercase tracking-wider">Days</p>
+        </div>
+        <div className="glass rounded-3xl py-7 px-2 badge-ring">
+          <p className="font-display text-4xl sm:text-6xl font-bold text-gradient num-glow">{String(timeLeft.hours).padStart(2, '0')}</p>
+          <p className="text-[11px] sm:text-xs text-white/45 mt-2 uppercase tracking-wider">Hours</p>
+        </div>
+        <div className="glass rounded-3xl py-7 px-2 badge-ring">
+          <p className="font-display text-4xl sm:text-6xl font-bold text-gradient num-glow">{String(timeLeft.mins).padStart(2, '0')}</p>
+          <p className="text-[11px] sm:text-xs text-white/45 mt-2 uppercase tracking-wider">Minutes</p>
+        </div>
+        <div className="glass rounded-3xl py-7 px-2 badge-ring">
+          <p className="font-display text-4xl sm:text-6xl font-bold text-gradient num-glow">{String(timeLeft.secs).padStart(2, '0')}</p>
+          <p className="text-[11px] sm:text-xs text-white/45 mt-2 uppercase tracking-wider">Seconds</p>
+        </div>
       </div>
 
-      <div className="container mx-auto px-6 max-w-4xl relative z-10 text-center">
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-accent border-2 border-brand-dark text-brand-dark text-sm font-bold uppercase tracking-widest mb-8 shadow-[4px_4px_0px_#1A1A1A] rotate-[-1deg]"
-        >
-          <Sparkles className="w-4 h-4" />
-          Ranchi is about to eat better
-        </motion.div>
-
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.1 }}
-          className="text-4xl md:text-5xl font-black font-serif text-brand-dark tracking-tight mb-4"
-        >
-          One kitchen. One standard.{' '}
-          <span className="text-brand-primary">No compromise.</span>
-        </motion.h2>
-
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.15 }}
-          className="text-base md:text-lg text-zinc-600 font-medium max-w-xl mx-auto mb-10"
-        >
-          We're not just another food app. We own the kitchen, employ the chefs,
-          and handle every delivery. If something's wrong, there's no one else to blame — and that's exactly how we like it.
-        </motion.p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2, type: 'spring' }}
-            className="inline-flex items-center gap-3 bg-white border-4 border-brand-dark px-8 py-5 shadow-[6px_6px_0px_#1A1A1A] rotate-[1deg]"
-          >
-            <CalendarDays className="w-6 h-6 text-brand-primary" />
-            <span className="text-2xl md:text-3xl font-black text-brand-dark tracking-tight">
-              August <span className="text-brand-primary">2026</span>
-            </span>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.25, type: 'spring' }}
-            className="inline-flex items-center gap-3 bg-brand-dark border-4 border-brand-dark px-8 py-5 shadow-[6px_6px_0px_#FF6B35] rotate-[-1deg]"
-          >
-            <MapPin className="w-6 h-6 text-brand-accent" />
-            <span className="text-2xl md:text-3xl font-black text-white tracking-tight">
-              Lalpur, <span className="text-brand-accent">Ranchi</span>
-            </span>
-          </motion.div>
+      <div className="mt-16 max-w-lg mx-auto glass rounded-3xl p-8 sm:p-10 relative overflow-hidden text-center">
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-orange-500/25 rounded-full blur-3xl"></div>
+        <h3 className="font-display text-2xl font-bold relative z-10">Be first through the door.</h3>
+        <p className="text-white/55 text-sm mt-2 relative z-10">Early sign-ups get founding-member perks + zero fees for life.</p>
+        <div className="mt-6 flex flex-col sm:flex-row gap-3 relative z-10">
+          <button onClick={onStart} className="btn-glow w-full px-6 py-4 rounded-full font-semibold text-sm whitespace-nowrap text-center">
+            Join waitlist
+          </button>
         </div>
-
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.35 }}
-          className="text-brand-dark/70 font-bold uppercase tracking-widest text-xs"
-        >
-          Register now — your ₹100 wallet credit is waiting when we open doors.
-        </motion.p>
       </div>
     </section>
   );

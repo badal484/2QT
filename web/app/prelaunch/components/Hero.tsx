@@ -1,128 +1,107 @@
-import { motion } from 'framer-motion';
-import { ArrowRight, ChevronDown, Sparkles } from 'lucide-react';
-
 export function Hero({ onStart }: { onStart: () => void }) {
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-[#FFF7ED] selection:bg-brand-primary/20">
+    <section className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pt-16 pb-28 grid lg:grid-cols-2 gap-14 items-center">
+      <div className="fade-in">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full glass text-xs font-semibold text-orange-300 badge-ring mb-7">
+          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 pulse-dot"></span>
+          Launching on campuses · August 2026
+        </div>
 
-      {/* Noise texture */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }}
-      />
+        <h1 className="font-display text-5xl sm:text-6xl lg:text-[4rem] leading-[1.05] font-bold tracking-tight">
+          Campus food,
+          <span className="text-gradient block">delivered too quick.</span>
+        </h1>
 
-      {/* Ambient blobs */}
-      <motion.div
-        animate={{ transform: ['translate(0%,0%) scale(1)', 'translate(6%,8%) scale(1.08)', 'translate(0%,0%) scale(1)'] }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-        className="absolute top-[-20%] left-[-15%] w-[60%] h-[60%] rounded-full bg-brand-primary/10 blur-[120px] pointer-events-none will-change-transform"
-      />
-      <motion.div
-        animate={{ transform: ['translate(0%,0%) scale(1)', 'translate(-6%,-6%) scale(1.06)', 'translate(0%,0%) scale(1)'] }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'linear', delay: 3 }}
-        className="absolute bottom-[-20%] right-[-15%] w-[55%] h-[55%] rounded-full bg-brand-accent/20 blur-[120px] pointer-events-none will-change-transform"
-      />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[30%] bg-brand-primary/5 blur-[100px] rounded-full pointer-events-none" />
+        <p className="mt-6 text-lg text-white/60 max-w-lg leading-relaxed">
+          2QT is the delivery app built <em className="text-white/85">by</em> and <em className="text-white/85">for</em> college students — zero platform fees, hygiene-checked meals, and drops that beat your walk to the dining hall.
+        </p>
 
-      <div className="relative z-10 container mx-auto px-6 pt-24 pb-36 max-w-4xl flex flex-col items-center text-center">
+        <div className="mt-9 flex flex-col sm:flex-row gap-3 max-w-md">
+          <button onClick={onStart} className="btn-glow flex-1 px-6 py-4 rounded-full font-semibold text-sm whitespace-nowrap text-center">
+            Get early access
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-white/35">No spam. Just a launch invite and campus perks.</p>
 
-        {/* Badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="inline-flex items-center gap-2.5 px-4 py-2 bg-brand-primary text-white border-2 border-brand-dark mb-7 shadow-[4px_4px_0px_#1A1A1A] rotate-[-2deg]"
-        >
-          <span className="text-xs font-bold tracking-[0.15em] uppercase">Launching August 2026 · Lalpur, Ranchi</span>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-          className="text-[clamp(3rem,10vw,6rem)] font-black font-serif text-brand-dark tracking-tighter leading-[1.02] mb-6"
-        >
-          Real food.{' '}
-          <span className="relative inline-block px-4 py-1 bg-brand-accent border-4 border-brand-dark shadow-[6px_6px_0px_#1A1A1A] rotate-[1deg] mt-2 lg:mt-0">
-            <span className="text-brand-dark">Honest price.</span>
-          </span>
-        </motion.h1>
-
-        {/* Sub */}
-        <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
-          className="text-lg md:text-xl text-zinc-700 font-medium mb-5 max-w-2xl leading-relaxed"
-        >
-          Built for students, open to everyone in Lalpur, Ranchi.
-          Experienced chefs. Our own kitchen. Zero platform fee —
-          you pay only food price, delivery & tax. Quality, hygiene, and timing all under our control.
-        </motion.p>
-
-        {/* Reward pill */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.26, type: 'spring', stiffness: 200 }}
-          className="flex items-center gap-2.5 bg-white border-2 border-brand-dark px-5 py-3 mb-10 shadow-[4px_4px_0px_#1A1A1A]"
-        >
-          <div className="flex items-center justify-center w-8 h-8 bg-brand-accent border-2 border-brand-dark">
-            <Sparkles className="w-4 h-4 text-brand-dark" />
+        <div className="mt-10 flex items-center gap-4">
+          <div className="flex -space-x-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-300 to-orange-600 border-2 border-[#07070a] flex items-center justify-center text-xs font-bold text-white">JM</div>
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-red-500 border-2 border-[#07070a] flex items-center justify-center text-xs font-bold text-white">RA</div>
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 border-2 border-[#07070a] flex items-center justify-center text-xs font-bold text-white">SK</div>
+            <div className="w-9 h-9 rounded-full bg-white/10 border-2 border-[#07070a] flex items-center justify-center text-[10px] font-bold text-white/70">+3k</div>
           </div>
-          <span className="text-sm font-bold text-brand-dark">
-            Early access →{' '}
-            <span className="text-brand-primary font-black">₹100 free</span>
-            {' '}in your wallet on launch day
-          </span>
-        </motion.div>
-
-        {/* CTAs */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.32, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto"
-        >
-          <button
-            onClick={onStart}
-            className="group relative flex w-full sm:w-auto items-center justify-center gap-2.5 overflow-hidden border-2 border-brand-dark bg-brand-primary px-8 py-4 font-bold text-lg text-white shadow-[6px_6px_0px_#1A1A1A] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_#1A1A1A] active:translate-x-[6px] active:translate-y-[6px] active:shadow-none"
-          >
-            <span className="relative">Claim My ₹100 Reward</span>
-            <ArrowRight className="relative w-5 h-5 transition-transform group-hover:translate-x-1" />
-          </button>
-
-          <button
-            onClick={() => document.getElementById('showcase-section')?.scrollIntoView({ behavior: 'smooth' })}
-            className="flex w-full sm:w-auto items-center justify-center gap-2 px-8 py-4 font-bold text-base text-brand-dark bg-white border-2 border-brand-dark shadow-[6px_6px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_#1A1A1A] active:translate-x-[6px] active:translate-y-[6px] active:shadow-none transition-all"
-          >
-            Why 2QT is different
-            <ChevronDown className="w-4 h-4" />
-          </button>
-        </motion.div>
-
-        {/* Trust line */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.55 }}
-          className="mt-8 text-xs text-brand-dark/70 font-bold uppercase tracking-wider"
-        >
-          No spam. No hidden fees. Just great food — coming to Ranchi.
-        </motion.p>
+          <p className="text-sm text-white/50"><span className="text-white font-semibold">3,482 students</span> already on the list</p>
+        </div>
       </div>
 
-      {/* Scroll hint */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.2 }}
-        className="absolute bottom-10 left-1/2 -translate-x-1/2"
-      >
-        <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}>
-          <ChevronDown className="w-5 h-5 text-zinc-700" />
-        </motion.div>
-      </motion.div>
-    </div>
+      {/* Visual mockup */}
+      <div className="relative fade-in" style={{ animationDelay: '.2s' }}>
+        <div className="relative mx-auto w-[300px] sm:w-[330px]">
+          {/* floating chips */}
+          <div className="absolute -left-10 top-6 z-20 float glass rounded-2xl px-4 py-3 shadow-2xl w-40 hidden sm:block">
+            <p className="text-[11px] text-white/45">Order status</p>
+            <p className="text-sm font-semibold mt-0.5 flex items-center gap-1.5">🔥 Arriving in <span className="text-orange-300">6 min</span></p>
+          </div>
+
+          <div className="absolute -right-14 top-1/3 z-20 float-slow float-delay glass rounded-2xl px-4 py-3 shadow-2xl w-44 hidden sm:block">
+            <p className="text-[11px] text-white/45">Split the bill</p>
+            <p className="text-sm font-semibold mt-0.5">4 roommates · $3.25 ea</p>
+          </div>
+
+          <div className="absolute -left-8 bottom-8 z-20 float-slow float-delay2 glass rounded-2xl px-4 py-3 shadow-2xl w-40 hidden sm:block">
+            <p className="text-sm font-semibold flex items-center gap-1.5">✅ Platform fee</p>
+            <p className="text-[11px] text-orange-300 font-bold">$0.00 forever</p>
+          </div>
+
+          {/* phone frame */}
+          <div className="relative rounded-[2.4rem] p-2 glass shadow-[0_40px_90px_-30px_rgba(255,90,20,0.35)]">
+            <div className="rounded-[2rem] bg-[#0c0c10] overflow-hidden border border-white/5">
+              <div className="flex justify-between items-center px-6 pt-4 text-[11px] text-white/40">
+                <span>9:41</span>
+                <span>●●●●</span>
+              </div>
+              <div className="px-5 pt-5 pb-8">
+                <p className="text-xs text-white/40">Good evening,</p>
+                <p className="font-display font-bold text-lg">Alex 👋</p>
+
+                <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 px-4 py-2.5 flex items-center gap-2 text-white/40 text-xs">
+                  <span>🔎</span> Search dining halls, cafés...
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  <div className="rounded-2xl bg-gradient-to-r from-orange-500/15 to-transparent border border-orange-400/20 p-3.5 flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-orange-500/20 flex items-center justify-center text-xl">🌯</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">The Burrito Bar</p>
+                      <p className="text-[11px] text-white/40">0.3 mi · 8 min</p>
+                    </div>
+                    <p className="text-[11px] font-bold text-orange-300">$0 fee</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-xl">🍜</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">Noodle House</p>
+                      <p className="text-[11px] text-white/40">0.5 mi · 11 min</p>
+                    </div>
+                    <p className="text-[11px] font-bold text-orange-300">$0 fee</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-xl">☕</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">Common Grounds</p>
+                      <p className="text-[11px] text-white/40">0.2 mi · 5 min</p>
+                    </div>
+                    <p className="text-[11px] font-bold text-orange-300">$0 fee</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 mb-4 flex justify-center">
+                <div className="w-28 h-1 rounded-full bg-white/15"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
