@@ -60,7 +60,7 @@ export default function ResolvedTab() {
       const res = await api.get("/support/tickets?status=resolved");
       return (res.tickets as Ticket[]).slice(0, 100);
     },
-    refetchInterval: 120_000,
+    refetchInterval: 5000,
   });
 
   const tickets = (data ?? []).filter(t => {

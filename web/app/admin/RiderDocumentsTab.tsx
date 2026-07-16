@@ -108,7 +108,7 @@ export function RiderDocumentsTab({ onOpenRider }: { onOpenRider?: (riderId: str
   const { data, isLoading, refetch } = useQuery<{ documents: RiderDoc[] }>({
     queryKey: ["admin-rider-documents"],
     queryFn: () => api.get("/admin/riders/documents"),
-    refetchInterval: 30_000,
+    refetchInterval: 5000,
   });
 
   const reviewMutation = useMutation({

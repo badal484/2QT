@@ -132,7 +132,7 @@ const PackerScreen = () => {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['packer-orders'],
     queryFn: () => api.get('/kitchen/packer/orders'),
-    refetchInterval: 20000,
+    refetchInterval: 5000,
   });
 
   const packMutation = useMutation({

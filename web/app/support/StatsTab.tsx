@@ -55,7 +55,7 @@ export default function StatsTab() {
       const res = await api.get("/support/stats");
       return { stats: res.stats as Stats, agents: (res.agents ?? []) as Agent[] };
     },
-    refetchInterval: 60_000,
+    refetchInterval: 5000,
   });
 
   if (isError) {

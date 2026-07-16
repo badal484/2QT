@@ -67,7 +67,7 @@ const TableBookingDetailScreen = ({ navigation, route }: any) => {
   const { data: booking, isLoading, refetch } = useQuery({
     queryKey: ['table-booking', bookingId],
     queryFn: () => api.get(`/table-bookings/${bookingId}`).then((r: any) => r.booking),
-    refetchInterval: 20000,
+    refetchInterval: 5000,
   });
 
   const { data: bill } = useQuery({
