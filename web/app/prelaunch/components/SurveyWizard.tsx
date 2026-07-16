@@ -221,17 +221,17 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
       <div className="mb-8 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <button onClick={back} aria-label="Back"
-            className={cn('flex items-center justify-center w-9 h-9 rounded-full border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white transition-all', currentIndex === 0 && 'opacity-0 pointer-events-none')}>
+            className={cn('flex items-center justify-center w-10 h-10 border-2 border-brand-dark bg-white text-brand-dark shadow-[2px_2px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none active:bg-brand-primary active:text-white transition-all', currentIndex === 0 && 'opacity-0 pointer-events-none')}>
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <span className="text-xs font-bold text-zinc-500 uppercase tracking-[0.16em]">
-            {currentIndex + 1} <span className="text-zinc-700">/ {QUESTIONS.length}</span>
+          <span className="text-xs font-black text-brand-dark uppercase tracking-[0.16em]">
+            {currentIndex + 1} <span className="text-brand-dark/50">/ {QUESTIONS.length}</span>
           </span>
           <div className="w-9" />
         </div>
-        <div className="h-1 w-full bg-white/[0.07] rounded-full overflow-hidden">
+        <div className="h-2 w-full bg-white border-2 border-brand-dark overflow-hidden shadow-[2px_2px_0px_#1A1A1A]">
           <motion.div
-            className="h-full rounded-full bg-brand-primary shadow-[0_0_8px_rgba(255,107,53,0.6)]"
+            className="h-full bg-brand-primary"
             animate={{ width: `${progress}%` }}
             transition={{ type: 'spring', stiffness: 60, damping: 18 }}
           />
@@ -250,11 +250,11 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
           >
             {/* Title */}
             <div className="mb-5 flex-shrink-0">
-              <h2 className="text-xl md:text-3xl font-extrabold font-serif text-white tracking-tight leading-[1.15]">
+              <h2 className="text-2xl md:text-4xl font-black font-serif text-brand-dark tracking-tight uppercase leading-[1.15]">
                 {q.title}
               </h2>
               {q.subtitle && (
-                <p className="mt-1.5 text-xs text-zinc-500 font-medium">
+                <p className="mt-2 text-sm font-bold text-brand-dark/70 uppercase tracking-widest">
                   {q.subtitle}{q.maxSelect ? ` (max ${q.maxSelect})` : ''}
                 </p>
               )}
@@ -267,13 +267,13 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   placeholder={q.placeholder}
                   value={String(data[q.id] || '')}
                   onChange={e => setData(prev => ({ ...prev, [q.id]: e.target.value }))}
-                  className="w-full text-xl md:text-2xl font-medium text-white bg-transparent border-b-2 border-white/15 py-3 placeholder:text-zinc-600 focus:border-brand-primary outline-none transition-colors caret-brand-primary"
+                  className="w-full text-xl md:text-2xl font-black text-brand-dark bg-transparent border-b-4 border-brand-dark py-3 placeholder:text-brand-dark/30 focus:border-brand-primary outline-none transition-colors caret-brand-primary"
                 />
-                <p className="mt-2 text-xs text-zinc-600">
+                <p className="mt-2 text-xs font-bold uppercase tracking-widest text-brand-dark/60">
                   {q.optional ? 'Optional — press Enter ↵ or tap Continue' : 'Press Enter ↵ to continue'}
                 </p>
                 <button onClick={next} disabled={!valid}
-                  className="mt-6 flex items-center gap-2 bg-brand-primary text-white px-7 py-3.5 rounded-2xl font-bold text-sm disabled:opacity-40 transition-all">
+                  className="mt-6 flex items-center gap-2 bg-brand-primary border-2 border-brand-dark shadow-[4px_4px_0px_#1A1A1A] text-white px-7 py-3.5 font-black uppercase text-sm disabled:opacity-40 transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px]">
                   {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -286,13 +286,13 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   const sel = data[q.id] === opt;
                   return (
                     <button key={opt} onClick={() => pickRadio(opt)}
-                      className={cn('w-full text-left px-4 py-3.5 rounded-2xl border transition-all flex items-center justify-between group select-none',
-                        sel ? 'border-brand-primary bg-brand-primary/10 text-white shadow-[0_0_14px_rgba(255,107,53,0.1)]'
-                            : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-zinc-400 hover:text-white')}>
-                      <span className="text-sm md:text-base font-semibold">{opt}</span>
-                      <span className={cn('w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        sel ? 'border-brand-primary bg-brand-primary' : 'border-white/20 group-hover:border-white/40')}>
-                        {sel && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                      className={cn('w-full text-left px-4 py-3.5 border-4 transition-all flex items-center justify-between group select-none shadow-[4px_4px_0px_#1A1A1A] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]',
+                        sel ? 'border-brand-primary bg-brand-primary text-white'
+                            : 'border-brand-dark bg-white hover:bg-brand-primary/10 text-brand-dark')}>
+                      <span className="text-sm md:text-base font-black uppercase tracking-wide">{opt}</span>
+                      <span className={cn('w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                        sel ? 'border-white bg-white text-brand-primary' : 'border-brand-dark group-hover:border-brand-primary')}>
+                        {sel && <Check className="w-4 h-4" strokeWidth={4} />}
                       </span>
                     </button>
                   );
@@ -300,25 +300,25 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                 {hasOther && (
                   <>
                     <button onClick={() => pickRadio(OTHER)}
-                      className={cn('w-full text-left px-4 py-3.5 rounded-2xl border transition-all flex items-center justify-between group select-none',
-                        otherSelected ? 'border-brand-primary bg-brand-primary/10 text-white'
-                                      : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-zinc-400 hover:text-white')}>
-                      <span className="text-sm md:text-base font-semibold">Other (Please specify)</span>
-                      <span className={cn('w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        otherSelected ? 'border-brand-primary bg-brand-primary' : 'border-white/20 group-hover:border-white/40')}>
-                        {otherSelected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                      className={cn('w-full text-left px-4 py-3.5 border-4 transition-all flex items-center justify-between group select-none shadow-[4px_4px_0px_#1A1A1A] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]',
+                        otherSelected ? 'border-brand-primary bg-brand-primary text-white'
+                                      : 'border-brand-dark bg-white hover:bg-brand-primary/10 text-brand-dark')}>
+                      <span className="text-sm md:text-base font-black uppercase tracking-wide">Other (Please specify)</span>
+                      <span className={cn('w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                        otherSelected ? 'border-white bg-white text-brand-primary' : 'border-brand-dark group-hover:border-brand-primary')}>
+                        {otherSelected && <Check className="w-4 h-4" strokeWidth={4} />}
                       </span>
                     </button>
                     {otherSelected && (
                       <input autoFocus type="text" placeholder="Please specify…"
                         value={otherInputs[q.id] || ''}
                         onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                        className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-brand-primary transition-colors placeholder:text-zinc-600"
+                        className="w-full bg-[#FFF7ED] border-4 border-brand-dark px-4 py-3 text-brand-dark font-bold text-sm outline-none focus:border-brand-primary transition-colors placeholder:text-brand-dark/30 shadow-[4px_4px_0px_#1A1A1A]"
                       />
                     )}
                     {otherSelected && (
                       <button onClick={next} disabled={!valid}
-                        className="flex items-center justify-center gap-2 bg-brand-primary text-white px-6 py-3 rounded-2xl font-bold text-sm disabled:opacity-40 transition-all">
+                        className="flex items-center justify-center gap-2 bg-brand-primary border-2 border-brand-dark shadow-[4px_4px_0px_#1A1A1A] text-white px-6 py-3 font-black uppercase text-sm disabled:opacity-40 transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px]">
                         {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                       </button>
                     )}
@@ -337,14 +337,14 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                     const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
                     return (
                       <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
-                        className={cn('w-full text-left px-4 py-3.5 rounded-2xl border transition-all flex items-center justify-between group select-none flex-shrink-0',
-                          sel         ? 'border-brand-primary bg-brand-primary/10 text-white shadow-[0_0_14px_rgba(255,107,53,0.1)]'
-                          : maxReached ? 'border-white/[0.04] bg-white/[0.02] text-zinc-700 cursor-not-allowed'
-                                       : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-zinc-400 hover:text-white')}>
-                        <span className="text-sm md:text-base font-semibold">{opt}</span>
-                        <span className={cn('w-[18px] h-[18px] rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          sel ? 'border-brand-primary bg-brand-primary' : 'border-white/20 group-hover:border-white/40')}>
-                          {sel && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                        className={cn('w-full text-left px-4 py-3.5 border-4 transition-all flex items-center justify-between group select-none flex-shrink-0 shadow-[4px_4px_0px_#1A1A1A] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]',
+                          sel         ? 'border-brand-primary bg-brand-primary text-white'
+                          : maxReached ? 'border-brand-dark/20 bg-black/5 text-brand-dark/40 cursor-not-allowed shadow-none'
+                                       : 'border-brand-dark bg-white hover:bg-brand-primary/10 text-brand-dark')}>
+                        <span className="text-sm md:text-base font-black uppercase tracking-wide">{opt}</span>
+                        <span className={cn('w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                          sel ? 'border-white bg-white text-brand-primary' : 'border-brand-dark group-hover:border-brand-primary')}>
+                          {sel && <Check className="w-4 h-4" strokeWidth={4} />}
                         </span>
                       </button>
                     );
@@ -352,20 +352,20 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   {hasOther && (
                     <>
                       <button onClick={() => toggleCheck(OTHER)}
-                        className={cn('w-full text-left px-4 py-3.5 rounded-2xl border transition-all flex items-center justify-between group select-none flex-shrink-0',
-                          checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary/10 text-white'
-                                                   : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-zinc-400 hover:text-white')}>
-                        <span className="text-sm md:text-base font-semibold">Other (Please specify)</span>
-                        <span className={cn('w-[18px] h-[18px] rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary' : 'border-white/20 group-hover:border-white/40')}>
-                          {checkArr.includes(OTHER) && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                        className={cn('w-full text-left px-4 py-3.5 border-4 transition-all flex items-center justify-between group select-none flex-shrink-0 shadow-[4px_4px_0px_#1A1A1A] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]',
+                          checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary text-white'
+                                                   : 'border-brand-dark bg-white hover:bg-brand-primary/10 text-brand-dark')}>
+                        <span className="text-sm md:text-base font-black uppercase tracking-wide">Other (Please specify)</span>
+                        <span className={cn('w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                          checkArr.includes(OTHER) ? 'border-white bg-white text-brand-primary' : 'border-brand-dark group-hover:border-brand-primary')}>
+                          {checkArr.includes(OTHER) && <Check className="w-4 h-4" strokeWidth={4} />}
                         </span>
                       </button>
                       {checkArr.includes(OTHER) && (
                         <input autoFocus type="text" placeholder="Please specify…"
                           value={otherInputs[q.id] || ''}
                           onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                          className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-brand-primary transition-colors placeholder:text-zinc-600 flex-shrink-0"
+                          className="w-full bg-[#FFF7ED] border-4 border-brand-dark px-4 py-3 text-brand-dark font-bold text-sm outline-none focus:border-brand-primary transition-colors placeholder:text-brand-dark/30 shadow-[4px_4px_0px_#1A1A1A] flex-shrink-0"
                         />
                       )}
                     </>
@@ -375,9 +375,9 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                 {/* Pinned Continue button — always visible */}
                 <div className="flex-shrink-0 pt-3 pb-1">
                   <motion.button onClick={next} disabled={!valid}
-                    animate={{ opacity: valid ? 1 : 0.35 }}
-                    className="w-full flex items-center justify-center gap-2 bg-brand-primary text-white px-6 py-3.5 rounded-2xl font-bold text-sm transition-all disabled:cursor-not-allowed shadow-[0_0_20px_rgba(255,107,53,0.2)]">
-                    {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
+                    animate={{ opacity: valid ? 1 : 0.4 }}
+                    className="w-full flex items-center justify-center gap-2 bg-brand-primary border-4 border-brand-dark text-white px-6 py-4 font-black uppercase tracking-widest text-sm transition-all disabled:cursor-not-allowed shadow-[6px_6px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_#1A1A1A] active:translate-x-[6px] active:translate-y-[6px] active:shadow-none">
+                    {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-5 h-5" />
                   </motion.button>
                 </div>
               </div>
