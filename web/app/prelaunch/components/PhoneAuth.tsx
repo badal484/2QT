@@ -2,6 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
+import { app } from '../../lib/firebase';
+import { toast } from 'sonner';
+
+declare global {
+  interface Window {
+    recaptchaVerifier: any;
+    grecaptcha: any;
+  }
+}
 
 interface PhoneAuthProps {
   onVerified: (phone: string) => void;
@@ -11,25 +21,67 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [phone, setPhone] = useState('');
   const [step, setStep] = useState<'PHONE' | 'OTP' | 'SUCCESS'>('PHONE');
   const [isLoading, setIsLoading] = useState(false);
-  const [otp, setOtp] = useState(['', '', '', '']);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']); // Firebase uses 6 digits
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+
+  useEffect(() => {
+    // Initialize reCAPTCHA when component mounts
+    const auth = getAuth(app);
+    if (!window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible',
+        });
+      } catch (e) {
+        console.error("Recaptcha Init Error", e);
+      }
+    }
+  }, []);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (phone.length < 10) return;
+    
     setIsLoading(true);
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 1200));
-    setIsLoading(false);
-    setStep('OTP');
+    try {
+      const auth = getAuth(app);
+      const appVerifier = window.recaptchaVerifier;
+      const fullPhone = `+91${phone}`;
+      
+      const confirmation = await signInWithPhoneNumber(auth, fullPhone, appVerifier);
+      setConfirmationResult(confirmation);
+      setStep('OTP');
+      toast.success('Verification code sent');
+    } catch (error: any) {
+      console.error("Firebase Auth Error", error);
+      toast.error(error.message || 'Failed to send OTP. Please try again.');
+      // Reset recaptcha on error
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.render().then((widgetId: any) => {
+          window.grecaptcha.reset(widgetId);
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleVerify = async (code: string) => {
+    if (!confirmationResult) return;
+    
     setIsLoading(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setIsLoading(false);
-    setStep('SUCCESS');
-    setTimeout(() => onVerified(phone), 1500);
+    try {
+      await confirmationResult.confirm(code);
+      setStep('SUCCESS');
+      setTimeout(() => onVerified(phone), 1500);
+    } catch (error: any) {
+      console.error("Firebase Verify Error", error);
+      toast.error('Invalid verification code');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -39,12 +91,12 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    if (value && index < 3) {
+    if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
     const fullCode = newOtp.join('');
-    if (fullCode.length === 4) {
+    if (fullCode.length === 6) {
       handleVerify(fullCode);
     }
   };
@@ -63,7 +115,10 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="w-full max-w-md mx-auto"
     >
-      <div className="bg-white/80 backdrop-blur-xl border border-white/50 p-8 rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.04)]">
+      <div className="bg-white/80 backdrop-blur-xl border border-white/50 p-8 rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.04)] relative">
+        
+        {/* Invisible reCAPTCHA container for Firebase */}
+        <div id="recaptcha-container"></div>
         
         {step === 'PHONE' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -106,7 +161,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
             <h2 className="text-3xl font-bold text-zinc-900 tracking-tight mb-2">Verify.</h2>
             <p className="text-zinc-500 font-medium mb-8">We sent a code to +91 {phone.slice(0,5)} {phone.slice(5)}</p>
             
-            <div className="flex justify-between gap-3 mb-8">
+            <div className="flex justify-between gap-2 mb-8">
               {otp.map((digit, i) => (
                 <input 
                   key={i}
@@ -118,7 +173,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   onChange={e => handleOtpChange(i, e.target.value)}
                   onKeyDown={e => handleKeyDown(i, e)}
                   disabled={isLoading}
-                  className="w-16 h-16 text-center text-3xl font-bold bg-zinc-50 border-2 border-zinc-100 rounded-2xl text-zinc-900 outline-none transition-all focus:bg-white focus:border-zinc-900 disabled:opacity-50"
+                  className="w-12 h-14 md:w-14 md:h-16 text-center text-2xl font-bold bg-zinc-50 border-2 border-zinc-100 rounded-xl text-zinc-900 outline-none transition-all focus:bg-white focus:border-zinc-900 disabled:opacity-50"
                 />
               ))}
             </div>
