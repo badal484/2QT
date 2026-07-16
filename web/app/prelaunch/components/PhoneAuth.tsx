@@ -83,7 +83,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       }
     } catch (error: any) {
       console.error("Firebase Verify Error", error);
-      toast.error('Invalid verification code');
+      toast.error(error.message || 'Invalid verification code');
     } finally {
       setIsLoading(false);
     }
