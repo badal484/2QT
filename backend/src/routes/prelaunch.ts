@@ -1,5 +1,5 @@
 import express from 'express';
-import { db } from '../db';
+import { query } from '../db';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 
@@ -28,7 +28,7 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const result = await db.query(
+    const result = await query(
       `INSERT INTO pre_launch_registrations (name, phone, email, survey_responses, source)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, created_at`,
@@ -50,7 +50,7 @@ router.post('/register', async (req, res) => {
 // Admin route to view waitlist
 router.get('/registrations', requireRole('super_admin', 'admin'), async (req, res) => {
   try {
-    const result = await db.query(
+    const result = await query(
       `SELECT * FROM pre_launch_registrations ORDER BY created_at DESC`
     );
     res.json({ success: true, data: result.rows });
@@ -64,7 +64,7 @@ router.get('/registrations', requireRole('super_admin', 'admin'), async (req, re
 // Public route to check if pre-launch mode is active
 router.get('/config', async (req, res) => {
   try {
-    const result = await db.query(
+    const result = await query(
       `SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`
     );
     const isPrelaunch = result.rows[0]?.value === 'true' || result.rows[0]?.value === true;
@@ -84,7 +84,7 @@ router.post('/config', requireRole('super_admin', 'admin'), async (req, res) => 
   }
 
   try {
-    await db.query(
+    await query(
       `INSERT INTO app_config (key, value)
        VALUES ('IS_PRELAUNCH_MODE', $1::jsonb)
        ON CONFLICT (key) DO UPDATE SET value = $1::jsonb, updated_at = CURRENT_TIMESTAMP`,
