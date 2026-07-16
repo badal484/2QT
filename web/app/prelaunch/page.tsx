@@ -51,26 +51,15 @@ export default function PreLaunchPage() {
     return () => clearInterval(interval);
   }, [step]);
 
-  const handlePhoneVerified = async (data: { phone: string, token: string, name: string }) => {
+  const handlePhoneVerified = (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string }) => {
     setPhone(data.phone);
     setIdToken(data.token);
     setUserName(data.name);
-    // Check if this phone already has a registration — skip the survey if so.
-    try {
-      const res = await fetch('/api/proxy/prelaunch/me', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: data.token }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.registered && json.referral_code) {
-          setReferralCode(json.referral_code);
-          setStep(3); // already registered — go straight to Thank You
-          return;
-        }
-      }
-    } catch {}
+    if (data.alreadyRegistered && data.referralCode) {
+      setReferralCode(data.referralCode);
+      setStep(3); // already registered — go straight to Thank You
+      return;
+    }
     setStep(2);
   };
 
