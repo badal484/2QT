@@ -10,6 +10,15 @@ module.exports = {
       fontFamily: {
         serif: ['var(--font-playfair)', 'serif'],
       },
+      keyframes: {
+        gradientShift: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+      },
+      animation: {
+        gradientShift: 'gradientShift 4s ease infinite',
+      },
       colors: {
         'brand-primary': '#FF6B35',
         'brand-primary-dark': '#E55A2A',
