@@ -31,12 +31,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const auth = getAuth(app);
-    if (!window.recaptchaVerifier) {
-      try {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
-      } catch (e) { console.error('Recaptcha init error', e); }
-    }
     return () => {
       if (cooldownRef.current) clearInterval(cooldownRef.current);
       if (window.recaptchaVerifier) {
@@ -59,22 +53,22 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     setIsLoading(true);
     try {
       const auth = getAuth(app);
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+      // Always create a fresh verifier — reusing a solved/consumed one causes failures
+      if (window.recaptchaVerifier) {
+        try { window.recaptchaVerifier.clear(); } catch {}
+        window.recaptchaVerifier = null;
       }
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
       const confirmation = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, window.recaptchaVerifier);
       setConfirmationResult(confirmation);
       startCooldown();
       return true;
     } catch (error: any) {
       toast.error('Failed to send OTP. Please try again.');
-      // Reset reCAPTCHA so next attempt can re-solve
       try {
-        if (window.recaptchaVerifier) {
-          const widgetId = await window.recaptchaVerifier.render();
-          window.grecaptcha?.reset(widgetId);
-        }
+        if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); }
       } catch {}
+      window.recaptchaVerifier = null;
       return false;
     } finally {
       setIsLoading(false);
