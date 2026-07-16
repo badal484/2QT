@@ -1,75 +1,48 @@
 import { Hero } from './Hero';
-import { Showcase } from './Showcase';
+import { WhyUs } from './WhyUs';
+import { Pricing } from './Pricing';
+import { Story } from './Story';
 import { Countdown } from './Countdown';
 import { LiveCounter } from './LiveCounter';
 
 export function Landing({ onStart }: { onStart: () => void }) {
   return (
-    <div className="relative w-full text-white overflow-hidden">
-      {/* ===== Navbar ===== */}
-      <header className="relative z-30 max-w-7xl mx-auto px-6 lg:px-10 pt-6 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center font-display font-bold text-sm badge-ring">2Q</div>
-          <span className="font-display font-bold text-lg tracking-tight">2QT</span>
+    <div className="w-full min-h-screen bg-[#FFFBF7]">
+
+      {/* Sticky navbar */}
+      <header className="sticky top-0 z-50 bg-[#FFFBF7]/90 backdrop-blur-md border-b border-orange-100">
+        <div className="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-[#FF5722] flex items-center justify-center text-white font-bold text-sm">2Q</div>
+            <span className="font-bold text-lg text-[#1C1C1E] tracking-tight">2QT</span>
+          </div>
+          <div className="hidden md:flex items-center gap-7 text-sm font-medium text-[#6B7280]">
+            <button onClick={() => document.getElementById('why-us')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-[#1C1C1E] transition-colors">Why 2QT</button>
+            <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-[#1C1C1E] transition-colors">Pricing</button>
+            <button onClick={() => document.getElementById('countdown')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-[#1C1C1E] transition-colors">Launch Date</button>
+          </div>
+          <button onClick={onStart} className="bg-[#FF5722] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#E64A19] transition-colors active:scale-95">
+            Get Early Access
+          </button>
         </div>
-        <nav className="hidden md:flex items-center gap-8 text-sm text-white/70">
-          <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">Features</button>
-          <button onClick={() => document.getElementById('countdown')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">Launch</button>
-          <button onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">FAQ</button>
-        </nav>
-        <button onClick={onStart} className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full glass hover:border-orange-400/60 transition-colors">
-          Join waitlist
-          <span className="text-orange-400">→</span>
-        </button>
       </header>
 
       <Hero onStart={onStart} />
 
-      <div id="features">
-        <Showcase />
-      </div>
+      <div id="why-us"><WhyUs /></div>
+      <div id="pricing"><Pricing /></div>
+      <Story />
+      <div id="countdown"><Countdown onStart={onStart} /></div>
 
-      <div id="countdown">
-        <Countdown onStart={onStart} />
-      </div>
-
-      {/* ===== FAQ ===== */}
-      <section id="faq" className="relative z-10 max-w-3xl mx-auto px-6 lg:px-10 py-24">
-        <h2 className="font-display text-3xl sm:text-4xl font-bold text-center mb-10">Quick questions</h2>
-        <div className="space-y-3">
-          <details className="group glass rounded-2xl p-5 open:border-orange-400/40">
-            <summary className="flex justify-between items-center cursor-pointer font-semibold text-sm">
-              Which campuses launch first?
-              <span className="text-orange-400 group-open:rotate-45 transition-transform text-lg">+</span>
-            </summary>
-            <p className="text-white/55 text-sm mt-3 leading-relaxed">We're rolling out to 12 flagship campuses in August 2026, prioritized by waitlist density. Sign up and refer friends to boost your school.</p>
-          </details>
-          <details className="group glass rounded-2xl p-5 open:border-orange-400/40">
-            <summary className="flex justify-between items-center cursor-pointer font-semibold text-sm">
-              Is 2QT really free of platform fees?
-              <span className="text-orange-400 group-open:rotate-45 transition-transform text-lg">+</span>
-            </summary>
-            <p className="text-white/55 text-sm mt-3 leading-relaxed">Yes — permanently. We partner directly with campus vendors instead of charging students hidden fees at checkout.</p>
-          </details>
-          <details className="group glass rounded-2xl p-5 open:border-orange-400/40">
-            <summary className="flex justify-between items-center cursor-pointer font-semibold text-sm">
-              How do you keep delivery hygienic?
-              <span className="text-orange-400 group-open:rotate-45 transition-transform text-lg">+</span>
-            </summary>
-            <p className="text-white/55 text-sm mt-3 leading-relaxed">Every partner kitchen passes a hygiene audit, meals are sealed with tamper-evident tags, and runners follow strict handling protocols.</p>
-          </details>
-        </div>
-      </section>
-
-      {/* ===== Footer ===== */}
-      <footer className="relative z-10 border-t border-white/10 mt-10">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-12 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center font-display font-bold text-xs">2Q</div>
-            <span className="font-display font-bold">2QT</span>
-            <span className="text-white/35 text-sm ml-2">— delivered too quick.</span>
+      {/* Footer */}
+      <footer className="border-t border-orange-100 py-10 px-5 bg-white">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-[#FF5722] flex items-center justify-center text-white font-bold text-xs">2Q</div>
+            <span className="font-bold text-[#1C1C1E]">2QT</span>
+            <span className="text-[#9CA3AF] text-sm ml-2">— Fresh food, fair price.</span>
           </div>
-          <p className="text-white/35 text-sm">© 2026 2QT, Inc. Made on a campus, for campuses.</p>
+          <p className="text-[#9CA3AF] text-sm">© 2026 2QT · Lalpur, Ranchi, Jharkhand</p>
         </div>
       </footer>
 
