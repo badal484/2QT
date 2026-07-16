@@ -254,7 +254,7 @@ router.post('/verify-otp', async (req, res) => {
     roleUpdate += zoneUpdateKeys;
 
     const { rows } = await query(
-        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete, email, photo_url`,
+        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete, email, photo_url, prelaunch_reward_credited`,
         [normalizedPhone, name || '2QT User', insertRole, insertVerified]
     );
 
@@ -294,6 +294,53 @@ router.post('/verify-otp', async (req, res) => {
                 
                 console.log(`--- SYSTEMATIC REFERRAL: User ${user.id} rewarded via ${referrerId} ---`);
             }
+        }
+    }
+
+    // Pre-launch wallet reward — credit ₹100 to users who registered on the waitlist
+    // Runs on every login but only fires once (guarded by prelaunch_reward_credited flag).
+    if (user.role === 'customer' && !user.prelaunch_reward_credited) {
+        try {
+            const { rows: plRows } = await query(
+                `SELECT id FROM pre_launch_registrations WHERE phone = $1 AND reward_credited = false`,
+                [user.phone]
+            );
+            if (plRows.length > 0) {
+                const { rows: cfgRows } = await query(
+                    `SELECT key, value FROM app_config WHERE key IN ('prelaunch_reward_active','prelaunch_reward_paise','prelaunch_reward_validity_days')`
+                );
+                const cfg: Record<string, any> = {};
+                cfgRows.forEach((r: any) => { cfg[r.key] = r.value; });
+                const rewardActive = cfg.prelaunch_reward_active === true || cfg.prelaunch_reward_active === 'true';
+                if (rewardActive) {
+                    const paise     = typeof cfg.prelaunch_reward_paise === 'number' ? cfg.prelaunch_reward_paise : parseInt(cfg.prelaunch_reward_paise || '10000', 10);
+                    const validDays = typeof cfg.prelaunch_reward_validity_days === 'number' ? cfg.prelaunch_reward_validity_days : parseInt(cfg.prelaunch_reward_validity_days || '7', 10);
+
+                    await query(`INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1,0) ON CONFLICT DO NOTHING`, [user.id]);
+                    await query(`UPDATE customer_wallet SET balance_paise = balance_paise + $1 WHERE customer_id = $2`, [paise, user.id]);
+                    const { rows: wRows } = await query(`SELECT balance_paise FROM customer_wallet WHERE customer_id = $1`, [user.id]);
+
+                    await query(`
+                        INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
+                        VALUES ($1,$2,'credit','Pre-Launch Exclusive Reward — Welcome to 2QT!',$3)
+                    `, [user.id, paise, wRows[0]?.balance_paise ?? paise]);
+
+                    await query(`UPDATE users SET prelaunch_reward_credited = true WHERE id = $1`, [user.id]);
+
+                    const expiresAt = new Date();
+                    expiresAt.setDate(expiresAt.getDate() + validDays);
+                    await query(`
+                        UPDATE pre_launch_registrations
+                        SET reward_credited = true, reward_credited_at = NOW(), reward_expires_at = $1, user_id = $2
+                        WHERE phone = $3
+                    `, [expiresAt.toISOString(), user.id, user.phone]);
+
+                    console.log(`--- PRELAUNCH REWARD: ₹${paise/100} credited to ${user.id} ---`);
+                }
+            }
+        } catch (plErr: any) {
+            // Non-fatal — never block login for reward failure
+            console.error('[PRELAUNCH REWARD SKIP]', plErr.message);
         }
     }
 
