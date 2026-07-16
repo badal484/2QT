@@ -147,6 +147,15 @@ router.post('/verify-otp', async (req, res) => {
         delMemOtp(normalizedPhone);
         redis.del(keys.pendingOtp(normalizedPhone)).catch(() => {});
 
+        // Pre-launch mode check
+        if (!['admin', 'chef', 'rider', 'packer', 'kitchen_manager', 'dine_in_staff'].includes(appRole)) {
+            const { rows: configRows } = await query(`SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`);
+            const isPrelaunch = configRows[0]?.value === 'true' || configRows[0]?.value === true;
+            if (isPrelaunch) {
+                return res.status(403).json({ error: 'PRELAUNCH_ACTIVE', message: 'We are currently in pre-launch mode. Please join the waitlist!' });
+            }
+        }
+
     let roleUpdate = '';
     let insertRole = 'customer';
     let insertVerified = false;
@@ -515,6 +524,15 @@ router.post('/firebase-login', async (req, res) => {
         let roleUpdate = '';
         let insertRole = 'customer';
         let insertVerified = true;
+
+        // Pre-launch mode check
+        if (!['admin', 'chef', 'rider', 'packer', 'kitchen_manager', 'dine_in_staff'].includes(appRole)) {
+            const { rows: configRows } = await query(`SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`);
+            const isPrelaunch = configRows[0]?.value === 'true' || configRows[0]?.value === true;
+            if (isPrelaunch) {
+                return res.status(403).json({ error: 'PRELAUNCH_ACTIVE', message: 'We are currently in pre-launch mode. Please join the waitlist!' });
+            }
+        }
 
         let detectedZoneId = null;
         let detectedKitchenId = null;

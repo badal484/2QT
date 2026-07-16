@@ -282,19 +282,10 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
         <View style={styles.sheetHandle} />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
 
-          {/* ETA row */}
-          <View style={styles.etaRow}>
-            <View>
-              <Text style={styles.etaLabel}>ESTIMATED ARRIVAL</Text>
-              <Text style={styles.etaValue}>{estTime}</Text>
-            </View>
-            <View style={styles.onTimeBadge}>
-              <Text style={styles.onTimeText}>ON TIME</Text>
-            </View>
-          </View>
-
           {/* Progress tracker */}
-          <ProgressTracker status={status} />
+          <View style={{ marginTop: 24, marginBottom: 12 }}>
+            <ProgressTracker status={status} />
+          </View>
 
           {/* Delivery OTP */}
           {status === 'out_for_delivery' && o?.delivery_otp && (

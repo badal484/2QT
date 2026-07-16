@@ -112,46 +112,43 @@ const OTPScreen = ({ route, navigation }: any) => {
         </Text>
 
         {/* Premium 6-Box OTP Input */}
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={handlePressBoxes}
-          style={styles.otpContainer}
-        >
-          {Array(6)
-            .fill(0)
-            .map((_, index) => {
-              const digit = otp[index] || '';
-              const isFocused = otp.length === index;
-              const hasDigit = digit !== '';
+        <View style={styles.otpWrapper}>
+          <TextInput
+            ref={inputRef}
+            style={styles.hiddenInput}
+            keyboardType="numeric"
+            maxLength={6}
+            value={otp}
+            onChangeText={handleOtpChange}
+            autoFocus
+            editable={!verifyMutation.isPending}
+            caretHidden={true}
+          />
+          <View pointerEvents="none" style={styles.otpContainer}>
+            {Array(6)
+              .fill(0)
+              .map((_, index) => {
+                const digit = otp[index] || '';
+                const isFocused = otp.length === index;
+                const hasDigit = digit !== '';
 
-              return (
-                <View
-                  key={index}
-                  style={[
-                    styles.otpBox,
-                    hasDigit && styles.otpBoxFilled,
-                    isFocused && styles.otpBoxFocused,
-                    verifyMutation.isPending && styles.otpBoxDisabled,
-                  ]}
-                >
-                  <Text style={styles.otpBoxText}>{digit}</Text>
-                  {isFocused && <View style={styles.cursor} />}
-                </View>
-              );
-            })}
-        </TouchableOpacity>
-
-        {/* Hidden TextInput for native keyboard */}
-        <TextInput
-          ref={inputRef}
-          style={styles.hiddenInput}
-          keyboardType="numeric"
-          maxLength={6}
-          value={otp}
-          onChangeText={handleOtpChange}
-          autoFocus
-          editable={!verifyMutation.isPending}
-        />
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.otpBox,
+                      hasDigit && styles.otpBoxFilled,
+                      isFocused && styles.otpBoxFocused,
+                      verifyMutation.isPending && styles.otpBoxDisabled,
+                    ]}
+                  >
+                    <Text style={styles.otpBoxText}>{digit}</Text>
+                    {isFocused && <View style={styles.cursor} />}
+                  </View>
+                );
+              })}
+          </View>
+        </View>
 
         {verifyMutation.isPending && <ActivityIndicator color={colors.primary} style={styles.spinner} />}
 
@@ -205,13 +202,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     letterSpacing: 1,
   },
+  otpWrapper: {
+    width: '100%',
+    position: 'relative',
+    marginTop: spacing.xxxl,
+    marginBottom: spacing.xl,
+  },
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: spacing.sm,
-    marginTop: spacing.xxxl,
-    marginBottom: spacing.xl,
   },
   otpBox: {
     width: 44,
@@ -257,9 +258,12 @@ const styles = StyleSheet.create({
   },
   hiddenInput: {
     position: 'absolute',
-    width: 1,
-    height: 1,
-    opacity: 0.01,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0,
+    zIndex: 10,
   },
   spinner: {
     marginTop: spacing.xl,
