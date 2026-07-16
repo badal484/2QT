@@ -88,7 +88,7 @@ router.post('/config', requireRole('super_admin', 'admin'), async (req, res) => 
       `INSERT INTO app_config (key, value)
        VALUES ('IS_PRELAUNCH_MODE', $1::jsonb)
        ON CONFLICT (key) DO UPDATE SET value = $1::jsonb, updated_at = CURRENT_TIMESTAMP`,
-      [isPrelaunch]
+      [JSON.stringify(isPrelaunch)]
     );
     res.json({ success: true, isPrelaunch });
   } catch (error) {
