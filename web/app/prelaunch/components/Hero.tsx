@@ -69,27 +69,15 @@ export function Hero({ onStart }: { onStart: () => void }) {
             {/* Subtle sweep animation */}
             <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent z-0" />
           </button>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.6 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-12 mt-24 border-t border-zinc-100 pt-12 w-full"
-        >
-          {[
-            { icon: UtensilsCrossed, label: "Freshly Cooked" },
-            { icon: Star, label: "No Platform Fee" },
-            { icon: Heart, label: "Hygienic Kitchen" },
-            { icon: Clock, label: "Fast Delivery" },
-          ].map((feature, i) => (
-            <div key={i} className="flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center text-zinc-800 shadow-sm">
-                <feature.icon className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-semibold text-zinc-600">{feature.label}</p>
-            </div>
-          ))}
+          
+          <button 
+            onClick={() => {
+              document.getElementById('showcase-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="w-full sm:w-auto px-8 py-5 rounded-2xl font-bold text-lg text-zinc-600 bg-zinc-50 border border-zinc-200 hover:bg-zinc-100 transition-colors"
+          >
+            Learn More
+          </button>
         </motion.div>
         
       </div>
