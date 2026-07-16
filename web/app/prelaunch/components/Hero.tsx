@@ -1,106 +1,175 @@
+import { motion } from 'framer-motion';
+import { ArrowRight, MapPin, Sparkles } from 'lucide-react';
+
 export function Hero({ onStart }: { onStart: () => void }) {
   return (
-    <section className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pt-16 pb-28 grid lg:grid-cols-2 gap-14 items-center">
-      <div className="fade-in">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full glass text-xs font-semibold text-orange-300 badge-ring mb-7">
-          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 pulse-dot"></span>
-          Launching on campuses · August 2026
-        </div>
+    <section className="relative overflow-hidden bg-[#FFFBF7]">
+      {/* Subtle warm gradient blob */}
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(255,87,34,0.08) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(244,211,94,0.12) 0%, transparent 70%)', transform: 'translate(-30%, 30%)' }} />
 
-        <h1 className="font-display text-5xl sm:text-6xl lg:text-[4rem] leading-[1.05] font-bold tracking-tight">
-          Campus food,
-          <span className="text-gradient block">delivered too quick.</span>
-        </h1>
+      <div className="max-w-5xl mx-auto px-5 pt-16 pb-20 md:pt-24 md:pb-28 relative z-10">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
 
-        <p className="mt-6 text-lg text-white/60 max-w-lg leading-relaxed">
-          2QT is the delivery app built <em className="text-white/85">by</em> and <em className="text-white/85">for</em> college students — zero platform fees, hygiene-checked meals, and drops that beat your walk to the dining hall.
-        </p>
+          {/* Left: Content */}
+          <div>
+            {/* Location badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold mb-6 border"
+              style={{ background: '#FFF3E0', borderColor: '#FFCCBC', color: '#E64A19' }}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              Launching in Lalpur, Ranchi · August 2026
+            </motion.div>
 
-        <div className="mt-9 flex flex-col sm:flex-row gap-3 max-w-md">
-          <button onClick={onStart} className="btn-glow flex-1 px-6 py-4 rounded-full font-semibold text-sm whitespace-nowrap text-center">
-            Get early access
-          </button>
-        </div>
-        <p className="mt-3 text-xs text-white/35">No spam. Just a launch invite and campus perks.</p>
+            {/* Headline */}
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.08 }}
+              className="text-4xl sm:text-5xl lg:text-[3.5rem] font-black font-serif text-[#1C1C1E] tracking-tight leading-[1.08] mb-5"
+            >
+              Fresh food.<br />
+              <span style={{ color: '#FF5722' }}>Fair price.</span><br />
+              No surprises.
+            </motion.h1>
 
-        <div className="mt-10 flex items-center gap-4">
-          <div className="flex -space-x-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-300 to-orange-600 border-2 border-[#07070a] flex items-center justify-center text-xs font-bold text-white">JM</div>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-red-500 border-2 border-[#07070a] flex items-center justify-center text-xs font-bold text-white">RA</div>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 border-2 border-[#07070a] flex items-center justify-center text-xs font-bold text-white">SK</div>
-            <div className="w-9 h-9 rounded-full bg-white/10 border-2 border-[#07070a] flex items-center justify-center text-[10px] font-bold text-white/70">+3k</div>
+            {/* Sub */}
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.16 }}
+              className="text-base sm:text-lg text-[#6B7280] leading-relaxed mb-8 max-w-md"
+            >
+              2QT runs its own kitchen in Lalpur with experienced chefs.
+              You pay food price + delivery + GST — nothing else.
+              Quality, hygiene, and timing fully under our control.
+            </motion.p>
+
+            {/* CTA */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.24 }}
+              className="flex flex-col sm:flex-row gap-3"
+            >
+              <button
+                onClick={onStart}
+                className="group flex items-center justify-center gap-2 text-white font-bold text-base px-7 py-4 rounded-2xl transition-all active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #FF5722, #E64A19)', boxShadow: '0 8px 24px rgba(255,87,34,0.35)' }}
+              >
+                <Sparkles className="w-4 h-4" />
+                Claim ₹100 Early Reward
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button
+                onClick={() => document.getElementById('why-us')?.scrollIntoView({ behavior: 'smooth' })}
+                className="flex items-center justify-center gap-1.5 font-semibold text-sm px-6 py-4 rounded-2xl border-2 border-[#E5E7EB] text-[#374151] hover:border-[#FF5722] hover:text-[#FF5722] transition-all"
+              >
+                See why we're different
+              </button>
+            </motion.div>
+
+            {/* Trust */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.45 }}
+              className="mt-5 text-xs text-[#9CA3AF] font-medium"
+            >
+              No spam. First 1,000 registrations get ₹100 free wallet credit on launch day.
+            </motion.p>
           </div>
-          <p className="text-sm text-white/50"><span className="text-white font-semibold">3,482 students</span> already on the list</p>
-        </div>
-      </div>
 
-      {/* Visual mockup */}
-      <div className="relative fade-in" style={{ animationDelay: '.2s' }}>
-        <div className="relative mx-auto w-[300px] sm:w-[330px]">
-          {/* floating chips */}
-          <div className="absolute -left-10 top-6 z-20 float glass rounded-2xl px-4 py-3 shadow-2xl w-40 hidden sm:block">
-            <p className="text-[11px] text-white/45">Order status</p>
-            <p className="text-sm font-semibold mt-0.5 flex items-center gap-1.5">🔥 Arriving in <span className="text-orange-300">6 min</span></p>
-          </div>
-
-          <div className="absolute -right-14 top-1/3 z-20 float-slow float-delay glass rounded-2xl px-4 py-3 shadow-2xl w-44 hidden sm:block">
-            <p className="text-[11px] text-white/45">Split the bill</p>
-            <p className="text-sm font-semibold mt-0.5">4 roommates · $3.25 ea</p>
-          </div>
-
-          <div className="absolute -left-8 bottom-8 z-20 float-slow float-delay2 glass rounded-2xl px-4 py-3 shadow-2xl w-40 hidden sm:block">
-            <p className="text-sm font-semibold flex items-center gap-1.5">✅ Platform fee</p>
-            <p className="text-[11px] text-orange-300 font-bold">$0.00 forever</p>
-          </div>
-
-          {/* phone frame */}
-          <div className="relative rounded-[2.4rem] p-2 glass shadow-[0_40px_90px_-30px_rgba(255,90,20,0.35)]">
-            <div className="rounded-[2rem] bg-[#0c0c10] overflow-hidden border border-white/5">
-              <div className="flex justify-between items-center px-6 pt-4 text-[11px] text-white/40">
-                <span>9:41</span>
-                <span>●●●●</span>
-              </div>
-              <div className="px-5 pt-5 pb-8">
-                <p className="text-xs text-white/40">Good evening,</p>
-                <p className="font-display font-bold text-lg">Alex 👋</p>
-
-                <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 px-4 py-2.5 flex items-center gap-2 text-white/40 text-xs">
-                  <span>🔎</span> Search dining halls, cafés...
+          {/* Right: Visual card */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.65, delay: 0.2 }}
+            className="hidden md:block"
+          >
+            <div className="relative">
+              {/* Main order card */}
+              <div className="bg-white rounded-3xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.1)] border border-orange-50">
+                <div className="flex items-center justify-between mb-5">
+                  <span className="text-sm font-bold text-[#1C1C1E]">Your Order</span>
+                  <span className="text-xs px-2.5 py-1 rounded-full font-semibold" style={{ background: '#FFF3E0', color: '#E64A19' }}>Cooking 🍳</span>
                 </div>
 
-                <div className="mt-5 space-y-3">
-                  <div className="rounded-2xl bg-gradient-to-r from-orange-500/15 to-transparent border border-orange-400/20 p-3.5 flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-orange-500/20 flex items-center justify-center text-xl">🌯</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">The Burrito Bar</p>
-                      <p className="text-[11px] text-white/40">0.3 mi · 8 min</p>
-                    </div>
-                    <p className="text-[11px] font-bold text-orange-300">$0 fee</p>
+                {/* Items */}
+                {[
+                  { name: 'Dal Makhani + Rice', price: '₹120' },
+                  { name: 'Paneer Butter Masala', price: '₹150' },
+                  { name: 'Tandoori Roti ×3', price: '₹45' },
+                ].map(item => (
+                  <div key={item.name} className="flex items-center justify-between py-3 border-b border-[#F3F4F6] last:border-0">
+                    <span className="text-sm text-[#374151]">{item.name}</span>
+                    <span className="text-sm font-semibold text-[#1C1C1E]">{item.price}</span>
                   </div>
-                  <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-xl">🍜</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">Noodle House</p>
-                      <p className="text-[11px] text-white/40">0.5 mi · 11 min</p>
-                    </div>
-                    <p className="text-[11px] font-bold text-orange-300">$0 fee</p>
+                ))}
+
+                {/* Bill breakdown */}
+                <div className="mt-4 pt-4 border-t-2 border-dashed border-[#F3F4F6] space-y-2">
+                  <div className="flex justify-between text-sm text-[#6B7280]">
+                    <span>Food total</span><span>₹315</span>
                   </div>
-                  <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-xl">☕</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">Common Grounds</p>
-                      <p className="text-[11px] text-white/40">0.2 mi · 5 min</p>
-                    </div>
-                    <p className="text-[11px] font-bold text-orange-300">$0 fee</p>
+                  <div className="flex justify-between text-sm text-[#6B7280]">
+                    <span>Delivery fee</span><span>₹25</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-[#6B7280]">
+                    <span>GST (5%)</span><span>₹17</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold" style={{ color: '#E64A19' }}>
+                    <span>Platform fee</span><span>₹0</span>
+                  </div>
+                  <div className="flex justify-between text-base font-black text-[#1C1C1E] pt-1 border-t border-[#F3F4F6]">
+                    <span>Total</span><span>₹357</span>
                   </div>
                 </div>
               </div>
-              <div className="mt-2 mb-4 flex justify-center">
-                <div className="w-28 h-1 rounded-full bg-white/15"></div>
-              </div>
+
+              {/* Floating badges */}
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute -top-4 -left-6 bg-white rounded-2xl px-4 py-3 shadow-lg border border-orange-100 text-sm font-semibold text-[#1C1C1E]"
+              >
+                🧑‍🍳 Experienced chefs
+              </motion.div>
+              <motion.div
+                animate={{ y: [0, 6, 0] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+                className="absolute -bottom-4 -right-6 bg-white rounded-2xl px-4 py-3 shadow-lg border border-orange-100 text-sm font-semibold text-[#1C1C1E]"
+              >
+                ✅ ₹0 platform fee
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
         </div>
+
+        {/* Stats strip */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mt-14 grid grid-cols-3 gap-4 max-w-lg"
+        >
+          {[
+            { value: '₹0', label: 'Platform fee' },
+            { value: '100%', label: 'Own kitchen' },
+            { value: '₹100', label: 'Launch reward' },
+          ].map(stat => (
+            <div key={stat.label} className="text-center">
+              <p className="text-2xl sm:text-3xl font-black font-serif" style={{ color: '#FF5722' }}>{stat.value}</p>
+              <p className="text-xs text-[#9CA3AF] font-medium mt-0.5">{stat.label}</p>
+            </div>
+          ))}
+        </motion.div>
       </div>
     </section>
   );
