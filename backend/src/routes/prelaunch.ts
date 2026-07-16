@@ -10,8 +10,18 @@ const registerSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional(),
   surveyResponses: z.record(z.any()).optional(),
-  source: z.string().optional()
+  source: z.string().optional(),
+  referredBy: z.string().optional()
 });
+
+function generateReferralCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
 
 // POST /api/v1/prelaunch/register
 // Public route for users to sign up for the waitlist
@@ -21,18 +31,20 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues });
   }
 
-  const { name, phone, email, surveyResponses, source } = parsed.data;
+  const { name, phone, email, surveyResponses, source, referredBy } = parsed.data;
 
   if (!phone && !email) {
     return res.status(400).json({ error: 'Either phone or email is required' });
   }
 
+  const referralCode = generateReferralCode();
+
   try {
     const result = await query(
-      `INSERT INTO pre_launch_registrations (name, phone, email, survey_responses, source)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, created_at`,
-      [name, phone, email, surveyResponses, source || 'organic']
+      `INSERT INTO pre_launch_registrations (name, phone, email, survey_responses, source, referral_code, referred_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, created_at, referral_code`,
+      [name, phone, email, surveyResponses, source || 'organic', referralCode, referredBy]
     );
 
     res.status(201).json({
@@ -57,6 +69,18 @@ router.get('/registrations', requireRole('super_admin', 'admin'), async (req, re
   } catch (error) {
     console.error('Failed to fetch registrations:', error);
     res.status(500).json({ error: 'Failed to fetch registrations' });
+  }
+});
+
+// GET /api/v1/prelaunch/stats
+// Public route to get waitlist count
+router.get('/stats', async (req, res) => {
+  try {
+    const result = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
+    res.json({ success: true, count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    console.error('Failed to fetch stats:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
 
