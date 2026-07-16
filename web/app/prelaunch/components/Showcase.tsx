@@ -78,7 +78,8 @@ export function Showcase() {
             transition={{ delay: 0.12 }}
             className="mt-4 text-base text-zinc-600 font-medium max-w-2xl mx-auto"
           >
-            Most delivery apps are middlemen. We're not. One kitchen, one team, full accountability.
+            Students are our primary focus, but great food is for everyone in Lalpur.
+            One kitchen, one team, full accountability.
           </motion.p>
         </div>
 

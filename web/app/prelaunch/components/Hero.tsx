@@ -55,8 +55,9 @@ export function Hero({ onStart }: { onStart: () => void }) {
           transition={{ duration: 0.6, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
           className="text-lg md:text-xl text-zinc-700 font-medium mb-5 max-w-2xl leading-relaxed"
         >
-          Experienced chefs. Our own kitchen in Lalpur. Zero platform fee — you pay only food price, delivery & tax.
-          Quality, hygiene, and timing — all under our control.
+          Built for students, open to everyone in Lalpur, Ranchi.
+          Experienced chefs. Our own kitchen. Zero platform fee —
+          you pay only food price, delivery & tax. Quality, hygiene, and timing all under our control.
         </motion.p>
 
         {/* Reward pill */}
