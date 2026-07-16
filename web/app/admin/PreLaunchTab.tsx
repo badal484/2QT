@@ -93,21 +93,36 @@ export function PreLaunchTab() {
 
   const load = useCallback(async (p = page, q = search) => {
     try {
-      const [cfgRes, statsRes, regsRes] = await Promise.all([
+      const [cfgResult, statsResult, regsResult] = await Promise.allSettled([
         api.get('/prelaunch/config'),
         api.get('/prelaunch/admin/stats'),
         api.get(`/prelaunch/registrations?page=${p}&limit=20${q ? `&search=${encodeURIComponent(q)}` : ''}`),
       ]);
-      setConfig(cfgRes.config || {});
-      setStats(statsRes);
-      setRegs(regsRes.data || []);
-      setTotal(regsRes.total || 0);
 
-      // Sync editable fields from config
-      const rp = cfgRes.config?.prelaunch_reward_paise;
-      const vd = cfgRes.config?.prelaunch_reward_validity_days;
-      if (rp !== undefined) setRewardPaise(String(rp));
-      if (vd !== undefined) setValidityDays(String(vd));
+      if (cfgResult.status === 'fulfilled') {
+        const cfgRes = cfgResult.value;
+        setConfig(cfgRes.config || {});
+        const rp = cfgRes.config?.prelaunch_reward_paise;
+        const vd = cfgRes.config?.prelaunch_reward_validity_days;
+        if (rp !== undefined) setRewardPaise(String(rp));
+        if (vd !== undefined) setValidityDays(String(vd));
+      }
+
+      if (statsResult.status === 'fulfilled') {
+        setStats(statsResult.value);
+      } else {
+        console.error('[PreLaunch] Stats failed:', statsResult.reason?.message);
+      }
+
+      if (regsResult.status === 'fulfilled') {
+        setRegs(regsResult.value.data || []);
+        setTotal(regsResult.value.total || 0);
+      } else {
+        console.error('[PreLaunch] Registrations failed:', regsResult.reason?.message);
+      }
+
+      const anyFailed = [cfgResult, statsResult, regsResult].some(r => r.status === 'rejected');
+      if (anyFailed) toast.error('Some data failed to load — backend may need a restart');
     } catch {
       toast.error('Failed to load pre-launch data');
     } finally {
