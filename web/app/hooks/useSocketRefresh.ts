@@ -9,24 +9,31 @@ export function useSocketRefresh(events: string[], onRefresh: () => void) {
   useEffect(() => {
     socket.connect();
 
-    const handler = (event: string) => {
-      if (event === 'new_order') {
-        try {
-          const audio = new Audio('/alert.mp3');
-          audio.play().catch(() => {});
-        } catch (e) {}
-      }
-      onRefreshRef.current();
+    const playAlert = () => {
+      try {
+        const audio = new Audio('/alert.mp3');
+        audio.play().catch(() => {});
+      } catch (e) {}
     };
+
+    // Keep handler references so socket.off removes only this hook's listeners,
+    // not every other component that registered the same event.
+    const boundHandlers: Array<[string, () => void]> = events.map(event => [
+      event,
+      () => {
+        if (event === 'new_order') playAlert();
+        onRefreshRef.current();
+      },
+    ]);
 
     // Re-fetch on reconnect so missed events during disconnect don't leave stale UI
     const handleReconnect = () => onRefreshRef.current();
 
-    events.forEach(event => socket.on(event, () => handler(event)));
+    boundHandlers.forEach(([event, fn]) => socket.on(event, fn));
     socket.on('connect', handleReconnect);
 
     return () => {
-      events.forEach(event => socket.off(event));
+      boundHandlers.forEach(([event, fn]) => socket.off(event, fn));
       socket.off('connect', handleReconnect);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
