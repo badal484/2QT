@@ -4,8 +4,8 @@ import { ChefHat, HandPlatter, Leaf, ShoppingBag } from 'lucide-react';
 const PILLARS = [
   {
     icon: HandPlatter,
-    heading: 'We serve. We're accountable.',
-    body: 'Unlike platforms that connect you to random cloud kitchens, 2QT operates from our own kitchen. When something is wrong, we fix it — because there's no third party to point fingers at.',
+    heading: "We serve. We're accountable.",
+    body: "Unlike platforms that connect you to random cloud kitchens, 2QT operates from our own kitchen. When something is wrong, we fix it — because there's no third party to point fingers at.",
   },
   {
     icon: ChefHat,
