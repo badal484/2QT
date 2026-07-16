@@ -1,21 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
-  --color-brand-primary: #FF6B35;
-  --color-brand-primary-dark: #E55A2A;
-  --color-brand-accent: #F4D35E;
-  --color-brand-dark: #1A1A1A;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Luxury Color Palette */
+  --color-luxury-bg: #FFFFFF;
+  --color-luxury-surface: #FAFAFA;
+  --color-luxury-text: #111111;
+  --color-luxury-text-muted: #666666;
+  --color-luxury-border: #EAEAEC;
+  
+  /* 2QT Brand Green (elegant) */
+  --color-brand-primary: #00C853;
+  --color-brand-primary-dark: #00A344;
+  --color-brand-accent: #E8F5E9;
+  
+  --color-brand-dark: #111111;
   --color-brand-light: #FAFAFA;
-  --color-swish-green: #FF6B35;
-  --color-swish-green-dark: #E55A2A;
 }
 
 html, body {
   max-width: 100vw;
   overflow-x: hidden;
-  background: var(--color-brand-light);
-  color: var(--color-brand-dark);
+  background: var(--color-luxury-bg);
+  color: var(--color-luxury-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
