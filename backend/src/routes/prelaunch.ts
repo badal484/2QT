@@ -128,16 +128,20 @@ router.post('/register', async (req, res) => {
 
         // Upsert pre-launch registration (schema-safe: works with or without migration 121)
         const referralCode = user.referral_code || genReferralCode();
+        // Search by both normalised form (91XXXXXXXXXX) and legacy +91 form so
+        // old test records stored with a leading '+' are still matched.
         const { rows: existingReg } = await query(
-            `SELECT id, referral_code, created_at FROM pre_launch_registrations WHERE phone = $1`,
-            [phone]
+            `SELECT id, referral_code, created_at FROM pre_launch_registrations
+             WHERE phone = $1 OR phone = $2`,
+            [phone, '+' + phone]
         );
 
         let regRows: any[];
         if (existingReg[0]) {
+            // Also normalise the stored phone to the canonical format while updating
             await query(
-                `UPDATE pre_launch_registrations SET name=$1, survey_responses=$2 WHERE phone=$3`,
-                [name, surveyResponses ?? {}, phone]
+                `UPDATE pre_launch_registrations SET name=$1, survey_responses=$2, phone=$3 WHERE id=$4`,
+                [name, surveyResponses ?? {}, phone, existingReg[0].id]
             );
             regRows = [existingReg[0]];
         } else {
