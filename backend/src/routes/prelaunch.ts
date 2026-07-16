@@ -111,17 +111,42 @@ router.post('/register', async (req, res) => {
             }
         }
 
-        // Upsert pre-launch registration
+        // Upsert pre-launch registration (schema-safe: works with or without migration 121)
         const referralCode = user.referral_code || genReferralCode();
-        const { rows: regRows } = await query(`
-            INSERT INTO pre_launch_registrations (user_id, name, phone, survey_responses, source, referral_code, referred_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (phone) DO UPDATE SET
-                name             = EXCLUDED.name,
-                survey_responses = EXCLUDED.survey_responses,
-                user_id          = EXCLUDED.user_id
-            RETURNING id, created_at, referral_code
-        `, [user.id, name, phone, surveyResponses ?? {}, source ?? 'waitlist_v2', referralCode, referredBy ?? null]);
+        const { rows: existingReg } = await query(
+            `SELECT id, referral_code, created_at FROM pre_launch_registrations WHERE phone = $1`,
+            [phone]
+        );
+
+        let regRows: any[];
+        if (existingReg[0]) {
+            await query(
+                `UPDATE pre_launch_registrations SET name=$1, survey_responses=$2 WHERE phone=$3`,
+                [name, surveyResponses ?? {}, phone]
+            );
+            regRows = [existingReg[0]];
+        } else {
+            const { rows: ins } = await query(
+                `INSERT INTO pre_launch_registrations (name, phone, survey_responses, source)
+                 VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
+                [name, phone, surveyResponses ?? {}, source ?? 'waitlist_v2']
+            );
+            regRows = ins;
+        }
+
+        // Set extended columns added by later migrations (non-fatal if columns don't exist yet)
+        try {
+            await query(
+                `UPDATE pre_launch_registrations SET referral_code=$1, referred_by=$2 WHERE id=$3`,
+                [referralCode, referredBy ?? null, regRows[0].id]
+            );
+        } catch { /* migration 120 not yet applied */ }
+        try {
+            await query(`UPDATE pre_launch_registrations SET user_id=$1 WHERE id=$2`, [user.id, regRows[0].id]);
+        } catch { /* migration 121 not yet applied */ }
+
+        // Expose referral_code in response (may come from existing row or was just set)
+        regRows[0].referral_code = regRows[0].referral_code ?? referralCode;
 
         // Issue short-lived JWT so the user can also use the main app
         const jti = crypto.randomUUID();
@@ -309,7 +334,6 @@ router.post('/admin/credit/:id', authenticate, requireRole('super_admin', 'admin
 // Admin config get/set
 router.post('/config', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const ALLOWED = new Set(['IS_PRELAUNCH_MODE', 'prelaunch_reward_active', 'prelaunch_launch_date', 'prelaunch_reward_paise', 'prelaunch_reward_validity_days']);
-    const userId = (req as any).user?.userId;
 
     // Support legacy single-field toggle
     if (typeof req.body.isPrelaunch === 'boolean' && !req.body.key) {
@@ -329,10 +353,10 @@ router.post('/config', authenticate, requireRole('super_admin', 'admin'), async 
         for (const [key, value] of Object.entries(req.body)) {
             if (!ALLOWED.has(key)) continue;
             await query(
-                `INSERT INTO app_config (key, value, updated_at, updated_by)
-                 VALUES ($1,$2::jsonb,NOW(),$3)
-                 ON CONFLICT (key) DO UPDATE SET value=$2::jsonb, updated_at=NOW(), updated_by=$3`,
-                [key, JSON.stringify(value), userId ?? null]
+                `INSERT INTO app_config (key, value, updated_at)
+                 VALUES ($1,$2::jsonb,NOW())
+                 ON CONFLICT (key) DO UPDATE SET value=$2::jsonb, updated_at=NOW()`,
+                [key, JSON.stringify(value)]
             );
         }
         res.json({ success: true });
