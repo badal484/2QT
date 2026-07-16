@@ -183,15 +183,21 @@ router.get('/registrations', authenticate, requireRole('super_admin', 'admin'), 
         const where  = search ? `WHERE r.phone ILIKE $3 OR r.name ILIKE $3` : '';
         const params: any[] = [limit, offset, ...(search ? [search] : [])];
 
-        const { rows } = await query(`
-            SELECT r.id, r.phone, r.name, r.source, r.survey_responses,
-                   r.referral_code, r.referred_by, r.created_at,
-                   r.reward_credited, r.reward_credited_at, r.reward_expires_at, r.reward_redeemed
-            FROM pre_launch_registrations r
-            ${where}
-            ORDER BY r.created_at DESC
-            LIMIT $1 OFFSET $2
-        `, params);
+        const baseSelect = `SELECT r.id, r.phone, r.name, r.source, r.survey_responses,
+                   r.referral_code, r.referred_by, r.created_at`;
+        const orderLimit = `ORDER BY r.created_at DESC LIMIT $1 OFFSET $2`;
+
+        let rows: any[];
+        try {
+            const result = await query(`
+                ${baseSelect}, r.reward_credited, r.reward_credited_at, r.reward_expires_at, r.reward_redeemed
+                FROM pre_launch_registrations r ${where} ${orderLimit}
+            `, params);
+            rows = result.rows;
+        } catch {
+            const result = await query(`${baseSelect} FROM pre_launch_registrations r ${where} ${orderLimit}`, params);
+            rows = result.rows.map((r: any) => ({ ...r, reward_credited: false, reward_credited_at: null, reward_expires_at: null, reward_redeemed: false }));
+        }
 
         const { rows: cntRows } = await query(
             `SELECT COUNT(*) FROM pre_launch_registrations r ${where}`,
@@ -206,12 +212,21 @@ router.get('/registrations', authenticate, requireRole('super_admin', 'admin'), 
 
 router.get('/admin/stats', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
-        const [totalsRes, budgetRes, mealTimeRes, collegeRes, dailyRes, freqRes] = await Promise.all([
-            query(`SELECT
-                    COUNT(*) AS total,
-                    SUM(CASE WHEN reward_credited THEN 1 ELSE 0 END) AS credited,
-                    SUM(CASE WHEN reward_redeemed THEN 1 ELSE 0 END) AS redeemed
-                   FROM pre_launch_registrations`),
+        // Totals: try with reward columns (migration 121); fall back to count-only
+        let totals = { total: 0, credited: 0, redeemed: 0 };
+        try {
+            const { rows } = await query(`SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN reward_credited THEN 1 ELSE 0 END) AS credited,
+                SUM(CASE WHEN reward_redeemed THEN 1 ELSE 0 END) AS redeemed
+            FROM pre_launch_registrations`);
+            totals = { total: parseInt(rows[0].total), credited: parseInt(rows[0].credited || '0'), redeemed: parseInt(rows[0].redeemed || '0') };
+        } catch {
+            const { rows } = await query(`SELECT COUNT(*) AS total FROM pre_launch_registrations`);
+            totals.total = parseInt(rows[0].total);
+        }
+
+        const [budgetRes, mealTimeRes, collegeRes, dailyRes, freqRes] = await Promise.all([
             query(`SELECT survey_responses->>'budget' AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE survey_responses->>'budget' IS NOT NULL GROUP BY label ORDER BY count DESC`),
             query(`SELECT survey_responses->>'mealTime' AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE survey_responses->>'mealTime' IS NOT NULL GROUP BY label ORDER BY count DESC`),
             query(`SELECT survey_responses->>'college' AS name, COUNT(*) AS count FROM pre_launch_registrations WHERE survey_responses->>'college' IS NOT NULL GROUP BY name ORDER BY count DESC LIMIT 10`),
@@ -219,9 +234,9 @@ router.get('/admin/stats', authenticate, requireRole('super_admin', 'admin'), as
             query(`SELECT survey_responses->>'frequency' AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE survey_responses->>'frequency' IS NOT NULL GROUP BY label ORDER BY count DESC`),
         ]);
         res.json({
-            total:       parseInt(totalsRes.rows[0].total),
-            credited:    parseInt(totalsRes.rows[0].credited  || '0'),
-            redeemed:    parseInt(totalsRes.rows[0].redeemed  || '0'),
+            total:       totals.total,
+            credited:    totals.credited,
+            redeemed:    totals.redeemed,
             budget:      budgetRes.rows,
             mealTime:    mealTimeRes.rows,
             topColleges: collegeRes.rows,
@@ -236,7 +251,7 @@ router.get('/admin/stats', authenticate, requireRole('super_admin', 'admin'), as
 
 router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
-        const { rows } = await query(`
+        const baseExportSelect = `
             SELECT r.phone, r.name,
                    r.survey_responses->>'college'      AS college,
                    r.survey_responses->>'year'         AS year,
@@ -250,11 +265,16 @@ router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (
                    r.survey_responses->>'tryNewBrand'  AS try_new_brand,
                    r.survey_responses->>'referFriends' AS refer_friends,
                    r.survey_responses->>'anythingElse' AS anything_else,
-                   r.source, r.referral_code, r.referred_by, r.created_at,
-                   r.reward_credited, r.reward_credited_at, r.reward_redeemed
-            FROM pre_launch_registrations r
-            ORDER BY r.created_at DESC
-        `);
+                   r.source, r.referral_code, r.referred_by, r.created_at`;
+
+        let rows: any[];
+        try {
+            const result = await query(`${baseExportSelect}, r.reward_credited, r.reward_credited_at, r.reward_redeemed FROM pre_launch_registrations r ORDER BY r.created_at DESC`);
+            rows = result.rows;
+        } catch {
+            const result = await query(`${baseExportSelect} FROM pre_launch_registrations r ORDER BY r.created_at DESC`);
+            rows = result.rows;
+        }
 
         if (!rows.length) {
             res.setHeader('Content-Type', 'text/csv');
