@@ -12,15 +12,15 @@
   --color-luxury-text-muted: #666666;
   --color-luxury-border: #EAEAEC;
   
-  /* 2QT Brand Orange (Original) */
-  --color-brand-primary: #FF6B35;
-  --color-brand-primary-dark: #E55A2A;
-  --color-brand-accent: #F4D35E;
+  /* 2QT Brand Green (elegant) */
+  --color-brand-primary: #00C853;
+  --color-brand-primary-dark: #00A344;
+  --color-brand-accent: #E8F5E9;
   
-  --color-brand-dark: #1A1A1A;
+  --color-brand-dark: #111111;
   --color-brand-light: #FAFAFA;
-  --color-swish-green: #FF6B35;
-  --color-swish-green-dark: #E55A2A;
+  --color-swish-green: #00C853;
+  --color-swish-green-dark: #00A344;
 }
 
 html, body {
@@ -87,7 +87,7 @@ html, body {
 }
 .input-field:focus {
   background: #fff;
-  border-color: #FF6B35;
-  box-shadow: 0 0 0 3px rgba(255,107,53,0.15);
+  border-color: #00C853;
+  box-shadow: 0 0 0 3px rgba(0,200,83,0.15);
 }
 .input-field::placeholder { color: #a1a1aa; }
