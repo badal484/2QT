@@ -202,10 +202,10 @@ router.post('/me', async (req, res) => {
         let phone = String(rawPhone).replace(/\D/g, '');
         if (phone.length === 10) phone = '91' + phone;
         const { rows } = await query(
-            `SELECT referral_code FROM pre_launch_registrations WHERE phone = $1 OR phone = $2`,
+            `SELECT referral_code, name FROM pre_launch_registrations WHERE phone = $1 OR phone = $2`,
             [phone, '+' + phone]
         );
-        if (rows[0]) return res.json({ registered: true, referral_code: rows[0].referral_code });
+        if (rows[0]) return res.json({ registered: true, referral_code: rows[0].referral_code, name: rows[0].name });
         res.json({ registered: false });
     } catch {
         res.json({ registered: false });
