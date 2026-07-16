@@ -30,12 +30,31 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const rcContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const getOrCreateContainer = () => {
+    if (!rcContainerRef.current) {
+      const div = document.createElement('div');
+      div.id = 'recaptcha-root';
+      document.body.appendChild(div);
+      rcContainerRef.current = div;
+    }
+    return rcContainerRef.current;
+  };
+
+  const buildVerifier = () => {
+    const auth = getAuth(app);
+    const container = getOrCreateContainer();
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, container, { size: 'invisible' });
+  };
+
   useEffect(() => {
+    buildVerifier();
     return () => {
       if (cooldownRef.current) clearInterval(cooldownRef.current);
-      if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; } catch {}
-      }
+      try { window.recaptchaVerifier?.clear(); window.recaptchaVerifier = null; } catch {}
+      rcContainerRef.current?.remove();
+      rcContainerRef.current = null;
     };
   }, []);
 
@@ -53,35 +72,34 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     setIsLoading(true);
     try {
       const auth = getAuth(app);
-      if (isResend && window.recaptchaVerifier) {
-        // Reset the widget token — don't destroy/recreate on same container
+
+      if (isResend) {
+        // Reset the token on the existing widget — don't destroy the container
         try {
-          const widgetId = await window.recaptchaVerifier.render();
-          window.grecaptcha?.reset(widgetId);
+          const id = await window.recaptchaVerifier.render();
+          window.grecaptcha?.reset(id);
         } catch {
-          // Widget reset failed; fall back to fresh instance
-          try { window.recaptchaVerifier.clear(); } catch {}
+          // Reset failed — rebuild from scratch
+          try { window.recaptchaVerifier?.clear(); } catch {}
           window.recaptchaVerifier = null;
-          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+          buildVerifier();
         }
-      } else {
-        // Initial send — always create a fresh verifier
-        if (window.recaptchaVerifier) {
-          try { window.recaptchaVerifier.clear(); } catch {}
-          window.recaptchaVerifier = null;
-        }
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+      } else if (!window.recaptchaVerifier) {
+        buildVerifier();
       }
+
       const confirmation = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, window.recaptchaVerifier);
       setConfirmationResult(confirmation);
       startCooldown();
       return true;
     } catch (error: any) {
-      const code = error?.code || error?.message || 'unknown';
+      const msg = error?.code || error?.message || String(error);
       console.error('OTP send failed:', error);
-      toast.error(`Failed to send OTP (${code})`);
-      try { if (window.recaptchaVerifier) window.recaptchaVerifier.clear(); } catch {}
+      toast.error(`Failed to send OTP: ${msg}`);
+      // Rebuild verifier so next attempt starts clean
+      try { window.recaptchaVerifier?.clear(); } catch {}
       window.recaptchaVerifier = null;
+      try { buildVerifier(); } catch {}
       return false;
     } finally {
       setIsLoading(false);
@@ -163,7 +181,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       className="w-full max-w-md mx-auto"
     >
       <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.5)] relative">
-        <div id="recaptcha-container" />
 
         {/* ── PHONE ── */}
         {step === 'PHONE' && (
