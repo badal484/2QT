@@ -53,12 +53,16 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     try {
       const auth = getAuth(app);
 
-      // Always create a fresh verifier attached to document.body.
-      // Attaching to a named div inside the card caused the reCAPTCHA iframe to
-      // receive an invalid/stale token — Firebase would accept the call but never
-      // actually send the SMS. A fresh body-level verifier guarantees a clean token.
+      // Clear old verifier and remove its container from the DOM, then create
+      // a fresh empty div. Firebase requires the container to be empty — using
+      // document.body directly throws "placeholder element must be empty".
       try { window.recaptchaVerifier?.clear(); } catch {}
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, document.body, {
+      const oldEl = document.getElementById('recaptcha-anchor');
+      if (oldEl) oldEl.remove();
+      const anchor = document.createElement('div');
+      anchor.id = 'recaptcha-anchor';
+      document.body.appendChild(anchor);
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, anchor, {
         size: 'invisible',
       });
 
