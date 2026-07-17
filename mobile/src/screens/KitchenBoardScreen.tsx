@@ -122,25 +122,53 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   });
 
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
     const onOrderUpdate = () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
     const onDineInUpdate = () => queryClient.invalidateQueries({ queryKey: ['board-dine-in-tickets'] });
     const onRiderArrived = (data: { orderId: string; riderName?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
       Alert.alert('Rider Arrived', `${data.riderName || 'Rider'} is at the kitchen for order pickup.`);
     };
-    socket.on('new_order', onOrderUpdate);
-    socket.on('order_updated', onOrderUpdate);
-    socket.on('table_order', onDineInUpdate);
-    socket.on('table_booking_updated', onDineInUpdate);
-    socket.on('rider_arrived', onRiderArrived);
-    return () => {
+
+    const attach = (socket: ReturnType<typeof getSocket>) => {
+      if (!socket) return;
+      socket.on('new_order', onOrderUpdate);
+      socket.on('order_updated', onOrderUpdate);
+      socket.on('table_order', onDineInUpdate);
+      socket.on('table_booking_updated', onDineInUpdate);
+      socket.on('rider_arrived', onRiderArrived);
+      // Re-fetch on reconnect (handles backend restart + network recovery)
+      socket.on('connect', onOrderUpdate);
+    };
+
+    const detach = (socket: ReturnType<typeof getSocket>) => {
+      if (!socket) return;
       socket.off('new_order', onOrderUpdate);
       socket.off('order_updated', onOrderUpdate);
       socket.off('table_order', onDineInUpdate);
       socket.off('table_booking_updated', onDineInUpdate);
       socket.off('rider_arrived', onRiderArrived);
+      socket.off('connect', onOrderUpdate);
+    };
+
+    // On app cold-start, React children effects run before parent (RootNavigator) effects,
+    // so getSocket() may be null here. Retry once after a short delay so the parent's
+    // connectSocket() call has time to complete. The 5s refetchInterval is the safety net
+    // in the rare window between mount and retry.
+    let socket = getSocket();
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    if (socket) {
+      attach(socket);
+    } else {
+      retryTimer = setTimeout(() => {
+        socket = getSocket();
+        attach(socket);
+      }, 1500);
+    }
+
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+      detach(getSocket());
     };
   }, [queryClient]);
 
