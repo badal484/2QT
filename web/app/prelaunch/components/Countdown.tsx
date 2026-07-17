@@ -47,7 +47,7 @@ export function Countdown({ onStart }: { onStart: () => void }) {
             Become a Founding Member. Get ₹100.
           </h3>
           <p className="text-sm text-zinc-400 mb-8 font-medium relative z-10">
-            Be one of the first 1,000 members and help us decide the Menu, Pricing, and Offers. Get ₹100 wallet credit the moment 2QT launches.
+            Be one of the first 1,000 members and help us decide the Menu and Offers. Get ₹100 wallet credit the moment 2QT launches.
           </p>
           <motion.button
             onClick={onStart}
