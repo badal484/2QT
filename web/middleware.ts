@@ -18,12 +18,15 @@ export async function middleware(request: NextRequest) {
   try {
     // Check if prelaunch mode is active from the backend
     const apiUrl = process.env.BACKEND_URL || 'http://localhost:8000/api/v1';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 800);
+
     const response = await fetch(`${apiUrl}/prelaunch/config`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
-      // Use next.revalidate to cache this edge config heavily if needed, but for now we fetch it fresh
-      next: { revalidate: 60 } 
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
