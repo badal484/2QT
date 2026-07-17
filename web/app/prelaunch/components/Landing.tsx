@@ -3,12 +3,12 @@ import { Hero } from './Hero';
 import { Showcase } from './Showcase';
 import { Countdown } from './Countdown';
 import { LiveCounter } from './LiveCounter';
-import { FloatingQualityBadge } from './FloatingQualityBadge';
+import { VerticalSidebar } from './VerticalSidebar';
 
 export function Landing({ onStart }: { onStart: () => void }) {
   return (
     <div className="w-full min-h-screen bg-transparent" style={{ scrollBehavior: 'smooth' }}>
-      <FloatingQualityBadge />
+      <VerticalSidebar />
 
       {/* Floating navbar */}
       <div className="fixed top-6 left-0 right-0 z-50 px-4 flex justify-center">
