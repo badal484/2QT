@@ -131,7 +131,9 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           addressText: variables.addressText,
         }));
       }
-      navigation.pop(2);
+      // returnToCart: came directly from CartScreen (no Address picker in between)
+      // so only pop 1. Without it the stack is Cart→Address→AddressBook, pop 2.
+      returnToCart ? navigation.goBack() : navigation.pop(2);
     },
     onError: () => Alert.alert('Error', 'Could not save address. Please try again.'),
   });
