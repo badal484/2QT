@@ -16,9 +16,9 @@ export function Landing({ onStart }: { onStart: () => void }) {
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-zinc-400">
-            <button className="hover:text-white transition-colors">The Vision</button>
-            <button className="hover:text-white transition-colors">Rewards</button>
-            <button className="hover:text-brand-primary transition-colors text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]">Check Status</button>
+            <button onClick={() => document.getElementById('vision')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">The Vision</button>
+            <button onClick={() => document.getElementById('rewards')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">Rewards</button>
+            <button onClick={onStart} className="hover:text-brand-primary transition-colors text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]">Check Status</button>
           </nav>
 
           <button
@@ -32,8 +32,8 @@ export function Landing({ onStart }: { onStart: () => void }) {
       </div>
 
       <Hero onStart={onStart} />
-      <Showcase />
-      <Countdown onStart={onStart} />
+      <div id="vision"><Showcase /></div>
+      <div id="rewards"><Countdown onStart={onStart} /></div>
       <LiveCounter />
     </div>
   );
