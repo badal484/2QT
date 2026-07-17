@@ -92,7 +92,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
   const { data: orderData, isLoading } = useQuery({
     queryKey: ['order-confirmed', orderId],
     queryFn: () => api.get(`/orders/${orderId}`),
-    refetchInterval: 5000,
+    refetchInterval: 6000,
   });
   const o = orderData?.order;
   const items: any[] = o?.items || [];

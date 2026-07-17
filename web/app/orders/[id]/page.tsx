@@ -155,7 +155,7 @@ export default function OrderTrackingPage() {
             setLiveRider({ lat: Number(d.order.rider_lat), lng: Number(d.order.rider_lng) });
         }
       } catch { /* silent */ }
-    }, 5000);
+    }, 15000);
 
     const joinRoom = () => socket.emit("join_order", id);
 

@@ -124,7 +124,7 @@ export default function SOSTab() {
       const res = await api.get("/support/sos-alerts");
       return res.alerts as SOSAlert[];
     },
-    refetchInterval: 5000,
+    refetchInterval: 15000,
   });
 
   useSocketRefresh(["sos_alert", "sos_resolved"], refetch);

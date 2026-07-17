@@ -61,7 +61,7 @@ const PartnerBookingsScreen = () => {
         ? api.get(`/table-bookings/restaurant/${restaurant.id}?date=${dateStr}`).then((r: any) => r.bookings as any[])
         : [],
     enabled: !!restaurant?.id,
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   const checkinMutation = useMutation({

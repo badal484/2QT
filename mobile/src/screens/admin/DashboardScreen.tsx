@@ -75,7 +75,7 @@ const DashboardScreen = ({ navigation }: any) => {
       console.log('--- DASHBOARD: STATS RECEIVED:', res);
       return res;
     },
-    refetchInterval: 5000,
+    refetchInterval: 10000,
     retry: 3,
   });
 
