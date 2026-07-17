@@ -1,95 +1,97 @@
 'use client';
 import { motion } from 'framer-motion';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Star, Users, Zap, Gift } from 'lucide-react';
 import Image from 'next/image';
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
 export function Hero({ onStart }: { onStart: () => void }) {
   return (
-    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-transparent px-6 lg:px-20 pt-28 pb-12">
-      <div className="relative z-10 max-w-7xl mx-auto w-full">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+    <section className="relative min-h-screen flex flex-col justify-center items-center overflow-hidden bg-transparent px-4 sm:px-6 lg:px-20 pt-32 pb-12 text-center">
+      
+      {/* Background Floating Elements */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {/* Glow Orbs */}
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-primary/20 rounded-full blur-[120px]"
+        />
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[120px]"
+        />
+      </div>
 
-          {/* ── Text ── */}
-          <div className="max-w-xl">
-            <motion.div
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, ease }}
-              className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-4 py-1.5 text-xs font-bold text-brand-primary shadow-[0_0_15px_rgba(255,90,31,0.2)]"
-            >
-              <Star className="h-3.5 w-3.5 fill-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
-              Exclusive Early Access
-            </motion.div>
+      <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col items-center">
+        
+        {/* Top Badge */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease }}
+          className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-primary/30 bg-brand-primary/10 px-5 py-2 text-sm font-bold text-brand-primary shadow-[0_0_20px_rgba(255,90,31,0.25)] backdrop-blur-md"
+        >
+          <Zap className="h-4 w-4 fill-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
+          The Exclusive Waitlist is Open
+        </motion.div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.65, delay: 0.07, ease }}
-              className="font-display font-bold tracking-tight leading-[1.1] text-white drop-shadow-md"
-              style={{ fontSize: 'clamp(3rem, 6vw, 4.5rem)' }}
-            >
-              Food delivery,<br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-amber-400 drop-shadow-[0_0_20px_rgba(255,90,31,0.4)]">reimagined.</span>
-            </motion.h1>
+        {/* Massive Headline */}
+        <motion.h1
+          initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.65, delay: 0.1, ease }}
+          className="font-display font-black tracking-tighter leading-[1.05] text-white drop-shadow-lg mb-6"
+          style={{ fontSize: 'clamp(3.5rem, 8vw, 6.5rem)' }}
+        >
+          Skip the line.<br />
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary via-orange-400 to-amber-300 drop-shadow-[0_0_30px_rgba(255,90,31,0.5)]">
+            Eat like a VIP.
+          </span>
+        </motion.h1>
 
-            <motion.p
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.15, ease }}
-              className="mt-6 text-lg leading-relaxed text-zinc-400 font-medium max-w-md"
-            >
-              Join the waitlist to secure your spot for a premium culinary experience. Invite friends to jump the line and unlock exclusive rewards.
-            </motion.p>
+        {/* Subtitle */}
+        <motion.p
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.2, ease }}
+          className="text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-12"
+        >
+          2QT is bringing ultra-fast, premium food delivery to campus. Join the waitlist, invite friends to jump ahead, and unlock a month of free delivery.
+        </motion.p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.23, ease }}
-              className="mt-10"
-            >
-              <motion.button
-                onClick={onStart}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="group flex items-center justify-center gap-3 rounded-full px-8 py-4 text-sm font-bold text-black transition-all bg-white shadow-[0_0_20px_rgba(255,255,255,0.15)] hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105"
-              >
-                Claim Your Spot
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </motion.button>
-            </motion.div>
-          </div>
-
-          {/* ── Visual ── */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1, y: [0, -10, 0] }}
-            transition={{ opacity: { duration: 0.7, delay: 0.2, ease }, scale: { duration: 0.7, delay: 0.2, ease }, y: { duration: 6, repeat: Infinity, ease: "easeInOut" } }}
-            className="w-full h-[600px] lg:h-[700px] relative rounded-[3rem] overflow-hidden shadow-[0_0_60px_rgba(255,90,31,0.2)] border border-white/5"
-          >
-            <Image 
-              src="/hero-bowl.png" 
-              alt="Mediterranean Quinoa Bowl"
-              fill
-              className="object-cover"
-              priority
-            />
-            
-            {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
-
-            {/* Label Overlay */}
-            <div className="absolute bottom-10 left-10 right-10">
-              <div className="inline-block bg-white/10 backdrop-blur-xl border border-white/20 text-white/90 text-xs font-semibold px-4 py-1.5 rounded-full mb-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-                Chef's Signature
-              </div>
-              <h3 className="text-white font-display font-bold text-2xl tracking-tight mb-2 drop-shadow-md">
-                Mediterranean Quinoa Bowl
-              </h3>
-              <p className="text-white/80 text-sm font-medium">
-                Fresh, healthy, and perfectly balanced.
-              </p>
-            </div>
-          </motion.div>
+        {/* Central Glassmorphic Entry Card */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.3, ease }}
+          className="w-full max-w-md bg-white/5 backdrop-blur-3xl rounded-[2rem] p-2 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative group"
+        >
+          <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-[2rem] pointer-events-none" />
           
-        </div>
+          <div className="p-6 md:p-8 flex flex-col items-center">
+            <div className="flex items-center gap-3 mb-6 text-zinc-400 font-semibold text-sm">
+              <Users className="w-5 h-5 text-brand-primary" />
+              <span>Over 8,000 students already waiting</span>
+            </div>
+
+            <button
+              onClick={onStart}
+              className="w-full relative overflow-hidden group/btn rounded-2xl bg-brand-primary px-8 py-5 text-lg font-bold text-white transition-all shadow-[0_0_30px_rgba(255,90,31,0.4)] hover:shadow-[0_0_50px_rgba(255,90,31,0.6)] hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {/* Button Shine Effect */}
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover/btn:animate-[shimmer_1.5s_infinite]" />
+              
+              <span className="relative flex items-center justify-center gap-3">
+                Secure Your Spot
+                <ArrowRight className="h-5 w-5 transition-transform group-hover/btn:translate-x-1" />
+              </span>
+            </button>
+
+            <div className="mt-5 flex items-center gap-2 text-xs font-medium text-zinc-500">
+              <Gift className="w-4 h-4 text-amber-400" />
+              <span>Top 100 get lifetime VIP status</span>
+            </div>
+          </div>
+        </motion.div>
+
       </div>
     </section>
   );
