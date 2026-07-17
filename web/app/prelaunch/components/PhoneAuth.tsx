@@ -53,11 +53,16 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     try {
       const auth = getAuth(app);
 
-      // Always create a fresh verifier — stale/pre-rendered verifiers silently
-      // produce invalid tokens, causing Firebase to accept the request but never
-      // send the SMS. Attaching to document.body avoids CSS clipping issues.
+      // Always create a fresh verifier and clear the DOM element to prevent
+      // "reCAPTCHA placeholder element must be empty" errors.
       try { window.recaptchaVerifier?.clear(); } catch {}
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, document.body, {
+      
+      const recaptchaContainer = document.getElementById('recaptcha-container');
+      if (recaptchaContainer) {
+        recaptchaContainer.innerHTML = '';
+      }
+
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
       });
 
@@ -302,7 +307,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           </motion.div>
         )}
 
-        {/* ── SUCCESS ── */}
         {step === 'SUCCESS' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
@@ -320,6 +324,9 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           </motion.div>
         )}
       </div>
+      
+      {/* Firebase reCAPTCHA container */}
+      <div id="recaptcha-container"></div>
     </motion.div>
   );
 }
