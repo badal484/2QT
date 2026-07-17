@@ -15,7 +15,7 @@ export function FloatingQualityBadge() {
       <motion.div 
         className="bg-black/40 backdrop-blur-2xl border border-white/10 border-r-0 rounded-l-2xl shadow-[-10px_0_30px_rgba(255,90,31,0.15)] flex items-center cursor-pointer overflow-hidden"
         initial={{ width: '3.5rem' }}
-        animate={{ width: isHovered ? '22rem' : '3.5rem' }}
+        animate={{ width: isHovered ? '16rem' : '3.5rem' }}
         transition={{ type: "spring", stiffness: 400, damping: 35 }}
       >
         <div className="w-14 h-14 shrink-0 flex items-center justify-center text-brand-primary relative">
@@ -23,10 +23,10 @@ export function FloatingQualityBadge() {
           <ShieldCheck className="w-6 h-6 relative z-10 drop-shadow-[0_0_8px_rgba(255,90,31,0.8)]" />
         </div>
         
-        <div className="pl-4 pr-6 py-3 shrink-0 w-[18.5rem]">
-          <h4 className="font-display font-bold text-white text-sm mb-1 drop-shadow-sm">Zero Restaurant Roulette</h4>
-          <p className="text-xs text-zinc-400 font-medium leading-relaxed">
-            Not a marketplace. We own the kitchen to guarantee 100% uncompromising quality and taste on every single order.
+        <div className="pl-4 pr-6 py-3 shrink-0 w-[12.5rem]">
+          <h4 className="font-display font-bold text-white text-sm mb-0.5 drop-shadow-sm">Our Own Kitchen</h4>
+          <p className="text-xs text-zinc-400 font-medium leading-snug">
+            100% Quality Guaranteed.
           </p>
         </div>
       </motion.div>
