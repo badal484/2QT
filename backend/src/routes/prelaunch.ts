@@ -177,9 +177,35 @@ router.post('/register', async (req, res) => {
             [user.id, tokenHash]
         );
 
+        // Fetch rank after registration
+        const { rows: rankRows } = await query(
+            `WITH ReferralCounts AS (
+                SELECT referred_by, COUNT(*) as ref_count
+                FROM pre_launch_registrations
+                WHERE referred_by IS NOT NULL
+                GROUP BY referred_by
+            ),
+            RankedRegistrations AS (
+                SELECT 
+                    r.id,
+                    COALESCE(rc.ref_count, 0) as ref_count,
+                    RANK() OVER (ORDER BY COALESCE(rc.ref_count, 0) DESC, r.created_at ASC) as rank
+                FROM pre_launch_registrations r
+                LEFT JOIN ReferralCounts rc ON r.referral_code = rc.referred_by
+            )
+            SELECT rank, ref_count FROM RankedRegistrations WHERE id = $1`,
+            [regRows[0].id]
+        );
+        const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
+        
         res.status(201).json({
             success: true,
-            data: regRows[0],
+            data: {
+                ...regRows[0],
+                rank: parseInt(rankRows[0]?.rank || '0', 10),
+                referrals: parseInt(rankRows[0]?.ref_count || '0', 10),
+                total: parseInt(totalRows[0].count, 10)
+            },
             user: { id: user.id, name: user.name, phone: user.phone, role: user.role },
             accessToken,
             refreshToken,
@@ -191,7 +217,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Check if a Firebase-authenticated user already has a pre-launch registration.
-// Used by the frontend to skip the survey for returning visitors.
+// Used by the frontend to skip the survey for returning visitors and show waitlist status.
 router.post('/me', async (req, res) => {
     const { idToken } = req.body;
     if (!idToken) return res.json({ registered: false });
@@ -201,14 +227,42 @@ router.post('/me', async (req, res) => {
         if (!rawPhone) return res.json({ registered: false });
         let phone = String(rawPhone).replace(/\D/g, '');
         if (phone.length === 10) phone = '91' + phone;
+
+        const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
+        const total = parseInt(totalRows[0].count, 10);
+
         const { rows } = await query(
-            `SELECT referral_code, name FROM pre_launch_registrations WHERE phone = $1 OR phone = $2`,
+            `WITH ReferralCounts AS (
+                SELECT referred_by, COUNT(*) as ref_count
+                FROM pre_launch_registrations
+                WHERE referred_by IS NOT NULL
+                GROUP BY referred_by
+            ),
+            RankedRegistrations AS (
+                SELECT 
+                    r.id, r.phone, r.referral_code, r.name,
+                    COALESCE(rc.ref_count, 0) as ref_count,
+                    RANK() OVER (ORDER BY COALESCE(rc.ref_count, 0) DESC, r.created_at ASC) as rank
+                FROM pre_launch_registrations r
+                LEFT JOIN ReferralCounts rc ON r.referral_code = rc.referred_by
+            )
+            SELECT * FROM RankedRegistrations WHERE phone = $1 OR phone = $2`,
             [phone, '+' + phone]
         );
-        if (rows[0]) return res.json({ registered: true, referral_code: rows[0].referral_code, name: rows[0].name });
+
+        if (rows[0]) {
+            return res.json({ 
+                registered: true, 
+                referral_code: rows[0].referral_code, 
+                name: rows[0].name,
+                rank: parseInt(rows[0].rank, 10),
+                referrals: parseInt(rows[0].ref_count, 10),
+                total
+            });
+        }
         res.json({ registered: false });
-    } catch {
-        res.json({ registered: false });
+    } catch (err: any) {
+        res.json({ registered: false, error: err.message });
     }
 });
 
