@@ -223,8 +223,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         {step === 'OTP' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm">Verify.</h2>
-            <p className="text-zinc-400 font-medium mb-8 text-sm">
+            <p className="text-zinc-400 font-medium mb-2 text-sm">
               We sent a code to +91 {phone.slice(0, 5)} {phone.slice(5)}
+            </p>
+            <p className="text-zinc-600 text-xs mb-8">
+              Didn&apos;t get it? Check your <span className="text-zinc-400 font-semibold">Spam / Blocked</span> messages folder.
             </p>
 
             <motion.div

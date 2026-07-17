@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Landing } from './components/Landing';
 import { PhoneAuth } from './components/PhoneAuth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { app } from '../lib/firebase';
 import { SurveyWizard, SurveyData } from './components/SurveyWizard';
 import { Dashboard } from './components/Dashboard';
 import { LiveCounter } from './components/LiveCounter';
@@ -20,6 +22,37 @@ export default function PreLaunchPage() {
       const ref = urlParams.get('ref');
       if (ref) setReferredBy(ref);
     }
+
+    // Check for existing Firebase auth session on mount
+    const auth = getAuth(app);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          const meRes = await fetch('/api/proxy/prelaunch/me', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: token }),
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            if (meData.registered) {
+              setPhone(user.phoneNumber || '');
+              setIdToken(token);
+              setUserName(meData.name || '');
+              setReferralCode(meData.referral_code || '');
+              setRankData({ rank: meData.rank || 0, total: meData.total || 0, referrals: meData.referrals || 0 });
+              setSurveyCompleted(meData.survey_completed || false);
+              setStep(2); // Jump straight to Dashboard
+            }
+          }
+        } catch (error) {
+          console.error("Session restore failed:", error);
+        }
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const [step, setStep] = useState<number>(0);
