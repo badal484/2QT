@@ -168,12 +168,13 @@ const CartScreen = ({ navigation }: any) => {
 
   const handleAddressNavigation = () => {
     triggerHaptic();
+    // Always use push, never navigate — navigate('Address') can silently jump
+    // back to a pre-existing Address screen in the stack, which removes Cart
+    // from the history and causes pop(2) in AddressBook to land on Home.
     if (addressesData?.addresses?.length === 0) {
-      // No saved addresses — go straight to AddressBook.
-      // Pass returnToCart so AddressBook knows to pop only 1 screen (not 2).
-      navigation.navigate('AddressBook', { returnToCart: true });
+      navigation.push('AddressBook', { returnToCart: true });
     } else {
-      navigation.navigate('Address');
+      navigation.push('Address');
     }
   };
 
