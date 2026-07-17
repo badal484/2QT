@@ -117,8 +117,26 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     mutationFn: (data: any) => api.post('/customers/addresses', data),
     onSuccess: (res, variables) => {
       ReactNativeHapticFeedback.trigger('notificationSuccess');
+
+      // Immediately seed the addresses cache so Cart shows the address the
+      // instant it re-renders, without waiting for a network refetch.
+      if (res?.address?.id) {
+        queryClient.setQueryData(['addresses'], (old: any) => {
+          const existing: any[] = old?.addresses ?? [];
+          const withoutDupe = existing.filter((a: any) => a.id !== res.address.id);
+          const newEntry = {
+            ...res.address,
+            is_serviceable: !!variables.zoneId,
+            zone_name: null,
+          };
+          return { addresses: [...withoutDupe, newEntry] };
+        });
+        dispatch(setAddress(res.address.id));
+      }
+
+      // Background refetch to get server-computed is_serviceable from the JOIN
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
-      if (res?.address?.id) dispatch(setAddress(res.address.id));
+
       if (variables.zoneId) {
         dispatch(setZone(variables.zoneId));
         dispatch(setServiceable({ zoneId: variables.zoneId, zoneName: null }));
@@ -131,8 +149,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           addressText: variables.addressText,
         }));
       }
-      // returnToCart: came directly from CartScreen (no Address picker in between)
-      // so only pop 1. Without it the stack is Cart→Address→AddressBook, pop 2.
+
       returnToCart ? navigation.goBack() : navigation.pop(2);
     },
     onError: () => Alert.alert('Error', 'Could not save address. Please try again.'),
