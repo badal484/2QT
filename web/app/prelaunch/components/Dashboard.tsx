@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, CheckCircle2, ChevronRight, Share2, Rocket, Lock } from 'lucide-react';
+import { Copy, CheckCircle2, ChevronRight, Share2, Rocket, Lock, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DashboardProps {
@@ -11,9 +11,10 @@ interface DashboardProps {
   name: string;
   surveyCompleted: boolean;
   onOpenSurvey: () => void;
+  onLogout: () => void;
 }
 
-export function Dashboard({ rank, total, referrals, referralCode, name, surveyCompleted, onOpenSurvey }: DashboardProps) {
+export function Dashboard({ rank, total, referrals, referralCode, name, surveyCompleted, onOpenSurvey, onLogout }: DashboardProps) {
   const [copied, setCopied] = useState(false);
   const peopleBehind = Math.max(0, total - rank);
 
@@ -51,9 +52,17 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
       className="w-full max-w-2xl mx-auto space-y-6"
     >
       {/* Welcome Banner */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-display font-bold text-white drop-shadow-sm mb-2">You're on the list, {name.split(' ')[0]}!</h1>
-        <p className="text-zinc-400 text-lg">Don't lose your spot. Invite friends to jump the line.</p>
+      <div className="flex justify-between items-start mb-8 gap-4">
+        <div className="text-left">
+          <h1 className="text-4xl font-display font-bold text-white drop-shadow-sm mb-2">You're on the list, {name.split(' ')[0]}!</h1>
+          <p className="text-zinc-400 text-lg">Don't lose your spot. Invite friends to jump the line.</p>
+        </div>
+        <button 
+          onClick={onLogout}
+          className="text-zinc-500 hover:text-white transition-colors text-xs uppercase tracking-widest font-bold flex items-center gap-2 mt-2 px-3 py-2 rounded-xl hover:bg-white/5 whitespace-nowrap"
+        >
+          <LogOut className="w-4 h-4" /> Sign Out
+        </button>
       </div>
 
       {/* ₹100 Reward Card */}
