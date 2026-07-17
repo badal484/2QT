@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "../lib/api";
 import { useAuth } from "../providers";
-import { auth } from "../../src/firebaseInit";
+import { auth } from "../lib/firebase";
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
 import { Suspense } from 'react';
