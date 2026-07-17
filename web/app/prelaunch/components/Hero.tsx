@@ -45,7 +45,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
         >
           Skip the line.<br />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary via-orange-400 to-amber-300 drop-shadow-[0_0_30px_rgba(255,90,31,0.5)]">
-            Eat like a VIP.
+            Order in seconds.
           </span>
         </motion.h1>
 
@@ -87,7 +87,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
 
             <div className="mt-5 flex items-center gap-2 text-xs font-medium text-zinc-500">
               <Gift className="w-4 h-4 text-amber-400" />
-              <span>Top 100 get lifetime VIP status</span>
+              <span>Complete survey to unlock ₹100 reward</span>
             </div>
           </div>
         </motion.div>
