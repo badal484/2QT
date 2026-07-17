@@ -20,7 +20,7 @@ export function Countdown({ onStart }: { onStart: () => void }) {
           viewport={{ once: true }} transition={{ delay: 0.07 }}
           className="text-3xl sm:text-4xl font-display font-bold text-white tracking-tight mb-3 drop-shadow-md"
         >
-          The food delivery Ranchi deserves.
+          Ranchi's food scene, finally upgraded.
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }}
