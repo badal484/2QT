@@ -8,23 +8,23 @@ import InstallPrompt from "../components/InstallPrompt";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://2qt.in";
 const SITE_NAME = "2QT";
 const SITE_DESC =
-  "Premium gourmet food delivered in 30 minutes across Bengaluru. Fresh ingredients, chef-crafted recipes, zero compromises.";
+  "Next-level food delivery in Ranchi. Our own kitchen, uncompromising quality, and fast delivery across Lalpur.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} — Gourmet Delivery in Bengaluru`,
+    default: `${SITE_NAME} — Next-Level Food Delivery in Ranchi`,
     template: `%s | ${SITE_NAME}`,
   },
   description: SITE_DESC,
   keywords: [
-    "food delivery Bengaluru",
-    "gourmet food delivery",
-    "online food order Bangalore",
-    "premium meal delivery",
-    "chef crafted food Bangalore",
-    "fast food delivery 30 minutes",
-    "meal subscription Bangalore",
+    "food delivery Ranchi",
+    "food delivery Lalpur",
+    "online food order Ranchi",
+    "premium meal delivery Ranchi",
+    "2QT food delivery",
+    "fast food delivery Ranchi",
+    "best restaurant Lalpur",
     "2QT food",
   ],
   authors: [{ name: "2QT", url: SITE_URL }],
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     locale: "en_IN",
     url: SITE_URL,
     siteName: SITE_NAME,
-    title: `${SITE_NAME} — Gourmet Delivery in Bengaluru`,
+    title: `${SITE_NAME} — Next-Level Food Delivery in Ranchi`,
     description: SITE_DESC,
     images: [
       {
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME} — Gourmet Delivery in Bengaluru`,
+    title: `${SITE_NAME} — Next-Level Food Delivery in Ranchi`,
     description: SITE_DESC,
     images: ["/og-image.jpg"],
     creator: "@2qt_food",
@@ -108,7 +108,7 @@ export default function RootLayout({
               url: SITE_URL,
               logo: `${SITE_URL}/icon-512x512.png`,
               description: SITE_DESC,
-              areaServed: { "@type": "City", name: "Bengaluru" },
+              areaServed: { "@type": "City", name: "Ranchi" },
               contactPoint: {
                 "@type": "ContactPoint",
                 telephone: "+91-886-700-0000",
