@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Landing } from './components/Landing';
 import { PhoneAuth } from './components/PhoneAuth';
 import { SurveyWizard, SurveyData } from './components/SurveyWizard';
-import { ThankYou } from './components/ThankYou';
+import { Dashboard } from './components/Dashboard';
 import { LiveCounter } from './components/LiveCounter';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
@@ -22,12 +22,13 @@ export default function PreLaunchPage() {
     }
   }, []);
 
-  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+  const [step, setStep] = useState<number>(0);
   const [phone, setPhone] = useState('');
   const [idToken, setIdToken] = useState('');
   const [userName, setUserName] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rankData, setRankData] = useState<{rank: number, total: number, referrals: number} | null>(null);
 
   // FOMO Toasts
   useEffect(() => {
@@ -51,16 +52,48 @@ export default function PreLaunchPage() {
     return () => clearInterval(interval);
   }, [step]);
 
-  const handlePhoneVerified = (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string }) => {
+  const handlePhoneVerified = async (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number }) => {
     setPhone(data.phone);
     setIdToken(data.token);
     setUserName(data.name);
-    if (data.alreadyRegistered && data.referralCode) {
-      setReferralCode(data.referralCode);
-      setStep(3); // already registered — go straight to Thank You
-      return;
+
+    if (data.alreadyRegistered) {
+      setReferralCode(data.referralCode || '');
+      setRankData({ rank: data.rank || 0, total: data.total || 0, referrals: data.referrals || 0 });
+      setStep(2); // Go straight to Dashboard
+    } else {
+      // Register immediately with empty survey to claim spot
+      setIsSubmitting(true);
+      setStep(1.5 as any); // Loading state
+      try {
+        const res = await fetch('/api/proxy/prelaunch/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: data.name,
+            idToken: data.token,
+            surveyResponses: {},
+            referredBy: referredBy || undefined,
+            source: 'waitlist_v2'
+          })
+        });
+
+        const json = await res.json();
+        if (res.ok) {
+          setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
+          setRankData({ rank: json.data?.rank || 0, total: json.data?.total || 0, referrals: json.data?.referrals || 0 });
+          setStep(2); // Dashboard
+        } else {
+          toast.error('Failed to register. Try again.');
+          setStep(1);
+        }
+      } catch (e: any) {
+        toast.error('Something went wrong. Please try again.');
+        setStep(1);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
-    setStep(2);
   };
 
   const handleSurveyComplete = async (data: SurveyData) => {
@@ -81,8 +114,9 @@ export default function PreLaunchPage() {
       const json = await res.json();
       if (res.ok) {
         sessionStorage.removeItem('2qt_survey_v2');
-        setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
-        setStep(3);
+        toast.success('Survey completed! Your rank has been boosted.');
+        setRankData({ rank: json.data?.rank || rankData?.rank || 0, total: json.data?.total || rankData?.total || 0, referrals: json.data?.referrals || rankData?.referrals || 0 });
+        setStep(2); // Back to Dashboard
       } else {
         throw new Error(json.error || 'Failed to submit');
       }
@@ -126,22 +160,36 @@ export default function PreLaunchPage() {
           </motion.div>
         )}
 
+        {step === 1.5 && (
+          <motion.div key="loading" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex flex-col items-center justify-center p-4">
+            <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
+            <p className="text-zinc-400 font-bold text-sm">Securing your spot in line...</p>
+          </motion.div>
+        )}
+
         {step === 2 && (
-          <motion.div key="survey" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 md:p-8">
-            {isSubmitting ? (
-              <div className="flex flex-col items-center justify-center">
-                <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
-                <p className="text-zinc-400 font-bold text-sm">Securing your launch reward...</p>
-              </div>
-            ) : (
-              <SurveyWizard onComplete={handleSurveyComplete} />
-            )}
+          <motion.div key="dashboard" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
+             <Dashboard 
+               rank={rankData?.rank || 0} 
+               total={rankData?.total || 0} 
+               referrals={rankData?.referrals || 0} 
+               referralCode={referralCode}
+               name={userName}
+               onOpenSurvey={() => setStep(3)}
+             />
           </motion.div>
         )}
 
         {step === 3 && (
-          <motion.div key="thankyou" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
-            <ThankYou referralCode={referralCode} />
+          <motion.div key="survey" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4 md:p-8">
+            {isSubmitting ? (
+              <div className="flex flex-col items-center justify-center">
+                <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
+                <p className="text-zinc-400 font-bold text-sm">Saving responses...</p>
+              </div>
+            ) : (
+              <SurveyWizard onComplete={handleSurveyComplete} />
+            )}
           </motion.div>
         )}
       </AnimatePresence>

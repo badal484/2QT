@@ -1,0 +1,151 @@
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Copy, CheckCircle2, ChevronRight, Share2, Rocket } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface DashboardProps {
+  rank: number;
+  total: number;
+  referrals: number;
+  referralCode: string;
+  name: string;
+  onOpenSurvey: () => void;
+}
+
+export function Dashboard({ rank, total, referrals, referralCode, name, onOpenSurvey }: DashboardProps) {
+  const [copied, setCopied] = useState(false);
+  const peopleBehind = Math.max(0, total - rank);
+
+  const tiers = [
+    { title: "Free Delivery", req: 1, desc: "For a whole month" },
+    { title: "50% Off", req: 3, desc: "On your first 5 orders" },
+    { title: "VIP Foodie", req: 10, desc: "Priority support & secret menus" }
+  ];
+
+  const handleCopy = () => {
+    const link = typeof window !== 'undefined' ? `${window.location.origin}/prelaunch?ref=${referralCode}` : `https://2qt.in/prelaunch?ref=${referralCode}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    toast.success('Referral link copied!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    const link = typeof window !== 'undefined' ? `${window.location.origin}/prelaunch?ref=${referralCode}` : `https://2qt.in/prelaunch?ref=${referralCode}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join 2QT Waitlist',
+          text: 'I just joined the 2QT waitlist! Use my link to join and we both get rewards.',
+          url: link,
+        });
+      } catch (e) {
+        handleCopy();
+      }
+    } else {
+      handleCopy();
+    }
+  };
+
+  const progressPercentage = Math.min(100, (referrals / 10) * 100);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="w-full max-w-2xl mx-auto space-y-6"
+    >
+      {/* Welcome Banner */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-display font-bold text-white drop-shadow-sm mb-2">You're on the list, {name.split(' ')[0]}!</h1>
+        <p className="text-zinc-400 text-lg">Don't lose your spot. Invite friends to jump the line.</p>
+      </div>
+
+      {/* Main Glass Card */}
+      <div className="bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-8 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative overflow-hidden">
+        {/* Glow */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary/10 rounded-full blur-[80px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
+
+        {/* Rank Header */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-10 relative z-10">
+          <div className="text-center sm:text-left">
+            <p className="text-zinc-500 uppercase tracking-widest text-xs font-bold mb-1">Your Waitlist Position</p>
+            <div className="flex items-baseline justify-center sm:justify-start gap-1">
+              <span className="text-5xl font-display font-bold text-white">#{rank.toLocaleString()}</span>
+            </div>
+            <p className="text-brand-primary font-medium text-sm mt-1">{peopleBehind.toLocaleString()} people behind you</p>
+          </div>
+          
+          <div className="text-center sm:text-right bg-black/20 rounded-2xl p-4 border border-white/5 w-full sm:w-auto">
+            <p className="text-zinc-500 uppercase tracking-widest text-xs font-bold mb-1">Total Referrals</p>
+            <span className="text-3xl font-display font-bold text-white">{referrals}</span>
+          </div>
+        </div>
+
+        {/* Progress Tracker */}
+        <div className="relative z-10 mb-10">
+          <div className="flex justify-between text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wide">
+            <span>Tiers</span>
+            <span>{referrals}/10 Friends</span>
+          </div>
+          <div className="h-4 bg-black/40 rounded-full overflow-hidden relative">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercentage}%` }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-brand-primary to-orange-400"
+            />
+          </div>
+          
+          <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+            {tiers.map((tier, i) => {
+              const unlocked = referrals >= tier.req;
+              return (
+                <div key={i} className={`flex flex-col items-center gap-1 ${unlocked ? 'opacity-100' : 'opacity-40 grayscale'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${unlocked ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(255,90,31,0.5)]' : 'bg-white/10 text-zinc-400'}`}>
+                    {unlocked ? <CheckCircle2 className="w-5 h-5" /> : tier.req}
+                  </div>
+                  <p className="text-xs font-bold text-white mt-1">{tier.title}</p>
+                  <p className="text-[10px] text-zinc-400 leading-tight hidden sm:block">{tier.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-4 relative z-10">
+          <div className="flex gap-3">
+            <button 
+              onClick={handleCopy}
+              className="flex-1 bg-white/10 hover:bg-white/15 border border-white/10 transition-all rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-white"
+            >
+              {copied ? <CheckCircle2 className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+            <button 
+              onClick={handleShare}
+              className="flex-[2] bg-brand-primary hover:bg-brand-primary-dark transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-white"
+            >
+              <Share2 className="w-5 h-5" />
+              Share with Friends
+            </button>
+          </div>
+          
+          <button 
+            onClick={onOpenSurvey}
+            className="w-full bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 transition-all rounded-2xl py-4 flex items-center justify-between px-6 font-bold text-white group"
+          >
+            <div className="flex items-center gap-3">
+              <Rocket className="w-5 h-5 text-blue-400 group-hover:-translate-y-1 transition-transform" />
+              <span>Boost your rank by 500 spots</span>
+            </div>
+            <ChevronRight className="w-5 h-5 text-blue-400 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
