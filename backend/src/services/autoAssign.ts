@@ -12,11 +12,17 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Max distance between a busy rider's current delivery and a new order's delivery.
+// If exceeded, the rider is skipped — they're heading in a different direction.
+const MAX_SECOND_ORDER_DIST_KM = 5.0;
+
 async function findBestRider(
     zoneId: string,
     kitchenLat: number,
     kitchenLng: number,
     isCodOrder = false,
+    newDeliveryLat: number | null = null,
+    newDeliveryLng: number | null = null,
 ): Promise<string | null> {
     const { rows: riders } = await query(`
         SELECT u.id,
@@ -56,13 +62,43 @@ async function findBestRider(
             if (cashInHand >= limitPaise) continue;
         }
 
+        const activeOrders = parseInt(rider.active_orders, 10);
+
+        // If this rider already has an active order, only give them the new order if
+        // its delivery destination is within MAX_SECOND_ORDER_DIST_KM of their current
+        // delivery. This prevents a rider delivering to Ranchi from getting an order
+        // going to Bachra (or any other distant location).
+        if (activeOrders > 0 && newDeliveryLat && newDeliveryLng) {
+            const { rows: activeRows } = await query(`
+                SELECT COALESCE(o.delivery_location_lat, a.lat) AS dlat,
+                       COALESCE(o.delivery_location_lng, a.lng) AS dlng
+                FROM orders o
+                LEFT JOIN addresses a ON a.id = o.address_id
+                WHERE o.rider_id = $1
+                  AND o.status NOT IN ('delivered', 'cancelled')
+                LIMIT 1
+            `, [rider.id]);
+
+            if (activeRows[0]) {
+                const dlat = parseFloat(activeRows[0].dlat);
+                const dlng = parseFloat(activeRows[0].dlng);
+                if (!isNaN(dlat) && !isNaN(dlng)) {
+                    const distBetweenDeliveries = haversineKm(dlat, dlng, newDeliveryLat, newDeliveryLng);
+                    if (distBetweenDeliveries > MAX_SECOND_ORDER_DIST_KM) {
+                        console.log(`[AUTO-ASSIGN] Skipping busy rider ${rider.id} — new delivery ${distBetweenDeliveries.toFixed(1)}km from current delivery (limit ${MAX_SECOND_ORDER_DIST_KM}km)`);
+                        continue;
+                    }
+                }
+            }
+        }
+
         const locRaw = await redis.get(keys.riderLocation(rider.id)).catch(() => null);
         if (!locRaw) continue; // no GPS — rider not actively sharing location
 
         try {
             const loc = JSON.parse(locRaw);
             const distKm = haversineKm(kitchenLat, kitchenLng, loc.lat, loc.lng);
-            candidates.push({ id: rider.id, activeOrders: parseInt(rider.active_orders, 10), distKm });
+            candidates.push({ id: rider.id, activeOrders, distKm });
         } catch { /* malformed GPS — skip */ }
     }
 
@@ -159,7 +195,7 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
         const deliveryLat = order.delivery_lat ? parseFloat(order.delivery_lat) : null;
         const deliveryLng = order.delivery_lng ? parseFloat(order.delivery_lng) : null;
 
-        const riderId = await findBestRider(order.zone_id, kitchenLat, kitchenLng, order.payment_method === 'cod');
+        const riderId = await findBestRider(order.zone_id, kitchenLat, kitchenLng, order.payment_method === 'cod', deliveryLat, deliveryLng);
 
         if (!riderId) {
             console.log(`[AUTO-ASSIGN] No eligible riders for ${order.display_id} (attempt ${attempt}) — alerting admin`);
