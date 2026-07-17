@@ -7,7 +7,7 @@ export function Showcase() {
         <p className="mt-4 text-zinc-400 font-medium text-lg">We control the kitchen. We control the quality. You get the best food in Lalpur.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 lg:grid-rows-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Big card */}
         <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-8 sm:col-span-2 lg:col-span-2 lg:row-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="absolute -top-10 -right-10 w-52 h-52 bg-brand-primary/20 rounded-full blur-[80px] group-hover:bg-brand-primary/30 transition-colors duration-500"></div>
@@ -25,18 +25,21 @@ export function Showcase() {
           </div>
         </div>
 
-        {/* Campus-fast */}
-        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 sm:col-span-2 lg:col-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">🍳</div>
-              <h3 className="font-display text-xl font-bold mb-2">Our Own Kitchen</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed font-medium max-w-xs">Better control, better quality. We guarantee you two things on every single order: <strong className="text-white">1. Quality</strong> and <strong className="text-white">2. Taste</strong>.</p>
-            </div>
-          </div>
+        {/* Our Own Kitchen */}
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
+          <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">🍳</div>
+          <h3 className="font-display text-lg font-bold mb-2">Our Own Kitchen</h3>
+          <p className="text-zinc-400 text-sm leading-relaxed font-medium">Better control, better quality. Lightning-fast delivery strictly within a 4km radius of Lalpur.</p>
         </div>
 
-        {/* Quality and Taste */}
+        {/* Quality & Taste */}
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
+          <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">✨</div>
+          <h3 className="font-display text-lg font-bold mb-2">Quality & Taste</h3>
+          <p className="text-zinc-400 text-sm leading-relaxed font-medium">We guarantee two things on every single order: <strong className="text-white">1. Uncompromising Quality</strong> and <strong className="text-white">2. Incredible Taste</strong>.</p>
+        </div>
+
+        {/* Experienced Chefs */}
         <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">👨‍🍳</div>
           <h3 className="font-display text-lg font-bold mb-2">Experienced Chefs</h3>
