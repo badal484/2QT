@@ -16,9 +16,9 @@ export function Landing({ onStart }: { onStart: () => void }) {
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-zinc-400">
-            <button className="hover:text-white transition-colors">Our Kitchens</button>
-            <button className="hover:text-white transition-colors">The App</button>
-            <button className="hover:text-brand-primary transition-colors text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]">My Account</button>
+            <button className="hover:text-white transition-colors">The Vision</button>
+            <button className="hover:text-white transition-colors">Rewards</button>
+            <button className="hover:text-brand-primary transition-colors text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]">Check Status</button>
           </nav>
 
           <button
@@ -26,7 +26,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
             className="rounded-full px-6 py-2.5 text-sm font-bold text-white transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] border border-brand-primary/50"
             style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}
           >
-            Order Now
+            Join Waitlist
           </button>
         </header>
       </div>
