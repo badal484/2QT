@@ -43,9 +43,9 @@ export function Hero({ onStart }: { onStart: () => void }) {
           className="font-display font-black tracking-tighter leading-[1.05] text-white drop-shadow-lg mb-6"
           style={{ fontSize: 'clamp(3.5rem, 8vw, 6.5rem)' }}
         >
-          Skip the line.<br />
+          Next-level delivery<br />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary via-orange-400 to-amber-300 drop-shadow-[0_0_30px_rgba(255,90,31,0.5)]">
-            Order in seconds.
+            for Ranchi.
           </span>
         </motion.h1>
 
