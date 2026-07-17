@@ -44,11 +44,10 @@ export function Countdown({ onStart }: { onStart: () => void }) {
             <Gift className="w-6 h-6 text-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
           </div>
           <h3 className="text-xl font-display font-bold text-white mb-2 relative z-10 drop-shadow-sm">
-            Secure your ₹100 reward
+            Set the menu. Get ₹100.
           </h3>
           <p className="text-sm text-zinc-400 mb-8 font-medium relative z-10">
-            First 1,000 registrations get ₹100 free wallet credit the moment 2QT launches.
-            No conditions. No minimum order.
+            We're paying our first 1,000 users to dictate the ultimate Lalpur menu. Give us your input and get ₹100 wallet credit the moment 2QT launches.
           </p>
           <motion.button
             onClick={onStart}
