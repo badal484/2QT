@@ -15,29 +15,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  try {
-    // Check if prelaunch mode is active from the backend
-    const apiUrl = process.env.BACKEND_URL || 'http://localhost:8000/api/v1';
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 800);
+  // Temporary: If we are on Vercel and BACKEND_URL is not set, don't try to fetch localhost.
+  // We'll just redirect root to /prelaunch.
+  const apiUrl = process.env.BACKEND_URL || 'http://localhost:8000/api/v1';
+  
+  if (pathname === '/' && apiUrl.includes('localhost')) {
+    return NextResponse.redirect(new URL('/prelaunch', request.url));
+  } else if (!apiUrl.includes('localhost')) {
+    try {
+      const response = await fetch(`${apiUrl}/prelaunch/config`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
 
-    const response = await fetch(`${apiUrl}/prelaunch/config`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.isPrelaunch) {
-        // Redirect everyone else to the prelaunch landing page
-        return NextResponse.redirect(new URL('/prelaunch', request.url));
+      if (response.ok) {
+        const data = await response.json();
+        if (data.isPrelaunch) {
+          return NextResponse.redirect(new URL('/prelaunch', request.url));
+        }
       }
+    } catch (error) {
+      console.error('Middleware prelaunch check failed:', error);
     }
-  } catch (error) {
-    // If backend is down or unreachable, just continue so we don't break the whole app
-    console.error('Middleware prelaunch check failed:', error);
   }
 
   return NextResponse.next();
