@@ -359,35 +359,44 @@ export default function KitchenPage() {
   useEffect(() => {
     fetchOrders();
     socket.connect();
-    socket.on("new_order", () => {
+
+    // Store handler refs so socket.off removes only these listeners, not all listeners
+    // for the event (socket.off(event) with no ref wipes every registered handler).
+    const handleNewOrder = () => {
       fetchOrders();
-      // Play notification sound for new order
-      try {
-        new Audio("https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg").play();
-      } catch {}
-    });
-    socket.on("critical_alert", (data: any) => {
-      // Play alert sound (use a short beep or custom audio file)
-      try {
-        new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play();
-      } catch {}
+      try { new Audio("/alert.mp3").play(); } catch {}
+    };
+    const handleCriticalAlert = (data: any) => {
+      try { new Audio("/alert.mp3").play(); } catch {}
       toast.error(`Critical Alert: ${data.type}`, {
         description: data.message,
         duration: Infinity,
       });
       try { playDispatchAlarm(); } catch {}
-    });
-    socket.on("order_cancelled", ({ orderId }: { orderId: string }) => {
+    };
+    const handleOrderCancelled = ({ orderId }: { orderId: string }) => {
       setOrders(prev => prev.filter(o => o.id !== orderId));
-    });
+    };
+
+    socket.on("new_order", handleNewOrder);
+    socket.on("critical_alert", handleCriticalAlert);
+    socket.on("order_cancelled", handleOrderCancelled);
     socket.on("order_updated", fetchOrders);
     socket.on("order_status_update", fetchOrders);
+    // Re-fetch on reconnect so orders aren't stale after a backend restart or network drop
+    socket.on("connect", fetchOrders);
+
+    // 30-second quiet poll as a safety net for any missed socket events
+    const pollId = setInterval(fetchOrders, 30000);
+
     return () => {
-      socket.off("new_order");
-      socket.off("critical_alert");
-      socket.off("order_cancelled");
+      socket.off("new_order", handleNewOrder);
+      socket.off("critical_alert", handleCriticalAlert);
+      socket.off("order_cancelled", handleOrderCancelled);
       socket.off("order_updated", fetchOrders);
       socket.off("order_status_update", fetchOrders);
+      socket.off("connect", fetchOrders);
+      clearInterval(pollId);
       socket.disconnect();
     };
   }, [fetchOrders]);
