@@ -237,7 +237,7 @@ const RiderMissionsScreen = ({ navigation }: any) => {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['rider-missions-v2'],
     queryFn:  () => api.get('/missions/rider'),
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   const onRefresh = useCallback(() => { refetch(); }, [refetch]);

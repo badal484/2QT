@@ -70,7 +70,7 @@ export default function InProgressTab() {
         ...(awaiting.tickets as Ticket[]),
       ];
     },
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   useSocketRefresh(["ticket_updated"], refetch);
