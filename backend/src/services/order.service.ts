@@ -1,6 +1,6 @@
 import { withTransaction, query } from '../db';
 import { redis, keys } from '../redis';
-import { NotificationService } from './notification.service';
+import { NotificationService, notifyKitchenStaff } from './notification.service';
 import { emitToKitchen, emitToUser, emitToAdmin, emitToRiders } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { TWO_QT } from '../config/constants';
@@ -276,6 +276,12 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
         }
 
         emitToKitchen(newOrder.kitchen_id, 'new_order', { orderId: newOrder.id });
+        notifyKitchenStaff(
+            newOrder.kitchen_id,
+            '🍽️ New Order!',
+            `Order #${newOrder.display_id} just came in — start preparing!`,
+            { type: 'new_order', orderId: String(newOrder.id) }
+        ).catch(() => {});
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
         const autoDispatchEnabled = settings[0]?.value === 'true';

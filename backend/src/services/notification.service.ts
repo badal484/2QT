@@ -270,6 +270,33 @@ async function sendSMS(phone: string, message: string) {
     }
 }
 
+// ─── Kitchen staff FCM push (background alert for new orders) ────────────────
+// Sends FCM push to all active kitchen staff of the given kitchenId so they
+// get an alert even when the app is backgrounded (socket closes in background).
+export async function notifyKitchenStaff(
+    kitchenId: string,
+    title: string,
+    body: string,
+    data: Record<string, string> = {}
+): Promise<void> {
+    try {
+        const { rows } = await query(
+            `SELECT device_token FROM users
+             WHERE kitchen_id = $1
+               AND role IN ('chef', 'kitchen_manager', 'packer', 'partner_kitchen')
+               AND device_token IS NOT NULL
+               AND is_active = TRUE`,
+            [kitchenId]
+        );
+        const sends = rows.map(({ device_token }: { device_token: string }) =>
+            sendFCM(device_token, title, body, data).catch(() => {})
+        );
+        await Promise.allSettled(sends);
+    } catch (err) {
+        console.error('[NOTIF] notifyKitchenStaff failed:', err);
+    }
+}
+
 // ─── Legacy class wrapper — keeps flat-data call sites (routes, workers) working ──
 
 export class NotificationService {
