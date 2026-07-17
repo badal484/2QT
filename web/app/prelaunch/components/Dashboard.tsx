@@ -96,7 +96,11 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
             <div className="flex items-baseline justify-center sm:justify-start gap-1">
               <span className="text-5xl font-display font-bold text-white">#{rank.toLocaleString()}</span>
             </div>
-            <p className="text-brand-primary font-medium text-sm mt-1">{peopleBehind.toLocaleString()} people behind you</p>
+            {peopleBehind > 0 ? (
+              <p className="text-brand-primary font-medium text-sm mt-1">{peopleBehind.toLocaleString()} people behind you</p>
+            ) : (
+              <p className="text-brand-primary font-medium text-sm mt-1">You're our newest member! 🎉</p>
+            )}
           </div>
           
           <div className="text-center sm:text-right bg-black/20 rounded-2xl p-4 border border-white/5 w-full sm:w-auto">
