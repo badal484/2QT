@@ -30,31 +30,23 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const rcContainerRef = useRef<HTMLDivElement | null>(null);
-
-  const getOrCreateContainer = () => {
-    if (!rcContainerRef.current) {
-      const div = document.createElement('div');
-      div.id = 'recaptcha-root';
-      document.body.appendChild(div);
-      rcContainerRef.current = div;
-    }
-    return rcContainerRef.current;
-  };
-
-  const buildVerifier = () => {
-    const auth = getAuth(app);
-    const container = getOrCreateContainer();
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, container, { size: 'invisible' });
-  };
-
   useEffect(() => {
-    buildVerifier();
+    const auth = getAuth(app);
+    if (!window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible',
+        });
+        window.recaptchaVerifier.render().catch(() => {});
+      } catch (e) {
+        console.error("Recaptcha init error", e);
+      }
+    }
+
     return () => {
       if (cooldownRef.current) clearInterval(cooldownRef.current);
-      try { window.recaptchaVerifier?.clear(); window.recaptchaVerifier = null; } catch {}
-      rcContainerRef.current?.remove();
-      rcContainerRef.current = null;
+      try { window.recaptchaVerifier?.clear(); } catch {}
+      window.recaptchaVerifier = null;
     };
   }, []);
 
@@ -73,17 +65,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     try {
       const auth = getAuth(app);
 
-      if (isResend) {
-        try {
-          const id = await window.recaptchaVerifier.render();
-          window.grecaptcha?.reset(id);
-        } catch {
-          try { window.recaptchaVerifier?.clear(); } catch {}
-          window.recaptchaVerifier = null;
-          buildVerifier();
-        }
-      } else if (!window.recaptchaVerifier) {
-        buildVerifier();
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible',
+        });
+        await window.recaptchaVerifier.render();
       }
 
       const confirmation = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, window.recaptchaVerifier);
@@ -96,7 +82,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       toast.error(`Failed to send OTP: ${msg}`);
       try { window.recaptchaVerifier?.clear(); } catch {}
       window.recaptchaVerifier = null;
-      try { buildVerifier(); } catch {}
       return false;
     } finally {
       setIsLoading(false);
@@ -206,6 +191,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       <div className="bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-8 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative overflow-hidden">
         {/* Glow accent */}
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-primary/20 rounded-full blur-[60px] pointer-events-none"></div>
+        <div id="recaptcha-container"></div>
 
         {/* ── PHONE ── */}
         {step === 'PHONE' && (
