@@ -14,7 +14,7 @@ interface PhoneAuthProps {
   onVerified: (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number }) => void;
 }
 
-const RESEND_SECONDS = 30;
+const RESEND_SECONDS = 60;
 
 export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [phone, setPhone]   = useState('');
