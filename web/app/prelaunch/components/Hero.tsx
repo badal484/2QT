@@ -85,9 +85,22 @@ export function Hero({ onStart }: { onStart: () => void }) {
               </span>
             </button>
 
-            <div className="mt-5 flex items-center gap-2 text-xs font-medium text-zinc-500">
-              <Gift className="w-4 h-4 text-amber-400" />
-              <span>Complete survey to unlock ₹100 reward</span>
+            <div className="mt-8 w-full text-left">
+              <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 px-1 text-center">How to claim your ₹100</div>
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center gap-3 text-sm text-zinc-300 bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-xs">1</div>
+                  <span className="font-medium">Click Secure Your Spot</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-zinc-300 bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-xs">2</div>
+                  <span className="font-medium">Complete a quick survey</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-zinc-300 bg-gradient-to-r from-amber-500/10 to-transparent rounded-xl p-3 border border-amber-500/20">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs"><Gift className="w-3.5 h-3.5" /></div>
+                  <span className="font-medium">Get <span className="text-amber-400 font-bold">₹100</span> on launch day!</span>
+                </div>
+              </div>
             </div>
           </div>
         </motion.div>
