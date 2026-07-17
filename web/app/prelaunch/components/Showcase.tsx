@@ -18,8 +18,8 @@ export function Showcase() {
               <p className="text-zinc-400 leading-relaxed font-medium">No delivery markup, no "service fee" surprise at checkout. Just pure savings on every order.</p>
             </div>
             <div className="mt-8 flex items-center gap-3 text-sm">
-              <span className="line-through text-zinc-600">$4.99 fees</span>
-              <span className="font-display font-bold text-brand-primary text-lg drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]">$0.00</span>
+              <span className="line-through text-zinc-600">₹49 fees</span>
+              <span className="font-display font-bold text-brand-primary text-lg drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]">₹0</span>
               <span className="text-xs px-3 py-1.5 rounded-full bg-brand-primary/20 text-brand-primary font-semibold border border-brand-primary/30">Always</span>
             </div>
           </div>
@@ -36,11 +36,11 @@ export function Showcase() {
           </div>
         </div>
 
-        {/* Hygienic */}
+        {/* Quality and Taste */}
         <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
-          <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">🧼</div>
-          <h3 className="font-display text-lg font-bold mb-2">100% hygienic</h3>
-          <p className="text-zinc-400 text-sm leading-relaxed font-medium">Sealed packaging, verified kitchens, and tamper-proof bags on every single order.</p>
+          <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">✨</div>
+          <h3 className="font-display text-lg font-bold mb-2">Quality & Taste Assured</h3>
+          <p className="text-zinc-400 text-sm leading-relaxed font-medium">Verified kitchens, sealed packaging, and uncompromising taste on every single order.</p>
         </div>
 
         {/* Live campus tracking */}
