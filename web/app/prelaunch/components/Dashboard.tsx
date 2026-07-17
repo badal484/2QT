@@ -52,10 +52,9 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
       className="w-full max-w-2xl mx-auto space-y-6"
     >
       {/* Welcome Banner */}
-      <div className="flex justify-between items-start mb-8 gap-4">
+      <div className="flex justify-between items-center mb-8 gap-4">
         <div className="text-left">
-          <h1 className="text-4xl font-display font-bold text-white drop-shadow-sm mb-2">You're on the list, {name.split(' ')[0]}!</h1>
-          <p className="text-zinc-400 text-lg">Don't lose your spot. Invite friends to jump the line.</p>
+          <h1 className="text-4xl font-display font-bold text-white drop-shadow-sm">You're on the list, {name.split(' ')[0]}!</h1>
         </div>
         <button 
           onClick={onLogout}
