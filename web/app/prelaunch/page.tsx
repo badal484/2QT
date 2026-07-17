@@ -16,6 +16,8 @@ export default function PreLaunchPage() {
   // Read referral code from URL if present
   const [referredBy, setReferredBy] = useState<string | null>(null);
   
+  const [isInitializing, setIsInitializing] = useState(true);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -45,11 +47,14 @@ export default function PreLaunchPage() {
               setSurveyCompleted(meData.survey_completed || false);
               setStep(2); // Jump straight to Dashboard
             }
+          } else {
+            console.error("Session restore API error:", await meRes.text());
           }
         } catch (error) {
           console.error("Session restore failed:", error);
         }
       }
+      setIsInitializing(false);
     });
 
     return () => unsubscribe();
@@ -201,13 +206,18 @@ export default function PreLaunchPage() {
       </div>
 
       <AnimatePresence mode="wait">
-        {step === 0 && (
+        {isInitializing ? (
+          <motion.div key="initializing" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex flex-col items-center justify-center p-4">
+            <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
+            <p className="text-zinc-400 font-bold text-sm">Loading your session...</p>
+          </motion.div>
+        ) : step === 0 && (
           <motion.div key="hero" initial="enter" animate="center" exit="exit" variants={variants} className="w-full">
             <Landing onStart={() => setStep(1)} />
           </motion.div>
         )}
 
-        {step === 1 && (
+        {!isInitializing && step === 1 && (
           <motion.div key="phone" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
             <PhoneAuth onVerified={handlePhoneVerified} />
           </motion.div>
