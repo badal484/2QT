@@ -265,10 +265,9 @@ const AddressScreen = ({ navigation }: any) => {
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 24) }]}>
           <BouncingButton
             style={styles.addBtn}
-            onPress={() => { 
-              triggerHaptic(); 
-              // Navigate to the new map picker
-              navigation.navigate('AddressBook'); 
+            onPress={() => {
+              triggerHaptic();
+              navigation.push('AddressBook');
             }}
             activeOpacity={0.9}
           >
@@ -283,7 +282,7 @@ const AddressScreen = ({ navigation }: any) => {
           onSelect={(lat, lon, name) => {
             setSearchVisible(false);
             setTimeout(() => {
-              navigation.navigate('AddressBook', { initialLat: lat, initialLng: lon, initialAddress: name });
+              navigation.push('AddressBook', { initialLat: lat, initialLng: lon, initialAddress: name });
             }, 100);
           }}
         />
