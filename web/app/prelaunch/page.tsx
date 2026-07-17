@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Landing } from './components/Landing';
 import { PhoneAuth } from './components/PhoneAuth';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { app } from '../lib/firebase';
 import { SurveyWizard, SurveyData } from './components/SurveyWizard';
 import { Dashboard } from './components/Dashboard';
@@ -164,6 +164,22 @@ export default function PreLaunchPage() {
     }
   };
 
+  const handleLogout = async () => {
+    const auth = getAuth(app);
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error("Sign out failed:", e);
+    }
+    setStep(0);
+    setPhone('');
+    setIdToken('');
+    setUserName('');
+    setReferralCode('');
+    setRankData(null);
+    setSurveyCompleted(false);
+  };
+
   const variants = {
     enter: { opacity: 0, y: 20 },
     center: { opacity: 1, y: 0 },
@@ -214,6 +230,7 @@ export default function PreLaunchPage() {
                name={userName}
                surveyCompleted={surveyCompleted}
                onOpenSurvey={() => setStep(3)}
+               onLogout={handleLogout}
              />
           </motion.div>
         )}
