@@ -17,12 +17,6 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
   const [copied, setCopied] = useState(false);
   const peopleBehind = Math.max(0, total - rank);
 
-  const tiers = [
-    { title: "Free Delivery", req: 1, desc: "For a whole month" },
-    { title: "50% Off", req: 3, desc: "On your first 5 orders" },
-    { title: "VIP Foodie", req: 10, desc: "Priority support & secret menus" }
-  ];
-
   const handleCopy = () => {
     const link = typeof window !== 'undefined' ? `${window.location.origin}/prelaunch?ref=${referralCode}` : `https://2qt.in/prelaunch?ref=${referralCode}`;
     navigator.clipboard.writeText(link);
@@ -48,7 +42,6 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
     }
   };
 
-  const progressPercentage = Math.min(100, (referrals / 10) * 100);
 
   return (
     <motion.div
@@ -112,36 +105,6 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
           </div>
         </div>
 
-        {/* Progress Tracker */}
-        <div className="relative z-10 mb-10">
-          <div className="flex justify-between text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wide">
-            <span>Tiers</span>
-            <span>{referrals}/10 Friends</span>
-          </div>
-          <div className="h-4 bg-black/40 rounded-full overflow-hidden relative">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${progressPercentage}%` }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-brand-primary to-orange-400"
-            />
-          </div>
-          
-          <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-            {tiers.map((tier, i) => {
-              const unlocked = referrals >= tier.req;
-              return (
-                <div key={i} className={`flex flex-col items-center gap-1 ${unlocked ? 'opacity-100' : 'opacity-40 grayscale'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${unlocked ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(255,90,31,0.5)]' : 'bg-white/10 text-zinc-400'}`}>
-                    {unlocked ? <CheckCircle2 className="w-5 h-5" /> : tier.req}
-                  </div>
-                  <p className="text-xs font-bold text-white mt-1">{tier.title}</p>
-                  <p className="text-[10px] text-zinc-400 leading-tight hidden sm:block">{tier.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
         {/* Action Buttons */}
         <div className="space-y-4 relative z-10">

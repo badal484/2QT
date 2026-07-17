@@ -294,6 +294,11 @@ export default function KitchenPage() {
   const [showMorningPrep, setShowMorningPrep] = useState(false);
   const [mobileKdsCol, setMobileKdsCol] = useState<KdsColId>("confirmed");
 
+  // Audio — Web Audio API avoids browser autoplay policy (new Audio().play() is blocked
+  // in non-user-gesture contexts like socket callbacks)
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const alertBufferRef = useRef<AudioBuffer | null>(null);
+
   // Dispatch
   const [riders, setRiders] = useState<LiveRider[]>([]);
   const [unassignedBatches, setUnassignedBatches] = useState<UnassignedBatch[]>([]);
@@ -356,6 +361,39 @@ export default function KitchenPage() {
     }
   }, []);
 
+  // Unlock Web Audio on first user gesture, then pre-load the alert sound into a buffer.
+  // After this runs once, playKitchenAlert() works from any context (socket events included).
+  useEffect(() => {
+    const unlock = async () => {
+      if (audioCtxRef.current) return;
+      try {
+        const ctx = new AudioContext();
+        if (ctx.state === 'suspended') await ctx.resume();
+        const res = await fetch('/alert.mp3');
+        const ab = await res.arrayBuffer();
+        alertBufferRef.current = await ctx.decodeAudioData(ab);
+        audioCtxRef.current = ctx;
+      } catch {}
+    };
+    const events = ['click', 'keydown', 'touchstart'] as const;
+    events.forEach(e => window.addEventListener(e, unlock, { once: true }));
+    return () => events.forEach(e => window.removeEventListener(e, unlock as EventListener));
+  }, []);
+
+  const playKitchenAlert = () => {
+    const ctx = audioCtxRef.current;
+    const buf = alertBufferRef.current;
+    if (ctx && buf) {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start();
+    } else {
+      // Fallback if user hasn't interacted yet
+      try { new Audio('/alert.mp3').play().catch(() => {}); } catch {}
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
     socket.connect();
@@ -364,10 +402,10 @@ export default function KitchenPage() {
     // for the event (socket.off(event) with no ref wipes every registered handler).
     const handleNewOrder = () => {
       fetchOrders();
-      try { new Audio("/alert.mp3").play(); } catch {}
+      playKitchenAlert();
     };
     const handleCriticalAlert = (data: any) => {
-      try { new Audio("/alert.mp3").play(); } catch {}
+      playKitchenAlert();
       toast.error(`Critical Alert: ${data.type}`, {
         description: data.message,
         duration: Infinity,

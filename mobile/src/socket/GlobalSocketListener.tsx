@@ -1,21 +1,26 @@
 import React, { useEffect } from 'react';
+import { Vibration } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from './client';
 import Sound from 'react-native-sound';
 
 Sound.setCategory('Playback');
 
-let alertSound: Sound | null = null;
-try {
-  alertSound = new Sound(require('../audio/alert.mp3'), (error) => {
-    if (error) {
-      console.log('failed to load the sound', error);
-      alertSound = null;
-    }
-  });
-} catch (e) {
-  console.log('Error initializing sound', e);
-}
+const playAlert = () => {
+  // Create a fresh Sound instance every time — avoids Android MediaPlayer
+  // state-machine issues (stop() on a never-started player throws IllegalStateException
+  // and its callback never fires, so play() never executes).
+  try {
+    const s = new Sound('alert.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (!error) {
+        s.setVolume(1.0);
+        s.play(() => s.release());
+      }
+    });
+  } catch {}
+  // Vibration fires unconditionally — audible alert even on silent mode
+  Vibration.vibrate([0, 400, 100, 400]);
+};
 
 export const GlobalSocketListener: React.FC = () => {
   const queryClient = useQueryClient();
@@ -35,11 +40,7 @@ export const GlobalSocketListener: React.FC = () => {
       };
 
       const handleNewOrder = () => {
-        if (alertSound) {
-          alertSound.play((success) => {
-            if (!success) alertSound?.reset();
-          });
-        }
+        playAlert();
         handleOrderUpdate();
       };
 
