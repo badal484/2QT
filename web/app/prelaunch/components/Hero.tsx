@@ -54,7 +54,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           transition={{ duration: 0.55, delay: 0.2, ease }}
           className="text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-12"
         >
-          Launching our app this August. We're bringing unmatched quality and speed to Ranchi that no other food app can assure. Register now, complete a quick survey, and get <span className="text-amber-400 font-bold">₹100 in your wallet</span> the moment we go live.
+          We refuse to launch with a boring menu. We're paying our first 1,000 users <span className="text-amber-400 font-bold">₹100</span> to dictate exactly what Lalpur is craving. Claim your spot, set the menu, and get paid on launch day.
         </motion.p>
 
         {/* Central Glassmorphic Entry Card */}
@@ -79,7 +79,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover/btn:animate-[shimmer_1.5s_infinite]" />
               
               <span className="relative flex items-center justify-center gap-3">
-                Secure Your Spot
+                Build the Menu & Get ₹100
                 <ArrowRight className="h-5 w-5 transition-transform group-hover/btn:translate-x-1" />
               </span>
             </button>
