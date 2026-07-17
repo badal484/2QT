@@ -33,7 +33,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-primary/30 bg-brand-primary/10 px-5 py-2 text-sm font-bold text-brand-primary shadow-[0_0_20px_rgba(255,90,31,0.25)] backdrop-blur-md"
         >
           <Zap className="h-4 w-4 fill-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
-          The Exclusive Waitlist is Open
+          First 1,000 users get ₹100 on launch day
         </motion.div>
 
         {/* Massive Headline */}
@@ -55,7 +55,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           transition={{ duration: 0.55, delay: 0.2, ease }}
           className="text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-12"
         >
-          2QT is bringing ultra-fast, premium food delivery to campus. Join the waitlist, invite friends to jump ahead, and unlock a month of free delivery.
+          2QT is Ranchi's fastest food delivery — launching soon. Register now, complete a quick survey, and get <span className="text-amber-400 font-bold">₹100 in your wallet</span> the moment we go live. Only 1,000 spots.
         </motion.p>
 
         {/* Central Glassmorphic Entry Card */}

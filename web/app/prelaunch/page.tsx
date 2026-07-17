@@ -29,6 +29,7 @@ export default function PreLaunchPage() {
   const [referralCode, setReferralCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rankData, setRankData] = useState<{rank: number, total: number, referrals: number} | null>(null);
+  const [surveyCompleted, setSurveyCompleted] = useState(false);
 
   // FOMO Toasts
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function PreLaunchPage() {
     if (data.alreadyRegistered) {
       setReferralCode(data.referralCode || '');
       setRankData({ rank: data.rank || 0, total: data.total || 0, referrals: data.referrals || 0 });
+      setSurveyCompleted(data.surveyCompleted || false);
       setStep(2); // Go straight to Dashboard
     } else {
       // Register immediately with empty survey to claim spot
@@ -82,6 +84,7 @@ export default function PreLaunchPage() {
         if (res.ok) {
           setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
           setRankData({ rank: json.data?.rank || 0, total: json.data?.total || 0, referrals: json.data?.referrals || 0 });
+          setSurveyCompleted(json.data?.survey_completed || false);
           setStep(2); // Dashboard
         } else {
           toast.error('Failed to register. Try again.');
@@ -114,8 +117,9 @@ export default function PreLaunchPage() {
       const json = await res.json();
       if (res.ok) {
         sessionStorage.removeItem('2qt_survey_v2');
-        toast.success('Survey completed! Your rank has been boosted.');
+        toast.success('Survey completed! Your ₹100 reward is confirmed.');
         setRankData({ rank: json.data?.rank || rankData?.rank || 0, total: json.data?.total || rankData?.total || 0, referrals: json.data?.referrals || rankData?.referrals || 0 });
+        setSurveyCompleted(true);
         setStep(2); // Back to Dashboard
       } else {
         throw new Error(json.error || 'Failed to submit');
@@ -169,12 +173,13 @@ export default function PreLaunchPage() {
 
         {step === 2 && (
           <motion.div key="dashboard" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
-             <Dashboard 
-               rank={rankData?.rank || 0} 
-               total={rankData?.total || 0} 
-               referrals={rankData?.referrals || 0} 
+             <Dashboard
+               rank={rankData?.rank || 0}
+               total={rankData?.total || 0}
+               referrals={rankData?.referrals || 0}
                referralCode={referralCode}
                name={userName}
+               surveyCompleted={surveyCompleted}
                onOpenSurvey={() => setStep(3)}
              />
           </motion.div>
