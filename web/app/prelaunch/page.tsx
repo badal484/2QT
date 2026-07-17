@@ -53,7 +53,7 @@ export default function PreLaunchPage() {
     return () => clearInterval(interval);
   }, [step]);
 
-  const handlePhoneVerified = async (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number }) => {
+  const handlePhoneVerified = async (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number; surveyCompleted?: boolean }) => {
     setPhone(data.phone);
     setIdToken(data.token);
     setUserName(data.name);
