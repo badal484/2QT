@@ -53,13 +53,15 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     try {
       const auth = getAuth(app);
 
-      // Always create a fresh verifier and clear the DOM element to prevent
-      // "reCAPTCHA placeholder element must be empty" errors.
+      // Always create a fresh verifier and completely replace the DOM element 
+      // to prevent "reCAPTCHA has already been rendered in this element" errors on Resend.
       try { window.recaptchaVerifier?.clear(); } catch {}
       
-      const recaptchaContainer = document.getElementById('recaptcha-container');
-      if (recaptchaContainer) {
-        recaptchaContainer.innerHTML = '';
+      const oldContainer = document.getElementById('recaptcha-container');
+      if (oldContainer && oldContainer.parentNode) {
+        const newContainer = document.createElement('div');
+        newContainer.id = 'recaptcha-container';
+        oldContainer.parentNode.replaceChild(newContainer, oldContainer);
       }
 
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
