@@ -70,6 +70,17 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           size: 'invisible',
         });
         await window.recaptchaVerifier.render();
+      } else if (isResend) {
+        try {
+          const id = await window.recaptchaVerifier.render();
+          if (window.grecaptcha) window.grecaptcha.reset(id);
+        } catch (e) {
+          try { window.recaptchaVerifier.clear(); } catch {}
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            size: 'invisible',
+          });
+          await window.recaptchaVerifier.render();
+        }
       }
 
       const confirmation = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, window.recaptchaVerifier);

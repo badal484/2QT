@@ -34,7 +34,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
 
-  const { initialLat, initialLng, initialAddress } = route?.params || {};
+  const { initialLat, initialLng, initialAddress, returnToCart } = route?.params || {};
 
   // Use Redux globalLocation as initial fallback — avoids black map / India center problem
   const savedLocation = useSelector((state: RootState) => state.app.globalLocation);
