@@ -244,7 +244,7 @@ function Dashboard({ onLogout }: { user: any; onLogout: () => void }) {
 
   // 5-second polling as safety net for missed socket events
   useEffect(() => {
-    const id = setInterval(silentRefresh, 5000);
+    const id = setInterval(silentRefresh, 30000);
     return () => clearInterval(id);
   }, [silentRefresh]);
 

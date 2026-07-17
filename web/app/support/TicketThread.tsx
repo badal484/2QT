@@ -141,7 +141,7 @@ export function TicketThread({ ticketId, onClose }: Props) {
       if (data?.ticketId === ticketId) load();
     };
     socket.on("ticket_message", handler);
-    const poll = setInterval(load, 5000);
+    const poll = setInterval(load, 10000);
     return () => {
       socket.off("ticket_message", handler);
       clearInterval(poll);

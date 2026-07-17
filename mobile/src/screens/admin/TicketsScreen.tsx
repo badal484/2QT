@@ -16,7 +16,7 @@ const TicketsScreen = ({ navigation }: any) => {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-tickets'],
     queryFn: () => api.get('/admin/support/tickets'),
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
 
   if (isLoading) return (

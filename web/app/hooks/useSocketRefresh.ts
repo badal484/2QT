@@ -32,13 +32,9 @@ export function useSocketRefresh(events: string[], onRefresh: () => void) {
     boundHandlers.forEach(([event, fn]) => socket.on(event, fn));
     socket.on('connect', handleReconnect);
 
-    // 5-second poll as universal safety net for missed socket events
-    const pollId = setInterval(() => onRefreshRef.current(), 5000);
-
     return () => {
       boundHandlers.forEach(([event, fn]) => socket.off(event, fn));
       socket.off('connect', handleReconnect);
-      clearInterval(pollId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events.join(',')]);
