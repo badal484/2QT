@@ -11,7 +11,7 @@ declare global {
 }
 
 interface PhoneAuthProps {
-  onVerified: (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number }) => void;
+  onVerified: (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number; surveyCompleted?: boolean }) => void;
 }
 
 const RESEND_SECONDS = 60;
@@ -142,7 +142,8 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                 referralCode: meData.referral_code,
                 rank: meData.rank,
                 total: meData.total,
-                referrals: meData.referrals
+                referrals: meData.referrals,
+                surveyCompleted: meData.survey_completed || false,
               }), 1200);
               return;
             }

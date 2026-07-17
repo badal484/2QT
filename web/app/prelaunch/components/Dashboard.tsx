@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, CheckCircle2, ChevronRight, Share2, Rocket } from 'lucide-react';
+import { Copy, CheckCircle2, ChevronRight, Share2, Rocket, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DashboardProps {
@@ -9,10 +9,11 @@ interface DashboardProps {
   referrals: number;
   referralCode: string;
   name: string;
+  surveyCompleted: boolean;
   onOpenSurvey: () => void;
 }
 
-export function Dashboard({ rank, total, referrals, referralCode, name, onOpenSurvey }: DashboardProps) {
+export function Dashboard({ rank, total, referrals, referralCode, name, surveyCompleted, onOpenSurvey }: DashboardProps) {
   const [copied, setCopied] = useState(false);
   const peopleBehind = Math.max(0, total - rank);
 
@@ -61,6 +62,33 @@ export function Dashboard({ rank, total, referrals, referralCode, name, onOpenSu
         <h1 className="text-4xl font-display font-bold text-white drop-shadow-sm mb-2">You're on the list, {name.split(' ')[0]}!</h1>
         <p className="text-zinc-400 text-lg">Don't lose your spot. Invite friends to jump the line.</p>
       </div>
+
+      {/* ₹100 Reward Card */}
+      {surveyCompleted ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="flex items-center gap-4 rounded-2xl border border-green-500/40 bg-green-500/10 px-6 py-4 shadow-[0_0_24px_rgba(34,197,94,0.2)]"
+        >
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-green-500/20 text-xl">✅</div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-white text-sm">₹100 Launch Reward — Confirmed!</p>
+            <p className="text-xs text-green-400 mt-0.5">Will be credited to your wallet on launch day.</p>
+          </div>
+        </motion.div>
+      ) : (
+        <motion.button
+          onClick={onOpenSurvey}
+          whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+          className="w-full flex items-center gap-4 rounded-2xl border border-amber-500/50 bg-amber-500/10 px-6 py-4 shadow-[0_0_24px_rgba(245,158,11,0.2)] hover:bg-amber-500/15 transition-colors text-left"
+        >
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-xl">🔒</div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-white text-sm">₹100 Launch Reward — Locked</p>
+            <p className="text-xs text-amber-400 mt-0.5">Complete the survey below to confirm your reward →</p>
+          </div>
+          <Lock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+        </motion.button>
+      )}
 
       {/* Main Glass Card */}
       <div className="bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-8 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative overflow-hidden">
@@ -134,16 +162,18 @@ export function Dashboard({ rank, total, referrals, referralCode, name, onOpenSu
             </button>
           </div>
           
-          <button 
-            onClick={onOpenSurvey}
-            className="w-full bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 transition-all rounded-2xl py-4 flex items-center justify-between px-6 font-bold text-white group"
-          >
-            <div className="flex items-center gap-3">
-              <Rocket className="w-5 h-5 text-blue-400 group-hover:-translate-y-1 transition-transform" />
-              <span>Boost your rank by 500 spots</span>
-            </div>
-            <ChevronRight className="w-5 h-5 text-blue-400 group-hover:translate-x-1 transition-transform" />
-          </button>
+          {!surveyCompleted && (
+            <button
+              onClick={onOpenSurvey}
+              className="w-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 transition-all rounded-2xl py-4 flex items-center justify-between px-6 font-bold text-white group"
+            >
+              <div className="flex items-center gap-3">
+                <Rocket className="w-5 h-5 text-amber-400 group-hover:-translate-y-1 transition-transform" />
+                <span>Unlock ₹100 + boost rank by 500 spots</span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition-transform" />
+            </button>
+          )}
         </div>
       </div>
     </motion.div>

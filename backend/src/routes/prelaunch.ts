@@ -198,13 +198,15 @@ router.post('/register', async (req, res) => {
         );
         const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
         
+        const surveyCompleted = Object.keys(surveyResponses ?? {}).length > 0;
         res.status(201).json({
             success: true,
             data: {
                 ...regRows[0],
                 rank: parseInt(rankRows[0]?.rank || '0', 10),
                 referrals: parseInt(rankRows[0]?.ref_count || '0', 10),
-                total: parseInt(totalRows[0].count, 10)
+                total: parseInt(totalRows[0].count, 10),
+                survey_completed: surveyCompleted,
             },
             user: { id: user.id, name: user.name, phone: user.phone, role: user.role },
             accessToken,
@@ -239,8 +241,8 @@ router.post('/me', async (req, res) => {
                 GROUP BY referred_by
             ),
             RankedRegistrations AS (
-                SELECT 
-                    r.id, r.phone, r.referral_code, r.name,
+                SELECT
+                    r.id, r.phone, r.referral_code, r.name, r.survey_responses,
                     COALESCE(rc.ref_count, 0) as ref_count,
                     RANK() OVER (ORDER BY COALESCE(rc.ref_count, 0) DESC, r.created_at ASC) as rank
                 FROM pre_launch_registrations r
@@ -251,13 +253,15 @@ router.post('/me', async (req, res) => {
         );
 
         if (rows[0]) {
-            return res.json({ 
-                registered: true, 
-                referral_code: rows[0].referral_code, 
+            const surveyCompleted = Object.keys(rows[0].survey_responses || {}).length > 0;
+            return res.json({
+                registered: true,
+                referral_code: rows[0].referral_code,
                 name: rows[0].name,
                 rank: parseInt(rows[0].rank, 10),
                 referrals: parseInt(rows[0].ref_count, 10),
-                total
+                total,
+                survey_completed: surveyCompleted,
             });
         }
         res.json({ registered: false });
