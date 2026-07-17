@@ -161,7 +161,7 @@ const CartScreen = ({ navigation }: any) => {
   const { data: addressesData } = useQuery({
     queryKey: ['addresses'],
     queryFn: () => api.get('/customers/addresses'),
-    enabled: !!addressId,
+    staleTime: 5 * 60 * 1000,
   });
   const selectedAddress = addressesData?.addresses?.find((a: any) => a.id === addressId);
   const isOutOfZone = !!addressId && !!selectedAddress && !selectedAddress.is_serviceable;
