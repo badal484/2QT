@@ -19,7 +19,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
               className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-4 py-1.5 text-xs font-bold text-brand-primary shadow-[0_0_15px_rgba(255,90,31,0.2)]"
             >
               <Star className="h-3.5 w-3.5 fill-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
-              Premium Culinary Experience
+              Exclusive Early Access
             </motion.div>
 
             <motion.h1
@@ -28,9 +28,8 @@ export function Hero({ onStart }: { onStart: () => void }) {
               className="font-display font-bold tracking-tight leading-[1.1] text-white drop-shadow-md"
               style={{ fontSize: 'clamp(3rem, 6vw, 4.5rem)' }}
             >
-              Extraordinary<br />
-              food,<br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-amber-400 drop-shadow-[0_0_20px_rgba(255,90,31,0.4)]">delivered to you.</span>
+              Food delivery,<br />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-amber-400 drop-shadow-[0_0_20px_rgba(255,90,31,0.4)]">reimagined.</span>
             </motion.h1>
 
             <motion.p
@@ -38,7 +37,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
               transition={{ duration: 0.55, delay: 0.15, ease }}
               className="mt-6 text-lg leading-relaxed text-zinc-400 font-medium max-w-md"
             >
-              Experience gourmet meals crafted by top chefs, delivered with uncompromising quality directly to your dining table.
+              Join the waitlist to secure your spot for a premium culinary experience. Invite friends to jump the line and unlock exclusive rewards.
             </motion.p>
 
             <motion.div
@@ -52,7 +51,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
                 whileTap={{ scale: 0.98 }}
                 className="group flex items-center justify-center gap-3 rounded-full px-8 py-4 text-sm font-bold text-black transition-all bg-white shadow-[0_0_20px_rgba(255,255,255,0.15)] hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105"
               >
-                Explore Menu
+                Claim Your Spot
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </motion.button>
             </motion.div>
