@@ -169,7 +169,9 @@ const CartScreen = ({ navigation }: any) => {
   const handleAddressNavigation = () => {
     triggerHaptic();
     if (addressesData?.addresses?.length === 0) {
-      navigation.navigate('AddressBook');
+      // No saved addresses — go straight to AddressBook.
+      // Pass returnToCart so AddressBook knows to pop only 1 screen (not 2).
+      navigation.navigate('AddressBook', { returnToCart: true });
     } else {
       navigation.navigate('Address');
     }
