@@ -27,7 +27,7 @@ export function Countdown({ onStart }: { onStart: () => void }) {
           viewport={{ once: true }} transition={{ delay: 0.12 }}
           className="text-zinc-400 font-medium text-base mb-12"
         >
-          Opening our kitchen in Lalpur, Ranchi in August 2026.
+          Launching our mobile app and opening our kitchen in Lalpur, Ranchi in August 2026.
         </motion.p>
 
 

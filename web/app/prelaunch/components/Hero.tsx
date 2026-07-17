@@ -49,13 +49,12 @@ export function Hero({ onStart }: { onStart: () => void }) {
           </span>
         </motion.h1>
 
-        {/* Subtitle */}
         <motion.p
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.2, ease }}
           className="text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-12"
         >
-          2QT is Ranchi's fastest food delivery — launching soon. Register now, complete a quick survey, and get <span className="text-amber-400 font-bold">₹100 in your wallet</span> the moment we go live. Only 1,000 spots.
+          Launching our app this August. We're bringing unmatched quality and speed to Ranchi that no other food app can assure. Register now, complete a quick survey, and get <span className="text-amber-400 font-bold">₹100 in your wallet</span> the moment we go live.
         </motion.p>
 
         {/* Central Glassmorphic Entry Card */}
