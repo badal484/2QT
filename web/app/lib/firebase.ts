@@ -3,7 +3,7 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCaLm5vOs9lw9QsF6v89HrNNbYiD5rqKg0",
+  apiKey: "AIzaSyCmN6UbkpIjP-_nb9E_g0EXi5t_2Daub_Y",
   authDomain: "qqtt-ddd83.firebaseapp.com",
   projectId: "qqtt-ddd83",
   storageBucket: "qqtt-ddd83.firebasestorage.app",
