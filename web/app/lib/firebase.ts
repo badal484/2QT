@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { getAuth } from "firebase/auth";
 
 // authDomain must match the app's own hostname to prevent Chrome Storage
 // Partitioning from wiping Firebase's sessionStorage state during the
@@ -22,7 +23,7 @@ const firebaseConfig = {
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-
+export const auth = getAuth(app);
 export { app };
 
 export async function initAnalytics() {
