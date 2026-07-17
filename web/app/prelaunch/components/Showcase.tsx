@@ -31,7 +31,7 @@ export function Showcase() {
             <div>
               <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">🍳</div>
               <h3 className="font-display text-xl font-bold mb-2">Our Own Kitchen</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed font-medium max-w-xs">Better control, better quality. Combined with lightning-fast delivery strictly within a 4km radius of Lalpur.</p>
+              <p className="text-zinc-400 text-sm leading-relaxed font-medium max-w-xs">Better control, better quality. We guarantee you two things on every single order: <strong className="text-white">1. Quality</strong> and <strong className="text-white">2. Taste</strong>.</p>
             </div>
           </div>
         </div>
@@ -40,7 +40,7 @@ export function Showcase() {
         <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">👨‍🍳</div>
           <h3 className="font-display text-lg font-bold mb-2">Experienced Chefs</h3>
-          <p className="text-zinc-400 text-sm leading-relaxed font-medium">Crafted with passion by culinary experts. We guarantee you two things on every single order: <strong className="text-white">1. Quality</strong> and <strong className="text-white">2. Taste</strong>.</p>
+          <p className="text-zinc-400 text-sm leading-relaxed font-medium">Great taste. Every time. Crafted with passion and served with pride by culinary experts.</p>
         </div>
 
         {/* Transparent Kitchen */}
