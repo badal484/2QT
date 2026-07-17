@@ -54,7 +54,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           transition={{ duration: 0.55, delay: 0.2, ease }}
           className="text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-12"
         >
-          We refuse to launch with a boring menu. We're paying our first 1,000 users <span className="text-amber-400 font-bold">₹100</span> to dictate exactly what Lalpur is craving. Claim your spot, set the menu, and get paid on launch day.
+          We're building 2QT — a new age food app with our own kitchen, experienced chefs, and honest pricing. Become one of our first 1,000 Founding Members, help us dictate exactly what Lalpur is craving, and get <span className="text-amber-400 font-bold">₹100</span> on launch day.
         </motion.p>
 
         {/* Central Glassmorphic Entry Card */}
