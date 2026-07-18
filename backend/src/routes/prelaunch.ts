@@ -59,19 +59,31 @@ router.post('/register', async (req, res) => {
     const { name, idToken, surveyResponses, source, referredBy } = parsed.data;
 
     try {
-        // Verify Firebase ID token to extract phone number
-        let decodedToken: any;
+        // Verify MSG91 Widget Token
+        let phone: string;
         try {
-            decodedToken = await firebaseAdminAuth.verifyIdToken(idToken);
+            const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
+                method: 'POST',
+                headers: {
+                    'authkey': process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1',
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({ 'access-token': idToken }) // idToken here is the MSG91 token
+            });
+            const verifyData = await verifyRes.json();
+            
+            if (verifyData.type !== 'success') {
+                 return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message });
+            }
+            const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
+            if (!rawPhone) return res.status(400).json({ error: 'NO_PHONE' });
+            
+            phone = String(rawPhone).replace(/\D/g, '');
+            if (phone.length === 10) phone = '91' + phone;
         } catch (err: any) {
             return res.status(401).json({ error: 'INVALID_TOKEN', message: err.message });
         }
 
-        const rawPhone = decodedToken.phone_number;
-        if (!rawPhone) return res.status(400).json({ error: 'NO_PHONE' });
-
-        let phone = String(rawPhone).replace(/\D/g, '');
-        if (phone.length === 10) phone = '91' + phone;
         if (!/^91\d{10}$/.test(phone)) return res.status(400).json({ error: 'INVALID_PHONE' });
 
         // Database Transaction for User, Referral, Wallet, and Loyalty creation
@@ -218,14 +230,23 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Check if a Firebase-authenticated user already has a pre-launch registration.
-// Used by the frontend to skip the survey for returning visitors and show waitlist status.
+// Check if an authenticated user already has a pre-launch registration.
 router.post('/me', async (req, res) => {
-    const { idToken } = req.body;
+    const idToken = req.body.idToken || req.body.msg91Token;
     if (!idToken) return res.json({ registered: false });
     try {
-        const decoded = await firebaseAdminAuth.verifyIdToken(idToken);
-        const rawPhone = decoded.phone_number;
+        const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
+            method: 'POST',
+            headers: {
+                'authkey': process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1',
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({ 'access-token': idToken })
+        });
+        const verifyData = await verifyRes.json();
+        if (verifyData.type !== 'success') return res.json({ registered: false });
+
+        const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
         if (!rawPhone) return res.json({ registered: false });
         let phone = String(rawPhone).replace(/\D/g, '');
         if (phone.length === 10) phone = '91' + phone;
