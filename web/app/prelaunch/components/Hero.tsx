@@ -1,6 +1,6 @@
 'use client';
 import { motion } from 'framer-motion';
-import { ArrowRight, Star, Users, Zap, Gift } from 'lucide-react';
+import { ArrowRight, Star, Users, Zap, Gift, Ticket } from 'lucide-react';
 import Image from 'next/image';
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -66,9 +66,10 @@ export function Hero({ onStart }: { onStart: () => void }) {
           <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-[2rem] pointer-events-none" />
           
           <div className="p-6 md:p-8 flex flex-col items-center">
-
-
-            <button
+            <div className="flex items-center gap-2 mb-6 text-brand-primary font-semibold text-sm bg-brand-primary/10 px-4 py-1.5 rounded-full border border-brand-primary/20">
+              <Ticket className="w-4 h-4" />
+              <span>Only 1,000 Founding Member passes available</span>
+            </div>            <button
               onClick={onStart}
               className="w-full relative overflow-hidden group/btn rounded-2xl bg-brand-primary px-4 sm:px-8 py-3.5 sm:py-5 text-sm sm:text-lg font-bold text-white transition-all shadow-[0_0_30px_rgba(255,90,31,0.4)] hover:shadow-[0_0_50px_rgba(255,90,31,0.6)] hover:scale-[1.02] active:scale-[0.98]"
             >
