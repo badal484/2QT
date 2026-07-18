@@ -52,32 +52,9 @@ const LoginScreen = ({ navigation }: any) => {
   const handleSendOTP = async () => {
     if (phone.length !== 10) return;
     const digits = '91' + phone;
-    const isDevNumber = ["910000000000", "912222222222", "913333333333"].includes(digits);
-
-    if (isDevNumber) {
-      mutation.mutate(digits);
-    } else {
-      setFirebaseLoading(true);
-      try {
-        const formattedPhone = '+91' + phone;
-        const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
-        setConfirmationResult(confirmation);
-        
-        navigation.navigate('OTP', {
-          phone: digits,
-          referralCode: referralCode.trim().toUpperCase(),
-          devOtp: '',
-          devRole: devRole === 'kitchen' ? 'chef' : devRole,
-          lat: globalLocation?.latitude,
-          lng: globalLocation?.longitude,
-        });
-      } catch (err: any) {
-        console.error('Firebase Auth sendOtp error:', err);
-        Alert.alert('Error', err.message || 'Could not send OTP. Check your connection.');
-      } finally {
-        setFirebaseLoading(false);
-      }
-    }
+    
+    // Send all numbers to our backend, which uses MSG91 internally
+    mutation.mutate(digits);
   };
 
   const branding = BRANDING[devRole] || BRANDING.customer;
