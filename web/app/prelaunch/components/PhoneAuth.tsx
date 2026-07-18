@@ -4,7 +4,7 @@ import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 declare global {
-  interface Window { initSendOTP: any; sendOTP: any; verifyOTP: any; }
+  interface Window { initSendOTP: any; sendOtp: any; verifyOtp: any; }
 }
 
 interface PhoneAuthProps {
