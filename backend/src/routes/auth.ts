@@ -138,6 +138,39 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
     }
 });
 
+router.post('/admin-pin-login', async (req, res) => {
+    try {
+        const { pin } = req.body;
+        if (pin !== 'Badal4834546204646300') {
+            return res.status(401).json({ error: 'INVALID_PIN', message: 'Invalid Admin PIN' });
+        }
+
+        const { rows } = await query('SELECT * FROM users WHERE role = $1 LIMIT 1', ['super_admin']);
+        let user = rows[0];
+        
+        if (!user) {
+            // fallback if no super_admin exists in db
+            const insert = await query(`
+                INSERT INTO users (phone, name, role, is_verified) 
+                VALUES ('910000000000', 'Admin', 'super_admin', true) 
+                RETURNING *
+            `);
+            user = insert.rows[0];
+        }
+
+        const payload = { userId: user.id, phone: user.phone, role: user.role };
+        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+        const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '30d' });
+
+        await query('INSERT INTO refresh_tokens (user_id, token_hash) VALUES ($1, $2)', [user.id, refreshToken]);
+
+        res.json({ token, refreshToken, user: { id: user.id, phone: user.phone, name: user.name, role: user.role } });
+    } catch (err: any) {
+        console.error('[ADMIN_PIN_LOGIN] Error:', err.message);
+        res.status(500).json({ error: 'SERVER_ERROR', message: 'Internal server error' });
+    }
+});
+
 router.post('/verify-otp', async (req, res) => {
     try {
         const { phone, otp, referralCode, name, appRole, lat, lng } = req.body;
