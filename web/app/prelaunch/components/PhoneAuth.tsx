@@ -29,15 +29,23 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ phone: `91${phone}` })
           });
-          const data = await res.json();
+          
+          let data;
+          try {
+              data = await res.json();
+          } catch (e) {
+              // Not JSON (e.g. 502 Bad Gateway HTML during deployment)
+              throw new Error(res.status === 502 || res.status === 503 ? 'Server is starting up. Please try again in 30 seconds.' : 'Unexpected server response');
+          }
+
           if (res.ok) {
               setStep('OTP');
               toast.success('OTP Sent!');
           } else {
               toast.error(data.message || 'Failed to send OTP');
           }
-      } catch (err) {
-          toast.error('Network error');
+      } catch (err: any) {
+          toast.error(err.message || 'Network error');
       } finally {
           setIsLoading(false);
       }
@@ -52,15 +60,21 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ phone: `91${phone}`, otp, appRole: 'prelaunch' })
           });
-          const data = await res.json();
+          
+          let data;
+          try {
+              data = await res.json();
+          } catch (e) {
+              throw new Error(res.status === 502 || res.status === 503 ? 'Server is starting up. Please try again.' : 'Unexpected server response');
+          }
           
           if (res.ok && data.accessToken) {
               handleServerVerification(data.accessToken);
           } else {
               toast.error(data.message || 'Invalid OTP');
           }
-      } catch (err) {
-          toast.error('Network error');
+      } catch (err: any) {
+          toast.error(err.message || 'Network error');
       } finally {
           setIsLoading(false);
       }
