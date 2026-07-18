@@ -2046,7 +2046,7 @@ export default function AdminPage() {
   const componentKey = `${activeTab}-${refreshKey}`;
 
   return (
-    <div className="min-h-screen bg-[#07070e] flex font-sans selection:bg-brand-primary/30 relative">
+    <div className="h-screen w-full overflow-hidden bg-[#07070e] flex font-sans selection:bg-brand-primary/30 relative">
       {/* ── Sidebar ── */}
       <aside className="w-[240px] bg-[#0a0a14] border-r border-white/[0.05] flex flex-col sticky top-0 h-screen z-20 shrink-0">
         {/* Logo */}
@@ -2061,7 +2061,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="flex-1 px-3 overflow-y-auto pb-4">
+        <div className="flex-1 px-3 overflow-y-auto pb-4 scrollbar-hide">
           {[
             { section: "Core",           items: ["Overview", "Analytics"] },
             { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Deliveries", "Fleet", "Applications", "Rider Docs", "Rider Issues", "SOS Alerts"] },
@@ -2139,7 +2139,7 @@ export default function AdminPage() {
       </aside>
 
       {/* ── Main Content Area ── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto scrollbar-hide">
         
         {/* Top Header Bar */}
         <header className="h-16 px-8 border-b border-white/[0.05] flex items-center justify-between bg-[#07070e]/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
