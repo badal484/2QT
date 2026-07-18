@@ -20,67 +20,64 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [pendingVerified, setPendingVerified] = useState<{ phone: string; token: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleSendOTP = async () => {
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://control.msg91.com/app/assets/otp-provider/otp-provider.js";
+    script.async = true;
+    script.onload = () => {
+      if (window.initSendOTP) {
+        window.initSendOTP({
+          widgetId: "366772613253353536373236",
+          tokenAuth: "524621TvewiLzS6a5add22P1",
+          exposeMethods: "true",
+          success: (data: any) => {
+            if (data.message) {
+              handleServerVerification(data.message);
+            }
+          },
+          failure: (error: any) => {
+            setIsLoading(false);
+            toast.error(error.message || 'Verification failed');
+          }
+        });
+      }
+    };
+    document.body.appendChild(script);
+  }, []);
+
+  const handleSendOTP = () => {
       if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
       setIsLoading(true);
+      
       try {
-          const res = await fetch('/api/proxy/auth/send-otp', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: `91${phone}` })
-          });
-          
-          let data;
-          try {
-              data = await res.json();
-          } catch (e) {
-              // Not JSON (e.g. 502 Bad Gateway HTML during deployment)
-              throw new Error(res.status === 502 || res.status === 503 ? 'Server is starting up. Please try again in 30 seconds.' : 'Unexpected server response');
-          }
-
-          if (res.ok) {
+          if (window.sendOtp) {
+              window.sendOtp(`91${phone}`);
               setStep('OTP');
               toast.success('OTP Sent!');
-              if (data.devOtp) {
-                  // Fallback for SMS delays: auto-fill the OTP
-                  setOtp(data.devOtp);
-                  toast.success(`Auto-filled OTP: ${data.devOtp}`, { duration: 5000 });
-              }
           } else {
-              toast.error(data.message || 'Failed to send OTP');
+              toast.error('Widget not fully loaded, please wait a second and try again.');
           }
       } catch (err: any) {
-          toast.error(err.message || 'Network error');
+          toast.error(err.message || 'Failed to trigger MSG91 Widget');
       } finally {
           setIsLoading(false);
       }
   };
 
-  const handleVerifyOTP = async () => {
+  const handleVerifyOTP = () => {
       if (otp.length < 4) return toast.error('Enter valid OTP');
       setIsLoading(true);
+      
       try {
-          const res = await fetch('/api/proxy/auth/verify-otp', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: `91${phone}`, otp, appRole: 'prelaunch' })
-          });
-          
-          let data;
-          try {
-              data = await res.json();
-          } catch (e) {
-              throw new Error(res.status === 502 || res.status === 503 ? 'Server is starting up. Please try again.' : 'Unexpected server response');
-          }
-          
-          if (res.ok && data.accessToken) {
-              handleServerVerification(data.accessToken);
+          if (window.verifyOtp) {
+              window.verifyOtp(otp);
+              // The success/failure callbacks defined in initSendOTP will handle the rest!
           } else {
-              toast.error(data.message || 'Invalid OTP');
+              toast.error('Widget not loaded');
+              setIsLoading(false);
           }
       } catch (err: any) {
-          toast.error(err.message || 'Network error');
-      } finally {
+          toast.error(err.message || 'Verification error');
           setIsLoading(false);
       }
   };
