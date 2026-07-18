@@ -30,7 +30,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
         <motion.div
           initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease }}
-          className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-primary/30 bg-brand-primary/10 px-5 py-2 text-sm font-bold text-brand-primary shadow-[0_0_20px_rgba(255,90,31,0.25)] backdrop-blur-md"
+          className="mb-6 sm:mb-8 inline-flex items-center gap-2 rounded-full border border-brand-primary/30 bg-brand-primary/10 px-4 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-brand-primary shadow-[0_0_20px_rgba(255,90,31,0.25)] backdrop-blur-md"
         >
           <Zap className="h-4 w-4 fill-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
           First 1,000 users get ₹100 on launch day
@@ -40,8 +40,8 @@ export function Hero({ onStart }: { onStart: () => void }) {
         <motion.h1
           initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, delay: 0.1, ease }}
-          className="font-display font-black tracking-tighter leading-[1.05] text-white drop-shadow-lg mb-6"
-          style={{ fontSize: 'clamp(3.5rem, 8vw, 6.5rem)' }}
+          className="font-display font-black tracking-tighter leading-[1.05] text-white drop-shadow-lg mb-4 sm:mb-6"
+          style={{ fontSize: 'clamp(2.5rem, 10vw, 6.5rem)' }}
         >
           Next-level delivery<br />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary via-orange-400 to-amber-300 drop-shadow-[0_0_30px_rgba(255,90,31,0.5)]">
@@ -52,7 +52,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
         <motion.p
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.2, ease }}
-          className="text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-12"
+          className="text-base sm:text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-10 sm:mb-12 px-2 sm:px-0"
         >
           We're building 2QT — a new age food app with our own kitchen, experienced chefs, and honest pricing. Become one of our first 1,000 Founding Members, help us dictate exactly what Lalpur is craving, and get <span className="text-amber-400 font-bold">₹100</span> on launch day.
         </motion.p>
@@ -73,7 +73,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
 
             <button
               onClick={onStart}
-              className="w-full relative overflow-hidden group/btn rounded-2xl bg-brand-primary px-8 py-5 text-lg font-bold text-white transition-all shadow-[0_0_30px_rgba(255,90,31,0.4)] hover:shadow-[0_0_50px_rgba(255,90,31,0.6)] hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full relative overflow-hidden group/btn rounded-2xl bg-brand-primary px-6 sm:px-8 py-4 sm:py-5 text-base sm:text-lg font-bold text-white transition-all shadow-[0_0_30px_rgba(255,90,31,0.4)] hover:shadow-[0_0_50px_rgba(255,90,31,0.6)] hover:scale-[1.02] active:scale-[0.98]"
             >
               {/* Button Shine Effect */}
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover/btn:animate-[shimmer_1.5s_infinite]" />

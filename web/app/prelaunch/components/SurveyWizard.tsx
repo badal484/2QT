@@ -286,7 +286,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   const sel = data[q.id] === opt;
                   return (
                     <button key={opt} onClick={() => pickRadio(opt)}
-                      className={cn('w-full text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none backdrop-blur-xl',
+                      className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none backdrop-blur-xl',
                         sel ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
                             : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
                       <span className={cn("text-sm md:text-base font-bold transition-colors", sel ? "text-white" : "text-zinc-300")}>{opt}</span>
@@ -300,7 +300,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                 {hasOther && (
                   <>
                     <button onClick={() => pickRadio(OTHER)}
-                      className={cn('w-full text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none backdrop-blur-xl',
+                      className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none backdrop-blur-xl',
                         otherSelected ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
                                       : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
                       <span className={cn("text-sm md:text-base font-bold transition-colors", otherSelected ? "text-white" : "text-zinc-300")}>Other (Please specify)</span>
@@ -339,7 +339,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                     const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
                     return (
                       <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
-                        className={cn('w-full text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
+                        className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
                           sel         ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
                           : maxReached ? 'border-white/5 bg-white/5 text-zinc-700 cursor-not-allowed'
                                        : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
@@ -354,7 +354,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   {hasOther && (
                     <>
                       <button onClick={() => toggleCheck(OTHER)}
-                        className={cn('w-full text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
+                        className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
                           checkArr.includes(OTHER) ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
                                                    : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
                         <span className={cn("text-sm md:text-base font-bold transition-colors", checkArr.includes(OTHER) ? "text-white" : "text-zinc-300")}>Other (Please specify)</span>
