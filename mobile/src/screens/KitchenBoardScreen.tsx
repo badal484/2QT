@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { playKitchenAlert } from '../utils/kitchenAlert';
 import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, StatusBar, StyleSheet, Alert,
@@ -128,6 +129,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     const onOrderUpdate = () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
+    const onNewOrder = () => { playKitchenAlert(); onOrderUpdate(); };
     const onDineInUpdate = () => queryClient.invalidateQueries({ queryKey: ['board-dine-in-tickets'] });
     const onRiderArrived = (data: { orderId: string; riderName?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
@@ -136,7 +138,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
 
     const attach = (socket: ReturnType<typeof getSocket>) => {
       if (!socket) return;
-      socket.on('new_order', onOrderUpdate);
+      socket.on('new_order', onNewOrder);
       socket.on('order_updated', onOrderUpdate);
       socket.on('table_order', onDineInUpdate);
       socket.on('table_booking_updated', onDineInUpdate);
@@ -147,7 +149,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
 
     const detach = (socket: ReturnType<typeof getSocket>) => {
       if (!socket) return;
-      socket.off('new_order', onOrderUpdate);
+      socket.off('new_order', onNewOrder);
       socket.off('order_updated', onOrderUpdate);
       socket.off('table_order', onDineInUpdate);
       socket.off('table_booking_updated', onDineInUpdate);
