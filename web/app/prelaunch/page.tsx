@@ -73,7 +73,16 @@ export default function PreLaunchPage() {
   useEffect(() => {
     if (step !== 0) return;
     
-    const colleges = ["St. Xavier's", "Presidency", "Jadavpur", "Christ University", "SRM", "VIT"];
+    const colleges = [
+      "St. Xavier's", 
+      "BIT Mesra", 
+      "Gossner College", 
+      "Marwari College", 
+      "Ranchi University", 
+      "RIMS",
+      "Amity University",
+      "Nirmala College"
+    ];
     
     const interval = setInterval(() => {
       const r = Math.random();
