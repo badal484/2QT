@@ -158,11 +158,16 @@ router.post('/admin-pin-login', async (req, res) => {
             user = insert.rows[0];
         }
 
-        const payload = { userId: user.id, phone: user.phone, role: user.role };
+        const jti = crypto.randomUUID();
+        const payload = { userId: user.id, phone: user.phone, role: user.role, jti };
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
-        const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '30d' });
+        const refreshToken = jwt.sign({ userId: user.id, jti }, JWT_REFRESH_SECRET, { expiresIn: '30d' });
 
-        await query('INSERT INTO refresh_tokens (user_id, token_hash) VALUES ($1, $2)', [user.id, refreshToken]);
+        const tokenHash = await bcrypt.hash(refreshToken, 10);
+        await query(
+            'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + interval \'30 days\')',
+            [user.id, tokenHash]
+        );
 
         res.json({ token, refreshToken, user: { id: user.id, phone: user.phone, name: user.name, role: user.role } });
     } catch (err: any) {
