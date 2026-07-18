@@ -107,7 +107,7 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
             {peopleBehind > 0 ? (
               <p className="text-brand-primary font-medium text-sm mt-1">{peopleBehind.toLocaleString()} people behind you</p>
             ) : (
-              <p className="text-brand-primary font-medium text-sm mt-1">You're our newest member! 🎉</p>
+
             )}
           </div>
           
