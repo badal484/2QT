@@ -86,7 +86,7 @@ router.post('/register', async (req, res) => {
                 const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
                     method: 'POST',
                     headers: {
-                        'authkey': process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1',
+                        'authkey': process.env.MSG91_AUTH_KEY || '',
                         'content-type': 'application/json'
                     },
                     body: JSON.stringify({ 'access-token': idToken }) // idToken here is the MSG91 token
@@ -277,7 +277,7 @@ router.post('/me', async (req, res) => {
             const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
                 method: 'POST',
                 headers: {
-                    'authkey': process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1',
+                    'authkey': process.env.MSG91_AUTH_KEY || '',
                     'content-type': 'application/json'
                 },
                 body: JSON.stringify({ 'access-token': idToken })
