@@ -172,7 +172,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                  <div className="relative w-full">
                     <input 
                         type="number" 
-                        placeholder="• • • • • •" 
+                        placeholder="• • • •" 
                         value={otp}
                         onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()}
