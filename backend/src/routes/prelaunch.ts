@@ -59,49 +59,47 @@ router.post('/register', async (req, res) => {
     const { name, idToken, surveyResponses, source, referredBy } = parsed.data;
 
     try {
-        // Verify Token (Either internal JWT or MSG91 Widget Token)
+        // Verify Token — try Firebase first, then internal JWT, then MSG91
         let phone: string;
         try {
-            // 1. Try verifying as internal JWT first
+            // 1. Firebase ID token (used by prelaunch web with Firebase Phone Auth)
             try {
-                const decoded = jwt.verify(idToken, JWT_SECRET) as any;
-                if (decoded && decoded.userId) {
-                    const { rows } = await query('SELECT phone FROM users WHERE id = $1', [decoded.userId]);
-                    if (rows[0] && rows[0].phone) {
-                        phone = rows[0].phone;
-                        // Skip to next block if found
-                        throw new Error('INTERNAL_JWT_SUCCESS');
+                const decoded = await firebaseAdminAuth.verifyIdToken(idToken);
+                const rawPhone = decoded.phone_number;
+                if (rawPhone) {
+                    phone = rawPhone.replace(/\D/g, '');
+                    if (phone.length === 10) phone = '91' + phone;
+                }
+            } catch { /* not a Firebase token */ }
+
+            // 2. Internal JWT
+            if (!phone!) {
+                try {
+                    const decoded = jwt.verify(idToken, JWT_SECRET) as any;
+                    if (decoded && decoded.userId) {
+                        const { rows } = await query('SELECT phone FROM users WHERE id = $1', [decoded.userId]);
+                        if (rows[0]?.phone) phone = rows[0].phone;
                     }
-                }
-            } catch (err: any) {
-                if (err.message !== 'INTERNAL_JWT_SUCCESS') {
-                    // It's not a valid internal JWT, fallback to MSG91
-                } else {
-                    // Successfully got phone from DB
-                }
+                } catch { /* not an internal JWT */ }
             }
 
-            // 2. Fallback to MSG91 Widget Token verification
+            // 3. MSG91 Widget Token
             if (!phone!) {
                 const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
                     method: 'POST',
-                    headers: {
-                        'authkey': process.env.MSG91_AUTH_KEY || '',
-                        'content-type': 'application/json'
-                    },
-                    body: JSON.stringify({ 'access-token': idToken }) // idToken here is the MSG91 token
+                    headers: { 'authkey': process.env.MSG91_AUTH_KEY || '', 'content-type': 'application/json' },
+                    body: JSON.stringify({ 'access-token': idToken })
                 });
                 const verifyData = await verifyRes.json();
-                
-                if (verifyData.type !== 'success') {
-                     return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message });
-                }
+                if (verifyData.type !== 'success')
+                    return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message });
                 const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
                 if (!rawPhone) return res.status(400).json({ error: 'NO_PHONE' });
-                
                 phone = String(rawPhone).replace(/\D/g, '');
                 if (phone.length === 10) phone = '91' + phone;
             }
+
+            if (!phone!) return res.status(401).json({ error: 'INVALID_TOKEN' });
         } catch (err: any) {
             return res.status(401).json({ error: 'INVALID_TOKEN', message: err.message });
         }
@@ -258,33 +256,37 @@ router.post('/me', async (req, res) => {
     if (!idToken) return res.json({ registered: false });
     try {
         let phone: string | null = null;
-        
-        // 1. Try verifying as internal JWT first
+
+        // 1. Firebase ID token
         try {
-            const decoded = jwt.verify(idToken, JWT_SECRET) as any;
-            if (decoded && decoded.userId) {
-                const { rows } = await query('SELECT phone FROM users WHERE id = $1', [decoded.userId]);
-                if (rows[0] && rows[0].phone) {
-                    phone = rows[0].phone;
-                }
+            const decoded = await firebaseAdminAuth.verifyIdToken(idToken);
+            const rawPhone = decoded.phone_number;
+            if (rawPhone) {
+                phone = rawPhone.replace(/\D/g, '');
+                if (phone.length === 10) phone = '91' + phone;
             }
-        } catch (err) {
-            // Not a valid internal JWT, proceed to MSG91
+        } catch { /* not a Firebase token */ }
+
+        // 2. Internal JWT
+        if (!phone) {
+            try {
+                const decoded = jwt.verify(idToken, JWT_SECRET) as any;
+                if (decoded && decoded.userId) {
+                    const { rows } = await query('SELECT phone FROM users WHERE id = $1', [decoded.userId]);
+                    if (rows[0]?.phone) phone = rows[0].phone;
+                }
+            } catch { /* not an internal JWT */ }
         }
 
-        // 2. Fallback to MSG91 Widget Token verification
+        // 3. MSG91 Widget Token
         if (!phone) {
             const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
                 method: 'POST',
-                headers: {
-                    'authkey': process.env.MSG91_AUTH_KEY || '',
-                    'content-type': 'application/json'
-                },
+                headers: { 'authkey': process.env.MSG91_AUTH_KEY || '', 'content-type': 'application/json' },
                 body: JSON.stringify({ 'access-token': idToken })
             });
             const verifyData = await verifyRes.json();
             if (verifyData.type !== 'success') return res.json({ registered: false });
-
             const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
             if (!rawPhone) return res.json({ registered: false });
             phone = String(rawPhone).replace(/\D/g, '');
