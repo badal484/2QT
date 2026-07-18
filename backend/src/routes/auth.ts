@@ -98,19 +98,22 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
     }
 
     let smsSent = false;
-    if (process.env.MSG91_AUTH_KEY) {
+    const msg91AuthKey = process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1';
+    const msg91TemplateId = process.env.MSG91_TEMPLATE_ID || '6a5ae4478f489f578300d262';
+    
+    if (msg91AuthKey) {
         try {
             await axios.post(
                 'https://control.msg91.com/api/v5/otp',
                 {
-                    template_id: process.env.MSG91_TEMPLATE_ID,
+                    template_id: msg91TemplateId,
                     mobile: normalizedPhone,
                     otp: otp
                 },
                 { 
                     headers: { 
                         'Content-Type': 'application/json',
-                        'authkey': process.env.MSG91_AUTH_KEY
+                        'authkey': msg91AuthKey
                     } 
                 }
             );
