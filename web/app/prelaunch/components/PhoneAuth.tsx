@@ -53,9 +53,9 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
       setIsLoading(true);
       
-      if (window.sendOTP) {
+      if (window.sendOtp) {
           try {
-              window.sendOTP(`91${phone}`);
+              window.sendOtp(`91${phone}`);
               setStep('OTP');
               toast.success('OTP Sent!');
           } catch (e) {
@@ -71,14 +71,17 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const handleVerifyOTP = () => {
       if (otp.length < 4) return toast.error('Enter valid OTP');
       setIsLoading(true);
-      if (window.verifyOTP) {
+      if (window.verifyOtp) {
           try {
-              window.verifyOTP(otp);
+              window.verifyOtp(otp);
               // The success callback defined in initSendOTP will handle the rest
           } catch (e) {
               toast.error('Failed to verify OTP');
               setIsLoading(false);
           }
+      } else {
+          toast.error('MSG91 SDK not loaded yet');
+          setIsLoading(false);
       }
   };
 
