@@ -105,10 +105,14 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
                 {
                     template_id: process.env.MSG91_TEMPLATE_ID,
                     mobile: normalizedPhone,
-                    authkey: process.env.MSG91_AUTH_KEY,
                     otp: otp
                 },
-                { headers: { 'Content-Type': 'application/json' } }
+                { 
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'authkey': process.env.MSG91_AUTH_KEY
+                    } 
+                }
             );
             smsSent = true;
             console.log('[MSG91] SMS dispatched to', normalizedPhone);
