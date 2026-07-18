@@ -20,16 +20,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [pendingVerified, setPendingVerified] = useState<{ phone: string; token: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [countdown, setCountdown] = useState(30);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (step === 'OTP' && countdown > 0) {
-      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [step, countdown]);
-
   useEffect(() => {
     const script = document.createElement('script');
     script.src = "https://control.msg91.com/app/assets/otp-provider/otp-provider.js";
@@ -56,41 +46,37 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   }, []);
 
   const handleSendOTP = () => {
-      if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
-      setIsLoading(true);
-      
-      try {
-          if (window.sendOtp) {
-              window.sendOtp(`91${phone}`);
-              setStep('OTP');
-              setCountdown(30); // reset countdown
-              toast.success('OTP Sent!');
-          } else {
-              toast.error('Widget not fully loaded, please wait a second and try again.');
-          }
-      } catch (err: any) {
-          toast.error(err.message || 'Failed to trigger MSG91 Widget');
-      } finally {
-          setIsLoading(false);
+    if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
+    setIsLoading(true);
+    try {
+      if (window.sendOtp) {
+        window.sendOtp(`91${phone}`);
+        setStep('OTP');
+        toast.success('OTP Sent!');
+      } else {
+        toast.error('Widget not fully loaded, please wait a second and try again.');
       }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send OTP');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleVerifyOTP = () => {
-      if (otp.length < 4) return toast.error('Enter valid OTP');
-      setIsLoading(true);
-      
-      try {
-          if (window.verifyOtp) {
-              window.verifyOtp(otp);
-              // The success/failure callbacks defined in initSendOTP will handle the rest!
-          } else {
-              toast.error('Widget not loaded');
-              setIsLoading(false);
-          }
-      } catch (err: any) {
-          toast.error(err.message || 'Verification error');
-          setIsLoading(false);
+    if (otp.length < 4) return toast.error('Enter valid OTP');
+    setIsLoading(true);
+    try {
+      if (window.verifyOtp) {
+        window.verifyOtp(otp);
+      } else {
+        toast.error('Widget not loaded');
+        setIsLoading(false);
       }
+    } catch (err: any) {
+      toast.error(err.message || 'Verification error');
+      setIsLoading(false);
+    }
   };
 
   const handleServerVerification = async (msg91AccessToken: string) => {
@@ -101,13 +87,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ msg91Token: msg91AccessToken }),
       });
-      
       const meData = await meRes.json();
-      
       if (meRes.ok && meData.registered) {
         setStep('SUCCESS');
         setTimeout(() => onVerified({
-          phone: `91${phone}`, 
+          phone: `91${phone}`,
           token: msg91AccessToken,
           name: meData.name || '',
           alreadyRegistered: true,
@@ -121,7 +105,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         setPendingVerified({ phone: `91${phone}`, token: msg91AccessToken });
         setStep('NAME');
       }
-    } catch (err) {
+    } catch {
       toast.error('Verification failed on server');
     } finally {
       setIsLoading(false);
@@ -145,112 +129,90 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       <div className="bg-white/5 backdrop-blur-3xl rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative overflow-hidden">
         <div className="absolute -top-20 -right-20 w-60 h-60 bg-brand-primary/20 rounded-full blur-[80px] pointer-events-none"></div>
         <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-orange-500/10 rounded-full blur-[80px] pointer-events-none"></div>
-        
+
         <AnimatePresence mode="wait">
-        {step === 'PHONE' && (
-          <motion.div key="phone" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="relative z-10 flex flex-col items-center w-full">
-            <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm text-center">Welcome.</h2>
-            <p className="text-zinc-400 font-medium mb-8 text-sm text-center">Enter your mobile number to join the waitlist.</p>
-            
-             <div className="w-full flex flex-col items-center gap-4">
-                 <div className="relative w-full flex items-center bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full overflow-hidden transition-all focus-within:border-brand-primary/60 shadow-inner">
-                    <span className="pl-5 font-bold text-zinc-400 text-lg border-r border-white/10 pr-3 py-3.5 sm:py-4">+91</span>
-                    <input 
-                        type="tel" 
-                        placeholder="00000 00000" 
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendOTP()}
-                        className="w-full bg-transparent border-none py-3.5 sm:py-4 px-4 text-base sm:text-lg font-bold text-white tracking-widest outline-none placeholder:text-zinc-600"
-                    />
-                 </div>
-                 
-                 <button onClick={handleSendOTP} disabled={isLoading || phone.length !== 10}
-                    className="w-full mt-4 group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
-                    style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
-                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Send OTP</span><ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
-                 </button>
-             </div>
-          </motion.div>
-        )}
-
-        {step === 'OTP' && (
-          <motion.div key="otp" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="relative z-10 flex flex-col items-center w-full">
-            <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm text-center">Verify.</h2>
-            <p className="text-zinc-400 font-medium mb-8 text-sm text-center">Enter the code sent to +91 {phone}</p>
-            
-             <div className="w-full flex flex-col items-center gap-4">
-                 <div className="relative w-full">
-                    <input 
-                        type="number" 
-                        placeholder="• • • •" 
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()}
-                        className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-4 px-6 text-center text-2xl font-black text-white tracking-[0.5em] outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
-                        autoFocus
-                    />
-                 </div>
-                 
-                 <button onClick={handleVerifyOTP} disabled={isLoading || otp.length < 4}
-                    className="w-full mt-4 group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
-                    style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
-                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify Code</span>}
-                 </button>
-                 
-                 <div className="mt-4 flex flex-col items-center gap-2 w-full">
-                     <button 
-                         onClick={handleSendOTP} 
-                         disabled={countdown > 0 || isLoading}
-                         className="text-xs font-bold text-zinc-400 hover:text-white uppercase tracking-widest transition-colors disabled:opacity-50 disabled:hover:text-zinc-400 disabled:cursor-not-allowed"
-                     >
-                         {countdown > 0 ? `Resend OTP in ${countdown}s` : 'Resend OTP'}
-                     </button>
-                     <button onClick={() => setStep('PHONE')} className="text-xs font-bold text-zinc-600 hover:text-zinc-400 uppercase tracking-widest transition-colors">
-                         Change Phone Number
-                     </button>
-                 </div>
-             </div>
-          </motion.div>
-        )}
-
-        {step === 'NAME' && (
-          <motion.div key="name" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 w-full">
-            <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm text-center">Almost there.</h2>
-            <p className="text-zinc-400 font-medium mb-8 text-sm text-center">What should we call you?</p>
-            <div className="space-y-6">
-              <input
-                type="text" autoFocus placeholder="Your full name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && name.trim().length >= 2 && submitName()}
-                className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-3.5 sm:py-4 px-5 sm:px-6 text-base sm:text-lg font-bold text-white tracking-wide outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
-              />
-              <button onClick={submitName} disabled={name.trim().length < 2}
-                className="w-full group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
-                style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
-                <span>Continue</span>
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 'SUCCESS' && (
-          <motion.div key="success"
-            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-8 relative z-10"
-          >
-            <motion.div
-              initial={{ scale: 0 }} animate={{ scale: 1 }}
-              transition={{ type: 'spring', delay: 0.1 }}
-              className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,90,31,0.3)] border border-white/20"
-            >
-              <CheckCircle2 className="w-12 h-12 text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]" />
+          {step === 'PHONE' && (
+            <motion.div key="phone" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="relative z-10 flex flex-col items-center w-full">
+              <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm text-center">Welcome.</h2>
+              <p className="text-zinc-400 font-medium mb-8 text-sm text-center">Enter your mobile number to join the waitlist.</p>
+              <div className="w-full flex flex-col items-center gap-4">
+                <div className="relative w-full flex items-center bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full overflow-hidden transition-all focus-within:border-brand-primary/60 shadow-inner">
+                  <span className="pl-5 font-bold text-zinc-400 text-lg border-r border-white/10 pr-3 py-3.5 sm:py-4">+91</span>
+                  <input
+                    type="tel" placeholder="00000 00000" value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendOTP()}
+                    className="w-full bg-transparent border-none py-3.5 sm:py-4 px-4 text-base sm:text-lg font-bold text-white tracking-widest outline-none placeholder:text-zinc-600"
+                  />
+                </div>
+                <button onClick={handleSendOTP} disabled={isLoading || phone.length !== 10}
+                  className="w-full mt-4 group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
+                  style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Send OTP</span><ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
+                </button>
+              </div>
             </motion.div>
-            <h2 className="text-3xl font-display font-bold tracking-tight text-white drop-shadow-sm">Verified</h2>
-            <p className="text-zinc-400 font-medium mt-2 text-sm">Hi {name} 👋</p>
-          </motion.div>
-        )}
+          )}
+
+          {step === 'OTP' && (
+            <motion.div key="otp" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="relative z-10 flex flex-col items-center w-full">
+              <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm text-center">Verify.</h2>
+              <p className="text-zinc-400 font-medium mb-2 text-sm text-center">Enter the code sent to +91 {phone}</p>
+              <p className="text-zinc-600 text-xs mb-8 text-center">
+                Didn&apos;t get it? Check your <span className="text-zinc-400 font-semibold">Spam / Blocked</span> messages folder.
+              </p>
+              <div className="w-full flex flex-col items-center gap-4">
+                <input
+                  type="number" placeholder="• • • • • •" value={otp} autoFocus
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()}
+                  className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-4 px-6 text-center text-2xl font-black text-white tracking-[0.5em] outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
+                />
+                <button onClick={handleVerifyOTP} disabled={isLoading || otp.length < 4}
+                  className="w-full mt-4 group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
+                  style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify Code</span>}
+                </button>
+                <button onClick={() => setStep('PHONE')} className="mt-4 text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
+                  Change Phone Number
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 'NAME' && (
+            <motion.div key="name" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 w-full">
+              <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm text-center">Almost there.</h2>
+              <p className="text-zinc-400 font-medium mb-8 text-sm text-center">What should we call you?</p>
+              <div className="space-y-6">
+                <input
+                  type="text" autoFocus placeholder="Your full name" value={name}
+                  onChange={e => setName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && name.trim().length >= 2 && submitName()}
+                  className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-3.5 sm:py-4 px-5 sm:px-6 text-base sm:text-lg font-bold text-white tracking-wide outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
+                />
+                <button onClick={submitName} disabled={name.trim().length < 2}
+                  className="w-full group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
+                  style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
+                  <span>Continue</span>
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 'SUCCESS' && (
+            <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center justify-center py-8 relative z-10"
+            >
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}
+                className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,90,31,0.3)] border border-white/20"
+              >
+                <CheckCircle2 className="w-12 h-12 text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]" />
+              </motion.div>
+              <h2 className="text-3xl font-display font-bold tracking-tight text-white drop-shadow-sm">Verified</h2>
+              <p className="text-zinc-400 font-medium mt-2 text-sm">Hi {name} 👋</p>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </motion.div>
