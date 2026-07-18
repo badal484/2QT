@@ -73,14 +73,14 @@ export function Hero({ onStart }: { onStart: () => void }) {
 
             <button
               onClick={onStart}
-              className="w-full relative overflow-hidden group/btn rounded-2xl bg-brand-primary px-6 sm:px-8 py-4 sm:py-5 text-base sm:text-lg font-bold text-white transition-all shadow-[0_0_30px_rgba(255,90,31,0.4)] hover:shadow-[0_0_50px_rgba(255,90,31,0.6)] hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full relative overflow-hidden group/btn rounded-2xl bg-brand-primary px-4 sm:px-8 py-3.5 sm:py-5 text-sm sm:text-lg font-bold text-white transition-all shadow-[0_0_30px_rgba(255,90,31,0.4)] hover:shadow-[0_0_50px_rgba(255,90,31,0.6)] hover:scale-[1.02] active:scale-[0.98]"
             >
               {/* Button Shine Effect */}
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover/btn:animate-[shimmer_1.5s_infinite]" />
               
-              <span className="relative flex items-center justify-center gap-3">
-                Build the Menu & Get ₹100
-                <ArrowRight className="h-5 w-5 transition-transform group-hover/btn:translate-x-1" />
+              <span className="relative flex items-center justify-center gap-2 sm:gap-3">
+                <span className="whitespace-nowrap">Build the Menu & Get ₹100</span>
+                <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 transition-transform group-hover/btn:translate-x-1" />
               </span>
             </button>
 
