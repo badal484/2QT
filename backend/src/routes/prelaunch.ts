@@ -59,27 +59,49 @@ router.post('/register', async (req, res) => {
     const { name, idToken, surveyResponses, source, referredBy } = parsed.data;
 
     try {
-        // Verify MSG91 Widget Token
+        // Verify Token (Either internal JWT or MSG91 Widget Token)
         let phone: string;
         try {
-            const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
-                method: 'POST',
-                headers: {
-                    'authkey': process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1',
-                    'content-type': 'application/json'
-                },
-                body: JSON.stringify({ 'access-token': idToken }) // idToken here is the MSG91 token
-            });
-            const verifyData = await verifyRes.json();
-            
-            if (verifyData.type !== 'success') {
-                 return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message });
+            // 1. Try verifying as internal JWT first
+            try {
+                const decoded = jwt.verify(idToken, JWT_SECRET) as any;
+                if (decoded && decoded.userId) {
+                    const { rows } = await query('SELECT phone FROM users WHERE id = $1', [decoded.userId]);
+                    if (rows[0] && rows[0].phone) {
+                        phone = rows[0].phone;
+                        // Skip to next block if found
+                        throw new Error('INTERNAL_JWT_SUCCESS');
+                    }
+                }
+            } catch (err: any) {
+                if (err.message !== 'INTERNAL_JWT_SUCCESS') {
+                    // It's not a valid internal JWT, fallback to MSG91
+                } else {
+                    // Successfully got phone from DB
+                }
             }
-            const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
-            if (!rawPhone) return res.status(400).json({ error: 'NO_PHONE' });
-            
-            phone = String(rawPhone).replace(/\D/g, '');
-            if (phone.length === 10) phone = '91' + phone;
+
+            // 2. Fallback to MSG91 Widget Token verification
+            if (!phone!) {
+                const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
+                    method: 'POST',
+                    headers: {
+                        'authkey': process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1',
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify({ 'access-token': idToken }) // idToken here is the MSG91 token
+                });
+                const verifyData = await verifyRes.json();
+                
+                if (verifyData.type !== 'success') {
+                     return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message });
+                }
+                const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
+                if (!rawPhone) return res.status(400).json({ error: 'NO_PHONE' });
+                
+                phone = String(rawPhone).replace(/\D/g, '');
+                if (phone.length === 10) phone = '91' + phone;
+            }
         } catch (err: any) {
             return res.status(401).json({ error: 'INVALID_TOKEN', message: err.message });
         }
@@ -235,21 +257,39 @@ router.post('/me', async (req, res) => {
     const idToken = req.body.idToken || req.body.msg91Token;
     if (!idToken) return res.json({ registered: false });
     try {
-        const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
-            method: 'POST',
-            headers: {
-                'authkey': process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1',
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({ 'access-token': idToken })
-        });
-        const verifyData = await verifyRes.json();
-        if (verifyData.type !== 'success') return res.json({ registered: false });
+        let phone: string | null = null;
+        
+        // 1. Try verifying as internal JWT first
+        try {
+            const decoded = jwt.verify(idToken, JWT_SECRET) as any;
+            if (decoded && decoded.userId) {
+                const { rows } = await query('SELECT phone FROM users WHERE id = $1', [decoded.userId]);
+                if (rows[0] && rows[0].phone) {
+                    phone = rows[0].phone;
+                }
+            }
+        } catch (err) {
+            // Not a valid internal JWT, proceed to MSG91
+        }
 
-        const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
-        if (!rawPhone) return res.json({ registered: false });
-        let phone = String(rawPhone).replace(/\D/g, '');
-        if (phone.length === 10) phone = '91' + phone;
+        // 2. Fallback to MSG91 Widget Token verification
+        if (!phone) {
+            const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
+                method: 'POST',
+                headers: {
+                    'authkey': process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1',
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({ 'access-token': idToken })
+            });
+            const verifyData = await verifyRes.json();
+            if (verifyData.type !== 'success') return res.json({ registered: false });
+
+            const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
+            if (!rawPhone) return res.json({ registered: false });
+            phone = String(rawPhone).replace(/\D/g, '');
+            if (phone.length === 10) phone = '91' + phone;
+        }
 
         const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
         const total = parseInt(totalRows[0].count, 10);
