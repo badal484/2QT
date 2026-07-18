@@ -3,13 +3,13 @@ export function Showcase() {
     <section className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 py-24 text-zinc-100">
       <div className="max-w-xl mx-auto text-center mb-14">
         <p className="text-xs font-bold tracking-[0.25em] text-brand-primary uppercase mb-3 drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]">Why 2QT Will Be Different</p>
-        <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight drop-shadow-md">Good Food. Honest Prices. Happy You.</h2>
+        <h2 className="font-display text-3xl sm:text-5xl font-bold tracking-tight drop-shadow-md">Good Food. Honest Prices. Happy You.</h2>
         <p className="mt-4 text-zinc-400 font-medium text-lg">We control the kitchen. We control the quality. You get the best food in Lalpur.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Big card */}
-        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-8 sm:col-span-2 lg:col-span-2 lg:row-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-8 sm:col-span-2 lg:col-span-2 lg:row-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="absolute -top-10 -right-10 w-52 h-52 bg-brand-primary/20 rounded-full blur-[80px] group-hover:bg-brand-primary/30 transition-colors duration-500"></div>
           <div className="relative z-10 h-full flex flex-col justify-between">
             <div>
@@ -26,35 +26,35 @@ export function Showcase() {
         </div>
 
         {/* Our Own Kitchen */}
-        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 sm:col-span-2 lg:col-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-7 sm:col-span-2 lg:col-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">🍳</div>
           <h3 className="font-display text-lg font-bold mb-2">Our Own Kitchen</h3>
           <p className="text-zinc-400 text-sm leading-relaxed font-medium">Better control, better quality. Lightning-fast delivery strictly within a 4km radius of Lalpur.</p>
         </div>
 
         {/* Quality */}
-        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">✨</div>
           <h3 className="font-display text-lg font-bold mb-2">Quality</h3>
           <p className="text-zinc-400 text-sm leading-relaxed font-medium">Uncompromising standards on every single order.</p>
         </div>
 
         {/* Taste */}
-        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">🌟</div>
           <h3 className="font-display text-lg font-bold mb-2">Taste</h3>
           <p className="text-zinc-400 text-sm leading-relaxed font-medium">Incredible flavor crafted by our culinary experts.</p>
         </div>
 
         {/* Experienced Chefs */}
-        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 sm:col-span-2 lg:col-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-7 sm:col-span-2 lg:col-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">👨‍🍳</div>
           <h3 className="font-display text-lg font-bold mb-2">Experienced Chefs</h3>
           <p className="text-zinc-400 text-sm leading-relaxed font-medium">Great taste. Every time. Crafted with passion and served with pride.</p>
         </div>
 
         {/* Transparent Kitchen */}
-        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 sm:col-span-2 lg:col-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500 flex flex-col sm:flex-row justify-between gap-6">
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-7 sm:col-span-2 lg:col-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500 flex flex-col sm:flex-row justify-between gap-6">
           <div className="flex-1">
             <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">🧼</div>
             <h3 className="font-display text-lg font-bold mb-2">Hygiene First</h3>

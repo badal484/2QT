@@ -190,7 +190,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="w-full max-w-md mx-auto"
     >
-      <div className="bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-8 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative">
+      <div className="bg-white/5 backdrop-blur-3xl rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative">
         {/* Glow accent */}
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-primary/20 rounded-full blur-[60px] pointer-events-none"></div>
         {/* ── PHONE ── */}
@@ -205,7 +205,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   type="tel" autoFocus placeholder="00000 00000"
                   value={phone}
                   onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-4 pl-16 pr-6 text-lg font-bold text-white tracking-wide outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
+                  className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-3.5 sm:py-4 pl-14 sm:pl-16 pr-4 sm:pr-6 text-base sm:text-lg font-bold text-white tracking-wide outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
                 />
               </div>
               <button type="submit" disabled={phone.length < 10 || isLoading}
@@ -245,7 +245,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   onKeyDown={e => handleKeyDown(i, e)}
                   disabled={isLoading}
                   className={cn(
-                    'w-10 h-12 md:w-12 md:h-14 text-center text-xl font-bold bg-white/5 border-2 rounded-2xl text-white outline-none transition-all disabled:opacity-50 shadow-inner',
+                    'w-9 sm:w-10 md:w-12 h-11 sm:h-12 md:h-14 text-center text-xl font-bold bg-white/5 border-2 rounded-xl sm:rounded-2xl text-white outline-none transition-all disabled:opacity-50 shadow-inner',
                     otpError
                       ? 'border-red-500/80 focus:border-red-500 bg-red-500/10 text-white'
                       : 'border-white/10 hover:border-white/20 focus:border-brand-primary/60 focus:bg-white/10'
@@ -298,7 +298,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && name.trim().length >= 2 && submitName()}
-                className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-4 px-6 text-lg font-bold text-white tracking-wide outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
+                className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-3.5 sm:py-4 px-5 sm:px-6 text-base sm:text-lg font-bold text-white tracking-wide outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
               />
               <button onClick={submitName} disabled={name.trim().length < 2}
                 className="w-full group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 disabled:pointer-events-none border border-brand-primary/50"
