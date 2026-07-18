@@ -159,6 +159,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const canPickup = currentStatus === 'ready_for_pickup';
   const isOutForDelivery = currentStatus === 'out_for_delivery';
   const isWaiting = ['confirmed', 'preparing'].includes(currentStatus);
+  const isDelivered = currentStatus === 'delivered';
   const currentStep = statusToStep(currentStatus);
   const totalItems = order.items?.length || 0;
   const allItemsChecked = totalItems === 0 || checkedItems.size === totalItems;
@@ -502,6 +503,16 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
             <ActivityIndicator size="small" color={R.orange} />
             <Text style={s.waitingText}>Waiting for kitchen to prepare order…</Text>
           </View>
+        ) : isDelivered ? (
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'RiderTabs' }] })}
+            activeOpacity={0.9}
+          >
+            <View style={s.actionBtnRow}>
+              <Text style={s.actionBtnText}>Back to Dashboard</Text>
+            </View>
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={[s.actionBtn, (updateStatusMutation.isPending || (canPickup && !allItemsChecked)) && { opacity: 0.45 }]}
