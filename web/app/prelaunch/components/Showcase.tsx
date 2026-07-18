@@ -35,14 +35,14 @@ export function Showcase() {
         {/* Quality */}
         <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">✨</div>
-          <h3 className="font-display text-lg font-bold mb-2">1. Quality</h3>
+          <h3 className="font-display text-lg font-bold mb-2">Quality</h3>
           <p className="text-zinc-400 text-sm leading-relaxed font-medium">Uncompromising standards on every single order.</p>
         </div>
 
         {/* Taste */}
         <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-7 lg:col-span-1 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500">
           <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl mb-5 shadow-inner">🌟</div>
-          <h3 className="font-display text-lg font-bold mb-2">2. Taste</h3>
+          <h3 className="font-display text-lg font-bold mb-2">Taste</h3>
           <p className="text-zinc-400 text-sm leading-relaxed font-medium">Incredible flavor crafted by our culinary experts.</p>
         </div>
 
