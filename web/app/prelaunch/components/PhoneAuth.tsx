@@ -25,23 +25,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     const script = document.createElement('script');
     script.src = "https://control.msg91.com/app/assets/otp-provider/otp-provider.js";
     script.async = true;
-    script.onload = () => {
-        if (window.initSendOTP) {
-            window.initSendOTP({
-                widgetId: "366772613253353536373236",
-                tokenAuth: "524621TvewiLzS6a5add22P1",
-                exposeMethods: true,
-                success: (data: any) => {
-                    const token = typeof data === 'string' ? data : data.message;
-                    handleServerVerification(token);
-                },
-                failure: (error: any) => {
-                    toast.error(error?.message || 'Failed to verify OTP');
-                    setIsLoading(false);
-                }
-            });
-        }
-    };
     document.body.appendChild(script);
 
     return () => {
@@ -53,15 +36,39 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
       setIsLoading(true);
       
-      if (window.sendOtp) {
+      if (window.initSendOTP) {
           try {
-              window.sendOtp(`91${phone}`);
-              setStep('OTP');
-              toast.success('OTP Sent!');
+              // Re-initialize with the actual phone number as identifier
+              window.initSendOTP({
+                  widgetId: "366772613253353536373236",
+                  tokenAuth: "524621TvewiLzS6a5add22P1",
+                  identifier: `91${phone}`,
+                  exposeMethods: true,
+                  success: (data: any) => {
+                      const token = typeof data === 'string' ? data : data.message;
+                      handleServerVerification(token);
+                  },
+                  failure: (error: any) => {
+                      toast.error(error?.message || 'Failed to verify OTP');
+                      setIsLoading(false);
+                  }
+              });
+
+              // Give it a tiny moment to register the methods
+              setTimeout(() => {
+                  if (window.sendOtp) {
+                      window.sendOtp();
+                      setStep('OTP');
+                      toast.success('OTP Sent!');
+                  } else {
+                      toast.error('MSG91 SDK not loaded fully yet');
+                  }
+                  setIsLoading(false);
+              }, 300);
           } catch (e) {
-              toast.error('Failed to send OTP');
+              toast.error('Failed to initialize OTP sending');
+              setIsLoading(false);
           }
-          setIsLoading(false);
       } else {
           toast.error('MSG91 SDK not loaded yet');
           setIsLoading(false);
