@@ -52,15 +52,15 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
       className="w-full max-w-2xl mx-auto space-y-6"
     >
       {/* Welcome Banner */}
-      <div className="flex justify-between items-center mb-8 gap-4">
+      <div className="flex justify-between items-start mb-6 sm:mb-8 gap-3 sm:gap-4">
         <div className="text-left">
-          <h1 className="text-4xl font-display font-bold text-white drop-shadow-sm">You're on the list, {name.split(' ')[0]}!</h1>
+          <h1 className="text-3xl sm:text-4xl font-display font-bold text-white drop-shadow-sm leading-tight">You're on the list, {name.split(' ')[0]}!</h1>
         </div>
         <button 
           onClick={onLogout}
-          className="text-zinc-500 hover:text-white transition-colors text-xs uppercase tracking-widest font-bold flex items-center gap-2 mt-2 px-3 py-2 rounded-xl hover:bg-white/5 whitespace-nowrap"
+          className="text-zinc-500 hover:text-white transition-colors text-[10px] sm:text-xs uppercase tracking-widest font-bold flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl hover:bg-white/5 whitespace-nowrap shrink-0 mt-1 sm:mt-0"
         >
-          <LogOut className="w-4 h-4" /> Sign Out
+          <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Sign Out
         </button>
       </div>
 
@@ -92,13 +92,13 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
       )}
 
       {/* Main Glass Card */}
-      <div className="bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-8 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative overflow-hidden">
+      <div className="bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-6 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative overflow-hidden">
         {/* Glow */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary/10 rounded-full blur-[80px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
 
         {/* Rank Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-10 relative z-10">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-8 sm:mb-10 relative z-10">
           <div className="text-center sm:text-left">
             <p className="text-zinc-500 uppercase tracking-widest text-xs font-bold mb-1">Your Waitlist Position</p>
             <div className="flex items-baseline justify-center sm:justify-start gap-1">
@@ -120,17 +120,17 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
 
         {/* Action Buttons */}
         <div className="space-y-4 relative z-10">
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button 
               onClick={handleCopy}
-              className="flex-1 bg-white/10 hover:bg-white/15 border border-white/10 transition-all rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-white"
+              className="w-full sm:flex-1 bg-white/10 hover:bg-white/15 border border-white/10 transition-all rounded-2xl py-3.5 sm:py-4 flex items-center justify-center gap-2 font-bold text-white text-sm sm:text-base"
             >
               {copied ? <CheckCircle2 className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
               {copied ? 'Copied!' : 'Copy Link'}
             </button>
             <button 
               onClick={handleShare}
-              className="flex-[2] bg-brand-primary hover:bg-brand-primary-dark transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-white"
+              className="w-full sm:flex-[2] bg-brand-primary hover:bg-brand-primary-dark transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] rounded-2xl py-3.5 sm:py-4 flex items-center justify-center gap-2 font-bold text-white text-sm sm:text-base"
             >
               <Share2 className="w-5 h-5" />
               Share with Friends
