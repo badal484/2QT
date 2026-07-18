@@ -51,21 +51,23 @@ export async function sendFCM(
     title: string,
     body: string,
     data: Record<string, string> = {},
-    imageUrl?: string
+    imageUrl?: string,
+    dataOnly = false
 ): Promise<'ok' | 'invalid_token' | 'skipped'> {
     const a = getApp();
     if (!a) return 'skipped';
 
     try {
         const isChat = data.type === 'chat_message';
+        const skipNotif = isChat || dataOnly;
 
         await getMessaging(a).send({
             token,
-            ...(isChat ? {} : { notification: { title, body, imageUrl: imageUrl || undefined } }),
+            ...(!skipNotif ? { notification: { title, body, imageUrl: imageUrl || undefined } } : {}),
             data,
             android: {
                 priority: 'high',
-                ...(isChat ? {} : { notification: { sound: 'default', channelId: 'order_updates', imageUrl: imageUrl || undefined } }),
+                ...(!skipNotif ? { notification: { sound: 'default', channelId: 'order_updates', imageUrl: imageUrl || undefined } } : {}),
             },
             apns: {
                 payload: { aps: { alert: { title, body }, sound: 'default', badge: 1 } },

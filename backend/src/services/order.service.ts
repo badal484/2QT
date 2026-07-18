@@ -280,7 +280,7 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
             newOrder.kitchen_id,
             '🍽️ New Order!',
             `Order #${newOrder.display_id} just came in — start preparing!`,
-            { type: 'new_order', orderId: String(newOrder.id) }
+            { type: 'new_kitchen_order', orderId: String(newOrder.id) }
         ).catch(() => {});
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");

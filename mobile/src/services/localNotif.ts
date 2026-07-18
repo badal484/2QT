@@ -24,7 +24,7 @@ function loadNotifee() {
 }
 
 function channelForType(type: string): string {
-  if (type === 'order_update') return 'order_dispatch'; // highest priority for rider assignments
+  if (type === 'order_update' || type === 'new_kitchen_order') return 'order_dispatch';
   if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates';
   if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account';
   return 'promotions';

@@ -85,6 +85,7 @@ export function subscribeToForegroundMessages(
                     order_cancelled:        'Order Cancelled',
                     rider_payout:           'Payment Sent! 💰',
                     broadcast_message:      data.title,
+                    new_kitchen_order:      '🍽️ New Order!',
                 };
                 title = TYPE_LABELS[data.type] ?? data.title ?? '';
                 body  = data.body ?? '';
@@ -150,6 +151,7 @@ export function setupBackgroundHandler() {
                 order_cancelled:        'Order Cancelled',
                 rider_payout:           'Payment Sent! 💰',
                 broadcast_message:      data.title ?? '2QT',
+                new_kitchen_order:      '🍽️ New Order!',
             };
             const title = TYPE_LABELS[data.type] ?? data.title ?? '';
             const body  = data.body ?? '';
