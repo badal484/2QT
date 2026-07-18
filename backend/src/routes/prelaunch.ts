@@ -6,6 +6,7 @@ import { z } from 'zod';
 import pool, { query } from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import { firebaseAdminAuth } from '../config/firebaseAdmin';
+import { redis } from '../redis';
 
 const router = Router();
 
@@ -83,20 +84,28 @@ router.post('/register', async (req, res) => {
                 } catch { /* not an internal JWT */ }
             }
 
-            // 3. MSG91 Widget Token
+            // 3. MSG91 Widget Token — check Redis cache first (token is single-use;
+            //    /me may have already consumed it and cached the phone)
             if (!phone!) {
-                const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
-                    method: 'POST',
-                    headers: { 'authkey': process.env.MSG91_AUTH_KEY || '', 'content-type': 'application/json' },
-                    body: JSON.stringify({ 'access-token': idToken })
-                });
-                const verifyData = await verifyRes.json();
-                if (verifyData.type !== 'success')
-                    return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message });
-                const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
-                if (!rawPhone) return res.status(400).json({ error: 'NO_PHONE' });
-                phone = String(rawPhone).replace(/\D/g, '');
-                if (phone.length === 10) phone = '91' + phone;
+                const cacheKey = `msg91_phone:${Buffer.from(idToken).toString('base64').slice(0, 40)}`;
+                const cached = await redis.get(cacheKey).catch(() => null);
+                if (cached) {
+                    phone = cached;
+                } else {
+                    const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
+                        method: 'POST',
+                        headers: { 'authkey': process.env.MSG91_AUTH_KEY || '', 'content-type': 'application/json' },
+                        body: JSON.stringify({ 'access-token': idToken })
+                    });
+                    const verifyData = await verifyRes.json();
+                    if (verifyData.type !== 'success')
+                        return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message });
+                    const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
+                    if (!rawPhone) return res.status(400).json({ error: 'NO_PHONE' });
+                    phone = String(rawPhone).replace(/\D/g, '');
+                    if (phone.length === 10) phone = '91' + phone;
+                    await redis.setEx(cacheKey, 600, phone).catch(() => {});
+                }
             }
 
             if (!phone!) return res.status(401).json({ error: 'INVALID_TOKEN' });
@@ -278,19 +287,27 @@ router.post('/me', async (req, res) => {
             } catch { /* not an internal JWT */ }
         }
 
-        // 3. MSG91 Widget Token
+        // 3. MSG91 Widget Token — check Redis cache first (token is single-use;
+        //    /me may have already consumed it, so cache the phone for 10 min)
         if (!phone) {
-            const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
-                method: 'POST',
-                headers: { 'authkey': process.env.MSG91_AUTH_KEY || '', 'content-type': 'application/json' },
-                body: JSON.stringify({ 'access-token': idToken })
-            });
-            const verifyData = await verifyRes.json();
-            if (verifyData.type !== 'success') return res.json({ registered: false });
-            const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
-            if (!rawPhone) return res.json({ registered: false });
-            phone = String(rawPhone).replace(/\D/g, '');
-            if (phone.length === 10) phone = '91' + phone;
+            const cacheKey = `msg91_phone:${Buffer.from(idToken).toString('base64').slice(0, 40)}`;
+            const cached = await redis.get(cacheKey).catch(() => null);
+            if (cached) {
+                phone = cached;
+            } else {
+                const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
+                    method: 'POST',
+                    headers: { 'authkey': process.env.MSG91_AUTH_KEY || '', 'content-type': 'application/json' },
+                    body: JSON.stringify({ 'access-token': idToken })
+                });
+                const verifyData = await verifyRes.json();
+                if (verifyData.type !== 'success') return res.json({ registered: false });
+                const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
+                if (!rawPhone) return res.json({ registered: false });
+                phone = String(rawPhone).replace(/\D/g, '');
+                if (phone.length === 10) phone = '91' + phone;
+                await redis.setEx(cacheKey, 600, phone).catch(() => {});
+            }
         }
 
         const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
