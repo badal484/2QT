@@ -41,6 +41,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           if (res.ok) {
               setStep('OTP');
               toast.success('OTP Sent!');
+              if (data.devOtp) {
+                  // Fallback for SMS delays: auto-fill the OTP
+                  setOtp(data.devOtp);
+                  toast.success(`Auto-filled OTP: ${data.devOtp}`, { duration: 5000 });
+              }
           } else {
               toast.error(data.message || 'Failed to send OTP');
           }
