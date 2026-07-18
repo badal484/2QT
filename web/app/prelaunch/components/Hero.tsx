@@ -66,10 +66,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-[2rem] pointer-events-none" />
           
           <div className="p-6 md:p-8 flex flex-col items-center">
-            <div className="flex items-center gap-3 mb-6 text-zinc-400 font-semibold text-sm">
-              <Users className="w-5 h-5 text-brand-primary" />
-              <span>Over 8,000 students already waiting</span>
-            </div>
+
 
             <button
               onClick={onStart}
