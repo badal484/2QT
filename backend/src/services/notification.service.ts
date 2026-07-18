@@ -289,7 +289,7 @@ export async function notifyKitchenStaff(
             [kitchenId]
         );
         const sends = rows.map(({ device_token }: { device_token: string }) =>
-            sendFCM(device_token, title, body, data, undefined, true).catch(() => {})
+            sendFCM(device_token, title, body, { ...data, body }, undefined, true).catch(() => {})
         );
         await Promise.allSettled(sends);
     } catch (err) {
