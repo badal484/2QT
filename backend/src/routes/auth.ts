@@ -156,7 +156,7 @@ router.post('/verify-otp', async (req, res) => {
         redis.del(keys.pendingOtp(normalizedPhone)).catch(() => {});
 
         // Pre-launch mode check
-        if (!['admin', 'chef', 'rider', 'packer', 'kitchen_manager', 'dine_in_staff'].includes(appRole)) {
+        if (!['admin', 'chef', 'rider', 'packer', 'kitchen_manager', 'dine_in_staff', 'prelaunch'].includes(appRole)) {
             const { rows: configRows } = await query(`SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`);
             const isPrelaunch = configRows[0]?.value === 'true' || configRows[0]?.value === true;
             if (isPrelaunch) {
