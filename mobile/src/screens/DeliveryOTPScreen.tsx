@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator, Image,
   Alert, StyleSheet, StatusBar, Animated, PermissionsAndroid, Platform,
-  KeyboardAvoidingView, ScrollView,
+  KeyboardAvoidingView, ScrollView, BackHandler,
 } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -106,8 +106,22 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
     queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
     queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
     queryClient.invalidateQueries({ queryKey: ['cash-in-hand'] });
-    navigation.navigate('RiderTabs');
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'RiderTabs' }],
+    });
   };
+
+  useEffect(() => {
+    if (delivered) {
+      const onBackPress = () => {
+        handleDone();
+        return true; // prevent default behavior
+      };
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }
+  }, [delivered]);
 
   const startCooldown = useCallback(() => {
     setResendCooldown(RESEND_COOLDOWN);

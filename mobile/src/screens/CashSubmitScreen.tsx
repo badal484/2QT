@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  ScrollView, Alert, ActivityIndicator,
+  ScrollView, Alert, ActivityIndicator, BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -144,7 +144,23 @@ const CashSubmitScreen = ({ navigation }: any) => {
     submitMutation.mutate();
   };
 
-  const handleDone = () => navigation.navigate('RiderTabs');
+  const handleDone = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'RiderTabs' }],
+    });
+  };
+
+  useEffect(() => {
+    if (submitted) {
+      const onBackPress = () => {
+        handleDone();
+        return true;
+      };
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }
+  }, [submitted]);
 
   if (submitted) {
     return <ResultOverlay total={confirmedTotal || totalRupees} method={method} onDone={handleDone} />;
