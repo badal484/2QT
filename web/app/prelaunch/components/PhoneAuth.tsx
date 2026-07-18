@@ -20,6 +20,16 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [pendingVerified, setPendingVerified] = useState<{ phone: string; token: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [countdown, setCountdown] = useState(30);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (step === 'OTP' && countdown > 0) {
+      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [step, countdown]);
+
   useEffect(() => {
     const script = document.createElement('script');
     script.src = "https://control.msg91.com/app/assets/otp-provider/otp-provider.js";
@@ -53,6 +63,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           if (window.sendOtp) {
               window.sendOtp(`91${phone}`);
               setStep('OTP');
+              setCountdown(30); // reset countdown
               toast.success('OTP Sent!');
           } else {
               toast.error('Widget not fully loaded, please wait a second and try again.');
@@ -187,9 +198,18 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                     {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify Code</span>}
                  </button>
                  
-                 <button onClick={() => setStep('PHONE')} className="mt-4 text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
-                     Change Phone Number
-                 </button>
+                 <div className="mt-4 flex flex-col items-center gap-2 w-full">
+                     <button 
+                         onClick={handleSendOTP} 
+                         disabled={countdown > 0 || isLoading}
+                         className="text-xs font-bold text-zinc-400 hover:text-white uppercase tracking-widest transition-colors disabled:opacity-50 disabled:hover:text-zinc-400 disabled:cursor-not-allowed"
+                     >
+                         {countdown > 0 ? `Resend OTP in ${countdown}s` : 'Resend OTP'}
+                     </button>
+                     <button onClick={() => setStep('PHONE')} className="text-xs font-bold text-zinc-600 hover:text-zinc-400 uppercase tracking-widest transition-colors">
+                         Change Phone Number
+                     </button>
+                 </div>
              </div>
           </motion.div>
         )}
