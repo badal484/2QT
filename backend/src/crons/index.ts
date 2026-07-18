@@ -137,7 +137,7 @@ export const initCrons = () => {
                         kitchenId,
                         '🍽️ New Order!',
                         `Order #${displayId} just came in — start preparing!`,
-                        { type: 'new_order', orderId: String(orderId) }
+                        { type: 'new_kitchen_order', orderId: String(orderId) }
                     ).catch(() => {});
 
                     const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
