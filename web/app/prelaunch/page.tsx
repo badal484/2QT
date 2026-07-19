@@ -25,39 +25,82 @@ export default function PreLaunchPage() {
       if (ref) setReferredBy(ref);
     }
 
-    // Check for existing Firebase auth session on mount
-    const auth = getAuth(app);
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const restoreSession = async () => {
+      let unsubscribe = () => {};
+      const savedToken = localStorage.getItem('2qt_auth_token');
+      
+      if (savedToken) {
         try {
-          const token = await user.getIdToken();
           const meRes = await fetch('/api/proxy/prelaunch/me', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken: token }),
+            body: JSON.stringify({ msg91Token: savedToken, idToken: savedToken }),
           });
           if (meRes.ok) {
             const meData = await meRes.json();
             if (meData.registered) {
-              setPhone(user.phoneNumber || '');
-              setIdToken(token);
+              setIdToken(savedToken);
               setUserName(meData.name || '');
               setReferralCode(meData.referral_code || '');
               setRankData({ rank: meData.rank || 0, total: meData.total || 0, referrals: meData.referrals || 0 });
               setSurveyCompleted(meData.survey_completed || false);
-              setStep(2); // Jump straight to Dashboard
+              if (!meData.survey_completed) {
+                setStep(3); // Go straight to Survey
+              } else {
+                setStep(2); // Jump straight to Dashboard
+              }
+              setIsInitializing(false);
+              return unsubscribe;
+            } else {
+              localStorage.removeItem('2qt_auth_token');
             }
-          } else {
-            console.error("Session restore API error:", await meRes.text());
           }
         } catch (error) {
           console.error("Session restore failed:", error);
         }
       }
-      setIsInitializing(false);
-    });
 
-    return () => unsubscribe();
+      // Check for existing Firebase auth session on mount (fallback)
+      const auth = getAuth(app);
+      unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user && !savedToken) {
+          try {
+            const token = await user.getIdToken();
+            const meRes = await fetch('/api/proxy/prelaunch/me', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ idToken: token }),
+            });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              if (meData.registered) {
+                setPhone(user.phoneNumber || '');
+                setIdToken(token);
+                setUserName(meData.name || '');
+                setReferralCode(meData.referral_code || '');
+                setRankData({ rank: meData.rank || 0, total: meData.total || 0, referrals: meData.referrals || 0 });
+                setSurveyCompleted(meData.survey_completed || false);
+                if (!meData.survey_completed) {
+                  setStep(3);
+                } else {
+                  setStep(2);
+                }
+              }
+            } else {
+              console.error("Session restore API error:", await meRes.text());
+            }
+          } catch (error) {
+            console.error("Session restore failed:", error);
+          }
+        }
+        setIsInitializing(false);
+      });
+      return unsubscribe;
+    };
+
+    let unsub: any;
+    restoreSession().then(u => unsub = u);
+    return () => { if(unsub) unsub(); };
   }, []);
 
   const [step, setStep] = useState<number>(0);
@@ -76,6 +119,7 @@ export default function PreLaunchPage() {
     setUserName(data.name);
 
     if (data.alreadyRegistered) {
+      localStorage.setItem('2qt_auth_token', data.token);
       setReferralCode(data.referralCode || '');
       setRankData({ rank: data.rank || 0, total: data.total || 0, referrals: data.referrals || 0 });
       setSurveyCompleted(data.surveyCompleted || false);
@@ -103,6 +147,7 @@ export default function PreLaunchPage() {
 
         const json = await res.json();
         if (res.ok) {
+          localStorage.setItem('2qt_auth_token', data.token);
           setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
           setRankData({ rank: json.data?.rank || 0, total: json.data?.total || 0, referrals: json.data?.referrals || 0 });
           setSurveyCompleted(json.data?.survey_completed || false);
@@ -158,6 +203,7 @@ export default function PreLaunchPage() {
   };
 
   const handleLogout = async () => {
+    localStorage.removeItem('2qt_auth_token');
     const auth = getAuth(app);
     try {
       await signOut(auth);
