@@ -184,7 +184,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
               </p>
               <div className="w-full flex flex-col items-center gap-4">
                 <input
-                  type="number" placeholder="• • • • • •" value={otp} autoFocus
+                  type="text" inputMode="numeric" pattern="[0-9]*" placeholder="• • • • • •" value={otp} autoFocus
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()}
                   className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-4 px-6 text-center text-2xl font-black text-white tracking-[0.5em] outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
