@@ -43,7 +43,98 @@ router.get('/config', async (_req, res) => {
     }
 });
 
-// Register via Firebase ID token (used by PhoneAuth.tsx on the landing page)
+// ── OTP (MSG91 REST API — no widget, no reCAPTCHA) ──────────────────────────
+
+const plOtpStore = new Map<string, { otp: string; exp: number }>();
+
+router.post('/send-otp', async (req, res) => {
+    try {
+        let phone = String(req.body.phone || '').replace(/\D/g, '');
+        if (phone.length === 10) phone = '91' + phone;
+        if (!/^91\d{10}$/.test(phone))
+            return res.status(400).json({ error: 'INVALID_PHONE' });
+
+        const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit
+        plOtpStore.set(phone, { otp, exp: Date.now() + 600_000 });
+        await redis.setEx(`prelaunch_otp:${phone}`, 600, otp).catch(() => {});
+
+        const authKey    = process.env.MSG91_AUTH_KEY    || '';
+        const templateId = process.env.MSG91_TEMPLATE_ID || '';
+        if (authKey) {
+            try {
+                await fetch('https://control.msg91.com/api/v5/otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', authkey: authKey },
+                    body: JSON.stringify({ template_id: templateId, mobile: phone, otp }),
+                });
+                console.log('[PRELAUNCH OTP] Sent to', phone);
+            } catch (e: any) {
+                console.error('[PRELAUNCH OTP] MSG91 error:', e.message);
+            }
+        }
+        res.json({ sent: true });
+    } catch (err: any) {
+        console.error('[PRELAUNCH SEND_OTP]', err.message);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.post('/verify-otp', async (req, res) => {
+    try {
+        let phone = String(req.body.phone || '').replace(/\D/g, '');
+        if (phone.length === 10) phone = '91' + phone;
+        if (!/^91\d{10}$/.test(phone))
+            return res.status(400).json({ error: 'INVALID_PHONE' });
+
+        const { otp } = req.body;
+        if (!otp) return res.status(400).json({ error: 'OTP_REQUIRED' });
+
+        const storedOtp =
+            (await redis.get(`prelaunch_otp:${phone}`).catch(() => null)) ??
+            (plOtpStore.get(phone)?.exp! > Date.now() ? plOtpStore.get(phone)?.otp : undefined);
+
+        if (!storedOtp || storedOtp !== String(otp))
+            return res.status(400).json({ error: 'INVALID_OTP', message: 'Incorrect OTP. Please try again.' });
+
+        await redis.del(`prelaunch_otp:${phone}`).catch(() => {});
+        plOtpStore.delete(phone);
+
+        // Short-lived token for /register
+        const phoneToken = jwt.sign({ phone, sub: 'prelaunch' }, JWT_SECRET, { expiresIn: '10m' });
+
+        // Check registration status (same query as /me)
+        const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
+        const total = parseInt(totalRows[0].count, 10);
+        const { rows } = await query(
+            `WITH RC AS (SELECT referred_by, COUNT(*) as ref_count FROM pre_launch_registrations WHERE referred_by IS NOT NULL GROUP BY referred_by)
+             SELECT r.*, COALESCE(rc.ref_count, 0) as ref_count,
+                    RANK() OVER (ORDER BY COALESCE(rc.ref_count, 0) DESC, r.created_at ASC) as rank
+             FROM pre_launch_registrations r
+             LEFT JOIN RC rc ON r.referral_code = rc.referred_by
+             WHERE r.phone = $1 OR r.phone = $2`,
+            [phone, '+' + phone]
+        );
+
+        if (rows[0]) {
+            return res.json({
+                verified: true, phoneToken,
+                registered: true,
+                name: rows[0].name,
+                referral_code: rows[0].referral_code,
+                rank: parseInt(rows[0].rank, 10),
+                referrals: parseInt(rows[0].ref_count, 10),
+                total,
+                survey_completed: Object.keys(rows[0].survey_responses || {}).length > 0,
+            });
+        }
+        res.json({ verified: true, phoneToken, registered: false });
+    } catch (err: any) {
+        console.error('[PRELAUNCH VERIFY_OTP]', err.message);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+// ── Register via Firebase ID token (used by PhoneAuth.tsx on the landing page)
 router.post('/register', async (req, res) => {
     const parsed = z.object({
         name: z.string().min(2),
@@ -106,6 +197,16 @@ router.post('/register', async (req, res) => {
                     if (phone.length === 10) phone = '91' + phone;
                     await redis.setEx(cacheKey, 600, phone).catch(() => {});
                 }
+            }
+
+            // 4. Prelaunch phone JWT (issued by /prelaunch/verify-otp)
+            if (!phone!) {
+                try {
+                    const decoded = jwt.verify(idToken, JWT_SECRET) as any;
+                    if (decoded?.phone && decoded?.sub === 'prelaunch') {
+                        phone = decoded.phone;
+                    }
+                } catch { /* not a prelaunch phone JWT */ }
             }
 
             if (!phone!) return res.status(401).json({ error: 'INVALID_TOKEN' });
@@ -308,6 +409,16 @@ router.post('/me', async (req, res) => {
                 if (phone.length === 10) phone = '91' + phone;
                 await redis.setEx(cacheKey, 600, phone).catch(() => {});
             }
+        }
+
+        // 4. Prelaunch phone JWT (issued by /prelaunch/verify-otp)
+        if (!phone) {
+            try {
+                const decoded = jwt.verify(idToken, JWT_SECRET) as any;
+                if (decoded?.phone && decoded?.sub === 'prelaunch') {
+                    phone = decoded.phone;
+                }
+            } catch { /* not a prelaunch phone JWT */ }
         }
 
         const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
