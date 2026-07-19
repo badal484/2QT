@@ -22,6 +22,15 @@ interface Question {
 
 const QUESTIONS: Question[] = [
   {
+    id: 'mostOrderedDishes',
+    title: 'Which dishes do you order most often?',
+    subtitle: 'Select up to 5',
+    type: 'checkbox-other',
+    maxSelect: 5,
+    otherCount: 5,
+    options: ['Chicken Biryani', 'Veg Biryani', 'Fried Rice', 'Hakka Noodles', 'Chicken Roll', 'Paneer Roll', 'Burger', 'Pizza', 'Momos', 'Sandwich', 'Chole Bhature', 'Rajma Rice', 'Veg Thali', 'Chicken Thali', 'Dosa', 'Idli', 'Chow Mein', 'Pasta', 'Shawarma', 'Wraps', 'Pav Bhaji', 'Maggi', 'Cold Coffee', 'Milkshake', 'Brownie / Dessert'],
+  },
+  {
     id: 'personType',
     title: 'Which category best describes you?',
     type: 'radio-other',
@@ -52,15 +61,6 @@ const QUESTIONS: Question[] = [
     type: 'checkbox-other',
     maxSelect: 3,
     options: ['North Indian', 'Chinese', 'Biryani', 'Pizza', 'Burger', 'Rolls', 'Momos', 'Sandwiches', 'South Indian', 'Healthy Meals', 'Street Food', 'Fast Food', 'Desserts'],
-  },
-  {
-    id: 'mostOrderedDishes',
-    title: 'Which dishes do you order most often?',
-    subtitle: 'Select up to 5',
-    type: 'checkbox-other',
-    maxSelect: 5,
-    otherCount: 5,
-    options: ['Chicken Biryani', 'Veg Biryani', 'Fried Rice', 'Hakka Noodles', 'Chicken Roll', 'Paneer Roll', 'Burger', 'Pizza', 'Momos', 'Sandwich', 'Chole Bhature', 'Rajma Rice', 'Veg Thali', 'Chicken Thali', 'Dosa', 'Idli', 'Chow Mein', 'Pasta', 'Shawarma', 'Wraps', 'Pav Bhaji', 'Maggi', 'Cold Coffee', 'Milkshake', 'Brownie / Dessert'],
   },
   {
     id: 'biggestProblems',
