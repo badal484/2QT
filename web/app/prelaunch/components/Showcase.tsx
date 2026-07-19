@@ -66,7 +66,7 @@ export function Showcase() {
               <div>
                 <h3 className="font-display text-xl sm:text-2xl font-bold mb-2">Guaranteed Hot & Fresh Food</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed font-medium max-w-2xl">
-                  Every order leaves our kitchen piping hot. We deliver within our own 4km radius so your food arrives the way it was cooked — not lukewarm. If it's not hot, we make it right. No questions asked.
+                  Here, we assure you hot food. Every order leaves our kitchen piping hot. We deliver within our own 4km radius so your food arrives the way it was cooked — not lukewarm. If it's not hot, we make it right. No questions asked.
                 </p>
               </div>
             </div>
