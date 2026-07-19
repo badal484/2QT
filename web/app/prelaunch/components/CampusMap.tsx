@@ -178,22 +178,38 @@ export function CampusMap() {
           {/* map area */}
           <div className="relative w-full" style={{ paddingBottom: '68%' }}>
 
-            {/* Concentric circles */}
-            {[28, 50, 75].map((size, i) => (
-              <motion.div
-                key={size}
-                initial={{ opacity: 0, scale: 0.6 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.15 + 0.3, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute rounded-full border border-dashed border-white/10 -translate-x-1/2 -translate-y-1/2"
-                style={{ width: `${size}%`, paddingBottom: `${size}%`, left: '47%', top: '50%' }}
-              >
-                <span className="absolute top-1 right-1 text-[9px] font-bold text-zinc-600 bg-[#0a0a14] px-1 rounded">
-                  {['1 KM', '3 KM', '5 KM'][i]}
-                </span>
-              </motion.div>
-            ))}
+            {/* SVG concentric rings — perfect circles that never clip */}
+            <svg
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              viewBox="0 0 100 68"
+              aria-hidden="true"
+            >
+              {[
+                { r: 13, label: '1 KM' },
+                { r: 23, label: '3 KM' },
+                { r: 34, label: '5 KM' },
+              ].map(({ r, label }) => (
+                <g key={r}>
+                  <circle
+                    cx="47" cy="34" r={r}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.10)"
+                    strokeWidth="0.3"
+                    strokeDasharray="2 1.5"
+                  />
+                  <text
+                    x={47 + r * 0.707 + 0.5}
+                    y={34 - r * 0.707 - 0.5}
+                    fill="rgba(90,90,110,0.9)"
+                    fontSize="2.2"
+                    fontWeight="bold"
+                    fontFamily="system-ui,sans-serif"
+                  >
+                    {label}
+                  </text>
+                </g>
+              ))}
+            </svg>
 
             {/* Center pin */}
             <div className="absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center" style={{ left: '47%', top: '50%' }}>
@@ -219,7 +235,7 @@ export function CampusMap() {
                 style={{ top: `${pin.top}%`, left: `${pin.left}%`, transform: 'translate(-50%, -50%)' }}
               >
                 {pin.align === 'left' && (
-                  <span className="text-[8px] sm:text-[9px] font-bold text-right max-w-[80px] leading-tight"
+                  <span className="hidden sm:inline text-[9px] font-bold text-right max-w-[80px] leading-tight"
                     style={{ color: pin.color }}>
                     {pin.label}
                   </span>
@@ -227,7 +243,7 @@ export function CampusMap() {
                 <div className="w-2 h-2 rounded-full flex-shrink-0 shadow-sm group-hover:scale-150 transition-transform"
                   style={{ backgroundColor: pin.color, boxShadow: `0 0 6px ${pin.color}80` }} />
                 {pin.align === 'right' && (
-                  <span className="text-[8px] sm:text-[9px] font-bold max-w-[80px] leading-tight"
+                  <span className="hidden sm:inline text-[9px] font-bold max-w-[80px] leading-tight"
                     style={{ color: pin.color }}>
                     {pin.label}
                   </span>
