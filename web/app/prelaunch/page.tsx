@@ -16,7 +16,6 @@ export default function PreLaunchPage() {
   const [referredBy, setReferredBy] = useState<string | null>(null);
   
   const [isInitializing, setIsInitializing] = useState(true);
-  const [bgVideoUrl, setBgVideoUrl] = useState('');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -24,14 +23,6 @@ export default function PreLaunchPage() {
       const ref = urlParams.get('ref');
       if (ref) setReferredBy(ref);
     }
-
-    fetch('/api/proxy/prelaunch/config')
-      .then(r => r.json())
-      .then(d => {
-        const vid = d.config?.prelaunch_bg_video_url;
-        if (vid) setBgVideoUrl(String(vid));
-      })
-      .catch(() => {});
 
     const restoreSession = async () => {
       let unsubscribe = () => {};
@@ -240,29 +231,16 @@ export default function PreLaunchPage() {
   };
 
   return (
-    <div className={`min-h-screen text-zinc-100 relative font-sans overflow-x-hidden selection:bg-brand-primary selection:text-white ${bgVideoUrl ? 'bg-transparent' : 'bg-[#05050A]'}`}>
+    <div className="min-h-screen bg-[#05050A] text-zinc-100 relative font-sans overflow-x-hidden selection:bg-brand-primary selection:text-white">
       
       {/* Global Background Layer */}
-      <div className={`fixed inset-0 pointer-events-none -z-10 ${bgVideoUrl ? 'bg-transparent' : 'bg-[#05050A]'}`}>
-        {bgVideoUrl ? (
-          <>
-            <video
-              src={bgVideoUrl}
-              autoPlay muted loop playsInline
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black/65" />
-          </>
-        ) : (
-          <>
-            <motion.div
-              animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -top-[20%] -right-[10%] w-[70vw] h-[70vw] bg-brand-primary/20 rounded-full blur-[120px]"
-            />
-            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]" />
-          </>
-        )}
+      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#05050A]">
+        <motion.div
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-[20%] -right-[10%] w-[70vw] h-[70vw] bg-brand-primary/20 rounded-full blur-[120px]"
+        />
+        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]"></div>
       </div>
 
       <AnimatePresence mode="wait">
