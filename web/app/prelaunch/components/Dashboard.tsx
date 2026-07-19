@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, CheckCircle2, ChevronRight, Share2, Rocket, Lock, LogOut, Wallet, Gift } from 'lucide-react';
+import { Copy, CheckCircle2, ChevronRight, Share2, Rocket, Lock, LogOut, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DashboardProps {
@@ -17,21 +17,12 @@ interface DashboardProps {
 function calcWallet(referrals: number, surveyCompleted: boolean) {
   const base = surveyCompleted ? 100 : 0;
   const perRef = referrals * 10;
-  const m5 = referrals >= 5 ? 25 : 0;
-  const m10 = referrals >= 10 ? 50 : 0;
-  return { base, perRef, m5, m10, total: base + perRef + m5 + m10 };
-}
-
-function nextMilestone(referrals: number): { target: number; bonus: number } | null {
-  if (referrals < 5) return { target: 5, bonus: 25 };
-  if (referrals < 10) return { target: 10, bonus: 50 };
-  return null;
+  return { base, perRef, total: base + perRef };
 }
 
 export function Dashboard({ rank, total, referrals, referralCode, name, surveyCompleted, onOpenSurvey, onLogout }: DashboardProps) {
   const [copied, setCopied] = useState(false);
   const wallet = calcWallet(referrals, surveyCompleted);
-  const milestone = nextMilestone(referrals);
 
   const handleCopy = () => {
     const link = typeof window !== 'undefined'
@@ -135,52 +126,7 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
             <span className="font-bold text-brand-primary">+₹{wallet.perRef}</span>
           </div>
 
-          {/* Milestone: 5 referrals */}
-          <div className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm ${wallet.m5 > 0 ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-white/5 border border-white/8 opacity-50'}`}>
-            <div className="flex items-center gap-2">
-              <Gift className="w-4 h-4 text-purple-400 shrink-0" />
-              <span className={`font-medium ${wallet.m5 > 0 ? 'text-purple-300' : 'text-zinc-500'}`}>
-                Milestone bonus — 5 referrals
-              </span>
-            </div>
-            <span className={`font-bold ${wallet.m5 > 0 ? 'text-purple-400' : 'text-zinc-600'}`}>
-              {wallet.m5 > 0 ? '+₹25' : '₹25'}
-            </span>
-          </div>
-
-          {/* Milestone: 10 referrals */}
-          <div className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm ${wallet.m10 > 0 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/5 border border-white/8 opacity-50'}`}>
-            <div className="flex items-center gap-2">
-              <Gift className="w-4 h-4 text-yellow-400 shrink-0" />
-              <span className={`font-medium ${wallet.m10 > 0 ? 'text-yellow-300' : 'text-zinc-500'}`}>
-                Milestone bonus — 10 referrals
-              </span>
-            </div>
-            <span className={`font-bold ${wallet.m10 > 0 ? 'text-yellow-400' : 'text-zinc-600'}`}>
-              {wallet.m10 > 0 ? '+₹50' : '₹50'}
-            </span>
-          </div>
         </div>
-
-        {/* Next milestone progress */}
-        {milestone && (
-          <div className="relative z-10 rounded-xl bg-black/20 border border-white/8 px-4 py-3">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs text-zinc-400 font-semibold">
-                {milestone.target - referrals} more referral{milestone.target - referrals !== 1 ? 's' : ''} → unlock +₹{milestone.bonus} bonus
-              </span>
-              <span className="text-xs text-zinc-500 font-bold">{referrals}/{milestone.target}</span>
-            </div>
-            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-              <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-brand-primary to-orange-400"
-                initial={{ width: 0 }}
-                animate={{ width: `${(referrals / milestone.target) * 100}%` }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              />
-            </div>
-          </div>
-        )}
       </motion.div>
 
       {/* Rank + Referrals stats */}
