@@ -17,6 +17,7 @@ interface Question {
   maxSelect?: number;
   placeholder?: string;
   optional?: boolean;
+  otherCount?: number; // how many custom text inputs to show for "Other"
 }
 
 const QUESTIONS: Question[] = [
@@ -58,6 +59,7 @@ const QUESTIONS: Question[] = [
     subtitle: 'Select up to 5',
     type: 'checkbox-other',
     maxSelect: 5,
+    otherCount: 5,
     options: ['Chicken Biryani', 'Veg Biryani', 'Fried Rice', 'Hakka Noodles', 'Chicken Roll', 'Paneer Roll', 'Burger', 'Pizza', 'Momos', 'Sandwich', 'Chole Bhature', 'Rajma Rice', 'Veg Thali', 'Chicken Thali', 'Dosa', 'Idli', 'Chow Mein', 'Pasta', 'Shawarma', 'Wraps', 'Pav Bhaji', 'Maggi', 'Cold Coffee', 'Milkshake', 'Brownie / Dessert'],
   },
   {
@@ -105,6 +107,19 @@ const QUESTIONS: Question[] = [
   },
 ];
 
+function getOtherValues(qId: string, otherCount: number, inputs: Record<string, string>): string[] {
+  if (otherCount <= 1) {
+    const v = (inputs[qId] || '').trim();
+    return v ? [v] : [];
+  }
+  const result: string[] = [];
+  for (let i = 0; i < otherCount; i++) {
+    const v = (inputs[`${qId}_${i}`] || '').trim();
+    if (v) result.push(v);
+  }
+  return result;
+}
+
 export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) => void }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [data, setData]               = useState<Record<string, string | string[]>>({});
@@ -149,7 +164,10 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
       return val === OTHER ? Boolean(other) : true;
     }
     if (checkArr.length === 0) return false;
-    if (q.type === 'checkbox-other' && checkArr.includes(OTHER)) return Boolean(other);
+    if (q.type === 'checkbox-other' && checkArr.includes(OTHER)) {
+      const count = q.otherCount ?? 1;
+      return getOtherValues(q.id, count, otherInputs).length > 0;
+    }
     return true;
   }, [data, otherInputs, q, checkArr]);
 
@@ -164,7 +182,14 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
         result[question.id] = val === OTHER ? (other || '') : String(val || '');
       } else {
         const arr = Array.isArray(val) ? val : [];
-        result[question.id] = arr.map(v => v === OTHER ? (other ? `Other: ${other}` : 'Other') : v);
+        const count = question.otherCount ?? 1;
+        const nonOther = arr.filter(v => v !== OTHER).length;
+        const maxCustom = Math.max(1, Math.min(count, (question.maxSelect ?? count) - nonOther));
+        result[question.id] = arr.flatMap(v => {
+          if (v !== OTHER) return [v];
+          const customs = getOtherValues(question.id, maxCustom, otherInputs);
+          return customs.length > 0 ? customs : ['Other'];
+        });
       }
     }
     return result;
@@ -375,12 +400,24 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                         </span>
                       </button>
                       {checkArr.includes(OTHER) && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-1">
-                          <input autoFocus type="text" placeholder="Please specify…"
-                            value={otherInputs[q.id] || ''}
-                            onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                            className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-6 py-4 text-white text-sm font-bold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner flex-shrink-0"
-                          />
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-1 space-y-2">
+                          {(q.otherCount ?? 1) > 1 ? (
+                            Array.from({ length: Math.max(1, Math.min(q.otherCount!, (q.maxSelect ?? q.otherCount!) - nonOtherCount)) }).map((_, i) => (
+                              <input key={i} type={i === 0 ? 'text' : 'text'}
+                                autoFocus={i === 0}
+                                placeholder={i === 0 ? 'Dish name (required)' : `Dish name ${i + 1} (optional)`}
+                                value={otherInputs[`${q.id}_${i}`] || ''}
+                                onChange={e => setOtherInputs(prev => ({ ...prev, [`${q.id}_${i}`]: e.target.value }))}
+                                className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-6 py-3.5 text-white text-sm font-bold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner"
+                              />
+                            ))
+                          ) : (
+                            <input autoFocus type="text" placeholder="Please specify…"
+                              value={otherInputs[q.id] || ''}
+                              onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
+                              className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-6 py-4 text-white text-sm font-bold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner flex-shrink-0"
+                            />
+                          )}
                         </motion.div>
                       )}
                     </>

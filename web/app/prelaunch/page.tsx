@@ -268,7 +268,12 @@ export default function PreLaunchPage() {
           </motion.div>
         )}
 
-        {step === 2 && (
+        {step === 2 && !surveyCompleted && (
+          // Safety net: if somehow we hit step 2 without survey done, redirect to survey
+          (() => { setTimeout(() => setStep(3), 0); return null; })()
+        )}
+
+        {step === 2 && surveyCompleted && (
           <motion.div key="dashboard" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
              <Dashboard
                rank={rankData?.rank || 0}
