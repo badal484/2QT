@@ -66,6 +66,7 @@ router.post('/send-otp', async (req, res) => {
         const authKey    = process.env.MSG91_AUTH_KEY    || '524621TvewiLzS6a5add22P1';
         const templateId = process.env.MSG91_TEMPLATE_ID || '6a5ae4478f489f578300d262';
 
+        let msg91Data: any = null;
         if (authKey && templateId) {
             try {
                 // MSG91 /otp endpoint — pass our own OTP so it fills ##OTP## in the template
@@ -81,7 +82,7 @@ router.post('/send-otp', async (req, res) => {
                         otp: otp,         // fills ##OTP## in the template
                     })
                 });
-                const msg91Data = await msg91Res.json().catch(() => ({})) as any;
+                msg91Data = await msg91Res.json().catch(() => ({}));
                 console.log('[PRELAUNCH OTP] MSG91 response:', JSON.stringify(msg91Data));
 
                 if (msg91Data.type === 'success') {
@@ -91,12 +92,13 @@ router.post('/send-otp', async (req, res) => {
                 }
             } catch (e: any) {
                 console.error('[PRELAUNCH OTP] MSG91 fetch error:', e.message);
+                msg91Data = { error: e.message };
             }
         } else {
             console.warn('[PRELAUNCH OTP] MSG91 credentials missing — SMS not sent');
         }
 
-        res.json({ sent: true });
+        res.json({ sent: true, debug: msg91Data });
     } catch (err: any) {
         console.error('[PRELAUNCH SEND_OTP]', err.message);
         res.status(500).json({ error: 'SERVER_ERROR' });
