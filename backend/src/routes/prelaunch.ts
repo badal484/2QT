@@ -63,21 +63,40 @@ router.post('/send-otp', async (req, res) => {
         await redis.setEx(`prelaunch_otp:${phone}`, 600, otp).catch(() => {});
         console.log(`[PRELAUNCH OTP] ${phone} → ${otp}`);
 
-        const authKey    = process.env.MSG91_AUTH_KEY    || '524621TvewiLzS6a5add22P1';
-        const templateId = process.env.MSG91_TEMPLATE_ID || '6a5ae4478f489f578300d262';
-        try {
-            await (await import('axios')).default.post(
-                'https://control.msg91.com/api/v5/otp',
-                { template_id: templateId, mobile: phone, otp },
-                { headers: { 'Content-Type': 'application/json', authkey: authKey } }
-            );
-            console.log('[PRELAUNCH OTP] MSG91 SMS dispatched');
-        } catch (e: any) {
-            console.error('[PRELAUNCH OTP] MSG91 error:', e?.response?.data || e.message);
+        const authKey    = process.env.MSG91_AUTH_KEY    || '';
+        const templateId = process.env.MSG91_TEMPLATE_ID || '';
+
+        if (authKey && templateId) {
+            try {
+                // MSG91 /otp endpoint — pass our own OTP so it fills ##OTP## in the template
+                const msg91Res = await fetch('https://control.msg91.com/api/v5/otp', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'authkey': authKey
+                    },
+                    body: JSON.stringify({ 
+                        template_id: templateId, 
+                        mobile: phone,    // e.g. 916204646300
+                        otp: otp,         // fills ##OTP## in the template
+                    })
+                });
+                const msg91Data = await msg91Res.json().catch(() => ({})) as any;
+                console.log('[PRELAUNCH OTP] MSG91 response:', JSON.stringify(msg91Data));
+
+                if (msg91Data.type === 'success') {
+                    console.log('[PRELAUNCH OTP] SMS sent successfully via MSG91');
+                } else {
+                    console.error('[PRELAUNCH OTP] MSG91 rejected:', msg91Data.message || msg91Data);
+                }
+            } catch (e: any) {
+                console.error('[PRELAUNCH OTP] MSG91 fetch error:', e.message);
+            }
+        } else {
+            console.warn('[PRELAUNCH OTP] MSG91 credentials missing — SMS not sent');
         }
 
-        // Return OTP in response (same as auth.ts — SMS has telecom issues)
-        res.json({ sent: true, devOtp: otp });
+        res.json({ sent: true });
     } catch (err: any) {
         console.error('[PRELAUNCH SEND_OTP]', err.message);
         res.status(500).json({ error: 'SERVER_ERROR' });
