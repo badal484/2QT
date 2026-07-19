@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Landing } from './components/Landing';
 import { PhoneAuth } from './components/PhoneAuth';
@@ -8,7 +8,6 @@ import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { app } from '../lib/firebase';
 import { SurveyWizard, SurveyData } from './components/SurveyWizard';
 import { Dashboard } from './components/Dashboard';
-import { LiveCounter } from './components/LiveCounter';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
@@ -108,7 +107,7 @@ export default function PreLaunchPage() {
   }, []);
 
   const [step, setStep] = useState<number>(0);
-  const [phone, setPhone] = useState('');
+  const [, setPhone] = useState('');
   const [idToken, setIdToken] = useState('');
   const [userName, setUserName] = useState('');
   const [referralCode, setReferralCode] = useState('');
@@ -151,7 +150,9 @@ export default function PreLaunchPage() {
 
         const json = await res.json();
         if (res.ok) {
-          localStorage.setItem('2qt_auth_token', json.sessionToken || data.token);
+          const token = json.sessionToken || data.token;
+          localStorage.setItem('2qt_auth_token', token);
+          setIdToken(token);
           setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
           setRankData({ rank: json.data?.rank || 0, total: json.data?.total || 0, referrals: json.data?.referrals || 0 });
           setSurveyCompleted(json.data?.survey_completed || false);

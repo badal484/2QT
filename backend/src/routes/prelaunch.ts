@@ -368,8 +368,10 @@ router.post('/register', async (req, res) => {
         const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
         
         const surveyCompleted = Object.keys(surveyResponses ?? {}).length > 0;
+        const sessionToken = jwt.sign({ phone, sub: 'prelaunch' }, JWT_SECRET, { expiresIn: '30d' });
         res.status(201).json({
             success: true,
+            sessionToken,
             data: {
                 ...regRows[0],
                 rank: parseInt(rankRows[0]?.rank || '0', 10),
