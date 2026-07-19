@@ -27,7 +27,10 @@ export default function PreLaunchPage() {
 
     fetch('/api/proxy/prelaunch/config')
       .then(r => r.json())
-      .then(d => { if (d.config?.prelaunch_bg_video_url) setBgVideoUrl(d.config.prelaunch_bg_video_url); })
+      .then(d => {
+        const vid = d.config?.prelaunch_bg_video_url;
+        if (vid) setBgVideoUrl(String(vid));
+      })
       .catch(() => {});
 
     const restoreSession = async () => {
