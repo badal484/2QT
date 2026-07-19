@@ -152,6 +152,7 @@ const fadeUp = {
 
 export function CampusMap() {
   const [active, setActive] = useState<string | null>(null);
+  const [tappedPin, setTappedPin] = useState<string | null>(null);
 
   return (
     <section className="relative py-12 sm:py-24 px-4 sm:px-6 overflow-hidden">
@@ -243,9 +244,20 @@ export function CampusMap() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.04 + 0.5, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute z-10 flex items-center gap-1 group cursor-default"
+                className="absolute z-10 flex items-center gap-1 group cursor-pointer"
                 style={{ top: `${pin.top}%`, left: `${pin.left}%`, transform: 'translate(-50%, -50%)' }}
+                onClick={() => setTappedPin(tappedPin === pin.label ? null : pin.label)}
               >
+                {/* Mobile tooltip on tap */}
+                {tappedPin === pin.label && (
+                  <div
+                    className="sm:hidden absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 z-30 px-2 py-1 rounded-lg text-[9px] font-bold whitespace-nowrap shadow-xl pointer-events-none"
+                    style={{ backgroundColor: pin.color, color: '#000' }}
+                  >
+                    {pin.label}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent" style={{ borderTopColor: pin.color }} />
+                  </div>
+                )}
                 {pin.align === 'left' && (
                   <span className="hidden sm:inline text-[9px] font-bold text-right max-w-[80px] leading-tight"
                     style={{ color: pin.color }}>
