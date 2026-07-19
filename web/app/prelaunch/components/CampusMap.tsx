@@ -139,11 +139,11 @@ const PINS: Pin[] = [
   { label: "Career Launcher",           color: '#ec4899', top: 82, left: 62, align: 'right' }, // ~2.5 km SE
 
   // ── RIMS cluster (red) — 3.2 km by road, NNE of Lalpur ───────────
-  { label: "RIMS Medical College",       color: '#ef4444', top: 14, left: 56, align: 'right' },
-  { label: "RIMS Nursing College",       color: '#ef4444', top: 18, left: 60, align: 'right' },
-  { label: "RIMS Dental College",        color: '#ef4444', top: 22, left: 63, align: 'right' },
-  { label: "RIMS Paramedical",           color: '#ef4444', top: 27, left: 61, align: 'right' },
-  { label: "RIMS Boys' Hostels",         color: '#ef4444', top: 32, left: 58, align: 'right' },
+  { label: "RIMS Medical College",       color: '#ef4444', top: 15, left: 57, align: 'right' },
+  { label: "RIMS Nursing College",       color: '#ef4444', top: 12, left: 61, align: 'right' },
+  { label: "RIMS Dental College",        color: '#ef4444', top: 19, left: 64, align: 'right' },
+  { label: "RIMS Paramedical",           color: '#ef4444', top: 22, left: 60, align: 'right' },
+  { label: "RIMS Boys' Hostels",         color: '#ef4444', top: 17, left: 55, align: 'right' },
 ];
 
 const fadeUp = {
@@ -155,7 +155,7 @@ export function CampusMap() {
   const [active, setActive] = useState<string | null>(null);
 
   return (
-    <section className="relative py-24 px-4 sm:px-6 overflow-hidden">
+    <section className="relative py-12 sm:py-24 px-4 sm:px-6 overflow-hidden">
       {/* background glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-brand-primary/10 rounded-full blur-[120px]" />
@@ -167,7 +167,7 @@ export function CampusMap() {
         <motion.div
           initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }} transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-8 sm:mb-16"
         >
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-xs font-bold uppercase tracking-widest mb-5">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
@@ -211,10 +211,10 @@ export function CampusMap() {
                     strokeDasharray="2 1.5"
                   />
                   <text
-                    x={47 + r * 0.707 + 0.5}
-                    y={34 - r * 0.707 - 0.5}
-                    fill="rgba(90,90,110,0.9)"
-                    fontSize="2.2"
+                    x={47 + r * 0.707 + 0.8}
+                    y={34 - r * 0.707 - 0.8}
+                    fill="rgba(110,110,130,1)"
+                    fontSize="3"
                     fontWeight="bold"
                     fontFamily="system-ui,sans-serif"
                   >
@@ -253,8 +253,8 @@ export function CampusMap() {
                     {pin.label}
                   </span>
                 )}
-                <div className="w-2 h-2 rounded-full flex-shrink-0 shadow-sm group-hover:scale-150 transition-transform"
-                  style={{ backgroundColor: pin.color, boxShadow: `0 0 6px ${pin.color}80` }} />
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm group-hover:scale-150 transition-transform"
+                  style={{ backgroundColor: pin.color, boxShadow: `0 0 8px ${pin.color}90` }} />
                 {pin.align === 'right' && (
                   <span className="hidden sm:inline text-[9px] font-bold max-w-[80px] leading-tight"
                     style={{ color: pin.color }}>
