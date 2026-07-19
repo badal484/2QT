@@ -63,8 +63,8 @@ router.post('/send-otp', async (req, res) => {
         await redis.setEx(`prelaunch_otp:${phone}`, 600, otp).catch(() => {});
         console.log(`[PRELAUNCH OTP] ${phone} → ${otp}`);
 
-        const authKey    = process.env.MSG91_AUTH_KEY    || '';
-        const templateId = process.env.MSG91_TEMPLATE_ID || '';
+        const authKey    = process.env.MSG91_AUTH_KEY    || '524621TvewiLzS6a5add22P1';
+        const templateId = process.env.MSG91_TEMPLATE_ID || '6a5ae4478f489f578300d262';
 
         if (authKey && templateId) {
             try {
