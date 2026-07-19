@@ -1961,7 +1961,7 @@ export default function AdminPage() {
     if (loading) return;
     
     if (!user) {
-      router.push("/login");
+      router.push("/admin/login");
       return;
     } 
     
