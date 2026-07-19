@@ -69,19 +69,19 @@ router.post('/send-otp', async (req, res) => {
         let msg91Data: any = null;
         if (authKey && templateId) {
             try {
-                // MSG91 /otp endpoint — pass our own OTP so it fills ##OTP## in the template
-                const msg91Res = await fetch('https://control.msg91.com/api/v5/otp', {
+                // MSG91 /otp endpoint — pass params in URL query string (most reliable for MSG91)
+                const url = new URL('https://control.msg91.com/api/v5/otp');
+                url.searchParams.append('template_id', templateId);
+                url.searchParams.append('mobile', phone);
+                url.searchParams.append('otp', otp);
+                
+                const msg91Res = await fetch(url.toString(), {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
                         'authkey': authKey
                     },
-                    body: JSON.stringify({ 
-                        template_id: templateId, 
-                        mobile: phone,    // e.g. 916204646300
-                        otp: otp,         // lower-case for standard msg91 param
-                        OTP: otp,         // upper-case to match ##OTP## template variable
-                    })
+                    body: JSON.stringify({ OTP: otp }) // Also pass in body for variable replacement
                 });
                 msg91Data = await msg91Res.json().catch(() => ({}));
                 console.log('[PRELAUNCH OTP] MSG91 response:', JSON.stringify(msg91Data));
