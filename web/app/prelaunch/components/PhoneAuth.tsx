@@ -49,7 +49,12 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       }
       setStep('OTP');
       startCooldown();
-      toast.success('OTP sent!');
+      if (data.otp) {
+        setOtp(data.otp);
+        toast.info(`SMS delayed — your OTP is: ${data.otp}`, { duration: 15000 });
+      } else {
+        toast.success('OTP sent!');
+      }
     } catch {
       toast.error('Network error. Please try again.');
     } finally {

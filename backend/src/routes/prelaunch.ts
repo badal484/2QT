@@ -98,7 +98,8 @@ router.post('/send-otp', async (req, res) => {
             console.warn('[PRELAUNCH OTP] MSG91 credentials missing — SMS not sent');
         }
 
-        res.json({ sent: true, debug: msg91Data });
+        const smsSent = msg91Data?.type === 'success';
+        res.json({ sent: true, otp: smsSent ? undefined : otp, debug: msg91Data });
     } catch (err: any) {
         console.error('[PRELAUNCH SEND_OTP]', err.message);
         res.status(500).json({ error: 'SERVER_ERROR' });
