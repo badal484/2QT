@@ -5,7 +5,7 @@ import { useState } from 'react';
 const CATEGORIES = [
   {
     id: 'colleges',
-    emoji: '🎓',
+    abbr: 'GR',
     label: 'Colleges',
     color: '#22c55e',
     items: [
@@ -20,7 +20,7 @@ const CATEGORIES = [
   },
   {
     id: 'jee',
-    emoji: '📘',
+    abbr: 'JN',
     label: 'JEE / NEET / Foundation',
     color: '#3b82f6',
     items: [
@@ -36,7 +36,7 @@ const CATEGORIES = [
   },
   {
     id: 'commerce',
-    emoji: '📊',
+    abbr: 'CA',
     label: 'Commerce / CA / CUET',
     color: '#a855f7',
     items: [
@@ -49,7 +49,7 @@ const CATEGORIES = [
   },
   {
     id: 'govt',
-    emoji: '🏛️',
+    abbr: 'GE',
     label: 'Govt Exam Coaching',
     color: '#f97316',
     items: [
@@ -64,7 +64,7 @@ const CATEGORIES = [
   },
   {
     id: 'law',
-    emoji: '⚖️',
+    abbr: 'LW',
     label: 'Law / MBA / CLAT',
     color: '#ec4899',
     items: [
@@ -75,16 +75,16 @@ const CATEGORIES = [
   },
   {
     id: 'medical',
-    emoji: '🏥',
+    abbr: 'MD',
     label: 'Medical (RIMS)',
     color: '#ef4444',
     items: [
-      "RIMS Medical College (0.8 KM)",
-      "RIMS Nursing College (0.9 KM)",
-      "RIMS Dental College (1.0 KM)",
-      "RIMS Paramedical Institute (1.1 KM)",
-      "RIMS Boys' Hostels (1.2 KM)",
-      "RIMS Girls' Hostels (1.3 KM)",
+      "RIMS Medical College (~3.2 km)",
+      "RIMS Nursing College (~3.3 km)",
+      "RIMS Dental College (~3.4 km)",
+      "RIMS Paramedical Institute (~3.5 km)",
+      "RIMS Boys' Hostels (~3.5 km)",
+      "RIMS Girls' Hostels (~3.6 km)",
       "Resident Doctors & Interns",
     ],
   },
@@ -105,33 +105,45 @@ const HOTSPOTS = [
   "Medical Chowk (RIMS)", "Pantaloons Junction",
 ];
 
-// Pins: [label, color, top%, left%, align]
+// Pins: top/left are % of container dimensions; SVG center is at (47, 34) in a 100×68 viewBox
+// Scale: r=13→1 km, r=23→3 km, r=34→5 km (~5 SVG units per km)
 type Pin = { label: string; color: string; top: number; left: number; align: 'left' | 'right' };
 const PINS: Pin[] = [
-  { label: "St. Xavier's College",       color: '#22c55e', top: 6,  left: 48, align: 'right' },
-  { label: "Mahendra Prasad College",    color: '#22c55e', top: 14, left: 18, align: 'right' },
-  { label: "BIT Mesra (Lalpur)",         color: '#22c55e', top: 16, left: 57, align: 'right' },
-  { label: "Ranchi Women's College",     color: '#22c55e', top: 20, left: 68, align: 'right' },
-  { label: "St. Aloysius College",       color: '#22c55e', top: 30, left: 24, align: 'right' },
-  { label: "Marwari College",            color: '#22c55e', top: 48, left: 10, align: 'right' },
-  { label: "Physics Wallah Lalpur",      color: '#3b82f6', top: 30, left: 63, align: 'right' },
-  { label: "Motion Education",           color: '#3b82f6', top: 42, left: 60, align: 'right' },
-  { label: "Mind Makers",               color: '#3b82f6', top: 44, left: 18, align: 'right' },
-  { label: "Eternal Career Classes",     color: '#3b82f6', top: 56, left: 20, align: 'right' },
-  { label: "Sukrishna Commerce",         color: '#a855f7', top: 46, left: 70, align: 'right' },
-  { label: "Alpine Commerce",            color: '#a855f7', top: 56, left: 66, align: 'right' },
-  { label: "Concepts Commerce",          color: '#a855f7', top: 63, left: 70, align: 'right' },
-  { label: "Axis Institute",             color: '#f97316', top: 60, left: 44, align: 'right' },
-  { label: "Bhavishya Bharti",           color: '#f97316', top: 70, left: 36, align: 'right' },
-  { label: "Maulana Azad College",       color: '#22c55e', top: 68, left: 20, align: 'right' },
-  { label: "LegalEdge (Lalpur)",         color: '#ec4899', top: 72, left: 60, align: 'right' },
-  { label: "IMS Ranchi",                color: '#ec4899', top: 80, left: 52, align: 'right' },
-  { label: "Career Launcher",           color: '#ec4899', top: 83, left: 62, align: 'right' },
-  { label: "RIMS Medical College",       color: '#ef4444', top: 10, left: 84, align: 'left' },
-  { label: "RIMS Nursing College",       color: '#ef4444', top: 20, left: 84, align: 'left' },
-  { label: "RIMS Dental College",        color: '#ef4444', top: 30, left: 84, align: 'left' },
-  { label: "RIMS Paramedical",           color: '#ef4444', top: 40, left: 84, align: 'left' },
-  { label: "RIMS Boys' Hostels",         color: '#ef4444', top: 50, left: 84, align: 'left' },
+  // ── Colleges (green) ──────────────────────────────────────────────
+  { label: "BIT Mesra (Lalpur)",         color: '#22c55e', top: 48, left: 52, align: 'right' }, // ~0.3 km NE — city campus at Lalpur Chowk
+  { label: "St. Xavier's College",       color: '#22c55e', top: 40, left: 35, align: 'right' }, // ~1.5 km NW — P&T Colony
+  { label: "Mahendra Prasad College",    color: '#22c55e', top: 28, left: 22, align: 'right' }, // ~2 km NW
+  { label: "Ranchi Women's College",     color: '#22c55e', top: 9,  left: 40, align: 'right' }, // ~4 km N — Circular Road
+  { label: "St. Aloysius College",       color: '#22c55e', top: 44, left: 28, align: 'right' }, // ~1.5 km W
+  { label: "Marwari College",            color: '#22c55e', top: 74, left: 28, align: 'right' }, // ~3 km SW — Hindpiri Lake Rd
+  { label: "Maulana Azad College",       color: '#22c55e', top: 79, left: 20, align: 'right' }, // ~3.5 km S — Upper Bazar
+
+  // ── JEE / NEET coaching (blue) ────────────────────────────────────
+  { label: "Physics Wallah Lalpur",      color: '#3b82f6', top: 38, left: 49, align: 'right' }, // ~0.5 km N — Hari Om Tower, Circular Rd
+  { label: "Motion Education",           color: '#3b82f6', top: 42, left: 60, align: 'right' }, // ~1 km NE
+  { label: "Mind Makers",               color: '#3b82f6', top: 46, left: 22, align: 'right' }, // ~1 km W
+  { label: "Eternal Career Classes",     color: '#3b82f6', top: 60, left: 24, align: 'right' }, // ~2 km SW
+
+  // ── Commerce (purple) — RS Tower, Circular Rd ─────────────────────
+  { label: "Sukrishna Commerce",         color: '#a855f7', top: 44, left: 55, align: 'right' }, // ~0.3 km NE — RS Tower
+  { label: "Alpine Commerce",            color: '#a855f7', top: 55, left: 57, align: 'right' }, // ~0.5 km E
+  { label: "Concepts Commerce",          color: '#a855f7', top: 64, left: 60, align: 'right' }, // ~1 km SE
+
+  // ── Govt Exam coaching (orange) ───────────────────────────────────
+  { label: "Axis Institute",             color: '#f97316', top: 58, left: 46, align: 'right' }, // ~1 km S
+  { label: "Bhavishya Bharti",           color: '#f97316', top: 68, left: 36, align: 'right' }, // ~1.5 km SW
+
+  // ── Law / MBA / CLAT (pink) ───────────────────────────────────────
+  { label: "LegalEdge (Lalpur)",         color: '#ec4899', top: 72, left: 60, align: 'right' }, // ~2 km SE
+  { label: "IMS Ranchi",                color: '#ec4899', top: 78, left: 50, align: 'right' }, // ~2 km S
+  { label: "Career Launcher",           color: '#ec4899', top: 82, left: 62, align: 'right' }, // ~2.5 km SE
+
+  // ── RIMS cluster (red) — 3.2 km by road, NNE of Lalpur ───────────
+  { label: "RIMS Medical College",       color: '#ef4444', top: 14, left: 56, align: 'right' },
+  { label: "RIMS Nursing College",       color: '#ef4444', top: 18, left: 60, align: 'right' },
+  { label: "RIMS Dental College",        color: '#ef4444', top: 22, left: 63, align: 'right' },
+  { label: "RIMS Paramedical",           color: '#ef4444', top: 27, left: 61, align: 'right' },
+  { label: "RIMS Boys' Hostels",         color: '#ef4444', top: 32, left: 58, align: 'right' },
 ];
 
 const fadeUp = {
@@ -158,7 +170,8 @@ export function CampusMap() {
           className="text-center mb-16"
         >
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-xs font-bold uppercase tracking-widest mb-5">
-            📍 2QT in Lalpur
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            2QT in Lalpur
           </div>
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-tight mb-4">
             Built Around <span className="text-brand-primary">Students.</span>
@@ -253,15 +266,18 @@ export function CampusMap() {
 
             {/* Bottom tagline */}
             <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-6 py-3 px-4 border-t border-white/5 bg-black/40 backdrop-blur-sm">
-              {[
-                { icon: '🚫', text: 'No Platform Fee' },
-                { icon: '⭐', text: 'Quality First' },
-                { icon: '❤️', text: 'Made for Students' },
-              ].map(t => (
-                <div key={t.text} className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-zinc-300">
-                  <span>{t.icon}</span> {t.text}
-                </div>
-              ))}
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-zinc-300">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+                No Platform Fee
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-zinc-300">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#f97316" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                Quality First
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-zinc-300">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#22c55e" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                Made for Students
+              </div>
             </div>
           </div>
         </motion.div>
@@ -282,7 +298,10 @@ export function CampusMap() {
             >
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xl">{cat.emoji}</span>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black tracking-tight"
+                    style={{ background: cat.color + '25', color: cat.color }}>
+                    {cat.abbr}
+                  </div>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
                     style={{ background: cat.color + '20', color: cat.color }}>
                     {cat.items.length}
@@ -321,7 +340,11 @@ export function CampusMap() {
             className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5"
           >
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-xl">🏫</span>
+              <div className="w-8 h-8 rounded-lg bg-yellow-400/20 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#facc15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 10 12 3 21 10"/><rect x="5" y="10" width="14" height="12"/><rect x="9" y="16" width="6" height="6"/>
+                </svg>
+              </div>
               <div>
                 <p className="text-sm font-black text-white">Schools</p>
                 <p className="text-[10px] text-zinc-500 font-medium">11th–12th Focus</p>
@@ -343,7 +366,11 @@ export function CampusMap() {
             className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5"
           >
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-xl">📍</span>
+              <div className="w-8 h-8 rounded-lg bg-brand-primary/20 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#FF5A1F">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
+              </div>
               <div>
                 <p className="text-sm font-black text-white">Student Hotspots</p>
                 <p className="text-[10px] text-zinc-500 font-medium">Where students hang out</p>
