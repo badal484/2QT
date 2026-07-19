@@ -238,6 +238,12 @@ export default function PreLaunchPage() {
 
   return (
     <div className="min-h-screen bg-[#05050A] text-zinc-100 relative font-sans overflow-x-hidden selection:bg-brand-primary selection:text-white">
+      <style dangerouslySetInnerHTML={{ __html: `
+        body { background-color: #05050A !important; }
+        ::-webkit-scrollbar-track { background: #05050A !important; }
+        ::-webkit-scrollbar-thumb { background: #333333 !important; border: 2px solid #05050A; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555555 !important; }
+      `}} />
 
       {/* Background video layer — z-0 sits above the dark outer bg */}
       {bgVideoUrl ? (
