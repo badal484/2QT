@@ -201,9 +201,10 @@ export function PreLaunchTab() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       const url = data.url as string;
-      await api.post('/prelaunch/config', { prelaunch_bg_video_url: url });
+      const saveRes = await api.post('/prelaunch/config', { prelaunch_bg_video_url: url });
+      if (!saveRes?.success) throw new Error('Config save failed — try again');
       setBgVideoUrl(url);
-      toast.success('Background video updated');
+      toast.success('Background video updated — reload prelaunch page to see it');
     } catch (e: any) {
       toast.error(e.message || 'Upload failed');
     } finally {
