@@ -34,9 +34,9 @@ export function Comparison() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="inline-flex px-4 py-1.5 bg-[#4B6E14]/20 border border-[#73A924]/50 rounded-md w-fit -skew-x-6"
+            className="inline-flex px-4 py-1.5 bg-white/5 border border-white/10 rounded-full w-fit backdrop-blur-sm"
           >
-            <span className="font-sans font-bold text-xl tracking-wider text-white skew-x-6">WHY 2QT IS BETTER?</span>
+            <span className="font-sans font-bold text-sm tracking-[0.2em] text-zinc-300 uppercase">Why 2QT is better</span>
           </motion.div>
           
           <motion.div 
@@ -44,7 +44,7 @@ export function Comparison() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="space-y-2"
+            className="space-y-2 mt-2"
           >
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-white tracking-tight uppercase leading-tight">
               Other apps assure,<br />
@@ -57,28 +57,10 @@ export function Comparison() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
-            className="text-lg sm:text-xl text-zinc-300 font-medium leading-relaxed max-w-md"
+            className="text-lg sm:text-xl text-zinc-400 font-medium leading-relaxed max-w-md mt-4"
           >
-            We have our <span className="text-brand-primary font-bold">own kitchen</span>, so we have full control over <span className="text-brand-primary font-bold">quality & taste</span>.
+            We have our <span className="text-white font-bold">own kitchen</span>, so we have full control over <span className="text-white font-bold">quality & taste</span>.
           </motion.p>
-          
-          {/* Decorative Kitchen Icon (Abstract) */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.8 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3 }}
-            className="mt-4"
-          >
-            <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-80">
-              <path d="M50 15L30 35H70L50 15Z" stroke="#73A924" strokeWidth="4" strokeLinejoin="round"/>
-              <path d="M25 45H75" stroke="#73A924" strokeWidth="4" strokeLinecap="round"/>
-              <rect x="25" y="60" width="20" height="15" rx="2" stroke="#73A924" strokeWidth="4"/>
-              <rect x="55" y="60" width="20" height="15" rx="2" stroke="#73A924" strokeWidth="4"/>
-              <path d="M20 90H80" stroke="#73A924" strokeWidth="4" strokeLinecap="round"/>
-              <rect x="20" y="55" width="60" height="35" stroke="#73A924" strokeWidth="4"/>
-            </svg>
-          </motion.div>
         </div>
 
         {/* Right Side: Table */}
