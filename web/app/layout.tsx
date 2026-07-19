@@ -6,7 +6,7 @@ import OTAUpdater from "../components/OTAUpdater";
 import InstallPrompt from "../components/InstallPrompt";
 import { Analytics } from "@vercel/analytics/react";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://2qt.in";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.go2qt.com";
 const SITE_NAME = "2QT";
 const SITE_DESC =
   "Next-level food delivery in Ranchi. Our own kitchen, uncompromising quality, and fast delivery across Lalpur.";
