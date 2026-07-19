@@ -113,7 +113,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         setStep('SUCCESS');
         setTimeout(() => onVerified({
           phone: `91${phone}`,
-          token: msg91Token,
+          token: meData.sessionToken || msg91Token,
           name: meData.name || '',
           alreadyRegistered: true,
           referralCode: meData.referral_code,

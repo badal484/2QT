@@ -39,7 +39,11 @@ export default function PreLaunchPage() {
           if (meRes.ok) {
             const meData = await meRes.json();
             if (meData.registered) {
-              setIdToken(savedToken);
+              // Upgrade stored token to the fresh long-lived sessionToken
+              if (meData.sessionToken) {
+                localStorage.setItem('2qt_auth_token', meData.sessionToken);
+              }
+              setIdToken(meData.sessionToken || savedToken);
               setUserName(meData.name || '');
               setReferralCode(meData.referral_code || '');
               setRankData({ rank: meData.rank || 0, total: meData.total || 0, referrals: meData.referrals || 0 });
@@ -147,7 +151,7 @@ export default function PreLaunchPage() {
 
         const json = await res.json();
         if (res.ok) {
-          localStorage.setItem('2qt_auth_token', data.token);
+          localStorage.setItem('2qt_auth_token', json.sessionToken || data.token);
           setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
           setRankData({ rank: json.data?.rank || 0, total: json.data?.total || 0, referrals: json.data?.referrals || 0 });
           setSurveyCompleted(json.data?.survey_completed || false);
