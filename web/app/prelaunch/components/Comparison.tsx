@@ -36,7 +36,7 @@ export function Comparison() {
             viewport={{ once: true }}
             className="inline-flex px-4 py-1.5 bg-[#4B6E14]/20 border border-[#73A924]/50 rounded-md w-fit -skew-x-6"
           >
-            <span className="font-display font-bold text-xl tracking-wider text-white skew-x-6">WHY 2QT IS BETTER?</span>
+            <span className="font-sans font-bold text-xl tracking-wider text-white skew-x-6">WHY 2QT IS BETTER?</span>
           </motion.div>
           
           <motion.div 
