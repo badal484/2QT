@@ -5,10 +5,6 @@ import { toast } from 'sonner';
 
 const RESEND_SECONDS = 30;
 
-declare global {
-  interface Window { initSendOTP: any; sendOtp: any; verifyOtp: any; }
-}
-
 interface PhoneAuthProps {
   onVerified: (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number; surveyCompleted?: boolean }) => void;
 }
@@ -35,107 +31,81 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
 
   useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = "https://control.msg91.com/app/assets/otp-provider/otp-provider.js";
-    script.async = true;
-    script.onload = () => {
-      if (window.initSendOTP) {
-        window.initSendOTP({
-          widgetId: "366772613253353536373236",
-          tokenAuth: "524621TvewiLzS6a5add22P1",
-          exposeMethods: "true",
-          success: (data: any) => {
-            if (data.message) {
-              handleServerVerification(data.message);
-            }
-          },
-          failure: (error: any) => {
-            setIsLoading(false);
-            toast.error(error.message || 'Verification failed');
-          }
-        });
-      }
-    };
-    document.body.appendChild(script);
-  }, []);
-
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
     setIsLoading(true);
     try {
-      if (window.sendOtp) {
-        window.sendOtp(`91${phone}`);
-        setStep('OTP');
-        startCooldown();
-        toast.success('OTP Sent!');
-      } else {
-        toast.error('Widget not fully loaded, please wait a second and try again.');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to send OTP');
+      const res = await fetch('/api/proxy/prelaunch/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) return toast.error(data.message || 'Failed to send OTP');
+      setStep('OTP');
+      startCooldown();
+      toast.success('OTP Sent!');
+    } catch {
+      toast.error('Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResendOTP = () => {
+  const handleResendOTP = async () => {
     if (resendCooldown > 0) return;
     try {
-      if (window.sendOtp) {
-        window.sendOtp(`91${phone}`);
+      const res = await fetch('/api/proxy/prelaunch/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      if (res.ok) {
         startCooldown();
         toast.success('OTP resent!');
+      } else {
+        toast.error('Failed to resend OTP');
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to resend OTP');
+    } catch {
+      toast.error('Network error. Please try again.');
     }
   };
 
-  const handleVerifyOTP = () => {
+  const handleVerifyOTP = async () => {
     if (otp.length < 4) return toast.error('Enter valid OTP');
     setIsLoading(true);
     try {
-      if (window.verifyOtp) {
-        window.verifyOtp(otp);
-      } else {
-        toast.error('Widget not loaded');
-        setIsLoading(false);
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Verification error');
-      setIsLoading(false);
-    }
-  };
-
-  const handleServerVerification = async (msg91AccessToken: string) => {
-    setIsLoading(true);
-    try {
-      const meRes = await fetch('/api/proxy/prelaunch/me', {
+      const res = await fetch('/api/proxy/prelaunch/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msg91Token: msg91AccessToken }),
+        body: JSON.stringify({ phone, otp }),
       });
-      const meData = await meRes.json();
-      if (meRes.ok && meData.registered) {
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || 'Invalid OTP. Please try again.');
+        return;
+      }
+
+      if (data.registered) {
+        setName(data.name || '');
         setStep('SUCCESS');
         setTimeout(() => onVerified({
           phone: `91${phone}`,
-          token: msg91AccessToken,
-          name: meData.name || '',
+          token: data.phoneToken,
+          name: data.name || '',
           alreadyRegistered: true,
-          referralCode: meData.referral_code,
-          rank: meData.rank,
-          total: meData.total,
-          referrals: meData.referrals,
-          surveyCompleted: meData.survey_completed || false,
+          referralCode: data.referral_code,
+          rank: data.rank,
+          total: data.total,
+          referrals: data.referrals,
+          surveyCompleted: data.survey_completed || false,
         }), 1200);
       } else {
-        setPendingVerified({ phone: `91${phone}`, token: msg91AccessToken });
+        setPendingVerified({ phone: `91${phone}`, token: data.phoneToken });
         setStep('NAME');
       }
     } catch {
-      toast.error('Verification failed on server');
+      toast.error('Verification failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -247,7 +217,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                 <CheckCircle2 className="w-12 h-12 text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]" />
               </motion.div>
               <h2 className="text-3xl font-display font-bold tracking-tight text-white drop-shadow-sm">Verified</h2>
-              <p className="text-zinc-400 font-medium mt-2 text-sm">Hi {name} 👋</p>
+              <p className="text-zinc-400 font-medium mt-2 text-sm">Hi {name}</p>
             </motion.div>
           )}
         </AnimatePresence>
