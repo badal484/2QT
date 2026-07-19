@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Share, PlusSquare, X } from 'lucide-react';
 
@@ -8,8 +9,12 @@ export default function InstallPrompt() {
     const [isIOS, setIsIOS] = useState(false);
     const [isStandalone, setIsStandalone] = useState(false);
     const [showPrompt, setShowPrompt] = useState(false);
+    const pathname = usePathname();
 
     useEffect(() => {
+        // Don't show on the prelaunch page — user hasn't signed up yet
+        if (pathname?.startsWith('/prelaunch')) return;
+
         const userAgent = window.navigator.userAgent.toLowerCase();
         const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
         const isStandaloneMode = ('standalone' in window.navigator) && (window.navigator as any).standalone;
@@ -22,7 +27,7 @@ export default function InstallPrompt() {
             const timer = setTimeout(() => setShowPrompt(true), 5000);
             return () => clearTimeout(timer);
         }
-    }, []);
+    }, [pathname]);
 
     if (!isIOS || isStandalone || !showPrompt) return null;
 
