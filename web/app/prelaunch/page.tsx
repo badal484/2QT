@@ -69,36 +69,6 @@ export default function PreLaunchPage() {
   const [rankData, setRankData] = useState<{rank: number, total: number, referrals: number} | null>(null);
   const [surveyCompleted, setSurveyCompleted] = useState(false);
 
-  // FOMO Toasts
-  useEffect(() => {
-    if (step !== 0) return;
-    
-    const colleges = [
-      "St. Xavier's", 
-      "BIT Mesra", 
-      "Gossner College", 
-      "Marwari College", 
-      "Ranchi University", 
-      "RIMS",
-      "Amity University",
-      "Nirmala College"
-    ];
-    
-    const interval = setInterval(() => {
-      const r = Math.random();
-      if (r > 0.6) {
-        const college = colleges[Math.floor(Math.random() * colleges.length)];
-        toast(`Someone from ${college} just claimed a reward.`, {
-          icon: '🔥',
-          position: 'bottom-left',
-          duration: 4000,
-          style: { background: 'rgba(20, 20, 25, 0.8)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', color: '#fff', fontWeight: 600 }
-        });
-      }
-    }, 12000);
-    
-    return () => clearInterval(interval);
-  }, [step]);
 
   const handlePhoneVerified = async (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number; surveyCompleted?: boolean }) => {
     setPhone(data.phone);
