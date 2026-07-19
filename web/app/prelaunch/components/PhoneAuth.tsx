@@ -31,6 +31,10 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
 
   useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
+  const safeJson = async (res: Response) => {
+    try { return await res.json(); } catch { return {}; }
+  };
+
   const handleSendOTP = async () => {
     if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
     setIsLoading(true);
@@ -40,13 +44,13 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
       });
-      const data = await res.json();
-      if (!res.ok) return toast.error(data.message || 'Failed to send OTP');
+      const data = await safeJson(res);
+      if (!res.ok) return toast.error(data.message || 'Failed to send OTP. Please try again.');
       setStep('OTP');
       startCooldown();
       toast.success('OTP Sent!');
     } catch {
-      toast.error('Network error. Please try again.');
+      toast.error('Unable to reach server. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -64,10 +68,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         startCooldown();
         toast.success('OTP resent!');
       } else {
-        toast.error('Failed to resend OTP');
+        const data = await safeJson(res);
+        toast.error(data.message || 'Failed to resend OTP');
       }
     } catch {
-      toast.error('Network error. Please try again.');
+      toast.error('Unable to reach server. Please try again.');
     }
   };
 
@@ -80,7 +85,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, otp }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) {
         toast.error(data.message || 'Invalid OTP. Please try again.');
         return;
