@@ -5,6 +5,10 @@ import { toast } from 'sonner';
 
 const RESEND_SECONDS = 30;
 
+declare global {
+  interface Window { initSendOTP: any; sendOtp: any; verifyOtp: any; }
+}
+
 interface PhoneAuthProps {
   onVerified: (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number; surveyCompleted?: boolean }) => void;
 }
@@ -31,82 +35,95 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
 
   useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
-  const safeJson = async (res: Response) => {
-    try { return await res.json(); } catch { return {}; }
-  };
+  // Load MSG91 widget
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
+    script.async = true;
+    script.onload = () => {
+      if (window.initSendOTP) {
+        window.initSendOTP({
+          widgetId: '366772613253353536373236',
+          tokenAuth: '524621TvewiLzS6a5add22P1',
+          exposeMethods: 'true',
+          success: (data: any) => {
+            if (data?.message) handleWidgetVerified(data.message);
+          },
+          failure: (error: any) => {
+            setIsLoading(false);
+            toast.error(error?.message || 'Verification failed');
+          },
+        });
+      }
+    };
+    document.body.appendChild(script);
+    return () => { document.body.removeChild(script); };
+  }, []);
 
-  const handleSendOTP = async () => {
+  const handleSendOTP = () => {
     if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
+    if (!window.sendOtp) return toast.error('Widget loading, please wait a moment');
     setIsLoading(true);
     try {
-      const res = await fetch('/api/proxy/prelaunch/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await safeJson(res);
-      if (!res.ok) return toast.error(data.message || 'Failed to send OTP. Please try again.');
+      window.sendOtp(`91${phone}`);
       setStep('OTP');
       startCooldown();
       toast.success('OTP Sent!');
-    } catch {
-      toast.error('Unable to reach server. Please try again.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send OTP');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResendOTP = async () => {
-    if (resendCooldown > 0) return;
+  const handleResendOTP = () => {
+    if (resendCooldown > 0 || !window.sendOtp) return;
     try {
-      const res = await fetch('/api/proxy/prelaunch/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
-      if (res.ok) {
-        startCooldown();
-        toast.success('OTP resent!');
-      } else {
-        const data = await safeJson(res);
-        toast.error(data.message || 'Failed to resend OTP');
-      }
-    } catch {
-      toast.error('Unable to reach server. Please try again.');
+      window.sendOtp(`91${phone}`);
+      startCooldown();
+      toast.success('OTP resent!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to resend OTP');
     }
   };
 
-  const handleVerifyOTP = async () => {
-    if (otp.length < 4) return toast.error('Enter valid OTP');
+  const handleVerifyOTP = () => {
+    if (otp.length < 6) return toast.error('Enter the 6-digit OTP');
+    if (!window.verifyOtp) return toast.error('Widget not ready');
     setIsLoading(true);
     try {
-      const res = await fetch('/api/proxy/prelaunch/verify-otp', {
+      window.verifyOtp(otp);
+    } catch (err: any) {
+      toast.error(err.message || 'Verification error');
+      setIsLoading(false);
+    }
+  };
+
+  const handleWidgetVerified = async (msg91Token: string) => {
+    setIsLoading(true);
+    try {
+      const meRes = await fetch('/api/proxy/prelaunch/me', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp }),
+        body: JSON.stringify({ msg91Token }),
       });
-      const data = await safeJson(res);
-      if (!res.ok) {
-        toast.error(data.message || 'Invalid OTP. Please try again.');
-        return;
-      }
-
-      if (data.registered) {
-        setName(data.name || '');
+      const meData = await meRes.json().catch(() => ({}));
+      if (meRes.ok && meData.registered) {
+        setName(meData.name || '');
         setStep('SUCCESS');
         setTimeout(() => onVerified({
           phone: `91${phone}`,
-          token: data.phoneToken,
-          name: data.name || '',
+          token: msg91Token,
+          name: meData.name || '',
           alreadyRegistered: true,
-          referralCode: data.referral_code,
-          rank: data.rank,
-          total: data.total,
-          referrals: data.referrals,
-          surveyCompleted: data.survey_completed || false,
+          referralCode: meData.referral_code,
+          rank: meData.rank,
+          total: meData.total,
+          referrals: meData.referrals,
+          surveyCompleted: meData.survey_completed || false,
         }), 1200);
       } else {
-        setPendingVerified({ phone: `91${phone}`, token: data.phoneToken });
+        setPendingVerified({ phone: `91${phone}`, token: msg91Token });
         setStep('NAME');
       }
     } catch {
@@ -131,8 +148,8 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       className="w-full max-w-md mx-auto"
     >
       <div className="bg-white/5 backdrop-blur-3xl rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 relative overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-60 h-60 bg-brand-primary/20 rounded-full blur-[80px] pointer-events-none"></div>
-        <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-orange-500/10 rounded-full blur-[80px] pointer-events-none"></div>
+        <div className="absolute -top-20 -right-20 w-60 h-60 bg-brand-primary/20 rounded-full blur-[80px] pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-orange-500/10 rounded-full blur-[80px] pointer-events-none" />
 
         <AnimatePresence mode="wait">
           {step === 'PHONE' && (
@@ -163,7 +180,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
               <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm text-center">Verify.</h2>
               <p className="text-zinc-400 font-medium mb-2 text-sm text-center">Enter the code sent to +91 {phone}</p>
               <p className="text-zinc-600 text-xs mb-8 text-center">
-                Didn&apos;t get it? Check your <span className="text-zinc-400 font-semibold">Spam / Blocked</span> messages folder.
+                Didn&apos;t get it? Check your <span className="text-zinc-400 font-semibold">Spam / Blocked</span> folder.
               </p>
               <div className="w-full flex flex-col items-center gap-4">
                 <input
@@ -177,12 +194,9 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify Code</span>}
                 </button>
-                <button
-                  onClick={handleResendOTP}
-                  disabled={resendCooldown > 0}
+                <button onClick={handleResendOTP} disabled={resendCooldown > 0}
                   className="text-xs font-semibold transition-colors disabled:cursor-not-allowed"
-                  style={{ color: resendCooldown > 0 ? 'rgb(113,113,122)' : 'rgb(255,90,31)' }}
-                >
+                  style={{ color: resendCooldown > 0 ? 'rgb(113,113,122)' : 'rgb(255,90,31)' }}>
                   {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
                 <button onClick={() => setStep('PHONE')} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
@@ -214,11 +228,9 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
 
           {step === 'SUCCESS' && (
             <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center justify-center py-8 relative z-10"
-            >
+              className="flex flex-col items-center justify-center py-8 relative z-10">
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}
-                className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,90,31,0.3)] border border-white/20"
-              >
+                className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,90,31,0.3)] border border-white/20">
                 <CheckCircle2 className="w-12 h-12 text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]" />
               </motion.div>
               <h2 className="text-3xl font-display font-bold tracking-tight text-white drop-shadow-sm">Verified</h2>
