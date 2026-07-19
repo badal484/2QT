@@ -167,12 +167,12 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
               </p>
               <div className="w-full flex flex-col items-center gap-4">
                 <input
-                  type="number" placeholder="• • • •" value={otp} autoFocus
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  type="number" placeholder="• • • • • •" value={otp} autoFocus
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()}
                   className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-4 px-6 text-center text-2xl font-black text-white tracking-[0.5em] outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
                 />
-                <button onClick={handleVerifyOTP} disabled={isLoading || otp.length < 4}
+                <button onClick={handleVerifyOTP} disabled={isLoading || otp.length < 6}
                   className="w-full mt-4 group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
                   style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify Code</span>}
