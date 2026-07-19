@@ -69,8 +69,8 @@ router.post('/send-otp', async (req, res) => {
         let msg91Data: any = null;
         if (authKey && templateId) {
             try {
-                // MSG91 Flow API — more robust for templates and variable substitution
-                const msg91Res = await fetch('https://control.msg91.com/api/v5/flow/', {
+                // MSG91 /otp endpoint
+                const msg91Res = await fetch('https://control.msg91.com/api/v5/otp', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -78,13 +78,8 @@ router.post('/send-otp', async (req, res) => {
                     },
                     body: JSON.stringify({ 
                         template_id: templateId, 
-                        short_url: "0",
-                        recipients: [
-                            {
-                                mobiles: phone,
-                                OTP: otp // explicitly matches ##OTP## in the template
-                            }
-                        ]
+                        mobile: phone,
+                        otp: otp
                     })
                 });
                 msg91Data = await msg91Res.json().catch(() => ({}));
