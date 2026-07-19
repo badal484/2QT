@@ -405,37 +405,33 @@ router.get('/admin/stats', authenticate, requireRole('super_admin', 'admin'), as
             totals.total = parseInt(rows[0].total);
         }
 
-        let spendRows: any[] = [], mealRows: any[] = [], institutionRows: any[] = [], dailyRows: any[] = [], freqRows: any[] = [];
+        let spendRows: any[] = [], likelyRows: any[] = [], institutionRows: any[] = [], dailyRows: any[] = [], freqRows: any[] = [];
         try {
-            const [spendRes, mealRes, instRes, dailyRes, freqRes] = await Promise.all([
-                // new key (spendPerOrder) with fallback to old key (budget)
-                query(`SELECT COALESCE(survey_responses->>'spendPerOrder', survey_responses->>'budget') AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE COALESCE(survey_responses->>'spendPerOrder', survey_responses->>'budget') IS NOT NULL GROUP BY label ORDER BY count DESC`),
-                // new key (mealPreference) with fallback to old key (mealTime)
-                query(`SELECT COALESCE(survey_responses->>'mealPreference', survey_responses->>'mealTime') AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE COALESCE(survey_responses->>'mealPreference', survey_responses->>'mealTime') IS NOT NULL GROUP BY label ORDER BY count DESC`),
-                // new key (institution) with fallback to old key (college)
-                query(`SELECT COALESCE(survey_responses->>'institution', survey_responses->>'college') AS name, COUNT(*) AS count FROM pre_launch_registrations WHERE COALESCE(survey_responses->>'institution', survey_responses->>'college') IS NOT NULL GROUP BY name ORDER BY count DESC LIMIT 10`),
+            const [spendRes, likelyRes, instRes, dailyRes, freqRes] = await Promise.all([
+                query(`SELECT survey_responses->>'spendPerOrder' AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE survey_responses->>'spendPerOrder' IS NOT NULL GROUP BY label ORDER BY count DESC`),
+                query(`SELECT survey_responses->>'likelyToTry' AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE survey_responses->>'likelyToTry' IS NOT NULL GROUP BY label ORDER BY CASE survey_responses->>'likelyToTry' WHEN 'Definitely' THEN 1 WHEN 'Probably' THEN 2 WHEN 'Maybe' THEN 3 WHEN 'Unlikely' THEN 4 WHEN 'No' THEN 5 ELSE 6 END`),
+                query(`SELECT survey_responses->>'personType' AS name, COUNT(*) AS count FROM pre_launch_registrations WHERE survey_responses->>'personType' IS NOT NULL GROUP BY name ORDER BY count DESC LIMIT 10`),
                 query(`SELECT TO_CHAR(DATE(created_at), 'Mon DD') AS day, COUNT(*) AS count FROM pre_launch_registrations WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY DATE(created_at), TO_CHAR(DATE(created_at), 'Mon DD') ORDER BY DATE(created_at)`),
-                // new key (orderFrequency) with fallback to old key (frequency)
-                query(`SELECT COALESCE(survey_responses->>'orderFrequency', survey_responses->>'frequency') AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE COALESCE(survey_responses->>'orderFrequency', survey_responses->>'frequency') IS NOT NULL GROUP BY label ORDER BY count DESC`),
+                query(`SELECT survey_responses->>'orderFrequency' AS label, COUNT(*) AS count FROM pre_launch_registrations WHERE survey_responses->>'orderFrequency' IS NOT NULL GROUP BY label ORDER BY count DESC`),
             ]);
-            spendRows        = spendRes.rows;
-            mealRows         = mealRes.rows;
-            institutionRows  = instRes.rows;
-            dailyRows        = dailyRes.rows;
-            freqRows         = freqRes.rows;
+            spendRows       = spendRes.rows;
+            likelyRows      = likelyRes.rows;
+            institutionRows = instRes.rows;
+            dailyRows       = dailyRes.rows;
+            freqRows        = freqRes.rows;
         } catch (chartErr: any) {
             console.error('[PRELAUNCH STATS CHARTS]', chartErr.message);
         }
 
         res.json({
-            total:            totals.total,
-            credited:         totals.credited,
-            redeemed:         totals.redeemed,
-            spendPerOrder:    spendRows,
-            mealPreference:   mealRows,
-            topInstitutions:  institutionRows,
-            daily:            dailyRows,
-            orderFrequency:   freqRows,
+            total:           totals.total,
+            credited:        totals.credited,
+            redeemed:        totals.redeemed,
+            spendPerOrder:   spendRows,
+            likelyToTry:     likelyRows,
+            topInstitutions: institutionRows,
+            daily:           dailyRows,
+            orderFrequency:  freqRows,
         });
     } catch (err: any) {
         console.error('[PRELAUNCH STATS]', err.message);

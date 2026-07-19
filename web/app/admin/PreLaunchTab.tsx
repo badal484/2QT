@@ -408,15 +408,15 @@ export function PreLaunchTab() {
             )}
           </div>
           <div className="bg-[#0e0e16] rounded-[20px] border border-white/[0.05] p-6 shadow-xl">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Meal Preference</h3>
-            {stats.mealPreference?.length ? (
-              <MiniBar data={stats.mealPreference} colorClass="bg-blue-500" />
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Likely to Try</h3>
+            {stats.likelyToTry?.length ? (
+              <MiniBar data={stats.likelyToTry} colorClass="bg-blue-500" />
             ) : (
               <p className="text-xs text-zinc-600 mt-4">No data yet</p>
             )}
           </div>
           <div className="bg-[#0e0e16] rounded-[20px] border border-white/[0.05] p-6 shadow-xl">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Top Institutions</h3>
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Audience Breakdown</h3>
             {stats.topInstitutions?.length ? (
               <MiniBar data={stats.topInstitutions.map((c: any) => ({ label: c.name, count: c.count }))} colorClass="bg-emerald-500" />
             ) : (
@@ -576,24 +576,18 @@ export function PreLaunchTab() {
               <div className="overflow-y-auto flex-1 px-6 py-4 space-y-3">
                 {viewingReg.survey_responses && Object.keys(viewingReg.survey_responses).length > 0 ? (
                   ([
-                    { key: 'personType',        label: 'Who are you?' },
-                    { key: 'institution',       label: 'School / College / Coaching' },
-                    { key: 'stayType',          label: 'Where do you stay?' },
-                    { key: 'orderFrequency',    label: 'How often order online?' },
-                    { key: 'deliveryApps',      label: 'Delivery apps used' },
-                    { key: 'biggestProblems',   label: 'Biggest problems' },
+                    { key: 'personType',        label: 'Category' },
+                    { key: 'institution',       label: 'School / College / Workplace' },
+                    { key: 'orderFrequency',    label: 'Order frequency' },
                     { key: 'spendPerOrder',     label: 'Spend per order' },
                     { key: 'cuisines',          label: 'Favourite cuisines' },
                     { key: 'mostOrderedDishes', label: 'Most ordered dishes' },
-                    { key: 'mealPreference',    label: 'Meal preference' },
+                    { key: 'biggestProblems',   label: 'Biggest problems' },
                     { key: 'orderTime',         label: 'Order time' },
                     { key: 'waitTime',          label: 'Willing to wait' },
                     { key: 'priorities',        label: 'Top priorities' },
-                    { key: 'wantedFeatures',    label: 'Wanted app features' },
-                    { key: 'convincingOffer',   label: 'Most convincing offer' },
-                    { key: 'chooseOver',        label: 'Would choose 2QT over others for' },
-                    { key: 'wishFeature',       label: 'Wish existed in Ranchi' },
-                    { key: 'earlyAccess',       label: 'Wants early access?' },
+                    { key: 'likelyToTry',       label: 'Likely to try 2QT' },
+                    { key: 'wishFeature',       label: 'Additional feedback' },
                   ] as { key: string; label: string }[]).map(({ key, label }) => {
                     const val = viewingReg.survey_responses[key];
                     if (val === undefined || val === null || val === '') return null;
