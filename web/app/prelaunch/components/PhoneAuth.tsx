@@ -1,7 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
+
+const RESEND_SECONDS = 30;
 
 declare global {
   interface Window { initSendOTP: any; sendOtp: any; verifyOtp: any; }
@@ -18,7 +20,20 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [pendingVerified, setPendingVerified] = useState<{ phone: string; token: string } | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCooldown = () => {
+    setResendCooldown(RESEND_SECONDS);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) { clearInterval(cooldownRef.current!); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -52,6 +67,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       if (window.sendOtp) {
         window.sendOtp(`91${phone}`);
         setStep('OTP');
+        startCooldown();
         toast.success('OTP Sent!');
       } else {
         toast.error('Widget not fully loaded, please wait a second and try again.');
@@ -60,6 +76,19 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       toast.error(err.message || 'Failed to send OTP');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendOTP = () => {
+    if (resendCooldown > 0) return;
+    try {
+      if (window.sendOtp) {
+        window.sendOtp(`91${phone}`);
+        startCooldown();
+        toast.success('OTP resent!');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to resend OTP');
     }
   };
 
@@ -163,8 +192,8 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
               </p>
               <div className="w-full flex flex-col items-center gap-4">
                 <input
-                  type="number" placeholder="• • • • • •" value={otp} autoFocus
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  type="number" placeholder="• • • •" value={otp} autoFocus
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()}
                   className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-4 px-6 text-center text-2xl font-black text-white tracking-[0.5em] outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
                 />
@@ -173,7 +202,15 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify Code</span>}
                 </button>
-                <button onClick={() => setStep('PHONE')} className="mt-4 text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
+                <button
+                  onClick={handleResendOTP}
+                  disabled={resendCooldown > 0}
+                  className="text-xs font-semibold transition-colors disabled:cursor-not-allowed"
+                  style={{ color: resendCooldown > 0 ? 'rgb(113,113,122)' : 'rgb(255,90,31)' }}
+                >
+                  {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
+                </button>
+                <button onClick={() => setStep('PHONE')} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
                   Change Phone Number
                 </button>
               </div>
