@@ -203,7 +203,17 @@ router.post('/register', async (req, res) => {
                 } catch { /* not an internal JWT */ }
             }
 
-            // 3. MSG91 Widget Token — check Redis cache first (token is single-use;
+            // 3. Prelaunch phone JWT (issued by /prelaunch/verify-otp or /register sessionToken)
+            if (!phone!) {
+                try {
+                    const decoded = jwt.verify(idToken, JWT_SECRET) as any;
+                    if (decoded?.phone && decoded?.sub === 'prelaunch') {
+                        phone = decoded.phone;
+                    }
+                } catch { /* not a prelaunch phone JWT */ }
+            }
+
+            // 4. MSG91 Widget Token — check Redis cache first (token is single-use;
             //    /me may have already consumed it and cached the phone)
             if (!phone!) {
                 const cacheKey = `msg91_phone:${Buffer.from(idToken).toString('base64').slice(0, 40)}`;
@@ -225,16 +235,6 @@ router.post('/register', async (req, res) => {
                     if (phone.length === 10) phone = '91' + phone;
                     await redis.setEx(cacheKey, 600, phone).catch(() => {});
                 }
-            }
-
-            // 4. Prelaunch phone JWT (issued by /prelaunch/verify-otp)
-            if (!phone!) {
-                try {
-                    const decoded = jwt.verify(idToken, JWT_SECRET) as any;
-                    if (decoded?.phone && decoded?.sub === 'prelaunch') {
-                        phone = decoded.phone;
-                    }
-                } catch { /* not a prelaunch phone JWT */ }
             }
 
             if (!phone!) return res.status(401).json({ error: 'INVALID_TOKEN' });
