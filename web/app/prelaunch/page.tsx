@@ -237,35 +237,35 @@ export default function PreLaunchPage() {
   };
 
   return (
-    <div className={`min-h-screen text-zinc-100 relative font-sans overflow-x-hidden selection:bg-brand-primary selection:text-white ${bgVideoUrl ? 'bg-transparent' : 'bg-[#05050A]'}`}>
+    <div className="min-h-screen bg-[#05050A] text-zinc-100 relative font-sans overflow-x-hidden selection:bg-brand-primary selection:text-white">
 
-      {/* Global Background Layer */}
-      <div className="fixed inset-0 pointer-events-none -z-10">
-        {bgVideoUrl ? (
-          <>
-            <video
-              src={bgVideoUrl}
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black/70" />
-          </>
-        ) : (
-          <>
-            <div className="absolute inset-0 bg-[#05050A]" />
-            <motion.div
-              animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -top-[20%] -right-[10%] w-[70vw] h-[70vw] bg-brand-primary/20 rounded-full blur-[120px]"
-            />
-            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]"></div>
-          </>
-        )}
-      </div>
+      {/* Background video layer — z-0 sits above the dark outer bg */}
+      {bgVideoUrl ? (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <video
+            src={bgVideoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/70" />
+        </div>
+      ) : (
+        /* Animated glow layer — -z-10 fine when outer div is opaque dark */
+        <div className="fixed inset-0 pointer-events-none -z-10 bg-[#05050A]">
+          <motion.div
+            animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -top-[20%] -right-[10%] w-[70vw] h-[70vw] bg-brand-primary/20 rounded-full blur-[120px]"
+          />
+          <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]"></div>
+        </div>
+      )}
 
+      {/* All content at z-[1] so it floats above the video layer */}
+      <div className="relative z-[1]">
       <AnimatePresence mode="wait">
         {isInitializing ? (
           <motion.div key="initializing" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex flex-col items-center justify-center p-4">
@@ -324,6 +324,7 @@ export default function PreLaunchPage() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
 
     </div>
   );
