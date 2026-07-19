@@ -240,10 +240,10 @@ export default function PreLaunchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#05050A] text-zinc-100 relative font-sans overflow-x-hidden selection:bg-brand-primary selection:text-white">
+    <div className={`min-h-screen text-zinc-100 relative font-sans overflow-x-hidden selection:bg-brand-primary selection:text-white ${bgVideoUrl ? 'bg-transparent' : 'bg-[#05050A]'}`}>
       
       {/* Global Background Layer */}
-      <div className="fixed inset-0 pointer-events-none -z-10 bg-[#05050A]">
+      <div className={`fixed inset-0 pointer-events-none -z-10 ${bgVideoUrl ? 'bg-transparent' : 'bg-[#05050A]'}`}>
         {bgVideoUrl ? (
           <>
             <video
