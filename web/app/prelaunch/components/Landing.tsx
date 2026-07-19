@@ -60,6 +60,17 @@ export function Landing({ onStart }: { onStart: () => void }) {
             </div>
           </a>
 
+          <div className="flex items-start gap-3 px-8 py-4 rounded-full bg-white/5 border border-white/10 shadow-lg">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-brand-primary mt-0.5 shrink-0">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+            <div className="text-left">
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-0.5">Find us at</p>
+              <p className="text-sm text-white font-semibold leading-snug">401, 3rd Floor, Devrani Complex</p>
+              <p className="text-sm text-zinc-400 font-medium">Lalpur, Ranchi</p>
+            </div>
+          </div>
+
           <p className="text-sm text-zinc-500 mt-4 font-medium">© 2026 2QT. All rights reserved.</p>
         </div>
       </footer>
