@@ -163,6 +163,11 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
       if (!val) return false;
       return val === OTHER ? Boolean(other) : true;
     }
+    // dish-picker mode: inputs at top, no OTHER sentinel needed
+    if (q.type === 'checkbox-other' && (q.otherCount ?? 1) > 1) {
+      const filledCustom = getOtherValues(q.id, q.otherCount!, otherInputs).length;
+      return checkArr.length + filledCustom > 0;
+    }
     if (checkArr.length === 0) return false;
     if (q.type === 'checkbox-other' && checkArr.includes(OTHER)) {
       const count = q.otherCount ?? 1;
@@ -183,13 +188,15 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
       } else {
         const arr = Array.isArray(val) ? val : [];
         const count = question.otherCount ?? 1;
-        const nonOther = arr.filter(v => v !== OTHER).length;
-        const maxCustom = Math.max(1, Math.min(count, (question.maxSelect ?? count) - nonOther));
-        result[question.id] = arr.flatMap(v => {
-          if (v !== OTHER) return [v];
-          const customs = getOtherValues(question.id, maxCustom, otherInputs);
-          return customs.length > 0 ? customs : ['Other'];
-        });
+        if (count > 1) {
+          // dish-picker: combine preset selections + custom typed dishes
+          const presets = arr.filter(v => v !== OTHER);
+          const customs = getOtherValues(question.id, count, otherInputs);
+          result[question.id] = [...presets, ...customs];
+        } else {
+          const other = (otherInputs[question.id] || '').trim();
+          result[question.id] = arr.map(v => v === OTHER ? (other ? `Other: ${other}` : 'Other') : v);
+        }
       }
     }
     return result;
@@ -370,55 +377,97 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
             {isCheckType && (
               <div className="flex-1 flex flex-col min-h-0 relative z-10">
                 <div className="flex-1 overflow-y-auto flex flex-col gap-3 pb-4 min-h-0 p-1">
-                  {q.options?.map(opt => {
-                    const sel = checkArr.includes(opt);
-                    const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
+
+                  {/* dish-picker mode: custom inputs at top, presets below */}
+                  {hasOther && (q.otherCount ?? 1) > 1 ? (() => {
+                    const filledCustom = getOtherValues(q.id, q.otherCount!, otherInputs).length;
+                    const totalSelected = nonOtherCount + filledCustom;
+                    const customSlots = Math.max(1, Math.min(q.otherCount!, (q.maxSelect ?? q.otherCount!) - nonOtherCount));
                     return (
-                      <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
-                        className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
-                          sel         ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
-                          : maxReached ? 'border-white/5 bg-white/5 text-zinc-700 cursor-not-allowed'
-                                       : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
-                        <span className={cn("text-sm md:text-base font-bold transition-colors", sel ? "text-white" : maxReached ? "text-zinc-700" : "text-zinc-300")}>{opt}</span>
-                        <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          sel ? 'border-brand-primary bg-brand-primary text-white shadow-[0_0_10px_rgba(255,90,31,0.5)]' : maxReached ? 'border-white/5 bg-transparent' : 'border-white/20 group-hover:border-white/40')}>
-                          {sel && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {hasOther && (
-                    <>
-                      <button onClick={() => toggleCheck(OTHER)}
-                        className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
-                          checkArr.includes(OTHER) ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
-                                                   : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
-                        <span className={cn("text-sm md:text-base font-bold transition-colors", checkArr.includes(OTHER) ? "text-white" : "text-zinc-300")}>Other (Please specify)</span>
-                        <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary text-white shadow-[0_0_10px_rgba(255,90,31,0.5)]' : 'border-white/20 group-hover:border-white/40')}>
-                          {checkArr.includes(OTHER) && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
-                        </span>
-                      </button>
-                      {checkArr.includes(OTHER) && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-1 space-y-2">
-                          {(q.otherCount ?? 1) > 1 ? (
-                            Array.from({ length: Math.max(1, Math.min(q.otherCount!, (q.maxSelect ?? q.otherCount!) - nonOtherCount)) }).map((_, i) => (
-                              <input key={i} type={i === 0 ? 'text' : 'text'}
-                                autoFocus={i === 0}
-                                placeholder={i === 0 ? 'Dish name (required)' : `Dish name ${i + 1} (optional)`}
-                                value={otherInputs[`${q.id}_${i}`] || ''}
-                                onChange={e => setOtherInputs(prev => ({ ...prev, [`${q.id}_${i}`]: e.target.value }))}
-                                className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-6 py-3.5 text-white text-sm font-bold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner"
-                              />
-                            ))
-                          ) : (
-                            <input autoFocus type="text" placeholder="Please specify…"
-                              value={otherInputs[q.id] || ''}
-                              onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                              className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-6 py-4 text-white text-sm font-bold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner flex-shrink-0"
+                      <>
+                        {/* Custom write-in inputs */}
+                        <div className="space-y-2 mb-1">
+                          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest px-1">Type what you want</p>
+                          {Array.from({ length: customSlots }).map((_, i) => (
+                            <input key={i} autoFocus={i === 0}
+                              type="text"
+                              placeholder={i === 0 ? 'e.g. Dal Makhani' : `Dish ${i + 1} (optional)`}
+                              value={otherInputs[`${q.id}_${i}`] || ''}
+                              onChange={e => setOtherInputs(prev => ({ ...prev, [`${q.id}_${i}`]: e.target.value }))}
+                              className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-5 py-3.5 text-white text-sm font-bold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner"
                             />
+                          ))}
+                        </div>
+
+                        {/* Divider */}
+                        <div className="flex items-center gap-3 my-1">
+                          <div className="flex-1 h-px bg-white/10" />
+                          <span className="text-zinc-600 text-xs font-bold uppercase tracking-widest">or pick from list</span>
+                          <div className="flex-1 h-px bg-white/10" />
+                        </div>
+
+                        {/* Preset options */}
+                        {q.options?.map(opt => {
+                          const sel = checkArr.includes(opt);
+                          const maxReached = !sel && totalSelected >= (q.maxSelect ?? Infinity);
+                          return (
+                            <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
+                              className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
+                                sel         ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
+                                : maxReached ? 'border-white/5 bg-white/5 text-zinc-700 cursor-not-allowed'
+                                             : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
+                              <span className={cn("text-sm md:text-base font-bold transition-colors", sel ? "text-white" : maxReached ? "text-zinc-700" : "text-zinc-300")}>{opt}</span>
+                              <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                                sel ? 'border-brand-primary bg-brand-primary text-white shadow-[0_0_10px_rgba(255,90,31,0.5)]' : maxReached ? 'border-white/5 bg-transparent' : 'border-white/20 group-hover:border-white/40')}>
+                                {sel && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </>
+                    );
+                  })() : (
+                    // Standard checkbox mode
+                    <>
+                      {q.options?.map(opt => {
+                        const sel = checkArr.includes(opt);
+                        const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
+                        return (
+                          <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
+                            className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
+                              sel         ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
+                              : maxReached ? 'border-white/5 bg-white/5 text-zinc-700 cursor-not-allowed'
+                                           : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
+                            <span className={cn("text-sm md:text-base font-bold transition-colors", sel ? "text-white" : maxReached ? "text-zinc-700" : "text-zinc-300")}>{opt}</span>
+                            <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                              sel ? 'border-brand-primary bg-brand-primary text-white shadow-[0_0_10px_rgba(255,90,31,0.5)]' : maxReached ? 'border-white/5 bg-transparent' : 'border-white/20 group-hover:border-white/40')}>
+                              {sel && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                      {hasOther && (
+                        <>
+                          <button onClick={() => toggleCheck(OTHER)}
+                            className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
+                              checkArr.includes(OTHER) ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
+                                                       : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
+                            <span className={cn("text-sm md:text-base font-bold transition-colors", checkArr.includes(OTHER) ? "text-white" : "text-zinc-300")}>Other (Please specify)</span>
+                            <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                              checkArr.includes(OTHER) ? 'border-brand-primary bg-brand-primary text-white shadow-[0_0_10px_rgba(255,90,31,0.5)]' : 'border-white/20 group-hover:border-white/40')}>
+                              {checkArr.includes(OTHER) && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
+                            </span>
+                          </button>
+                          {checkArr.includes(OTHER) && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-1">
+                              <input autoFocus type="text" placeholder="Please specify…"
+                                value={otherInputs[q.id] || ''}
+                                onChange={e => setOtherInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-6 py-4 text-white text-sm font-bold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner flex-shrink-0"
+                              />
+                            </motion.div>
                           )}
-                        </motion.div>
+                        </>
                       )}
                     </>
                   )}
