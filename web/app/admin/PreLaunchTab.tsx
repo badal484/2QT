@@ -6,6 +6,7 @@ import {
   Download, ToggleLeft, ToggleRight, QrCode, Users,
   CheckCircle2, Search, ChevronLeft, ChevronRight, X,
   Wallet, RefreshCw, Settings2, ExternalLink, Eye, Trash2, AlertTriangle,
+  Video, Upload, Link2,
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { api } from '../lib/api';
@@ -91,6 +92,9 @@ export function PreLaunchTab() {
   const [validityDays, setValidityDays] = useState('7');
   const [targetReg, setTargetReg] = useState('2000');
   const [savingConfig, setSavingConfig] = useState(false);
+  const [bgVideoUrl, setBgVideoUrl] = useState('');
+  const [videoUploading, setVideoUploading] = useState(false);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const qrRef = useRef<HTMLDivElement>(null);
 
   const landingUrl = typeof window !== 'undefined' ? `${window.location.origin}/prelaunch` : 'https://go2qt.com/prelaunch';
@@ -106,12 +110,14 @@ export function PreLaunchTab() {
       if (cfgResult.status === 'fulfilled') {
         const cfgRes = cfgResult.value;
         setConfig(cfgRes.config || {});
-        const rp = cfgRes.config?.prelaunch_reward_paise;
-        const vd = cfgRes.config?.prelaunch_reward_validity_days;
-        const tg = cfgRes.config?.prelaunch_target;
-        if (rp !== undefined) setRewardPaise(String(rp));
-        if (vd !== undefined) setValidityDays(String(vd));
-        if (tg !== undefined) setTargetReg(String(tg));
+        const rp  = cfgRes.config?.prelaunch_reward_paise;
+        const vd  = cfgRes.config?.prelaunch_reward_validity_days;
+        const tg  = cfgRes.config?.prelaunch_target;
+        const vid = cfgRes.config?.prelaunch_bg_video_url;
+        if (rp  !== undefined) setRewardPaise(String(rp));
+        if (vd  !== undefined) setValidityDays(String(vd));
+        if (tg  !== undefined) setTargetReg(String(tg));
+        if (vid !== undefined) setBgVideoUrl(String(vid));
       }
 
       if (statsResult.status === 'fulfilled') {
@@ -178,6 +184,40 @@ export function PreLaunchTab() {
       toast.error('Save failed');
     } finally {
       setSavingConfig(false);
+    }
+  };
+
+  const uploadBgVideo = async (file: File) => {
+    setVideoUploading(true);
+    try {
+      const token = localStorage.getItem('2qt_token');
+      const form = new FormData();
+      form.append('video', file);
+      const res = await fetch('/api/proxy/upload/video', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const url = data.url as string;
+      await api.post('/prelaunch/config', { prelaunch_bg_video_url: url });
+      setBgVideoUrl(url);
+      toast.success('Background video updated');
+    } catch (e: any) {
+      toast.error(e.message || 'Upload failed');
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const removeBgVideo = async () => {
+    try {
+      await api.post('/prelaunch/config', { prelaunch_bg_video_url: '' });
+      setBgVideoUrl('');
+      toast.success('Background video removed');
+    } catch {
+      toast.error('Failed to remove video');
     }
   };
 
@@ -409,6 +449,59 @@ export function PreLaunchTab() {
                 Download PNG
               </button>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Background Video ── */}
+      <div className="bg-[#0e0e16] rounded-[20px] border border-white/[0.05] p-6 shadow-xl">
+        <div className="flex items-center gap-2 mb-5">
+          <Video className="w-4 h-4 text-zinc-500" />
+          <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-widest">Prelaunch Background Video</h3>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-6">
+          {/* Preview */}
+          <div className="w-full sm:w-64 h-36 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 flex items-center justify-center">
+            {bgVideoUrl ? (
+              <video src={bgVideoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-zinc-600">
+                <Video className="w-8 h-8" />
+                <p className="text-xs font-medium">No video set</p>
+              </div>
+            )}
+          </div>
+
+          {/* Controls */}
+          <div className="flex-1 flex flex-col gap-4">
+            {bgVideoUrl && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-xl">
+                <Link2 className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                <p className="text-xs text-zinc-400 font-mono truncate flex-1">{bgVideoUrl}</p>
+                <button onClick={removeBgVideo} className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/mov"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadBgVideo(f); e.target.value = ''; }}
+            />
+            <button
+              onClick={() => videoInputRef.current?.click()}
+              disabled={videoUploading}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 rounded-xl text-sm font-bold hover:bg-brand-primary/20 transition-colors disabled:opacity-50"
+            >
+              {videoUploading
+                ? <><RefreshCw className="w-4 h-4 animate-spin" /> Uploading…</>
+                : <><Upload className="w-4 h-4" /> {bgVideoUrl ? 'Replace Video' : 'Upload Video'}</>}
+            </button>
+            <p className="text-xs text-zinc-600">MP4 / WebM / MOV · max 200 MB · ~10 seconds recommended</p>
           </div>
         </div>
       </div>
