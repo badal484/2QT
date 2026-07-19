@@ -16,6 +16,7 @@ export default function PreLaunchPage() {
   const [referredBy, setReferredBy] = useState<string | null>(null);
   
   const [isInitializing, setIsInitializing] = useState(true);
+  const [bgVideoUrl, setBgVideoUrl] = useState('');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -23,6 +24,11 @@ export default function PreLaunchPage() {
       const ref = urlParams.get('ref');
       if (ref) setReferredBy(ref);
     }
+
+    fetch('/api/proxy/prelaunch/config')
+      .then(r => r.json())
+      .then(d => { if (d.config?.prelaunch_bg_video_url) setBgVideoUrl(d.config.prelaunch_bg_video_url); })
+      .catch(() => {});
 
     const restoreSession = async () => {
       let unsubscribe = () => {};
@@ -235,13 +241,25 @@ export default function PreLaunchPage() {
       
       {/* Global Background Layer */}
       <div className="fixed inset-0 pointer-events-none -z-10 bg-[#05050A]">
-        {/* Animated Cinematic Glow */}
-        <motion.div 
-          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -top-[20%] -right-[10%] w-[70vw] h-[70vw] bg-brand-primary/20 rounded-full blur-[120px]"
-        />
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]"></div>
+        {bgVideoUrl ? (
+          <>
+            <video
+              src={bgVideoUrl}
+              autoPlay muted loop playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/65" />
+          </>
+        ) : (
+          <>
+            <motion.div
+              animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -top-[20%] -right-[10%] w-[70vw] h-[70vw] bg-brand-primary/20 rounded-full blur-[120px]"
+            />
+            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]" />
+          </>
+        )}
       </div>
 
       <AnimatePresence mode="wait">

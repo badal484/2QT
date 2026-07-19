@@ -709,7 +709,7 @@ router.post('/admin/credit/:id', authenticate, requireRole('super_admin', 'admin
 
 // Admin config get/set
 router.post('/config', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
-    const ALLOWED = new Set(['IS_PRELAUNCH_MODE', 'prelaunch_reward_active', 'prelaunch_launch_date', 'prelaunch_reward_paise', 'prelaunch_reward_validity_days', 'prelaunch_target']);
+    const ALLOWED = new Set(['IS_PRELAUNCH_MODE', 'prelaunch_reward_active', 'prelaunch_launch_date', 'prelaunch_reward_paise', 'prelaunch_reward_validity_days', 'prelaunch_target', 'prelaunch_bg_video_url']);
 
     // Support legacy single-field toggle
     if (typeof req.body.isPrelaunch === 'boolean' && !req.body.key) {
