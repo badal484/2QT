@@ -71,6 +71,16 @@ export function Landing({ onStart }: { onStart: () => void }) {
             </div>
           </div>
 
+          <a href="tel:+916204646300" className="flex items-start gap-3 px-8 py-4 rounded-full bg-white/5 border border-white/10 hover:border-brand-primary/50 hover:bg-white/10 transition-all group shadow-lg">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-brand-primary mt-0.5 shrink-0 group-hover:scale-110 transition-transform">
+              <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+            </svg>
+            <div className="text-left">
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-0.5">Call us</p>
+              <p className="text-sm text-white font-semibold group-hover:text-brand-primary transition-colors">+91 62046 46300</p>
+            </div>
+          </a>
+
           <p className="text-sm text-zinc-500 mt-4 font-medium">© 2026 2QT. All rights reserved.</p>
         </div>
       </footer>
