@@ -93,7 +93,6 @@ const CATEGORIES = [
 const SCHOOLS = [
   "St. Aloysius Intermediate College",
   "Guru Nanak Higher Secondary School",
-  "DAV Schools (near your radius)",
   "Surendranath Centenary School",
   "St. Anne's School",
   "St. Thomas School",
