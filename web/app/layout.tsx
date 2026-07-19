@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import OTAUpdater from "../components/OTAUpdater";
 import InstallPrompt from "../components/InstallPrompt";
+import { Analytics } from "@vercel/analytics/react";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://2qt.in";
 const SITE_NAME = "2QT";
@@ -125,6 +126,7 @@ export default function RootLayout({
         <Providers>{children}</Providers>
         <OTAUpdater />
         <InstallPrompt />
+        <Analytics />
       </body>
     </html>
   );
