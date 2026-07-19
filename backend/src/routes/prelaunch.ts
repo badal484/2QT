@@ -79,7 +79,8 @@ router.post('/send-otp', async (req, res) => {
                     body: JSON.stringify({ 
                         template_id: templateId, 
                         mobile: phone,    // e.g. 916204646300
-                        otp: otp,         // fills ##OTP## in the template
+                        otp: otp,         // lower-case for standard msg91 param
+                        OTP: otp,         // upper-case to match ##OTP## template variable
                     })
                 });
                 msg91Data = await msg91Res.json().catch(() => ({}));
