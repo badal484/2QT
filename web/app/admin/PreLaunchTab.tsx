@@ -87,6 +87,7 @@ export function PreLaunchTab() {
   const [creditingId, setCreditingId] = useState<string | null>(null);
   const [rewardPaise, setRewardPaise] = useState('10000');
   const [validityDays, setValidityDays] = useState('7');
+  const [targetReg, setTargetReg] = useState('2000');
   const [savingConfig, setSavingConfig] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -105,8 +106,10 @@ export function PreLaunchTab() {
         setConfig(cfgRes.config || {});
         const rp = cfgRes.config?.prelaunch_reward_paise;
         const vd = cfgRes.config?.prelaunch_reward_validity_days;
+        const tg = cfgRes.config?.prelaunch_target;
         if (rp !== undefined) setRewardPaise(String(rp));
         if (vd !== undefined) setValidityDays(String(vd));
+        if (tg !== undefined) setTargetReg(String(tg));
       }
 
       if (statsResult.status === 'fulfilled') {
@@ -165,6 +168,7 @@ export function PreLaunchTab() {
       await api.post('/prelaunch/config', {
         prelaunch_reward_paise:         parseInt(rewardPaise, 10),
         prelaunch_reward_validity_days: parseInt(validityDays, 10),
+        prelaunch_target:               parseInt(targetReg, 10),
       });
       toast.success('Reward config saved');
       load();
@@ -267,7 +271,7 @@ export function PreLaunchTab() {
       {/* ── Stats Row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Registrations" value={(stats?.total ?? 0).toLocaleString('en-IN')} sub="since campaign start" color="orange" />
-        <StatCard label="Target" value="1,000" sub={`${Math.round(((stats?.total ?? 0) / 1000) * 100)}% reached`} color="zinc" />
+        <StatCard label="Target" value={parseInt(targetReg || '2000', 10).toLocaleString('en-IN')} sub={`${Math.round(((stats?.total ?? 0) / parseInt(targetReg || '2000', 10)) * 100)}% reached`} color="zinc" />
         <StatCard label="Rewards Credited" value={stats?.credited ?? 0} sub="wallet credits issued" color="green" />
         <StatCard label="Rewards Redeemed" value={stats?.redeemed ?? 0} sub="orders placed using reward" color="blue" />
       </div>
@@ -296,7 +300,7 @@ export function PreLaunchTab() {
           />
 
           {/* Editable config */}
-          <div className="pt-4 grid grid-cols-2 gap-4 mt-2">
+          <div className="pt-4 grid grid-cols-3 gap-4 mt-2">
             <div>
               <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Reward Amount (paise)</label>
               <input
@@ -316,6 +320,16 @@ export function PreLaunchTab() {
                 className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm font-bold outline-none focus:border-brand-primary transition-colors"
               />
               <p className="text-xs text-zinc-600 mt-1">days from launch date</p>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Target Registrations</label>
+              <input
+                type="number"
+                value={targetReg}
+                onChange={e => setTargetReg(e.target.value)}
+                className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm font-bold outline-none focus:border-brand-primary transition-colors"
+              />
+              <p className="text-xs text-zinc-600 mt-1">registration goal</p>
             </div>
           </div>
           <button
