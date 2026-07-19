@@ -1,13 +1,12 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ShoppingBag, MapPin, Star, Heart, Clock, ChevronRight, Utensils, Smartphone, Download } from "lucide-react";
+import { ArrowRight, MapPin, Star, Heart, Utensils, Smartphone, Download } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "./providers";
 import { InstallModal } from "../components/InstallModal";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { toast } from "sonner";
 
 export default function HomePage() {
   const { user } = useAuth()!;
@@ -52,7 +51,7 @@ export default function HomePage() {
           <div className="text-2xl font-bold tracking-tight">
             2QT<span className="text-brand-primary">.</span>
           </div>
-          
+
           <div className="flex items-center gap-4 md:gap-10">
             <div className="hidden md:flex items-center gap-10">
               <Link href="/#features" className="text-sm font-medium text-black/60 hover:text-brand-primary transition-colors">Our Kitchens</Link>
@@ -73,7 +72,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative pt-48 pb-32 px-6 sm:px-10 overflow-hidden">
         <div className="absolute top-0 right-0 w-[80%] h-[120%] bg-gradient-to-bl from-brand-accent/20 via-brand-primary/5 to-transparent -z-10 blur-[120px]" />
-        
+
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -124,15 +123,14 @@ export default function HomePage() {
                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                  <div className="absolute bottom-6 md:bottom-8 left-6 md:left-8 right-6 md:right-8 text-white">
                     <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] md:text-xs font-semibold mb-3 shadow-lg">
-                       Chef's Signature
+                       Chef&apos;s Signature
                     </div>
                     <div className="text-xl md:text-2xl font-bold mb-1 font-outfit">Mediterranean Quinoa Bowl</div>
                     <div className="text-white/80 text-xs md:text-sm">Fresh, healthy, and perfectly balanced.</div>
                  </div>
                </div>
             </div>
-            
-            {/* Glowing Orbs for Advanced aesthetic */}
+
             <div className="absolute -top-10 -right-10 w-48 md:w-72 h-48 md:h-72 bg-brand-accent/40 rounded-full blur-[60px] md:blur-[80px] -z-10 animate-pulse" />
             <div className="absolute -bottom-10 -left-10 w-48 md:w-72 h-48 md:h-72 bg-brand-primary/30 rounded-full blur-[60px] md:blur-[80px] -z-10" />
           </motion.div>
@@ -141,15 +139,14 @@ export default function HomePage() {
 
       {/* Stats Section */}
       <section className="py-20 border-y border-black/5 bg-zinc-50 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
         <div className="max-w-7xl mx-auto px-6 sm:px-10 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12 relative z-10">
           {[
             { label: "Quality Rating", val: "4.9" },
             { label: "Curated Dishes", val: "150+" },
             { label: "Happy Diners", val: "50k+" },
           ].map((stat, i) => (
-            <motion.div 
-              key={i} 
+            <motion.div
+              key={i}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -179,8 +176,8 @@ export default function HomePage() {
               { title: "Cloud Kitchens", desc: "State-of-the-art facilities designed purely for delivery perfection.", icon: Heart },
               { title: "White-glove Delivery", desc: "Trained professionals ensuring your food arrives exactly as intended.", icon: MapPin },
             ].map((f, i) => (
-              <motion.div 
-                key={i} 
+              <motion.div
+                key={i}
                 whileHover={{ y: -10 }}
                 className="bg-white border border-black/5 rounded-[32px] p-10 shadow-sm hover:shadow-xl transition-all duration-300"
               >
@@ -197,11 +194,8 @@ export default function HomePage() {
 
       {/* App Download Section */}
       <section id="app" className="py-24 px-6 sm:px-10 bg-brand-dark text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.05]" />
-        
-        {/* Glow Effects */}
         <div className="absolute top-1/2 left-0 w-96 h-96 bg-brand-primary/20 rounded-full blur-[100px] -translate-y-1/2 -z-0 pointer-events-none" />
-        
+
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center relative z-10">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -213,16 +207,16 @@ export default function HomePage() {
                <Smartphone className="w-3.5 h-3.5" />
                Zero Storage Space Required
             </div>
-            
+
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 tracking-tight">
               Instant App.<br/>
               <span className="text-brand-primary">Infinite Flavor.</span>
             </h2>
-            
+
             <p className="text-white/70 text-lg md:text-xl font-medium mb-10 max-w-md leading-relaxed">
               We engineered the 2QT App using Next-Gen PWA technology. That means no App Store or Play Store downloads, zero updates to manage, and it takes up literally 0MB of storage on your phone.
             </p>
-            
+
             <ul className="space-y-4 mb-10">
               {[
                 "Live turn-by-turn order tracking",
@@ -240,7 +234,7 @@ export default function HomePage() {
             </ul>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <button 
+              <button
                 onClick={() => setIsInstallModalOpen(true)}
                 className="group flex items-center justify-center gap-3 bg-brand-primary text-white px-8 py-4 rounded-2xl text-[15px] font-bold hover:bg-brand-primary-dark transition-all shadow-[0_10px_30px_rgba(255,107,53,0.3)]"
               >
@@ -249,7 +243,7 @@ export default function HomePage() {
               </button>
             </div>
           </motion.div>
-          
+
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -257,9 +251,8 @@ export default function HomePage() {
             transition={{ duration: 1, ease: "easeOut" }}
             className="relative flex justify-center lg:justify-end"
           >
-            {/* Abstract Phone Mockup */}
             <div className="relative w-[280px] md:w-[320px] aspect-[1/2.1] bg-black rounded-[48px] p-2 shadow-2xl border-4 border-zinc-800 transform rotate-[-5deg] hover:rotate-0 transition-transform duration-700 group">
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-20" /> {/* Notch */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-20" />
               <div className="relative w-full h-full bg-brand-light rounded-[38px] overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.div
