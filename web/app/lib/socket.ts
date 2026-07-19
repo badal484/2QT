@@ -5,7 +5,7 @@ const getSocketUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL.replace('/api/v1', '');
   // In production (non-localhost), use the Render backend directly
   if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
-    return 'https://twoqt.onrender.com';
+    return 'https://twoqt-1.onrender.com';
   }
   return 'http://localhost:8000';
 };
