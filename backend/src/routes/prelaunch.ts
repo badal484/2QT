@@ -54,7 +54,7 @@ router.post('/send-otp', async (req, res) => {
         if (!/^91\d{10}$/.test(phone))
             return res.status(400).json({ error: 'INVALID_PHONE' });
 
-        const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit
+        const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit (matches template)
         plOtpStore.set(phone, { otp, exp: Date.now() + 600_000 });
         await redis.setEx(`prelaunch_otp:${phone}`, 600, otp).catch(() => {});
 
@@ -62,12 +62,13 @@ router.post('/send-otp', async (req, res) => {
         const templateId = process.env.MSG91_TEMPLATE_ID || '';
         if (authKey) {
             try {
-                await fetch('https://control.msg91.com/api/v5/otp', {
+                const msg91Res = await fetch('https://control.msg91.com/api/v5/otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', authkey: authKey },
                     body: JSON.stringify({ template_id: templateId, mobile: phone, otp }),
                 });
-                console.log('[PRELAUNCH OTP] Sent to', phone);
+                const msg91Data = await msg91Res.json().catch(() => ({}));
+                console.log('[PRELAUNCH OTP] MSG91 response:', JSON.stringify(msg91Data));
             } catch (e: any) {
                 console.error('[PRELAUNCH OTP] MSG91 error:', e.message);
             }
