@@ -5,6 +5,7 @@ import { Countdown } from './Countdown';
 import { LiveCounter } from './LiveCounter';
 import { VerticalSidebar } from './VerticalSidebar';
 import { CampusMap } from './CampusMap';
+import { Comparison } from './Comparison';
 
 export function Landing({ onStart }: { onStart: () => void }) {
   return (
@@ -36,6 +37,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
       </div>
 
       <Hero onStart={onStart} />
+      <Comparison />
       <div id="vision"><Showcase /></div>
       <div id="campus"><CampusMap /></div>
       <div id="rewards"><Countdown onStart={onStart} /></div>
