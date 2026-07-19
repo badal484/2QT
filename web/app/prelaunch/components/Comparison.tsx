@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 
-const features = [
+const features: { name: string; qt2: boolean | 'partial'; others: boolean | 'partial' }[] = [
   { name: 'Own Kitchen', qt2: true, others: false },
   { name: 'Quality Control', qt2: true, others: 'partial' },
   { name: 'Taste Consistency', qt2: true, others: 'partial' },
