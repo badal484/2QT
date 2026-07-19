@@ -91,6 +91,11 @@ html, body {
 }
 .input-field::placeholder { color: #a1a1aa; }
 
+/* Hide reCAPTCHA badge (injected by Firebase Auth / MSG91 widget) */
+.grecaptcha-badge {
+  visibility: hidden !important;
+}
+
 /* Remove number input spinners globally */
 input[type='number']::-webkit-outer-spin-button,
 input[type='number']::-webkit-inner-spin-button {
