@@ -35,37 +35,23 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
 
   useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
-  // Load MSG91 widget
+  // Cleaned up MSG91 script loading since we now use our own backend APIs directly
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
-    script.async = true;
-    script.onload = () => {
-      if (window.initSendOTP) {
-        window.initSendOTP({
-          widgetId: '366772613253353536373236',
-          tokenAuth: '524621TvewiLzS6a5add22P1',
-          exposeMethods: 'true',
-          success: (data: any) => {
-            if (data?.message) handleWidgetVerified(data.message);
-          },
-          failure: (error: any) => {
-            setIsLoading(false);
-            toast.error(error?.message || 'Verification failed');
-          },
-        });
-      }
-    };
-    document.body.appendChild(script);
-    return () => { document.body.removeChild(script); };
+    // Left empty on purpose
   }, []);
 
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
-    if (!window.sendOtp) return toast.error('Widget loading, please wait a moment');
     setIsLoading(true);
     try {
-      window.sendOtp(`91${phone}`);
+      const res = await fetch('/api/proxy/prelaunch/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.message || data.error || 'Failed to send OTP');
+      
       setStep('OTP');
       startCooldown();
       toast.success('OTP Sent!');
@@ -76,10 +62,15 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     }
   };
 
-  const handleResendOTP = () => {
-    if (resendCooldown > 0 || !window.sendOtp) return;
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0) return;
     try {
-      window.sendOtp(`91${phone}`);
+      const res = await fetch('/api/proxy/prelaunch/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      if (!res.ok) throw new Error('Failed to resend');
       startCooldown();
       toast.success('OTP resent!');
     } catch (err: any) {
@@ -87,47 +78,41 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     }
   };
 
-  const handleVerifyOTP = () => {
+  const handleVerifyOTP = async () => {
     if (otp.length < 6) return toast.error('Enter the 6-digit OTP');
-    if (!window.verifyOtp) return toast.error('Widget not ready');
     setIsLoading(true);
     try {
-      window.verifyOtp(otp);
-    } catch (err: any) {
-      toast.error(err.message || 'Verification error');
-      setIsLoading(false);
-    }
-  };
-
-  const handleWidgetVerified = async (msg91Token: string) => {
-    setIsLoading(true);
-    try {
-      const meRes = await fetch('/api/proxy/prelaunch/me', {
+      const res = await fetch('/api/proxy/prelaunch/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msg91Token }),
+        body: JSON.stringify({ phone, otp }),
       });
-      const meData = await meRes.json().catch(() => ({}));
-      if (meRes.ok && meData.registered) {
-        setName(meData.name || '');
+      const data = await res.json();
+      
+      if (!res.ok || !data.verified) {
+        throw new Error(data.message || data.error || 'Incorrect OTP');
+      }
+
+      if (data.registered) {
+        setName(data.name || '');
         setStep('SUCCESS');
         setTimeout(() => onVerified({
           phone: `91${phone}`,
-          token: meData.sessionToken || msg91Token,
-          name: meData.name || '',
+          token: data.sessionToken || data.phoneToken,
+          name: data.name || '',
           alreadyRegistered: true,
-          referralCode: meData.referral_code,
-          rank: meData.rank,
-          total: meData.total,
-          referrals: meData.referrals,
-          surveyCompleted: meData.survey_completed || false,
+          referralCode: data.referral_code,
+          rank: data.rank,
+          total: data.total,
+          referrals: data.referrals,
+          surveyCompleted: data.survey_completed || false,
         }), 1200);
       } else {
-        setPendingVerified({ phone: `91${phone}`, token: msg91Token });
+        setPendingVerified({ phone: `91${phone}`, token: data.phoneToken });
         setStep('NAME');
       }
-    } catch {
-      toast.error('Verification failed. Please try again.');
+    } catch (err: any) {
+      toast.error(err.message || 'Verification failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
