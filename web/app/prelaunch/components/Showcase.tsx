@@ -53,6 +53,30 @@ export function Showcase() {
           <p className="text-zinc-400 text-sm leading-relaxed font-medium">Great taste. Every time. Crafted with passion and served with pride.</p>
         </div>
 
+        {/* Hot Food Guarantee */}
+        <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-8 sm:col-span-2 lg:col-span-4 relative overflow-hidden shadow-lg hover:shadow-[0_0_40px_rgba(239,68,68,0.15)] transition-all border border-white/10 hover:border-red-500/40 duration-500">
+          <div className="absolute -top-10 -right-10 w-64 h-64 bg-red-500/10 rounded-full blur-[100px] group-hover:bg-red-500/20 transition-colors duration-500" />
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div className="flex items-start gap-5">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0 shadow-inner">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#ef4444">
+                  <path d="M17.66 11.2C17.43 10.9 17.15 10.64 16.89 10.38C16.22 9.78 15.46 9.35 14.82 8.72C13.33 7.26 13 4.85 13.95 3C13 3.23 12.17 3.75 11.46 4.32C8.87 6.4 7.85 10.07 9.07 13.22C9.11 13.32 9.15 13.42 9.15 13.55C9.15 13.77 9 13.97 8.8 14.05C8.57 14.15 8.33 14.09 8.14 13.93C8.08 13.88 8.04 13.83 8 13.76C6.87 12.33 6.69 10.28 7.45 8.64C5.78 10 4.87 12.3 5 14.47C5.06 14.97 5.12 15.47 5.29 15.97C5.43 16.57 5.7 17.17 6 17.7C7.08 19.43 8.95 20.67 10.96 20.92C13.1 21.19 15.39 20.8 17.03 19.32C18.86 17.66 19.5 15 18.56 12.72L18.43 12.46C18.22 12 17.66 11.2 17.66 11.2Z"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-display text-xl sm:text-2xl font-bold mb-2">Guaranteed Hot & Fresh Food</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed font-medium max-w-2xl">
+                  Every order leaves our kitchen piping hot. We deliver within our own 4km radius so your food arrives the way it was cooked — not lukewarm. If it's not hot, we make it right. No questions asked.
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-bold text-sm whitespace-nowrap">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.66 11.2C17.43 10.9 17.15 10.64 16.89 10.38C16.22 9.78 15.46 9.35 14.82 8.72C13.33 7.26 13 4.85 13.95 3C13 3.23 12.17 3.75 11.46 4.32C8.87 6.4 7.85 10.07 9.07 13.22C9.11 13.32 9.15 13.42 9.15 13.55C9.15 13.77 9 13.97 8.8 14.05C8.57 14.15 8.33 14.09 8.14 13.93C8.08 13.88 8.04 13.83 8 13.76C6.87 12.33 6.69 10.28 7.45 8.64C5.78 10 4.87 12.3 5 14.47C5.06 14.97 5.12 15.47 5.29 15.97C5.43 16.57 5.7 17.17 6 17.7C7.08 19.43 8.95 20.67 10.96 20.92C13.1 21.19 15.39 20.8 17.03 19.32C18.86 17.66 19.5 15 18.56 12.72L18.43 12.46C18.22 12 17.66 11.2 17.66 11.2Z"/></svg>
+              The 2QT Hot Promise
+            </div>
+          </div>
+        </div>
+
         {/* Transparent Kitchen */}
         <div className="group bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-7 sm:col-span-2 lg:col-span-2 relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(255,90,31,0.15)] transition-all border border-white/10 hover:border-brand-primary/40 duration-500 flex flex-col sm:flex-row justify-between gap-6">
           <div className="flex-1">
