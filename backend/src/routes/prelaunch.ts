@@ -508,6 +508,21 @@ router.get('/registrations', authenticate, requireRole('super_admin', 'admin'), 
     }
 });
 
+router.delete('/registrations/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+    const { id } = req.params;
+    try {
+        const { rows } = await query('SELECT name, phone FROM pre_launch_registrations WHERE id = $1', [id]);
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+
+        await query('DELETE FROM pre_launch_registrations WHERE id = $1', [id]);
+        console.log(`[PRELAUNCH DELETE] Removed registration ${id} (${rows[0].name} / ${rows[0].phone})`);
+        res.json({ success: true, message: `Registration for ${rows[0].name} deleted` });
+    } catch (err: any) {
+        console.error('[PRELAUNCH DELETE]', err.message);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
 router.get('/admin/stats', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
         // Totals: try with reward columns (migration 121); fall back to count-only
