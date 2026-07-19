@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const BACKEND = process.env.BACKEND_URL || 'http://localhost:8000/api/v1';
-const TTL = 30_000; // 30-second cache
+const TTL = 30_000;
 
-// Module-level cache — persists within an edge worker's lifetime
 let _cache: { on: boolean; t: number } | null = null;
 
 async function gateEnabled(): Promise<boolean> {
@@ -19,15 +18,13 @@ async function gateEnabled(): Promise<boolean> {
     _cache = { on, t: Date.now() };
     return on;
   } catch {
-    // On error, keep the last known state; default to off so nothing breaks
     return _cache?.on ?? false;
   }
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Always allow these through regardless of gate state
   if (
     pathname.startsWith('/prelaunch') ||
     pathname.startsWith('/admin') ||
