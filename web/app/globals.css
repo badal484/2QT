@@ -90,3 +90,14 @@ html, body {
   box-shadow: 0 0 0 3px rgba(255,107,53,0.15);
 }
 .input-field::placeholder { color: #a1a1aa; }
+
+/* Remove number input spinners globally */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
