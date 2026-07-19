@@ -79,7 +79,11 @@ export default function PreLaunchPage() {
       setReferralCode(data.referralCode || '');
       setRankData({ rank: data.rank || 0, total: data.total || 0, referrals: data.referrals || 0 });
       setSurveyCompleted(data.surveyCompleted || false);
-      setStep(2); // Go straight to Dashboard
+      if (!data.surveyCompleted) {
+        setStep(3); // Go straight to Survey
+      } else {
+        setStep(2); // Go straight to Dashboard
+      }
     } else {
       // Register immediately with empty survey to claim spot
       setIsSubmitting(true);
@@ -102,7 +106,12 @@ export default function PreLaunchPage() {
           setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
           setRankData({ rank: json.data?.rank || 0, total: json.data?.total || 0, referrals: json.data?.referrals || 0 });
           setSurveyCompleted(json.data?.survey_completed || false);
-          setStep(2); // Dashboard
+          
+          if (!json.data?.survey_completed) {
+            setStep(3); // Go straight to Survey
+          } else {
+            setStep(2); // Dashboard
+          }
         } else {
           toast.error('Failed to register. Try again.');
           setStep(1);
