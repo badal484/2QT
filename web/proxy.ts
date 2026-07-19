@@ -28,6 +28,7 @@ export async function proxy(req: NextRequest) {
   if (
     pathname.startsWith('/prelaunch') ||
     pathname.startsWith('/admin') ||
+    pathname.startsWith('/login') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/kitchen-portal') ||
