@@ -45,34 +45,45 @@ router.get('/config', async (_req, res) => {
 
 // ── OTP (MSG91 REST API — no widget, no reCAPTCHA) ──────────────────────────
 
-const plOtpStore = new Map<string, { otp: string; exp: number }>();
+function normPhone(raw: any): string | null {
+    let p = String(raw || '').replace(/\D/g, '');
+    if (p.length === 10) p = '91' + p;
+    return /^91\d{10}$/.test(p) ? p : null;
+}
 
 router.post('/send-otp', async (req, res) => {
     try {
-        let phone = String(req.body.phone || '').replace(/\D/g, '');
-        if (phone.length === 10) phone = '91' + phone;
-        if (!/^91\d{10}$/.test(phone))
-            return res.status(400).json({ error: 'INVALID_PHONE' });
-
-        const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit (matches template)
-        plOtpStore.set(phone, { otp, exp: Date.now() + 600_000 });
-        await redis.setEx(`prelaunch_otp:${phone}`, 600, otp).catch(() => {});
+        const phone = normPhone(req.body.phone);
+        if (!phone) return res.status(400).json({ error: 'INVALID_PHONE' });
 
         const authKey    = process.env.MSG91_AUTH_KEY    || '';
         const templateId = process.env.MSG91_TEMPLATE_ID || '';
-        if (authKey) {
-            try {
-                const msg91Res = await fetch('https://control.msg91.com/api/v5/otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', authkey: authKey },
-                    body: JSON.stringify({ template_id: templateId, mobile: phone, otp }),
+
+        // Let MSG91 generate its own OTP — no digit-count mismatch with template
+        const msg91Res = await fetch('https://control.msg91.com/api/v5/otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', authkey: authKey },
+            body: JSON.stringify({ template_id: templateId, mobile: phone }),
+        });
+        const msg91Data = await msg91Res.json().catch(() => ({})) as any;
+        console.log('[PRELAUNCH SEND_OTP] MSG91:', JSON.stringify(msg91Data));
+
+        if (msg91Data.type !== 'success') {
+            // MSG91 may block re-sends within the cooldown window — try their retry endpoint
+            const retryRes = await fetch(
+                `https://control.msg91.com/api/v5/otp/retry?mobile=${phone}&retrytype=text`,
+                { headers: { authkey: authKey } }
+            );
+            const retryData = await retryRes.json().catch(() => ({})) as any;
+            console.log('[PRELAUNCH RESEND_OTP] MSG91 retry:', JSON.stringify(retryData));
+            if (retryData.type !== 'success') {
+                return res.status(500).json({
+                    error: 'SMS_FAILED',
+                    message: retryData.message || msg91Data.message || 'Could not send OTP. Please try again.',
                 });
-                const msg91Data = await msg91Res.json().catch(() => ({}));
-                console.log('[PRELAUNCH OTP] MSG91 response:', JSON.stringify(msg91Data));
-            } catch (e: any) {
-                console.error('[PRELAUNCH OTP] MSG91 error:', e.message);
             }
         }
+
         res.json({ sent: true });
     } catch (err: any) {
         console.error('[PRELAUNCH SEND_OTP]', err.message);
@@ -82,23 +93,24 @@ router.post('/send-otp', async (req, res) => {
 
 router.post('/verify-otp', async (req, res) => {
     try {
-        let phone = String(req.body.phone || '').replace(/\D/g, '');
-        if (phone.length === 10) phone = '91' + phone;
-        if (!/^91\d{10}$/.test(phone))
-            return res.status(400).json({ error: 'INVALID_PHONE' });
+        const phone = normPhone(req.body.phone);
+        if (!phone) return res.status(400).json({ error: 'INVALID_PHONE' });
 
         const { otp } = req.body;
         if (!otp) return res.status(400).json({ error: 'OTP_REQUIRED' });
 
-        const storedOtp =
-            (await redis.get(`prelaunch_otp:${phone}`).catch(() => null)) ??
-            (plOtpStore.get(phone)?.exp! > Date.now() ? plOtpStore.get(phone)?.otp : undefined);
+        // Verify via MSG91 — they own the OTP session
+        const authKey = process.env.MSG91_AUTH_KEY || '';
+        const verifyRes = await fetch(
+            `https://control.msg91.com/api/v5/otp/verify?mobile=${phone}&otp=${encodeURIComponent(String(otp))}`,
+            { headers: { authkey: authKey } }
+        );
+        const verifyData = await verifyRes.json().catch(() => ({})) as any;
+        console.log('[PRELAUNCH VERIFY_OTP] MSG91:', JSON.stringify(verifyData));
 
-        if (!storedOtp || storedOtp !== String(otp))
+        if (verifyData.type !== 'success') {
             return res.status(400).json({ error: 'INVALID_OTP', message: 'Incorrect OTP. Please try again.' });
-
-        await redis.del(`prelaunch_otp:${phone}`).catch(() => {});
-        plOtpStore.delete(phone);
+        }
 
         // Short-lived token for /register
         const phoneToken = jwt.sign({ phone, sub: 'prelaunch' }, JWT_SECRET, { expiresIn: '10m' });
