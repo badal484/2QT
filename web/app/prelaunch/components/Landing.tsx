@@ -4,6 +4,7 @@ import { Showcase } from './Showcase';
 import { Countdown } from './Countdown';
 import { LiveCounter } from './LiveCounter';
 import { VerticalSidebar } from './VerticalSidebar';
+import { CampusMap } from './CampusMap';
 
 export function Landing({ onStart }: { onStart: () => void }) {
   return (
@@ -19,6 +20,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-zinc-400">
             <button onClick={() => document.getElementById('vision')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">The Vision</button>
+            <button onClick={() => document.getElementById('campus')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">Our Reach</button>
             <button onClick={() => document.getElementById('rewards')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">Rewards</button>
             <button onClick={onStart} className="hover:text-brand-primary transition-colors text-brand-primary drop-shadow-[0_0_8px_rgba(255,90,31,0.5)]">Check Status</button>
           </nav>
@@ -35,6 +37,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
 
       <Hero onStart={onStart} />
       <div id="vision"><Showcase /></div>
+      <div id="campus"><CampusMap /></div>
       <div id="rewards"><Countdown onStart={onStart} /></div>
       <LiveCounter />
 
