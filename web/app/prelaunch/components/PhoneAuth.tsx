@@ -1,27 +1,34 @@
-import { useState, useRef } from 'react';
+'use client';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const RESEND_SECONDS = 30;
 
-interface PhoneAuthProps {
-  onVerified: (data: { phone: string; token: string; name: string; alreadyRegistered?: boolean; referralCode?: string; rank?: number; total?: number; referrals?: number; surveyCompleted?: boolean }) => void;
+declare global {
+  interface Window { initSendOTP: any; sendOtp: any; verifyOtp: any; }
 }
 
-async function safeJson(res: Response) {
-  try { return await res.json(); } catch { return {}; }
+interface PhoneAuthProps {
+  onVerified: (data: {
+    phone: string; token: string; name: string;
+    alreadyRegistered?: boolean; referralCode?: string;
+    rank?: number; total?: number; referrals?: number; surveyCompleted?: boolean;
+  }) => void;
 }
 
 export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [step, setStep] = useState<'PHONE' | 'OTP' | 'NAME' | 'SUCCESS'>('PHONE');
   const [isLoading, setIsLoading] = useState(false);
+  const [widgetReady, setWidgetReady] = useState(false);
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
-  const [phoneToken, setPhoneToken] = useState('');
+  const [pendingToken, setPendingToken] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startCooldown = () => {
     setResendCooldown(RESEND_SECONDS);
@@ -33,65 +40,96 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     }, 1000);
   };
 
-  const handleSendOTP = async () => {
-    if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/proxy/prelaunch/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await safeJson(res);
-      if (!res.ok) {
-        toast.error(data.error === 'INVALID_PHONE' ? 'Invalid phone number' : 'Failed to send OTP. Try again.');
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
+    script.async = true;
+    script.onload = () => {
+      if (!window.initSendOTP) {
+        toast.error('OTP service unavailable. Please refresh.');
         return;
       }
+      window.initSendOTP({
+        widgetId: '366772613253353536373236',
+        tokenAuth: '524621TvewiLzS6a5add22P1',
+        exposeMethods: 'true',
+        success: (data: any) => {
+          if (data?.message) handleWidgetVerified(data.message);
+        },
+        failure: (error: any) => {
+          setIsLoading(false);
+          toast.error(error?.message || 'Verification failed. Try again.');
+        },
+      });
+      // Poll until sendOtp method is injected by the widget
+      pollRef.current = setInterval(() => {
+        if (window.sendOtp) {
+          setWidgetReady(true);
+          clearInterval(pollRef.current!);
+        }
+      }, 100);
+    };
+    script.onerror = () => toast.error('Failed to load OTP service. Please refresh.');
+    document.body.appendChild(script);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+      try { document.body.removeChild(script); } catch {}
+    };
+  }, []);
+
+  const handleSendOTP = () => {
+    if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
+    if (!widgetReady || !window.sendOtp) {
+      toast.error('OTP service is loading, please wait a moment…');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      window.sendOtp(`91${phone}`);
       setStep('OTP');
       startCooldown();
-      if (data.otp) {
-        setOtp(data.otp);
-        toast.info(`SMS delayed — your OTP is: ${data.otp}`, { duration: 15000 });
-      } else {
-        toast.success('OTP sent!');
-      }
-    } catch {
-      toast.error('Network error. Please try again.');
+      toast.success('OTP sent!');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResendOTP = async () => {
-    if (resendCooldown > 0) return;
+  const handleResendOTP = () => {
+    if (resendCooldown > 0 || !window.sendOtp) return;
     try {
-      const res = await fetch('/api/proxy/prelaunch/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
-      if (res.ok) { startCooldown(); toast.success('OTP resent!'); }
-      else toast.error('Failed to resend. Try again.');
-    } catch {
-      toast.error('Network error.');
+      window.sendOtp(`91${phone}`);
+      startCooldown();
+      toast.success('OTP resent!');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to resend OTP.');
     }
   };
 
-  const handleVerifyOTP = async () => {
+  const handleVerifyOTP = () => {
     if (otp.length < 6) return toast.error('Enter the 6-digit OTP');
+    if (!window.verifyOtp) return toast.error('Verification service not ready. Please refresh.');
     setIsLoading(true);
     try {
-      const res = await fetch('/api/proxy/prelaunch/verify-otp', {
+      window.verifyOtp(otp);
+    } catch (e: any) {
+      toast.error(e?.message || 'Verification error. Try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleWidgetVerified = async (msg91Token: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/proxy/prelaunch/me', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp }),
+        body: JSON.stringify({ msg91Token }),
       });
-      const data = await safeJson(res);
-      if (!res.ok) {
-        toast.error(data.message || 'Incorrect OTP. Please try again.');
-        return;
-      }
-      if (data.registered) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.registered) {
         setName(data.name || '');
         setStep('SUCCESS');
         setTimeout(() => onVerified({
@@ -106,7 +144,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           surveyCompleted: data.survey_completed || false,
         }), 1200);
       } else {
-        setPhoneToken(data.phoneToken);
+        setPendingToken(msg91Token);
         setStep('NAME');
       }
     } catch {
@@ -119,7 +157,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const submitName = () => {
     if (name.trim().length < 2) return;
     setStep('SUCCESS');
-    setTimeout(() => onVerified({ phone: `91${phone}`, token: phoneToken, name: name.trim() }), 1200);
+    setTimeout(() => onVerified({ phone: `91${phone}`, token: pendingToken, name: name.trim() }), 1200);
   };
 
   return (
@@ -152,7 +190,9 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                 <button onClick={handleSendOTP} disabled={isLoading || phone.length !== 10}
                   className="w-full mt-4 group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
                   style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Send OTP</span><ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : !widgetReady
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Loading…</span></>
+                    : <><span>Send OTP</span><ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
                 </button>
               </div>
             </motion.div>
@@ -182,7 +222,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   style={{ color: resendCooldown > 0 ? 'rgb(113,113,122)' : 'rgb(255,90,31)' }}>
                   {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
-                <button onClick={() => setStep('PHONE')} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
+                <button onClick={() => { setStep('PHONE'); setOtp(''); }} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
                   Change Phone Number
                 </button>
               </div>
