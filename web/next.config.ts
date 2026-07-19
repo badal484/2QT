@@ -64,11 +64,6 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: '/',
-        destination: '/prelaunch',
-        permanent: false,
-      },
-      {
         source: '/app',
         destination: 'https://play.google.com/store/apps/details?id=com.veltomobile.buyer',
         permanent: false,
