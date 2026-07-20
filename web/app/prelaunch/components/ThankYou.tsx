@@ -28,7 +28,7 @@ export function ThankYou({ referralCode }: ThankYouProps) {
       try {
         await navigator.share({
           title: 'Join the 2QT Waitlist',
-          text: "I just secured my ₹100 launch reward on 2QT! Join before we launch in August 2026.",
+          text: "I just secured a free meal on launch day from 2QT! Join before we launch in August 2026.",
           url: shareUrl,
         });
       } catch { handleCopy(); }
@@ -86,8 +86,8 @@ export function ThankYou({ referralCode }: ThankYouProps) {
         <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-3xl p-8 mb-8 relative overflow-hidden text-center shadow-lg transform hover:scale-[1.02] transition-transform">
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,white_2px,transparent_2px)] [background-size:16px_16px]"></div>
           <p className="text-white/90 text-sm font-bold tracking-widest uppercase mb-2 relative z-10">Your Launch Reward</p>
-          <p className="text-7xl font-display font-bold text-white tracking-tighter mb-2 relative z-10 drop-shadow-md">₹100</p>
-          <p className="text-white/90 text-sm font-semibold relative z-10">Added to your 2QT wallet on launch day</p>
+          <p className="text-6xl font-display font-bold text-white tracking-tighter mb-2 relative z-10 drop-shadow-md">🍽️ Free Meal</p>
+          <p className="text-white/90 text-sm font-semibold relative z-10">Yours on launch day — no strings attached</p>
         </div>
 
         {/* Launch date */}

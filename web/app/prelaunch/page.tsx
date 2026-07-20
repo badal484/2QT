@@ -204,7 +204,7 @@ export default function PreLaunchPage() {
       const json = await res.json();
       if (res.ok) {
         sessionStorage.removeItem('2qt_survey_v2');
-        toast.success('Survey completed! Your ₹100 reward is confirmed.');
+        toast.success('Survey completed! Your free meal on launch is confirmed.');
         setRankData({ rank: json.data?.rank || rankData?.rank || 0, total: json.data?.total || rankData?.total || 0, referrals: json.data?.referrals || rankData?.referrals || 0 });
         setSurveyCompleted(true);
         setStep(2); // Back to Dashboard
