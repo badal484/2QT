@@ -30,6 +30,11 @@ export default function PreLaunchPage() {
       .then(d => { const v = d.config?.prelaunch_bg_video_url; if (v) setBgVideoUrl(String(v)); })
       .catch(() => {});
 
+    // Keep Render free-tier backend warm — ping every 9 min to prevent cold starts
+    const keepalive = setInterval(() => {
+      fetch('/api/proxy/prelaunch/config').catch(() => {});
+    }, 9 * 60 * 1000);
+
     const restoreSession = async () => {
       let unsubscribe = () => {};
       const savedToken = localStorage.getItem('2qt_auth_token');
@@ -109,7 +114,7 @@ export default function PreLaunchPage() {
 
     let unsub: any;
     restoreSession().then(u => unsub = u);
-    return () => { if(unsub) unsub(); };
+    return () => { if(unsub) unsub(); clearInterval(keepalive); };
   }, []);
 
   const [step, setStep] = useState<number>(0);
