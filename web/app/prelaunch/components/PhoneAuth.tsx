@@ -95,6 +95,17 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       toast.error('OTP service is loading, please wait a moment…');
       return;
     }
+
+    // MSG91 widget caches the last verified session in localStorage/sessionStorage.
+    // When a cached session exists, sendOtp() fires success with the cached token
+    // instead of sending a new SMS. Clear non-app storage so MSG91 always sends fresh OTP.
+    try {
+      sessionStorage.clear();
+      Object.keys(localStorage)
+        .filter(k => k !== '2qt_auth_token')
+        .forEach(k => localStorage.removeItem(k));
+    } catch {}
+
     setIsLoading(true);
     try {
       window.sendOtp(`91${phone}`);
