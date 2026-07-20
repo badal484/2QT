@@ -60,10 +60,10 @@ export function Countdown({ onStart }: { onStart: () => void }) {
             <Gift className="w-6 h-6 text-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
           </div>
           <h3 className="text-xl font-display font-bold text-white mb-2 relative z-10 drop-shadow-sm">
-            Become a Founding Member. Get a Free Meal.
+            Complete the survey & get ₹100 on 2QT Wallet on launch day!
           </h3>
           <p className="text-sm text-zinc-400 mb-8 font-medium relative z-10">
-            Be one of the first 1,000 members and help us decide the Menu and Offers. Get a free meal the moment 2QT launches.
+            Be one of the first 1,000 members and help us decide the menu and offers. Get a ₹100 reward the moment 2QT launches.
           </p>
           <motion.button
             onClick={onStart}
