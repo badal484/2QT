@@ -231,7 +231,25 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
 
   const next = () => {
     if (!valid) return;
-    if (isLast) { onComplete(buildData()); return; }
+    if (isLast) {
+      const surveyData = buildData();
+      // Guard against stale sessionStorage: find first unanswered required question
+      const firstMissing = QUESTIONS.findIndex((question, idx) => {
+        if (idx === currentIndex) return false;
+        if (question.optional) return false;
+        const val = surveyData[question.id];
+        if (question.type === 'text' || question.type === 'radio' || question.type === 'radio-other')
+          return !val || String(val).trim() === '';
+        return Array.isArray(val) ? val.length === 0 : !val;
+      });
+      if (firstMissing !== -1) {
+        setDirection(firstMissing < currentIndex ? -1 : 1);
+        setCurrentIndex(firstMissing);
+        return;
+      }
+      onComplete(surveyData);
+      return;
+    }
     setDirection(1);
     setCurrentIndex(i => i + 1);
   };

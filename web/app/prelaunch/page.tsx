@@ -149,6 +149,8 @@ export default function PreLaunchPage() {
       }
     } else {
       // Register immediately with empty survey to claim spot
+      // Clear any stale survey session from a previous test/user on this device
+      sessionStorage.removeItem('2qt_survey_v2');
       setIsSubmitting(true);
       setStep(1.5 as any); // Loading state
       try {
@@ -214,10 +216,10 @@ export default function PreLaunchPage() {
         setSurveyCompleted(true);
         setStep(2); // Back to Dashboard
       } else {
-        throw new Error(json.error || 'Failed to submit');
+        throw new Error(json.message || json.error || 'Failed to submit');
       }
     } catch (e: any) {
-      toast.error('Something went wrong. Please try again.');
+      toast.error(e?.message && e.message !== 'Failed to submit' ? e.message : 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
