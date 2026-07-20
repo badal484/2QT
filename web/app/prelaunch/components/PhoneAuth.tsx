@@ -1,14 +1,10 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const RESEND_SECONDS = 30;
-
-declare global {
-  interface Window { initSendOTP: any; sendOtp: any; verifyOtp: any; }
-}
 
 interface PhoneAuthProps {
   onVerified: (data: {
@@ -21,23 +17,13 @@ interface PhoneAuthProps {
 export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [step, setStep] = useState<'PHONE' | 'OTP' | 'NAME' | 'SUCCESS'>('PHONE');
   const [isLoading, setIsLoading] = useState(false);
-  const [widgetReady, setWidgetReady] = useState(false);
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [pendingToken, setPendingToken] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Ref so that the MSG91 success callback always reads the latest phone value
-  // (the closure inside useEffect captures the initial empty string otherwise)
   const phoneRef = useRef('');
-
-  // Guard: only process the MSG91 success callback when the user explicitly
-  // sent an OTP. This prevents the widget from auto-firing with a cached token
-  // from a previous user (shared-device bug).
-  const callbackEnabledRef = useRef(false);
 
   const startCooldown = () => {
     setResendCooldown(RESEND_SECONDS);
@@ -49,62 +35,19 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     }, 1000);
   };
 
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
-    script.async = true;
-    script.onload = () => {
-      if (!window.initSendOTP) {
-        toast.error('OTP service unavailable. Please refresh.');
-        return;
-      }
-      window.initSendOTP({
-        widgetId: '366772613253353536373236',
-        tokenAuth: '524621TvewiLzS6a5add22P1',
-        exposeMethods: 'true',
-        success: (data: any) => {
-          // Block auto-fires that happen before the user ever clicks "Send OTP".
-          // Once enabled (by Send OTP / Resend), do NOT reset the flag here —
-          // the stale cached token fires first (phone mismatch), then the real
-          // OTP fires second. We need to keep the flag true so the real one
-          // is processed. handleWidgetVerified resets it only on actual success.
-          if (!callbackEnabledRef.current) return;
-          if (data?.message) handleWidgetVerified(data.message);
-        },
-        failure: (error: any) => {
-          callbackEnabledRef.current = false;
-          setIsLoading(false);
-          toast.error(error?.message || 'Verification failed. Try again.');
-        },
-      });
-      // Poll until sendOtp method is injected by the widget
-      pollRef.current = setInterval(() => {
-        if (window.sendOtp) {
-          setWidgetReady(true);
-          clearInterval(pollRef.current!);
-        }
-      }, 100);
-    };
-    script.onerror = () => toast.error('Failed to load OTP service. Please refresh.');
-    document.body.appendChild(script);
-    return () => {
-      callbackEnabledRef.current = false;
-      if (pollRef.current) clearInterval(pollRef.current);
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
-      try { document.body.removeChild(script); } catch {}
-    };
-  }, []);
-
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
-    if (!widgetReady || !window.sendOtp) {
-      toast.error('OTP service is loading, please wait a moment…');
-      return;
-    }
     setIsLoading(true);
     try {
-      window.sendOtp(`91${phone}`);
-      callbackEnabledRef.current = true; // allow the next widget callback to proceed
+      const res = await fetch('/api/proxy/prelaunch/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to send OTP');
+      }
       setStep('OTP');
       startCooldown();
       toast.success('OTP sent!');
@@ -115,61 +58,38 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     }
   };
 
-  const handleResendOTP = () => {
-    if (resendCooldown > 0 || !window.sendOtp) return;
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0) return;
     try {
-      window.sendOtp(`91${phone}`);
-      callbackEnabledRef.current = true;
-      startCooldown();
-      toast.success('OTP resent!');
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to resend OTP.');
-    }
-  };
-
-  const handleVerifyOTP = () => {
-    if (otp.length < 6) return toast.error('Enter the 6-digit OTP');
-    if (!window.verifyOtp) return toast.error('Verification service not ready. Please refresh.');
-    setIsLoading(true);
-    try {
-      window.verifyOtp(otp);
-    } catch (e: any) {
-      toast.error(e?.message || 'Verification error. Try again.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleWidgetVerified = async (msg91Token: string) => {
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/proxy/prelaunch/me', {
+      const res = await fetch('/api/proxy/prelaunch/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msg91Token }),
+        body: JSON.stringify({ phone: phoneRef.current }),
+      });
+      if (res.ok) {
+        startCooldown();
+        toast.success('OTP resent!');
+      }
+    } catch {
+      toast.error('Failed to resend OTP.');
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (otp.length < 6) return toast.error('Enter the 6-digit OTP');
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/proxy/prelaunch/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneRef.current, otp }),
       });
       const data = await res.json().catch(() => ({}));
-
-      // Validate that the token the widget returned belongs to the phone
-      // the user actually typed. The MSG91 widget fires the success callback
-      // with its cached (previous user's) token the moment sendOtp() is called,
-      // BEFORE the user enters their OTP. If phone mismatches, silently discard
-      // and keep callbackEnabledRef true so the real OTP callback can still fire.
-      if (data.phoneToken && phoneRef.current) {
-        try {
-          const payload = JSON.parse(atob(data.phoneToken.split('.')[1]));
-          const tokenPhone = String(payload.phone || '');
-          if (tokenPhone && tokenPhone !== `91${phoneRef.current}`) {
-            // Stale cached token — silently drop it, stay on OTP step
-            setIsLoading(false);
-            return;
-          }
-        } catch { /* ignore JWT decode errors */ }
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Incorrect OTP. Please try again.');
       }
 
-      // Passed phone validation — this is the real token. Consume the guard.
-      callbackEnabledRef.current = false;
-
-      if (res.ok && data.registered) {
+      if (data.registered) {
         setName(data.name || '');
         setStep('SUCCESS');
         setTimeout(() => onVerified({
@@ -184,14 +104,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           surveyCompleted: data.survey_completed || false,
         }), 1200);
       } else {
-        // Use the phoneToken issued by /me (a proper JWT) instead of the
-        // single-use MSG91 token which is already consumed at this point
-        setPendingToken(data.phoneToken || msg91Token);
+        setPendingToken(data.phoneToken);
         setStep('NAME');
       }
-    } catch {
-      callbackEnabledRef.current = false;
-      toast.error('Verification failed. Please try again.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Verification failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -237,8 +154,8 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                 <button onClick={handleSendOTP} disabled={isLoading || phone.length !== 10}
                   className="w-full mt-4 group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
                   style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : !widgetReady
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Loading…</span></>
+                  {isLoading
+                    ? <Loader2 className="w-5 h-5 animate-spin" />
                     : <><span>Send OTP</span><ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
                 </button>
               </div>
@@ -269,7 +186,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   style={{ color: resendCooldown > 0 ? 'rgb(113,113,122)' : 'rgb(255,90,31)' }}>
                   {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
-                <button onClick={() => { setStep('PHONE'); setOtp(''); callbackEnabledRef.current = false; }} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
+                <button onClick={() => { setStep('PHONE'); setOtp(''); }} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
                   Change Phone Number
                 </button>
               </div>
