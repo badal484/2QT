@@ -5,7 +5,7 @@ dotenv.config();
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 20, // High-performance pool for Bengaluru pilot
+    max: parseInt(process.env.DB_POOL_MAX || '5'), // 5 for Render free (25 conn limit), override via env for paid tier
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: true,
