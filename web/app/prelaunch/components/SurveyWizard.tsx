@@ -136,7 +136,7 @@ function getOtherValues(qId: string, otherCount: number, inputs: Record<string, 
   const result: string[] = [];
   for (let i = 0; i < otherCount; i++) {
     const v = (inputs[`${qId}_${i}`] || '').trim();
-    if (v) result.push(v);
+    if (v.length >= 4) result.push(v);
   }
   return result;
 }
@@ -423,15 +423,23 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                         {/* Custom write-in inputs */}
                         <div className="space-y-2 mb-1">
                           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest px-1">Type what you want</p>
-                          {Array.from({ length: customSlots }).map((_, i) => (
-                            <input key={i} autoFocus={i === 0}
-                              type="text"
-                              placeholder={i === 0 ? 'e.g. Dal Makhani' : `Dish ${i + 1} (optional)`}
-                              value={otherInputs[`${q.id}_${i}`] || ''}
-                              onChange={e => setOtherInputs(prev => ({ ...prev, [`${q.id}_${i}`]: e.target.value }))}
-                              className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-5 py-3.5 text-white text-sm font-bold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner"
-                            />
-                          ))}
+                          {Array.from({ length: customSlots }).map((_, i) => {
+                            const val = (otherInputs[`${q.id}_${i}`] || '').trim();
+                            const tooShort = val.length > 0 && val.length < 4;
+                            return (
+                              <div key={i}>
+                                <input autoFocus={i === 0}
+                                  type="text"
+                                  placeholder={i === 0 ? 'e.g. Dal Makhani' : `Dish ${i + 1} (optional)`}
+                                  value={otherInputs[`${q.id}_${i}`] || ''}
+                                  onChange={e => setOtherInputs(prev => ({ ...prev, [`${q.id}_${i}`]: e.target.value }))}
+                                  className={cn('w-full bg-white/5 border-2 rounded-2xl px-5 py-3.5 text-white text-sm font-bold outline-none focus:bg-white/10 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner',
+                                    tooShort ? 'border-amber-500/60 focus:border-amber-500' : 'border-white/10 focus:border-brand-primary/60')}
+                                />
+                                {tooShort && <p className="text-amber-500 text-xs font-semibold mt-1 px-1">Min 4 characters</p>}
+                              </div>
+                            );
+                          })}
                         </div>
 
                         {/* Divider */}
