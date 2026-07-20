@@ -528,30 +528,40 @@ router.get('/registrations', authenticate, requireRole('super_admin', 'admin'), 
     const search = req.query.search ? `%${req.query.search}%` : null;
 
     try {
-        const where  = search ? `WHERE r.phone ILIKE $3 OR r.name ILIKE $3` : '';
+        const where  = search ? `WHERE r.phone ILIKE $3::text OR r.name ILIKE $3::text` : '';
         const params: any[] = [limit, offset, ...(search ? [search] : [])];
 
-        const baseSelect = `SELECT r.id, r.phone, r.name, r.source, r.survey_responses,
-                   r.referral_code, r.referred_by, r.created_at`;
-        const orderLimit = `ORDER BY r.created_at DESC LIMIT $1 OFFSET $2`;
+        const baseSelect = `WITH ReferralCounts AS (
+                SELECT referred_by, COUNT(*) as ref_count
+                FROM pre_launch_registrations
+                WHERE referred_by IS NOT NULL
+                GROUP BY referred_by
+            )
+            SELECT r.id, r.phone, r.name, r.source, r.survey_responses,
+                   r.referral_code, r.referred_by, r.created_at,
+                   COALESCE(rc.ref_count, 0) as referral_count`;
+        const fromJoin = `FROM pre_launch_registrations r LEFT JOIN ReferralCounts rc ON r.referral_code = rc.referred_by`;
+        const orderLimit = `${where} ORDER BY r.created_at DESC LIMIT $1::int OFFSET $2::int`;
 
         let rows: any[];
         try {
             const result = await query(`
                 ${baseSelect}, r.reward_credited, r.reward_credited_at, r.reward_expires_at, r.reward_redeemed
-                FROM pre_launch_registrations r ${where} ${orderLimit}
+                ${fromJoin} ${orderLimit}
             `, params);
             rows = result.rows;
         } catch {
-            const result = await query(`${baseSelect} FROM pre_launch_registrations r ${where} ${orderLimit}`, params);
+            const result = await query(`${baseSelect} ${fromJoin} ${orderLimit}`, params);
             rows = result.rows.map((r: any) => ({ ...r, reward_credited: false, reward_credited_at: null, reward_expires_at: null, reward_redeemed: false }));
         }
 
+        const countWhere = search ? `WHERE r.phone ILIKE $1::text OR r.name ILIKE $1::text` : '';
         const { rows: cntRows } = await query(
-            `SELECT COUNT(*) FROM pre_launch_registrations r ${where}`,
+            `SELECT COUNT(*) FROM pre_launch_registrations r ${countWhere}`,
             search ? [search] : [],
         );
-        res.json({ success: true, data: rows, total: parseInt(cntRows[0].count), page, limit });
+        const data = rows.map((r: any) => ({ ...r, referral_count: parseInt(r.referral_count || '0', 10) }));
+        res.json({ success: true, data, total: parseInt(cntRows[0].count), page, limit });
     } catch (err: any) {
         console.error('[PRELAUNCH LIST]', err.message);
         res.status(500).json({ error: 'SERVER_ERROR' });
@@ -626,6 +636,12 @@ router.get('/admin/stats', authenticate, requireRole('super_admin', 'admin'), as
 router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
         const { rows } = await query(`
+            WITH ReferralCounts AS (
+                SELECT referred_by, COUNT(*) as ref_count
+                FROM pre_launch_registrations
+                WHERE referred_by IS NOT NULL
+                GROUP BY referred_by
+            )
             SELECT
                 r.created_at                                                         AS registered_at,
                 r.name,
@@ -633,6 +649,7 @@ router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (
                 r.source,
                 r.referral_code,
                 r.referred_by,
+                COALESCE(rc.ref_count, 0)                                            AS referral_count,
                 -- new survey fields (with old-key fallback)
                 COALESCE(r.survey_responses->>'personType',      r.survey_responses->>'college')    AS person_type,
                 COALESCE(r.survey_responses->>'institution',     r.survey_responses->>'college')    AS institution,
@@ -656,6 +673,7 @@ router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (
                 COALESCE(r.reward_credited_at::text, '')                             AS reward_credited_at,
                 COALESCE(r.reward_redeemed::text,  'false')                          AS reward_redeemed
             FROM pre_launch_registrations r
+            LEFT JOIN ReferralCounts rc ON r.referral_code = rc.referred_by
             ORDER BY r.created_at DESC
         `);
 
