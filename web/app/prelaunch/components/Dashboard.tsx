@@ -150,7 +150,7 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
           >
             <div className="flex items-center gap-3">
               <Rocket className="w-5 h-5 text-amber-400 group-hover:-translate-y-1 transition-transform" />
-              <span>Complete survey — unlock free meal + boost rank 500 spots</span>
+              <span className="text-sm sm:text-base">Complete survey — unlock your free meal</span>
             </div>
             <ChevronRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition-transform" />
           </button>

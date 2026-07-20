@@ -52,7 +52,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
             href="https://www.instagram.com/2qtindia?utm_source=qr&igsh=bmZjMXk5NWM3a2li" 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="flex items-center gap-4 px-8 py-4 rounded-full bg-white/5 border border-white/10 hover:border-brand-primary/50 hover:bg-white/10 transition-all group shadow-lg"
+            className="flex items-center gap-3 sm:gap-4 px-4 sm:px-8 py-3 sm:py-4 rounded-full bg-white/5 border border-white/10 hover:border-brand-primary/50 hover:bg-white/10 transition-all group shadow-lg w-full max-w-xs sm:max-w-none"
           >
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-500 flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform">
                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -65,7 +65,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
             </div>
           </a>
 
-          <div className="flex items-start gap-3 px-8 py-4 rounded-full bg-white/5 border border-white/10 shadow-lg">
+          <div className="flex items-start gap-3 px-4 sm:px-8 py-3 sm:py-4 rounded-full bg-white/5 border border-white/10 shadow-lg w-full max-w-xs sm:max-w-none">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-brand-primary mt-0.5 shrink-0">
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
             </svg>
@@ -76,7 +76,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
             </div>
           </div>
 
-          <a href="tel:+916204646300" className="flex items-start gap-3 px-8 py-4 rounded-full bg-white/5 border border-white/10 hover:border-brand-primary/50 hover:bg-white/10 transition-all group shadow-lg">
+          <a href="tel:+916204646300" className="flex items-start gap-3 px-4 sm:px-8 py-3 sm:py-4 rounded-full bg-white/5 border border-white/10 hover:border-brand-primary/50 hover:bg-white/10 transition-all group shadow-lg w-full max-w-xs sm:max-w-none">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-brand-primary mt-0.5 shrink-0 group-hover:scale-110 transition-transform">
               <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
             </svg>
