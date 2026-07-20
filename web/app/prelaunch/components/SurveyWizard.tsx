@@ -78,9 +78,10 @@ const QUESTIONS: Question[] = [
   {
     id: 'cuisines',
     title: 'Which cuisines do you enjoy the most?',
-    subtitle: 'Select up to 3',
+    subtitle: 'Select exactly 3',
     type: 'checkbox-other',
     maxSelect: 3,
+    minSelect: 3,
     options: ['North Indian', 'Chinese', 'Biryani', 'Pizza', 'Burger', 'Rolls', 'Momos', 'Sandwiches', 'South Indian', 'Healthy Meals', 'Street Food', 'Fast Food', 'Desserts'],
   },
   {
@@ -194,6 +195,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
       return q.minSelect ? total >= q.minSelect : total > 0;
     }
     if (checkArr.length === 0) return false;
+    if (q.minSelect && nonOtherCount < q.minSelect) return false;
     if (q.type === 'checkbox-other' && checkArr.includes(OTHER)) {
       const count = q.otherCount ?? 1;
       return getOtherValues(q.id, count, otherInputs).length > 0;
