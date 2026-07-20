@@ -231,7 +231,7 @@ export function PreLaunchTab() {
     setCreditingId(id);
     try {
       await api.post(`/prelaunch/admin/credit/${id}`, {});
-      toast.success('₹100 reward credited to wallet');
+      toast.success('Free meal reward credited to wallet');
       load();
     } catch (e: any) {
       const msg = e?.response?.data?.error || e?.message || 'Failed';
@@ -335,8 +335,8 @@ export function PreLaunchTab() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Registrations" value={(stats?.total ?? 0).toLocaleString('en-IN')} sub="since campaign start" color="orange" />
         <StatCard label="Target" value={parseInt(targetReg || '2000', 10).toLocaleString('en-IN')} sub={`${Math.round(((stats?.total ?? 0) / parseInt(targetReg || '2000', 10)) * 100)}% reached`} color="zinc" />
-        <StatCard label="Rewards Credited" value={stats?.credited ?? 0} sub="wallet credits issued" color="green" />
-        <StatCard label="Rewards Redeemed" value={stats?.redeemed ?? 0} sub="orders placed using reward" color="blue" />
+        <StatCard label="Free Meals Credited" value={stats?.credited ?? 0} sub="free meals issued" color="green" />
+        <StatCard label="Free Meals Redeemed" value={stats?.redeemed ?? 0} sub="orders placed using free meal" color="blue" />
       </div>
 
       {/* ── Control Panel + QR ── */}
@@ -357,7 +357,7 @@ export function PreLaunchTab() {
           />
           <Toggle
             label="Reward Active"
-            desc="When ON — users who registered will receive ₹100 on their first login after launch"
+            desc="When ON — qualifying members will receive their free meal on first login after launch"
             value={isRewardOn}
             onChange={() => toggle('prelaunch_reward_active', isRewardOn)}
           />
@@ -365,7 +365,7 @@ export function PreLaunchTab() {
           {/* Editable config */}
           <div className="pt-4 grid grid-cols-3 gap-4 mt-2">
             <div>
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Reward Amount (paise)</label>
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Meal Value (paise)</label>
               <input
                 type="number"
                 value={rewardPaise}
