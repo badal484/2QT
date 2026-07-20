@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Check, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -261,18 +261,22 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
     setData(prev => {
       const cur = Array.isArray(prev[q.id]) ? (prev[q.id] as string[]) : [];
       if (cur.includes(val)) return { ...prev, [q.id]: cur.filter(v => v !== val) };
-      if (q.maxSelect && val !== OTHER && cur.filter(v => v !== OTHER).length >= q.maxSelect) return prev;
+      if (q.maxSelect && cur.length >= q.maxSelect) return prev;
       return { ...prev, [q.id]: [...cur, val] };
     });
   };
 
+  // Keep a ref so the Enter-key handler always calls the latest `next` closure
+  const nextRef = useRef(next);
+  useEffect(() => { nextRef.current = next; });
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && valid && (q.type === 'text' || (isRadioType && otherSelected))) next();
+      if (e.key === 'Enter' && valid && (q.type === 'text' || (isRadioType && otherSelected))) nextRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [currentIndex, valid, otherSelected]);
+  }, [currentIndex, valid, otherSelected, isRadioType, q.type]);
 
   const variants = {
     enter:  (d: number) => ({ x: d > 0 ? 48 : -48, opacity: 0, filter: 'blur(4px)' }),
@@ -329,7 +333,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                       const filledCustom = q.otherCount && q.otherCount > 1 ? getOtherValues(q.id, q.otherCount, otherInputs).length : 0;
                       const total = checkArr.length + filledCustom;
                       const remaining = q.minSelect - total;
-                      if (remaining <= 0) return <span className="text-green-400">5 / 5 selected</span>;
+                      if (remaining <= 0) return <span className="text-green-400">{q.minSelect} / {q.minSelect} selected</span>;
                       return <span className="text-amber-400">{total} / {q.minSelect} selected — pick {remaining} more</span>;
                     })()
                   ) : (

@@ -98,8 +98,7 @@ router.post('/send-otp', async (req, res) => {
             console.warn('[PRELAUNCH OTP] MSG91 credentials missing — SMS not sent');
         }
 
-        const smsSent = msg91Data?.type === 'success';
-        res.json({ sent: true, otp: smsSent ? undefined : otp, debug: msg91Data });
+        res.json({ sent: true });
     } catch (err: any) {
         console.error('[PRELAUNCH SEND_OTP]', err.message);
         res.status(500).json({ error: 'SERVER_ERROR' });
@@ -177,6 +176,22 @@ router.post('/register', async (req, res) => {
     }
 
     const { name, idToken, surveyResponses, source, referredBy } = parsed.data;
+
+    // Validate survey if non-empty — prevents anyone bypassing the free meal with {x:1}
+    if (surveyResponses && Object.keys(surveyResponses).length > 0) {
+        const dishes  = surveyResponses.mostOrderedDishes;
+        const cuisines = surveyResponses.cuisines;
+        if (!Array.isArray(dishes) || dishes.length < 5)
+            return res.status(400).json({ error: 'INVALID_SURVEY', message: 'Select at least 5 dishes.' });
+        if (!Array.isArray(cuisines) || cuisines.length < 3)
+            return res.status(400).json({ error: 'INVALID_SURVEY', message: 'Select exactly 3 cuisines.' });
+        const required = ['personType', 'institution', 'orderFrequency', 'spendPerOrder', 'biggestProblems', 'orderTime', 'waitTime', 'priorities', 'likelyToTry'];
+        for (const field of required) {
+            const v = surveyResponses[field];
+            if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0))
+                return res.status(400).json({ error: 'INVALID_SURVEY', message: `Missing required field: ${field}` });
+        }
+    }
 
     try {
         // Verify Token — try Firebase first, then internal JWT, then MSG91
@@ -653,27 +668,34 @@ router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (
 // Manual credit for a specific registration id
 router.post('/admin/credit/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { id } = req.params;
+    const client = await pool.connect();
     try {
-        const { rows: regRows } = await query(
-            `SELECT r.user_id, r.phone, r.reward_credited FROM pre_launch_registrations r WHERE r.id = $1`,
+        await client.query('BEGIN');
+
+        // Lock the row so concurrent admin clicks can't double-credit
+        const { rows: regRows } = await client.query(
+            `SELECT user_id, phone, reward_credited FROM pre_launch_registrations WHERE id = $1 FOR UPDATE`,
             [id]
         );
-        if (!regRows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
-        if (regRows[0].reward_credited) return res.status(409).json({ error: 'ALREADY_CREDITED' });
+        if (!regRows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'NOT_FOUND' }); }
+        if (regRows[0].reward_credited) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'ALREADY_CREDITED' }); }
 
         // Resolve user_id — may be null if user hasn't installed app yet
         let userId = regRows[0].user_id;
         if (!userId) {
-            const { rows: uRows } = await query(`SELECT id, prelaunch_reward_credited FROM users WHERE phone = $1`, [regRows[0].phone]);
-            if (!uRows[0]) return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'User has not signed up to the app yet' });
-            if (uRows[0].prelaunch_reward_credited) return res.status(409).json({ error: 'ALREADY_CREDITED' });
+            const { rows: uRows } = await client.query(
+                `SELECT id, prelaunch_reward_credited FROM users WHERE phone = $1 FOR UPDATE`,
+                [regRows[0].phone]
+            );
+            if (!uRows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'User has not signed up to the app yet' }); }
+            if (uRows[0].prelaunch_reward_credited) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'ALREADY_CREDITED' }); }
             userId = uRows[0].id;
         } else {
-            const { rows: uRows } = await query(`SELECT prelaunch_reward_credited FROM users WHERE id = $1`, [userId]);
-            if (uRows[0]?.prelaunch_reward_credited) return res.status(409).json({ error: 'ALREADY_CREDITED' });
+            const { rows: uRows } = await client.query(`SELECT prelaunch_reward_credited FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+            if (uRows[0]?.prelaunch_reward_credited) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'ALREADY_CREDITED' }); }
         }
 
-        const { rows: cfgRows } = await query(
+        const { rows: cfgRows } = await client.query(
             `SELECT key, value FROM app_config WHERE key IN ('prelaunch_reward_paise','prelaunch_reward_validity_days')`
         );
         const cfg: Record<string, any> = {};
@@ -681,29 +703,33 @@ router.post('/admin/credit/:id', authenticate, requireRole('super_admin', 'admin
         const paise     = typeof cfg.prelaunch_reward_paise === 'number' ? cfg.prelaunch_reward_paise : parseInt(cfg.prelaunch_reward_paise || '10000', 10);
         const validDays = typeof cfg.prelaunch_reward_validity_days === 'number' ? cfg.prelaunch_reward_validity_days : parseInt(cfg.prelaunch_reward_validity_days || '7', 10);
 
-        await query(`INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1,0) ON CONFLICT DO NOTHING`, [userId]);
-        await query(`UPDATE customer_wallet SET balance_paise = balance_paise + $1 WHERE customer_id = $2`, [paise, userId]);
-        const { rows: wRows } = await query(`SELECT balance_paise FROM customer_wallet WHERE customer_id = $1`, [userId]);
+        await client.query(`INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1,0) ON CONFLICT DO NOTHING`, [userId]);
+        await client.query(`UPDATE customer_wallet SET balance_paise = balance_paise + $1 WHERE customer_id = $2`, [paise, userId]);
+        const { rows: wRows } = await client.query(`SELECT balance_paise FROM customer_wallet WHERE customer_id = $1`, [userId]);
 
-        await query(`
+        await client.query(`
             INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
             VALUES ($1,$2,'credit','Pre-Launch Exclusive Reward',$3)
         `, [userId, paise, wRows[0]?.balance_paise ?? paise]);
 
-        await query(`UPDATE users SET prelaunch_reward_credited = true WHERE id = $1`, [userId]);
+        await client.query(`UPDATE users SET prelaunch_reward_credited = true WHERE id = $1`, [userId]);
 
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + validDays);
-        await query(`
+        await client.query(`
             UPDATE pre_launch_registrations
             SET reward_credited = true, reward_credited_at = NOW(), reward_expires_at = $1, user_id = $2
             WHERE id = $3
         `, [expiresAt.toISOString(), userId, id]);
 
+        await client.query('COMMIT');
         res.json({ success: true, credited: paise });
     } catch (err: any) {
+        await client.query('ROLLBACK').catch(() => {});
         console.error('[PRELAUNCH MANUAL CREDIT]', err.message);
         res.status(500).json({ error: 'SERVER_ERROR' });
+    } finally {
+        client.release();
     }
 });
 
