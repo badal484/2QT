@@ -459,7 +459,8 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                         {(q.searchable && itemSearch.trim()
                           ? q.options?.filter(o => o.toLowerCase().includes(itemSearch.toLowerCase()))
                           : q.options
-                        )?.map(opt => {
+                        )?.slice().sort((a, b) => (checkArr.includes(b) ? 1 : 0) - (checkArr.includes(a) ? 1 : 0))
+                        .map(opt => {
                           const sel = checkArr.includes(opt);
                           const maxReached = !sel && totalSelected >= (q.maxSelect ?? Infinity);
                           return (
