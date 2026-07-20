@@ -63,10 +63,12 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         tokenAuth: '524621TvewiLzS6a5add22P1',
         exposeMethods: 'true',
         success: (data: any) => {
-          // Ignore any auto-fire / cached-token callback from the widget.
-          // Only process when the user explicitly sent an OTP.
+          // Block auto-fires that happen before the user ever clicks "Send OTP".
+          // Once enabled (by Send OTP / Resend), do NOT reset the flag here —
+          // the stale cached token fires first (phone mismatch), then the real
+          // OTP fires second. We need to keep the flag true so the real one
+          // is processed. handleWidgetVerified resets it only on actual success.
           if (!callbackEnabledRef.current) return;
-          callbackEnabledRef.current = false;
           if (data?.message) handleWidgetVerified(data.message);
         },
         failure: (error: any) => {
@@ -148,20 +150,24 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       const data = await res.json().catch(() => ({}));
 
       // Validate that the token the widget returned belongs to the phone
-      // the user actually typed. The backend encodes the phone in phoneToken
-      // (a JWT) — decode the payload and compare.
+      // the user actually typed. The MSG91 widget fires the success callback
+      // with its cached (previous user's) token the moment sendOtp() is called,
+      // BEFORE the user enters their OTP. If phone mismatches, silently discard
+      // and keep callbackEnabledRef true so the real OTP callback can still fire.
       if (data.phoneToken && phoneRef.current) {
         try {
           const payload = JSON.parse(atob(data.phoneToken.split('.')[1]));
           const tokenPhone = String(payload.phone || '');
           if (tokenPhone && tokenPhone !== `91${phoneRef.current}`) {
-            toast.error('Phone mismatch. Please try again.');
-            setStep('PHONE');
+            // Stale cached token — silently drop it, stay on OTP step
             setIsLoading(false);
             return;
           }
         } catch { /* ignore JWT decode errors */ }
       }
+
+      // Passed phone validation — this is the real token. Consume the guard.
+      callbackEnabledRef.current = false;
 
       if (res.ok && data.registered) {
         setName(data.name || '');
@@ -184,6 +190,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         setStep('NAME');
       }
     } catch {
+      callbackEnabledRef.current = false;
       toast.error('Verification failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -262,7 +269,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   style={{ color: resendCooldown > 0 ? 'rgb(113,113,122)' : 'rgb(255,90,31)' }}>
                   {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
-                <button onClick={() => { setStep('PHONE'); setOtp(''); }} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
+                <button onClick={() => { setStep('PHONE'); setOtp(''); callbackEnabledRef.current = false; }} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
                   Change Phone Number
                 </button>
               </div>
