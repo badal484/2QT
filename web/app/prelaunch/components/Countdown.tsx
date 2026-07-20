@@ -63,7 +63,7 @@ export function Countdown({ onStart }: { onStart: () => void }) {
             Become a Founding Member. Get a Free Meal.
           </h3>
           <p className="text-sm text-zinc-400 mb-8 font-medium relative z-10">
-            Be one of the first 1,000 members and help us decide the menu and offers. Get a free meal the moment 2QT launches.
+            Be one of the first 1,000 members and help us decide the Menu and Offers. Get a free meal the moment 2QT launches.
           </p>
           <motion.button
             onClick={onStart}
