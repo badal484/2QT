@@ -39,7 +39,7 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
       try {
         await navigator.share({
           title: 'Join 2QT Waitlist',
-          text: `Join the 2QT waitlist! Use my link — you get a free meal on launch & I move up the list.`,
+          text: `Join the 2QT waitlist! Use my link — you get a free meal on launch & I get ₹10 per referral.`,
           url: link,
         });
       } catch { handleCopy(); }
@@ -124,7 +124,7 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 text-center">
           <p className="text-zinc-500 uppercase tracking-widest text-xs font-bold mb-1">Total Referrals</p>
           <span className="text-4xl font-display font-bold text-white">{referrals}</span>
-          <p className="text-zinc-600 text-xs mt-1">{referrals === 0 ? 'Each referral moves you up the list' : 'Climbing the waitlist — nice!'}</p>
+          <p className="text-zinc-600 text-xs mt-1">{referrals === 0 ? 'Earn ₹10 per referral on launch' : `+₹${referrals * 10} credited on launch day`}</p>
         </div>
       </div>
 
@@ -143,7 +143,7 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
             className="w-full sm:flex-[2] bg-brand-primary hover:bg-brand-primary-dark transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-white text-sm"
           >
             <Share2 className="w-5 h-5" />
-            Share with Friends — move up the list
+            Share with Friends — earn ₹10 each
           </button>
         </div>
 
