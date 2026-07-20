@@ -11,6 +11,11 @@ import { Dashboard } from './components/Dashboard';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
+function StepRedirectToSurvey({ onRedirect }: { onRedirect: () => void }) {
+  useEffect(() => { onRedirect(); }, [onRedirect]);
+  return null;
+}
+
 export default function PreLaunchPage() {
   // Read referral code from URL if present
   const [referredBy, setReferredBy] = useState<string | null>(null);
@@ -164,7 +169,7 @@ export default function PreLaunchPage() {
           const token = json.sessionToken || data.token;
           localStorage.setItem('2qt_auth_token', token);
           setIdToken(token);
-          setReferralCode(json.data?.referral_code || json.referral_code || '2QT-LAUNCH');
+          setReferralCode(json.data?.referral_code || json.referral_code || '');
           setRankData({ rank: json.data?.rank || 0, total: json.data?.total || 0, referrals: json.data?.referrals || 0 });
           setSurveyCompleted(json.data?.survey_completed || false);
           
@@ -302,10 +307,8 @@ export default function PreLaunchPage() {
           </motion.div>
         )}
 
-        {step === 2 && !surveyCompleted && (
-          // Safety net: if somehow we hit step 2 without survey done, redirect to survey
-          (() => { setTimeout(() => setStep(3), 0); return null; })()
-        )}
+        {/* Safety net: if somehow we reach step 2 without survey done, redirect to survey */}
+        {step === 2 && !surveyCompleted && <StepRedirectToSurvey onRedirect={() => setStep(3)} />}
 
         {step === 2 && surveyCompleted && (
           <motion.div key="dashboard" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">

@@ -17,14 +17,18 @@ interface DashboardProps {
 export function Dashboard({ rank, total, referrals, referralCode, name, surveyCompleted, onOpenSurvey, onLogout }: DashboardProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     const link = typeof window !== 'undefined'
       ? `${window.location.origin}/prelaunch?ref=${referralCode}`
       : `https://go2qt.com/prelaunch?ref=${referralCode}`;
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    toast.success('Referral link copied!');
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success('Referral link copied!');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy — please copy the link manually.');
+    }
   };
 
   const handleShare = async () => {
@@ -120,7 +124,7 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 text-center">
           <p className="text-zinc-500 uppercase tracking-widest text-xs font-bold mb-1">Total Referrals</p>
           <span className="text-4xl font-display font-bold text-white">{referrals}</span>
-          <p className="text-zinc-600 text-xs mt-1">+₹{referrals * 10} earned</p>
+          <p className="text-zinc-600 text-xs mt-1">{referrals === 0 ? 'Share to move up the list' : `${referrals} friend${referrals > 1 ? 's' : ''} joined`}</p>
         </div>
       </div>
 
