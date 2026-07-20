@@ -30,6 +30,15 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Ref so that the MSG91 success callback always reads the latest phone value
+  // (the closure inside useEffect captures the initial empty string otherwise)
+  const phoneRef = useRef('');
+
+  // Guard: only process the MSG91 success callback when the user explicitly
+  // sent an OTP. This prevents the widget from auto-firing with a cached token
+  // from a previous user (shared-device bug).
+  const callbackEnabledRef = useRef(false);
+
   const startCooldown = () => {
     setResendCooldown(RESEND_SECONDS);
     cooldownRef.current = setInterval(() => {
@@ -54,9 +63,14 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         tokenAuth: '524621TvewiLzS6a5add22P1',
         exposeMethods: 'true',
         success: (data: any) => {
+          // Ignore any auto-fire / cached-token callback from the widget.
+          // Only process when the user explicitly sent an OTP.
+          if (!callbackEnabledRef.current) return;
+          callbackEnabledRef.current = false;
           if (data?.message) handleWidgetVerified(data.message);
         },
         failure: (error: any) => {
+          callbackEnabledRef.current = false;
           setIsLoading(false);
           toast.error(error?.message || 'Verification failed. Try again.');
         },
@@ -72,6 +86,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     script.onerror = () => toast.error('Failed to load OTP service. Please refresh.');
     document.body.appendChild(script);
     return () => {
+      callbackEnabledRef.current = false;
       if (pollRef.current) clearInterval(pollRef.current);
       if (cooldownRef.current) clearInterval(cooldownRef.current);
       try { document.body.removeChild(script); } catch {}
@@ -87,6 +102,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     setIsLoading(true);
     try {
       window.sendOtp(`91${phone}`);
+      callbackEnabledRef.current = true; // allow the next widget callback to proceed
       setStep('OTP');
       startCooldown();
       toast.success('OTP sent!');
@@ -101,6 +117,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     if (resendCooldown > 0 || !window.sendOtp) return;
     try {
       window.sendOtp(`91${phone}`);
+      callbackEnabledRef.current = true;
       startCooldown();
       toast.success('OTP resent!');
     } catch (e: any) {
@@ -129,11 +146,28 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         body: JSON.stringify({ msg91Token }),
       });
       const data = await res.json().catch(() => ({}));
+
+      // Validate that the token the widget returned belongs to the phone
+      // the user actually typed. The backend encodes the phone in phoneToken
+      // (a JWT) — decode the payload and compare.
+      if (data.phoneToken && phoneRef.current) {
+        try {
+          const payload = JSON.parse(atob(data.phoneToken.split('.')[1]));
+          const tokenPhone = String(payload.phone || '');
+          if (tokenPhone && tokenPhone !== `91${phoneRef.current}`) {
+            toast.error('Phone mismatch. Please try again.');
+            setStep('PHONE');
+            setIsLoading(false);
+            return;
+          }
+        } catch { /* ignore JWT decode errors */ }
+      }
+
       if (res.ok && data.registered) {
         setName(data.name || '');
         setStep('SUCCESS');
         setTimeout(() => onVerified({
-          phone: `91${phone}`,
+          phone: `91${phoneRef.current}`,
           token: data.sessionToken,
           name: data.name || '',
           alreadyRegistered: true,
@@ -159,7 +193,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const submitName = () => {
     if (name.trim().length < 2) return;
     setStep('SUCCESS');
-    setTimeout(() => onVerified({ phone: `91${phone}`, token: pendingToken, name: name.trim() }), 1200);
+    setTimeout(() => onVerified({ phone: `91${phoneRef.current}`, token: pendingToken, name: name.trim() }), 1200);
   };
 
   return (
@@ -184,7 +218,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   <span className="pl-5 font-bold text-zinc-400 text-lg border-r border-white/10 pr-3 py-3.5 sm:py-4">+91</span>
                   <input
                     type="tel" placeholder="00000 00000" value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setPhone(val);
+                      phoneRef.current = val;
+                    }}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendOTP()}
                     className="w-full bg-transparent border-none py-3.5 sm:py-4 px-4 text-base sm:text-lg font-bold text-white tracking-widest outline-none placeholder:text-zinc-600"
                   />
