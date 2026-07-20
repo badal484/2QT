@@ -225,10 +225,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           {step === 'OTP' && (
             <motion.div key="otp" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="relative z-10 flex flex-col items-center w-full">
               <h2 className="text-3xl font-display font-bold tracking-tight mb-2 text-white drop-shadow-sm text-center">Verify.</h2>
-              <p className="text-zinc-400 font-medium mb-2 text-sm text-center">Enter the code sent to +91 {phone}</p>
-              <p className="text-zinc-600 text-xs mb-8 text-center">
-                Didn&apos;t get it? Check your <span className="text-zinc-400 font-semibold">Spam / Blocked</span> folder.
-              </p>
+              <p className="text-zinc-400 font-medium mb-8 text-sm text-center">Enter the code sent to +91 {phone}</p>
               <div className="w-full flex flex-col items-center gap-4">
                 <input
                   type="text" inputMode="numeric" pattern="[0-9]*" placeholder="• • • • • •" value={otp} autoFocus
