@@ -28,9 +28,9 @@ const STATS = [
   },
   {
     icon: ChefHat,
-    value: '₹100',
-    label: 'Early Access Reward',
-    sub: 'Credited on launch day',
+    value: 'Free',
+    label: 'Meal on Launch Day',
+    sub: 'For first 1,000 members',
     bg: 'bg-brand-accent',
     textColor: 'text-brand-dark',
   },

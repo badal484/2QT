@@ -33,7 +33,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           className="mb-6 sm:mb-8 inline-flex items-center gap-2 rounded-full border border-brand-primary/30 bg-brand-primary/10 px-4 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-brand-primary shadow-[0_0_20px_rgba(255,90,31,0.25)] backdrop-blur-md"
         >
           <Zap className="h-4 w-4 fill-brand-primary drop-shadow-[0_0_5px_rgba(255,90,31,0.5)]" />
-          First 1,000 users get ₹100 on launch day
+          First 1,000 users get a free meal on launch day
         </motion.div>
 
         {/* Massive Headline */}
@@ -54,7 +54,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           transition={{ duration: 0.55, delay: 0.2, ease }}
           className="text-base sm:text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-10 sm:mb-12 px-2 sm:px-0"
         >
-          We're building 2QT — a new age food app with our own kitchen, experienced chefs, and honest pricing. Become one of our first 1,000 Founding Members, help us dictate exactly what Lalpur is craving, and get <span className="text-amber-400 font-bold">₹100</span> on launch day.
+          We're building 2QT — a new age food app with our own kitchen, experienced chefs, and honest pricing. Become one of our first 1,000 Founding Members, help us dictate exactly what Lalpur is craving, and get a <span className="text-amber-400 font-bold">free meal</span> on launch day.
         </motion.p>
 
         {/* Central Glassmorphic Entry Card */}
@@ -77,13 +77,13 @@ export function Hero({ onStart }: { onStart: () => void }) {
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover/btn:animate-[shimmer_1.5s_infinite]" />
               
               <span className="relative flex items-center justify-center gap-2 sm:gap-3">
-                <span className="whitespace-nowrap">Build the Menu & Get ₹100</span>
+                <span className="whitespace-nowrap">Build the Menu & Get a Free Meal</span>
                 <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 transition-transform group-hover/btn:translate-x-1" />
               </span>
             </button>
 
             <div className="mt-8 w-full text-left">
-              <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 px-1 text-center">How to claim your ₹100</div>
+              <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 px-1 text-center">How to claim your free meal</div>
               <div className="flex flex-col gap-2.5">
                 <div className="flex items-center gap-3 text-sm text-zinc-300 bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-xs">1</div>
@@ -95,7 +95,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
                 </div>
                 <div className="flex items-center gap-3 text-sm text-zinc-300 bg-gradient-to-r from-amber-500/10 to-transparent rounded-xl p-3 border border-amber-500/20">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs"><Gift className="w-3.5 h-3.5" /></div>
-                  <span className="font-medium">Get <span className="text-amber-400 font-bold">₹100</span> on launch day!</span>
+                  <span className="font-medium">Get a <span className="text-amber-400 font-bold">free meal</span> on launch day!</span>
                 </div>
               </div>
             </div>

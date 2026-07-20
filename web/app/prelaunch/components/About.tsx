@@ -120,7 +120,7 @@ export function About() {
           </p>
           <div className="flex flex-col gap-1 text-sm font-semibold text-zinc-400 text-center md:text-right">
             <span className="text-white font-bold">First 1,000 registrations</span>
-            <span>get ₹100 free wallet credit on launch day.</span>
+            <span>get a free meal on launch day.</span>
           </div>
         </motion.div>
       </div>
