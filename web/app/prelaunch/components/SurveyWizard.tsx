@@ -420,6 +420,19 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                     const customSlots = Math.max(1, Math.min(q.otherCount!, (q.maxSelect ?? q.otherCount!) - nonOtherCount));
                     return (
                       <>
+                        {/* Selected presets chips */}
+                        {checkArr.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {checkArr.map(opt => (
+                              <button key={opt} onClick={() => toggleCheck(opt)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-primary/20 border border-brand-primary/50 text-white text-xs font-bold transition-all hover:bg-red-500/20 hover:border-red-500/50 group">
+                                {opt}
+                                <span className="text-brand-primary group-hover:text-red-400 text-sm leading-none">×</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
                         {/* Custom write-in inputs */}
                         <div className="space-y-2 mb-1">
                           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest px-1">Type what you want</p>
