@@ -18,17 +18,33 @@ export function Countdown({ onStart }: { onStart: () => void }) {
         <motion.h2
           initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }} transition={{ delay: 0.07 }}
-          className="text-3xl sm:text-4xl font-display font-bold text-white tracking-tight mb-3 drop-shadow-md"
+          className="text-3xl sm:text-4xl font-display font-bold text-white tracking-tight mb-10 drop-shadow-md"
         >
           Ranchi's food scene, finally upgraded.
         </motion.h2>
-        <motion.p
-          initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }}
+
+        {/* Big date statement */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }} transition={{ delay: 0.12 }}
-          className="text-zinc-400 font-medium text-base mb-12"
+          className="mb-12 select-none"
         >
-          Launching our mobile app and opening our kitchen in Lalpur, Ranchi in August 2026.
-        </motion.p>
+          <p
+            className="font-display font-black text-white leading-none tracking-tighter drop-shadow-2xl"
+            style={{ fontSize: 'clamp(4.5rem, 18vw, 10rem)' }}
+          >
+            AUGUST
+          </p>
+          <p
+            className="font-display font-black text-brand-primary leading-none tracking-tighter drop-shadow-[0_0_40px_rgba(255,90,31,0.6)]"
+            style={{ fontSize: 'clamp(2.5rem, 10vw, 6rem)' }}
+          >
+            2026
+          </p>
+          <p className="text-zinc-500 text-sm font-medium mt-4 tracking-wide">
+            Launching in Lalpur, Ranchi
+          </p>
+        </motion.div>
 
 
 
