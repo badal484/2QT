@@ -131,7 +131,7 @@ router.post('/verify-otp', async (req, res) => {
         const { rows: totalRows } = await query(`SELECT COUNT(*) as count FROM pre_launch_registrations`);
         const total = parseInt(totalRows[0].count, 10);
         const { rows } = await query(
-            `WITH RC AS (SELECT referred_by, COUNT(*) as ref_count FROM pre_launch_registrations WHERE referred_by IS NOT NULL GROUP BY referred_by)
+            `WITH RC AS (SELECT referred_by, COUNT(*) as ref_count FROM pre_launch_registrations WHERE referred_by IS NOT NULL AND survey_responses IS NOT NULL AND survey_responses != '{}'::jsonb GROUP BY referred_by)
              SELECT r.*, COALESCE(rc.ref_count, 0) as ref_count,
                     RANK() OVER (ORDER BY COALESCE(rc.ref_count, 0) DESC, r.created_at ASC) as rank
              FROM pre_launch_registrations r
@@ -326,7 +326,7 @@ router.post('/register', async (req, res) => {
         // Set extended columns added by later migrations (non-fatal if columns don't exist yet)
         try {
             await query(
-                `UPDATE pre_launch_registrations SET referral_code=$1, referred_by=$2 WHERE id=$3`,
+                `UPDATE pre_launch_registrations SET referral_code=$1, referred_by=COALESCE(referred_by, $2) WHERE id=$3`,
                 [referralCode, referredBy ?? null, regRows[0].id]
             );
         } catch { /* migration 120 not yet applied */ }
@@ -352,7 +352,7 @@ router.post('/register', async (req, res) => {
             `WITH ReferralCounts AS (
                 SELECT referred_by, COUNT(*) as ref_count
                 FROM pre_launch_registrations
-                WHERE referred_by IS NOT NULL
+                WHERE referred_by IS NOT NULL AND survey_responses IS NOT NULL AND survey_responses != '{}'::jsonb
                 GROUP BY referred_by
             ),
             RankedRegistrations AS (
@@ -458,7 +458,7 @@ router.post('/me', async (req, res) => {
             `WITH ReferralCounts AS (
                 SELECT referred_by, COUNT(*) as ref_count
                 FROM pre_launch_registrations
-                WHERE referred_by IS NOT NULL
+                WHERE referred_by IS NOT NULL AND survey_responses IS NOT NULL AND survey_responses != '{}'::jsonb
                 GROUP BY referred_by
             ),
             RankedRegistrations AS (
