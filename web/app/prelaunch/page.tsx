@@ -57,7 +57,9 @@ export default function PreLaunchPage() {
             if (meData.registered) {
               // If a referral link is open and this session belongs to a DIFFERENT user,
               // sign them out immediately so the friend lands on the registration page.
-              if (urlRef && meData.referral_code !== urlRef) {
+              // Referral link = someone new wants to join. Always clear the existing
+              // session so the friend sees the landing page, not the referrer's dashboard.
+              if (urlRef) {
                 localStorage.removeItem('2qt_auth_token');
                 try { await signOut(getAuth(app)); } catch {}
                 setIsInitializing(false);
