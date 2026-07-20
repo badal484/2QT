@@ -15,6 +15,7 @@ interface Question {
   type: 'radio' | 'radio-other' | 'checkbox' | 'checkbox-other' | 'text';
   options?: string[];
   maxSelect?: number;
+  minSelect?: number;
   placeholder?: string;
   optional?: boolean;
   otherCount?: number; // how many custom text inputs to show for "Other"
@@ -24,11 +25,12 @@ const QUESTIONS: Question[] = [
   {
     id: 'mostOrderedDishes',
     title: 'Which dishes do you order most often?',
-    subtitle: 'Select up to 5',
+    subtitle: 'Select exactly 5',
     type: 'checkbox-other',
     maxSelect: 5,
+    minSelect: 5,
     otherCount: 5,
-    options: ['Chicken Biryani', 'Veg Biryani', 'Fried Rice', 'Hakka Noodles', 'Chicken Roll', 'Paneer Roll', 'Burger', 'Pizza', 'Momos', 'Sandwich', 'Chole Bhature', 'Rajma Rice', 'Veg Thali', 'Chicken Thali', 'Dosa', 'Idli', 'Chow Mein', 'Pasta', 'Shawarma', 'Wraps', 'Pav Bhaji', 'Maggi', 'Cold Coffee', 'Milkshake', 'Brownie / Dessert'],
+    options: ['Chicken Biryani', 'Veg Biryani', 'Fried Rice', 'Hakka Noodles', 'Chicken Roll', 'Paneer Roll', 'Burger', 'Pizza', 'Momos', 'Sandwich', 'Chole Bhature', 'Rajma Rice', 'Veg Thali', 'Chicken Thali', 'Dosa', 'Idli', 'Chowmin', 'Pasta', 'Shawarma', 'Wraps', 'Pav Bhaji', 'Maggi', 'Cold Coffee', 'Milkshake', 'Brownie / Dessert'],
   },
   {
     id: 'personType',
@@ -166,7 +168,8 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
     // dish-picker mode: inputs at top, no OTHER sentinel needed
     if (q.type === 'checkbox-other' && (q.otherCount ?? 1) > 1) {
       const filledCustom = getOtherValues(q.id, q.otherCount!, otherInputs).length;
-      return checkArr.length + filledCustom > 0;
+      const total = checkArr.length + filledCustom;
+      return q.minSelect ? total >= q.minSelect : total > 0;
     }
     if (checkArr.length === 0) return false;
     if (q.type === 'checkbox-other' && checkArr.includes(OTHER)) {
@@ -296,8 +299,18 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                 {q.title}
               </h2>
               {q.subtitle && (
-                <p className="mt-2 text-sm text-zinc-400 font-medium">
-                  {q.subtitle}{q.maxSelect ? ` (max ${q.maxSelect})` : ''}
+                <p className="mt-2 text-sm font-medium">
+                  {q.minSelect ? (
+                    (() => {
+                      const filledCustom = q.otherCount && q.otherCount > 1 ? getOtherValues(q.id, q.otherCount, otherInputs).length : 0;
+                      const total = checkArr.length + filledCustom;
+                      const remaining = q.minSelect - total;
+                      if (remaining <= 0) return <span className="text-green-400">5 / 5 selected</span>;
+                      return <span className="text-amber-400">{total} / {q.minSelect} selected — pick {remaining} more</span>;
+                    })()
+                  ) : (
+                    <span className="text-zinc-400">{q.subtitle}{q.maxSelect ? ` (max ${q.maxSelect})` : ''}</span>
+                  )}
                 </p>
               )}
             </div>
