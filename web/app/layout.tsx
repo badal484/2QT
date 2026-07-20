@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     description: SITE_DESC,
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "2QT — Premium Gourmet Delivery",
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${SITE_NAME} — Next-Level Food Delivery in Ranchi`,
     description: SITE_DESC,
-    images: ["/og-image.jpg"],
+    images: ["/og-image.png"],
     creator: "@2qt_food",
   },
   alternates: {
