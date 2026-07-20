@@ -24,11 +24,9 @@ export default function PreLaunchPage() {
   const [bgVideoUrl, setBgVideoUrl] = useState('');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const ref = urlParams.get('ref');
-      if (ref) setReferredBy(ref);
-    }
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlRef = urlParams.get('ref');
+    if (urlRef) setReferredBy(urlRef);
 
     fetch('/api/proxy/prelaunch/config')
       .then(r => r.json())
@@ -40,10 +38,20 @@ export default function PreLaunchPage() {
       fetch('/api/proxy/prelaunch/config').catch(() => {});
     }, 9 * 60 * 1000);
 
+    // Referral link = someone new wants to join. Clear any existing session immediately
+    // (synchronous, before any async) so the friend always lands on the registration page,
+    // never on the referrer's dashboard.
+    if (urlRef) {
+      localStorage.removeItem('2qt_auth_token');
+      sessionStorage.removeItem('2qt_survey_v2');
+      signOut(getAuth(app)).catch(() => {});
+      setIsInitializing(false);
+      return () => { clearInterval(keepalive); };
+    }
+
     const restoreSession = async () => {
       let unsubscribe = () => {};
       const savedToken = localStorage.getItem('2qt_auth_token');
-      const urlRef = new URLSearchParams(window.location.search).get('ref');
 
       if (savedToken) {
         try {
@@ -55,17 +63,6 @@ export default function PreLaunchPage() {
           if (meRes.ok) {
             const meData = await meRes.json();
             if (meData.registered) {
-              // If a referral link is open and this session belongs to a DIFFERENT user,
-              // sign them out immediately so the friend lands on the registration page.
-              // Referral link = someone new wants to join. Always clear the existing
-              // session so the friend sees the landing page, not the referrer's dashboard.
-              if (urlRef) {
-                localStorage.removeItem('2qt_auth_token');
-                try { await signOut(getAuth(app)); } catch {}
-                setIsInitializing(false);
-                setStep(0);
-                return unsubscribe;
-              }
               // Upgrade stored token to the fresh long-lived sessionToken
               if (meData.sessionToken) {
                 localStorage.setItem('2qt_auth_token', meData.sessionToken);
