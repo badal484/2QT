@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export type SurveyData = Record<string, string | string[]>;
@@ -16,6 +16,7 @@ interface Question {
   options?: string[];
   maxSelect?: number;
   minSelect?: number;
+  searchable?: boolean;
   placeholder?: string;
   optional?: boolean;
   otherCount?: number; // how many custom text inputs to show for "Other"
@@ -30,7 +31,25 @@ const QUESTIONS: Question[] = [
     maxSelect: 5,
     minSelect: 5,
     otherCount: 5,
-    options: ['Chicken Biryani', 'Veg Biryani', 'Fried Rice', 'Hakka Noodles', 'Chicken Roll', 'Paneer Roll', 'Burger', 'Pizza', 'Momos', 'Sandwich', 'Chole Bhature', 'Rajma Rice', 'Veg Thali', 'Chicken Thali', 'Dosa', 'Idli', 'Chowmin', 'Pasta', 'Shawarma', 'Wraps', 'Pav Bhaji', 'Maggi', 'Cold Coffee', 'Milkshake', 'Brownie / Dessert'],
+    searchable: true,
+    options: [
+      'Chicken Biryani', 'Veg Biryani',
+      'Chicken Chilli', 'Paneer Chilli', 'Mushroom Chilli', 'Baby Corn Chilli', 'Veg Chilli', 'Chicken Wings',
+      'Veg Fried Rice', 'Egg Fried Rice', 'Chicken Fried Rice', 'Paneer Fried Rice', 'Mushroom Fried Rice', 'Mixed Fried Rice', 'Special Veg Fried Rice',
+      'Veg Chowmein', 'Egg Chowmein', 'Chicken Chowmein', 'Paneer Chowmein', 'Mushroom Chowmein', 'Corn Chowmein', 'Mixed Veg Corn Chowmein',
+      'Egg Roll', 'Chicken Roll', 'Chicken Egg Roll', 'Double Egg Roll', 'Double Chicken Roll', 'Double Egg Chicken Roll', 'Double Egg Double Chicken Roll', 'Paneer Roll', 'Paneer Egg Roll', 'Paneer Mushroom Roll', 'Mushroom Roll', 'Veg Roll', 'Veg Paneer Roll', 'Veg Mix Roll', 'Chicken Wrap', 'Paneer Wrap',
+      'Veg Momos', 'Paneer Momos', 'Chicken Momos', 'Fried Momos', 'Tandoori Momos',
+      'Veg Burger', 'Crispy Veg Burger', 'Chicken Burger', 'Crispy Chicken Burger',
+      'Margherita Pizza', 'Farmhouse Pizza', 'Paneer Pizza', 'Chicken Pizza',
+      'Veg Sandwich', 'Grilled Veg Sandwich', 'Paneer Sandwich', 'Chicken Sandwich',
+      'Chicken Shawarma', 'Paneer Shawarma',
+      'White Sauce Pasta', 'Red Sauce Pasta', 'Chicken Pasta',
+      'Chole Bhature', 'Rajma Rice', 'Veg Thali', 'Chicken Thali',
+      'Plain Dosa', 'Masala Dosa', 'Idli', 'Sambar Idli',
+      'Pav Bhaji', 'Maggi', 'Cheese Maggi',
+      'Cold Coffee', 'Oreo Shake', 'Chocolate Shake', 'Vanilla Shake', 'Mango Shake',
+      'Brownie', 'Brownie with Ice Cream', 'Gulab Jamun', 'Ice Cream',
+    ],
   },
   {
     id: 'personType',
@@ -127,6 +146,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
   const [data, setData]               = useState<Record<string, string | string[]>>({});
   const [otherInputs, setOtherInputs] = useState<Record<string, string>>({});
   const [direction, setDirection]     = useState(1);
+  const [itemSearch, setItemSearch]   = useState('');
 
   useEffect(() => {
     try {
@@ -143,6 +163,8 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
   useEffect(() => {
     sessionStorage.setItem('2qt_survey_v2', JSON.stringify({ data, otherInputs, index: currentIndex }));
   }, [data, otherInputs, currentIndex]);
+
+  useEffect(() => { setItemSearch(''); }, [currentIndex]);
 
   const q = QUESTIONS[currentIndex];
   const isLast = currentIndex === QUESTIONS.length - 1;
@@ -419,8 +441,25 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                           <div className="flex-1 h-px bg-white/10" />
                         </div>
 
+                        {/* Search */}
+                        {q.searchable && (
+                          <div className="relative mb-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                            <input
+                              type="text"
+                              placeholder="Search dishes…"
+                              value={itemSearch}
+                              onChange={e => setItemSearch(e.target.value)}
+                              className="w-full bg-white/5 border-2 border-white/10 rounded-2xl pl-10 pr-5 py-3 text-white text-sm font-semibold outline-none focus:bg-white/10 focus:border-brand-primary/60 hover:border-white/20 transition-colors placeholder:text-zinc-600 shadow-inner"
+                            />
+                          </div>
+                        )}
+
                         {/* Preset options */}
-                        {q.options?.map(opt => {
+                        {(q.searchable && itemSearch.trim()
+                          ? q.options?.filter(o => o.toLowerCase().includes(itemSearch.toLowerCase()))
+                          : q.options
+                        )?.map(opt => {
                           const sel = checkArr.includes(opt);
                           const maxReached = !sel && totalSelected >= (q.maxSelect ?? Infinity);
                           return (
