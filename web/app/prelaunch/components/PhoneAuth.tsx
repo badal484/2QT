@@ -30,28 +30,12 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Guard: starts false so any cached-session auto-fire on widget init is ignored.
-  // Set to true only after user explicitly clicks Send OTP / Resend OTP.
-  const callbackEnabledRef = useRef(false);
-
-  const MSG91_CONFIG = {
-    widgetId: '366772613253353536373236',
-    tokenAuth: '524621TvewiLzS6a5add22P1',
-    exposeMethods: 'true' as const,
-  };
-
-  const getCallbacks = () => ({
-    success: (data: any) => {
-      if (!callbackEnabledRef.current) return;
-      callbackEnabledRef.current = false;
-      if (data?.message) handleWidgetVerified(data.message);
-    },
-    failure: (error: any) => {
-      callbackEnabledRef.current = false;
-      setIsLoading(false);
-      toast.error(error?.message || 'Verification failed. Try again.');
-    },
-  });
+  // Only process the widget success callback when the user explicitly clicked
+  // "Verify Code". This blocks:
+  //   1. Auto-fires on widget init (cached session from previous user)
+  //   2. Stale success fires when sendOtp() is called on shared devices
+  // Without calling initSendOTP twice (which broke verifyOtp callbacks).
+  const verifyCalledRef = useRef(false);
 
   const startCooldown = () => {
     setResendCooldown(RESEND_SECONDS);
@@ -72,8 +56,22 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         toast.error('OTP service unavailable. Please refresh.');
         return;
       }
-      // callbackEnabledRef is false here, so any auto-fire on init is swallowed
-      window.initSendOTP({ ...MSG91_CONFIG, ...getCallbacks() });
+      window.initSendOTP({
+        widgetId: '366772613253353536373236',
+        tokenAuth: '524621TvewiLzS6a5add22P1',
+        exposeMethods: 'true',
+        success: (data: any) => {
+          // Only handle the callback after user clicks "Verify Code"
+          if (!verifyCalledRef.current) return;
+          verifyCalledRef.current = false;
+          if (data?.message) handleWidgetVerified(data.message);
+        },
+        failure: (error: any) => {
+          verifyCalledRef.current = false;
+          setIsLoading(false);
+          toast.error(error?.message || 'Verification failed. Try again.');
+        },
+      });
       pollRef.current = setInterval(() => {
         if (window.sendOtp) {
           setWidgetReady(true);
@@ -84,37 +82,26 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     script.onerror = () => toast.error('Failed to load OTP service. Please refresh.');
     document.body.appendChild(script);
     return () => {
-      callbackEnabledRef.current = false;
+      verifyCalledRef.current = false;
       if (pollRef.current) clearInterval(pollRef.current);
       if (cooldownRef.current) clearInterval(cooldownRef.current);
       try { document.body.removeChild(script); } catch {}
     };
   }, []);
 
-  const handleSendOTP = async () => {
+  const handleSendOTP = () => {
     if (phone.length !== 10) return toast.error('Please enter a valid 10-digit number');
     if (!widgetReady || !window.sendOtp) {
       toast.error('OTP service is loading, please wait a moment…');
       return;
     }
     setIsLoading(true);
-
-    // Re-initialize the widget with callback guard OFF to flush any cached session.
-    // MSG91 fires the stale success callback when sendOtp() is called if a previous
-    // verified session is cached — reinit + 400ms delay absorbs that stale fire
-    // before we enable the guard for the real verification.
-    callbackEnabledRef.current = false;
-    window.initSendOTP({ ...MSG91_CONFIG, ...getCallbacks() });
-    await new Promise(r => setTimeout(r, 400));
-
-    callbackEnabledRef.current = true;
     try {
       window.sendOtp(`91${phone}`);
       setStep('OTP');
       startCooldown();
       toast.success('OTP sent!');
     } catch (e: any) {
-      callbackEnabledRef.current = false;
       toast.error(e?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setIsLoading(false);
@@ -123,13 +110,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
 
   const handleResendOTP = () => {
     if (resendCooldown > 0 || !window.sendOtp) return;
-    callbackEnabledRef.current = true;
     try {
       window.sendOtp(`91${phone}`);
       startCooldown();
       toast.success('OTP resent!');
     } catch (e: any) {
-      callbackEnabledRef.current = false;
       toast.error(e?.message || 'Failed to resend OTP.');
     }
   };
@@ -138,9 +123,11 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
     if (otp.length < 6) return toast.error('Enter the 6-digit OTP');
     if (!window.verifyOtp) return toast.error('Verification service not ready. Please refresh.');
     setIsLoading(true);
+    verifyCalledRef.current = true; // allow the next success callback through
     try {
       window.verifyOtp(otp);
     } catch (e: any) {
+      verifyCalledRef.current = false;
       toast.error(e?.message || 'Verification error. Try again.');
       setIsLoading(false);
     }
@@ -248,7 +235,8 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   style={{ color: resendCooldown > 0 ? 'rgb(113,113,122)' : 'rgb(255,90,31)' }}>
                   {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
-                <button onClick={() => { setStep('PHONE'); setOtp(''); callbackEnabledRef.current = false; }} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
+                <button onClick={() => { setStep('PHONE'); setOtp(''); verifyCalledRef.current = false; }}
+                  className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
                   Change Phone Number
                 </button>
               </div>
