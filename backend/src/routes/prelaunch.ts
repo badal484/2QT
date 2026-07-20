@@ -352,15 +352,21 @@ router.post('/register', async (req, res) => {
         // Expose referral_code in response (may come from existing row or was just set)
         regRows[0].referral_code = regRows[0].referral_code ?? referralCode;
 
-        // Issue short-lived JWT so the user can also use the main app
-        const jti = crypto.randomUUID();
-        const accessToken = jwt.sign({ userId: user.id, role: user.role, jti }, JWT_SECRET, { expiresIn: '2h' });
-        const refreshToken = jwt.sign({ userId: user.id, jti }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
-        const tokenHash = await bcrypt.hash(refreshToken, 10);
-        await query(
-            `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1,$2,NOW()+INTERVAL '7 days')`,
-            [user.id, tokenHash]
-        );
+        // Issue short-lived JWT so the user can also use the main app (non-fatal if refresh_tokens insert fails)
+        let accessToken = '';
+        let refreshToken = '';
+        try {
+            const jti = crypto.randomUUID();
+            accessToken = jwt.sign({ userId: user.id, role: user.role, jti }, JWT_SECRET, { expiresIn: '2h' });
+            refreshToken = jwt.sign({ userId: user.id, jti }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+            const tokenHash = await bcrypt.hash(refreshToken, 10);
+            await query(
+                `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1,$2,NOW()+INTERVAL '7 days')`,
+                [user.id, tokenHash]
+            );
+        } catch (tokenErr: any) {
+            console.error('[PRELAUNCH REGISTER] refresh_token insert failed (non-fatal):', tokenErr.message);
+        }
 
         // Fetch rank after registration
         const { rows: rankRows } = await query(
