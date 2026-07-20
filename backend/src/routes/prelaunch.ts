@@ -488,11 +488,16 @@ router.post('/me', async (req, res) => {
             [phone, '+' + phone]
         );
 
+        // Always issue a short-lived phoneToken so /register can use it
+        // instead of the already-consumed MSG91 single-use token
+        const phoneToken = jwt.sign({ phone, sub: 'prelaunch' }, JWT_SECRET, { expiresIn: '10m' });
+
         if (rows[0]) {
             const surveyCompleted = Object.keys(rows[0].survey_responses || {}).length > 0;
             const sessionToken = jwt.sign({ phone, sub: 'prelaunch' }, JWT_SECRET, { expiresIn: '30d' });
             return res.json({
                 registered: true,
+                phoneToken,
                 sessionToken,
                 referral_code: rows[0].referral_code,
                 name: rows[0].name,
@@ -502,7 +507,7 @@ router.post('/me', async (req, res) => {
                 survey_completed: surveyCompleted,
             });
         }
-        res.json({ registered: false });
+        res.json({ registered: false, phoneToken });
     } catch (err: any) {
         res.json({ registered: false, error: err.message });
     }

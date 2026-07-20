@@ -144,7 +144,9 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           surveyCompleted: data.survey_completed || false,
         }), 1200);
       } else {
-        setPendingToken(msg91Token);
+        // Use the phoneToken issued by /me (a proper JWT) instead of the
+        // single-use MSG91 token which is already consumed at this point
+        setPendingToken(data.phoneToken || msg91Token);
         setStep('NAME');
       }
     } catch {
