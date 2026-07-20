@@ -80,10 +80,10 @@ export function ThankYou({ referralCode }: ThankYouProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
-        className="w-full bg-white/5 backdrop-blur-3xl rounded-[2.5rem] p-8 md:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 mb-8 relative overflow-hidden"
+        className="w-full bg-white/5 backdrop-blur-3xl rounded-[2rem] sm:rounded-[2.5rem] p-4 sm:p-8 md:p-10 shadow-[0_0_50px_rgba(255,90,31,0.15)] border border-white/10 mb-8 relative overflow-hidden"
       >
         {/* Reward highlight */}
-        <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-3xl p-8 mb-8 relative overflow-hidden text-center shadow-lg transform hover:scale-[1.02] transition-transform">
+        <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-2xl sm:rounded-3xl p-5 sm:p-8 mb-6 sm:mb-8 relative overflow-hidden text-center shadow-lg transform hover:scale-[1.02] transition-transform">
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,white_2px,transparent_2px)] [background-size:16px_16px]"></div>
           <p className="text-white/90 text-sm font-bold tracking-widest uppercase mb-2 relative z-10">Your Launch Reward</p>
           <p className="text-6xl font-display font-bold text-white tracking-tighter mb-2 relative z-10 drop-shadow-md">🍽️ Free Meal</p>

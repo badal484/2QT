@@ -26,7 +26,7 @@ export function Comparison() {
     <section className="relative w-full py-20 overflow-hidden flex justify-center px-4 sm:px-8 z-20">
       <div className="absolute inset-0 pointer-events-none opacity-20" style={{ background: 'radial-gradient(circle at 50% 50%, #FF5A1F 0%, transparent 60%)' }} />
       
-      <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row gap-12 lg:gap-8 items-center bg-black/40 backdrop-blur-md rounded-[2rem] border border-white/5 p-8 sm:p-12 shadow-2xl">
+      <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row gap-8 lg:gap-8 items-center bg-black/40 backdrop-blur-md rounded-[2rem] border border-white/5 p-4 sm:p-8 lg:p-12 shadow-2xl">
         
         {/* Left Side: Copy */}
         <div className="flex-1 flex flex-col gap-6 w-full relative z-10">
@@ -74,15 +74,13 @@ export function Comparison() {
           <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-xl">
             {/* Table Header */}
             <div className="grid grid-cols-3 border-b border-white/10 text-center items-center">
-              <div className="col-span-1 p-4" /> {/* Empty top-left cell */}
-              
-              <div className="col-span-1 p-4 bg-white/5 border-x border-brand-primary/30 relative">
+              <div className="col-span-1 p-2.5 sm:p-4" />
+              <div className="col-span-1 p-2.5 sm:p-4 bg-white/5 border-x border-brand-primary/30 relative">
                 <div className="absolute top-0 left-0 w-full h-[2px] bg-brand-primary" />
-                <span className="font-display font-black text-2xl tracking-tight text-white">2QT<span className="text-brand-primary">.</span></span>
+                <span className="font-display font-black text-lg sm:text-2xl tracking-tight text-white">2QT<span className="text-brand-primary">.</span></span>
               </div>
-              
-              <div className="col-span-1 p-4 bg-[#741515]/30">
-                <span className="font-display font-bold text-lg text-white opacity-90 tracking-wide uppercase">Others</span>
+              <div className="col-span-1 p-2.5 sm:p-4 bg-[#741515]/30">
+                <span className="font-display font-bold text-sm sm:text-lg text-white opacity-90 tracking-wide uppercase">Others</span>
               </div>
             </div>
 
@@ -90,15 +88,15 @@ export function Comparison() {
             <div className="flex flex-col">
               {features.map((feature, i) => (
                 <div key={i} className="grid grid-cols-3 border-b border-white/5 last:border-b-0 hover:bg-white/5 transition-colors">
-                  <div className="col-span-1 p-4 sm:p-5 flex items-center gap-3 border-r border-white/5">
-                    <span className="text-sm sm:text-base font-semibold text-zinc-300">{feature.name}</span>
+                  <div className="col-span-1 p-2.5 sm:p-4 lg:p-5 flex items-center gap-3 border-r border-white/5">
+                    <span className="text-xs sm:text-sm lg:text-base font-semibold text-zinc-300 leading-tight">{feature.name}</span>
                   </div>
-                  
-                  <div className="col-span-1 p-4 sm:p-5 bg-white/5 border-r border-white/5 flex items-center justify-center backdrop-blur-sm">
+
+                  <div className="col-span-1 p-2.5 sm:p-4 lg:p-5 bg-white/5 border-r border-white/5 flex items-center justify-center backdrop-blur-sm">
                     <FeatureIcon status={feature.qt2} />
                   </div>
-                  
-                  <div className="col-span-1 p-4 sm:p-5 flex items-center justify-center">
+
+                  <div className="col-span-1 p-2.5 sm:p-4 lg:p-5 flex items-center justify-center">
                     <FeatureIcon status={feature.others} />
                   </div>
                 </div>
