@@ -400,8 +400,8 @@ router.post('/register', async (req, res) => {
             refreshToken,
         });
     } catch (err: any) {
-        console.error('[PRELAUNCH REGISTER]', err.message);
-        res.status(500).json({ error: 'SERVER_ERROR' });
+        console.error('[PRELAUNCH REGISTER]', err.message, err.stack);
+        res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
     }
 });
 

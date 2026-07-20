@@ -313,8 +313,24 @@ export default function PreLaunchPage() {
         {step === 2 && !surveyCompleted && <StepRedirectToSurvey onRedirect={() => setStep(3)} />}
 
         {step === 2 && surveyCompleted && (
-          <motion.div key="dashboard" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
-             <Dashboard
+          <motion.div key="dashboard" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex flex-col items-center justify-center p-4">
+            {/* Shared-device / referral-link banner: shown when page was opened via a
+                referral link but a previous user's session is already active */}
+            {referredBy && (
+              <div className="w-full max-w-2xl mx-auto mb-4 flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-4">
+                <div>
+                  <p className="text-amber-200 text-sm font-semibold">This link was shared with you to join!</p>
+                  <p className="text-amber-500 text-xs mt-0.5">Not {userName.split(' ')[0]}? Sign out and register with this link.</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="shrink-0 text-xs font-bold text-white bg-brand-primary hover:opacity-90 px-4 py-2 rounded-xl transition-opacity whitespace-nowrap shadow-[0_0_12px_rgba(255,90,31,0.4)]"
+                >
+                  Join Fresh →
+                </button>
+              </div>
+            )}
+            <Dashboard
                rank={rankData?.rank || 0}
                total={rankData?.total || 0}
                referrals={rankData?.referrals || 0}
