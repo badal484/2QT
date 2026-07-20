@@ -14,14 +14,8 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-function calcWallet(referrals: number) {
-  const perRef = referrals * 10;
-  return { perRef };
-}
-
 export function Dashboard({ rank, total, referrals, referralCode, name, surveyCompleted, onOpenSurvey, onLogout }: DashboardProps) {
   const [copied, setCopied] = useState(false);
-  const wallet = calcWallet(referrals);
 
   const handleCopy = () => {
     const link = typeof window !== 'undefined'
@@ -80,54 +74,38 @@ export function Dashboard({ rank, total, referrals, referralCode, name, surveyCo
         <div className="absolute -top-10 -right-10 w-52 h-52 bg-brand-primary/15 rounded-full blur-[80px] pointer-events-none" />
 
         {/* Rewards header */}
-        <div className="flex items-start justify-between gap-4 mb-6 relative z-10">
-          <div>
-            <p className="text-zinc-500 uppercase tracking-widest text-xs font-bold mb-1 flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5" /> Your Launch Rewards
-            </p>
-            {wallet.perRef > 0 && (
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl sm:text-5xl font-display font-bold text-white">₹{wallet.perRef}</span>
-                <span className="text-zinc-500 text-sm font-medium">referral credit</span>
-              </div>
-            )}
-          </div>
+        <div className="flex items-center justify-between mb-5 relative z-10">
+          <p className="text-zinc-500 uppercase tracking-widest text-xs font-bold flex items-center gap-1.5">
+            <Wallet className="w-3.5 h-3.5" /> Your Launch Reward
+          </p>
           {referrals >= 10 && (
-            <span className="shrink-0 px-3 py-1.5 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-xs font-bold">
-              All Milestones Unlocked!
+            <span className="px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-xs font-bold">
+              Top Referrer
             </span>
           )}
         </div>
 
-        {/* Breakdown */}
-        <div className="space-y-2 relative z-10 mb-5">
-          {/* Free meal reward */}
-          <div className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm ${surveyCompleted ? 'bg-green-500/10 border border-green-500/20' : 'bg-amber-500/10 border border-amber-500/20'}`}>
-            <div className="flex items-center gap-2">
-              {surveyCompleted
-                ? <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
-                : <Lock className="w-4 h-4 text-amber-400 shrink-0" />}
-              <span className={surveyCompleted ? 'text-green-300 font-medium' : 'text-amber-300 font-medium'}>
-                {surveyCompleted ? 'Free meal unlocked (survey completed)' : 'Free meal — complete survey to unlock'}
-              </span>
+        {/* Single reward row */}
+        <div className={`flex items-center justify-between rounded-2xl px-5 py-4 relative z-10 ${surveyCompleted ? 'bg-green-500/10 border border-green-500/20' : 'bg-amber-500/10 border border-amber-500/20'}`}>
+          <div className="flex items-center gap-3">
+            {surveyCompleted
+              ? <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
+              : <Lock className="w-5 h-5 text-amber-400 shrink-0" />}
+            <div>
+              <p className={`font-semibold text-sm ${surveyCompleted ? 'text-white' : 'text-amber-200'}`}>
+                Free meal on launch day
+              </p>
+              <p className={`text-xs mt-0.5 ${surveyCompleted ? 'text-green-400' : 'text-amber-500'}`}>
+                {surveyCompleted ? 'Confirmed — we will notify you on launch' : 'Complete the survey to claim'}
+              </p>
             </div>
-            <span className={`font-bold ${surveyCompleted ? 'text-green-400' : 'text-amber-400'}`}>
-              {surveyCompleted ? '🍽️ Claimed' : '🔒 Locked'}
-            </span>
           </div>
-
-          {/* Per-referral earnings */}
-          <div className="flex items-center justify-between rounded-xl px-4 py-3 text-sm bg-white/5 border border-white/8">
-            <div className="flex items-center gap-2">
-              <Share2 className="w-4 h-4 text-brand-primary shrink-0" />
-              <span className="text-zinc-300 font-medium">
-                {referrals} referral{referrals !== 1 ? 's' : ''} × ₹10
-              </span>
-            </div>
-            <span className="font-bold text-brand-primary">+₹{wallet.perRef}</span>
-          </div>
-
+          <span className={`text-xs font-bold uppercase tracking-widest ${surveyCompleted ? 'text-green-400' : 'text-amber-400'}`}>
+            {surveyCompleted ? 'Confirmed' : 'Pending'}
+          </span>
         </div>
+
+        <div className="h-5" />
       </motion.div>
 
       {/* Rank + Referrals stats */}
