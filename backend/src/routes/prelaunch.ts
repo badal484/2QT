@@ -231,7 +231,7 @@ router.post('/register', async (req, res) => {
             // 4. MSG91 Widget Token — check Redis cache first (token is single-use;
             //    /me may have already consumed it and cached the phone)
             if (!phone!) {
-                const cacheKey = `msg91_phone:${Buffer.from(idToken).toString('base64').slice(0, 40)}`;
+                const cacheKey = `msg91_phone:${crypto.createHash('sha256').update(idToken).digest('hex')}`;
                 const cached = await redis.get(cacheKey).catch(() => null);
                 if (cached) {
                     phone = cached;
@@ -452,7 +452,7 @@ router.post('/me', async (req, res) => {
         // 4. MSG91 Widget Token — check Redis cache first (token is single-use;
         //    /me may have already consumed it, so cache the phone for 10 min)
         if (!phone) {
-            const cacheKey = `msg91_phone:${Buffer.from(idToken).toString('base64').slice(0, 40)}`;
+            const cacheKey = `msg91_phone:${crypto.createHash('sha256').update(idToken).digest('hex')}`;
             const cached = await redis.get(cacheKey).catch(() => null);
             if (cached) {
                 phone = cached;
