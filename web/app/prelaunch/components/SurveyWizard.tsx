@@ -58,18 +58,6 @@ const QUESTIONS: Question[] = [
     placeholder: 'e.g. BIT Lalpur, St. Xavier\'s College, RIMS, TCS, Own Business',
   },
   {
-    id: 'orderFrequency',
-    title: 'How often do you order food online?',
-    type: 'radio',
-    options: ['Never', 'Once a week', '2–3 times a week', '4–6 times a week', 'Daily'],
-  },
-  {
-    id: 'spendPerOrder',
-    title: 'How much do you usually spend on one food order?',
-    type: 'radio',
-    options: ['₹100–149', '₹150–199', '₹200–299', '₹300+'],
-  },
-  {
     id: 'cuisines',
     title: 'Which cuisines do you enjoy the most?',
     subtitle: 'Select exactly 3',
