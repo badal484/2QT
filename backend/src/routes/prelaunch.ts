@@ -312,7 +312,6 @@ router.post('/register', async (req, res) => {
         }
 
         // Upsert pre-launch registration (schema-safe: works with or without migration 121)
-        const referralCode = user.referral_code || genReferralCode();
         // Search by both normalised form (91XXXXXXXXXX) and legacy +91 form so
         // old test records stored with a leading '+' are still matched.
         const { rows: existingReg } = await query(
@@ -320,6 +319,11 @@ router.post('/register', async (req, res) => {
              WHERE phone = $1 OR phone = $2`,
             [phone, '+' + phone]
         );
+        // Prelaunch referral codes are independent of users.referral_code (the main app's
+        // own referral system) — reusing that here would let a phone number that already
+        // has a 2QT customer account inherit its pre-existing main-app referral history
+        // (and any referrals made against that code) into a brand-new waitlist entry.
+        const referralCode = existingReg[0]?.referral_code || genReferralCode();
 
         let regRows: any[];
         if (existingReg[0]) {
@@ -528,30 +532,44 @@ router.get('/registrations', authenticate, requireRole('super_admin', 'admin'), 
     const search = req.query.search ? `%${req.query.search}%` : null;
 
     try {
-        const where  = search ? `WHERE r.phone ILIKE $3::text OR r.name ILIKE $3::text` : '';
+        const where  = search ? `WHERE phone ILIKE $3::text OR name ILIKE $3::text` : '';
         const params: any[] = [limit, offset, ...(search ? [search] : [])];
 
-        const baseSelect = `WITH ReferralCounts AS (
+        // Rank must be computed over the WHOLE table (it's a window function), so search/
+        // pagination is applied in the outer query, after ranking — same ReferralCounts
+        // definition (only counts referrers who've completed the survey) as /me and /register,
+        // so the number shown here always matches what the user sees on their own dashboard.
+        const rankedCte = `WITH ReferralCounts AS (
                 SELECT referred_by, COUNT(*) as ref_count
                 FROM pre_launch_registrations
-                WHERE referred_by IS NOT NULL
+                WHERE referred_by IS NOT NULL AND survey_responses IS NOT NULL AND survey_responses != '{}'::jsonb
                 GROUP BY referred_by
-            )
-            SELECT r.id, r.phone, r.name, r.source, r.survey_responses,
-                   r.referral_code, r.referred_by, r.created_at,
-                   COALESCE(rc.ref_count, 0) as referral_count`;
-        const fromJoin = `FROM pre_launch_registrations r LEFT JOIN ReferralCounts rc ON r.referral_code = rc.referred_by`;
-        const orderLimit = `${where} ORDER BY r.created_at DESC LIMIT $1::int OFFSET $2::int`;
+            ),
+            RankedRegistrations AS (
+                SELECT r.id, r.phone, r.name, r.source, r.survey_responses,
+                       r.referral_code, r.referred_by, r.created_at`;
+        const rankedSelectRest = `,
+                       COALESCE(rc.ref_count, 0) as referral_count,
+                       RANK() OVER (ORDER BY COALESCE(rc.ref_count, 0) DESC, r.created_at ASC) as rank
+                FROM pre_launch_registrations r
+                LEFT JOIN ReferralCounts rc ON r.referral_code = rc.referred_by
+            )`;
+        const orderLimit = `${where} ORDER BY created_at DESC LIMIT $1::int OFFSET $2::int`;
 
         let rows: any[];
         try {
             const result = await query(`
-                ${baseSelect}, r.reward_credited, r.reward_credited_at, r.reward_expires_at, r.reward_redeemed
-                ${fromJoin} ${orderLimit}
+                ${rankedCte}, r.reward_credited, r.reward_credited_at, r.reward_expires_at, r.reward_redeemed
+                ${rankedSelectRest}
+                SELECT * FROM RankedRegistrations ${orderLimit}
             `, params);
             rows = result.rows;
         } catch {
-            const result = await query(`${baseSelect} ${fromJoin} ${orderLimit}`, params);
+            const result = await query(`
+                ${rankedCte}
+                ${rankedSelectRest}
+                SELECT * FROM RankedRegistrations ${orderLimit}
+            `, params);
             rows = result.rows.map((r: any) => ({ ...r, reward_credited: false, reward_credited_at: null, reward_expires_at: null, reward_redeemed: false }));
         }
 
@@ -560,7 +578,7 @@ router.get('/registrations', authenticate, requireRole('super_admin', 'admin'), 
             `SELECT COUNT(*) FROM pre_launch_registrations r ${countWhere}`,
             search ? [search] : [],
         );
-        const data = rows.map((r: any) => ({ ...r, referral_count: parseInt(r.referral_count || '0', 10) }));
+        const data = rows.map((r: any) => ({ ...r, referral_count: parseInt(r.referral_count || '0', 10), rank: parseInt(r.rank || '0', 10) }));
         res.json({ success: true, data, total: parseInt(cntRows[0].count), page, limit });
     } catch (err: any) {
         console.error('[PRELAUNCH LIST]', err.message);
@@ -639,7 +657,7 @@ router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (
             WITH ReferralCounts AS (
                 SELECT referred_by, COUNT(*) as ref_count
                 FROM pre_launch_registrations
-                WHERE referred_by IS NOT NULL
+                WHERE referred_by IS NOT NULL AND survey_responses IS NOT NULL AND survey_responses != '{}'::jsonb
                 GROUP BY referred_by
             )
             SELECT
@@ -650,6 +668,7 @@ router.get('/export', authenticate, requireRole('super_admin', 'admin'), async (
                 r.referral_code,
                 r.referred_by,
                 COALESCE(rc.ref_count, 0)                                            AS referral_count,
+                RANK() OVER (ORDER BY COALESCE(rc.ref_count, 0) DESC, r.created_at ASC) AS rank,
                 -- new survey fields (with old-key fallback)
                 COALESCE(r.survey_responses->>'personType',      r.survey_responses->>'college')    AS person_type,
                 COALESCE(r.survey_responses->>'institution',     r.survey_responses->>'college')    AS institution,
