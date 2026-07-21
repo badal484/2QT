@@ -572,7 +572,7 @@ export function PreLaunchTab() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-white/[0.05]">
-                {['Registered', 'Name', 'Phone', 'Referrals', 'Person Type', 'Institution', 'Reward'].map(h => (
+                {['Registered', 'Name', 'Phone', 'Rank', 'Referrals', 'Person Type', 'Institution', 'Reward'].map(h => (
                   <th key={h} className="px-5 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
                 <th className="px-5 py-3" />
@@ -581,7 +581,7 @@ export function PreLaunchTab() {
             <tbody className="divide-y divide-white/[0.03]">
               {regs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-xs font-bold text-zinc-600 uppercase tracking-widest">
+                  <td colSpan={10} className="px-5 py-12 text-center text-xs font-bold text-zinc-600 uppercase tracking-widest">
                     {search ? 'No results found' : 'No registrations yet'}
                   </td>
                 </tr>
@@ -593,6 +593,9 @@ export function PreLaunchTab() {
                   <td className="px-5 py-3.5 text-sm font-semibold text-white whitespace-nowrap">{r.name}</td>
                   <td className="px-5 py-3.5 text-sm text-zinc-400 font-mono whitespace-nowrap">
                     {r.phone ? (() => { const p = r.phone.replace(/^\+/, ''); return `+${p.slice(0,2)} ${p.slice(2,7)} ${p.slice(7)}`; })() : '—'}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm font-bold text-white whitespace-nowrap">
+                    #{r.rank ?? '—'}
                   </td>
                   <td className="px-5 py-3.5 text-sm whitespace-nowrap">
                     {r.referral_count > 0 ? (
