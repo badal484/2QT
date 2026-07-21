@@ -185,7 +185,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'INVALID_SURVEY', message: 'Select at least 5 dishes.' });
         if (!Array.isArray(cuisines) || cuisines.length < 3)
             return res.status(400).json({ error: 'INVALID_SURVEY', message: 'Select exactly 3 cuisines.' });
-        const required = ['institution', 'orderFrequency', 'spendPerOrder', 'biggestProblems', 'orderTime', 'waitTime', 'priorities', 'likelyToTry'];
+        const required = ['institution', 'biggestProblems', 'orderTime', 'waitTime', 'priorities', 'likelyToTry'];
         for (const field of required) {
             const v = surveyResponses[field];
             if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0))
