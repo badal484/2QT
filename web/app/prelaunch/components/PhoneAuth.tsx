@@ -27,6 +27,10 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const [name, setName] = useState('');
   const [pendingToken, setPendingToken] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  // MSG91 only assigns a reqId once sendOtp()'s own success callback fires — verifying
+  // before that (e.g. a fast typer, or a resend fired right before verify) makes MSG91
+  // reject with "reqId required". Gate verify on this instead of firing optimistically.
+  const [otpConfirmedSent, setOtpConfirmedSent] = useState(false);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -106,25 +110,44 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         .forEach(k => localStorage.removeItem(k));
     } catch {}
 
+    setOtpConfirmedSent(false);
     setIsLoading(true);
     try {
-      window.sendOtp(`91${phone}`);
-      setStep('OTP');
-      startCooldown();
-      toast.success('OTP sent!');
+      window.sendOtp(
+        `91${phone}`,
+        () => {
+          setOtpConfirmedSent(true);
+          setStep('OTP');
+          startCooldown();
+          toast.success('OTP sent!');
+          setIsLoading(false);
+        },
+        (e: any) => {
+          toast.error(e?.message || 'Failed to send OTP. Please try again.');
+          setIsLoading(false);
+        },
+      );
     } catch (e: any) {
       toast.error(e?.message || 'Failed to send OTP. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
 
   const handleResendOTP = () => {
     if (resendCooldown > 0 || !window.sendOtp) return;
+    setOtpConfirmedSent(false);
     try {
-      window.sendOtp(`91${phone}`);
-      startCooldown();
-      toast.success('OTP resent!');
+      window.sendOtp(
+        `91${phone}`,
+        () => {
+          setOtpConfirmedSent(true);
+          startCooldown();
+          toast.success('OTP resent!');
+        },
+        (e: any) => {
+          toast.error(e?.message || 'Failed to resend OTP.');
+        },
+      );
     } catch (e: any) {
       toast.error(e?.message || 'Failed to resend OTP.');
     }
@@ -133,6 +156,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   const handleVerifyOTP = () => {
     if (otp.length < 6) return toast.error('Enter the 6-digit OTP');
     if (!window.verifyOtp) return toast.error('Verification service not ready. Please refresh.');
+    if (!otpConfirmedSent) return toast.error('Still confirming OTP was sent — please wait a moment.');
     setIsLoading(true);
     verifyCalledRef.current = true; // allow the next success callback through
     try {
@@ -233,7 +257,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()}
                   className="w-full bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-full py-4 px-6 text-center text-2xl font-black text-white tracking-[0.5em] outline-none transition-all focus:bg-white/10 focus:border-brand-primary/60 shadow-inner placeholder:text-zinc-600"
                 />
-                <button onClick={handleVerifyOTP} disabled={isLoading || otp.length < 6}
+                <button onClick={handleVerifyOTP} disabled={isLoading || otp.length < 6 || !otpConfirmedSent}
                   className="w-full mt-4 group flex items-center justify-center gap-2 text-white py-4 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,90,31,0.4)] hover:shadow-[0_0_30px_rgba(255,90,31,0.6)] disabled:opacity-50 border border-brand-primary/50"
                   style={{ background: 'linear-gradient(135deg, #FF5A1F 0%, #FFA03A 100%)' }}>
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify Code</span>}
@@ -243,7 +267,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
                   style={{ color: resendCooldown > 0 ? 'rgb(113,113,122)' : 'rgb(255,90,31)' }}>
                   {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
-                <button onClick={() => { setStep('PHONE'); setOtp(''); verifyCalledRef.current = false; }}
+                <button onClick={() => { setStep('PHONE'); setOtp(''); setOtpConfirmedSent(false); verifyCalledRef.current = false; }}
                   className="text-xs font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors">
                   Change Phone Number
                 </button>
