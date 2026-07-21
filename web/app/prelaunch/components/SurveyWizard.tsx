@@ -22,7 +22,6 @@ interface Question {
   optional?: boolean;
   otherCount?: number; // how many custom text inputs to show for "Other"
   image?: string;
-  gridLayout?: boolean;
 }
 
 // Small hand-picked icon set for the cuisines question — keeps the food theme visible
@@ -31,22 +30,6 @@ const CUISINE_EMOJI: Record<string, string> = {
   'North Indian': '🍛', 'Chinese': '🥢', 'Biryani': '🍚', 'Pizza': '🍕', 'Burger': '🍔',
   'Rolls': '🌯', 'Momos': '🥟', 'Sandwiches': '🥪', 'South Indian': '🥘',
   'Healthy Meals': '🥗', 'Street Food': '🌭', 'Fast Food': '🍟', 'Desserts': '🍰',
-};
-
-const OPTION_IMAGES: Record<string, string> = {
-  'North Indian': '/paneer_butter_masala_premium_1777971595917.png',
-  'Biryani': '/classic_chicken_biryani_premium_1777971580434.png',
-  'Pizza': '/pizza.png',
-  'Burger': '/gourmet_burger_premium_1777968634465.png',
-  'Healthy Meals': '/premium_healthy_bowl_1777968667530.png',
-  'Desserts': '/chocolate_lava_cake_luxury_1777968683520.png',
-  'Fast Food': '/burger.png',
-  'Pasta': '/creamy_pasta_alfredo_1777968650640.png',
-  'Great Taste': '/chocolate_lava_cake_luxury_1777968683520.png',
-  'Guaranteed Quality': '/premium_healthy_bowl_1777968667530.png',
-  'Hot & Fresh Food': '/classic_chicken_biryani_premium_1777971580434.png',
-  'Definitely': '/hero-bowl.png',
-  'Probably': '/burger.png',
 };
 
 const QUESTIONS: Question[] = [
@@ -94,7 +77,6 @@ const QUESTIONS: Question[] = [
     title: 'Which cuisines do you enjoy the most?',
     subtitle: 'Select exactly 3',
     type: 'checkbox-other',
-    gridLayout: true,
     maxSelect: 3,
     minSelect: 3,
     options: ['North Indian', 'Chinese', 'Biryani', 'Pizza', 'Burger', 'Rolls', 'Momos', 'Sandwiches', 'South Indian', 'Healthy Meals', 'Street Food', 'Fast Food', 'Desserts'],
@@ -130,7 +112,6 @@ const QUESTIONS: Question[] = [
     title: 'What matters most to you when ordering food online?',
     subtitle: 'Select up to 3',
     type: 'checkbox',
-    gridLayout: true,
     maxSelect: 3,
     options: ['Great Taste', 'Guaranteed Quality', 'Hot & Fresh Food', 'Hygiene', 'Fast Delivery', 'Fresh Ingredients', 'Good Packaging', 'Affordable Pricing', 'Brand Reputation'],
   },
@@ -140,7 +121,6 @@ const QUESTIONS: Question[] = [
     image: '/hero-bowl.png',
     title: 'If a new food delivery app offered guaranteed quality, great taste, hot & fresh food, no platform fee, and fast delivery — how likely would you be to try it?',
     type: 'radio',
-    gridLayout: true,
     options: ['Definitely', 'Probably', 'Maybe', 'Unlikely', 'No'],
   },
   {
@@ -458,30 +438,9 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
 
             {/* RADIO */}
             {isRadioType && (
-              <div className={cn("flex-1 overflow-y-auto pb-6 relative z-10 p-1", q.gridLayout ? "grid grid-cols-2 sm:grid-cols-3 gap-3" : "flex flex-col gap-3")}>
+              <div className="flex-1 overflow-y-auto pb-6 flex flex-col gap-3 relative z-10 p-1">
                 {q.options?.map(opt => {
                   const sel = data[q.id] === opt;
-                  if (q.gridLayout) {
-                    return (
-                      <button key={opt} onClick={() => pickRadio(opt)}
-                        className={cn('relative w-full aspect-[4/3] sm:aspect-square rounded-2xl border-2 transition-all flex flex-col items-center justify-center p-3 group overflow-hidden',
-                          sel ? 'border-brand-primary bg-brand-primary/20 shadow-[0_0_20px_rgba(255,90,31,0.3)]' : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10')}>
-                        <div className="flex-1 w-full flex items-center justify-center min-h-0 relative z-10">
-                          {OPTION_IMAGES[opt] ? (
-                            <img src={OPTION_IMAGES[opt]} alt={opt} className="w-full h-full object-contain drop-shadow-xl group-hover:scale-110 transition-transform duration-500" />
-                          ) : (
-                            <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center text-3xl shadow-inner group-hover:scale-110 transition-transform">
-                              {CUISINE_EMOJI[opt] || q.emoji}
-                            </div>
-                          )}
-                        </div>
-                        <div className="w-full text-center mt-2 relative z-10">
-                          <span className={cn("text-xs md:text-sm font-bold transition-colors leading-tight block", sel ? "text-white" : "text-zinc-300")}>{opt}</span>
-                        </div>
-                        {sel && <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-brand-primary text-white flex items-center justify-center shadow-md z-20"><Check className="w-3.5 h-3.5" strokeWidth={4} /></div>}
-                      </button>
-                    );
-                  }
                   return (
                     <button key={opt} onClick={() => pickRadio(opt)}
                       className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none backdrop-blur-xl',
@@ -496,7 +455,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                   );
                 })}
                 {hasOther && (
-                  <div className={cn(q.gridLayout ? 'col-span-full' : 'w-full')}>
+                  <>
                     <button onClick={() => pickRadio(OTHER)}
                       className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none backdrop-blur-xl',
                         otherSelected ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
@@ -523,7 +482,7 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                         {isLast ? 'Submit' : 'Continue'} <ArrowRight className="w-4 h-4" />
                       </button>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             )}
@@ -622,33 +581,10 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                     );
                   })() : (
                     // Standard checkbox mode
-                    <div className={cn("flex-1 overflow-y-auto pb-4", q.gridLayout ? "grid grid-cols-2 sm:grid-cols-3 gap-3" : "flex flex-col gap-3")}>
+                    <>
                       {q.options?.map(opt => {
                         const sel = checkArr.includes(opt);
                         const maxReached = !sel && q.maxSelect !== undefined && nonOtherCount >= q.maxSelect;
-                        if (q.gridLayout) {
-                          return (
-                            <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
-                              className={cn('relative w-full aspect-[4/3] sm:aspect-square rounded-2xl border-2 transition-all flex flex-col items-center justify-center p-3 group overflow-hidden',
-                                sel ? 'border-brand-primary bg-brand-primary/20 shadow-[0_0_20px_rgba(255,90,31,0.3)]'
-                                : maxReached ? 'border-white/5 bg-white/5 opacity-50 cursor-not-allowed'
-                                             : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10')}>
-                              <div className="flex-1 w-full flex items-center justify-center min-h-0 relative z-10">
-                                {OPTION_IMAGES[opt] ? (
-                                  <img src={OPTION_IMAGES[opt]} alt={opt} className={cn("w-full h-full object-contain drop-shadow-xl transition-transform duration-500", !maxReached && "group-hover:scale-110")} />
-                                ) : (
-                                  <div className={cn("w-14 h-14 rounded-full bg-white/5 flex items-center justify-center text-3xl shadow-inner transition-transform", !maxReached && "group-hover:scale-110")}>
-                                    {CUISINE_EMOJI[opt] || q.emoji}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="w-full text-center mt-2 relative z-10">
-                                <span className={cn("text-xs md:text-sm font-bold transition-colors leading-tight block", sel ? "text-white" : maxReached ? "text-zinc-500" : "text-zinc-300")}>{opt}</span>
-                              </div>
-                              {sel && <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-brand-primary text-white flex items-center justify-center shadow-md z-20"><Check className="w-3.5 h-3.5" strokeWidth={4} /></div>}
-                            </button>
-                          );
-                        }
                         return (
                           <button key={opt} onClick={() => toggleCheck(opt)} disabled={maxReached}
                             className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
@@ -667,9 +603,9 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                         );
                       })}
                       {hasOther && (
-                        <div className={cn(q.gridLayout ? 'col-span-full' : 'w-full')}>
+                        <>
                           <button onClick={() => toggleCheck(OTHER)}
-                            className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none backdrop-blur-xl',
+                            className={cn('w-full text-left px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl border-2 transition-all flex items-center justify-between group select-none flex-shrink-0 backdrop-blur-xl',
                               checkArr.includes(OTHER) ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
                                                        : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
                             <span className={cn("text-sm md:text-base font-bold transition-colors", checkArr.includes(OTHER) ? "text-white" : "text-zinc-300")}>Other (Please specify)</span>
@@ -687,9 +623,9 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                               />
                             </motion.div>
                           )}
-                        </div>
+                        </>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
 
