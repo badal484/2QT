@@ -52,12 +52,6 @@ const QUESTIONS: Question[] = [
     ],
   },
   {
-    id: 'personType',
-    title: 'Which category best describes you?',
-    type: 'radio-other',
-    options: ['School Student (11th)', 'School Student (12th)', 'College Student', 'Coaching Student', 'Medical Student', 'Working Professional', 'Business Owner / Self-employed'],
-  },
-  {
     id: 'institution',
     title: 'Which school, college, coaching institute, company, or workplace are you associated with?',
     type: 'text',
