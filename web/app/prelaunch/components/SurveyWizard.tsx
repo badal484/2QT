@@ -10,6 +10,7 @@ const OTHER = '__other__';
 
 interface Question {
   id: string;
+  emoji: string;
   title: string;
   subtitle?: string;
   type: 'radio' | 'radio-other' | 'checkbox' | 'checkbox-other' | 'text';
@@ -22,9 +23,18 @@ interface Question {
   otherCount?: number; // how many custom text inputs to show for "Other"
 }
 
+// Small hand-picked icon set for the cuisines question — keeps the food theme visible
+// on the options themselves, not just the question header.
+const CUISINE_EMOJI: Record<string, string> = {
+  'North Indian': '🍛', 'Chinese': '🥢', 'Biryani': '🍚', 'Pizza': '🍕', 'Burger': '🍔',
+  'Rolls': '🌯', 'Momos': '🥟', 'Sandwiches': '🥪', 'South Indian': '🥘',
+  'Healthy Meals': '🥗', 'Street Food': '🌭', 'Fast Food': '🍟', 'Desserts': '🍰',
+};
+
 const QUESTIONS: Question[] = [
   {
     id: 'mostOrderedDishes',
+    emoji: '🍜',
     title: 'Which dishes do you order most often?',
     subtitle: 'Select exactly 5',
     type: 'checkbox-other',
@@ -53,12 +63,14 @@ const QUESTIONS: Question[] = [
   },
   {
     id: 'institution',
+    emoji: '🎓',
     title: 'Which school, college, coaching institute, company, or workplace are you associated with?',
     type: 'text',
     placeholder: 'e.g. BIT Lalpur, St. Xavier\'s College, RIMS, TCS, Own Business',
   },
   {
     id: 'cuisines',
+    emoji: '🍛',
     title: 'Which cuisines do you enjoy the most?',
     subtitle: 'Select exactly 3',
     type: 'checkbox-other',
@@ -68,6 +80,7 @@ const QUESTIONS: Question[] = [
   },
   {
     id: 'biggestProblems',
+    emoji: '😤',
     title: 'What are the biggest problems you face while ordering food online?',
     subtitle: 'Select up to 3',
     type: 'checkbox-other',
@@ -76,6 +89,7 @@ const QUESTIONS: Question[] = [
   },
   {
     id: 'orderTime',
+    emoji: '⏰',
     title: 'When do you usually order food?',
     subtitle: 'Select all that apply',
     type: 'checkbox',
@@ -83,12 +97,14 @@ const QUESTIONS: Question[] = [
   },
   {
     id: 'waitTime',
+    emoji: '⏱️',
     title: "What's the longest you're willing to wait for your food?",
     type: 'radio',
     options: ['Under 15 minutes', '15–20 minutes', '20–30 minutes', '30–45 minutes', 'More than 45 minutes'],
   },
   {
     id: 'priorities',
+    emoji: '❤️',
     title: 'What matters most to you when ordering food online?',
     subtitle: 'Select up to 3',
     type: 'checkbox',
@@ -97,12 +113,14 @@ const QUESTIONS: Question[] = [
   },
   {
     id: 'likelyToTry',
+    emoji: '🚀',
     title: 'If a new food delivery app offered guaranteed quality, great taste, hot & fresh food, no platform fee, and fast delivery — how likely would you be to try it?',
     type: 'radio',
     options: ['Definitely', 'Probably', 'Maybe', 'Unlikely', 'No'],
   },
   {
     id: 'wishFeature',
+    emoji: '💭',
     title: "Is there anything else you'd like to tell us?",
     subtitle: 'Share your food suggestions, app features, delivery expectations, offers you\'d like to see, or any other feedback.',
     type: 'text',
@@ -293,6 +311,26 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
       {/* Glow ambient */}
       <div className="absolute top-0 right-1/4 w-40 h-40 bg-brand-primary/20 rounded-full blur-[80px] pointer-events-none -z-10"></div>
 
+      {/* Floating food ambiance — subtle, non-interactive */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+        {[
+          { e: '🍕', top: '8%',  left: '6%',  dur: 7,  delay: 0 },
+          { e: '🍔', top: '18%', left: '88%', dur: 8.5, delay: 0.6 },
+          { e: '🍜', top: '68%', left: '4%',  dur: 9,  delay: 1.2 },
+          { e: '🍰', top: '78%', left: '90%', dur: 7.5, delay: 0.3 },
+        ].map((f, i) => (
+          <motion.span
+            key={i}
+            className="absolute text-3xl opacity-[0.07] select-none"
+            style={{ top: f.top, left: f.left }}
+            animate={{ y: [0, -14, 0], rotate: [0, 6, -6, 0] }}
+            transition={{ duration: f.dur, delay: f.delay, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            {f.e}
+          </motion.span>
+        ))}
+      </div>
+
       {/* Progress */}
       <div className="mb-8 flex-shrink-0 relative z-10">
         <div className="flex items-center justify-between mb-4">
@@ -305,12 +343,19 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
           </span>
           <div className="w-10" />
         </div>
-        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden border border-white/5 shadow-inner">
+        <div className="relative h-1.5 w-full bg-white/10 rounded-full overflow-visible border border-white/5 shadow-inner">
           <motion.div
-            className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
+            className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full overflow-hidden"
             animate={{ width: `${progress}%` }}
             transition={{ type: 'spring', stiffness: 60, damping: 18 }}
           />
+          <motion.span
+            className="absolute -top-2.5 text-base -translate-x-1/2"
+            animate={{ left: `${progress}%` }}
+            transition={{ type: 'spring', stiffness: 60, damping: 18 }}
+          >
+            🛵
+          </motion.span>
         </div>
       </div>
 
@@ -326,6 +371,15 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
           >
             {/* Title */}
             <div className="mb-6 flex-shrink-0 relative z-10">
+              <motion.span
+                key={`emoji-${currentIndex}`}
+                initial={{ scale: 0, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.05 }}
+                className="inline-block text-4xl md:text-5xl mb-3 drop-shadow-[0_0_20px_rgba(255,90,31,0.35)]"
+              >
+                {q.emoji}
+              </motion.span>
               <h2 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight leading-snug drop-shadow-md">
                 {q.title}
               </h2>
@@ -521,7 +575,10 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                               sel         ? 'border-brand-primary/60 bg-brand-primary/20 shadow-[0_0_15px_rgba(255,90,31,0.3)]'
                               : maxReached ? 'border-white/5 bg-white/5 text-zinc-700 cursor-not-allowed'
                                            : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 shadow-sm')}>
-                            <span className={cn("text-sm md:text-base font-bold transition-colors", sel ? "text-white" : maxReached ? "text-zinc-700" : "text-zinc-300")}>{opt}</span>
+                            <span className={cn("text-sm md:text-base font-bold transition-colors flex items-center gap-2", sel ? "text-white" : maxReached ? "text-zinc-700" : "text-zinc-300")}>
+                              {CUISINE_EMOJI[opt] && <span className="text-lg">{CUISINE_EMOJI[opt]}</span>}
+                              {opt}
+                            </span>
                             <span className={cn('w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
                               sel ? 'border-brand-primary bg-brand-primary text-white shadow-[0_0_10px_rgba(255,90,31,0.5)]' : maxReached ? 'border-white/5 bg-transparent' : 'border-white/20 group-hover:border-white/40')}>
                               {sel && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
