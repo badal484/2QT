@@ -189,11 +189,14 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
       return q.minSelect ? total >= q.minSelect : total > 0;
     }
     if (checkArr.length === 0) return false;
-    if (q.minSelect && nonOtherCount < q.minSelect) return false;
     if (q.type === 'checkbox-other' && checkArr.includes(OTHER)) {
       const count = q.otherCount ?? 1;
-      return getOtherValues(q.id, count, otherInputs).length > 0;
+      if (getOtherValues(q.id, count, otherInputs).length === 0) return false;
+      // Other fills one of the min/max slots, same as toggleCheck's maxSelect gate does
+      if (q.minSelect && nonOtherCount + 1 < q.minSelect) return false;
+      return true;
     }
+    if (q.minSelect && nonOtherCount < q.minSelect) return false;
     return true;
   }, [data, otherInputs, q, checkArr]);
 
