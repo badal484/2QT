@@ -687,9 +687,9 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
                               />
                             </motion.div>
                           )}
-                        </>
+                        </div>
                       )}
-                    </>
+                    </div>
                   )}
                 </div>
 
