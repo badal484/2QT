@@ -21,6 +21,7 @@ interface Question {
   placeholder?: string;
   optional?: boolean;
   otherCount?: number; // how many custom text inputs to show for "Other"
+  image?: string;
 }
 
 // Small hand-picked icon set for the cuisines question — keeps the food theme visible
@@ -35,6 +36,7 @@ const QUESTIONS: Question[] = [
   {
     id: 'mostOrderedDishes',
     emoji: '🍜',
+    image: '/gourmet_burger_premium_1777968634465.png',
     title: 'Which dishes do you order most often?',
     subtitle: 'Select exactly 5',
     type: 'checkbox-other',
@@ -71,6 +73,7 @@ const QUESTIONS: Question[] = [
   {
     id: 'cuisines',
     emoji: '🍛',
+    image: '/classic_chicken_biryani_premium_1777971580434.png',
     title: 'Which cuisines do you enjoy the most?',
     subtitle: 'Select exactly 3',
     type: 'checkbox-other',
@@ -105,6 +108,7 @@ const QUESTIONS: Question[] = [
   {
     id: 'priorities',
     emoji: '❤️',
+    image: '/premium_healthy_bowl_1777968667530.png',
     title: 'What matters most to you when ordering food online?',
     subtitle: 'Select up to 3',
     type: 'checkbox',
@@ -114,6 +118,7 @@ const QUESTIONS: Question[] = [
   {
     id: 'likelyToTry',
     emoji: '🚀',
+    image: '/hero-bowl.png',
     title: 'If a new food delivery app offered guaranteed quality, great taste, hot & fresh food, no platform fee, and fast delivery — how likely would you be to try it?',
     type: 'radio',
     options: ['Definitely', 'Probably', 'Maybe', 'Unlikely', 'No'],
@@ -314,20 +319,19 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
       {/* Floating food ambiance — subtle, non-interactive */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
         {[
-          { e: '🍕', top: '8%',  left: '6%',  dur: 7,  delay: 0 },
-          { e: '🍔', top: '18%', left: '88%', dur: 8.5, delay: 0.6 },
-          { e: '🍜', top: '68%', left: '4%',  dur: 9,  delay: 1.2 },
-          { e: '🍰', top: '78%', left: '90%', dur: 7.5, delay: 0.3 },
+          { src: '/pizza.png', top: '8%',  left: '6%',  dur: 7,  delay: 0, w: 80 },
+          { src: '/burger.png', top: '18%', left: '82%', dur: 8.5, delay: 0.6, w: 90 },
+          { src: '/pasta.png', top: '68%', left: '4%',  dur: 9,  delay: 1.2, w: 100 },
+          { src: '/chocolate_lava_cake_luxury_1777968683520.png', top: '78%', left: '80%', dur: 7.5, delay: 0.3, w: 85 },
         ].map((f, i) => (
-          <motion.span
+          <motion.img
             key={i}
-            className="absolute text-3xl opacity-[0.07] select-none"
-            style={{ top: f.top, left: f.left }}
+            src={f.src}
+            className="absolute opacity-15 select-none object-contain drop-shadow-2xl"
+            style={{ top: f.top, left: f.left, width: f.w, height: f.w }}
             animate={{ y: [0, -14, 0], rotate: [0, 6, -6, 0] }}
             transition={{ duration: f.dur, delay: f.delay, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            {f.e}
-          </motion.span>
+          />
         ))}
       </div>
 
@@ -371,15 +375,27 @@ export function SurveyWizard({ onComplete }: { onComplete: (data: SurveyData) =>
           >
             {/* Title */}
             <div className="mb-6 flex-shrink-0 relative z-10">
-              <motion.span
-                key={`emoji-${currentIndex}`}
-                initial={{ scale: 0, rotate: -20 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.05 }}
-                className="inline-block text-4xl md:text-5xl mb-3 drop-shadow-[0_0_20px_rgba(255,90,31,0.35)]"
-              >
-                {q.emoji}
-              </motion.span>
+              {q.image ? (
+                <motion.div
+                  key={`img-${currentIndex}`}
+                  initial={{ scale: 0, rotate: -15, opacity: 0 }}
+                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.05 }}
+                  className="w-24 h-24 md:w-28 md:h-28 mb-3 drop-shadow-[0_0_25px_rgba(255,90,31,0.25)] relative"
+                >
+                  <img src={q.image} alt={q.title} className="w-full h-full object-contain" />
+                </motion.div>
+              ) : (
+                <motion.span
+                  key={`emoji-${currentIndex}`}
+                  initial={{ scale: 0, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.05 }}
+                  className="inline-block text-4xl md:text-5xl mb-3 drop-shadow-[0_0_20px_rgba(255,90,31,0.35)]"
+                >
+                  {q.emoji}
+                </motion.span>
+              )}
               <h2 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight leading-snug drop-shadow-md">
                 {q.title}
               </h2>
