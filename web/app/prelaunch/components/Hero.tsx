@@ -91,7 +91,10 @@ export function Hero({ onStart }: { onStart: () => void }) {
                 </div>
                 <div className="flex items-center gap-3 text-sm text-zinc-300 bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-xs">2</div>
-                  <span className="font-medium">Complete a quick survey</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">Complete a quick survey</span>
+                    <span className="text-xs text-zinc-500">Takes ~2 minutes</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-zinc-300 bg-gradient-to-r from-amber-500/10 to-transparent rounded-xl p-3 border border-amber-500/20">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs"><Gift className="w-3.5 h-3.5" /></div>
