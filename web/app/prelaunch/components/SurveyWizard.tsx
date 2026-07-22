@@ -82,12 +82,6 @@ const QUESTIONS: Question[] = [
     options: ['7:00–9:00 AM', '9:00–11:00 AM', '12:00–2:00 PM', '2:00–4:00 PM', '4:00–6:00 PM', '6:00–8:00 PM', '8:00–10:00 PM', 'After 10:00 PM'],
   },
   {
-    id: 'waitTime',
-    title: "What's the longest you're willing to wait for your food?",
-    type: 'radio',
-    options: ['Under 15 minutes', '15–20 minutes', '20–30 minutes', '30–45 minutes', 'More than 45 minutes'],
-  },
-  {
     id: 'priorities',
     title: 'What matters most to you when ordering food online?',
     subtitle: 'Select up to 3',
