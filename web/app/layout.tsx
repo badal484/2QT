@@ -1,7 +1,34 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import "./globals.css";
 import { Providers } from "./providers";
+import { Inter, Space_Grotesk, Playfair_Display_SC, Karla } from "next/font/google";
+import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space",
+  display: "swap",
+});
+
+const playfair = Playfair_Display_SC({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-playfair",
+  display: "swap",
+});
+
+const karla = Karla({
+  subsets: ["latin"],
+  variable: "--font-karla",
+  display: "swap",
+});
+
 import OTAUpdater from "../components/OTAUpdater";
 import InstallPrompt from "../components/InstallPrompt";
 import { Analytics } from "@vercel/analytics/react";
@@ -90,14 +117,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="2QT" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display+SC:wght@400;700&family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         <link rel="preconnect" href="https://ik.imagekit.io" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
         <link rel="dns-prefetch" href="https://api.razorpay.com" />
       </head>
-      <body className="min-h-full flex flex-col bg-white text-zinc-900 selection:bg-swish-green/20">
+      <body className={`min-h-full flex flex-col bg-white text-zinc-900 selection:bg-swish-green/20 ${inter.variable} ${spaceGrotesk.variable} ${playfair.variable} ${karla.variable}`}>
         <Script
           id="org-jsonld"
           type="application/ld+json"

@@ -37,9 +37,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
         </motion.div>
 
         {/* Massive Headline */}
-        <motion.h1
-          initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, delay: 0.1, ease }}
+        <h1
           className="font-display font-black tracking-tighter leading-[1.05] text-white drop-shadow-lg mb-4 sm:mb-6"
           style={{ fontSize: 'clamp(2.5rem, 10vw, 6.5rem)' }}
         >
@@ -47,15 +45,13 @@ export function Hero({ onStart }: { onStart: () => void }) {
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary via-orange-400 to-amber-300 drop-shadow-[0_0_30px_rgba(255,90,31,0.5)]">
             for Ranchi.
           </span>
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.2, ease }}
+        <p
           className="text-base sm:text-lg md:text-xl leading-relaxed text-zinc-300 font-medium max-w-2xl mb-10 sm:mb-12 px-2 sm:px-0"
         >
           We're building 2QT — a new age food app with our own kitchen, experienced chefs, and honest pricing. Become one of our first 1,000 Founding Members, help us dictate exactly what Lalpur is craving, and get a <span className="text-amber-400 font-bold">free meal</span> on launch day.
-        </motion.p>
+        </p>
 
         {/* Central Glassmorphic Entry Card */}
         <motion.div

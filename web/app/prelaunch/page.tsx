@@ -294,18 +294,13 @@ export default function PreLaunchPage() {
       {/* All content at z-[1] so it floats above the video layer */}
       <div className="relative z-[1]">
       <AnimatePresence mode="wait">
-        {isInitializing ? (
-          <motion.div key="initializing" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex flex-col items-center justify-center p-4">
-            <Loader2 className="w-12 h-12 animate-spin text-brand-primary mb-4" />
-            <p className="text-zinc-400 font-bold text-sm">Loading your session...</p>
-          </motion.div>
-        ) : step === 0 && (
+        {step === 0 && (
           <motion.div key="hero" initial="enter" animate="center" exit="exit" variants={variants} className="w-full">
             <Landing onStart={() => setStep(1)} />
           </motion.div>
         )}
 
-        {!isInitializing && step === 1 && (
+        {step === 1 && (
           <motion.div key="phone" initial="enter" animate="center" exit="exit" variants={variants} className="w-full min-h-screen flex items-center justify-center p-4">
             <PhoneAuth onVerified={handlePhoneVerified} />
           </motion.div>
