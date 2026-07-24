@@ -147,7 +147,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
       const minimumSplashTime = new Promise<void>((resolve) => setTimeout(resolve, 3000));
 
       // Wake Render free-tier backend immediately in background — doesn't block boot
-      fetch('https://twoqt.onrender.com/api/v1/menu/zones').catch(() => {});
+      fetch('https://twoqt-1.onrender.com/api/v1/menu/zones').catch(() => {});
 
       // Clear stale persisted zone — will be resolved fresh via GPS or address selection
       dispatch(setZone(null));

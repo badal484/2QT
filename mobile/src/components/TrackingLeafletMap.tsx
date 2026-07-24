@@ -138,7 +138,7 @@ function riderIcon(hdg){
   return L.divIcon({
     html:'<div style="transform:rotate('+hdg+'deg);position:relative;width:64px;height:64px">'
       +'<div class="rider-pulse" style="width:84px;height:84px;"></div>'
-      +'<img src="https://twoqt.onrender.com/public/images/bike_handle.png?v=1" style="width:100%;height:100%;object-fit:contain;"/>'
+      +'<img src="https://twoqt-1.onrender.com/public/images/bike_handle.png?v=1" style="width:100%;height:100%;object-fit:contain;"/>'
       +'</div>',
     className:'', iconSize:[64,64], iconAnchor:[32,32]
   });
@@ -148,7 +148,7 @@ function homeIcon(){
   return L.divIcon({
     html:'<div style="position:relative;width:52px;height:52px;display:flex;align-items:center;justify-content:center">'
       +'<div class="home-pulse" style="top:90%"></div>'
-      +'<div style="width: 52px; height: 52px; background-image: url(https://twoqt.onrender.com/public/images/customer_icon.png?v=4); background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 10;"></div>'
+      +'<div style="width: 52px; height: 52px; background-image: url(https://twoqt-1.onrender.com/public/images/customer_icon.png?v=4); background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 10;"></div>'
       +'</div>',
     className:'', iconSize:[52,52], iconAnchor:[26,52]
   });
@@ -157,7 +157,7 @@ function homeIcon(){
 function kitchenIcon(){
   return L.divIcon({
     html:'<div style="position:relative;width:52px;height:52px;display:flex;align-items:center;justify-content:center">'
-      +'<div style="width: 52px; height: 52px; background-image: url(https://twoqt.onrender.com/public/images/kitchen_icon.png?v=4); background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 10;"></div>'
+      +'<div style="width: 52px; height: 52px; background-image: url(https://twoqt-1.onrender.com/public/images/kitchen_icon.png?v=4); background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 10;"></div>'
       +'</div>',
     className:'', iconSize:[52,52], iconAnchor:[26,52]
   });
