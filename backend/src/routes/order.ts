@@ -309,6 +309,8 @@ router.post('/:id/feedback', authenticate, async (req: AuthRequest, res) => {
             VALUES ($1, 10, 'earn', NOW() + INTERVAL '1 year')
         `, [req.user!.userId]);
 
+        emitToAdmin('new_feedback', { orderId: id, foodRating, deliveryRating });
+
         // SYSTEMATIC INTEGRATION: Critical Alert for bad feedback
         if (foodRating <= 2 || deliveryRating <= 2) {
             emitToAdmin('critical_alert', {

@@ -5,6 +5,7 @@ import { RefreshCw, Camera, Package, CheckCircle2 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { SkeletonList, SkeletonOrderCard } from "../components/ui/Skeleton";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 export function DeliveredOrdersTab() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -25,6 +26,7 @@ export function DeliveredOrdersTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useSocketRefresh(['order_status_update'], load);
 
   const shown = orders.filter(o => {
     if (podFilter === "with_pod")    return !!o.pod_photo_url;

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ShieldAlert, CheckCircle2, RefreshCw, Clock, Phone, MapPin, AlertOctagon, Navigation } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const ALERT_META: Record<string, { label: string; color: string; bg: string; border: string }> = {
   emergency:       { label: "🚨 Emergency",       color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-500/30" },
@@ -41,6 +42,7 @@ export function SOSAlertsTab() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+  useSocketRefresh(['sos_alert'], load);
 
   // Auto-refresh active alerts every 15s
   useEffect(() => {

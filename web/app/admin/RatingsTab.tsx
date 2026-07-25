@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { Star, RefreshCw, MessageSquare, ChefHat, Bike, User } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 function Stars({ value, size = 14 }: { value: number; size?: number }) {
   return (
@@ -53,6 +54,7 @@ export function RatingsTab() {
     queryFn: () => api.get("/admin/feedback"),
     staleTime: 60_000,
   });
+  useSocketRefresh(['new_feedback'], refetch);
 
   const all: any[] = data?.feedbacks ?? [];
 
