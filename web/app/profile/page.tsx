@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Wallet, Star, ShoppingBag, MapPin, LogOut, ChevronRight, ArrowLeft, Edit3, Gift, Clock, Trash2, Plus, Minus, Zap, Loader2, ArrowRight, HelpCircle, Send, CheckCircle2, AlertCircle, Navigation, Bell, ShieldCheck, Download, RotateCcw, Phone, UtensilsCrossed, Share2 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
@@ -120,9 +121,9 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
       <section className="bg-white rounded-3xl border border-zinc-200 p-8 shadow-sm">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-3xl font-bold shadow-sm overflow-hidden">
+            <div className="relative w-24 h-24 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-3xl font-bold shadow-sm overflow-hidden">
               {user?.photo_url
-                ? <img src={user.photo_url} alt="Profile" className="w-full h-full object-cover" />
+                ? <Image src={user.photo_url} alt="Profile" fill sizes="96px" className="object-cover" />
                 : (user?.name ?? "U")[0].toUpperCase()
               }
             </div>
