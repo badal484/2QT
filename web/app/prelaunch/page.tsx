@@ -88,7 +88,18 @@ export default function PreLaunchPage() {
         }
       }
 
-      // Check for existing Firebase auth session on mount (fallback)
+      // Check for existing Firebase auth session on mount (fallback). This triggers a
+      // cross-origin auth iframe + gapi bootstrap that's expensive on the main thread —
+      // defer it until the browser is idle so it doesn't compete with the landing
+      // page's first paint (this is a background check, not something the user is
+      // waiting on).
+      await new Promise<void>(resolve => {
+        if (typeof window.requestIdleCallback === 'function') {
+          window.requestIdleCallback(() => resolve(), { timeout: 2000 });
+        } else {
+          setTimeout(resolve, 200);
+        }
+      });
       const auth = getAuth(app);
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user && !savedToken) {
