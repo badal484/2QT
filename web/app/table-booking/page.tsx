@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, UtensilsCrossed, Star, MapPin, Loader2, ChevronRight } from "lucide-react";
 import { api } from "../lib/api";
@@ -63,9 +64,9 @@ export default function TableBookingLandingPage() {
             {restaurants.map((r: any) => (
               <Link key={r.id} href={`/table-booking/${r.id}`}>
                 <div className="bg-white rounded-2xl border border-zinc-200 p-5 flex gap-4 hover:border-brand-primary/40 hover:shadow-md transition-all cursor-pointer">
-                  <div className="w-20 h-20 rounded-xl overflow-hidden bg-zinc-100 shrink-0">
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-100 shrink-0">
                     {r.cover_photo || r.photo_url
-                      ? <img src={r.cover_photo || r.photo_url} alt={r.name} className="w-full h-full object-cover" />
+                      ? <Image src={r.cover_photo || r.photo_url} alt={r.name} fill sizes="80px" className="object-cover" />
                       : <div className="w-full h-full flex items-center justify-center"><UtensilsCrossed className="w-6 h-6 text-zinc-300" /></div>
                     }
                   </div>
