@@ -11,6 +11,7 @@ import { AppBootManager } from './src/components/AppBootManager';
 import SplashScreen from './src/screens/SplashScreen';
 import { GlobalSocketListener } from './src/socket/GlobalSocketListener';
 import { Toast } from './src/components/ui/Toast';
+import { useAppStateFocusManager } from './src/hooks/useAppStateFocusManager';
 
 if (!__DEV__) {
   console.log = () => {};
@@ -30,6 +31,7 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
+  useAppStateFocusManager();
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#FAF8F4' }}>
       <SafeAreaProvider>

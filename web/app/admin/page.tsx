@@ -15,6 +15,7 @@ import { useAuth } from "../providers";
 import { api } from "../lib/api";
 import { SkeletonList, SkeletonStatCard, SkeletonOrderCard } from "../components/ui/Skeleton";
 import { socket } from "../lib/socket";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import dynamic from "next/dynamic";
@@ -532,6 +533,7 @@ function ScheduledTab() {
   });
 
   useEffect(() => { load(); }, []);
+  useSocketRefresh(['new_order'], load);
 
   const cancelScheduled = async (id: string) => {
     if (!confirm('Cancel this scheduled order? The customer will be notified.')) return;
@@ -639,6 +641,7 @@ function CustomersTab() {
   };
 
   useEffect(() => { load(); }, []);
+  useSocketRefresh(['user_updated'], load);
 
   const toggleStatus = async (id: string, current: boolean) => {
     await api.patch(`/admin/users/${id}/status`, { is_active: !current });
@@ -954,6 +957,7 @@ function InventoryTab() {
   };
 
   useEffect(() => { load(); }, []);
+  useSocketRefresh(['inventory_updated'], load);
 
   const updateStock = async (id: string, current: number, delta: number) => {
     await api.patch(`/admin/inventory/${id}`, { current_stock: current + delta });
@@ -1271,6 +1275,7 @@ function SupportTab() {
   };
 
   useEffect(() => { load(); }, []);
+  useSocketRefresh(['new_ticket', 'ticket_customer_reply', 'ticket_rider_reply'], load);
 
   const resolve = async (id: string) => {
     if (!resolution) return;
@@ -1422,11 +1427,14 @@ function PayoutsTab() {
 function AnalyticsTab() {
   const [stats, setStats] = useState<any>(null);
   const [feedback, setFeedback] = useState<any>(null);
-  
-  useEffect(() => {
+
+  const load = useCallback(() => {
     api.get("/admin/dashboard").then(setStats);
     api.get("/admin/feedback").then(setFeedback);
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useSocketRefresh(['new_feedback', 'new_order', 'order_status_update'], load);
 
   return (
     <div>
@@ -1480,6 +1488,7 @@ function SettingsTab() {
   };
 
   useEffect(() => { load(); }, []);
+  useSocketRefresh(['settings_updated'], load);
 
   const patch = async (key: string, value: string) => {
     setSaving(true);
@@ -1761,6 +1770,7 @@ function RiderApplicationsTab() {
   };
 
   useEffect(() => { load(); }, []);
+  useSocketRefresh(['new_rider_application'], load);
 
   const handleActionClick = (id: string, action: 'approve' | 'reject') => {
     setConfirmDialog({ isOpen: true, action, id });

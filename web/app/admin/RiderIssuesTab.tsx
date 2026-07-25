@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, RefreshCw, Clock, UserX, Package } from "l
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { SkeletonList } from "../components/ui/Skeleton";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const ISSUE_META: Record<string, { label: string; color: string; bg: string }> = {
   customer_unreachable:  { label: "Customer Unreachable", color: "text-amber-400",   bg: "bg-amber-400/10" },
@@ -37,6 +38,7 @@ export function RiderIssuesTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useSocketRefresh(['rider_issue_reported'], load);
 
   const resolve = async (id: string) => {
     setResolving(id);

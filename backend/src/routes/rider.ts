@@ -145,6 +145,7 @@ router.post('/apply', authenticate, async (req: AuthRequest, res) => {
             [userId, vehicleType, licenseNumber, idPhotoUrl || null, 'pending']
         );
 
+        emitToAdmin('new_rider_application', { userId });
         res.json({ success: true, status: 'pending' });
     } catch (err: any) {
         console.error('APPLY_ERROR', err);

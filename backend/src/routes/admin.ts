@@ -2103,6 +2103,7 @@ router.put('/restaurants/:id', authenticate, requireRole('super_admin', 'admin')
             depositPaise, maxPartySize, gstPercent, commissionPercent, upiId, isActive]);
 
         if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        emitToAdmin('restaurant_updated', { restaurantId: rows[0].id, name: rows[0].name, isActive: rows[0].is_active });
         res.json({ restaurant: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: err.message });

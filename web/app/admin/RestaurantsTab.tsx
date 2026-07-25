@@ -32,6 +32,7 @@ const parsePhotos = (photos: any): MediaItem[] => {
 };
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
 
@@ -1569,6 +1570,7 @@ export function RestaurantsTab() {
     loadZones();
     load();
   }, [load, loadZones]);
+  useSocketRefresh(['restaurant_created', 'restaurant_updated'], load);
 
   const handleOnboardSuccess = (result: any) => {
     setShowOnboard(false);

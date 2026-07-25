@@ -11,6 +11,7 @@ import {
 import QRCode from 'react-qr-code';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useSocketRefresh } from '../hooks/useSocketRefresh';
 
 // ── tiny helpers ─────────────────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ export function PreLaunchTab() {
   }, [page, search]);
 
   useEffect(() => { load(); }, []);
+  useSocketRefresh(['new_prelaunch_registration'], () => load());
 
   const totalPages = Math.max(1, Math.ceil(total / 20));
 

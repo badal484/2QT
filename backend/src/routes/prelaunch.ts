@@ -7,6 +7,7 @@ import pool, { query } from '../db';
 import { authenticate, requireRole } from '../middleware/auth';
 import { firebaseAdminAuth } from '../config/firebaseAdmin';
 import { redis } from '../redis';
+import { emitToAdmin } from '../socket';
 
 const router = Router();
 
@@ -395,6 +396,7 @@ router.post('/register', async (req, res) => {
         
         const surveyCompleted = Object.keys(surveyResponses ?? {}).length > 0;
         const sessionToken = jwt.sign({ phone, sub: 'prelaunch' }, JWT_SECRET, { expiresIn: '30d' });
+        emitToAdmin('new_prelaunch_registration', { registrationId: regRows[0].id, name });
         res.status(201).json({
             success: true,
             sessionToken,

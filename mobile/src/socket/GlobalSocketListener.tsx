@@ -28,7 +28,7 @@ export const GlobalSocketListener: React.FC = () => {
       // ── Menu, categories, offers ───────────────────────────────────────────
       const handleMenuUpdate = () => {
         queryClient.invalidateQueries({ queryKey: ['menu'] });
-        queryClient.invalidateQueries({ queryKey: ['menuCategories'] });
+        queryClient.invalidateQueries({ queryKey: ['menu-categories'] });
         queryClient.invalidateQueries({ queryKey: ['activePromos'] });
         queryClient.invalidateQueries({ queryKey: ['home'] });
       };
