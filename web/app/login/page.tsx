@@ -86,7 +86,7 @@ function LoginForm() {
     setLoadingMsg("");
     setDevOtp("");
 
-    const isDevNumber = ["910000000000", "912222222222", "913333333333"].includes(digits);
+    const isDevNumber = ["917892493486", "912222222222", "913333333333"].includes(digits);
 
     if (isDevNumber) {
       const hintTimer = setTimeout(() => {
@@ -291,7 +291,7 @@ function LoginForm() {
                     <Shield className="w-3.5 h-3.5" /> Dev Test Accounts
                   </p>
                   {[
-                    { phone: "910000000000", role: "Admin", color: "text-purple-400", bg: "hover:bg-purple-500/10" },
+                    { phone: "917892493486", role: "Admin", color: "text-purple-400", bg: "hover:bg-purple-500/10" },
                     { phone: "912222222222", role: "Chef", color: "text-orange-400", bg: "hover:bg-orange-500/10" },
                     { phone: "913333333333", role: "Rider", color: "text-blue-400", bg: "hover:bg-blue-500/10" },
                   ].map(a => (
