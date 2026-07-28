@@ -350,12 +350,16 @@ export const calculatePricing = async ({
         if (tiers.length > 0) {
             deliveryFeePaise = tiers[0].fee_paise;
         } else {
-            // Fallback: flat or per_km
+            // Fallback: flat or per_km — guard against null/NaN config values silently
+            // producing a NaN (which becomes `null` over JSON and can render as "Free").
+            const baseFee = Number(zone.base_delivery_fee_paise) || 0;
             if (zone.delivery_fee_type === 'per_km') {
-                const extraKm = Math.max(0, distanceKm - parseFloat(zone.base_distance_km));
-                deliveryFeePaise = zone.base_delivery_fee_paise + Math.ceil(extraKm * 10) / 10 * zone.per_km_fee_paise;
+                const baseDistance = Number(zone.base_distance_km) || 0;
+                const perKmFee = Number(zone.per_km_fee_paise) || 0;
+                const extraKm = Math.max(0, distanceKm - baseDistance);
+                deliveryFeePaise = baseFee + (Math.ceil(extraKm * 10) / 10) * perKmFee;
             } else {
-                deliveryFeePaise = zone.base_delivery_fee_paise;
+                deliveryFeePaise = baseFee;
             }
 
             // Free delivery threshold (only when no tier system)
