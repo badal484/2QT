@@ -1392,12 +1392,17 @@ router.patch('/zones/:id', authenticate, requireRole('super_admin', 'admin'), as
 router.delete('/zones/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const id = req.params.id as string;
     try {
+        await query('UPDATE users SET zone_id = NULL WHERE zone_id = $1', [id]);
+        await query('UPDATE addresses SET zone_id = NULL WHERE zone_id = $1', [id]);
+        await query('UPDATE kitchens SET zone_id = NULL WHERE zone_id = $1', [id]);
+        await query('DELETE FROM kitchen_zones WHERE zone_id = $1', [id]);
+        await query('DELETE FROM delivery_fee_tiers WHERE zone_id = $1', [id]);
         await query('DELETE FROM zones WHERE id = $1', [id]);
         await redis.del(keys.menu(id));
         emitToAll('zone_updated', { action: 'delete', zoneId: id });
         res.json({ success: true });
     } catch (err: any) {
-        res.status(500).json({ error: 'Cannot delete zone. It may be linked to existing orders or users.', details: err.message });
+        res.status(500).json({ error: 'Cannot delete zone. It may be linked to existing orders.', details: err.message });
     }
 });
 
@@ -1609,14 +1614,13 @@ router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'),
 router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     try {
+        await query("UPDATE users SET kitchen_id = NULL, role = CASE WHEN role IN ('chef', 'kitchen_manager', 'partner_kitchen', 'packer') THEN 'customer'::user_role ELSE role END WHERE kitchen_id = $1", [id]);
+        await query('DELETE FROM kitchen_zones WHERE kitchen_id = $1', [id]);
         await query('DELETE FROM kitchens WHERE id = $1', [id]);
         emitToAll('kitchen_updated', { action: 'delete', kitchenId: id });
         res.json({ success: true });
     } catch (err: any) {
-        if (err.constraint === 'users_kitchen_id_fkey' || err.message.includes('users_kitchen_id_fkey')) {
-            return res.status(400).json({ error: 'Cannot delete kitchen because there are staff members assigned to it. Please remove the staff first.' });
-        }
-        res.status(500).json({ error: 'Failed to delete kitchen', details: err.message });
+        res.status(500).json({ error: 'Failed to delete kitchen. It may be linked to existing orders.', details: err.message });
     }
 });
 

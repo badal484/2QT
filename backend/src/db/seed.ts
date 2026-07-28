@@ -93,7 +93,7 @@ const seed = async () => {
       const riderPhone = '918888888888';
       const chefPhone = '917777777777';
       const customerPhone = '919999999999';
-      const adminPhone = '910000000000';
+      const adminPhone = '917892493486';
 
       await client.query(`
         INSERT INTO users (phone, role, name)

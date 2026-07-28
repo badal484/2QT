@@ -4,7 +4,8 @@ import { withTransaction, query } from '../db';
 import { redis, keys } from '../redis';
 import { emitToKitchen, emitToUser, emitToOrder, emitToAll, emitToAdmin, emitToPartner } from '../socket';
 import { processReferral } from '../services/referral.service';
-import { finalizeOrder } from '../services/order.service';
+import { finalizeOrder, finalizeWalletRecharge } from '../services/order.service';
+import { handleSubscriptionRenewal } from '../services/subscription.service';
 import { NotificationService } from '../services/notification.service';
 
 const router = Router();
@@ -148,6 +149,33 @@ router.post('/razorpay', async (req, res) => {
                 }
             } catch (err) {
                 console.error('[webhook cash_submission order.paid fallback]', err);
+            }
+            return res.json({ status: 'ok' });
+        }
+
+        // ── Wallet Recharge ───────────────────────────────────────────────────
+        if (notes.type === 'wallet_recharge') {
+            const customerId = notes.customerId as string;
+            const amountPaise = payload.payment.entity.amount as number;
+            try {
+                await finalizeWalletRecharge(rzpPaymentId, amountPaise, customerId);
+            } catch (err) {
+                console.error('[webhook wallet_recharge]', err);
+            }
+            return res.json({ status: 'ok' });
+        }
+
+        // ── Subscription Purchase ─────────────────────────────────────────────
+        if (notes.type === 'subscription_purchase') {
+            const customerId = notes.customerId as string;
+            const planId = notes.planId as string;
+            try {
+                // Ensure subscription service is called to grant the plan
+                await handleSubscriptionRenewal(customerId, planId);
+                // We should record the gateway payment id for refund purposes
+                // But subscription table schema is handled inside the service.
+            } catch (err) {
+                console.error('[webhook subscription_purchase]', err);
             }
             return res.json({ status: 'ok' });
         }

@@ -163,14 +163,21 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
             if (items.length > 0) {
                 const ids = items.map((i: any) => i.menu_item_id);
                 const qtys = items.map((i: any) => i.quantity);
-                await client.query(`
+                const { rows: updatedItems } = await client.query(`
                     UPDATE menu_items SET
                         today_sold_count = today_sold_count + v.qty,
                         available = CASE WHEN today_sold_count + v.qty >= daily_limit AND daily_limit > 0 THEN false ELSE available END,
                         sold_out_reason = CASE WHEN today_sold_count + v.qty >= daily_limit AND daily_limit > 0 THEN 'daily_limit_reached' ELSE sold_out_reason END
                     FROM (SELECT UNNEST($1::uuid[]) as id, UNNEST($2::int[]) as qty) v
                     WHERE menu_items.id = v.id
+                    RETURNING menu_items.id, menu_items.today_sold_count, menu_items.daily_limit
                 `, [ids, qtys]);
+                
+                for (const item of updatedItems) {
+                    if (item.daily_limit > 0 && item.today_sold_count > item.daily_limit) {
+                        throw new Error(`ITEM_SOLD_OUT_DURING_CHECKOUT`);
+                    }
+                }
             }
 
             // Ingredient deductions (per-item — cannot be batched cleanly due to JOIN chain)
@@ -229,17 +236,35 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
                 `, [order.customer_id, pointsToAward, order.id]);
             }
 
-            // 8. Track promo code usage — enforces max_uses cap and per_user_limit
+            // 8. Track promo code usage — enforces max_uses cap and per_user_limit atomically
             if (order.promo_code_id) {
-                await client.query(
-                    `INSERT INTO customer_promo_uses (customer_id, promo_code_id, order_id)
-                     VALUES ($1, $2, $3)`,
-                    [order.customer_id, order.promo_code_id, order.id]
-                );
-                await client.query(
-                    `UPDATE promo_codes SET times_used = times_used + 1 WHERE id = $1`,
+                const { rows: promoRows } = await client.query(
+                    `SELECT max_uses, per_user_limit FROM promo_codes WHERE id = $1 FOR UPDATE`,
                     [order.promo_code_id]
                 );
+                const promo = promoRows[0];
+                if (promo) {
+                    if (promo.per_user_limit !== null) {
+                        const { rows: usageRows } = await client.query(
+                            `SELECT COUNT(*) as cnt FROM customer_promo_uses WHERE customer_id = $1 AND promo_code_id = $2`,
+                            [order.customer_id, order.promo_code_id]
+                        );
+                        if (parseInt(usageRows[0].cnt) >= promo.per_user_limit) {
+                            throw new Error('PROMO_USAGE_LIMIT_REACHED');
+                        }
+                    }
+                    await client.query(
+                        `INSERT INTO customer_promo_uses (customer_id, promo_code_id, order_id) VALUES ($1, $2, $3)`,
+                        [order.customer_id, order.promo_code_id, order.id]
+                    );
+                    const { rows: updatedPromo } = await client.query(
+                        `UPDATE promo_codes SET times_used = times_used + 1 WHERE id = $1 RETURNING times_used, max_uses`,
+                        [order.promo_code_id]
+                    );
+                    if (updatedPromo[0].max_uses !== null && updatedPromo[0].times_used > updatedPromo[0].max_uses) {
+                        throw new Error('PROMO_MAX_USES_REACHED');
+                    }
+                }
             }
 
             // 8. Emit All Balance Updates (Systematic Reactivity)

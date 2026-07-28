@@ -23,7 +23,7 @@ router.get('/auth', authenticate, (req: AuthRequest, res) => {
     }
 });
 
-router.post('/image', generalLimiter, upload.single('image'), async (req: any, res: any) => {
+router.post('/image', generalLimiter, authenticate, upload.single('image'), async (req: any, res: any) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -42,7 +42,7 @@ router.post('/image', generalLimiter, upload.single('image'), async (req: any, r
 
 const videoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
-router.post('/video', generalLimiter, videoUpload.single('video'), async (req: any, res: any) => {
+router.post('/video', generalLimiter, authenticate, videoUpload.single('video'), async (req: any, res: any) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
