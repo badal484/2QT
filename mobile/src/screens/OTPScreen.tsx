@@ -50,7 +50,8 @@ const OTPScreen = ({ route, navigation }: any) => {
 
   const otpHandler = (message: string) => {
     if (message && message !== 'Timeout Error' && !verifyMutation.isPending) {
-      const match = /(\d{6})/.exec(message);
+      // Word-bounded so a longer embedded number (e.g. a phone number) can't match its first 6 digits
+      const match = /\b(\d{6})\b/.exec(message);
       if (match && match[1]) {
         const code = match[1];
         setOtp(code);
