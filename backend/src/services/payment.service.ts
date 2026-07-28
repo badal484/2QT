@@ -359,7 +359,7 @@ export const calculatePricing = async ({
             }
 
             // Free delivery threshold (only when no tier system)
-            if (zone.free_delivery_above_paise != null && effectiveSubtotal >= zone.free_delivery_above_paise) {
+            if (zone.free_delivery_above_paise != null && zone.free_delivery_above_paise > 0 && effectiveSubtotal >= zone.free_delivery_above_paise) {
                 deliveryFeePaise = 0;
             }
         }
