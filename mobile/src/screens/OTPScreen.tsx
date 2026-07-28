@@ -18,6 +18,14 @@ const OTPScreen = ({ route, navigation }: any) => {
   const dispatch = useDispatch();
   const inputRef = useRef<TextInput>(null);
 
+  const startAndroidAutoRead = () => {
+    if (Platform.OS === 'android') {
+      RNOtpVerify.getOtp()
+        .then(() => RNOtpVerify.addListener(otpHandler))
+        .catch((e) => console.log('OTP Verify error', e));
+    }
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       setTimer((prev) => (prev > 0 ? prev - 1 : 0));
@@ -25,14 +33,12 @@ const OTPScreen = ({ route, navigation }: any) => {
 
     if (devOtp) {
       setOtp(devOtp);
-      setTimeout(() => verifyMutation.mutate(devOtp), 500);
+      setTimeout(() => {
+        if (!verifyMutation.isPending) verifyMutation.mutate(devOtp);
+      }, 500);
     }
 
-    if (Platform.OS === 'android') {
-      RNOtpVerify.getOtp()
-        .then(() => RNOtpVerify.addListener(otpHandler))
-        .catch((e) => console.log('OTP Verify error', e));
-    }
+    startAndroidAutoRead();
 
     return () => {
       clearInterval(interval);
@@ -43,7 +49,7 @@ const OTPScreen = ({ route, navigation }: any) => {
   }, [devOtp]);
 
   const otpHandler = (message: string) => {
-    if (message && message !== 'Timeout Error') {
+    if (message && message !== 'Timeout Error' && !verifyMutation.isPending) {
       const match = /(\d{6})/.exec(message);
       if (match && match[1]) {
         const code = match[1];
@@ -75,13 +81,18 @@ const OTPScreen = ({ route, navigation }: any) => {
     mutationFn: () => api.post('/auth/send-otp', { phone }),
     onSuccess: () => {
       setTimer(30);
+      setOtp('');
+      startAndroidAutoRead();
       Alert.alert('Resent', 'A new OTP has been sent to your phone.');
+    },
+    onError: (err: any) => {
+      Alert.alert('Error', err?.message || 'Could not resend the code. Please try again.');
     },
   });
 
   const handleOtpChange = (text: string) => {
     setOtp(text);
-    if (text.length === 6) {
+    if (text.length === 6 && !verifyMutation.isPending) {
       verifyMutation.mutate(text);
     }
   };
