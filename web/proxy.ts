@@ -3,6 +3,8 @@ import type { NextRequest } from 'next/server';
 
 const BACKEND = process.env.BACKEND_URL || 'http://localhost:8000/api/v1';
 const TTL = 30_000;
+const BYPASS_COOKIE = 'prelaunch_bypass';
+const BYPASS_SECRET = process.env.PRELAUNCH_BYPASS_SECRET;
 
 let _cache: { on: boolean; t: number } | null = null;
 
@@ -36,6 +38,26 @@ export async function proxy(req: NextRequest) {
     pathname === '/favicon.ico' ||
     /\.(png|jpg|jpeg|gif|svg|webp|ico|css|js|woff2?|ttf|otf|mp3|mp4|txt|xml)$/.test(pathname)
   ) {
+    return NextResponse.next();
+  }
+
+  // Preview-link bypass: visiting once with ?preview_key=<secret> sets a cookie so the
+  // site owner can see the real site while everyone else still sees /prelaunch.
+  const previewKey = req.nextUrl.searchParams.get('preview_key');
+  if (BYPASS_SECRET && previewKey === BYPASS_SECRET) {
+    const url = new URL(req.url);
+    url.searchParams.delete('preview_key');
+    const res = NextResponse.redirect(url);
+    res.cookies.set(BYPASS_COOKIE, BYPASS_SECRET, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 90,
+      path: '/',
+    });
+    return res;
+  }
+  if (BYPASS_SECRET && req.cookies.get(BYPASS_COOKIE)?.value === BYPASS_SECRET) {
     return NextResponse.next();
   }
 
