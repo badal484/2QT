@@ -472,8 +472,10 @@ router.post('/refresh', async (req, res) => {
 router.delete('/logout', authenticate, async (req: AuthRequest, res) => {
     const user = req.user!;
     
-    // Revoke current access token jti in Redis
-    await redis.set(keys.revokedToken(user.jti), '1', { EX: 15 * 60 });
+    // Revoke current access token jti in Redis — TTL must cover the token's full
+    // lifetime (2h, matching the accessToken expiresIn), otherwise a captured token
+    // would work again once this revocation entry expires but the token itself hasn't.
+    await redis.set(keys.revokedToken(user.jti), '1', { EX: 2 * 60 * 60 });
 
     // Revoke all refresh tokens
     await query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1', [user.userId]);
