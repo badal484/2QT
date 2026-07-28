@@ -7,8 +7,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "../lib/api";
 import { useAuth } from "../providers";
-import { auth } from "../lib/firebase";
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
 import { Suspense } from 'react';
 
@@ -27,8 +25,6 @@ function LoginForm() {
   const [devOtp, setDevOtp] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const { login } = useAuth()!;
 
   useEffect(() => { setMounted(true); }, []);
@@ -86,53 +82,25 @@ function LoginForm() {
     setLoadingMsg("");
     setDevOtp("");
 
-    const isDevNumber = ["917892493486", "912222222222", "913333333333"].includes(digits);
+    const hintTimer = setTimeout(() => {
+      setLoadingMsg("Server is starting up, please wait...");
+    }, 8000);
 
-    if (isDevNumber) {
-      const hintTimer = setTimeout(() => {
-        setLoadingMsg("Server is starting up, please wait...");
-      }, 8000);
-
-      try {
-        const data = await api.sendOtp(digits);
-        if (data?.devOtp) {
-          setOtp(data.devOtp);
-          setDevOtp(data.devOtp);
-        }
-        return true;
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Something went wrong";
-        setError(msg === 'SERVER_TIMEOUT' ? "Server took too long. Tap Continue to try again." : msg);
-        return false;
-      } finally {
-        clearTimeout(hintTimer);
-        setLoading(false);
-        setLoadingMsg("");
+    try {
+      const data = await api.sendOtp(digits);
+      if (data?.devOtp) {
+        setOtp(data.devOtp);
+        setDevOtp(data.devOtp);
       }
-    } else {
-      try {
-        if (!recaptchaVerifierRef.current) {
-          recaptchaVerifierRef.current = new RecaptchaVerifier(
-            auth,
-            "recaptcha-container",
-            {
-              size: "invisible",
-              callback: () => {}
-            }
-          );
-        }
-        const verifier = recaptchaVerifierRef.current;
-        const formatPhone = `+${digits.startsWith("91") ? "" : "91"}${digits}`;
-        const confirmation = await signInWithPhoneNumber(auth, formatPhone, verifier);
-        setConfirmationResult(confirmation);
-        return true;
-      } catch (err: any) {
-        console.error("Firebase Auth sendOtp error:", err);
-        setError(err.message || "Failed to send verification code via Firebase. Please try again.");
-        return false;
-      } finally {
-        setLoading(false);
-      }
+      return true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(msg === 'SERVER_TIMEOUT' ? "Server took too long. Tap Continue to try again." : msg);
+      return false;
+    } finally {
+      clearTimeout(hintTimer);
+      setLoading(false);
+      setLoadingMsg("");
     }
   };
 
@@ -177,18 +145,11 @@ function LoginForm() {
     setLoading(true);
     setError("");
     try {
-      let data;
-      if (confirmationResult) {
-        const credential = await confirmationResult.confirm(otp);
-        const idToken = await credential.user.getIdToken();
-        const referralCode = searchParams.get("referral") || undefined;
-        data = await api.firebaseLogin(idToken, referralCode, undefined, undefined);
-      } else {
-        data = await api.verifyOtp(phone, otp, undefined);
-      }
+      const referralCode = searchParams.get("referral") || undefined;
+      const data = await api.verifyOtp(phone, otp, referralCode);
       login(data.user);
-      
-      if (!data.user.name || data.user.name === "2QT User" || data.user.name === "2QT_User") {
+
+      if (!data.user.name || data.user.name === "2QT User") {
         setStep("onboarding");
       } else {
         redirectUser(data.user.role);
@@ -480,7 +441,6 @@ function LoginForm() {
               </motion.form>
             )}
           </AnimatePresence>
-          <div id="recaptcha-container" />
         </div>
       </motion.div>
     </div>

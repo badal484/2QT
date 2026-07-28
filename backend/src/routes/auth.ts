@@ -8,7 +8,6 @@ import { query } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import axios from 'axios';
-import { firebaseAdminAuth } from '../config/firebaseAdmin';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -17,6 +16,10 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 if (!JWT_REFRESH_SECRET) throw new Error('JWT_REFRESH_SECRET environment variable is not set');
 
 const phoneSchema = z.string().regex(/^91\d{10}$/);
+
+// Non-customer roles that are exempt from the prelaunch gate — determined by each phone's
+// ALREADY-established role in the DB, never trusted from client-supplied input.
+const STAFF_ROLES = ['chef', 'rider', 'rider_captain', 'partner_kitchen', 'partner', 'super_admin', 'admin', 'finance', 'kitchen_manager', 'dine_in_staff', 'support', 'packer'];
 
 // In-memory OTP fallback — works even when Redis is slow/down on Render free tier
 const memOtp = new Map<string, { otp: string; exp: number }>();
@@ -160,8 +163,11 @@ router.post('/verify-otp', async (req, res) => {
         delMemOtp(normalizedPhone);
         redis.del(keys.pendingOtp(normalizedPhone)).catch(() => {});
 
-        // Pre-launch mode check
-        if (!['admin', 'chef', 'rider', 'packer', 'kitchen_manager', 'dine_in_staff', 'prelaunch'].includes(appRole)) {
+        // Pre-launch mode check — gated on this phone's ALREADY-established role in the DB,
+        // never the client-supplied appRole (which anyone could set to bypass the gate otherwise).
+        const { rows: existingRoleRows } = await query('SELECT role FROM users WHERE phone = $1', [normalizedPhone]);
+        const existingRole = existingRoleRows[0]?.role;
+        if (!existingRole || !STAFF_ROLES.includes(existingRole)) {
             const { rows: configRows } = await query(`SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`);
             const isPrelaunch = configRows[0]?.value === 'true' || configRows[0]?.value === true;
             if (isPrelaunch) {
@@ -225,8 +231,16 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     if (appRole === 'rider') {
-        insertRole = 'rider';
-        roleUpdate = `, role = 'rider'`;
+        // Riders only ever get promoted via the apply → admin-approval flow (admin.ts, on
+        // rider_applications approval). Never auto-promote an arbitrary phone number here —
+        // just leave insertRole/roleUpdate at their defaults if they're not already a rider.
+        const { rows: riderRows } = await query(
+            `SELECT id FROM users WHERE phone = $1 AND role::text IN ('rider', 'rider_captain')`,
+            [normalizedPhone]
+        );
+        if (riderRows.length === 0) {
+            return res.status(403).json({ error: 'NOT_RIDER', message: 'This number is not registered as a rider. Please apply first.' });
+        }
     }
     if (appRole === 'chef') {
         // Kitchen app: only pre-authorized accounts (role='chef' set by admin) can log in.
@@ -552,196 +566,6 @@ router.post('/onboarding/complete', authenticate, async (req: AuthRequest, res) 
     const userId = req.user!.userId;
     await query('UPDATE users SET onboarding_complete = true WHERE id = $1', [userId]);
     res.json({ success: true });
-});
-
-router.post('/firebase-login', async (req, res) => {
-    try {
-        const { idToken, referralCode, name, appRole, lat, lng } = req.body;
-        if (!idToken) {
-            return res.status(400).json({ error: 'INVALID_TOKEN', message: 'idToken is required' });
-        }
-
-        let decodedToken;
-        try {
-            decodedToken = await firebaseAdminAuth.verifyIdToken(idToken);
-        } catch (err: any) {
-            console.error('--- FIREBASE VERIFY ERROR:', err.message);
-            return res.status(401).json({ error: 'INVALID_TOKEN', message: 'Failed to verify Firebase ID Token: ' + err.message });
-        }
-
-        const phone = decodedToken.phone_number;
-        if (!phone) {
-            return res.status(400).json({ error: 'NO_PHONE_IN_TOKEN', message: 'Phone number not found in Firebase token' });
-        }
-
-        let normalizedPhone = String(phone).replace(/\D/g, '');
-        if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
-
-        if (!phoneSchema.safeParse(normalizedPhone).success) {
-            return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
-        }
-
-        let roleUpdate = '';
-        let insertRole = 'customer';
-        let insertVerified = true;
-
-        // Pre-launch mode check
-        if (!['admin', 'chef', 'rider', 'packer', 'kitchen_manager', 'dine_in_staff'].includes(appRole)) {
-            const { rows: configRows } = await query(`SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`);
-            const isPrelaunch = configRows[0]?.value === 'true' || configRows[0]?.value === true;
-            if (isPrelaunch) {
-                return res.status(403).json({ error: 'PRELAUNCH_ACTIVE', message: 'We are currently in pre-launch mode. Please join the waitlist!' });
-            }
-        }
-
-        let detectedZoneId = null;
-        let detectedKitchenId = null;
-        let zoneInsertKeys = '';
-        let zoneInsertVals = '';
-        let zoneUpdateKeys = '';
-
-        if (lat && lng && appRole !== 'rider' && appRole !== 'chef' && appRole !== 'admin') {
-            const { rows: zones } = await query(`
-                SELECT id, radius_km, polygon_points,
-                (6371 * acos(cos(radians($1)) * cos(radians(kitchen_lat)) * cos(radians(kitchen_lng) - radians($2)) + sin(radians($1)) * sin(radians(kitchen_lat)))) AS distance
-                FROM zones WHERE is_active = true ORDER BY distance ASC
-            `, [lat, lng]);
-
-            const isPointInPolygon = (point: {lat: number, lng: number}, polygon: {lat: number, lng: number}[]) => {
-                let x = point.lng, y = point.lat, inside = false;
-                for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                    let xi = polygon[i].lng, yi = polygon[i].lat, xj = polygon[j].lng, yj = polygon[j].lat;
-                    let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-                    if (intersect) inside = !inside;
-                }
-                return inside;
-            };
-
-            for (const zone of zones) {
-                let isMatch = false;
-                if (zone.polygon_points && Array.isArray(zone.polygon_points) && zone.polygon_points.length > 2) {
-                    isMatch = isPointInPolygon({ lat, lng }, zone.polygon_points);
-                } else {
-                    isMatch = zone.distance <= zone.radius_km;
-                }
-                
-                if (isMatch) {
-                    detectedZoneId = zone.id;
-                    const { rows: kInfo } = await query(`SELECT k.id FROM kitchens k JOIN kitchen_zones kz ON k.id = kz.kitchen_id WHERE kz.zone_id = $1 LIMIT 1`, [zone.id]);
-                    if (kInfo.length > 0) detectedKitchenId = kInfo[0].id;
-                    break;
-                }
-            }
-        }
-
-        if (detectedZoneId) {
-            zoneInsertKeys = ', zone_id';
-            zoneInsertVals = `, '${detectedZoneId}'`;
-            zoneUpdateKeys += `, zone_id = COALESCE(users.zone_id, '${detectedZoneId}')`;
-        }
-        if (detectedKitchenId) {
-            zoneInsertKeys += ', kitchen_id';
-            zoneInsertVals += `, '${detectedKitchenId}'`;
-            zoneUpdateKeys += `, kitchen_id = COALESCE(users.kitchen_id, '${detectedKitchenId}')`;
-        }
-
-        if (appRole === 'rider') {
-            insertRole = 'rider';
-            roleUpdate = `, role = 'rider'`;
-        }
-        if (appRole === 'chef') {
-            const { rows: chefRows } = await query(
-                `SELECT id FROM users WHERE phone = $1 AND role::text IN ('chef', 'kitchen_manager', 'partner_kitchen', 'dine_in_staff', 'packer')`,
-                [normalizedPhone]
-            );
-            if (chefRows.length === 0) {
-                return res.status(403).json({ error: 'NOT_KITCHEN_STAFF', message: 'This number is not registered as kitchen staff. Contact your manager.' });
-            }
-        }
-
-        roleUpdate += zoneUpdateKeys;
-
-        const { rows } = await query(
-            `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true, is_verified = true${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete, email, photo_url`,
-            [normalizedPhone, name || '2QT User', insertRole, insertVerified]
-        );
-
-        const user = rows[0];
-
-        // Initialize wallet and award Welcome Bonus if new
-        const { rowCount: walletCreated } = await query('INSERT INTO customer_wallet (customer_id, balance_paise) VALUES ($1, 0) ON CONFLICT (customer_id) DO NOTHING', [user.id]);
-        
-        if ((walletCreated ?? 0) > 0) {
-            await query(`
-                INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
-                VALUES ($1, 500, 'earn', NOW() + INTERVAL '1 year')
-            `, [user.id]);
-
-            if (referralCode) {
-                const { rows: referrers } = await query('SELECT id FROM users WHERE referral_code = $1', [referralCode]);
-                if (referrers[0]) {
-                    const referrerId = referrers[0].id;
-                    await query('UPDATE customer_wallet SET balance_paise = balance_paise + 5000 WHERE customer_id = $1', [user.id]);
-                    await query(`
-                        INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
-                        VALUES ($1, 5000, 'credit', 'Referral Welcome Bonus', 5000)
-                    `, [user.id]);
-
-                    await query(`
-                        INSERT INTO referrals (referrer_id, referred_id, status)
-                        VALUES ($1, $2, 'pending')
-                        ON CONFLICT (referred_id) DO NOTHING
-                    `, [referrerId, user.id]);
-                }
-            }
-        }
-
-        const jti = crypto.randomUUID();
-
-        const accessToken = jwt.sign(
-            { userId: user.id, role: user.role, kitchenId: user.kitchen_id ?? null, zoneId: user.zone_id ?? null, jti },
-            JWT_SECRET,
-            { expiresIn: '2h' }
-        );
-
-        const refreshToken = jwt.sign(
-            { userId: user.id, jti },
-            JWT_REFRESH_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        const tokenHash = await bcrypt.hash(refreshToken, 10);
-        await query(
-            'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + interval \'7 days\')',
-            [user.id, tokenHash]
-        );
-
-        let kitchenName: string | null = null;
-        if (user.kitchen_id) {
-            const { rows: kRows } = await query('SELECT name FROM kitchens WHERE id = $1', [user.kitchen_id]);
-            if (kRows[0]) kitchenName = kRows[0].name;
-        }
-
-        res.json({
-            user: {
-                id: user.id,
-                name: user.name,
-                phone: user.phone,
-                role: user.role,
-                kitchenId: user.kitchen_id ?? null,
-                kitchenName: kitchenName,
-                zoneId: user.zone_id ?? null,
-                termsAccepted: !!user.terms_accepted_at,
-                onboarding_complete: user.onboarding_complete,
-                is_verified: user.is_verified
-            },
-            accessToken,
-            refreshToken
-        });
-    } catch (err: any) {
-        console.error('FIREBASE_LOGIN_ERROR:', err);
-        res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong during login.' });
-    }
 });
 
 export default router;

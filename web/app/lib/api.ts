@@ -165,23 +165,10 @@ class ApiClient {
     });
   }
 
-  async verifyOtp(phone: string, otp: string, name?: string, appRole?: string) {
+  async verifyOtp(phone: string, otp: string, referralCode?: string, name?: string, appRole?: string) {
     const data = await this.request('/auth/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ phone, otp, name, appRole }),
-    });
-    if (data?.accessToken) {
-      localStorage.setItem('2qt_token', data.accessToken);
-      localStorage.setItem('2qt_refresh_token', data.refreshToken);
-      localStorage.setItem('2qt_user', JSON.stringify(data.user));
-    }
-    return data;
-  }
-
-  async firebaseLogin(idToken: string, referralCode?: string, name?: string, appRole?: string) {
-    const data = await this.request('/auth/firebase-login', {
-      method: 'POST',
-      body: JSON.stringify({ idToken, referralCode, name, appRole }),
+      body: JSON.stringify({ phone, otp, referralCode, name, appRole }),
     });
     if (data?.accessToken) {
       localStorage.setItem('2qt_token', data.accessToken);
