@@ -79,6 +79,9 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             throw new Error('CART_ZONE_MISMATCH: Your cart contains items from a different delivery zone. Please clear your cart.');
         }
 
+        // Haversine here is only used to narrow down which kitchen in the zone is closest
+        // (a cheap pre-filter over a handful of candidates) — it must never be used as the
+        // BILLED distance itself.
         const { rows: kitchens } = await query(`
             SELECT k.id, k.lat, k.lng,
                    (6371 * acos(cos(radians($2)) * cos(radians(k.lat)) * cos(radians(k.lng) - radians($3)) + sin(radians($2)) * sin(radians(k.lat)))) AS distance
@@ -88,24 +91,19 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             ORDER BY distance ASC
             LIMIT 1
         `, [zoneId, custLat, custLng]);
-        
+
         if (kitchens.length === 0) throw new Error('NO_KITCHENS_AVAILABLE_FOR_ZONE');
-        
+
         const closestKitchen = kitchens[0];
         let kitchenId = closestKitchen.id;
         let closestKitchenLat = closestKitchen.lat;
         let closestKitchenLng = closestKitchen.lng;
-        let minDistance = closestKitchen.distance;
 
-        // Use Google Maps for exact driving distance if available, else keep Haversine
-        let finalDistanceKm = minDistance;
-        try {
-            const googleDist = await getDistanceKm(closestKitchenLat, closestKitchenLng, custLat, custLng);
-            if (googleDist !== null) {
-                finalDistanceKm = googleDist;
-            }
-        } catch (e) {
-            console.error('Google Maps Distance fallback failed:', e);
+        // Billed distance MUST come from real road distance — never fall back to Haversine.
+        // If Google Maps can't resolve a distance, fail loudly rather than silently undercharge.
+        const finalDistanceKm = await getDistanceKm(closestKitchenLat, closestKitchenLng, custLat, custLng);
+        if (finalDistanceKm === null) {
+            throw new Error('DISTANCE_UNAVAILABLE: Unable to calculate delivery distance right now. Please try again in a moment.');
         }
 
         const pricing = await calculatePricing({
