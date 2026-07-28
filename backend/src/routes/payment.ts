@@ -79,32 +79,36 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             throw new Error('CART_ZONE_MISMATCH: Your cart contains items from a different delivery zone. Please clear your cart.');
         }
 
-        // Haversine here is only used to narrow down which kitchen in the zone is closest
-        // (a cheap pre-filter over a handful of candidates) — it must never be used as the
-        // BILLED distance itself.
+        // No distance sorting here at all — candidates are fetched unordered, and which one is
+        // "closest" is decided below using real road distance, never Haversine.
         const { rows: kitchens } = await query(`
-            SELECT k.id, k.lat, k.lng,
-                   (6371 * acos(cos(radians($2)) * cos(radians(k.lat)) * cos(radians(k.lng) - radians($3)) + sin(radians($2)) * sin(radians(k.lat)))) AS distance
+            SELECT k.id, k.lat, k.lng
             FROM kitchens k
             JOIN kitchen_zones kz ON k.id = kz.kitchen_id
             WHERE kz.zone_id = $1 AND k.is_active = true AND k.is_paused = false
-            ORDER BY distance ASC
-            LIMIT 1
-        `, [zoneId, custLat, custLng]);
+        `, [zoneId]);
 
         if (kitchens.length === 0) throw new Error('NO_KITCHENS_AVAILABLE_FOR_ZONE');
 
-        const closestKitchen = kitchens[0];
-        let kitchenId = closestKitchen.id;
-        let closestKitchenLat = closestKitchen.lat;
-        let closestKitchenLng = closestKitchen.lng;
+        // Billed distance (and kitchen selection when a zone has more than one) MUST come from
+        // real road distance. If Google Maps can't resolve it, fail loudly rather than silently
+        // undercharge or fall back to a straight-line estimate.
+        const kitchenDistances = await Promise.all(
+            kitchens.map((k: any) => getDistanceKm(k.lat, k.lng, custLat, custLng))
+        );
 
-        // Billed distance MUST come from real road distance — never fall back to Haversine.
-        // If Google Maps can't resolve a distance, fail loudly rather than silently undercharge.
-        const finalDistanceKm = await getDistanceKm(closestKitchenLat, closestKitchenLng, custLat, custLng);
-        if (finalDistanceKm === null) {
+        let bestIdx = -1;
+        for (let i = 0; i < kitchenDistances.length; i++) {
+            const d = kitchenDistances[i];
+            if (d !== null && (bestIdx === -1 || d < (kitchenDistances[bestIdx] as number))) bestIdx = i;
+        }
+        if (bestIdx === -1) {
             throw new Error('DISTANCE_UNAVAILABLE: Unable to calculate delivery distance right now. Please try again in a moment.');
         }
+
+        const closestKitchen = kitchens[bestIdx];
+        const kitchenId = closestKitchen.id;
+        const finalDistanceKm = kitchenDistances[bestIdx] as number;
 
         const pricing = await calculatePricing({
             cartItems: items,
