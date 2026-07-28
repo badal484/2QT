@@ -21,15 +21,20 @@ const razorpay = new Razorpay({
 
 router.post('/create-order', authenticate, paymentLimiter, async (req: AuthRequest, res) => {
     const customerId = req.user!.userId;
-    
-    const payloadHash = crypto.createHash('md5').update(JSON.stringify(req.body)).digest('hex');
-    const idempotencyKey = `idempotency:${customerId}:${payloadHash}`;
-    const acquiredLock = await redis.set(idempotencyKey, '1', { NX: true, EX: 10 }).catch(() => true);
-    if (!acquiredLock) {
-        return res.status(429).json({ error: 'DUPLICATE_ORDER', message: 'This order is already being processed. Please wait.' });
-    }
 
     const { items, addressId, promoCode, useWallet, useLoyalty, isSubscriptionOrder, paymentMethod = 'online', dryRun, instructions, scheduledAt, riderTipPaise, deliveryContactName, deliveryContactPhone } = req.body;
+
+    // Idempotency lock only guards against double-submitting a REAL order — dry-run pricing
+    // previews (fired repeatedly as the customer edits their cart) have no side effects and
+    // must never be rate-limited against themselves.
+    if (!dryRun) {
+        const payloadHash = crypto.createHash('md5').update(JSON.stringify(req.body)).digest('hex');
+        const idempotencyKey = `idempotency:${customerId}:${payloadHash}`;
+        const acquiredLock = await redis.set(idempotencyKey, '1', { NX: true, EX: 10 }).catch(() => true);
+        if (!acquiredLock) {
+            return res.status(429).json({ error: 'DUPLICATE_ORDER', message: 'This order is already being processed. Please wait.' });
+        }
+    }
 
     try {
         const { rows: addrInfo } = await query('SELECT zone_id, lat, lng FROM addresses WHERE id = $1 AND customer_id = $2', [addressId, customerId]);
