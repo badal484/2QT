@@ -178,6 +178,19 @@ class ApiClient {
     return data;
   }
 
+  async verifyWidgetToken(accessToken: string, referralCode?: string, name?: string, appRole?: string) {
+    const data = await this.request('/auth/verify-widget-token', {
+      method: 'POST',
+      body: JSON.stringify({ accessToken, referralCode, name, appRole }),
+    });
+    if (data?.accessToken) {
+      localStorage.setItem('2qt_token', data.accessToken);
+      localStorage.setItem('2qt_refresh_token', data.refreshToken);
+      localStorage.setItem('2qt_user', JSON.stringify(data.user));
+    }
+    return data;
+  }
+
   async logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('2qt_token');
