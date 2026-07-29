@@ -157,16 +157,17 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
 // way /verify-otp and the old /firebase-login independently did before.
 async function completeAuth(
     normalizedPhone: string,
-    opts: { referralCode?: string; name?: string; appRole?: string; lat?: number; lng?: number },
+    opts: { referralCode?: string; name?: string; appRole?: string; lat?: number; lng?: number; platform?: string },
     res: Response
 ): Promise<void> {
-    const { referralCode, name, appRole, lat, lng } = opts;
+    const { referralCode, name, appRole, lat, lng, platform } = opts;
 
     // Pre-launch mode check — gated on this phone's ALREADY-established role in the DB,
     // never the client-supplied appRole (which anyone could set to bypass the gate otherwise).
+    // The mobile apps are exempt entirely (platform: 'app') -- prelaunch only gates the website.
     const { rows: existingRoleRows } = await query('SELECT role FROM users WHERE phone = $1', [normalizedPhone]);
     const existingRole = existingRoleRows[0]?.role;
-    if (!existingRole || !STAFF_ROLES.includes(existingRole)) {
+    if (platform !== 'app' && (!existingRole || !STAFF_ROLES.includes(existingRole))) {
         const { rows: configRows } = await query(`SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`);
         const isPrelaunch = configRows[0]?.value === 'true' || configRows[0]?.value === true;
         if (isPrelaunch) {
@@ -419,7 +420,7 @@ async function completeAuth(
 
 router.post('/verify-otp', async (req, res) => {
     try {
-        const { phone, otp, referralCode, name, appRole, lat, lng } = req.body;
+        const { phone, otp, referralCode, name, appRole, lat, lng, platform } = req.body;
         let normalizedPhone = String(phone).replace(/\D/g, '');
         if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
 
@@ -439,7 +440,7 @@ router.post('/verify-otp', async (req, res) => {
         delMemOtp(normalizedPhone);
         redis.del(keys.pendingOtp(normalizedPhone)).catch(() => {});
 
-        await completeAuth(normalizedPhone, { referralCode, name, appRole, lat, lng }, res);
+        await completeAuth(normalizedPhone, { referralCode, name, appRole, lat, lng, platform }, res);
     } catch (err: any) {
         console.error('VERIFY OTP CRASH:', err);
         res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong during login.' });
@@ -452,7 +453,7 @@ router.post('/verify-otp', async (req, res) => {
 // run it through the exact same completeAuth logic as the SMS-OTP path above.
 router.post('/verify-widget-token', async (req, res) => {
     try {
-        const { accessToken, referralCode, name, appRole, lat, lng } = req.body;
+        const { accessToken, referralCode, name, appRole, lat, lng, platform } = req.body;
         if (!accessToken) return res.status(400).json({ error: 'MISSING_TOKEN', message: 'accessToken is required' });
 
         const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
@@ -473,7 +474,7 @@ router.post('/verify-widget-token', async (req, res) => {
             return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
         }
 
-        await completeAuth(normalizedPhone, { referralCode, name, appRole, lat, lng }, res);
+        await completeAuth(normalizedPhone, { referralCode, name, appRole, lat, lng, platform }, res);
     } catch (err: any) {
         console.error('VERIFY WIDGET TOKEN CRASH:', err);
         res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong during login.' });
