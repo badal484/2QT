@@ -123,6 +123,8 @@ const OTPScreen = ({ route, navigation }: any) => {
             autoFocus
             editable={!verifyMutation.isPending}
             caretHidden={true}
+            textContentType="oneTimeCode"
+            autoComplete="sms-otp"
           />
           <View pointerEvents="none" style={styles.otpContainer}>
             {Array(6)
