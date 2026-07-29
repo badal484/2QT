@@ -3,15 +3,15 @@ import { Alert, NativeModules, StyleSheet, Text, TextInput, TouchableOpacity, Vi
 import { useMutation } from '@tanstack/react-query';
 import Animated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { Bike, ChefHat, ShieldCheck, Flame } from 'lucide-react-native';
+import { DefaultWidget } from '@msg91comm/sendotp-react-native';
 import { api } from '../api/client';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
-import { Button } from '../components/ui';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import { radius, spacing } from '../theme/spacing';
-import auth from '@react-native-firebase/auth';
-import { setConfirmationResult } from '../utils/firebaseAuthHelper';
+import { Button, TextField } from '../components/ui';
+import { tokens } from '../theme/tokens';
+import { ENV } from '../config/env';
+import { setAuth } from '../store/slices/authSlice';
+import { connectSocket } from '../socket/client';
 
 const { width } = Dimensions.get('window');
 const { RoleModule } = NativeModules;
@@ -19,42 +19,52 @@ const BUILD_ROLE = RoleModule?.BUILD_ROLE || 'customer';
 
 const BRANDING: Record<string, { name: string; sub: string; color: string; Icon: any }> = {
   customer: { name: '2QT', sub: 'Cooked Fresh, Daily', color: '#FF4500', Icon: ChefHat }, // Matching the exact orange from the mockup
-  rider: { name: '2QT CAPTAIN', sub: 'Rider Portal', color: colors.ink, Icon: Bike },
+  rider: { name: '2QT CAPTAIN', sub: 'Rider Portal', color: tokens.colors.textPrimary, Icon: Bike },
   kitchen: { name: '2QT PARTNER', sub: 'Kitchen Command', color: '#0E7490', Icon: Flame },
-  admin: { name: '2QT ADMIN', sub: 'Operations Deck', color: colors.danger, Icon: ShieldCheck },
+  admin: { name: '2QT ADMIN', sub: 'Operations Deck', color: tokens.colors.danger, Icon: ShieldCheck },
 };
 
 const LoginScreen = ({ navigation }: any) => {
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [devRole, setDevRole] = useState(BUILD_ROLE);
-  const [firebaseLoading, setFirebaseLoading] = useState(false);
+  const [showWidget, setShowWidget] = useState(false);
+  const dispatch = useDispatch();
 
   const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
 
-  const mutation = useMutation({
-    mutationFn: (phoneNumber: string) => api.post('/auth/send-otp', { phone: phoneNumber }),
+  // MSG91 widget handles phone entry + OTP send + OTP verify entirely on-device (its own
+  // modal, shown below) and hands back an access-token here — no separate OTP-entry screen
+  // needed for this path.
+  const widgetVerifyMutation = useMutation({
+    mutationFn: (accessToken: string) => api.post('/auth/verify-widget-token', {
+      accessToken,
+      referralCode: referralCode.trim().toUpperCase(),
+      appRole: devRole === 'kitchen' ? 'chef' : devRole,
+      lat: globalLocation?.latitude,
+      lng: globalLocation?.longitude,
+    }),
     onSuccess: (data) => {
-      navigation.navigate('OTP', {
-        phone: data.phone,
-        referralCode: referralCode.trim().toUpperCase(),
-        devOtp: data.devOtp,
-        devRole: devRole === 'kitchen' ? 'chef' : devRole,
-        lat: globalLocation?.latitude,
-        lng: globalLocation?.longitude,
-      });
+      dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
+      connectSocket(data.accessToken);
     },
     onError: () => {
-      Alert.alert('Error', 'Could not send OTP. Check your connection.');
+      Alert.alert('Error', 'Could not verify your phone. Please try again.');
     },
   });
 
-  const handleSendOTP = async () => {
+  const handleSendOTP = () => {
     if (phone.length !== 10) return;
-    const digits = '91' + phone;
-    
-    // Send all numbers to our backend, which uses MSG91 internally
-    mutation.mutate(digits);
+    setShowWidget(true);
+  };
+
+  const handleWidgetCompletion = (result: any) => {
+    setShowWidget(false);
+    if (result?.success) {
+      widgetVerifyMutation.mutate(result.message);
+    } else if (result?.message) {
+      Alert.alert('Verification Failed', result.message);
+    }
   };
 
   const branding = BRANDING[devRole] || BRANDING.customer;
@@ -64,6 +74,7 @@ const LoginScreen = ({ navigation }: any) => {
     <KeyboardAvoidingView 
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
     >
       <StatusBar barStyle="dark-content" backgroundColor={styles.container.backgroundColor} />
       
@@ -71,7 +82,7 @@ const LoginScreen = ({ navigation }: any) => {
         
         <Animated.View entering={ZoomIn.duration(800).springify()} style={styles.logoWrapper}>
           <View style={[styles.logoCard, { backgroundColor: branding.color }]}>
-            <Icon color={colors.white} size={48} strokeWidth={2} />
+            <Icon color="#FFFFFF" size={48} strokeWidth={2} />
           </View>
         </Animated.View>
 
@@ -86,31 +97,24 @@ const LoginScreen = ({ navigation }: any) => {
         </Animated.View>
 
         <Animated.View entering={FadeInDown.duration(600).delay(200).springify()} style={styles.formWrapper}>
-          <View style={styles.inputField}>
-            <Text style={styles.countryCodeText}>+91</Text>
-            <TextInput
-              style={styles.phoneInput}
-              placeholder="00000 00000"
-              placeholderTextColor="#A0A0A0"
-              keyboardType="numeric"
-              maxLength={10}
-              value={phone}
-              onChangeText={setPhone}
-              autoFocus
-            />
-          </View>
+          <TextField
+            leftAdornment={<Text style={styles.countryCodeText}>+91</Text>}
+            placeholder="00000 00000"
+            keyboardType="numeric"
+            maxLength={10}
+            value={phone}
+            onChangeText={setPhone}
+            autoFocus
+          />
 
           {devRole === 'customer' && (
-            <View style={[styles.inputField, { marginTop: spacing.lg }]}>
-              <TextInput
-                style={styles.referralInput}
-                placeholder="REFERRAL CODE (OPTIONAL)"
-                placeholderTextColor="#A0A0A0"
-                autoCapitalize="characters"
-                value={referralCode}
-                onChangeText={setReferralCode}
-              />
-            </View>
+            <TextField
+              containerStyle={{ marginTop: 16 }}
+              placeholder="REFERRAL CODE (OPTIONAL)"
+              autoCapitalize="characters"
+              value={referralCode}
+              onChangeText={setReferralCode}
+            />
           )}
         </Animated.View>
 
@@ -119,9 +123,8 @@ const LoginScreen = ({ navigation }: any) => {
             <Button
               label="SEND VERIFICATION CODE"
               onPress={handleSendOTP}
-              loading={mutation.isPending || firebaseLoading}
+              loading={widgetVerifyMutation.isPending}
               style={[styles.actionBtn, { backgroundColor: branding.color }]}
-              textStyle={styles.actionBtnText}
             />
           ) : (
             <View style={styles.disabledTextContainer}>
@@ -150,6 +153,14 @@ const LoginScreen = ({ navigation }: any) => {
           </View>
         )}
       </View>
+
+      <DefaultWidget
+        visible={showWidget}
+        onClose={() => setShowWidget(false)}
+        onCompletion={handleWidgetCompletion}
+        widgetId={ENV.MSG91_WIDGET_ID}
+        tokenAuth={ENV.MSG91_WIDGET_TOKEN_AUTH}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -157,17 +168,17 @@ const LoginScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7', // The exact cool off-white from the mockup
+    backgroundColor: tokens.colors.background,
   },
   content: {
     flex: 1,
-    padding: spacing.xxl,
+    padding: tokens.spacing.xxl,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
   },
   logoWrapper: {
-    marginBottom: spacing.xxl,
+    marginBottom: tokens.spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -181,65 +192,41 @@ const styles = StyleSheet.create({
   },
   headerWrapper: {
     alignItems: 'center',
-    marginBottom: spacing.xxxl,
-    paddingHorizontal: spacing.sm,
+    marginBottom: tokens.spacing.xxxl,
+    paddingHorizontal: tokens.spacing.sm,
   },
   brandingSubText: {
     fontSize: 11,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 2.5,
-    color: '#8E8E93',
-    marginBottom: spacing.sm,
+    color: tokens.colors.textSecondary,
+    marginBottom: tokens.spacing.sm,
   },
   brandingNameText: {
-    color: colors.ink,
+    color: tokens.colors.textPrimary,
     fontSize: 48,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     letterSpacing: -1.5,
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: tokens.spacing.sm,
   },
   heroText: {
-    color: '#8E8E93',
+    color: tokens.colors.textSecondary,
     textAlign: 'center',
-    fontFamily: fontFamily.medium,
+    fontFamily: tokens.typography.family.medium,
     fontSize: 16,
     lineHeight: 24,
   },
   formWrapper: {
     width: '100%',
-    marginBottom: spacing.xxxl,
-  },
-  inputField: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E9E9EB', // Very flat grey fill from mockup
-    borderRadius: 24,
-    borderCurve: 'continuous',
-    height: 72,
-    paddingHorizontal: spacing.xl,
+    marginBottom: tokens.spacing.xxxl,
   },
   countryCodeText: {
-    color: colors.ink,
-    fontSize: 22,
-    fontFamily: fontFamily.black,
-    marginRight: spacing.lg,
-  },
-  phoneInput: {
-    flex: 1,
-    color: colors.ink,
-    fontSize: 22,
-    fontFamily: fontFamily.bold,
-    height: '100%',
-  },
-  referralInput: {
-    flex: 1,
-    color: colors.ink,
-    fontSize: 16,
-    fontFamily: fontFamily.bold,
-    height: '100%',
+    color: tokens.colors.textPrimary,
+    fontSize: tokens.typography.size.h2,
+    fontFamily: tokens.typography.family.black,
+    marginRight: tokens.spacing.lg,
   },
   bottomWrapper: {
     width: '100%',
@@ -249,14 +236,10 @@ const styles = StyleSheet.create({
   actionBtn: {
     width: '100%',
     height: 64,
-    borderRadius: 24,
+    borderRadius: tokens.radii.full,
     borderCurve: 'continuous',
     shadowOpacity: 0,
     elevation: 0,
-  },
-  actionBtnText: {
-    fontFamily: fontFamily.black,
-    letterSpacing: 1,
   },
   disabledTextContainer: {
     height: 64,
@@ -264,47 +247,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disabledText: {
-    color: '#999999',
+    color: tokens.colors.textTertiary,
     fontSize: 13,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     letterSpacing: 1.5,
   },
   secureBadge: {
-    marginTop: spacing.xl,
+    marginTop: tokens.spacing.xl,
   },
   secureText: {
-    color: '#B0B0B0',
+    color: tokens.colors.textTertiary,
     fontSize: 10,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     letterSpacing: 2,
   },
   devRoleContainer: {
     position: 'absolute',
-    bottom: spacing.xxl,
+    bottom: tokens.spacing.xxl,
     width: '100%',
     alignItems: 'center',
-    paddingTop: spacing.lg,
+    paddingTop: tokens.spacing.lg,
   },
   devRoleRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: tokens.spacing.sm,
   },
   devRoleBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: '#E9E9EB',
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radii.md,
+    backgroundColor: tokens.colors.surface,
   },
   devRoleBtnText: {
     fontSize: 9,
-    fontFamily: fontFamily.black,
-    color: colors.inkMuted,
+    fontFamily: tokens.typography.family.black,
+    color: tokens.colors.textSecondary,
     letterSpacing: 1,
   },
   devRoleBtnTextActive: {
-    color: colors.white,
+    color: '#FFFFFF',
   },
 });
 
