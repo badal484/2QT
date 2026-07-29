@@ -3,18 +3,19 @@ import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, Toucha
 import RNOtpVerify from 'react-native-otp-verify';
 import { useDispatch } from 'react-redux';
 import { useMutation } from '@tanstack/react-query';
+import { OTPWidget } from '@msg91comm/sendotp-react-native';
 import { api } from '../api/client';
 import { setAuth } from '../store/slices/authSlice';
 import { connectSocket } from '../socket/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { radius, spacing } from '../theme/spacing';
-import { getConfirmationResult } from '../utils/firebaseAuthHelper';
 
 const OTPScreen = ({ route, navigation }: any) => {
-  const { phone, referralCode, devOtp, devRole, lat, lng } = route.params;
+  const { phone, referralCode, devRole, lat, lng } = route.params;
   const [otp, setOtp] = useState('');
   const [timer, setTimer] = useState(30);
+  const [reqId, setReqId] = useState<string>(route.params.reqId);
   const dispatch = useDispatch();
   const inputRef = useRef<TextInput>(null);
 
@@ -31,13 +32,6 @@ const OTPScreen = ({ route, navigation }: any) => {
       setTimer((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
-    if (devOtp) {
-      setOtp(devOtp);
-      setTimeout(() => {
-        if (!verifyMutation.isPending) verifyMutation.mutate(devOtp);
-      }, 500);
-    }
-
     startAndroidAutoRead();
 
     return () => {
@@ -46,7 +40,7 @@ const OTPScreen = ({ route, navigation }: any) => {
         RNOtpVerify.removeListener();
       }
     };
-  }, [devOtp]);
+  }, []);
 
   const otpHandler = (message: string) => {
     if (message && message !== 'Timeout Error' && !verifyMutation.isPending) {
@@ -63,8 +57,13 @@ const OTPScreen = ({ route, navigation }: any) => {
 
   const verifyMutation = useMutation({
     mutationFn: async (code: string) => {
-      // Send all OTP verification to our backend MSG91 endpoint
-      return api.post('/auth/verify-otp', { phone, otp: code, referralCode, appRole: devRole, lat, lng });
+      const response: any = await OTPWidget.verifyOTP({ reqId, otp: code });
+      if (response?.type !== 'success') {
+        throw new Error(response?.message || 'The code you entered is incorrect.');
+      }
+      const accessToken = response.message || response.access_token || response.accessToken;
+      if (!accessToken) throw new Error('Verification did not return an access token.');
+      return api.post('/auth/verify-widget-token', { accessToken, referralCode, appRole: devRole, lat, lng });
     },
     onSuccess: (data) => {
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
@@ -79,7 +78,15 @@ const OTPScreen = ({ route, navigation }: any) => {
   });
 
   const resendMutation = useMutation({
-    mutationFn: () => api.post('/auth/send-otp', { phone }),
+    mutationFn: async () => {
+      const response: any = await OTPWidget.retryOTP({ reqId });
+      if (response?.type !== 'success') {
+        throw new Error(response?.message || 'Could not resend the code.');
+      }
+      // If MSG91 issues a fresh reqId on retry, switch to it -- otherwise keep the current one.
+      const newReqId = response.message || response.reqId || response.request_id;
+      if (newReqId) setReqId(newReqId);
+    },
     onSuccess: () => {
       setTimer(30);
       setOtp('');
