@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polygon, useMapEvents, useMap, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, useMapEvents, useMap, Marker, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Trash2, MousePointerClick, Search, LocateFixed, Loader2 } from 'lucide-react';
+import { Trash2, MousePointerClick, Search, LocateFixed, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../app/lib/api';
 
@@ -22,10 +22,11 @@ interface MapPolygonPickerProps {
   defaultCenter?: [number, number];
 }
 
-function MapEvents({ polygonPoints, onChange, setMapInstance, positions }: any) {
+function MapEvents({ polygonPoints, onChange, setMapInstance, positions, setSearchedLocation }: any) {
   useMapEvents({
     click(e) {
       onChange([...polygonPoints, { lat: e.latlng.lat, lng: e.latlng.lng }]);
+      if (setSearchedLocation) setSearchedLocation(null);
     },
   });
   
@@ -45,6 +46,14 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [searchedLocation, setSearchedLocation] = useState<{lat: number, lng: number, name: string} | null>(null);
+
+  const searchIcon = L.divIcon({
+    html: `<div style="background-color: #F56A17; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="background-color: white; width: 6px; height: 6px; border-radius: 50%;"></div></div>`,
+    className: 'custom-search-marker',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
 
   const positions = polygonPoints.map(p => [p.lat, p.lng] as [number, number]);
 
@@ -57,9 +66,12 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
       const data = await api.get(`/menu/geocode/search?q=${encodeURIComponent(searchQuery)}`);
       
       if (data && data.length > 0) {
+        const lat = Number(data[0].lat);
+        const lng = Number(data[0].lng || data[0].lon); // Fallback to lon for Nominatim
         toast.info(`Found: ${data[0].display_name}. Please drop points manually.`);
-        if (data[0].lat && data[0].lng && mapInstance) {
-          mapInstance.flyTo([Number(data[0].lat), Number(data[0].lng)], 14, { animate: true, duration: 1.5 });
+        if (lat && lng && mapInstance) {
+          mapInstance.flyTo([lat, lng], 15, { animate: true, duration: 1.5 });
+          setSearchedLocation({ lat, lng, name: data[0].display_name });
         }
       } else {
         toast.error("Location not found. Try a different search.");
@@ -96,6 +108,7 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
 
   const handleClear = () => {
     onChange([]);
+    setSearchedLocation(null);
   };
 
   return (
@@ -159,12 +172,19 @@ export default function MapPolygonPicker({ polygonPoints = [], onChange, default
           attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
           url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         />
-        <MapEvents polygonPoints={polygonPoints} onChange={onChange} setMapInstance={setMapInstance} positions={positions} />
+        <MapEvents polygonPoints={polygonPoints} onChange={onChange} setMapInstance={setMapInstance} positions={positions} setSearchedLocation={setSearchedLocation} />
         {positions.length > 0 && (
           <Polygon 
             positions={positions} 
             pathOptions={{ color: '#F56A17', fillColor: '#F56A17', fillOpacity: 0.2, weight: 3 }} 
           />
+        )}
+        {searchedLocation && (
+          <Marker position={[searchedLocation.lat, searchedLocation.lng]} icon={searchIcon} zIndexOffset={1000}>
+            <Tooltip direction="top" offset={[0, -10]} opacity={1} permanent className="font-bold">
+              Searched Location
+            </Tooltip>
+          </Marker>
         )}
         {positions.map((pos, idx) => (
             <Marker key={idx} position={pos} opacity={0.8} />
