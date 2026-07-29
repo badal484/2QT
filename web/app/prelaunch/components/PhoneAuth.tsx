@@ -62,7 +62,7 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
       }
       window.initSendOTP({
         widgetId: '366743654f50373431363431',
-        tokenAuth: '524621TGwv719DIc6a6993adP1',
+        tokenAuth: '524621TvewiLzS6a5add22P1',
         exposeMethods: 'true',
         success: (data: any) => {
           // Only handle the callback after user clicks "Verify Code"
