@@ -106,22 +106,27 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
 
     if (msg91AuthKey) {
         try {
-            await axios.post(
+            const msg91Res = await axios.post(
                 'https://control.msg91.com/api/v5/otp',
                 {
                     template_id: msg91TemplateId,
                     mobile: normalizedPhone,
                     otp: otp
                 },
-                { 
-                    headers: { 
+                {
+                    headers: {
                         'Content-Type': 'application/json',
                         'authkey': msg91AuthKey
-                    } 
+                    }
                 }
             );
-            smsSent = true;
-            console.log('[MSG91] SMS dispatched to', normalizedPhone);
+            // MSG91 can respond HTTP 200 with an error payload (bad key, no balance, etc.) --
+            // axios only throws on non-2xx, so a 200 alone doesn't mean the SMS was accepted.
+            console.log('[MSG91] Response for', normalizedPhone, ':', JSON.stringify(msg91Res.data));
+            smsSent = msg91Res.data?.type === 'success';
+            if (!smsSent) {
+                console.error('[MSG91_REJECTED]', normalizedPhone, JSON.stringify(msg91Res.data));
+            }
         } catch (error: any) {
             console.error('[MSG91_ERROR]', error?.response?.data || error.message);
         }
