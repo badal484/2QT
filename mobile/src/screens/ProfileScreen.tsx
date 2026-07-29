@@ -30,13 +30,14 @@ import { api } from '../api/client';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { tokens } from '../theme/tokens';
 
 const hapticOptions = {
   enableVibrateFallback: true,
   ignoreAndroidSystemSettings: false,
 };
 
-const MinimalListItem = React.memo(({ icon, title, value, onPress, subtitle, color = "#1A1A2E", isDestructive = false }: any) => (
+const MinimalListItem = React.memo(({ icon, title, value, onPress, subtitle, color = tokens.colors.textPrimary, isDestructive = false }: any) => (
   <BouncingButton 
     activeOpacity={0.7}
     style={styles.minimalListItem}
@@ -50,15 +51,15 @@ const MinimalListItem = React.memo(({ icon, title, value, onPress, subtitle, col
         {icon}
       </View>
       <View>
-        <Text style={[styles.minimalListTitle, isDestructive && { color: '#EF4444' }]}>{title}</Text>
-        {subtitle && <Text style={styles.minimalListSub}>{subtitle}</Text>}
+        <Text allowFontScaling={false} style={[styles.minimalListTitle, isDestructive && { color: tokens.colors.danger }]}>{title}</Text>
+        {subtitle && <Text allowFontScaling={false} style={styles.minimalListSub}>{subtitle}</Text>}
       </View>
     </View>
     <View style={styles.minimalListRight}>
       {value !== undefined && value !== null && value !== '' && (
-        <Text style={styles.minimalListValue}>{value}</Text>
+        <Text allowFontScaling={false} style={styles.minimalListValue}>{value}</Text>
       )}
-      <ChevronRight size={16} color="#E5E7EB" />
+      <ChevronRight size={16} color={tokens.colors.border} />
     </View>
   </BouncingButton>
 ));
@@ -70,7 +71,7 @@ const ProfileScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const isRider = user?.role === 'rider';
-  const accent = isRider ? '#FC4603' : '#10B981';
+  const accent = isRider ? tokens.colors.primary : tokens.colors.success;
   const accentLight = isRider ? '#FFF0E8' : '#ECFDF5';
 
   const { data: wallet } = useQuery({
@@ -125,12 +126,12 @@ const ProfileScreen = ({ navigation }: any) => {
               <User size={32} color={accent} />
             )}
             <View style={[styles.editPicBadge, { backgroundColor: accent }]}>
-              <Text style={styles.editPicText}>EDIT</Text>
+              <Text allowFontScaling={false} style={styles.editPicText}>EDIT</Text>
             </View>
           </BouncingButton>
           <View style={styles.headerTextCol}>
-            <Text style={styles.headerName}>{user?.name || (isRider ? 'Rider' : 'Gourmet')}</Text>
-            <Text style={styles.phoneText}>+{user?.phone}</Text>
+            <Text allowFontScaling={false} style={styles.headerName}>{user?.name || (isRider ? 'Rider' : 'Gourmet')}</Text>
+            <Text allowFontScaling={false} style={styles.phoneText}>+{user?.phone}</Text>
           </View>
         </Animated.View>
 
@@ -139,13 +140,13 @@ const ProfileScreen = ({ navigation }: any) => {
           <Animated.View entering={FadeInDown.delay(120).duration(400)}>
             <BouncingButton style={styles.referralBanner} activeOpacity={0.8} onPress={() => navigation.navigate('Referral')}>
               <View style={styles.referralIconBox}>
-                <Gift size={20} color="#FFFFFF" />
+                <Gift size={20} color={tokens.colors.surface} />
               </View>
               <View style={styles.referralTexts}>
-                <Text style={styles.referralTitle}>Invite & Earn ₹50</Text>
-                <Text style={styles.referralSub}>Get ₹50 for every friend who orders.</Text>
+                <Text allowFontScaling={false} style={styles.referralTitle}>Invite & Earn ₹50</Text>
+                <Text allowFontScaling={false} style={styles.referralSub}>Get ₹50 for every friend who orders.</Text>
               </View>
-              <ChevronRight size={20} color="#FFFFFF" />
+              <ChevronRight size={20} color={tokens.colors.surface} />
             </BouncingButton>
           </Animated.View>
         )}
@@ -153,33 +154,33 @@ const ProfileScreen = ({ navigation }: any) => {
           {isRider ? (
             <>
               <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('Payouts')}>
-                <Wallet size={20} color="#6B7280" />
-                <Text style={styles.statLabel}>Earnings</Text>
-                <Text style={styles.statValue}>₹{((riderStats?.totalEarnings ?? 0) / 100).toFixed(0)}</Text>
+                <Wallet size={20} color={tokens.colors.textSecondary} />
+                <Text allowFontScaling={false} style={styles.statLabel}>Earnings</Text>
+                <Text allowFontScaling={false} style={styles.statValue}>₹{((riderStats?.totalEarnings ?? 0) / 100).toFixed(0)}</Text>
               </BouncingButton>
               <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('RiderHistory')}>
-                <Package size={20} color="#6B7280" />
-                <Text style={styles.statLabel}>Total Trips</Text>
-                <Text style={styles.statValue}>{riderStats?.totalDeliveries || 0}</Text>
+                <Package size={20} color={tokens.colors.textSecondary} />
+                <Text allowFontScaling={false} style={styles.statLabel}>Total Trips</Text>
+                <Text allowFontScaling={false} style={styles.statValue}>{riderStats?.totalDeliveries || 0}</Text>
               </BouncingButton>
               <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => {}}>
                 <Star size={20} color="#F59E0B" />
-                <Text style={styles.statLabel}>Rating</Text>
-                <Text style={[styles.statValue, { color: '#F59E0B' }]}>{(riderStats?.rating ?? 5.0).toFixed(1)}★</Text>
+                <Text allowFontScaling={false} style={styles.statLabel}>Rating</Text>
+                <Text allowFontScaling={false} style={[styles.statValue, { color: '#F59E0B' }]}>{(riderStats?.rating ?? 5.0).toFixed(1)}★</Text>
               </BouncingButton>
             </>
           ) : (
             <>
               <BouncingButton style={[styles.statBox, !featureLoyalty && { flex: 1 }]} activeOpacity={0.8} onPress={() => navigation.navigate('Wallet')}>
-                <Wallet size={20} color="#6B7280" />
-                <Text style={styles.statLabel}>Wallet Balance</Text>
-                <Text style={styles.statValue}>{wallet ? `₹${(wallet.balancePaise / 100).toFixed(2)}` : '₹0.00'}</Text>
+                <Wallet size={20} color={tokens.colors.textSecondary} />
+                <Text allowFontScaling={false} style={styles.statLabel}>Wallet Balance</Text>
+                <Text allowFontScaling={false} style={styles.statValue}>{wallet ? `₹${(wallet.balancePaise / 100).toFixed(2)}` : '₹0.00'}</Text>
               </BouncingButton>
               {featureLoyalty && (
                 <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('Loyalty')}>
-                  <Sparkles size={20} color="#FC4603" />
-                  <Text style={styles.statLabel}>Loyalty Points</Text>
-                  <Text style={[styles.statValue, { color: '#FC4603' }]}>{loyalty?.points || 0}</Text>
+                  <Sparkles size={20} color={tokens.colors.primary} />
+                  <Text allowFontScaling={false} style={styles.statLabel}>Loyalty Points</Text>
+                  <Text allowFontScaling={false} style={[styles.statValue, { color: tokens.colors.primary }]}>{loyalty?.points || 0}</Text>
                 </BouncingButton>
               )}
             </>
@@ -191,18 +192,18 @@ const ProfileScreen = ({ navigation }: any) => {
 
         {/* ACTIVITY GROUP */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.settingsGroup}>
-          <Text style={styles.groupLabel}>{isRider ? 'Fleet Management' : 'Activity'}</Text>
+          <Text allowFontScaling={false} style={styles.groupLabel}>{isRider ? 'Fleet Management' : 'Activity'}</Text>
           {isRider ? (
             <>
-              <MinimalListItem icon={<ShieldCheck size={22} color="#6B7280" strokeWidth={1.5} />} title="Documents" onPress={() => navigation.navigate('RiderDocuments')} />
-              <MinimalListItem icon={<Star size={22} color="#6B7280" strokeWidth={1.5} />} title="Daily Missions" onPress={() => navigation.navigate('RiderMissions')} />
-              <MinimalListItem icon={<BarChart2 size={22} color="#6B7280" strokeWidth={1.5} />} title="Weekly Scorecard" subtitle="Your performance this week" onPress={() => navigation.navigate('RiderScorecard')} />
+              <MinimalListItem icon={<ShieldCheck size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Documents" onPress={() => navigation.navigate('RiderDocuments')} />
+              <MinimalListItem icon={<Star size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Daily Missions" onPress={() => navigation.navigate('RiderMissions')} />
+              <MinimalListItem icon={<BarChart2 size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Weekly Scorecard" subtitle="Your performance this week" onPress={() => navigation.navigate('RiderScorecard')} />
             </>
           ) : (
             <>
-              <MinimalListItem icon={<Package size={22} color="#6B7280" strokeWidth={1.5} />} title="Your Orders" onPress={() => navigation.navigate('OrdersTab')} />
-              {/* <MinimalListItem icon={<Calendar size={22} color="#6B7280" strokeWidth={1.5} />} title="My Table Bookings" onPress={() => navigation.navigate('MyTableBookings')} /> */}
-              <MinimalListItem icon={<MapPin size={22} color="#6B7280" strokeWidth={1.5} />} title="Saved Addresses" onPress={() => navigation.navigate('Address')} />
+              <MinimalListItem icon={<Package size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Your Orders" onPress={() => navigation.navigate('OrdersTab')} />
+              {/* <MinimalListItem icon={<Calendar size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="My Table Bookings" onPress={() => navigation.navigate('MyTableBookings')} /> */}
+              <MinimalListItem icon={<MapPin size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Saved Addresses" onPress={() => navigation.navigate('Address', { fromCheckout: true })} />
             </>
 
           )}
@@ -210,16 +211,16 @@ const ProfileScreen = ({ navigation }: any) => {
 
         {/* HELP & SUPPORT GROUP */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={[styles.settingsGroup, { marginBottom: 40 }]}>
-          <Text style={styles.groupLabel}>Support</Text>
-          <MinimalListItem icon={<Bell size={22} color="#6B7280" strokeWidth={1.5} />} title="Notifications" onPress={() => navigation.navigate(isRider ? 'RiderNotifications' : 'Notifications')} />
-          <MinimalListItem icon={<MessageCircle size={22} color="#6B7280" strokeWidth={1.5} />} title="Help & Support" onPress={() => navigation.navigate(isRider ? 'RiderHelp' : 'Help')} />
-          <MinimalListItem icon={<LogOut size={22} color="#EF4444" strokeWidth={1.5} />} title="Sign Out" isDestructive={true} onPress={handleLogout} />
+          <Text allowFontScaling={false} style={styles.groupLabel}>Support</Text>
+          <MinimalListItem icon={<Bell size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Notifications" onPress={() => navigation.navigate(isRider ? 'RiderNotifications' : 'Notifications')} />
+          <MinimalListItem icon={<MessageCircle size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Help & Support" onPress={() => navigation.navigate(isRider ? 'RiderHelp' : 'Help')} />
+          <MinimalListItem icon={<LogOut size={22} color={tokens.colors.danger} strokeWidth={1.5} />} title="Sign Out" isDestructive={true} onPress={handleLogout} />
         </Animated.View>
 
         {/* Dev Role Switcher */}
         {__DEV__ && (
             <View style={styles.devCard}>
-                <Text style={styles.devHeader}>Developer Role Control</Text>
+                <Text allowFontScaling={false} style={styles.devHeader}>Developer Role Control</Text>
                 <View style={styles.devBtnRow}>
                     {['customer', 'rider', 'chef', 'super_admin'].map(r => (
                         <BouncingButton 
@@ -234,7 +235,7 @@ const ProfileScreen = ({ navigation }: any) => {
                             }}
                             style={[styles.devBtn, user?.role === r ? styles.devBtnActive : styles.devBtnInactive]}
                         >
-                            <Text style={[styles.devBtnText, user?.role === r ? styles.devBtnTextActive : styles.devBtnTextInactive]}>{r}</Text>
+                            <Text allowFontScaling={false} style={[styles.devBtnText, user?.role === r ? styles.devBtnTextActive : styles.devBtnTextInactive]}>{r}</Text>
                         </BouncingButton>
                     ))}
                 </View>
@@ -242,7 +243,7 @@ const ProfileScreen = ({ navigation }: any) => {
         )}
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>2QT v1.0.0 Stable</Text>
+          <Text allowFontScaling={false} style={styles.footerText}>2QT v1.0.0 Stable</Text>
         </View>
 
       </ScrollView>
@@ -253,7 +254,7 @@ const ProfileScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // Pure white Swish style
+    backgroundColor: tokens.colors.surface, // Pure white Swish style
   },
   header: {
     alignItems: 'center',
@@ -263,12 +264,12 @@ const styles = StyleSheet.create({
   profilePicWrapper: {
     width: 88,
     height: 88,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: tokens.colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -288,7 +289,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#F3F4F6',
+    borderColor: tokens.colors.background,
   },
   editPicText: {
     fontSize: 9,
@@ -301,13 +302,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerName: {
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   phoneText: {
-    color: '#6B7280',
+    color: tokens.colors.textSecondary,
     fontWeight: '600',
     fontSize: 14,
     marginTop: 4,
@@ -323,19 +324,19 @@ const styles = StyleSheet.create({
   statBox: {
     flex: 1,
     backgroundColor: '#F9FAFB', // Extremely soft gray, no border, no shadow
-    borderRadius: 16,
+    borderRadius: tokens.radii.lg,
     padding: 16,
   },
   statLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#6B7280',
+    color: tokens.colors.textSecondary,
     marginTop: 12,
   },
   statValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
     marginTop: 4,
   },
 
@@ -344,7 +345,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   groupLabel: {
-    color: '#9CA3AF',
+    color: tokens.colors.textTertiary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -374,10 +375,10 @@ const styles = StyleSheet.create({
   minimalListTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
   },
   minimalListSub: {
-    color: '#9CA3AF',
+    color: tokens.colors.textTertiary,
     fontSize: 13,
     fontWeight: '400',
     marginTop: 2,
@@ -385,7 +386,7 @@ const styles = StyleSheet.create({
   minimalListValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#6B7280',
+    color: tokens.colors.textSecondary,
     marginRight: 8,
   },
 
@@ -395,14 +396,14 @@ const styles = StyleSheet.create({
   },
   referralCard: {
     padding: 16,
-    borderRadius: 16,
+    borderRadius: tokens.radii.lg,
     flexDirection: 'row',
     alignItems: 'center',
   },
   referralIconWrapper: {
     width: 40,
     height: 40,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -410,13 +411,13 @@ const styles = StyleSheet.create({
   },
   devCard: {
     marginHorizontal: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     padding: 24,
     borderRadius: 20,
     marginBottom: 24,
   },
   devHeader: {
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
     fontWeight: '800',
     marginBottom: 16,
     textTransform: 'uppercase',
@@ -430,15 +431,15 @@ const styles = StyleSheet.create({
   devBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
+    borderRadius: tokens.radii.lg,
     marginRight: 8,
     marginBottom: 8,
   },
   devBtnActive: {
-    backgroundColor: '#10B981',
+    backgroundColor: tokens.colors.success,
   },
   devBtnInactive: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: tokens.colors.background,
   },
   devBtnText: {
     fontWeight: '700',
@@ -446,10 +447,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   devBtnTextActive: {
-    color: '#FFFFFF',
+    color: tokens.colors.surface,
   },
   devBtnTextInactive: {
-    color: '#6B7280',
+    color: tokens.colors.textSecondary,
   },
   footer: {
     alignItems: 'center',
@@ -465,7 +466,7 @@ const styles = StyleSheet.create({
 
   // Tier + streak card
   tierCard: {
-    marginHorizontal: 16, marginBottom: 12, backgroundColor: '#FFFFFF',
+    marginHorizontal: 16, marginBottom: 12, backgroundColor: tokens.colors.surface,
     borderRadius: 20, padding: 16,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
     borderWidth: 1, borderColor: '#E9E9EB',
@@ -484,7 +485,7 @@ const styles = StyleSheet.create({
     height: 5, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden', marginBottom: 14,
   },
   tierProgressFill: {
-    height: 5, backgroundColor: '#FC4603', borderRadius: 3,
+    height: 5, backgroundColor: tokens.colors.primary, borderRadius: 3,
   },
   perfRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -499,7 +500,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#E8F5E9',
     padding: 16,
-    borderRadius: 16,
+    borderRadius: tokens.radii.lg,
     marginHorizontal: 20,
     marginTop: 10,
     marginBottom: 20,
