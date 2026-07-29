@@ -63,7 +63,7 @@ const OTPScreen = ({ route, navigation }: any) => {
       }
       const accessToken = response.message || response.access_token || response.accessToken;
       if (!accessToken) throw new Error('Verification did not return an access token.');
-      return api.post('/auth/verify-widget-token', { accessToken, referralCode, appRole: devRole, lat, lng });
+      return api.post('/auth/verify-widget-token', { accessToken, referralCode, appRole: devRole, lat, lng, platform: 'app' });
     },
     onSuccess: (data) => {
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
