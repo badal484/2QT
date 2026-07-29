@@ -70,10 +70,17 @@ const OTPScreen = ({ route, navigation }: any) => {
       connectSocket(data.accessToken);
     },
     onError: (err: any) => {
-      const msg = err?.message || 'The code you entered is incorrect.';
-      Alert.alert('Error', msg);
+      const msg: string = err?.message || 'The code you entered is incorrect.';
       setOtp('');
-      inputRef.current?.focus();
+      // MSG91 marks a reqId+otp pair as consumed the moment verifyOTP succeeds, even if OUR
+      // own backend step after it fails for an unrelated reason (e.g. prelaunch gate). Retyping
+      // the same code can never work again in that case -- only a fresh OTP will.
+      if (/already verif/i.test(msg)) {
+        Alert.alert('Code already used', 'That code was already verified. Please tap "Resend Now" to get a new one.');
+      } else {
+        Alert.alert('Error', msg);
+        inputRef.current?.focus();
+      }
     },
   });
 
