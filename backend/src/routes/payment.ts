@@ -73,20 +73,39 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
         const itemIds = items.map((i: any) => i.menuItemId);
         const { rows: itemZones } = await query('SELECT DISTINCT zone_id FROM menu_items WHERE id = ANY($1)', [itemIds]);
         if (itemZones.length > 1) {
-            throw new Error('CART_MULTIPLE_ZONES: You cannot order items from multiple zones. Please clear your cart.');
+            throw new Error('CART_MULTIPLE_ZONES: Your cart contains items from multiple areas. Please clear your cart.');
         }
-        if (itemZones.length === 1 && itemZones[0].zone_id !== zoneId) {
-            throw new Error('CART_ZONE_MISMATCH: Your cart contains items from a different delivery zone. Please clear your cart.');
+        
+        let effectiveZoneId = zoneId;
+        if (itemZones.length === 1 && itemZones[0].zone_id !== effectiveZoneId) {
+            // Address zone might be stale (e.g. new zone created covering old address). Re-verify with PostGIS.
+            const targetZoneId = itemZones[0].zone_id;
+            const { rows: zoneCheck } = await query(`
+                SELECT id FROM zones 
+                WHERE id = $1 AND is_active = true 
+                AND ST_Contains(polygon::geometry, ST_SetSRID(ST_MakePoint($2, $3), 4326))
+            `, [targetZoneId, custLng, custLat]);
+            
+            if (zoneCheck.length > 0) {
+                effectiveZoneId = targetZoneId;
+                // Auto-heal the stale address
+                await query('UPDATE addresses SET zone_id = $1 WHERE id = $2', [effectiveZoneId, addressId]).catch(() => {});
+            } else {
+                throw new Error('CART_ZONE_MISMATCH: Items in cart are from a different area. Please clear your cart.');
+            }
         }
 
         // No distance sorting here at all — candidates are fetched unordered, and which one is
         // "closest" is decided below using real road distance, never Haversine.
+        // Billed distance (and kitchen selection when a zone has more than one) MUST come from
+        // real road distance. If Google Maps can't resolve it, fail loudly rather than silently
+        // undercharge or fall back to a straight-line estimate.
         const { rows: kitchens } = await query(`
             SELECT k.id, k.lat, k.lng
             FROM kitchens k
             JOIN kitchen_zones kz ON k.id = kz.kitchen_id
             WHERE kz.zone_id = $1 AND k.is_active = true AND k.is_paused = false
-        `, [zoneId]);
+        `, [effectiveZoneId]);
 
         if (kitchens.length === 0) throw new Error('NO_KITCHENS_AVAILABLE_FOR_ZONE');
 
