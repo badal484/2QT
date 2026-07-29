@@ -134,10 +134,16 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
         console.log('[OTP_FALLBACK] No MSG91 key — returning OTP in response body');
     }
 
+    // TEMPORARY: bypass real SMS for this specific number while MSG91 delivery is being sorted
+    // out, so testing isn't blocked on it. Scoped to one number, not a general dev-mode switch --
+    // returning the real OTP to whichever phone asks would let anyone log into anyone else's
+    // account. Remove once MSG91 delivery is confirmed working.
+    const OTP_BYPASS_NUMBERS = ['916204646300'];
+
     res.json({
         sent: smsSent,
         phone: normalizedPhone,
-        ...(process.env.NODE_ENV === 'development' ? { devOtp: otp } : {})
+        ...(process.env.NODE_ENV === 'development' || OTP_BYPASS_NUMBERS.includes(normalizedPhone) ? { devOtp: otp } : {})
     });
     } catch (err: any) {
         console.error('[SEND_OTP] Unhandled error:', err.message, err.stack);
