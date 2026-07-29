@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import crypto from 'crypto';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
@@ -151,39 +151,29 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
 });
 
 
-router.post('/verify-otp', async (req, res) => {
-    try {
-        const { phone, otp, referralCode, name, appRole, lat, lng } = req.body;
-        let normalizedPhone = String(phone).replace(/\D/g, '');
-        if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
-        
-        // Check memory first (works even when Redis is down), then Redis
-        let storedOtp: string | null = getMemOtp(normalizedPhone);
-        if (!storedOtp) {
-            try {
-                storedOtp = await Promise.race([
-                    redis.get(keys.pendingOtp(normalizedPhone)),
-                    new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 3000)),
-                ]) as string | null;
-            } catch { storedOtp = null; }
-        }
-        if (!storedOtp || storedOtp !== String(otp)) {
-            return res.status(400).json({ error: 'INVALID_OTP', message: 'Invalid or expired OTP' });
-        }
-        delMemOtp(normalizedPhone);
-        redis.del(keys.pendingOtp(normalizedPhone)).catch(() => {});
+// Shared by every login path (SMS OTP, MSG91 widget token, ...) once the phone number has
+// been verified by whatever mechanism that path uses. Keeping this in one place means a fix
+// here (role checks, prelaunch gating, referral/wallet logic) can't drift between paths the
+// way /verify-otp and the old /firebase-login independently did before.
+async function completeAuth(
+    normalizedPhone: string,
+    opts: { referralCode?: string; name?: string; appRole?: string; lat?: number; lng?: number },
+    res: Response
+): Promise<void> {
+    const { referralCode, name, appRole, lat, lng } = opts;
 
-        // Pre-launch mode check — gated on this phone's ALREADY-established role in the DB,
-        // never the client-supplied appRole (which anyone could set to bypass the gate otherwise).
-        const { rows: existingRoleRows } = await query('SELECT role FROM users WHERE phone = $1', [normalizedPhone]);
-        const existingRole = existingRoleRows[0]?.role;
-        if (!existingRole || !STAFF_ROLES.includes(existingRole)) {
-            const { rows: configRows } = await query(`SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`);
-            const isPrelaunch = configRows[0]?.value === 'true' || configRows[0]?.value === true;
-            if (isPrelaunch) {
-                return res.status(403).json({ error: 'PRELAUNCH_ACTIVE', message: 'We are currently in pre-launch mode. Please join the waitlist!' });
-            }
+    // Pre-launch mode check — gated on this phone's ALREADY-established role in the DB,
+    // never the client-supplied appRole (which anyone could set to bypass the gate otherwise).
+    const { rows: existingRoleRows } = await query('SELECT role FROM users WHERE phone = $1', [normalizedPhone]);
+    const existingRole = existingRoleRows[0]?.role;
+    if (!existingRole || !STAFF_ROLES.includes(existingRole)) {
+        const { rows: configRows } = await query(`SELECT value FROM app_config WHERE key = 'IS_PRELAUNCH_MODE'`);
+        const isPrelaunch = configRows[0]?.value === 'true' || configRows[0]?.value === true;
+        if (isPrelaunch) {
+            res.status(403).json({ error: 'PRELAUNCH_ACTIVE', message: 'We are currently in pre-launch mode. Please join the waitlist!' });
+            return;
         }
+    }
 
     let roleUpdate = '';
     let insertRole = 'customer';
@@ -249,7 +239,8 @@ router.post('/verify-otp', async (req, res) => {
             [normalizedPhone]
         );
         if (riderRows.length === 0) {
-            return res.status(403).json({ error: 'NOT_RIDER', message: 'This number is not registered as a rider. Please apply first.' });
+            res.status(403).json({ error: 'NOT_RIDER', message: 'This number is not registered as a rider. Please apply first.' });
+            return;
         }
     }
     if (appRole === 'chef') {
@@ -262,7 +253,8 @@ router.post('/verify-otp', async (req, res) => {
             [normalizedPhone]
         );
         if (chefRows.length === 0) {
-            return res.status(403).json({ error: 'NOT_KITCHEN_STAFF', message: 'This number is not registered as kitchen staff. Contact your manager.' });
+            res.status(403).json({ error: 'NOT_KITCHEN_STAFF', message: 'This number is not registered as kitchen staff. Contact your manager.' });
+            return;
         }
         // Leave insertRole / roleUpdate at their defaults — don't change the existing role.
     }
@@ -385,13 +377,13 @@ router.post('/verify-otp', async (req, res) => {
 
     const accessToken = jwt.sign(
         { userId: user.id, role: user.role, kitchenId: user.kitchen_id ?? null, zoneId: user.zone_id ?? null, jti },
-        JWT_SECRET,
+        JWT_SECRET!,
         { expiresIn: '2h' }
     );
 
     const refreshToken = jwt.sign(
         { userId: user.id, jti },
-        JWT_REFRESH_SECRET,
+        JWT_REFRESH_SECRET!,
         { expiresIn: '7d' }
     );
 
@@ -423,8 +415,67 @@ router.post('/verify-otp', async (req, res) => {
         accessToken,
         refreshToken
     });
+}
+
+router.post('/verify-otp', async (req, res) => {
+    try {
+        const { phone, otp, referralCode, name, appRole, lat, lng } = req.body;
+        let normalizedPhone = String(phone).replace(/\D/g, '');
+        if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
+
+        // Check memory first (works even when Redis is down), then Redis
+        let storedOtp: string | null = getMemOtp(normalizedPhone);
+        if (!storedOtp) {
+            try {
+                storedOtp = await Promise.race([
+                    redis.get(keys.pendingOtp(normalizedPhone)),
+                    new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 3000)),
+                ]) as string | null;
+            } catch { storedOtp = null; }
+        }
+        if (!storedOtp || storedOtp !== String(otp)) {
+            return res.status(400).json({ error: 'INVALID_OTP', message: 'Invalid or expired OTP' });
+        }
+        delMemOtp(normalizedPhone);
+        redis.del(keys.pendingOtp(normalizedPhone)).catch(() => {});
+
+        await completeAuth(normalizedPhone, { referralCode, name, appRole, lat, lng }, res);
     } catch (err: any) {
         console.error('VERIFY OTP CRASH:', err);
+        res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong during login.' });
+    }
+});
+
+// MSG91 Widget (React Native SDK) login — the widget handles phone entry + OTP send + OTP
+// verify entirely on-device and hands back an access-token, which we verify server-side
+// (same pattern already proven working in prelaunch.ts) to get the real phone number, then
+// run it through the exact same completeAuth logic as the SMS-OTP path above.
+router.post('/verify-widget-token', async (req, res) => {
+    try {
+        const { accessToken, referralCode, name, appRole, lat, lng } = req.body;
+        if (!accessToken) return res.status(400).json({ error: 'MISSING_TOKEN', message: 'accessToken is required' });
+
+        const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
+            method: 'POST',
+            headers: { 'authkey': process.env.MSG91_AUTH_KEY || '', 'content-type': 'application/json' },
+            body: JSON.stringify({ 'access-token': accessToken })
+        });
+        const verifyData: any = await verifyRes.json();
+        if (verifyData.type !== 'success') {
+            return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message || 'Widget token verification failed' });
+        }
+
+        const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
+        if (!rawPhone) return res.status(400).json({ error: 'NO_PHONE' });
+        let normalizedPhone = String(rawPhone).replace(/\D/g, '');
+        if (normalizedPhone.length === 10) normalizedPhone = '91' + normalizedPhone;
+        if (!phoneSchema.safeParse(normalizedPhone).success) {
+            return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
+        }
+
+        await completeAuth(normalizedPhone, { referralCode, name, appRole, lat, lng }, res);
+    } catch (err: any) {
+        console.error('VERIFY WIDGET TOKEN CRASH:', err);
         res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong during login.' });
     }
 });
