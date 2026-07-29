@@ -8,6 +8,11 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
+# Required for Firebase's Swift pods (FirebaseAuthInterop, GoogleUtilities, RecaptchaInterop,
+# etc.) when linking statically -- without this, pod install fails with "cannot yet be
+# integrated as static libraries" once any pod pulls them in as a transitive dependency.
+use_modular_headers!
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
