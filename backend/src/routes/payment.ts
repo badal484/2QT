@@ -78,15 +78,27 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
         
         let effectiveZoneId = zoneId;
         if (itemZones.length === 1 && itemZones[0].zone_id !== effectiveZoneId) {
-            // Address zone might be stale (e.g. new zone created covering old address). Re-verify with PostGIS.
+            // Address zone might be stale (e.g. new zone created covering old address). Re-verify using JS ray-casting.
             const targetZoneId = itemZones[0].zone_id;
-            const { rows: zoneCheck } = await query(`
-                SELECT id FROM zones 
-                WHERE id = $1 AND is_active = true 
-                AND ST_Contains(polygon::geometry, ST_SetSRID(ST_MakePoint($2, $3), 4326))
-            `, [targetZoneId, custLng, custLat]);
+            const { rows: zoneData } = await query(`
+                SELECT id, polygon_points FROM zones 
+                WHERE id = $1 AND is_active = true
+            `, [targetZoneId]);
             
-            if (zoneCheck.length > 0) {
+            let inside = false;
+            if (zoneData.length > 0 && Array.isArray(zoneData[0].polygon_points)) {
+                const polygon = zoneData[0].polygon_points;
+                let x = custLng, y = custLat;
+                for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                    const xi = polygon[i].lng, yi = polygon[i].lat;
+                    const xj = polygon[j].lng, yj = polygon[j].lat;
+                    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+                        inside = !inside;
+                    }
+                }
+            }
+            
+            if (inside) {
                 effectiveZoneId = targetZoneId;
                 // Auto-heal the stale address
                 await query('UPDATE addresses SET zone_id = $1 WHERE id = $2', [effectiveZoneId, addressId]).catch(() => {});
