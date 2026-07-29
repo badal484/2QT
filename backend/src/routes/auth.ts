@@ -101,9 +101,9 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
     }
 
     let smsSent = false;
-    const msg91AuthKey = process.env.MSG91_AUTH_KEY || '524621TvewiLzS6a5add22P1';
+    const msg91AuthKey = process.env.MSG91_AUTH_KEY;
     const msg91TemplateId = process.env.MSG91_TEMPLATE_ID || '6a5ae4478f489f578300d262';
-    
+
     if (msg91AuthKey) {
         try {
             await axios.post(
@@ -130,7 +130,7 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
     }
 
     res.json({
-        sent: true,
+        sent: smsSent,
         phone: normalizedPhone,
         ...(process.env.NODE_ENV === 'development' ? { devOtp: otp } : {})
     });
