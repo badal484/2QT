@@ -1,17 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, NativeModules, StyleSheet, Text, TextInput, TouchableOpacity, View, StatusBar, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import Animated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { Bike, ChefHat, ShieldCheck, Flame } from 'lucide-react-native';
-import { DefaultWidget } from '@msg91comm/sendotp-react-native';
-import { api } from '../api/client';
-import { useSelector, useDispatch } from 'react-redux';
+import { OTPWidget } from '@msg91comm/sendotp-react-native';
+import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { Button, TextField } from '../components/ui';
 import { tokens } from '../theme/tokens';
 import { ENV } from '../config/env';
-import { setAuth } from '../store/slices/authSlice';
-import { connectSocket } from '../socket/client';
 
 const { width } = Dimensions.get('window');
 const { RoleModule } = NativeModules;
@@ -28,43 +25,44 @@ const LoginScreen = ({ navigation }: any) => {
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [devRole, setDevRole] = useState(BUILD_ROLE);
-  const [showWidget, setShowWidget] = useState(false);
-  const dispatch = useDispatch();
 
   const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
 
-  // MSG91 widget handles phone entry + OTP send + OTP verify entirely on-device (its own
-  // modal, shown below) and hands back an access-token here — no separate OTP-entry screen
-  // needed for this path.
-  const widgetVerifyMutation = useMutation({
-    mutationFn: (accessToken: string) => api.post('/auth/verify-widget-token', {
-      accessToken,
-      referralCode: referralCode.trim().toUpperCase(),
-      appRole: devRole === 'kitchen' ? 'chef' : devRole,
-      lat: globalLocation?.latitude,
-      lng: globalLocation?.longitude,
-    }),
-    onSuccess: (data) => {
-      dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
-      connectSocket(data.accessToken);
+  // Widget must be initialized before sendOTP/verifyOTP/retryOTP can be called.
+  useEffect(() => {
+    OTPWidget.initializeWidget(ENV.MSG91_WIDGET_ID, ENV.MSG91_WIDGET_TOKEN_AUTH);
+  }, []);
+
+  const sendMutation = useMutation({
+    mutationFn: async (digits: string) => {
+      const response: any = await OTPWidget.sendOTP({ identifier: digits });
+      if (response?.type !== 'success') {
+        throw new Error(response?.message || 'Could not send OTP');
+      }
+      // reqId location isn't fully pinned down by MSG91's docs beyond "the response" -- check
+      // every field name that's shown up across their other endpoints before giving up.
+      const reqId = response.message || response.reqId || response.request_id;
+      if (!reqId) throw new Error('No request ID returned');
+      return reqId as string;
     },
-    onError: () => {
-      Alert.alert('Error', 'Could not verify your phone. Please try again.');
+    onSuccess: (reqId) => {
+      navigation.navigate('OTP', {
+        phone: '91' + phone,
+        reqId,
+        referralCode: referralCode.trim().toUpperCase(),
+        devRole: devRole === 'kitchen' ? 'chef' : devRole,
+        lat: globalLocation?.latitude,
+        lng: globalLocation?.longitude,
+      });
+    },
+    onError: (err: any) => {
+      Alert.alert('Error', err?.message || 'Could not send OTP. Check your connection.');
     },
   });
 
   const handleSendOTP = () => {
     if (phone.length !== 10) return;
-    setShowWidget(true);
-  };
-
-  const handleWidgetCompletion = (result: any) => {
-    setShowWidget(false);
-    if (result?.success) {
-      widgetVerifyMutation.mutate(result.message);
-    } else if (result?.message) {
-      Alert.alert('Verification Failed', result.message);
-    }
+    sendMutation.mutate('91' + phone);
   };
 
   const branding = BRANDING[devRole] || BRANDING.customer;
@@ -123,7 +121,7 @@ const LoginScreen = ({ navigation }: any) => {
             <Button
               label="SEND VERIFICATION CODE"
               onPress={handleSendOTP}
-              loading={widgetVerifyMutation.isPending}
+              loading={sendMutation.isPending}
               style={[styles.actionBtn, { backgroundColor: branding.color }]}
             />
           ) : (
@@ -153,14 +151,6 @@ const LoginScreen = ({ navigation }: any) => {
           </View>
         )}
       </View>
-
-      <DefaultWidget
-        visible={showWidget}
-        onClose={() => setShowWidget(false)}
-        onCompletion={handleWidgetCompletion}
-        widgetId={ENV.MSG91_WIDGET_ID}
-        tokenAuth={ENV.MSG91_WIDGET_TOKEN_AUTH}
-      />
     </KeyboardAvoidingView>
   );
 };
