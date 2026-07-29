@@ -54,10 +54,26 @@ redis.set = (async (...args: any[]) => {
     if (options?.EX) ttl = options.EX * 1000;
     else if (options?.PX) ttl = options.PX;
     
+    // If it's an NX lock (like idempotency), check local cache first
+    if (options?.NX) {
+        const cached = fallbackCache.get(key);
+        if (cached && (cached.expiresAt === 0 || cached.expiresAt > Date.now())) {
+            // Lock is already held locally, simulate Redis returning null
+            return null;
+        }
+    }
+    
+    // Optimistically set in local fallback cache
     fallbackCache.set(key, { value: String(value), expiresAt: ttl ? Date.now() + ttl : 0 });
     
-    try { return await withTimeout((originalSet as any)(...args)); } 
-    catch (e: any) { console.error('[Redis Safe SET]', e.message); return null; }
+    try { 
+        return await withTimeout((originalSet as any)(...args)); 
+    } catch (e: any) { 
+        console.error('[Redis Safe SET]', e.message); 
+        // If Redis failed, but we successfully set it locally (or it was an NX lock we acquired locally), return 'OK' instead of null.
+        // Returning null for an NX lock means 'failed to acquire lock', which blocks the order completely.
+        return 'OK'; 
+    }
 }) as any;
 
 const originalDel = redis.del.bind(redis);
