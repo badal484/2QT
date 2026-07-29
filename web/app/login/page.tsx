@@ -10,6 +10,10 @@ import { useAuth } from "../providers";
 
 import { Suspense } from 'react';
 
+declare global {
+  interface Window { initSendOTP: any; sendOtp: any; verifyOtp: any; }
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -22,10 +26,61 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [serverReady, setServerReady] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [devOtp, setDevOtp] = useState("");
+  const [widgetReady, setWidgetReady] = useState(false);
+  // MSG91 only assigns a reqId once sendOtp()'s own success callback fires — verifying
+  // before that (e.g. a fast typer, or a resend fired right before verify) makes MSG91
+  // reject with "reqId required". Gate verify on this instead of firing optimistically.
+  const [otpConfirmedSent, setOtpConfirmedSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Only process the widget's global success callback when the user explicitly clicked
+  // "Verify Code" — the widget can fire success on init from a cached session otherwise.
+  const verifyCalledRef = useRef(false);
   const { login } = useAuth()!;
+
+  // Load the MSG91 widget — same product/widgetId the prelaunch page already uses
+  // successfully, and now the mobile app too, as an alternative to the transactional OTP
+  // API (which is stuck on a template/DLT registration issue independent of this).
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
+    script.async = true;
+    script.onload = () => {
+      if (!window.initSendOTP) {
+        setError('OTP service unavailable. Please refresh.');
+        return;
+      }
+      window.initSendOTP({
+        widgetId: '366772613253353536373236',
+        tokenAuth: '524621TvewiLzS6a5add22P1',
+        exposeMethods: 'true',
+        success: (data: any) => {
+          if (!verifyCalledRef.current) return;
+          verifyCalledRef.current = false;
+          if (data?.message) handleWidgetVerified(data.message);
+        },
+        failure: (err: any) => {
+          verifyCalledRef.current = false;
+          setLoading(false);
+          setError(err?.message || 'Verification failed. Try again.');
+        },
+      });
+      pollRef.current = setInterval(() => {
+        if (window.sendOtp) {
+          setWidgetReady(true);
+          clearInterval(pollRef.current!);
+        }
+      }, 100);
+    };
+    script.onerror = () => setError('Failed to load OTP service. Please refresh.');
+    document.body.appendChild(script);
+    return () => {
+      verifyCalledRef.current = false;
+      if (pollRef.current) clearInterval(pollRef.current);
+      try { document.body.removeChild(script); } catch {}
+    };
+  }, []);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -77,31 +132,46 @@ function LoginForm() {
       setError("Enter a valid phone number (at least 10 digits)");
       return false;
     }
+    if (!widgetReady || !window.sendOtp) {
+      setError("OTP service is loading, please wait a moment…");
+      return false;
+    }
     setLoading(true);
     setError("");
     setLoadingMsg("");
-    setDevOtp("");
+    setOtpConfirmedSent(false);
 
-    const hintTimer = setTimeout(() => {
-      setLoadingMsg("Server is starting up, please wait...");
-    }, 8000);
-
+    // MSG91 widget caches the last verified session in localStorage/sessionStorage --
+    // when a cached session exists, sendOtp() fires success with the cached token instead
+    // of sending a new SMS. Clear non-app storage so it always sends a fresh OTP.
     try {
-      const data = await api.sendOtp(digits);
-      if (data?.devOtp) {
-        setOtp(data.devOtp);
-        setDevOtp(data.devOtp);
+      sessionStorage.clear();
+      Object.keys(localStorage)
+        .filter(k => k !== '2qt_token' && k !== '2qt_refresh_token' && k !== '2qt_user')
+        .forEach(k => localStorage.removeItem(k));
+    } catch {}
+
+    return new Promise<boolean>((resolve) => {
+      try {
+        window.sendOtp(
+          `91${digits}`,
+          () => {
+            setOtpConfirmedSent(true);
+            setLoading(false);
+            resolve(true);
+          },
+          (err: any) => {
+            setError(err?.message || "Failed to send OTP. Please try again.");
+            setLoading(false);
+            resolve(false);
+          },
+        );
+      } catch (err: any) {
+        setError(err?.message || "Failed to send OTP. Please try again.");
+        setLoading(false);
+        resolve(false);
       }
-      return true;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Something went wrong";
-      setError(msg === 'SERVER_TIMEOUT' ? "Server took too long. Tap Continue to try again." : msg);
-      return false;
-    } finally {
-      clearTimeout(hintTimer);
-      setLoading(false);
-      setLoadingMsg("");
-    }
+    });
   };
 
   const handleSendOtp = async (e: { preventDefault(): void }) => {
@@ -140,13 +210,32 @@ function LoginForm() {
     }
   };
 
-  const handleVerifyOtp = async (e: { preventDefault(): void }) => {
+  const handleVerifyOtp = (e: { preventDefault(): void }) => {
     e.preventDefault();
+    if (otp.length < 6) return;
+    if (!window.verifyOtp) return setError("Verification service not ready. Please refresh.");
+    if (!otpConfirmedSent) return setError("Still confirming OTP was sent — please wait a moment.");
+    setLoading(true);
+    setError("");
+    verifyCalledRef.current = true; // allow the widget's next success callback through
+    try {
+      window.verifyOtp(otp);
+    } catch (err: any) {
+      verifyCalledRef.current = false;
+      setError(err?.message || "Verification error. Try again.");
+      setLoading(false);
+    }
+  };
+
+  // Fired from the widget's global success callback (registered in initSendOTP above) once
+  // MSG91 has verified the OTP — msg91Token is then verified server-side, same as the
+  // mobile app's widget flow, via the shared /auth/verify-widget-token endpoint.
+  const handleWidgetVerified = async (msg91Token: string) => {
     setLoading(true);
     setError("");
     try {
       const referralCode = searchParams.get("referral") || undefined;
-      const data = await api.verifyOtp(phone, otp, referralCode);
+      const data = await api.verifyWidgetToken(msg91Token, referralCode);
       login(data.user);
 
       if (!data.user.name || data.user.name === "2QT User") {
@@ -303,7 +392,7 @@ function LoginForm() {
                   </motion.p>
                 )}
 
-                {mounted && !serverReady && (
+                {mounted && (!serverReady || !widgetReady) && (
                   <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-zinc-400 text-center">
                     Connecting to server...
                   </motion.p>
@@ -317,10 +406,10 @@ function LoginForm() {
 
                 <button
                   type="submit"
-                  disabled={loading || (mounted && !serverReady)}
+                  disabled={loading || (mounted && (!serverReady || !widgetReady))}
                   className="w-full bg-brand-primary text-white py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 hover:bg-orange-500 transition-all disabled:opacity-50 active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                 >
-                  {loading || (mounted && !serverReady) ? (
+                  {loading || (mounted && (!serverReady || !widgetReady)) ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     "Continue"
@@ -337,17 +426,6 @@ function LoginForm() {
                 onSubmit={handleVerifyOtp}
                 className="space-y-6"
               >
-                {devOtp && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="px-4 py-3 rounded-xl bg-brand-primary/15 border border-brand-primary/40 text-center"
-                  >
-                    <p className="text-xs text-zinc-400 mb-1">SMS not configured — your OTP:</p>
-                    <p className="text-3xl font-black tracking-[0.5em] text-brand-primary">{devOtp}</p>
-                  </motion.div>
-                )}
-
                 <div>
                   <input
                     type="text"
@@ -371,7 +449,7 @@ function LoginForm() {
                 <div className="space-y-3">
                   <button
                     type="submit"
-                    disabled={loading || otp.length < 6}
+                    disabled={loading || otp.length < 6 || !otpConfirmedSent}
                     className="w-full bg-brand-primary text-white py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 hover:bg-orange-500 transition-all disabled:opacity-50 active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                   >
                     {loading ? (
@@ -392,7 +470,7 @@ function LoginForm() {
 
                   <button
                     type="button"
-                    onClick={() => { setStep("phone"); setError(""); setOtp(""); }}
+                    onClick={() => { setStep("phone"); setError(""); setOtp(""); setOtpConfirmedSent(false); verifyCalledRef.current = false; }}
                     className="w-full text-sm font-semibold text-zinc-500 hover:text-white transition-colors py-2"
                   >
                     Use a different number
