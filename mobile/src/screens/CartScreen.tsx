@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { isKitchenOpen, formatTime12h } from '../utils/kitchenHours';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
@@ -13,18 +13,17 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { setQuantity, clearCart, setPromoCode as setPromoCodeAction, addItem as addItemAction } from '../store/slices/cartSlice';
 import { getSocket } from '../socket/client';
-import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock, Zap } from 'lucide-react-native';
+import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock, Zap, ArrowLeft } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
+import { tokens } from '../theme/tokens';
 import RazorpayCheckout from 'react-native-razorpay';
 
 const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 const triggerHaptic = () => ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
 
-const ACCENT = colors.accent;
-const BG = colors.background;
+const ACCENT = tokens.colors.primary;
+const BG = tokens.colors.background;
 
 // ── Custom cross-platform toggle ──────────────────────────────────────────────
 const Toggle = ({ value, onValueChange, activeColor = ACCENT }: {
@@ -78,16 +77,16 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
             <FastImage source={{ uri: item.photoUrl, priority: FastImage.priority.normal }} style={styles.itemImg} resizeMode={FastImage.resizeMode.cover} />
           ) : (
             <View style={[styles.itemImg, styles.itemImgPlaceholder]}>
-              <ChefHat size={22} color={colors.inkFaint} />
+              <ChefHat size={22} color={tokens.colors.textTertiary} />
             </View>
           )}
         </View>
         <View style={styles.itemMeta}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-            <View style={[styles.vegBadgeMini, { borderColor: item.isVeg ? '#22C55E' : colors.danger }]}>
-              <View style={[styles.vegDotMini, { backgroundColor: item.isVeg ? '#22C55E' : colors.danger }]} />
+            <View style={[styles.vegBadgeMini, { borderColor: item.isVeg ? '#22C55E' : tokens.colors.danger }]}>
+              <View style={[styles.vegDotMini, { backgroundColor: item.isVeg ? '#22C55E' : tokens.colors.danger }]} />
             </View>
-            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+            <Text allowFontScaling={false} style={styles.itemName} numberOfLines={1}>{item.name}</Text>
           </View>
           {item.customizations && item.customizations.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 6 }}>
@@ -100,28 +99,28 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
                   {!!c.photo_url && (
                     <FastImage source={{ uri: c.photo_url, priority: FastImage.priority.low }} style={{ width: 18, height: 18, borderRadius: 4, marginRight: 6, backgroundColor: '#f1f1f1' }} resizeMode={FastImage.resizeMode.cover} />
                   )}
-                  <Text style={{ fontSize: 10, fontFamily: fontFamily.medium, color: colors.inkMuted, flexShrink: 1 }} numberOfLines={1}>
-                    {c.group}: <Text style={{ fontFamily: fontFamily.bold, color: colors.ink }}>{c.option}</Text>
+                  <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, flexShrink: 1 }} numberOfLines={1}>
+                    {c.group}: <Text allowFontScaling={false} style={{ fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary }}>{c.option}</Text>
                   </Text>
                 </View>
               ))}
             </View>
           )}
-          <Text style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
+          <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
         </View>
         <View style={styles.qtyRow}>
           <BouncingButton
             style={styles.qtyBtn}
             onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
           >
-            <Text style={styles.qtyBtnText}>−</Text>
+            <Text allowFontScaling={false} style={styles.qtyBtnText}>−</Text>
           </BouncingButton>
-          <Text style={styles.qtyNum}>{item.quantity}</Text>
+          <Text allowFontScaling={false} style={styles.qtyNum}>{item.quantity}</Text>
           <BouncingButton
             style={[styles.qtyBtn, styles.qtyBtnActive]}
             onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
           >
-            <Text style={[styles.qtyBtnText, styles.qtyBtnActiveText]}>+</Text>
+            <Text allowFontScaling={false} style={[styles.qtyBtnText, styles.qtyBtnActiveText]}>+</Text>
           </BouncingButton>
         </View>
       </View>
@@ -130,13 +129,18 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
   );
 });
 
+// Custom comparator to prevent thrashing
+CartItem.displayName = 'CartItem';
+const CartItemMemoized = React.memo(CartItem, (prevProps, nextProps) => {
+  return prevProps.item.quantity === nextProps.item.quantity &&
+         prevProps.isLast === nextProps.isLast;
+});
+
 const CartScreen = ({ navigation }: any) => {
-  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
-  const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   
   const { items, addressId, zoneId } = useSelector((state: RootState) => state.cart);
-  const { user } = useSelector((state: RootState) => state.auth);
   const activeZoneId = useSelector((state: any) => state.app.activeZoneId);
   const effectiveZoneId = zoneId || activeZoneId;
 
@@ -172,9 +176,9 @@ const CartScreen = ({ navigation }: any) => {
     // back to a pre-existing Address screen in the stack, which removes Cart
     // from the history and causes pop(2) in AddressBook to land on Home.
     if (addressesData?.addresses?.length === 0) {
-      navigation.push('AddressBook', { returnToCart: true });
+      navigation.push('AddressBook', { returnToCart: true, fromCheckout: true });
     } else {
-      navigation.push('Address');
+      navigation.push('Address', { fromCheckout: true, returnToCart: true });
     }
   };
 
@@ -194,7 +198,7 @@ const CartScreen = ({ navigation }: any) => {
   }, [menuData?.items, items]);
 
   const fallbackSubtotal = useMemo(() => items.reduce((s, i) => s + i.quantity * i.pricePaise, 0), [items]);
-  const { data: pricingData, isFetching: pricingFetching } = useQuery({
+  const { data: pricingData, isFetching: pricingFetching, isError: pricingErrored, error: pricingError } = useQuery({
     queryKey: ['your-order-pricing', items, addressId, appliedPromoCode, effectiveZoneId],
     queryFn: () =>
       api.post('/payment/create-order', {
@@ -204,6 +208,31 @@ const CartScreen = ({ navigation }: any) => {
     enabled: items.length > 0 && !!addressId && !isOutOfZone,
     placeholderData: keepPreviousData,
   });
+
+  // onSuccess/onError were removed from useQuery in TanStack Query v5 (query options no
+  // longer match any overload with it present, which was also breaking pricingData's type
+  // inference below) — this is the v5-correct way to react to a successful fetch.
+  useEffect(() => {
+    if (pricingData) {
+      console.log('\n\n--- RAW PRICING RESPONSE ---\n', JSON.stringify(pricingData, null, 2), '\n\n');
+    }
+  }, [pricingData]);
+
+  // Only trust a delivery fee (including a genuine ₹0) once we've actually heard back from
+  // the server — otherwise the zero-filled fallback below would render identically to "Free".
+  const hasPricingData = !!pricingData?.pricing;
+
+  const rawError = (pricingError as any)?.message || "Couldn't calculate";
+  let displayError = rawError;
+  if (rawError.includes('CART_ZONE_MISMATCH')) {
+    displayError = "Items in cart are from a different area. Please clear your cart.";
+  } else if (rawError.includes('CART_MULTIPLE_ZONES')) {
+    displayError = "Your cart contains items from multiple areas. Please clear your cart.";
+  } else if (rawError.includes('NO_KITCHENS_AVAILABLE_FOR_ZONE')) {
+    displayError = "No kitchens available here right now.";
+  } else if (rawError.includes('KITCHEN_CLOSED')) {
+    displayError = rawError.split('KITCHEN_CLOSED:')[1]?.trim() || "Kitchen is currently closed.";
+  }
 
   const p = pricingData?.pricing || {
     subtotalPaise: fallbackSubtotal,
@@ -227,19 +256,21 @@ const CartScreen = ({ navigation }: any) => {
   const smallOrderFee = (p.smallOrderFeePaise || 0) / 100;
   const totalSaved = ((p.menuOfferDiscountPaise || 0) + (p.discountPaise || 0) + (p.campaignDiscountPaise || 0)) / 100;
 
+  const totalItemCount = useMemo(() => items.reduce((s, i) => s + i.quantity, 0), [items]);
+
   if (items.length === 0) {
     return (
       <View style={[styles.emptyContainer, { paddingTop: insets.top }]}>
         <Animated.View entering={FadeIn.duration(600)} style={styles.emptyIconBox}>
           <ShoppingCart size={48} color={ACCENT} />
         </Animated.View>
-        <Text style={styles.emptyTitle}>Your cart is empty</Text>
-        <Text style={styles.emptySub}>Discover our delicious menu and add something tasty!</Text>
+        <Text allowFontScaling={false} style={styles.emptyTitle}>Your cart is empty</Text>
+        <Text allowFontScaling={false} style={styles.emptySub}>Discover our delicious menu and add something tasty!</Text>
         <BouncingButton
           style={styles.exploreBtn}
           onPress={() => { triggerHaptic(); navigation.reset({ index: 0, routes: [{ name: 'Home' }] }); }}
         >
-          <Text style={styles.exploreBtnText}>Explore Menu</Text>
+          <Text allowFontScaling={false} style={styles.exploreBtnText}>Explore Menu</Text>
         </BouncingButton>
       </View>
     );
@@ -249,26 +280,30 @@ const CartScreen = ({ navigation }: any) => {
   const kitchenOpen = isKitchenOpen(menuData?.openingTime, menuData?.closingTime);
   const kitchenPaused = !!menuData?.kitchenPaused;
   const openLabel = menuData?.openingTime ? formatTime12h(menuData.openingTime) : '10:00 AM';
-  const totalItemCount = useMemo(() => items.reduce((s, i) => s + i.quantity, 0), [items]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Order confirmation</Text>
-          <Text style={styles.headerSub}>{totalItemCount} {totalItemCount === 1 ? 'item' : 'items'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => { triggerHaptic(); navigation.goBack(); }}>
+            <ArrowLeft size={24} color={tokens.colors.textPrimary} style={{ marginRight: 12 }} />
+          </TouchableOpacity>
+          <View>
+            <Text allowFontScaling={false} style={styles.headerTitle}>Order confirmation</Text>
+            <Text allowFontScaling={false} style={styles.headerSub}>{totalItemCount} {totalItemCount === 1 ? 'item' : 'items'}</Text>
+          </View>
         </View>
         <BouncingButton style={styles.clearCartBtn} onPress={() => { triggerHaptic(); dispatch(clearCart()); }}>
-          <Text style={styles.clearCartText}>Clear Cart</Text>
+          <Text allowFontScaling={false} style={styles.clearCartText}>Clear Cart</Text>
         </BouncingButton>
       </View>
 
       {/* Savings banner — shows total saved across menu offers + promo */}
       {totalSaved > 0 && (
         <View style={styles.savingsBanner}>
-          <Text style={styles.savingsBannerText}>You saved ₹{totalSaved.toFixed(2)} on this order 🎉</Text>
+          <Text allowFontScaling={false} style={styles.savingsBannerText}>You saved ₹{totalSaved.toFixed(2)} on this order 🎉</Text>
         </View>
       )}
 
@@ -282,37 +317,37 @@ const CartScreen = ({ navigation }: any) => {
             styles.estimateIconBox, 
             { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12 }
           ]}>
-            <Text style={{ fontSize: 13, fontFamily: fontFamily.black, color: '#000', letterSpacing: -0.5 }}>
-              2QT<Text style={{ color: '#F97316' }}>.</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.black, color: '#000', letterSpacing: -0.5 }}>
+              2QT<Text allowFontScaling={false} style={{ color: '#F97316' }}>.</Text>
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.estimateTitle}>2QT Promise</Text>
-            <Text style={styles.estimateSub}>Fresh food, delivered fast to your door.</Text>
+            <Text allowFontScaling={false} style={styles.estimateTitle}>2QT Promise</Text>
+            <Text allowFontScaling={false} style={styles.estimateSub}>Fresh food, delivered fast to your door.</Text>
           </View>
         </Animated.View>
 
         {/* Cart Items Card */}
         <Animated.View entering={FadeInDown.delay(30).duration(300)} style={styles.card}>
-          {items.map((item, index) => (
-            <CartItem key={item.menuItemId} item={item} isLast={index === items.length - 1} />
-          ))}
+            {items.map((item: any, idx: number) => (
+              <CartItemMemoized key={`${item.menuItemId}-${JSON.stringify(item.customizations)}`} item={item} isLast={idx === items.length - 1} />
+            ))}
         </Animated.View>
 
         {/* You Might Like This Cross-Selling Carousel */}
         {recommendations.length > 0 && (
           <Animated.View entering={FadeInDown.delay(50).duration(300)} style={styles.card}>
-            <Text style={styles.cardTitle}>You might like this</Text>
+            <Text allowFontScaling={false} style={styles.cardTitle}>You might like this</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
               {recommendations.map((rec: any) => {
-                const vegColor = rec.is_egg ? '#EAB308' : (rec.is_veg ? '#22C55E' : colors.danger);
+                const vegColor = rec.is_egg ? '#EAB308' : (rec.is_veg ? '#22C55E' : tokens.colors.danger);
                 return (
                   <View key={rec.id} style={styles.recCard}>
                     {rec.photo_url ? (
                       <Image source={{ uri: rec.photo_url }} style={styles.recImg} />
                     ) : (
                       <View style={[styles.recImg, styles.recImgPlaceholder]}>
-                        <ChefHat size={20} color={colors.inkFaint} />
+                        <ChefHat size={20} color={tokens.colors.textTertiary} />
                       </View>
                     )}
                     <BouncingButton
@@ -333,7 +368,7 @@ const CartScreen = ({ navigation }: any) => {
                         );
                       }}
                     >
-                      <Text style={styles.recAddText}>+</Text>
+                      <Text allowFontScaling={false} style={styles.recAddText}>+</Text>
                     </BouncingButton>
                     <View style={styles.recMeta}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
@@ -341,8 +376,8 @@ const CartScreen = ({ navigation }: any) => {
                           <View style={[styles.vegDotMini, { backgroundColor: vegColor, width: 3, height: 3 }]} />
                         </View>
                       </View>
-                      <Text style={styles.recName} numberOfLines={1}>{rec.name}</Text>
-                      <Text style={styles.recPrice}>₹{rec.price_paise / 100}</Text>
+                      <Text allowFontScaling={false} style={styles.recName} numberOfLines={1}>{rec.name}</Text>
+                      <Text allowFontScaling={false} style={styles.recPrice}>₹{rec.price_paise / 100}</Text>
                     </View>
                   </View>
                 );
@@ -354,7 +389,7 @@ const CartScreen = ({ navigation }: any) => {
         {/* Promo Code Card */}
         {hasActivePromos && (
           <Animated.View entering={FadeInDown.delay(70).duration(300)} style={styles.card}>
-            <Text style={styles.cardTitle}>Offers & Coupons</Text>
+            <Text allowFontScaling={false} style={styles.cardTitle}>Offers & Coupons</Text>
 
             {/* Quick-apply chips for available promos */}
             {!appliedPromoCode && activePromos.length > 0 && (
@@ -369,9 +404,9 @@ const CartScreen = ({ navigation }: any) => {
                     }}
                     style={styles.promoChip}
                   >
-                    <Tag size={11} color={colors.success} />
-                    <Text style={styles.promoChipCode}>{promo.code}</Text>
-                    <Text style={styles.promoChipDesc} numberOfLines={1}>
+                    <Tag size={11} color={tokens.colors.success} />
+                    <Text allowFontScaling={false} style={styles.promoChipCode}>{promo.code}</Text>
+                    <Text allowFontScaling={false} style={styles.promoChipDesc} numberOfLines={1}>
                       {promo.discount_type === 'percentage'
                         ? `${promo.discount_percent}% off`
                         : `₹${(promo.discount_flat_paise || 0) / 100} off`}
@@ -384,15 +419,15 @@ const CartScreen = ({ navigation }: any) => {
 
             <View style={styles.promoRow}>
               <View style={styles.promoIconBox}>
-                <Tag size={15} color={colors.success} />
+                <Tag size={15} color={tokens.colors.success} />
               </View>
               {appliedPromoCode ? (
                 <View style={styles.promoAppliedRow}>
-                  <CheckCircle2 size={14} color={colors.success} />
+                  <CheckCircle2 size={14} color={tokens.colors.success} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.promoAppliedText}>{appliedPromoCode}</Text>
+                    <Text allowFontScaling={false} style={styles.promoAppliedText}>{appliedPromoCode}</Text>
                     {p.discountPaise > 0 && (
-                      <Text style={styles.promoSavingText}>−₹{(p.discountPaise / 100).toFixed(2)} saved</Text>
+                      <Text allowFontScaling={false} style={styles.promoSavingText}>−₹{(p.discountPaise / 100).toFixed(2)} saved</Text>
                     )}
                   </View>
                 </View>
@@ -400,7 +435,7 @@ const CartScreen = ({ navigation }: any) => {
                 <TextInput
                   style={styles.promoInput}
                   placeholder="Enter promo code"
-                  placeholderTextColor={colors.inkFaint}
+                  placeholderTextColor={tokens.colors.textTertiary}
                   value={promoCode}
                   onChangeText={setPromoCode}
                   autoCapitalize="characters"
@@ -419,7 +454,7 @@ const CartScreen = ({ navigation }: any) => {
                   }
                 }}
               >
-                <Text style={[styles.applyBtnText, !promoCode && !appliedPromoCode && styles.applyBtnTextDisabled]}>
+                <Text allowFontScaling={false} style={[styles.applyBtnText, !promoCode && !appliedPromoCode && styles.applyBtnTextDisabled]}>
                   {appliedPromoCode ? 'Remove' : 'Apply'}
                 </Text>
               </BouncingButton>
@@ -438,21 +473,21 @@ const CartScreen = ({ navigation }: any) => {
               <MapPin size={16} color={ACCENT} />
             </View>
             <View style={styles.addressBody}>
-              <Text style={styles.cardSectionLabel}>Delivering to</Text>
+              <Text allowFontScaling={false} style={styles.cardSectionLabel}>Delivering to</Text>
               {selectedAddress ? (
                 <>
-                  <Text style={styles.addressLabel}>{selectedAddress.label}</Text>
-                  <Text style={styles.addressText} numberOfLines={2}>
+                  <Text allowFontScaling={false} style={styles.addressLabel}>{selectedAddress.label}</Text>
+                  <Text allowFontScaling={false} style={styles.addressText} numberOfLines={2}>
                     {selectedAddress.address_text}
                   </Text>
                 </>
               ) : (
-                <Text style={styles.addressText}>
+                <Text allowFontScaling={false} style={styles.addressText}>
                   {addressId ? 'Loading…' : 'No address selected'}
                 </Text>
               )}
             </View>
-            <Text style={styles.changeText}>{selectedAddress ? 'Change' : 'Add'}</Text>
+            <Text allowFontScaling={false} style={styles.changeText}>{selectedAddress ? 'Change' : 'Add'}</Text>
           </BouncingButton>
         </Animated.View>
 
@@ -462,8 +497,8 @@ const CartScreen = ({ navigation }: any) => {
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
               <UserRound size={18} color={ACCENT} style={{ marginRight: 12 }} />
               <View>
-                <Text style={styles.cardTitleInline}>Someone else will receive?</Text>
-                <Text style={styles.cardSubInline}>Add alternate contact for rider</Text>
+                <Text allowFontScaling={false} style={styles.cardTitleInline}>Someone else will receive?</Text>
+                <Text allowFontScaling={false} style={styles.cardSubInline}>Add alternate contact for rider</Text>
               </View>
             </View>
             <Toggle value={altReceiver} onValueChange={setAltReceiver} activeColor={ACCENT} />
@@ -471,10 +506,10 @@ const CartScreen = ({ navigation }: any) => {
           {altReceiver && (
             <Animated.View entering={FadeInDown.duration(200)} style={{ marginTop: 16, gap: 12 }}>
               <View style={styles.inputBox}>
-                <UserRound size={16} color={colors.inkFaint} style={{ marginRight: 10 }} />
+                <UserRound size={16} color={tokens.colors.textTertiary} style={{ marginRight: 10 }} />
                 <TextInput
                   placeholder="Receiver's name"
-                  placeholderTextColor={colors.inkFaint}
+                  placeholderTextColor={tokens.colors.textTertiary}
                   value={altName}
                   onChangeText={setAltName}
                   style={styles.inputText}
@@ -482,10 +517,10 @@ const CartScreen = ({ navigation }: any) => {
                 />
               </View>
               <View style={styles.inputBox}>
-                <Phone size={16} color={colors.inkFaint} style={{ marginRight: 10 }} />
+                <Phone size={16} color={tokens.colors.textTertiary} style={{ marginRight: 10 }} />
                 <TextInput
                   placeholder="Receiver's phone number"
-                  placeholderTextColor={colors.inkFaint}
+                  placeholderTextColor={tokens.colors.textTertiary}
                   value={altPhone}
                   onChangeText={setAltPhone}
                   keyboardType="phone-pad"
@@ -500,10 +535,10 @@ const CartScreen = ({ navigation }: any) => {
 
         {/* Delivery Instructions */}
         <Animated.View entering={FadeInDown.delay(110).duration(300)} style={styles.card}>
-          <Text style={styles.cardTitle}>Delivery Instructions</Text>
+          <Text allowFontScaling={false} style={styles.cardTitle}>Delivery Instructions</Text>
           <TextInput 
             placeholder="e.g. Leave at door, don't ring bell..."
-            placeholderTextColor={colors.inkFaint}
+            placeholderTextColor={tokens.colors.textTertiary}
             value={deliveryInstructions}
             onChangeText={setDeliveryInstructions}
             style={styles.textArea}
@@ -515,9 +550,9 @@ const CartScreen = ({ navigation }: any) => {
         <Animated.View entering={FadeInDown.delay(120).duration(300)} style={styles.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
             <Heart size={18} color="#FC4603" style={{ marginRight: 8 }} />
-            <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Tip your delivery partner</Text>
+            <Text allowFontScaling={false} style={[styles.cardTitle, { marginBottom: 0 }]}>Tip your delivery partner</Text>
           </View>
-          <Text style={styles.tipSub}>100% of your tip goes directly to your rider. Thank you!</Text>
+          <Text allowFontScaling={false} style={styles.tipSub}>100% of your tip goes directly to your rider. Thank you!</Text>
           <View style={styles.tipOptionsRow}>
             {[20, 50, 100].map((amt) => (
               <BouncingButton 
@@ -528,7 +563,7 @@ const CartScreen = ({ navigation }: any) => {
                   setRiderTip(riderTip === amt ? 0 : amt);
                 }}
               >
-                <Text style={[styles.tipChipText, riderTip === amt && styles.tipChipTextActive]}>
+                <Text allowFontScaling={false} style={[styles.tipChipText, riderTip === amt && styles.tipChipTextActive]}>
                   ₹{amt}
                 </Text>
               </BouncingButton>
@@ -538,81 +573,87 @@ const CartScreen = ({ navigation }: any) => {
 
         {/* Billing Details Card */}
         <Animated.View entering={FadeInDown.delay(110).duration(300)} style={styles.card}>
-          <Text style={styles.cardTitle}>Billing details</Text>
+          <Text allowFontScaling={false} style={styles.cardTitle}>Billing details</Text>
 
           <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Subtotal</Text>
-            <Text style={styles.billValue}>₹{subtotal}</Text>
+            <Text allowFontScaling={false} style={styles.billLabel}>Subtotal</Text>
+            <Text allowFontScaling={false} style={styles.billValue}>₹{subtotal}</Text>
           </View>
           {addressId && (
             <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Delivery</Text>
-              {deliveryFee === 0 ? (
-                <Text style={[styles.billValue, { color: '#22C55E', fontWeight: '800' }]}>Free</Text>
+              <Text allowFontScaling={false} style={styles.billLabel}>Delivery</Text>
+              {pricingErrored ? (
+                <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.danger, fontSize: 12, maxWidth: 200, textAlign: 'right' }]}>
+                  {displayError}
+                </Text>
+              ) : !hasPricingData ? (
+                <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.textTertiary, fontSize: 12 }]}>Calculating...</Text>
+              ) : deliveryFee === 0 ? (
+                <Text allowFontScaling={false} style={[styles.billValue, { color: '#22C55E', fontWeight: '800' }]}>Free</Text>
               ) : (
-                <Text style={styles.billValue}>₹{deliveryFee}</Text>
+                <Text allowFontScaling={false} style={styles.billValue}>₹{deliveryFee}</Text>
               )}
             </View>
           )}
           {!addressId && (
             <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: colors.inkFaint, fontStyle: 'italic' }]}>Delivery</Text>
-              <Text style={[styles.billValue, { color: colors.inkFaint, fontSize: 12 }]}>Add address</Text>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.textTertiary, fontStyle: 'italic' }]}>Delivery</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.textTertiary, fontSize: 12 }]}>Add address</Text>
             </View>
           )}
           {tax > 0 && (
             <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Taxes & GST</Text>
-              <Text style={styles.billValue}>₹{tax.toFixed(2)}</Text>
+              <Text allowFontScaling={false} style={styles.billLabel}>Taxes & GST</Text>
+              <Text allowFontScaling={false} style={styles.billValue}>₹{tax.toFixed(2)}</Text>
             </View>
           )}
           {menuOfferDiscount > 0 && (
             <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: '#22C55E' }]}>Item Offers</Text>
-              <Text style={[styles.billValue, { color: '#22C55E' }]}>−₹{menuOfferDiscount.toFixed(2)}</Text>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: '#22C55E' }]}>Item Offers</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: '#22C55E' }]}>−₹{menuOfferDiscount.toFixed(2)}</Text>
             </View>
           )}
           {p.discountPaise > 0 && (
             <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: '#22C55E' }]}>Promo ({appliedPromoCode})</Text>
-              <Text style={[styles.billValue, { color: '#22C55E' }]}>−₹{(p.discountPaise / 100).toFixed(2)}</Text>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: '#22C55E' }]}>Promo ({appliedPromoCode})</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: '#22C55E' }]}>−₹{(p.discountPaise / 100).toFixed(2)}</Text>
             </View>
           )}
           {campaignDiscount > 0 && (
             <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: '#7C3AED' }]}>🎯 Campaign Deal</Text>
-              <Text style={[styles.billValue, { color: '#7C3AED' }]}>−₹{campaignDiscount.toFixed(2)}</Text>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: '#7C3AED' }]}>🎯 Campaign Deal</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: '#7C3AED' }]}>−₹{campaignDiscount.toFixed(2)}</Text>
             </View>
           )}
           {smallOrderFee > 0 && (
             <View style={styles.billRow}>
-              <Text style={[styles.billLabel, { color: colors.inkMuted }]}>Small Order Fee</Text>
-              <Text style={styles.billValue}>₹{smallOrderFee.toFixed(2)}</Text>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.textSecondary }]}>Small Order Fee</Text>
+              <Text allowFontScaling={false} style={styles.billValue}>₹{smallOrderFee.toFixed(2)}</Text>
             </View>
           )}
           {riderTip > 0 && (
             <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Delivery Partner Tip</Text>
-              <Text style={styles.billValue}>₹{riderTip}</Text>
+              <Text allowFontScaling={false} style={styles.billLabel}>Delivery Partner Tip</Text>
+              <Text allowFontScaling={false} style={styles.billValue}>₹{riderTip}</Text>
             </View>
           )}
 
           <View style={styles.totalSeparator} />
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
+            <Text allowFontScaling={false} style={styles.totalLabel}>Total</Text>
+            <Text allowFontScaling={false} style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
           </View>
 
           {totalSaved > 0 && (
             <View style={styles.billTotalSavedBanner}>
-              <Text style={styles.billTotalSavedText}>Total saved on this order: ₹{totalSaved.toFixed(2)}</Text>
+              <Text allowFontScaling={false} style={styles.billTotalSavedText}>Total saved on this order: ₹{totalSaved.toFixed(2)}</Text>
             </View>
           )}
         </Animated.View>
 
         {isOutOfZone && (
           <View style={styles.outOfZoneBanner}>
-            <Text style={styles.outOfZoneText}>This address is outside our delivery zone. Please change your address.</Text>
+            <Text allowFontScaling={false} style={styles.outOfZoneText}>This address is outside our delivery zone. Please change your address.</Text>
           </View>
         )}
       </ScrollView>
@@ -624,8 +665,8 @@ const CartScreen = ({ navigation }: any) => {
       >
         <View style={styles.footerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 11, fontFamily: fontFamily.extrabold, color: colors.inkFaint, textTransform: 'uppercase' }}>Item Total</Text>
-            <Text style={{ fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 }}>₹{grandTotal.toFixed(2)}</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textTertiary, textTransform: 'uppercase' }}>Item Total</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>₹{grandTotal.toFixed(2)}</Text>
           </View>
           
           <BouncingButton
@@ -662,7 +703,7 @@ const CartScreen = ({ navigation }: any) => {
             {busy ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.footerCtaText}>
+              <Text allowFontScaling={false} style={styles.footerCtaText}>
                 {kitchenPaused
                   ? 'Kitchen Paused'
                   : !kitchenOpen
@@ -682,39 +723,39 @@ const CartScreen = ({ navigation }: any) => {
 export default CartScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' }, // Light gray background for block separation
+  container: { flex: 1, backgroundColor: tokens.colors.background }, // Light gray background for block separation
 
   // Header
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     zIndex: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: tokens.colors.border,
   },
-  headerTitle: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
-  headerSub: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 },
+  headerTitle: { fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 },
+  headerSub: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2 },
   clearCartBtn: {
     paddingHorizontal: 12, paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: tokens.colors.background,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E5E7EB',
+    borderColor: tokens.colors.border,
   },
   clearCartText: {
-    fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted,
+    fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.textSecondary,
   },
 
   savingsBanner: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#DCFCE7',
     paddingVertical: 12,
     paddingHorizontal: 20,
     alignItems: 'center',
   },
   savingsBannerText: {
     fontSize: 13,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     color: '#FC4603',
     letterSpacing: 0.2,
   },
@@ -725,7 +766,7 @@ const styles = StyleSheet.create({
   estimateCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     padding: 16,
     gap: 12,
     marginBottom: 8,
@@ -734,19 +775,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
   },
   estimateTitle: {
     fontSize: 16,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     color: '#FC4603',
   },
   estimateSub: {
     fontSize: 13,
-    fontFamily: fontFamily.medium,
-    color: colors.inkMuted,
+    fontFamily: tokens.typography.family.medium,
+    color: tokens.colors.textSecondary,
     marginTop: 2,
   },
 
@@ -759,11 +800,11 @@ const styles = StyleSheet.create({
   },
   cardDivider: { height: 1, backgroundColor: '#E5E7EB', borderStyle: 'solid', borderWidth: 1, borderRadius: 1, marginVertical: 12, borderColor: '#E5E7EB' },
   cardTitle: {
-    fontSize: 16, fontFamily: fontFamily.black, color: colors.ink,
+    fontSize: 16, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary,
     marginBottom: 16, letterSpacing: -0.3,
   },
   cardSectionLabel: {
-    fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted,
+    fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.textSecondary,
     letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4,
   },
 
@@ -776,9 +817,9 @@ const styles = StyleSheet.create({
   itemImg: { width: '100%', height: '100%' },
   itemImgPlaceholder: { backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' },
   itemMeta: { flex: 1, marginRight: 12 },
-  itemName: { fontSize: 14, fontFamily: fontFamily.black, color: colors.ink, lineHeight: 20, letterSpacing: -0.2 },
-  itemCustomizations: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2, marginBottom: 2 },
-  itemPrice: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 },
+  itemName: { fontSize: 14, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, lineHeight: 20, letterSpacing: -0.2 },
+  itemCustomizations: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2, marginBottom: 2 },
+  itemPrice: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginTop: 4 },
   vegBadgeMini: {
     width: 10,
     height: 10,
@@ -801,9 +842,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5E7EB',
   },
   qtyBtnActive: { backgroundColor: '#FC4603' },
-  qtyBtnText: { fontSize: 16, color: colors.ink, fontFamily: fontFamily.black, lineHeight: 18 },
+  qtyBtnText: { fontSize: 16, color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.black, lineHeight: 18 },
   qtyBtnActiveText: { color: '#FFFFFF' },
-  qtyNum: { fontSize: 13, fontFamily: fontFamily.black, color: colors.ink, minWidth: 20, textAlign: 'center' },
+  qtyNum: { fontSize: 13, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, minWidth: 20, textAlign: 'center' },
 
   // Address
   addressRow: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -814,9 +855,9 @@ const styles = StyleSheet.create({
     marginRight: 14, marginTop: 2,
   },
   addressBody: { flex: 1, marginRight: 8 },
-  addressLabel: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 4, letterSpacing: -0.2 },
-  addressText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 20 },
-  changeText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#FC4603', marginTop: 4 },
+  addressLabel: { fontSize: 15, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 4, letterSpacing: -0.2 },
+  addressText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, lineHeight: 20 },
+  changeText: { fontSize: 13, fontFamily: tokens.typography.family.bold, color: '#FC4603', marginTop: 4 },
 
   // Promo
   promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -827,23 +868,23 @@ const styles = StyleSheet.create({
   },
   promoInput: {
     flex: 1, height: 46,
-    fontSize: 14, fontFamily: fontFamily.black, color: colors.ink, textTransform: 'uppercase', letterSpacing: 1,
+    fontSize: 14, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, textTransform: 'uppercase', letterSpacing: 1,
     borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
   },
   promoAppliedRow: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  promoAppliedText: { fontSize: 15, fontFamily: fontFamily.black, color: '#FC4603' },
-  promoSavingText: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted, marginTop: 2 },
-  promoInvalidText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.dangerTint },
+  promoAppliedText: { fontSize: 15, fontFamily: tokens.typography.family.black, color: '#FC4603' },
+  promoSavingText: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2 },
+  promoInvalidText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: '#FEE2E2' },
   applyBtn: {
     height: 46, paddingHorizontal: 20, borderRadius: 14,
     backgroundColor: '#FC4603',
     alignItems: 'center', justifyContent: 'center',
   },
   applyBtnDisabled: { backgroundColor: '#F7F8FA' },
-  applyBtnText: { fontSize: 14, fontFamily: fontFamily.black, color: '#FFFFFF' },
-  applyBtnTextDisabled: { color: colors.inkFaint },
+  applyBtnText: { fontSize: 14, fontFamily: tokens.typography.family.black, color: '#FFFFFF' },
+  applyBtnTextDisabled: { color: tokens.colors.textTertiary },
 
   // Recommendations Carousel
   recCard: {
@@ -886,7 +927,7 @@ const styles = StyleSheet.create({
   recAddText: {
     fontSize: 20,
     color: '#fff',
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     lineHeight: 22,
   },
   recMeta: {
@@ -895,15 +936,15 @@ const styles = StyleSheet.create({
   },
   recName: {
     fontSize: 12,
-    fontFamily: fontFamily.bold,
-    color: colors.ink,
+    fontFamily: tokens.typography.family.bold,
+    color: tokens.colors.textPrimary,
     marginVertical: 4,
     lineHeight: 16,
   },
   recPrice: {
     fontSize: 13,
-    fontFamily: fontFamily.black,
-    color: colors.ink,
+    fontFamily: tokens.typography.family.black,
+    color: tokens.colors.textPrimary,
   },
 
   // Bill
@@ -911,13 +952,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 14,
   },
-  billLabel: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted },
-  billValue: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
+  billLabel: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary },
+  billValue: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
 
   totalSeparator: { height: 1, backgroundColor: '#E5E7EB', borderStyle: 'dashed', borderWidth: 1, borderRadius: 1, marginVertical: 16, borderColor: '#E5E7EB' },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 16, fontFamily: fontFamily.black, color: colors.ink },
-  totalValue: { fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -1 },
+  totalLabel: { fontSize: 16, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary },
+  totalValue: { fontSize: 24, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -1 },
 
   billTotalSavedBanner: {
     backgroundColor: '#F0FDF4',
@@ -928,7 +969,7 @@ const styles = StyleSheet.create({
   },
   billTotalSavedText: {
     fontSize: 13,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     color: '#FC4603',
   },
 
@@ -937,7 +978,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2', borderRadius: 16,
     padding: 16,
   },
-  outOfZoneText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.dangerTint, textAlign: 'center', lineHeight: 20 },
+  outOfZoneText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: '#FEE2E2', textAlign: 'center', lineHeight: 20 },
 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -959,7 +1000,7 @@ const styles = StyleSheet.create({
   },
   footerCtaText: {
     fontSize: 16,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     color: '#FFFFFF',
   },
   placeOrderBtnDisabled: { opacity: 0.55 },
@@ -972,29 +1013,29 @@ const styles = StyleSheet.create({
     width: 110, height: 110, borderRadius: 55,
     backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', marginBottom: 28,
   },
-  emptyTitle: { fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 12, letterSpacing: -0.5 },
-  emptySub: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', lineHeight: 24 },
+  emptyTitle: { fontSize: 24, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 12, letterSpacing: -0.5 },
+  emptySub: { fontSize: 15, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, textAlign: 'center', lineHeight: 24 },
   exploreBtn: {
     marginTop: 32, backgroundColor: '#FC4603',
     paddingHorizontal: 36, paddingVertical: 16, borderRadius: 20,
   },
-  exploreBtnText: { fontSize: 15, fontFamily: fontFamily.black, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 },
+  exploreBtnText: { fontSize: 15, fontFamily: tokens.typography.family.black, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 },
 
   // New Styles for Added UI
-  cardTitleInline: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2 },
-  cardSubInline: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkFaint },
+  cardTitleInline: { fontSize: 15, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: 2 },
+  cardSubInline: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary },
   inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, paddingHorizontal: 12, height: 48 },
-  inputText: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
-  textArea: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, padding: 12, minHeight: 80, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, textAlignVertical: 'top' },
-  tipSub: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkFaint, marginBottom: 12, lineHeight: 18 },
+  inputText: { flex: 1, fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary },
+  textArea: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, padding: 12, minHeight: 80, fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary, textAlignVertical: 'top' },
+  tipSub: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary, marginBottom: 12, lineHeight: 18 },
   tipOptionsRow: { flexDirection: 'row', gap: 10 },
   tipChip: { flex: 1, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', alignItems: 'center' },
   tipChipActive: { borderColor: '#FC4603', backgroundColor: '#E8F2EC' },
-  tipChipText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
+  tipChipText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
   tipChipTextActive: { color: '#FC4603' },
   promoChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#D1FAE5', backgroundColor: '#F0FDF4' },
-  promoChipCode: { fontSize: 12, fontFamily: fontFamily.black, color: '#FC4603', letterSpacing: 0.5 },
-  promoChipDesc: { fontSize: 11, fontFamily: fontFamily.medium, color: '#059669', maxWidth: 100 },
+  promoChipCode: { fontSize: 12, fontFamily: tokens.typography.family.black, color: '#FC4603', letterSpacing: 0.5 },
+  promoChipDesc: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: '#059669', maxWidth: 100 },
 
   plusBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -1008,6 +1049,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center',
   },
   plusBannerText: { flex: 1 },
-  plusBannerTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: '#4C1D95', lineHeight: 18 },
-  plusBannerSub: { fontSize: 11, fontFamily: fontFamily.medium, color: '#7C3AED', marginTop: 2 },
+  plusBannerTitle: { fontSize: 13, fontFamily: tokens.typography.family.bold, color: '#4C1D95', lineHeight: 18 },
+  plusBannerSub: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: '#7C3AED', marginTop: 2 },
 });
