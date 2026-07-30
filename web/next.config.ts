@@ -64,6 +64,17 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.go2qt.com',
+          },
+        ],
+        destination: 'https://go2qt.com/:path*',
+        permanent: true,
+      },
+      {
         source: '/app',
         destination: 'https://play.google.com/store/apps/details?id=com.veltomobile.buyer',
         permanent: false,

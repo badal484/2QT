@@ -5,7 +5,8 @@ export const runtime = 'edge';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic'; // never cache — health pings must hit origin
 
-const BACKEND = (process.env.BACKEND_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
+const rawBackend = (process.env.BACKEND_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
+const BACKEND = rawBackend.endsWith('/api/v1') ? rawBackend : `${rawBackend}/api/v1`;
 
 async function handler(
   req: NextRequest,
