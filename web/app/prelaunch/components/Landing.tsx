@@ -86,7 +86,14 @@ export function Landing({ onStart }: { onStart: () => void }) {
             </div>
           </a>
 
-          <p className="text-sm text-zinc-500 mt-4 font-medium">© 2026 2QT. All rights reserved.</p>
+          <div className="flex items-center gap-4 text-xs text-zinc-600 mt-2">
+            <a href="/terms" className="hover:text-zinc-400 transition-colors">Terms</a>
+            <span>·</span>
+            <a href="/privacy" className="hover:text-zinc-400 transition-colors">Privacy</a>
+            <span>·</span>
+            <a href="/refund" className="hover:text-zinc-400 transition-colors">Refund Policy</a>
+          </div>
+          <p className="text-sm text-zinc-500 font-medium">© 2026 2QT. All rights reserved.</p>
         </div>
       </footer>
     </div>
