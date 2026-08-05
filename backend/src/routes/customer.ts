@@ -68,10 +68,13 @@ router.patch('/me', authenticate, async (req: AuthRequest, res) => {
 
 router.get('/wallet', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+
     const { rows: wallet } = await query('SELECT * FROM customer_wallet WHERE customer_id = $1', [userId]);
     const { rows: transactions } = await query(
-        'SELECT * FROM wallet_transactions WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 50',
-        [userId]
+        'SELECT * FROM wallet_transactions WHERE customer_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+        [userId, limit, offset]
     );
 
     res.json({ 
@@ -81,12 +84,17 @@ router.get('/wallet', authenticate, async (req: AuthRequest, res) => {
             amountPaise: t.amount_paise,
             balanceAfterPaise: t.balance_after_paise,
             createdAt: t.created_at
-        }))
+        })),
+        limit,
+        offset
     });
 });
 
 router.get('/loyalty', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const offset = parseInt(req.query.offset as string) || 0;
+
     const { rows: pointsRes } = await query(`
         SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN points ELSE -points END), 0) as total_points
         FROM loyalty_transactions
@@ -96,15 +104,17 @@ router.get('/loyalty', authenticate, async (req: AuthRequest, res) => {
     const { rows: history } = await query(`
         SELECT * FROM loyalty_transactions 
         WHERE customer_id = $1 
-        ORDER BY created_at DESC LIMIT 20
-    `, [userId]);
+        ORDER BY created_at DESC LIMIT $2 OFFSET $3
+    `, [userId, limit, offset]);
 
     res.json({
         points: parseInt(pointsRes[0].total_points),
         history: history.map((h: any) => ({
             ...h,
             createdAt: h.created_at
-        }))
+        })),
+        limit,
+        offset
     });
 });
 

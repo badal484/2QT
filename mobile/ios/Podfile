@@ -8,19 +8,22 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-# Required for Firebase's Swift pods (FirebaseAuthInterop, GoogleUtilities, RecaptchaInterop,
-# etc.) when linking statically -- without this, pod install fails with "cannot yet be
-# integrated as static libraries" once any pod pulls them in as a transitive dependency.
-use_modular_headers!
-
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
-
 target 'VeltoMobile' do
   config = use_native_modules!
+  use_modular_headers!
+  
+  # Force Firebase pods to build as static frameworks.
+  # This resolves the <FirebaseAuth/FirebaseAuth-Swift.h> not found error,
+  # without needing `use_frameworks!` which breaks C++ pods (lottie, jsi).
+  pre_install do |installer|
+    installer.pod_targets.each do |pod|
+      if pod.name.start_with?('Firebase') || pod.name.start_with?('Google') || pod.name == 'RecaptchaInterop'
+        def pod.build_type;
+          Pod::BuildType.static_framework
+        end
+      end
+    end
+  end
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -35,5 +38,43 @@ target 'VeltoMobile' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    
+    # Automatically add a dummy Swift file to enable Swift compilation for the main target
+    # This is required for Firebase Swift headers (FirebaseAuth-Swift.h) to be found
+    # when not using use_frameworks!
+    project_path = installer.sandbox.project_path.to_s.gsub('Pods/Pods.xcodeproj', 'VeltoMobile.xcodeproj')
+    project = Xcodeproj::Project.open(project_path)
+    target = project.targets.find { |t| t.name == 'VeltoMobile' }
+    if target
+      dummy_swift_path = File.join(File.dirname(project_path), 'VeltoMobile', 'Dummy.swift')
+      File.write(dummy_swift_path, "// Dummy Swift file to enable Swift compiler in Xcode\nimport Foundation\n")
+      group = project.main_group.find_subpath('VeltoMobile', true)
+      unless group.files.any? { |file| file.path == 'Dummy.swift' }
+        file_reference = group.new_reference(dummy_swift_path)
+        target.source_build_phase.add_file_reference(file_reference)
+      end
+      target.build_configurations.each do |c|
+        c.build_settings['SWIFT_VERSION'] = '5.0'
+      end
+      project.save
+    end
+
+    # react-native-worklets-core needs the codegen-generated RNWorkletsSpec.h
+    # header at compile time. In RN 0.74+ the file lives inside the
+    # React-Codegen framework, which isn't always on the search path for
+    # third-party pods when they compile before the framework is fully staged.
+    # Adding both possible locations covers Debug/Release on device/simulator.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      end
+      
+      if target.name == 'react-native-worklets-core'
+        target.build_configurations.each do |config|
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited) '
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/ReactCodegen/ReactCodegen.framework/Headers"'
+        end
+      end
+    end
   end
 end

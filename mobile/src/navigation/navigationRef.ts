@@ -21,8 +21,17 @@ export function navigateTo(name: string, params?: Record<string, any>) {
   }
 }
 
+function trackNotificationClick(notifId?: string) {
+  if (!notifId) return;
+  try {
+    const { api } = require('../api/client');
+    api.post(`/notifications/${notifId}/click`).catch(() => {});
+  } catch {}
+}
+
 // Maps FCM notification data → screen name + params
 export function navigateFromNotification(data: Record<string, string>) {
+  trackNotificationClick(data.notifId);
   const { type, orderId, screen, bookingId, ticketId } = data;
 
   // Explicit screen override from payload (for trigger rules)

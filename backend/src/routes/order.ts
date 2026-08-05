@@ -293,21 +293,26 @@ router.post('/:id/feedback', authenticate, async (req: AuthRequest, res) => {
         if (!order[0]) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
         if (order[0].status !== 'delivered') return res.status(400).json({ error: 'ORDER_NOT_DELIVERED' });
 
-        await query(`
+        const { rowCount } = await query(`
             INSERT INTO order_feedback (order_id, customer_id, rating, delivery_rating, comment)
             VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (order_id) DO UPDATE SET
-                rating = EXCLUDED.rating,
-                delivery_rating = EXCLUDED.delivery_rating,
-                comment = EXCLUDED.comment,
-                created_at = NOW()
+            ON CONFLICT (order_id) DO NOTHING
         `, [id, req.user!.userId, foodRating, deliveryRating, comment]);
 
-        // SYSTEMATIC INTEGRATION: Loyalty Reward for leaving feedback
-        await query(`
-            INSERT INTO loyalty_transactions (customer_id, points, type, expires_at)
-            VALUES ($1, 10, 'earn', NOW() + INTERVAL '1 year')
-        `, [req.user!.userId]);
+        if (rowCount === 1) {
+            // SYSTEMATIC INTEGRATION: Loyalty Reward for first time leaving feedback
+            await query(`
+                INSERT INTO loyalty_transactions (customer_id, points, type, order_id, expires_at)
+                VALUES ($1, 10, 'earn', $2, NOW() + INTERVAL '1 year')
+            `, [req.user!.userId, id]);
+        } else {
+            // Just update existing feedback, no new points
+            await query(`
+                UPDATE order_feedback SET
+                    rating = $1, delivery_rating = $2, comment = $3, created_at = NOW()
+                WHERE order_id = $4
+            `, [foodRating, deliveryRating, comment, id]);
+        }
 
         emitToAdmin('new_feedback', { orderId: id, foodRating, deliveryRating });
 

@@ -70,6 +70,14 @@ router.patch('/:id/read', authenticate, async (req: AuthRequest, res: Response) 
     res.json({ success: true });
 });
 
+router.post('/:id/click', authenticate, async (req: AuthRequest, res: Response) => {
+    await query(
+        'UPDATE notifications SET clicked_at = NOW(), is_read = TRUE WHERE id = $1 AND user_id = $2',
+        [req.params.id, req.user!.userId]
+    ).catch(() => {});
+    res.json({ success: true });
+});
+
 router.post('/read-all', authenticate, async (req: AuthRequest, res: Response) => {
     await query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [req.user!.userId]);
     res.json({ success: true });
