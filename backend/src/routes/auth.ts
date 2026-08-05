@@ -101,7 +101,6 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
     }
 
     let smsSent = false;
-    let msg91Debug: any = null; // TEMPORARY diagnostic — remove once delivery is confirmed working
     const msg91AuthKey = process.env.MSG91_AUTH_KEY;
     const msg91TemplateId = process.env.MSG91_TEMPLATE_ID || '6a5ae4478f489f578300d262';
 
@@ -125,23 +124,19 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
             // axios only throws on non-2xx, so a 200 alone doesn't mean the SMS was accepted.
             console.log('[MSG91] Response for', normalizedPhone, ':', JSON.stringify(msg91Res.data));
             smsSent = msg91Res.data?.type === 'success';
-            msg91Debug = { httpStatus: msg91Res.status, body: msg91Res.data, templateId: msg91TemplateId };
             if (!smsSent) {
                 console.error('[MSG91_REJECTED]', normalizedPhone, JSON.stringify(msg91Res.data));
             }
         } catch (error: any) {
             console.error('[MSG91_ERROR]', error?.response?.data || error.message);
-            msg91Debug = { httpStatus: error?.response?.status ?? null, body: error?.response?.data ?? error.message, templateId: msg91TemplateId };
         }
     } else {
-        console.log('[OTP_FALLBACK] No MSG91 key — returning OTP in response body');
-        msg91Debug = { noKeyConfigured: true };
+        console.log('[OTP_FALLBACK] No MSG91 key configured');
     }
 
     res.json({
         sent: smsSent,
         phone: normalizedPhone,
-        msg91Debug, // TEMPORARY — remove once delivery is confirmed working
         ...(process.env.NODE_ENV === 'development' ? { devOtp: otp } : {})
     });
     } catch (err: any) {
