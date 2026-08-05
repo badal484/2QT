@@ -24,7 +24,7 @@ function loadNotifee() {
 }
 
 function channelForType(type: string): string {
-  if (type === 'order_update' || type === 'new_kitchen_order') return 'order_dispatch';
+  if (type === 'order_update' || type === 'new_kitchen_order') return 'order_dispatch_v2';
   if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates';
   if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account';
   return 'promotions';
@@ -33,14 +33,14 @@ function channelForType(type: string): string {
 export async function createNotificationChannels() {
   if (!loadNotifee()) return;
   try {
-    // Separate MAX-importance channel for direct rider dispatch — sound + heads-up on lock screen
+    // Separate MAX-importance channel for direct rider dispatch & kitchen orders — custom sound + heads-up on lock screen
     await _notifee.createChannel({
-      id: 'order_dispatch',
+      id: 'order_dispatch_v2',
       name: 'Order Dispatch Alerts',
       importance: _AndroidImportance.HIGH,
-      sound: 'default',
+      sound: 'alert', // Plays alert.mp3 from res/raw
       vibration: true,
-      vibrationPattern: [300, 500, 300, 500, 300],
+      vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800, 400, 800],
     });
     await _notifee.createChannel({ id: 'order_updates', name: 'Order Updates',   importance: _AndroidImportance.HIGH });
     await _notifee.createChannel({ id: 'promotions',   name: 'Promotions',       importance: _AndroidImportance.DEFAULT });
@@ -57,7 +57,7 @@ export async function displayLocalNotification(
 ) {
   if (!loadNotifee()) return;
   const channelId = channelForType(data.type ?? '');
-  const isDispatch = channelId === 'order_dispatch';
+  const isDispatch = channelId === 'order_dispatch_v2';
   const isChat = data.type === 'chat_message';
   
   let chatMessages: any[] = [];
@@ -74,6 +74,9 @@ export async function displayLocalNotification(
     });
   }
 
+  // Group order status updates under a single expandable notification per order
+  const groupId = data.orderId ? `order_${data.orderId}` : undefined;
+
   try {
     await _notifee.displayNotification({
       id: isChat && data.ticketId ? data.ticketId : undefined,
@@ -82,13 +85,13 @@ export async function displayLocalNotification(
       data,
       android: {
         channelId,
+        groupId,
         pressAction: { id: 'default' },
         importance: _AndroidImportance.HIGH,
-        sound: 'default',
-        // Show as heads-up notification even when screen is off
+        sound: isDispatch ? 'alert' : 'default',
         ...(isDispatch && {
           fullScreenAction: { id: 'default', launchActivity: 'default' },
-          vibrationPattern: [300, 500, 300, 500, 300],
+          vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800, 400, 800],
           lights: [0xFFFC4603, 500, 500],
         }),
         ...(isChat && {
@@ -108,7 +111,9 @@ export async function displayLocalNotification(
       },
       ios: {
         sound: 'default',
-        critical: isDispatch,   // bypasses silent mode for order dispatch
+        // timeSensitive breaks through Focus mode (does not require Apple entitlement)
+        // critical bypasses silent mode but requires explicit Apple approval — skip
+        interruptionLevel: isDispatch ? 'timeSensitive' : 'active',
         foregroundPresentationOptions: { alert: true, badge: true, sound: true, banner: true, list: true },
       },
     });

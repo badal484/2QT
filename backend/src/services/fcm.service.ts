@@ -67,7 +67,13 @@ export async function sendFCM(
             data,
             android: {
                 priority: 'high',
-                ...(!skipNotif ? { notification: { sound: 'default', channelId: 'order_updates', imageUrl: imageUrl || undefined } } : {}),
+                ...(!skipNotif ? { 
+                    notification: { 
+                        sound: data.sound || 'default', 
+                        channelId: data.android_channel_id || 'order_updates', 
+                        imageUrl: imageUrl || undefined 
+                    } 
+                } : {}),
             },
             apns: {
                 payload: { aps: { alert: { title, body }, sound: 'default', badge: 1 } },

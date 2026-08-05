@@ -147,13 +147,52 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     if (PROMO_TYPES.has(type) && !prefs.promotions) return;
     if (PAYOUT_TYPES.has(type) && !prefs.payouts) return;
 
-    // 5. Build content
+    // 5. Quiet hours (10pm–8am IST) and rate limit for promotional messages
+    if (PROMO_TYPES.has(type)) {
+        // IST = UTC+5:30
+        const nowIST = new Date(Date.now() + 330 * 60 * 1000);
+        const hourIST = nowIST.getUTCHours();
+        if (hourIST >= 22 || hourIST < 8) {
+            console.log(`[NOTIF] Quiet hours — skipping promo type=${type} user=${user.id}`);
+            return;
+        }
+        // Max 3 promotional pushes per user per hour
+        try {
+            const rateKey = `notif_rate:${user.id}:promo`;
+            const count = await redis.incr(rateKey);
+            if (count === 1) await redis.expire(rateKey, 3600);
+            if (count > 3) {
+                console.log(`[NOTIF] Rate limit — skipping promo type=${type} user=${user.id}`);
+                return;
+            }
+        } catch {
+            // Redis down — proceed without rate limiting
+        }
+    }
+
+    // 6. Build content
     const title   = interpolate(tmpl.title_template, vars);
     const body    = interpolate(tmpl.body_template, vars);
     const waText  = interpolate(tmpl.whatsapp_template || tmpl.body_template, vars);
     const channels: string[] = overrideChannels ?? tmpl.channels ?? ['push', 'whatsapp'];
 
-    // 6. Dispatch channels in parallel (fire-and-forget individually)
+    // 7. Insert to DB first so we get notifId to embed in FCM data (enables click tracking)
+    let notifId: string | undefined;
+    try {
+        const { rows: notifRows } = await query(
+            `INSERT INTO notifications (user_id, type, title, body, data, channel, delivery_status)
+             VALUES ($1, $2, $3, $4, $5, $6, 'sent')
+             RETURNING id`,
+            [user.id, type, title, body, JSON.stringify(vars), channels[0] ?? 'push']
+        );
+        notifId = notifRows[0]?.id;
+        emitToUser(user.id, 'new_notification', { type, title, body, notifId });
+    } catch (err: any) {
+        console.error('[NOTIF_DB_ERR]', err.message);
+    }
+
+    // 8. Dispatch channels in parallel (fire-and-forget individually)
+    const fcmData: Record<string, string> = { type, ...vars, ...(notifId ? { notifId } : {}) };
     const tasks: Promise<any>[] = [];
 
     // FCM mobile push
@@ -163,7 +202,7 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
         } else {
             console.log(`[NOTIF] Sending FCM type=${type} to user=${user.id} token=${(user.device_token as string).slice(0, 15)}…`);
             tasks.push(
-                sendFCM(user.device_token, title, body, { type, ...vars }, imageUrl)
+                sendFCM(user.device_token, title, body, fcmData, imageUrl)
                     .then((result: any) => {
                         console.log(`[NOTIF] FCM result=${result} type=${type} user=${user!.id}`);
                         if (result === 'invalid_token') {
@@ -188,17 +227,6 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     if (channels.includes('whatsapp') && prefs.whatsapp_enabled) {
         tasks.push(sendWhatsApp(user.phone, waText).catch(() => {}));
     }
-
-    // Store in notifications table (in-app bell)
-    tasks.push(
-        query(
-            `INSERT INTO notifications (user_id, type, title, body, data, channel, delivery_status)
-             VALUES ($1, $2, $3, $4, $5, $6, 'sent')`,
-            [user.id, type, title, body, JSON.stringify(vars), channels[0] ?? 'push']
-        ).then(() => {
-            emitToUser(user!.id, 'new_notification', { type, title, body });
-        }).catch(err => console.error('[NOTIF_DB_ERR]', err.message))
-    );
 
     await Promise.allSettled(tasks);
 }
@@ -289,7 +317,14 @@ export async function notifyKitchenStaff(
             [kitchenId]
         );
         const sends = rows.map(({ device_token }: { device_token: string }) =>
-            sendFCM(device_token, title, body, { ...data, body }, undefined, true).catch(() => {})
+            sendFCM(
+                device_token, 
+                title, 
+                body, 
+                { ...data, body, sound: 'alert', android_channel_id: 'order_dispatch_v2' }, 
+                undefined, 
+                false
+            ).catch(() => {})
         );
         await Promise.allSettled(sends);
     } catch (err) {
