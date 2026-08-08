@@ -73,6 +73,25 @@ target 'VeltoMobile' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        
+        # FIX C++ LINKER BUG: Remove RN_DEBUG_STRING_CONVERTIBLE=1 from Debug builds
+        # React Native prebuilt frameworks often lack these symbols, causing 'Undefined symbol' in VisionCamera
+        defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+        if defs.is_a?(Array)
+          defs.delete('RN_DEBUG_STRING_CONVERTIBLE=1')
+        elsif defs.is_a?(String)
+          defs = defs.gsub('RN_DEBUG_STRING_CONVERTIBLE=1', '')
+        end
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+        
+        cflags = config.build_settings['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
+        if cflags.is_a?(String)
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = cflags.gsub('-DRN_DEBUG_STRING_CONVERTIBLE=1', '').gsub('-DRN_DEBUG_STRING_CONVERTIBLE', '')
+        elsif cflags.is_a?(Array)
+          cflags.delete('-DRN_DEBUG_STRING_CONVERTIBLE=1')
+          cflags.delete('-DRN_DEBUG_STRING_CONVERTIBLE')
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = cflags
+        end
       end
       
       if target.name == 'react-native-worklets-core'
