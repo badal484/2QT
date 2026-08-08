@@ -13,6 +13,7 @@
 		0C80B921A6F3F58F76C31292 /* libPods-VeltoMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-VeltoMobile.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		157E43708F22465F824E923C /* Inter-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DB1DEF5CDCBA46A0B15D010C /* Inter-Black.ttf */; };
+		25A35F4BD3685224D675E8A3 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 341F5424C61D642E6548C682 /* Dummy.swift */; };
 		39027E96F18546988CA86F21 /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 55E26F26AE184F1BA1B4091B /* Inter-SemiBold.ttf */; };
 		5C735C2AA72BBF890FD74533 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 488AE1F33A9CECB314BC95CB /* Dummy.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
@@ -20,8 +21,12 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		9EEC909EA8D94CABB2B2B8C8 /* Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A9A5372DB7464595B54409F5 /* Inter-Bold.ttf */; };
 		A1495F1687D94DB2A5545A58 /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9CCF6B5E07D14AC2A2114DDB /* Inter-Regular.ttf */; };
+		A642BB3DE88FDB6FD1FCA385 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CAD4975265FF109E462967 /* Dummy.swift */; };
+		CA7C1381A734CFBD5DB46138 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D73B0A9487895263643735B /* Dummy.swift */; };
 		DA40C605648D746FB863B106 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD2230C12F8FBE67A2E53A31 /* Dummy.swift */; };
+		DF42AD2CBE1E7CAC01945E4D /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14298AE9CCB6AEA3213B93C1 /* Dummy.swift */; };
 		E12A058AE0C455CA15A463E3 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F4D9C41A8911CF8246D4D0 /* Dummy.swift */; };
+		FBB26E6D6EB0E7B8DD4D6681 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4ECF9041A18A2F5BA1AC891 /* Dummy.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,7 +34,10 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = VeltoMobile/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = VeltoMobile/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = VeltoMobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		14298AE9CCB6AEA3213B93C1 /* Dummy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Dummy.swift; path = VeltoMobile/Dummy.swift; sourceTree = "<group>"; };
+		2D73B0A9487895263643735B /* Dummy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Dummy.swift; path = VeltoMobile/Dummy.swift; sourceTree = "<group>"; };
 		30B3A641738846238B1E21BE /* Inter-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Medium.ttf"; path = "../assets/fonts/Inter-Medium.ttf"; sourceTree = "<group>"; };
+		341F5424C61D642E6548C682 /* Dummy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Dummy.swift; path = VeltoMobile/Dummy.swift; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-VeltoMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VeltoMobile.debug.xcconfig"; path = "Target Support Files/Pods-VeltoMobile/Pods-VeltoMobile.debug.xcconfig"; sourceTree = "<group>"; };
 		488AE1F33A9CECB314BC95CB /* Dummy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Dummy.swift; path = VeltoMobile/Dummy.swift; sourceTree = "<group>"; };
 		55E26F26AE184F1BA1B4091B /* Inter-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-SemiBold.ttf"; path = "../assets/fonts/Inter-SemiBold.ttf"; sourceTree = "<group>"; };
@@ -39,7 +47,9 @@
 		72AEE712EB74273BC09FCF79 /* Dummy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Dummy.swift; path = VeltoMobile/Dummy.swift; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VeltoMobile/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = VeltoMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		88CAD4975265FF109E462967 /* Dummy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Dummy.swift; path = VeltoMobile/Dummy.swift; sourceTree = "<group>"; };
 		9CCF6B5E07D14AC2A2114DDB /* Inter-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Regular.ttf"; path = "../assets/fonts/Inter-Regular.ttf"; sourceTree = "<group>"; };
+		A4ECF9041A18A2F5BA1AC891 /* Dummy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Dummy.swift; path = VeltoMobile/Dummy.swift; sourceTree = "<group>"; };
 		A9A5372DB7464595B54409F5 /* Inter-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Bold.ttf"; path = "../assets/fonts/Inter-Bold.ttf"; sourceTree = "<group>"; };
 		DB1DEF5CDCBA46A0B15D010C /* Inter-Black.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Black.ttf"; path = "../assets/fonts/Inter-Black.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -71,6 +81,11 @@
 				72AEE712EB74273BC09FCF79 /* Dummy.swift */,
 				58F4D9C41A8911CF8246D4D0 /* Dummy.swift */,
 				488AE1F33A9CECB314BC95CB /* Dummy.swift */,
+				A4ECF9041A18A2F5BA1AC891 /* Dummy.swift */,
+				341F5424C61D642E6548C682 /* Dummy.swift */,
+				14298AE9CCB6AEA3213B93C1 /* Dummy.swift */,
+				2D73B0A9487895263643735B /* Dummy.swift */,
+				88CAD4975265FF109E462967 /* Dummy.swift */,
 			);
 			name = VeltoMobile;
 			sourceTree = "<group>";
@@ -309,6 +324,11 @@
 				017BEC061B2CDE99C3D2125C /* Dummy.swift in Sources */,
 				E12A058AE0C455CA15A463E3 /* Dummy.swift in Sources */,
 				5C735C2AA72BBF890FD74533 /* Dummy.swift in Sources */,
+				FBB26E6D6EB0E7B8DD4D6681 /* Dummy.swift in Sources */,
+				25A35F4BD3685224D675E8A3 /* Dummy.swift in Sources */,
+				DF42AD2CBE1E7CAC01945E4D /* Dummy.swift in Sources */,
+				CA7C1381A734CFBD5DB46138 /* Dummy.swift in Sources */,
+				A642BB3DE88FDB6FD1FCA385 /* Dummy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
