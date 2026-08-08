@@ -13,4 +13,4 @@ jobs:
       - name: Ping backend
         run: |
           curl -sf --max-time 45 -o /dev/null -w "Backend responded: %{http_code} in %{time_total}s\n" \
-            https://api.go2qt.com/api/v1/health
+            https://twoqt-1.onrender.com/api/v1/health
