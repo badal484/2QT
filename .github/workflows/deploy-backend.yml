@@ -1,0 +1,29 @@
+name: Deploy Backend to AWS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'docker-compose.aws.yml'
+      - 'nginx/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/velto
+            git pull origin main
+            docker compose -f docker-compose.aws.yml build backend
+            docker compose -f docker-compose.aws.yml up -d
+            docker system prune -f
+            echo "Deployed at $(date)"
