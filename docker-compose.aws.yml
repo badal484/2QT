@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: velto-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --loglevel warning
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: velto-backend
+    container_name: velto-backend
+    restart: unless-stopped
+    env_file: /opt/velto/.env.prod
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:
+    driver: local

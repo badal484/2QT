@@ -1,3 +1,4 @@
+import './instrument'; // Sentry must be first — before any other import
 import './jobs/worker'; // Start background job processing
 import 'express-async-errors';
 import express from 'express';
@@ -34,11 +35,6 @@ process.on('unhandledRejection', (err: any) => {
 
 const app = express();
 const server = http.createServer(app);
-
-// Sentry Init
-if (process.env.SENTRY_DSN) {
-    Sentry.init({ dsn: process.env.SENTRY_DSN });
-}
 
 // Middleware
 app.use(compression({ level: 6, threshold: 1024 })); // gzip responses > 1KB
@@ -131,7 +127,8 @@ app.get('/', (req, res) => {
     res.send('2QT API Server Running');
 });
 
-// Error Handling
+// Error Handling — Sentry must come before the custom error handler
+Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
