@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
@@ -16,14 +17,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { uploadToImageKit } from '../utils/imageKit';
+import { useFeedback } from '../context/FeedbackContext';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
-  red: '#EF4444', redLight: '#FEF2F2',
+  red: tokens.colors.danger, redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: '#FFFBEB',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  border: '#E9E9EB', bg: '#F8F8F8', white: tokens.colors.surface,
 };
 
 const VEHICLE_TYPES = ['bicycle', 'motorcycle', 'scooter', 'car'];
@@ -38,6 +40,7 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
+  const { showDialog } = useFeedback();
   const user = useSelector((state: RootState) => state.auth.user);
   // If onboarding_complete is still false, this screen was reached during initial onboarding
   const isOnboarding = !(user?.onboarding_complete ?? false);
@@ -77,13 +80,13 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
           await api.post('/auth/onboarding/complete', {});
           dispatch(updateUser({ onboarding_complete: true }));
         } catch {
-          Alert.alert('Error', 'Documents saved but could not complete setup. Please try again.');
+          showDialog({ title: 'Error', message: 'Documents saved but could not complete setup. Please try again.', confirmText: 'Okay', type: 'error' });
         }
       } else {
-        Alert.alert('Submitted', 'Your documents have been sent for review.');
+        showDialog({ title: 'Submitted', message: 'Your documents have been sent for review.', confirmText: 'Okay', type: 'success' });
       }
     },
-    onError: () => Alert.alert('Error', 'Could not save documents. Please try again.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not save documents. Please try again.', confirmText: 'Okay', type: 'error' }),
   });
 
   const pickPhoto = async (type: 'profile' | 'document', useCamera: boolean) => {
@@ -101,7 +104,7 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
         const uploaded = await uploadToImageKit(asset, 'rider_profiles');
         setProfilePhotoUrl(uploaded.url);
       } catch {
-        Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
+        showDialog({ title: 'Upload Failed', message: 'Could not upload photo. Please try again.', confirmText: 'Okay', type: 'error' });
         setProfilePhotoUri(null);
       } finally {
         setIsUploadingProfile(false);
@@ -114,7 +117,7 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
         const uploaded = await uploadToImageKit(asset, 'rider_docs');
         setIdPhotoUrl(uploaded.url);
       } catch {
-        Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
+        showDialog({ title: 'Upload Failed', message: 'Could not upload photo. Please try again.', confirmText: 'Okay', type: 'error' });
         setIdPhotoUri(null);
       } finally {
         setIsUploading(false);
@@ -139,8 +142,8 @@ const RiderDocumentsScreen = ({ navigation }: any) => {
   };
 
   const handleSave = () => {
-    if (!profilePhotoUrl) { Alert.alert('Required', 'Please upload your profile photo. Customers will see this during delivery.'); return; }
-    if (!vehicleType) { Alert.alert('Required', 'Please select your vehicle type.'); return; }
+    if (!profilePhotoUrl) { showDialog({ title: 'Required', message: 'Please upload your profile photo. Customers will see this during delivery.', confirmText: 'Okay', type: 'warning' }); return; }
+    if (!vehicleType) { showDialog({ title: 'Required', message: 'Please select your vehicle type.', confirmText: 'Okay', type: 'warning' }); return; }
     saveMutation.mutate({ vehicleType, licenseNumber, idPhotoUrl, profilePhotoUrl });
   };
 

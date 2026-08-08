@@ -65,9 +65,14 @@ PODS:
     - GoogleUtilities/Reachability (~> 8.1)
     - GoogleUtilities/UserDefaults (~> 8.1)
     - nanopb (~> 3.30910.0)
+  - Google-Maps-iOS-Utils (6.1.0):
+    - GoogleMaps (~> 9.0)
   - GoogleDataTransport (10.1.1):
     - nanopb (~> 3.30910.0)
     - PromisesObjC (~> 2.4)
+  - GoogleMaps (9.4.0):
+    - GoogleMaps/Maps (= 9.4.0)
+  - GoogleMaps/Maps (9.4.0)
   - GoogleUtilities/AppDelegateSwizzler (8.1.2):
     - GoogleUtilities/Environment
     - GoogleUtilities/Logger
@@ -2639,6 +2644,8 @@ DEPENDENCIES:
   - "AsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - BVLinearGradient (from `../node_modules/react-native-linear-gradient`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
+  - Google-Maps-iOS-Utils (= 6.1.0)
+  - GoogleMaps (= 9.4.0)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - lottie-ios (from `../node_modules/lottie-ios`)
   - lottie-react-native (from `../node_modules/lottie-react-native`)
@@ -2752,7 +2759,9 @@ SPEC REPOS:
     - FirebaseCoreInternal
     - FirebaseInstallations
     - FirebaseMessaging
+    - Google-Maps-iOS-Utils
     - GoogleDataTransport
+    - GoogleMaps
     - GoogleUtilities
     - GTMSessionFetcher
     - libwebp
@@ -2986,7 +2995,9 @@ SPEC CHECKSUMS:
   FirebaseCoreInternal: e7bbaeb00ab73011298f35ed223aa7371e212948
   FirebaseInstallations: 047343aa91fd6a1ebfa3eb374ddecf36a8aaddfd
   FirebaseMessaging: ed18fb50634e6e85b5d3e77e628c21e2c928cc53
+  Google-Maps-iOS-Utils: 0a484b05ed21d88c9f9ebbacb007956edd508a96
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
+  GoogleMaps: 0608099d4870cac8754bdba9b6953db543432438
   GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
   GTMSessionFetcher: 127211aeec0b1e904fc49f4f6f895dcc535b0ecf
   hermes-engine: 59e4b2f0929346b84337d6fae396c142935dd159
@@ -3098,6 +3109,6 @@ SPEC CHECKSUMS:
   VisionCamera: 0044a94f7489f19e19d5938e97dfc36f4784af3c
   Yoga: 04bb4bfeb02c0000b940c1e6e89e856cd8de5a71
 
-PODFILE CHECKSUM: 2baa1e1978de20d90d3b76785c601a1f6dcd2e73
+PODFILE CHECKSUM: aaa5fe4aad53c6a33906189b77ed66ded159656b
 
 COCOAPODS: 1.16.2

@@ -96,7 +96,7 @@ export const MapPinPicker: React.FC<Props> = ({
         geocodeAndSet(latitude, longitude);
       },
       () => {}, // silently ignore — Stage 1 already showing something
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -138,7 +138,7 @@ export const MapPinPicker: React.FC<Props> = ({
           latitude: initialLat, longitude: initialLng, latitudeDelta: 0.005, longitudeDelta: 0.005
         }, 800);
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
     );
   }, [geocodeAndSet, initialLat, initialLng]);
 

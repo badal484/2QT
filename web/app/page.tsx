@@ -141,9 +141,9 @@ export default function HomePage() {
       <section className="py-20 border-y border-black/5 bg-zinc-50 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 sm:px-10 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12 relative z-10">
           {[
-            { label: "Quality Rating", val: "4.9" },
-            { label: "Curated Dishes", val: "150+" },
-            { label: "Happy Diners", val: "50k+" },
+            { label: "Delivery Time", val: "15 min" },
+            { label: "Early Signups", val: "322+" },
+            { label: "Cities Covered", val: "Ranchi" },
           ].map((stat, i) => (
             <motion.div
               key={i}
@@ -296,24 +296,31 @@ export default function HomePage() {
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 mb-6">Company</h4>
               <ul className="space-y-4 text-sm font-semibold text-brand-dark">
-                <li><Link href="#" className="hover:text-brand-primary transition-colors">About Us</Link></li>
-                <li><Link href="#" className="hover:text-brand-primary transition-colors">Careers</Link></li>
-                <li><Link href="#" className="hover:text-brand-primary transition-colors">Press</Link></li>
+                <li><Link href="/prelaunch" className="hover:text-brand-primary transition-colors">About Us</Link></li>
+                <li><Link href="/become-a-rider/apply" className="hover:text-brand-primary transition-colors">Work with us</Link></li>
+                <li><Link href="/partner" className="hover:text-brand-primary transition-colors">Partner with us</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 mb-6">Contact</h4>
               <ul className="space-y-4 text-sm font-semibold text-brand-dark">
-                <li><Link href="#" className="hover:text-brand-primary transition-colors">Help Center</Link></li>
-                <li><Link href="/partner" className="hover:text-brand-primary transition-colors">Partner with us</Link></li>
-                <li><Link href="/become-a-rider/apply" className="hover:text-brand-primary transition-colors">Become a Rider</Link></li>
-                <li><Link href="mailto:hello@2qthello.com" className="text-brand-primary">hello@2qthello.com</Link></li>
+                <li><Link href="/profile?tab=support" className="hover:text-brand-primary transition-colors">Help Center</Link></li>
+                <li><Link href="tel:+916204646300" className="hover:text-brand-primary transition-colors">+91 62046 46300</Link></li>
+                <li><Link href="mailto:support@go2qt.com" className="text-brand-primary">support@go2qt.com</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 mb-6">Legal</h4>
+              <ul className="space-y-4 text-sm font-semibold text-brand-dark">
+                <li><Link href="/terms" className="hover:text-brand-primary transition-colors">Terms of Service</Link></li>
+                <li><Link href="/privacy" className="hover:text-brand-primary transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/refund" className="hover:text-brand-primary transition-colors">Refund Policy</Link></li>
               </ul>
             </div>
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-black/5 text-xs font-medium text-black/40 flex justify-between">
-          <span>© 2026 2QT Culinary. All rights reserved.</span>
+          <span>© 2026 2QT. All rights reserved.</span>
           <div className="flex gap-6">
             <Link href="/kitchen-portal" className="hover:text-brand-dark transition-colors">Kitchen Portal</Link>
             <Link href="/finance" className="hover:text-brand-dark transition-colors">Finance Portal</Link>

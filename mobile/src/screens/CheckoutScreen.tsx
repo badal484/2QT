@@ -1,48 +1,18 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, AppState } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, StyleSheet, AppState } from 'react-native';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearCart } from '../store/slices/cartSlice';
 import { RootState } from '../store';
 import RazorpayCheckout from 'react-native-razorpay';
-import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import Animated, { FadeInDown, SlideInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSpring } from 'react-native-reanimated';
+import Animated, { FadeInDown, SlideInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { ArrowLeft, MapPin, Sparkles, ChevronRight, ShieldCheck, Wallet, Banknote, CreditCard, Lock } from 'lucide-react-native';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
+import { haptics } from '../utils/haptics';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const hapticOptions = {
-  enableVibrateFallback: true,
-  ignoreAndroidSystemSettings: false,
-};
-
-const triggerHaptic = (type = 'impactLight') => ReactNativeHapticFeedback.trigger(type as any, hapticOptions);
-
-const BouncingButton = ({ onPress, style, children, disabled = false }: any) => {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
-  return (
-    <Animated.View style={[style, animatedStyle]}>
-      <TouchableOpacity
-        activeOpacity={1}
-        disabled={disabled}
-        onPressIn={() => {
-          if (!disabled) {
-            scale.value = withSpring(0.95, { damping: 10, stiffness: 400 });
-            triggerHaptic('impactMedium');
-          }
-        }}
-        onPressOut={() => { if (!disabled) scale.value = withSpring(1, { damping: 10, stiffness: 400 }); }}
-        onPress={() => { if (!disabled) onPress(); }}
-      >
-        {children}
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
+import { useFeedback } from '../context/FeedbackContext';
 
 const PulseLoader = () => {
   const scale = useSharedValue(0.8);
@@ -60,25 +30,27 @@ const PulseLoader = () => {
 
   return (
     <Animated.View style={[styles.pulseCircle, animatedStyle]}>
-      <ShieldCheck size={48} color={colors.primary} />
+      <ShieldCheck size={48} color={tokens.colors.primary} />
     </Animated.View>
   );
 };
 
 const PaymentMethodCard = ({ title, subtitle, icon, isSelected, onPress }: any) => {
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => { triggerHaptic('impactLight'); onPress(); }}
+    <PressableScale hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      onPress={() => { haptics.selection(); onPress(); }}
       style={[styles.pmCard, isSelected && styles.pmCardSelected]}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: isSelected }}
+      accessibilityLabel={title}
     >
       <View style={styles.pmLeft}>
         <View style={styles.pmIconWrap}>
           {icon}
         </View>
         <View style={styles.pmTextWrap}>
-          <Text style={[styles.pmTitle, isSelected && { color: colors.ink }]}>{title}</Text>
-          {subtitle ? <Text style={styles.pmSubtitle}>{subtitle}</Text> : null}
+          <Text allowFontScaling={false} style={[styles.pmTitle, isSelected && { color: tokens.colors.textPrimary }]}>{title}</Text>
+          {subtitle ? <Text allowFontScaling={false} style={styles.pmSubtitle}>{subtitle}</Text> : null}
         </View>
       </View>
       <View style={styles.pmRadioWrapper}>
@@ -86,7 +58,7 @@ const PaymentMethodCard = ({ title, subtitle, icon, isSelected, onPress }: any) 
           {isSelected && <View style={styles.pmRadioInner} />}
         </View>
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 };
 
@@ -98,6 +70,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   const { featureLoyalty } = useSelector((state: RootState) => state.app);
   const appState = useRef(AppState.currentState);
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
@@ -156,7 +129,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
     queryFn: () => api.get('/customers/loyalty'),
   });
 
-  const verifyIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const verifyIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -177,7 +150,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         if (res.order?.status === 'confirmed' || res.order?.status === 'preparing') {
           if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current);
           navigated = true;
-          triggerHaptic('notificationSuccess');
+          haptics.success();
           setIsVerifying(false);
           dispatch(clearCart());
           queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -208,7 +181,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current);
         navigated = true;
         setIsVerifying(false);
-        Alert.alert('Payment Pending', 'Your payment is being processed. You can check the status in your orders history.');
+        showDialog({ title: 'Payment Pending', message: 'Your payment is being processed. You can check the status in your orders history.' });
         navigation.navigate('OrderHistory');
       }
     }, 2000);
@@ -218,7 +191,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
     mutationFn: (data: any) => api.post('/payment/create-order', data),
     onSuccess: (res: any) => {
       if (res.status === 'confirmed') {
-        triggerHaptic('notificationSuccess');
+        haptics.success();
         dispatch(clearCart());
         navigation.reset({
           index: 1,
@@ -240,7 +213,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         return;
       }
       if (!res.keyId) {
-        Alert.alert('Configuration Error', 'Razorpay is not set up on the server.');
+        showDialog({ title: 'Configuration Error', message: 'Razorpay is not set up on the server.' });
         return;
       }
 
@@ -253,7 +226,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         name: '2QT',
         order_id: res.razorpayOrderId,
         prefill: { email: user?.email || 'customer@2qt.app', contact: user?.phone || '', name: user?.name || 'Customer' },
-        theme: { color: colors.primary }
+        theme: { color: tokens.colors.primary }
       };
 
       // Cleaned up the intent flow as user wants standard Razorpay checkout
@@ -278,17 +251,17 @@ const CheckoutScreen = ({ navigation, route }: any) => {
               } else if (error?.description) msg = error.description;
               else if (error?.message) msg = error.message;
             } catch (e) { msg = error?.description || error?.message || 'Transaction cancelled'; }
-            Alert.alert('Payment Failed', msg);
+            showDialog({ title: 'Payment Failed', message: msg });
           });
       } else {
-        Alert.alert('Error', 'Payment gateway is not available on this device.');
+        showDialog({ title: 'Error', message: 'Payment gateway is not available on this device.' });
       }
     },
-    onError: (err: any) => Alert.alert('Order Failed', err.message || 'Could not initiate payment')
+    onError: (err: any) => showDialog({ title: 'Order Failed', message: err.message || 'Could not initiate payment' })
   });
 
   const handlePlaceOrder = () => {
-    triggerHaptic('impactHeavy');
+    haptics.impact(); // the one weighty confirmation on this screen — placing/paying for the order
     placeOrderMutation.mutate({
       items: cart.items,
       addressId: route.params?.addressId,
@@ -307,32 +280,44 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   if (isVerifying) return (
     <View style={styles.verifyingContainer}>
       <PulseLoader />
-      <Animated.Text entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Verifying Payment</Animated.Text>
-      <Animated.Text entering={FadeInDown.delay(300)} style={styles.verifyingSub}>Securely confirming your order...</Animated.Text>
+      <Animated.Text allowFontScaling={false} entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Verifying Payment</Animated.Text>
+      <Animated.Text allowFontScaling={false} entering={FadeInDown.delay(300)} style={styles.verifyingSub}>Securely confirming your order...</Animated.Text>
     </View>
   );
 
   if (loadingAddresses) return (
     <View style={styles.verifyingContainer}>
       <PulseLoader />
-      <Animated.Text entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Loading</Animated.Text>
+      <Animated.Text allowFontScaling={false} entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Loading</Animated.Text>
     </View>
   );
 
   if (isOutOfZone) return (
     <View style={styles.outOfZoneContainer}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.outOfZoneBack}>
-        <ArrowLeft size={24} color={colors.ink} />
-      </TouchableOpacity>
+      <PressableScale 
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} 
+        onPress={() => navigation.navigate('AddressBook')} 
+        style={styles.outOfZoneBack}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <ArrowLeft size={24} color={tokens.colors.textPrimary} />
+      </PressableScale>
       <Animated.View entering={FadeInDown.duration(400)} style={styles.outOfZoneContent}>
         <View style={styles.outOfZoneIconBox}>
-          <MapPin size={48} color={colors.danger} />
+          <MapPin size={48} color={tokens.colors.danger} />
         </View>
-        <Text style={styles.outOfZoneTitle}>Out of delivery zone</Text>
-        <Text style={styles.outOfZoneSub}>Your address is outside our delivery area.</Text>
-        <TouchableOpacity style={styles.outOfZoneChangeBtn} onPress={() => navigation.navigate('Address')}>
-          <Text style={styles.outOfZoneChangeBtnText}>Change Delivery Address</Text>
-        </TouchableOpacity>
+        <Text allowFontScaling={false} style={styles.outOfZoneTitle}>Out of delivery zone</Text>
+        <Text allowFontScaling={false} style={styles.outOfZoneSub}>Your address is outside our delivery area.</Text>
+        <PressableScale 
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} 
+          style={styles.outOfZoneChangeBtn} 
+          onPress={() => navigation.navigate('Address', { fromCheckout: true, returnToCart: true })}
+          accessibilityRole="button"
+          accessibilityLabel="Change delivery address"
+        >
+          <Text allowFontScaling={false} style={styles.outOfZoneChangeBtnText}>Change Delivery Address</Text>
+        </PressableScale>
       </Animated.View>
     </View>
   );
@@ -340,7 +325,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   if (loadingPricing && !pricing) return (
     <View style={styles.verifyingContainer}>
       <PulseLoader />
-      <Animated.Text entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Calculating Total</Animated.Text>
+      <Animated.Text allowFontScaling={false} entering={FadeInDown.delay(200)} style={styles.verifyingTitle}>Calculating Total</Animated.Text>
     </View>
   );
 
@@ -352,86 +337,86 @@ const CheckoutScreen = ({ navigation, route }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
-        <TouchableOpacity onPress={() => { triggerHaptic('impactLight'); navigation.goBack(); }} style={styles.backButton}>
-          <ArrowLeft size={22} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Select Payment Method</Text>
+        <PressableScale hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <ArrowLeft size={22} color={tokens.colors.textPrimary} />
+        </PressableScale>
+        <Text allowFontScaling={false} style={styles.headerTitle}>Select Payment Method</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         
         {/* Bill Summary */}
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.card}>
-          <Text style={styles.sectionTitle}>Order Summary</Text>
-          <View style={styles.billRow}><Text style={styles.billLabel}>Item Total</Text><Text style={styles.billValue}>₹{p.subtotalPaise / 100}</Text></View>
-          <View style={styles.billRow}><Text style={styles.billLabel}>Delivery Fee</Text><Text style={styles.billValue}>₹{p.deliveryFeePaise / 100}</Text></View>
-          <View style={styles.billRow}><Text style={styles.billLabel}>Taxes</Text><Text style={styles.billValue}>₹{((p.cgstPaise || 0) + (p.sgstPaise || 0)) / 100}</Text></View>
-          {riderTip > 0 && <View style={styles.billRow}><Text style={styles.billLabel}>Rider Tip</Text><Text style={styles.billValue}>₹{riderTip}</Text></View>}
+          <Text allowFontScaling={false} style={styles.sectionTitle}>Order Summary</Text>
+          <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Item Total</Text><Text allowFontScaling={false} style={styles.billValue}>₹{p.subtotalPaise / 100}</Text></View>
+          <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Delivery Fee</Text><Text allowFontScaling={false} style={styles.billValue}>₹{p.deliveryFeePaise / 100}</Text></View>
+          <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Taxes</Text><Text allowFontScaling={false} style={styles.billValue}>₹{((p.cgstPaise || 0) + (p.sgstPaise || 0)) / 100}</Text></View>
+          {riderTip > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Rider Tip</Text><Text allowFontScaling={false} style={styles.billValue}>₹{riderTip}</Text></View>}
           
           {(p.discountPaise > 0 || p.loyaltyDiscountPaise > 0 || p.walletDeductionPaise > 0) && (
             <View style={styles.divider} />
           )}
-          {p.discountPaise > 0 && <View style={styles.billRow}><Text style={styles.billGreenLabel}>Promo Discount</Text><Text style={styles.billGreenValue}>-₹{p.discountPaise / 100}</Text></View>}
-          {featureLoyalty && p.loyaltyDiscountPaise > 0 && <View style={styles.billRow}><Text style={styles.billGreenLabel}>2QT Points Used</Text><Text style={styles.billGreenValue}>-₹{p.loyaltyDiscountPaise / 100}</Text></View>}
-          {p.walletDeductionPaise > 0 && <View style={styles.billRow}><Text style={styles.billGreenLabel}>Wallet Used</Text><Text style={styles.billGreenValue}>-₹{p.walletDeductionPaise / 100}</Text></View>}
+          {p.discountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Promo Discount</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{p.discountPaise / 100}</Text></View>}
+          {featureLoyalty && p.loyaltyDiscountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>2QT Points Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{p.loyaltyDiscountPaise / 100}</Text></View>}
+          {p.walletDeductionPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Wallet Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{p.walletDeductionPaise / 100}</Text></View>}
           
           <View style={styles.divider} />
           <View style={styles.billTotalRow}>
-            <Text style={styles.billTotalLabel}>To Pay</Text>
-            <Text style={styles.billTotalValue}>₹{p.gatewayAmountPaise / 100}</Text>
+            <Text allowFontScaling={false} style={styles.billTotalLabel}>To Pay</Text>
+            <Text allowFontScaling={false} style={styles.billTotalValue}>₹{p.gatewayAmountPaise / 100}</Text>
           </View>
         </Animated.View>
 
         {/* Use Wallet / Loyalty */}
         {(walletBal > 0 || (featureLoyalty && loyaltyPts > 0)) && (
           <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.card}>
-            <Text style={styles.sectionTitle}>Apply Savings</Text>
+            <Text allowFontScaling={false} style={styles.sectionTitle}>Apply Savings</Text>
             {walletBal > 0 && (
-              <TouchableOpacity style={styles.savingsRow} activeOpacity={0.8} onPress={() => { triggerHaptic(); setUseWallet(!useWallet); }}>
-                <View style={[styles.savingsIcon, useWallet && { backgroundColor: colors.primary }]}>
-                  <Wallet size={16} color={useWallet ? '#fff' : colors.primary} />
+              <PressableScale hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={styles.savingsRow} onPress={() => { haptics.selection(); setUseWallet(!useWallet); }} accessibilityRole="checkbox" accessibilityState={{ checked: useWallet }} accessibilityLabel="Use 2QT Wallet">
+                <View style={[styles.savingsIcon, useWallet && { backgroundColor: tokens.colors.primary }]}>
+                  <Wallet size={16} color={useWallet ? tokens.colors.surface : tokens.colors.primary} />
                 </View>
                 <View style={styles.savingsInfo}>
-                  <Text style={styles.savingsTitle}>2QT Wallet</Text>
-                  <Text style={styles.savingsSub}>Balance: ₹{walletBal / 100}</Text>
+                  <Text allowFontScaling={false} style={styles.savingsTitle}>2QT Wallet</Text>
+                  <Text allowFontScaling={false} style={styles.savingsSub}>Balance: ₹{walletBal / 100}</Text>
                 </View>
                 <View style={[styles.customCheckbox, useWallet && styles.customCheckboxActive]}>
                   {useWallet && <View style={styles.customCheckboxInner} />}
                 </View>
-              </TouchableOpacity>
+              </PressableScale>
             )}
             {featureLoyalty && loyaltyPts > 0 && (
-              <TouchableOpacity style={[styles.savingsRow, { marginTop: walletBal > 0 ? 16 : 0 }]} activeOpacity={0.8} onPress={() => { triggerHaptic(); setUseLoyalty(!useLoyalty); }}>
+              <PressableScale hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={[styles.savingsRow, { marginTop: walletBal > 0 ? tokens.spacing.lg : 0 }]} onPress={() => { haptics.selection(); setUseLoyalty(!useLoyalty); }} accessibilityRole="checkbox" accessibilityState={{ checked: useLoyalty }} accessibilityLabel="Use Loyalty Points">
                 <View style={[styles.savingsIcon, useLoyalty && { backgroundColor: '#FC4603' }]}>
-                  <Sparkles size={16} color={useLoyalty ? '#fff' : '#FC4603'} />
+                  <Sparkles size={16} color={useLoyalty ? tokens.colors.surface : '#FC4603'} />
                 </View>
                 <View style={styles.savingsInfo}>
-                  <Text style={styles.savingsTitle}>Loyalty Points</Text>
-                  <Text style={styles.savingsSub}>{loyaltyPts} points available</Text>
+                  <Text allowFontScaling={false} style={styles.savingsTitle}>Loyalty Points</Text>
+                  <Text allowFontScaling={false} style={styles.savingsSub}>{loyaltyPts} points available</Text>
                 </View>
                 <View style={[styles.customCheckbox, useLoyalty && { borderColor: '#FC4603' }]}>
                   {useLoyalty && <View style={[styles.customCheckboxInner, { backgroundColor: '#FC4603' }]} />}
                 </View>
-              </TouchableOpacity>
+              </PressableScale>
             )}
           </Animated.View>
         )}
 
         {/* Payment Methods */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-          <Text style={styles.sectionHeader}>PAYMENT OPTIONS</Text>
+          <Text allowFontScaling={false} style={styles.sectionHeader}>PAYMENT OPTIONS</Text>
           
           <PaymentMethodCard
             title="Pay Online"
             subtitle="Credit/Debit cards, UPI, Wallets, Netbanking via Razorpay"
-            icon={<CreditCard size={20} color={colors.primary} />}
+            icon={<CreditCard size={20} color={tokens.colors.primary} />}
             isSelected={paymentSubMethod === 'online'}
             onPress={() => setPaymentSubMethod('online')}
           />
           <PaymentMethodCard
             title="Cash on Delivery"
             subtitle="Pay via cash or UPI at your doorstep"
-            icon={<Banknote size={20} color="#F59E0B" />}
+            icon={<Banknote size={20} color={tokens.colors.warning} />}
             isSelected={paymentSubMethod === 'cod'}
             onPress={() => setPaymentSubMethod('cod')}
             isCod={true}
@@ -441,28 +426,30 @@ const CheckoutScreen = ({ navigation, route }: any) => {
       </ScrollView>
 
       {/* Floating Action Button */}
-      <Animated.View entering={SlideInDown.duration(400).delay(250)} style={[styles.fabContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <Animated.View entering={SlideInDown.delay(300).duration(300)} style={[styles.fabContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <View style={styles.secureBadgeRow}>
-          <Lock size={12} color={colors.inkMuted} />
-          <Text style={styles.secureText}>100% Secure Payments via Razorpay</Text>
+          <Lock size={12} color={tokens.colors.textSecondary} />
+          <Text allowFontScaling={false} style={styles.secureText}>100% Secure Payments via Razorpay</Text>
         </View>
         
-        <BouncingButton 
+        <PressableScale
           style={styles.fabBtn}
           disabled={placeOrderMutation.isPending || isFetching}
           onPress={handlePlaceOrder}
+          accessibilityRole="button"
+          accessibilityLabel={p.gatewayAmountPaise <= 0 ? 'Place Order' : (paymentSubMethod === 'cod' ? 'Place Order via Cash on Delivery' : 'Pay Now')}
         >
           <View style={styles.fabBtnContent}>
             <View>
-              <Text style={styles.fabTotalLabel}>Total to Pay</Text>
-              <Text style={styles.fabTotalValue}>₹{p.gatewayAmountPaise / 100}</Text>
+              <Text allowFontScaling={false} style={styles.fabTotalLabel}>Total to Pay</Text>
+              <Text allowFontScaling={false} style={styles.fabTotalValue}>₹{p.gatewayAmountPaise / 100}</Text>
             </View>
             <View style={styles.fabActionRow}>
               {placeOrderMutation.isPending || isFetching ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <>
-                  <Text style={styles.fabActionText}>
+                  <Text allowFontScaling={false} style={styles.fabActionText}>
                     {p.gatewayAmountPaise <= 0 ? 'Place Order' : (paymentSubMethod === 'cod' ? 'Place Order (COD)' : 'Pay Now')}
                   </Text>
                   <ChevronRight size={18} color="#fff" style={{ marginLeft: 4 }} />
@@ -470,7 +457,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
               )}
             </View>
           </View>
-        </BouncingButton>
+        </PressableScale>
       </Animated.View>
     </View>
   );
@@ -479,92 +466,92 @@ const CheckoutScreen = ({ navigation, route }: any) => {
 export default CheckoutScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: tokens.colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', paddingHorizontal: 16, paddingBottom: 16,
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    backgroundColor: tokens.colors.surface, paddingHorizontal: tokens.spacing.lg, paddingBottom: tokens.spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.colors.border,
   },
   backButton: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6',
-    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+    width: 40, height: 40, borderRadius: 20, backgroundColor: tokens.colors.background,
+    alignItems: 'center', justifyContent: 'center', marginRight: tokens.spacing.md,
   },
-  headerTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink },
+  headerTitle: { fontSize: 18, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
   
   scrollView: { flex: 1 },
-  scrollContent: { padding: 16 },
+  scrollContent: { padding: tokens.spacing.lg },
 
   card: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    backgroundColor: tokens.colors.surface, borderRadius: tokens.radii.xxl, padding: tokens.spacing.xl, marginBottom: tokens.spacing.lg,
+    ...tokens.shadows.soft,
   },
-  sectionTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 16 },
+  sectionTitle: { fontSize: 16, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: tokens.spacing.lg },
   
-  billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  billLabel: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted },
-  billValue: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink },
-  billGreenLabel: { fontSize: 14, fontFamily: fontFamily.medium, color: '#10B981' },
-  billGreenValue: { fontSize: 14, fontFamily: fontFamily.bold, color: '#10B981' },
-  divider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 12 },
+  billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: tokens.spacing.md },
+  billLabel: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary },
+  billValue: { fontSize: 14, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textPrimary },
+  billGreenLabel: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.success },
+  billGreenValue: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.success },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: tokens.colors.border, marginVertical: tokens.spacing.md },
   billTotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  billTotalLabel: { fontSize: 16, fontFamily: fontFamily.black, color: colors.ink },
-  billTotalValue: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
+  billTotalLabel: { fontSize: 16, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary },
+  billTotalValue: { fontSize: 18, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 },
 
   savingsRow: { flexDirection: 'row', alignItems: 'center' },
-  savingsIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  savingsIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: tokens.colors.primaryTint, alignItems: 'center', justifyContent: 'center', marginRight: tokens.spacing.md },
   savingsInfo: { flex: 1 },
-  savingsTitle: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2 },
-  savingsSub: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted },
+  savingsTitle: { fontSize: 15, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: 2 },
+  savingsSub: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary },
 
-  customCheckbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
-  customCheckboxActive: { borderColor: colors.primary },
-  customCheckboxInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary },
+  customCheckbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: tokens.colors.border, alignItems: 'center', justifyContent: 'center' },
+  customCheckboxActive: { borderColor: tokens.colors.primary },
+  customCheckboxInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: tokens.colors.primary },
 
-  sectionHeader: { fontSize: 12, fontFamily: fontFamily.black, color: colors.inkFaint, letterSpacing: 1, marginBottom: 12, marginLeft: 4, marginTop: 8 },
+  sectionHeader: { fontSize: 12, fontFamily: tokens.typography.family.black, color: tokens.colors.textTertiary, letterSpacing: 1, marginBottom: tokens.spacing.md, marginLeft: 4, marginTop: 8 },
   
   pmCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,
-    borderWidth: 1, borderColor: '#F3F4F6',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1,
+    backgroundColor: tokens.colors.surface, borderRadius: 16, padding: tokens.spacing.lg, marginBottom: tokens.spacing.md,
+    borderWidth: 1, borderColor: tokens.colors.border,
+    ...tokens.shadows.soft,
   },
-  pmCardSelected: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
+  pmCardSelected: { borderColor: tokens.colors.primary, backgroundColor: tokens.colors.primaryTint },
   pmLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  pmIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', marginRight: 14, borderWidth: 1, borderColor: '#F3F4F6' },
+  pmIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center', marginRight: 14, borderWidth: 1, borderColor: tokens.colors.border },
   pmTextWrap: { flex: 1 },
-  pmTitle: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2 },
-  pmSubtitle: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted },
-  pmRadioWrapper: { marginLeft: 12 },
-  pmRadio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
-  pmRadioSelected: { borderColor: colors.primary },
-  pmRadioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary },
+  pmTitle: { fontSize: 15, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: 2 },
+  pmSubtitle: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary },
+  pmRadioWrapper: { marginLeft: tokens.spacing.md },
+  pmRadio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: tokens.colors.border, alignItems: 'center', justifyContent: 'center' },
+  pmRadioSelected: { borderColor: tokens.colors.primary },
+  pmRadioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: tokens.colors.primary },
 
   fabContainer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F3F4F6',
-    paddingHorizontal: 16, paddingTop: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 10,
+    backgroundColor: tokens.colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: tokens.colors.border,
+    paddingHorizontal: tokens.spacing.lg, paddingTop: tokens.spacing.md,
+    ...tokens.shadows.soft,
   },
-  secureBadgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12, gap: 6 },
-  secureText: { fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted },
-  fabBtn: { backgroundColor: colors.primary, borderRadius: 16, overflow: 'hidden' },
-  fabBtnContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 18 },
-  fabTotalLabel: { fontSize: 11, fontFamily: fontFamily.semibold, color: 'rgba(255,255,255,0.8)' },
-  fabTotalValue: { fontSize: 18, fontFamily: fontFamily.black, color: '#fff', letterSpacing: -0.5 },
+  secureBadgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: tokens.spacing.md, gap: 6 },
+  secureText: { fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.textSecondary },
+  fabBtn: { backgroundColor: tokens.colors.primary, borderRadius: 16, overflow: 'hidden' },
+  fabBtnContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: tokens.spacing.xl, paddingVertical: 18 },
+  fabTotalLabel: { fontSize: 11, fontFamily: tokens.typography.family.semibold, color: 'rgba(255,255,255,0.8)' },
+  fabTotalValue: { fontSize: 18, fontFamily: tokens.typography.family.black, color: tokens.colors.surface, letterSpacing: -0.5 },
   fabActionRow: { flexDirection: 'row', alignItems: 'center' },
-  fabActionText: { fontSize: 16, fontFamily: fontFamily.bold, color: '#fff' },
+  fabActionText: { fontSize: 16, fontFamily: tokens.typography.family.bold, color: tokens.colors.surface },
 
-  verifyingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F9FAFB' },
-  pulseCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  verifyingTitle: { fontSize: 22, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 8 },
-  verifyingSub: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', paddingHorizontal: 40 },
+  verifyingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: tokens.colors.background },
+  pulseCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: tokens.colors.primaryTint, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  verifyingTitle: { fontSize: 22, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 8 },
+  verifyingSub: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, textAlign: 'center', paddingHorizontal: 40 },
 
-  outOfZoneContainer: { flex: 1, backgroundColor: '#F9FAFB' },
-  outOfZoneBack: { position: 'absolute', top: 50, left: 20, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
-  outOfZoneContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  outOfZoneIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  outOfZoneTitle: { fontSize: 22, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 12 },
-  outOfZoneSub: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', marginBottom: 32, lineHeight: 22 },
-  outOfZoneChangeBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 32, width: '100%', alignItems: 'center' },
-  outOfZoneChangeBtnText: { fontSize: 16, fontFamily: fontFamily.bold, color: '#fff' },
+  outOfZoneContainer: { flex: 1, backgroundColor: tokens.colors.background },
+  outOfZoneBack: { position: 'absolute', top: 50, left: 20, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: tokens.colors.surface, alignItems: 'center', justifyContent: 'center', ...tokens.shadows.soft, },
+  outOfZoneContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: tokens.spacing.xl },
+  outOfZoneIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: tokens.colors.dangerTint, alignItems: 'center', justifyContent: 'center', marginBottom: tokens.spacing.xl },
+  outOfZoneTitle: { fontSize: 22, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: tokens.spacing.md },
+  outOfZoneSub: { fontSize: 15, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 22 },
+  outOfZoneChangeBtn: { backgroundColor: tokens.colors.primary, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 32, width: '100%', alignItems: 'center' },
+  outOfZoneChangeBtnText: { fontSize: 16, fontFamily: tokens.typography.family.bold, color: tokens.colors.surface },
 });

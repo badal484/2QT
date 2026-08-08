@@ -1,6 +1,8 @@
-import { ArrowLeft, MapPin, Navigation, Search, Home, Briefcase, Building } from 'lucide-react-native';
+import { tokens } from '../theme/tokens';
+import { MapPin, Navigation, Search, Home, Briefcase, Building } from 'lucide-react-native';
 import React, { useState, useEffect, useRef } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import {
   View, Text, ActivityIndicator, TextInput,
   StyleSheet, Alert, ScrollView,
@@ -12,14 +14,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setAddress, setZone } from '../store/slices/cartSlice';
 import { setServiceable, setUnserviceable } from '../store/slices/appSlice';
 import { useLocation } from '../hooks/useLocation';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { haptics } from "../utils/haptics";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { AddressSearchModal } from '../components/AddressSearchModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
 import { reverseGeocodeDetailed } from '../utils/geocode';
 import { RootState } from '../store';
+import { useFeedback } from '../context/FeedbackContext';
 
 const LABELS = [
   { key: 'Home',   Icon: Home },
@@ -33,6 +34,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
 
   const { initialLat, initialLng, initialAddress, returnToCart } = route?.params || {};
 
@@ -94,8 +96,8 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     if (!isDraggingRef.current) {
       isDraggingRef.current = true;
       setIsDragging(true);
-      ReactNativeHapticFeedback.trigger('impactLight');
-      pinY.value = withSpring(-20, { damping: 10, stiffness: 200 });
+      haptics.selection();
+      pinY.value = withTiming(-20, { duration: 150 });
     }
   };
 
@@ -106,7 +108,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
     if (!isDraggingRef.current) return; // programmatic animation — ignore
     isDraggingRef.current = false;
     setIsDragging(false);
-    pinY.value = withSpring(0, { damping: 12, stiffness: 300 });
+    pinY.value = withTiming(0, { duration: 200 });
 
     const result = await reverseGeocodeDetailed(coords.latitude, coords.longitude);
     setAddressText(result.name);
@@ -116,7 +118,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   const addMutation = useMutation({
     mutationFn: (data: any) => api.post('/customers/addresses', data),
     onSuccess: (res, variables) => {
-      ReactNativeHapticFeedback.trigger('notificationSuccess');
+      haptics.success();
 
       // Immediately seed the addresses cache so Cart shows the address the
       // instant it re-renders, without waiting for a network refetch.
@@ -152,17 +154,29 @@ const AddressBookScreen = ({ navigation, route }: any) => {
 
       returnToCart ? navigation.goBack() : navigation.pop(2);
     },
-    onError: () => Alert.alert('Error', 'Could not save address. Please try again.'),
+    onError: () => {
+      showDialog({
+        title: 'Error',
+        message: 'Could not save address. Please try again.',
+        confirmText: 'Okay',
+        type: 'error'
+      });
+    },
   });
 
   const handleConfirm = () => {
-    ReactNativeHapticFeedback.trigger('impactMedium');
+    haptics.selection();
     setShowDetails(true);
   };
 
   const handleSave = async () => {
     if (!flatNumber.trim()) {
-      Alert.alert('Missing Details', 'Please enter your House / Flat number.');
+      showDialog({
+        title: 'Missing Details',
+        message: 'Please enter your House / Flat number.',
+        confirmText: 'Okay',
+        type: 'warning'
+      });
       return;
     }
     setIsChecking(true);
@@ -194,21 +208,22 @@ const AddressBookScreen = ({ navigation, route }: any) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-        <View style={styles.headerRow}>
-          <BouncingButton style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <ArrowLeft size={22} color="#1A1A2E" />
-          </BouncingButton>
-          <Text style={styles.headerTitle}>
-            {showDetails ? 'Add address details' : 'Add delivery location'}
-          </Text>
-        </View>
+      <View style={styles.header}>
+        <ScreenHeader
+          title={showDetails ? 'Add address details' : 'Add delivery location'}
+          style={{ paddingHorizontal: 0, paddingBottom: 12 }}
+        />
 
         {!showDetails && (
-          <BouncingButton style={styles.searchBar} onPress={() => setIsSearchVisible(true)} activeOpacity={0.9}>
-            <Search size={20} color={colors.primary} style={{ marginRight: 12 }} />
-            <Text style={styles.searchBarText}>Search delivery location</Text>
-          </BouncingButton>
+          <PressableScale 
+            style={styles.searchBar} 
+            onPress={() => setIsSearchVisible(true)}
+            accessibilityRole="search"
+            accessibilityLabel="Search delivery location"
+          >
+            <Search size={20} color={tokens.colors.primary} style={{ marginRight: 12 }} />
+            <Text allowFontScaling={false} style={styles.searchBarText}>Search delivery location</Text>
+          </PressableScale>
         )}
       </View>
 
@@ -236,60 +251,66 @@ const AddressBookScreen = ({ navigation, route }: any) => {
               rotateEnabled={false}
             />
             <View style={styles.mapPreviewPin} pointerEvents="none">
-              <MapPin size={28} color="#FFFFFF" fill="#EF4444" />
+              <MapPin size={28} color={tokens.colors.textInverse} fill={tokens.colors.danger} />
             </View>
           </View>
 
           {/* Confirmed address row */}
           <View style={styles.confirmedRow}>
-            <Navigation size={18} color={colors.primary} fill={colors.primary} />
+            <Navigation size={18} color={tokens.colors.primary} fill={tokens.colors.primary} />
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.confirmedStreet} numberOfLines={1}>
+              <Text allowFontScaling={false} style={styles.confirmedStreet} numberOfLines={1}>
                 {addressText || 'Selected Location'}
               </Text>
-              <Text style={styles.confirmedFull} numberOfLines={2}>{addressFull || addressText}</Text>
+              <Text allowFontScaling={false} style={styles.confirmedFull} numberOfLines={2}>{addressFull || addressText}</Text>
             </View>
-            <BouncingButton
-              onPress={() => { ReactNativeHapticFeedback.trigger('impactLight'); setShowDetails(false); }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            <PressableScale
+              onPress={() => { haptics.selection(); setShowDetails(false); }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel="Change selected location"
             >
-              <Text style={styles.changeText}>Change</Text>
-            </BouncingButton>
+              <Text allowFontScaling={false} style={styles.changeText}>Change</Text>
+            </PressableScale>
           </View>
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>Add Address</Text>
+          <Text allowFontScaling={false} style={styles.sectionTitle}>Add Address</Text>
           <TextInput
             style={styles.input}
             placeholder="House No / Flat / Floor"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={tokens.colors.textTertiary}
             value={flatNumber}
             onChangeText={setFlatNumber}
             autoFocus
+            accessibilityLabel="House or flat number"
           />
           <TextInput
             style={styles.input}
             placeholder="Building & Block No. (Optional)"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={tokens.colors.textTertiary}
             value={buildingName}
             onChangeText={setBuildingName}
+            accessibilityLabel="Building and block number"
           />
 
-          <Text style={styles.sectionTitle}>Add Label</Text>
+          <Text allowFontScaling={false} style={styles.sectionTitle}>Add Label</Text>
           <View style={styles.labelRow}>
             {LABELS.map(l => {
               const active = label === l.key;
               return (
-                <BouncingButton
+                <PressableScale
                   key={l.key}
-                  onPress={() => { ReactNativeHapticFeedback.trigger('selection'); setLabel(l.key); }}
+                  onPress={() => { haptics.selection(); setLabel(l.key); }}
                   style={[styles.chip, active && styles.chipActive]}
-                  activeOpacity={0.8}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: active }}
+                  accessibilityLabel={l.key}
                 >
-                  <l.Icon size={16} color={active ? '#fff' : '#6B7280'} />
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{l.key}</Text>
-                </BouncingButton>
+                  <l.Icon size={16} color={active ? tokens.colors.textInverse : tokens.colors.textSecondary} />
+                  <Text allowFontScaling={false} style={[styles.chipText, active && styles.chipTextActive]}>{l.key}</Text>
+                </PressableScale>
               );
             })}
           </View>
@@ -323,26 +344,27 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           <View style={styles.centerPin} pointerEvents="none">
             <Animated.View style={animatedPin}>
               <View style={styles.pinShadow}>
-                <MapPin size={32} color="#FFFFFF" fill="#EF4444" />
+                <MapPin size={32} color={tokens.colors.textInverse} fill={tokens.colors.danger} />
               </View>
             </Animated.View>
           </View>
 
           {/* Locate Me button */}
-          <BouncingButton
+          <PressableScale
             style={[styles.locateBtn, { bottom: 16 }]}
             onPress={() => {
               userDraggedRef.current = false; // allow GPS to re-center when user explicitly asks
-              ReactNativeHapticFeedback.trigger('impactMedium');
+              haptics.selection();
               fetchLocation();
             }}
-            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Locate me using GPS"
           >
             {loadingLocation
-              ? <ActivityIndicator size="small" color={colors.primary} />
-              : <><Navigation size={18} color={colors.primary} style={{ marginRight: 6 }} /><Text style={styles.locateText}>LOCATE ME</Text></>
+              ? <ActivityIndicator size="small" color={tokens.colors.primary} />
+              : <><Navigation size={18} color={tokens.colors.primary} style={{ marginRight: 6 }} /><Text allowFontScaling={false} style={styles.locateText}>LOCATE ME</Text></>
             }
-          </BouncingButton>
+          </PressableScale>
         </View>
       )}
 
@@ -350,29 +372,30 @@ const AddressBookScreen = ({ navigation, route }: any) => {
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 24) }]}>
         {!showDetails && (
           <View style={styles.addressPreview}>
-            <Navigation size={20} color={colors.primary} fill={colors.primary} style={{ marginRight: 14, marginTop: 2 }} />
+            <Navigation size={20} color={tokens.colors.primary} fill={tokens.colors.primary} style={{ marginRight: 14, marginTop: 2 }} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.addressPreviewStreet} numberOfLines={1}>
+              <Text allowFontScaling={false} style={styles.addressPreviewStreet} numberOfLines={1}>
                 {isDragging ? 'Moving…' : (addressText || (loadingLocation ? 'Locating…' : 'Drop pin on map'))}
               </Text>
-              <Text style={styles.addressPreviewFull} numberOfLines={2}>
+              <Text allowFontScaling={false} style={styles.addressPreviewFull} numberOfLines={2}>
                 {isDragging ? '' : (addressFull || addressText)}
               </Text>
             </View>
           </View>
         )}
 
-        <BouncingButton
+        <PressableScale
           style={[styles.btn, (!addressText || isDragging || isBusy) && styles.btnDisabled]}
           disabled={!addressText || isDragging || isBusy}
           onPress={showDetails ? handleSave : handleConfirm}
-          activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel={showDetails ? 'Save Address' : 'Confirm address location'}
         >
           {isBusy
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.btnText}>{showDetails ? 'Save Address' : 'Confirm'}</Text>
+            ? <ActivityIndicator color={tokens.colors.textInverse} />
+            : <Text allowFontScaling={false} style={styles.btnText}>{showDetails ? 'Save Address' : 'Confirm'}</Text>
           }
-        </BouncingButton>
+        </PressableScale>
       </View>
 
       <AddressSearchModal
@@ -398,33 +421,22 @@ const AddressBookScreen = ({ navigation, route }: any) => {
 export default AddressBookScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: tokens.colors.surface },
 
   header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    backgroundColor: tokens.colors.surface,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.md,
     zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 4,
+    ...tokens.shadows.soft,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center', justifyContent: 'center', marginRight: 14,
-  },
-  headerTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: '#1A1A2E' },
   searchBar: {
     flexDirection: 'row', alignItems: 'center',
-    height: 48, backgroundColor: '#fff',
-    borderRadius: 20, paddingHorizontal: 16,
-    borderWidth: 1, borderColor: '#E5E7EB',
+    height: 48, backgroundColor: tokens.colors.surface,
+    borderRadius: tokens.radii.full, paddingHorizontal: tokens.spacing.lg,
+    borderWidth: 1, borderColor: tokens.colors.border,
   },
-  searchBarText: { color: '#9CA3AF', fontSize: 15, fontFamily: fontFamily.medium },
+  searchBarText: { color: tokens.colors.textTertiary, fontSize: 15, fontFamily: tokens.typography.family.medium },
 
   // ── Map step ──
   mapContainer: { flex: 1 },
@@ -433,27 +445,26 @@ const styles = StyleSheet.create({
     marginTop: -40, marginLeft: -14, zIndex: 2,
   },
   pinShadow: {
-    shadowColor: '#EF4444', shadowOffset: { width: 0, height: 8 },
+    shadowColor: tokens.colors.danger, shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08, shadowRadius: 12, elevation: 8,
   },
   locateBtn: {
     position: 'absolute', alignSelf: 'center',
-    flexDirection: 'row', backgroundColor: '#fff',
+    flexDirection: 'row', backgroundColor: tokens.colors.surface,
     paddingHorizontal: 20, paddingVertical: 12,
     borderRadius: 100, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 12, elevation: 6,
-    borderWidth: 1, borderColor: '#E5E7EB', zIndex: 10,
+    ...tokens.shadows.soft,
+    borderWidth: 1, borderColor: tokens.colors.border, zIndex: 10,
   },
-  locateText: { color: colors.primary, fontFamily: fontFamily.bold, fontSize: 13, letterSpacing: 0.5 },
+  locateText: { color: tokens.colors.primary, fontFamily: tokens.typography.family.bold, fontSize: 13, letterSpacing: 0.5 },
 
   // ── Details step ──
-  detailsScroll: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 40 },
+  detailsScroll: { paddingHorizontal: tokens.spacing.xl, paddingTop: 0, paddingBottom: 40 },
   mapPreview: {
     width: '100%', height: 160,
-    borderRadius: 16, overflow: 'hidden',
-    marginBottom: 20,
-    backgroundColor: '#E5E7EB',
+    borderRadius: tokens.radii.xl, overflow: 'hidden',
+    marginBottom: tokens.spacing.xl,
+    backgroundColor: tokens.colors.border,
   },
   mapPreviewPin: {
     position: 'absolute', top: '50%', left: '50%',
@@ -461,47 +472,46 @@ const styles = StyleSheet.create({
   },
   confirmedRow: {
     flexDirection: 'row', alignItems: 'flex-start',
-    paddingHorizontal: 4, marginBottom: 20,
+    paddingHorizontal: 4, marginBottom: tokens.spacing.xl,
   },
-  confirmedStreet: { fontSize: 16, fontFamily: fontFamily.bold, color: '#1A1A2E', marginBottom: 2 },
-  confirmedFull: { fontSize: 13, fontFamily: fontFamily.regular, color: '#6B7280', lineHeight: 18 },
-  changeText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.primary, marginLeft: 12 },
-  divider: { height: 1, backgroundColor: '#F3F4F6', marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: '#1A1A2E', marginBottom: 12 },
+  confirmedStreet: { fontSize: 16, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: 2 },
+  confirmedFull: { fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary, lineHeight: 18 },
+  changeText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary, marginLeft: 12 },
+  divider: { height: 1, backgroundColor: tokens.colors.background, marginBottom: tokens.spacing.xl },
+  sectionTitle: { fontSize: 16, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: tokens.spacing.md },
   input: {
-    backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB',
-    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 15, fontFamily: fontFamily.medium, color: '#1A1A2E',
-    marginBottom: 12,
+    backgroundColor: tokens.colors.background, borderWidth: 1, borderColor: tokens.colors.border,
+    borderRadius: tokens.radii.xl, paddingHorizontal: tokens.spacing.lg, paddingVertical: 14,
+    fontSize: 15, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.md,
   },
   labelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 10,
-    borderRadius: 100, borderWidth: 1, borderColor: '#E5E7EB',
-    backgroundColor: '#fff',
+    borderRadius: 100, borderWidth: 1, borderColor: tokens.colors.border,
+    backgroundColor: tokens.colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipActive: { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.primary },
   chipIcon: { fontSize: 14 },
-  chipText: { fontFamily: fontFamily.bold, fontSize: 13, color: '#6B7280' },
-  chipTextActive: { color: '#fff' },
+  chipText: { fontFamily: tokens.typography.family.bold, fontSize: 13, color: tokens.colors.textSecondary },
+  chipTextActive: { color: tokens.colors.textInverse },
 
   // ── Bottom bar ──
   bottomBar: {
-    backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06, shadowRadius: 12, elevation: 10,
+    backgroundColor: tokens.colors.surface, paddingHorizontal: tokens.spacing.xl, paddingTop: tokens.spacing.lg,
+    ...tokens.shadows.soft,
   },
   addressPreview: {
-    flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16,
+    flexDirection: 'row', alignItems: 'flex-start', marginBottom: tokens.spacing.lg,
   },
-  addressPreviewStreet: { fontSize: 17, fontFamily: fontFamily.bold, color: '#1A1A2E', marginBottom: 2 },
-  addressPreviewFull: { fontSize: 13, fontFamily: fontFamily.regular, color: '#6B7280', lineHeight: 18 },
+  addressPreviewStreet: { fontSize: 17, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: 2 },
+  addressPreviewFull: { fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary, lineHeight: 18 },
   btn: {
     height: 54, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: tokens.colors.primary,
   },
-  btnDisabled: { backgroundColor: '#D1D5DB' },
-  btnText: { color: '#fff', fontFamily: fontFamily.bold, fontSize: 16 },
+  btnDisabled: { backgroundColor: tokens.colors.border },
+  btnText: { color: tokens.colors.textInverse, fontFamily: tokens.typography.family.bold, fontSize: 16 },
 });

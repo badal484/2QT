@@ -26,7 +26,7 @@ interface LeafletMapProps {
   style?: any;
 }
 
-export const LeafletMap: React.FC<LeafletMapProps> = ({
+export const LeafletMap: React.FC<LeafletMapProps> = React.memo(({
   latitude,
   longitude,
   zoom = 15,
@@ -213,4 +213,4 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       style={[style, { flex: 1, backgroundColor: '#E5E3DF' }]}
     />
   );
-};
+});

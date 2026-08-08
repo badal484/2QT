@@ -1,12 +1,20 @@
-import { ArrowLeft, Star } from 'lucide-react-native';
+import { tokens } from '../theme/tokens';
+import { Star } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { api } from '../api/client';
+import { haptics } from '../utils/haptics';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { Button } from '../components/ui/Button';
+import { TextField } from '../components/ui/TextField';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { useFeedback } from '../context/FeedbackContext';
 
 const RateOrderScreen = ({ route, navigation }: any) => {
   const { orderId } = route.params;
+  const { showDialog } = useFeedback();
   const [foodRating, setFoodRating] = useState(0);
   const [deliveryRating, setDeliveryRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -14,70 +22,68 @@ const RateOrderScreen = ({ route, navigation }: any) => {
   const mutation = useMutation({
     mutationFn: (data: any) => api.post(`/orders/${orderId}/feedback`, data),
     onSuccess: () => {
-      Alert.alert('Thank You!', 'Your feedback helps us improve.');
+      haptics.success();
+      showDialog({ title: 'Thank You!', message: 'Your feedback helps us improve.', confirmText: 'Okay', type: 'success' });
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    },
+    onError: () => {
+      haptics.error();
+      showDialog({ title: 'Error', message: 'Could not submit your feedback. Please try again.', confirmText: 'Okay', type: 'error' });
     },
   });
 
+  const canSubmit = foodRating > 0 && deliveryRating > 0 && !mutation.isPending;
+
   return (
     <View style={styles.container}>
-      <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
-        <ArrowLeft size={24} color="#1A1A2E" />
-      </BouncingButton>
+      <ScreenHeader title="Rate your experience" subtitle={`Order #${orderId.slice(-6).toUpperCase()}`} />
 
-      <Text style={styles.title}>Rate your experience</Text>
-      <Text style={styles.orderIdText}>Order #{orderId.slice(-6).toUpperCase()}</Text>
+      <Animated.View entering={FadeInDown.delay(50).duration(300)} style={styles.body}>
+        <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.sectionLabel}>Taste & Quality</Text>
+        <View style={styles.ratingRow}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <PressableScale
+              key={star}
+              onPress={() => { haptics.selection(); setFoodRating(star); }}
+              style={styles.starBtn}
+            >
+              <Star size={24} color={foodRating >= star ? tokens.colors.warning : tokens.colors.border} fill={foodRating >= star ? tokens.colors.warning : 'none'} />
+            </PressableScale>
+          ))}
+        </View>
 
-      {/* Food Rating */}
-      <Text style={styles.sectionLabel}>Taste & Quality</Text>
-      <View style={styles.ratingRow}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <BouncingButton 
-            key={star} 
-            onPress={() => setFoodRating(star)}
-            style={styles.starBtn}
-          >
-            <Star size={24} color={foodRating >= star ? "#EAB308" : "#E5E7EB"} fill={foodRating >= star ? "#EAB308" : "none"} />
-          </BouncingButton>
-        ))}
-      </View>
+        <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.sectionLabel}>Delivery Speed & Care</Text>
+        <View style={styles.ratingRow}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <PressableScale
+              key={star}
+              onPress={() => { haptics.selection(); setDeliveryRating(star); }}
+              style={styles.starBtn}
+            >
+              <Star size={24} color={deliveryRating >= star ? tokens.colors.warning : tokens.colors.border} fill={deliveryRating >= star ? tokens.colors.warning : 'none'} />
+            </PressableScale>
+          ))}
+        </View>
 
-      {/* Delivery Rating */}
-      <Text style={styles.sectionLabel}>Delivery Speed & Care</Text>
-      <View style={styles.ratingRow}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <BouncingButton 
-            key={star} 
-            onPress={() => setDeliveryRating(star)}
-            style={styles.starBtn}
-          >
-            <Star size={24} color={deliveryRating >= star ? "#EAB308" : "#E5E7EB"} fill={deliveryRating >= star ? "#EAB308" : "none"} />
-          </BouncingButton>
-        ))}
-      </View>
+        <TextField
+          label="Additional Comments"
+          placeholder="Anything else you'd like to share?"
+          multiline
+          value={comment}
+          onChangeText={setComment}
+          textAlignVertical="top"
+          style={styles.commentInput}
+          containerStyle={{ marginBottom: tokens.spacing.xl }}
+        />
 
-      <Text style={styles.sectionLabel}>Additional Comments</Text>
-      <TextInput
-        style={styles.commentInput}
-        placeholder="Anything else you'd like to share?"
-        placeholderTextColor="#9ca3af"
-        multiline
-        value={comment}
-        onChangeText={setComment}
-        textAlignVertical="top"
-      />
-
-      <BouncingButton 
-        onPress={() => mutation.mutate({ foodRating, deliveryRating, comment })}
-        disabled={foodRating === 0 || deliveryRating === 0 || mutation.isPending}
-        style={[styles.submitBtn, (foodRating === 0 || deliveryRating === 0) ? styles.submitBtnDisabled : styles.submitBtnEnabled]}
-      >
-        {mutation.isPending ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.submitBtnText}>Submit Feedback</Text>
-        )}
-      </BouncingButton>
+        <Button
+          label={mutation.isPending ? '' : 'Submit Feedback'}
+          onPress={() => mutation.mutate({ foodRating, deliveryRating, comment })}
+          disabled={!canSubmit}
+          loading={mutation.isPending}
+          haptic="none"
+        />
+      </Animated.View>
     </View>
   );
 };
@@ -85,79 +91,36 @@ const RateOrderScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 32,
-    paddingTop: 64,
+    backgroundColor: tokens.colors.surface,
   },
-  backButton: {
-    marginBottom: 24,
-  },
-  title: {
-    color: '#1A1A2E',
-    fontSize: 32,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
-  orderIdText: {
-    color: '#9ca3af',
-    fontSize: 14,
-    marginBottom: 40,
+  body: {
+    paddingHorizontal: tokens.spacing.xl,
+    paddingTop: tokens.spacing.lg,
   },
   sectionLabel: {
-    color: '#1A1A2E',
-    fontWeight: '900',
-    marginBottom: 12,
+    fontFamily: tokens.typography.family.black,
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.md,
     textTransform: 'uppercase',
     letterSpacing: 2,
-    fontSize: 10,
+    fontSize: 11,
   },
   ratingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 32,
-    paddingHorizontal: 16,
+    marginBottom: tokens.spacing.xxl,
+    paddingHorizontal: tokens.spacing.md,
   },
   starBtn: {
     width: 48,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f9fafb',
-    borderRadius: 20,
+    backgroundColor: tokens.colors.background,
+    borderRadius: tokens.radii.lg,
   },
   commentInput: {
-    backgroundColor: '#f9fafb',
-    padding: 24,
-    borderRadius: 24,
-    fontSize: 18,
-    color: '#1A1A2E',
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-    marginBottom: 40,
-    height: 128,
-  },
-  submitBtn: {
-    paddingVertical: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  submitBtnEnabled: {
-    backgroundColor: '#FF6B35',
-  },
-  submitBtnDisabled: {
-    backgroundColor: '#e5e7eb',
-  },
-  submitBtnText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 18,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    minHeight: 96,
   },
 });
 

@@ -1,16 +1,13 @@
+import { tokens } from '../theme/tokens';
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated as RNAnimated, Share, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { BouncingButton } from '../components/ui/BouncingButton';
 import { Tag, Bike, Zap, Gift, ChevronRight, Share2 } from 'lucide-react-native';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-
-const hapticOpts = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
-const triggerSuccess = () => ReactNativeHapticFeedback.trigger('notificationSuccess', hapticOpts);
+import { haptics } from '../utils/haptics';
+import { Button } from '../components/ui/Button';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 
 // Animated counter — counts up from 0 to target
 const AnimatedCounter = ({ target, prefix = '₹', style }: { target: number; prefix?: string; style?: any }) => {
@@ -35,6 +32,7 @@ const AnimatedCounter = ({ target, prefix = '₹', style }: { target: number; pr
       ref={displayRef}
       defaultValue={`${prefix}0.00`}
       editable={false}
+      allowFontScaling={false}
       style={style}
     />
   );
@@ -72,7 +70,7 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
   const subtotal = subtotalPaise / 100;
 
   useEffect(() => {
-    triggerSuccess();
+    haptics.success();
   }, []);
 
   const handleTrack = () => {
@@ -89,11 +87,11 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
 
   const savingsLines = [
     menuOfferDiscountPaise > 0 && {
-      icon: <Tag size={18} color="#059669" />,
+      icon: <Tag size={18} color={tokens.colors.success} />,
       label: 'Item Offers',
       amount: menuOfferDiscountPaise / 100,
-      color: '#059669',
-      bg: '#F0FDF4',
+      color: tokens.colors.success,
+      bg: tokens.colors.successTint,
     },
     promoDiscountPaise > 0 && {
       icon: <Gift size={18} color="#7C3AED" />,
@@ -110,11 +108,11 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
       bg: '#F5F3FF',
     },
     featureLoyalty && loyaltyDiscountPaise > 0 && {
-      icon: <Zap size={18} color="#D97706" />,
+      icon: <Zap size={18} color={tokens.colors.warning} />,
       label: 'Loyalty Points',
       amount: loyaltyDiscountPaise / 100,
-      color: '#D97706',
-      bg: '#FFFBEB',
+      color: tokens.colors.warning,
+      bg: tokens.colors.warningTint,
     },
     walletDeductionPaise > 0 && {
       icon: <Bike size={18} color="#2563EB" />,
@@ -142,29 +140,29 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.emojiRing}>
-          <Text style={styles.emoji}>🎉</Text>
+          <Text allowFontScaling={false} style={styles.emoji}>🎉</Text>
         </View>
-        <Text style={styles.title}>You saved</Text>
+        <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.title}>You saved</Text>
         <AnimatedCounter target={totalSaved} style={styles.totalAmount} />
-        <Text style={styles.subtitle}>on order #{displayId}</Text>
+        <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.subtitle}>on order #{displayId}</Text>
       </View>
 
       {/* Savings breakdown */}
       {savingsLines.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>How you saved</Text>
+          <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.cardTitle}>How you saved</Text>
           {savingsLines.map((line, i) => (
             <View key={i} style={[styles.savingRow, i < savingsLines.length - 1 && styles.savingRowBorder]}>
               <View style={[styles.savingIconBox, { backgroundColor: line.bg }]}>
                 {line.icon}
               </View>
-              <Text style={styles.savingLabel}>{line.label}</Text>
-              <Text style={[styles.savingAmount, { color: line.color }]}>−₹{line.amount.toFixed(2)}</Text>
+              <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.savingLabel}>{line.label}</Text>
+              <Text allowFontScaling={false} style={[styles.savingAmount, { color: line.color }]}>−₹{line.amount.toFixed(2)}</Text>
             </View>
           ))}
           {subtotal > 0 && (
             <View style={styles.savingPercent}>
-              <Text style={styles.savingPercentText}>
+              <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.savingPercentText}>
                 That's {Math.round((totalSaved / subtotal) * 100)}% off your order total
               </Text>
             </View>
@@ -174,25 +172,26 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
 
       {/* Share nudge */}
       {totalSaved > 0 && (
-        <BouncingButton onPress={handleShare} style={styles.shareBtn} activeOpacity={0.85}>
+        <PressableScale onPress={handleShare} style={styles.shareBtn}>
           <Share2 size={16} color="#7C3AED" />
-          <Text style={styles.shareBtnText}>Share your savings</Text>
-        </BouncingButton>
+          <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.shareBtnText}>Share your savings</Text>
+        </PressableScale>
       )}
 
       {/* CTA */}
       <View style={styles.ctaGroup}>
-        <BouncingButton onPress={handleTrack} style={styles.trackBtn} activeOpacity={0.88}>
-          <Text style={styles.trackBtnText}>Track My Order</Text>
-          <ChevronRight size={18} color="#fff" />
-        </BouncingButton>
-        <BouncingButton
+        <Button
+          label="Track My Order"
+          onPress={handleTrack}
+          icon={<ChevronRight size={18} color={tokens.colors.textInverse} />}
+          iconPosition="right"
+        />
+        <PressableScale
           onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] })}
           style={styles.homeBtn}
-          activeOpacity={0.7}
         >
-          <Text style={styles.homeBtnText}>Back to Home</Text>
-        </BouncingButton>
+          <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.homeBtnText}>Back to Home</Text>
+        </PressableScale>
       </View>
     </View>
   );
@@ -203,7 +202,7 @@ export default OrderSavingsScreen;
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     paddingHorizontal: 24,
     overflow: 'hidden',
@@ -216,42 +215,42 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: 28 },
   emojiRing: {
     width: 96, height: 96, borderRadius: 48,
-    backgroundColor: '#FEF9C3',
+    backgroundColor: tokens.colors.warningTint,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 16,
     borderWidth: 4, borderColor: '#FDE68A',
   },
   emoji: { fontSize: 44 },
-  title: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.inkMuted, marginBottom: 4 },
+  title: { fontSize: 18, fontFamily: tokens.typography.family.bold, color: tokens.colors.textSecondary, marginBottom: 4 },
   totalAmount: {
-    fontSize: 52, fontFamily: fontFamily.black, color: '#FC4603', letterSpacing: -2,
+    fontSize: 52, fontFamily: tokens.typography.family.black, color: tokens.colors.primary, letterSpacing: -2,
     height: 64,
     backgroundColor: 'transparent',
     borderWidth: 0,
     padding: 0,
   },
-  subtitle: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.inkFaint, marginTop: 4 },
+  subtitle: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary, marginTop: 4 },
 
   card: {
     width: '100%',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: tokens.colors.background,
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: tokens.colors.border,
   },
-  cardTitle: { fontSize: 13, fontFamily: fontFamily.extrabold, color: colors.inkFaint, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 },
+  cardTitle: { fontSize: 13, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textTertiary, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 },
   savingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
-  savingRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  savingRowBorder: { borderBottomWidth: 1, borderBottomColor: tokens.colors.border },
   savingIconBox: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  savingLabel: { flex: 1, fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink },
-  savingAmount: { fontSize: 15, fontFamily: fontFamily.black },
+  savingLabel: { flex: 1, fontSize: 14, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textPrimary },
+  savingAmount: { fontSize: 15, fontFamily: tokens.typography.family.black },
   savingPercent: {
-    marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: tokens.colors.border,
     alignItems: 'center',
   },
-  savingPercentText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#FC4603' },
+  savingPercentText: { fontSize: 13, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary },
 
   shareBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -259,17 +258,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
     borderWidth: 1, borderColor: '#DDD6FE',
     marginBottom: 24,
+    minHeight: 44,
   },
-  shareBtnText: { fontSize: 14, fontFamily: fontFamily.bold, color: '#7C3AED' },
+  shareBtnText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: '#7C3AED' },
 
   ctaGroup: { width: '100%', gap: 12, marginTop: 'auto' },
-  trackBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#FC4603',
-    borderRadius: 22, paddingVertical: 16,
-    width: '100%',
-  },
-  trackBtnText: { fontSize: 16, fontFamily: fontFamily.black, color: '#FFFFFF' },
-  homeBtn: { alignItems: 'center', paddingVertical: 12 },
-  homeBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.inkMuted },
+  homeBtn: { alignItems: 'center', paddingVertical: 12, minHeight: 44, justifyContent: 'center' },
+  homeBtnText: { fontSize: 14, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textSecondary },
 });

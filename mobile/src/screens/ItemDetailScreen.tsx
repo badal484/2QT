@@ -1,22 +1,23 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, StyleSheet,
   StatusBar, useWindowDimensions, Alert, Image
 } from 'react-native';
-import Svg, { Path, Rect, Circle, Text as SvgText, Line, Ellipse } from 'react-native-svg';
+import Share from 'react-native-share';
+import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft } from 'lucide-react-native';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import { ChevronLeft, Share2 } from 'lucide-react-native';
 import { NetworkImage } from '../components/NetworkImage';
 import { CustomizationBottomSheet } from '../components/ui/CustomizationBottomSheet';
-import { RootState } from '../store';
+import { RootState, store } from '../store';
 import { addItem, setQuantity, clearCart } from '../store/slices/cartSlice';
 import { api } from '../api/client';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
+import { haptics } from '../utils/haptics';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { useFeedback } from '../context/FeedbackContext';
 
 
 
@@ -31,49 +32,43 @@ const PremiumBag = () => (
   </View>
 );
 
-function haptic() {
-  ReactNativeHapticFeedback.trigger('impactLight', {
-    enableVibrateFallback: false,
-    ignoreAndroidSystemSettings: true,
-  });
-}
-
 const RelatedItemCard = React.memo(({ ri, onAdd, dispatch, navigation }: any) => {
   const riCart = useSelector((state: RootState) => state.cart.items.find(ci => ci.menuItemId === ri.id));
-  const riVeg = ri.is_egg ? '#EAB308' : ri.is_veg ? '#22C55E' : '#EF4444';
+  const riVeg = ri.is_egg ? tokens.colors.warning : ri.is_veg ? tokens.colors.success : tokens.colors.danger;
   return (
-    <BouncingButton
+    <PressableScale
       style={s.relatedCard}
-      activeOpacity={0.92}
       onPress={() => navigation.replace('ItemDetail', { item: ri })}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${ri.name}`}
     >
       <View style={s.relatedImgBox}>
         {ri.photo_url ? (
           <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
         ) : (
           <View style={[s.relatedImg, s.heroPlaceholder]}>
-            <Text style={{ fontSize: 24 }}>🍽️</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 24 }}>🍽️</Text>
           </View>
         )}
         {ri.is_bestseller && (
           <View style={s.relatedBadge}>
-            <Text style={s.relatedBadgeText}>★ Bestseller</Text>
+            <Text allowFontScaling={false} style={s.relatedBadgeText}>★ Bestseller</Text>
           </View>
         )}
       </View>
       {ri.available && !riCart ? (
-        <BouncingButton style={s.relatedAddBtn} onPress={() => { haptic(); onAdd(ri); }} activeOpacity={0.85}>
-          <Text style={s.relatedAddText}>ADD</Text>
-        </BouncingButton>
+        <PressableScale style={s.relatedAddBtn} onPress={() => { haptics.selection(); onAdd(ri); }} accessibilityRole="button" accessibilityLabel="Add to cart">
+          <Text allowFontScaling={false} style={s.relatedAddText}>ADD</Text>
+        </PressableScale>
       ) : ri.available && riCart ? (
         <View style={s.relatedQtyBox}>
-          <BouncingButton hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }}>
-            <Text style={s.relatedQtyBtn}>−</Text>
-          </BouncingButton>
-          <Text style={s.relatedQtyVal}>{riCart.quantity}</Text>
-          <BouncingButton hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }}>
-            <Text style={s.relatedQtyBtn}>+</Text>
-          </BouncingButton>
+          <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }} accessibilityRole="button" accessibilityLabel="Decrease quantity">
+            <Text allowFontScaling={false} style={s.relatedQtyBtn}>−</Text>
+          </PressableScale>
+          <Text allowFontScaling={false} style={s.relatedQtyVal}>{riCart.quantity}</Text>
+          <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }} accessibilityRole="button" accessibilityLabel="Increase quantity">
+            <Text allowFontScaling={false} style={s.relatedQtyBtn}>+</Text>
+          </PressableScale>
         </View>
       ) : null}
       <View style={s.relatedMeta}>
@@ -82,13 +77,13 @@ const RelatedItemCard = React.memo(({ ri, onAdd, dispatch, navigation }: any) =>
         </View>
         {ri.tags?.[0] && (
           <View style={[s.servePill, { paddingHorizontal: 6, paddingVertical: 2 }]}>
-            <Text style={[s.servePillText, { fontSize: 9 }]}>{ri.tags[0]}</Text>
+            <Text allowFontScaling={false} style={[s.servePillText, { fontSize: 9 }]}>{ri.tags[0]}</Text>
           </View>
         )}
       </View>
-      <Text style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
-      <Text style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
-    </BouncingButton>
+      <Text allowFontScaling={false} style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
+      <Text allowFontScaling={false} style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
+    </PressableScale>
   );
 });
 
@@ -96,6 +91,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   const { width: SCREEN_W } = useWindowDimensions();
   const { item } = route.params;
   const dispatch = useDispatch();
+  const { showDialog } = useFeedback();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
@@ -134,7 +130,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   });
   const promos: any[] = promosData?.codes ?? [];
 
-  const vegColor = item.is_egg ? '#EAB308' : item.is_veg ? '#22C55E' : '#EF4444';
+  const vegColor = item.is_egg ? tokens.colors.warning : item.is_veg ? tokens.colors.success : tokens.colors.danger;
   const price = item.price_paise / 100;
   const qty = cartItem?.quantity ?? 0;
   const totalPrice = price * (qty || 1);
@@ -158,16 +154,23 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
           instructions: instructions || undefined,
         }),
       );
-    const current = cartItemsRef.current;
+    const current = store.getState().cart.items;
     if (current.length > 0 && current[0].kitchenId !== itemToAdd.kitchen_id) {
-      Alert.alert('Replace cart?', 'Your cart has items from a different kitchen.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Replace', style: 'destructive', onPress: () => { dispatch(clearCart()); doAdd(); } },
-      ]);
+      showDialog({
+        title: 'Replace cart?',
+        message: 'Your cart has items from a different kitchen.',
+        confirmText: 'Replace',
+        cancelText: 'Cancel',
+        type: 'warning',
+        onConfirm: () => {
+          dispatch(clearCart());
+          doAdd();
+        }
+      });
     } else {
       doAdd();
     }
-  }, [dispatch]);
+  }, [dispatch, showDialog]);
 
   const handleAddWithCheck = useCallback((itemToAdd: any) => {
     if (itemToAdd.customization_groups?.length > 0) {
@@ -177,15 +180,59 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
     }
   }, [handleAdd]);
 
+  const handleShare = useCallback(async () => {
+    try {
+      haptics.selection();
+      const appLink = `https://2qt.in/menu/${item.id}`;
+      const message = `Check out ${item.name} at 2QT for just ₹${item.price_paise / 100}! It's incredibly fresh and delicious!\n\n${appLink}`;
+      
+      if (item.photo_url) {
+        const response = await fetch(item.photo_url);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64data = reader.result as string;
+          await Share.open({
+            message: message,
+            url: base64data,
+            type: 'image/jpeg',
+          });
+        };
+        reader.readAsDataURL(blob);
+      } else {
+        await Share.open({ message });
+      }
+    } catch (error) {
+      console.log('User cancelled or error:', error);
+    }
+  }, [item]);
+
+  // Brief confirmation pulse on the sticky price whenever quantity changes —
+  // the one moment on this screen that most benefits from tactile feedback.
+  const priceScale = useSharedValue(1);
+  const isFirstRender = useRef(true);
+  React.useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    priceScale.value = withSequence(
+      withTiming(1.15, { duration: 120 }),
+      withTiming(1, { duration: 150 }),
+    );
+  }, [qty, priceScale]);
+  const pricePulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: priceScale.value }] }));
+
   return (
     <View style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
 
       {/* ── Floating Header ── */}
-      <View style={[s.header, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
-        <BouncingButton style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
-          <ChevronLeft size={22} color={colors.ink} strokeWidth={2.5} />
-        </BouncingButton>
+      <View style={[s.header, { paddingTop: insets.top + 10, flexDirection: 'row', justifyContent: 'space-between', width: '100%' }]} pointerEvents="box-none">
+        <PressableScale style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back">
+          <ChevronLeft size={22} color={tokens.colors.textPrimary} strokeWidth={2.5} />
+        </PressableScale>
+        
+        <PressableScale style={[s.backBtn, { marginRight: 16 }]} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share item">
+          <Share2 size={20} color={tokens.colors.textPrimary} strokeWidth={2.5} />
+        </PressableScale>
       </View>
 
       <ScrollView
@@ -195,70 +242,72 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
         bounces={false}
       >
         {/* ── Hero image ── */}
-        <View style={[s.heroBox, { width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }]}>
+        <Animated.View entering={FadeIn.duration(tokens.motion.duration.normal)} style={[s.heroBox, { width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }]}>
           {item.photo_url ? (
             <NetworkImage uri={item.photo_url} style={s.heroImg} />
           ) : (
             <View style={[s.heroImg, s.heroPlaceholder]}>
-              <Text style={s.heroEmoji}>🍽️</Text>
+              <Text allowFontScaling={false} style={s.heroEmoji}>🍽️</Text>
             </View>
           )}
-        </View>
+        </Animated.View>
 
         {/* ── Item info ── */}
-        <View style={s.infoBlock}>
+        <Animated.View entering={FadeInDown.duration(tokens.motion.duration.normal).delay(80)} style={s.infoBlock}>
           <View style={s.badgeRow}>
             <View style={[s.vegBox, { borderColor: vegColor }]}>
               <View style={[s.vegDot, { backgroundColor: vegColor }]} />
             </View>
             {!!serveTag && (
               <View style={s.servePill}>
-                <Text style={s.servePillText}>{serveTag}</Text>
+                <Text allowFontScaling={false} style={s.servePillText}>{serveTag}</Text>
               </View>
             )}
             {item.is_bestseller && (
               <View style={s.bestsellerPill}>
-                <Text style={s.bestsellerText}>★ Bestseller</Text>
+                <Text allowFontScaling={false} style={s.bestsellerText}>★ Bestseller</Text>
               </View>
             )}
           </View>
 
-          <Text style={s.itemName}>{item.name}</Text>
+          <Text allowFontScaling={false} style={s.itemName}>{item.name}</Text>
 
           {!!item.description && (
-            <Text style={s.itemDesc}>{item.description}</Text>
+            <Text allowFontScaling={false} style={s.itemDesc}>{item.description}</Text>
           )}
 
           {(item.tags?.length ?? 0) > 0 && (
             <>
-              <BouncingButton
+              <PressableScale
                 style={s.detailToggle}
-                onPress={() => { haptic(); setShowDetails(v => !v); }}
-                activeOpacity={0.7}
+                onPress={() => setShowDetails(v => !v)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel="Toggle dish details"
               >
-                <Text style={s.detailToggleText}>
+                <Text allowFontScaling={false} style={s.detailToggleText}>
                   {showDetails ? 'Hide dish details ∧' : 'Show dish details ∨'}
                 </Text>
-              </BouncingButton>
+              </PressableScale>
               {showDetails && (
                 <View style={s.tagsWrap}>
                   {(item.tags as string[]).map((tag: string) => (
                     <View key={tag} style={s.tagChip}>
-                      <Text style={s.tagChipText}>{tag}</Text>
+                      <Text allowFontScaling={false} style={s.tagChipText}>{tag}</Text>
                     </View>
                   ))}
                 </View>
               )}
             </>
           )}
-        </View>
+        </Animated.View>
 
         {/* ── People also bought ── */}
         {relatedItems.length > 0 && (
           <>
             <View style={s.divider} />
             <View style={s.section}>
-              <Text style={s.sectionTitle}>People also bought</Text>
+              <Text allowFontScaling={false} style={s.sectionTitle}>People also bought</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -283,21 +332,21 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
         <View style={s.brandSection}>
           {/* Ghost text — "Order it / 2QT IT" mimicking WISH IT / SWISH IT */}
           <View style={s.brandGhostBox} pointerEvents="none">
-            <Text style={s.brandGhostScript}>Order it</Text>
-            <Text style={s.brandGhostBold}>2QT IT</Text>
+            <Text allowFontScaling={false} style={s.brandGhostScript}>Order it</Text>
+            <Text allowFontScaling={false} style={s.brandGhostBold}>2QT IT</Text>
           </View>
           {/* Bag + side labels */}
           <View style={s.brandRow}>
             <View style={[s.brandSide, { alignItems: 'flex-end' }]}>
-              <Text style={s.brandSideText}>FRESH{'\n'}QUICK{'\n'}DELICIOUS</Text>
+              <Text allowFontScaling={false} style={s.brandSideText}>FRESH{'\n'}QUICK{'\n'}DELICIOUS</Text>
             </View>
             <PremiumBag />
             <View style={[s.brandSide, { alignItems: 'flex-start' }]}>
-              <Text style={s.brandSideText}>FRESH FOOD{'\n'}DELIVERED{'\n'}FAST</Text>
+              <Text allowFontScaling={false} style={s.brandSideText}>FRESH FOOD{'\n'}DELIVERED{'\n'}FAST</Text>
             </View>
           </View>
           {/* Tagline */}
-          <Text style={s.brandTagline}>Quality. Quantity. Taste.</Text>
+          <Text allowFontScaling={false} style={s.brandTagline}>Quality. Quantity. Taste.</Text>
         </View>
 
         {/* ── Coupon carousel ── */}
@@ -312,20 +361,20 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
               {promos.map((promo, idx) => (
                 <View key={promo.id ?? idx} style={[s.promoCard, { width: SCREEN_W - 64 }]}>
                   <View style={s.promoIconBox}>
-                    <Text style={s.promoIconText}>%</Text>
+                    <Text allowFontScaling={false} style={s.promoIconText}>%</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.promoTitle} numberOfLines={1}>
+                    <Text allowFontScaling={false} style={s.promoTitle} numberOfLines={1}>
                       {promo.discount_type === 'percentage'
                         ? `${promo.discount_percent}% upto ₹${promo.max_discount_paise / 100} Off`
                         : `₹${promo.discount_flat_paise / 100} Off`}
                     </Text>
-                    <Text style={s.promoSub}>
+                    <Text allowFontScaling={false} style={s.promoSub}>
                       USE {promo.code}
                       {promo.min_order_paise ? ` | ABOVE ₹${promo.min_order_paise / 100}` : ''}
                     </Text>
                   </View>
-                  <Text style={s.promoIdx}>{idx + 1}/{promos.length}</Text>
+                  <Text allowFontScaling={false} style={s.promoIdx}>{idx + 1}/{promos.length}</Text>
                 </View>
               ))}
             </ScrollView>
@@ -337,16 +386,17 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
       <View style={[s.stickyBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {/* View Cart strip — appears when anything is in the cart */}
         {cartCount > 0 && (
-          <BouncingButton
+          <PressableScale
             style={s.viewCartRow}
             onPress={() => navigation.navigate('Cart')}
-            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="View Cart"
           >
-            <Text style={s.viewCartLeft}>
+            <Text allowFontScaling={false} style={s.viewCartLeft}>
               {cartCount} item{cartCount > 1 ? 's' : ''}  ·  ₹{cartTotal % 1 === 0 ? cartTotal : cartTotal.toFixed(0)}
             </Text>
-            <Text style={s.viewCartRight}>View Cart  →</Text>
-          </BouncingButton>
+            <Text allowFontScaling={false} style={s.viewCartRight}>View Cart  →</Text>
+          </PressableScale>
         )}
         {/* Main item row */}
         <View style={s.stickyMain}>
@@ -354,42 +404,47 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
             {item.photo_url && (
               <NetworkImage uri={item.photo_url} style={s.stickyThumb} />
             )}
-            <Text style={s.stickyPrice}>
+            <Animated.Text allowFontScaling={false} style={[s.stickyPrice, pricePulseStyle]}>
               ₹{totalPrice % 1 === 0 ? totalPrice : totalPrice.toFixed(0)}
-            </Text>
+            </Animated.Text>
           </View>
           <View style={s.stickyRight}>
             {item.available === false ? (
               <View style={s.soldOutBadge}>
-                <Text style={s.soldOutText}>Sold Out</Text>
+                <Text allowFontScaling={false} style={s.soldOutText}>Sold Out</Text>
               </View>
             ) : (
               <>
-                <Text style={s.customiseLabel}>Customise</Text>
+                <Text allowFontScaling={false} style={s.customiseLabel}>Customise</Text>
                 {qty > 0 ? (
                   <View style={s.qtyControl}>
-                    <BouncingButton
+                    <PressableScale
                       hitSlop={{ top: 8, bottom: 8, left: 10, right: 6 }}
-                      onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: qty - 1 })); }}
+                      onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.id, quantity: qty - 1 })); }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Decrease quantity"
                     >
-                      <Text style={s.qtyCtrlBtn}>−</Text>
-                    </BouncingButton>
-                    <Text style={s.qtyCtrlVal}>{qty}</Text>
-                    <BouncingButton
+                      <Text allowFontScaling={false} style={s.qtyCtrlBtn}>−</Text>
+                    </PressableScale>
+                    <Text allowFontScaling={false} style={s.qtyCtrlVal}>{qty}</Text>
+                    <PressableScale
                       hitSlop={{ top: 8, bottom: 8, left: 6, right: 10 }}
-                      onPress={() => { haptic(); dispatch(setQuantity({ menuItemId: item.id, quantity: qty + 1 })); }}
+                      onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.id, quantity: qty + 1 })); }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Increase quantity"
                     >
-                      <Text style={s.qtyCtrlBtn}>+</Text>
-                    </BouncingButton>
+                      <Text allowFontScaling={false} style={s.qtyCtrlBtn}>+</Text>
+                    </PressableScale>
                   </View>
                 ) : (
-                  <BouncingButton
+                  <PressableScale
                     style={s.addBtn}
-                    onPress={() => { haptic(); handleAddWithCheck(item); }}
-                    activeOpacity={0.88}
+                    onPress={() => { haptics.selection(); handleAddWithCheck(item); }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add to cart"
                   >
-                    <Text style={s.addBtnText}>Add</Text>
-                  </BouncingButton>
+                    <Text allowFontScaling={false} style={s.addBtnText}>Add</Text>
+                  </PressableScale>
                 )}
               </>
             )}
@@ -412,11 +467,11 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
 };
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#FFFFFF' },
+  root: { flex: 1, backgroundColor: tokens.colors.surface },
   header: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: tokens.spacing.lg,
   },
   backBtn: {
     width: 40,
@@ -425,27 +480,23 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    ...tokens.shadows.soft,
   },
 
   scroll: { flex: 1 },
-  heroBox: { backgroundColor: '#F9FAFB' },
+  heroBox: { backgroundColor: tokens.colors.background },
   heroImg: { width: '100%', height: '100%' },
   heroPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   heroEmoji: { fontSize: 70 },
 
   infoBlock: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -24,
+    paddingHorizontal: tokens.spacing.xl,
+    paddingTop: tokens.spacing.xl,
+    paddingBottom: tokens.spacing.xl,
+    backgroundColor: tokens.colors.surface,
+    borderTopLeftRadius: tokens.radii.xxl,
+    borderTopRightRadius: tokens.radii.xxl,
+    marginTop: -tokens.spacing.xl,
   },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   vegBox: {
@@ -467,7 +518,7 @@ const s = StyleSheet.create({
   },
   servePillText: {
     fontSize: 11,
-    fontFamily: fontFamily.semibold,
+    fontFamily: tokens.typography.family.semibold,
     color: '#7A5C00',
   },
   bestsellerPill: {
@@ -480,41 +531,41 @@ const s = StyleSheet.create({
   },
   bestsellerText: {
     fontSize: 11,
-    fontFamily: fontFamily.semibold,
+    fontFamily: tokens.typography.family.semibold,
     color: '#92400E',
   },
   itemName: {
     fontSize: 22,
-    fontFamily: fontFamily.black,
-    color: colors.ink,
+    fontFamily: tokens.typography.family.black,
+    color: tokens.colors.textPrimary,
     lineHeight: 28,
     letterSpacing: -0.5,
     marginBottom: 6,
   },
   itemDesc: {
     fontSize: 13,
-    fontFamily: fontFamily.regular,
-    color: colors.inkMuted,
+    fontFamily: tokens.typography.family.regular,
+    color: tokens.colors.textSecondary,
     lineHeight: 18,
     marginBottom: 10,
   },
   detailToggle: { alignSelf: 'flex-start', marginTop: 4 },
   detailToggleText: {
     fontSize: 14,
-    fontFamily: fontFamily.semibold,
-    color: colors.primary,
+    fontFamily: tokens.typography.family.semibold,
+    color: tokens.colors.primary,
   },
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   tagChip: {
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: '#FFEDD5',
   },
   tagChipText: {
     fontSize: 12,
-    fontFamily: fontFamily.semibold,
-    color: colors.primary,
+    fontFamily: tokens.typography.family.semibold,
+    color: tokens.colors.primary,
   },
 
   divider: { height: 28 },
@@ -522,25 +573,25 @@ const s = StyleSheet.create({
   section: { paddingTop: 18, paddingBottom: 6 },
   sectionTitle: {
     fontSize: 17,
-    fontFamily: fontFamily.black,
-    color: colors.ink,
+    fontFamily: tokens.typography.family.black,
+    color: tokens.colors.textPrimary,
     letterSpacing: -0.3,
-    marginBottom: 12,
-    paddingHorizontal: 16,
+    marginBottom: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.lg,
   },
-  relatedRow: { paddingHorizontal: 16, paddingBottom: 16 },
+  relatedRow: { paddingHorizontal: tokens.spacing.lg, paddingBottom: tokens.spacing.lg },
 
   relatedCard: {
     width: 130,
-    backgroundColor: '#FFFFFF',
-    marginRight: 16,
+    backgroundColor: tokens.colors.surface,
+    marginRight: tokens.spacing.lg,
   },
   relatedImgBox: {
     width: '100%',
     height: 120,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: tokens.colors.background,
     marginBottom: 24, // Space for the floating button
   },
   relatedImg: { width: '100%', height: '100%' },
@@ -555,7 +606,7 @@ const s = StyleSheet.create({
   },
   relatedBadgeText: {
     fontSize: 9,
-    fontFamily: fontFamily.semibold,
+    fontFamily: tokens.typography.family.semibold,
     color: '#92400E',
   },
   relatedAddBtn: {
@@ -565,22 +616,18 @@ const s = StyleSheet.create({
     width: 90,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: tokens.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    ...tokens.shadows.soft,
     zIndex: 10,
   },
   relatedAddText: {
     fontSize: 14,
-    color: colors.primary,
-    fontFamily: fontFamily.black,
+    color: tokens.colors.primary,
+    fontFamily: tokens.typography.family.black,
     letterSpacing: 0.5,
   },
   relatedQtyBox: {
@@ -592,40 +639,36 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.primary,
+    backgroundColor: tokens.colors.primary,
     borderRadius: 16,
     paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    ...tokens.shadows.soft,
     zIndex: 10,
   },
   relatedQtyBtn: {
     fontSize: 18,
-    color: '#FFFFFF',
-    fontFamily: fontFamily.bold,
+    color: tokens.colors.surface,
+    fontFamily: tokens.typography.family.bold,
     lineHeight: 20,
   },
   relatedQtyVal: {
     fontSize: 14,
-    color: '#FFFFFF',
-    fontFamily: fontFamily.bold,
+    color: tokens.colors.surface,
+    fontFamily: tokens.typography.family.bold,
     textAlign: 'center',
   },
   relatedMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   relatedName: {
     fontSize: 13,
-    fontFamily: fontFamily.bold,
-    color: colors.ink,
+    fontFamily: tokens.typography.family.bold,
+    color: tokens.colors.textPrimary,
     lineHeight: 18,
     marginBottom: 4,
   },
   relatedPrice: {
     fontSize: 14,
-    fontFamily: fontFamily.extrabold,
-    color: colors.ink,
+    fontFamily: tokens.typography.family.extrabold,
+    color: tokens.colors.textPrimary,
     letterSpacing: -0.3,
   },
 
@@ -634,7 +677,7 @@ const s = StyleSheet.create({
     paddingTop: 30,
     paddingBottom: 40,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -648,7 +691,7 @@ const s = StyleSheet.create({
     zIndex: 0,
   },
   brandGhostScript: {
-    fontFamily: fontFamily.medium,
+    fontFamily: tokens.typography.family.medium,
     fontStyle: 'italic',
     fontSize: 54,
     color: 'rgba(0,0,0,0.035)',
@@ -656,7 +699,7 @@ const s = StyleSheet.create({
     lineHeight: 60,
   },
   brandGhostBold: {
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     fontSize: 64,
     color: 'rgba(0,0,0,0.035)',
     letterSpacing: 4,
@@ -664,7 +707,7 @@ const s = StyleSheet.create({
     marginTop: -20,
   },
   brandTagline: {
-    fontFamily: fontFamily.medium,
+    fontFamily: tokens.typography.family.medium,
     fontSize: 11,
     color: 'rgba(0,0,0,0.28)',
     letterSpacing: 1.5,
@@ -682,14 +725,14 @@ const s = StyleSheet.create({
   brandSide: { flex: 1 },
   brandSideText: {
     fontSize: 10,
-    fontFamily: fontFamily.bold,
+    fontFamily: tokens.typography.family.bold,
     color: 'rgba(0,0,0,0.25)',
     letterSpacing: 1.2,
     lineHeight: 18,
   },
 
   // Coupon
-  promoRow: { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
+  promoRow: { paddingHorizontal: tokens.spacing.lg, paddingVertical: 14, gap: 10 },
   promoCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -705,20 +748,20 @@ const s = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.primary,
+    backgroundColor: tokens.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  promoIconText: { fontSize: 16, color: '#FFFFFF', fontFamily: fontFamily.black },
-  promoTitle: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary, lineHeight: 18 },
+  promoIconText: { fontSize: 16, color: tokens.colors.surface, fontFamily: tokens.typography.family.black },
+  promoTitle: { fontSize: 13, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary, lineHeight: 18 },
   promoSub: {
     fontSize: 11,
-    fontFamily: fontFamily.semibold,
-    color: colors.primary,
+    fontFamily: tokens.typography.family.semibold,
+    color: tokens.colors.primary,
     opacity: 0.7,
     marginTop: 1,
   },
-  promoIdx: { fontSize: 11, fontFamily: fontFamily.semibold, color: colors.inkMuted, alignSelf: 'flex-start' },
+  promoIdx: { fontSize: 11, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textSecondary, alignSelf: 'flex-start' },
 
   // Sticky bar
   stickyBar: {
@@ -726,18 +769,18 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: tokens.colors.border,
     flexDirection: 'column',
-    paddingHorizontal: 16,
+    paddingHorizontal: tokens.spacing.lg,
     paddingTop: 10,
   },
   viewCartRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.primary,
+    backgroundColor: tokens.colors.primary,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -745,13 +788,13 @@ const s = StyleSheet.create({
   },
   viewCartLeft: {
     fontSize: 13,
-    fontFamily: fontFamily.semibold,
-    color: '#FFFFFF',
+    fontFamily: tokens.typography.family.semibold,
+    color: tokens.colors.surface,
   },
   viewCartRight: {
     fontSize: 13,
-    fontFamily: fontFamily.extrabold,
-    color: '#FFFFFF',
+    fontFamily: tokens.typography.family.extrabold,
+    color: tokens.colors.surface,
     letterSpacing: 0.2,
   },
   stickyMain: {
@@ -760,13 +803,13 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
   },
   stickyLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  stickyThumb: { width: 48, height: 48, borderRadius: 20, backgroundColor: '#F9FAFB' },
-  stickyPrice: { fontSize: 22, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
+  stickyThumb: { width: 48, height: 48, borderRadius: 20, backgroundColor: tokens.colors.background },
+  stickyPrice: { fontSize: 22, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 },
   stickyRight: { alignItems: 'flex-end', justifyContent: 'center' },
   customiseLabel: {
     fontSize: 10,
-    fontFamily: fontFamily.bold,
-    color: colors.inkMuted,
+    fontFamily: tokens.typography.family.bold,
+    color: tokens.colors.textSecondary,
     letterSpacing: 0.5,
     marginBottom: 4,
     marginRight: 4,
@@ -774,16 +817,16 @@ const s = StyleSheet.create({
   addBtn: {
     width: 116,
     height: 42,
-    backgroundColor: colors.primary,
+    backgroundColor: tokens.colors.primary,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addBtnText: { fontSize: 17, fontFamily: fontFamily.extrabold, color: '#FFFFFF', letterSpacing: 0.3 },
+  addBtnText: { fontSize: 17, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.surface, letterSpacing: 0.3 },
   qtyControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: tokens.colors.primary,
     borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -791,11 +834,11 @@ const s = StyleSheet.create({
     width: 116,
     justifyContent: 'center',
   },
-  qtyCtrlBtn: { fontSize: 22, fontFamily: fontFamily.bold, color: '#FFFFFF', lineHeight: 26 },
+  qtyCtrlBtn: { fontSize: 22, fontFamily: tokens.typography.family.bold, color: tokens.colors.surface, lineHeight: 26 },
   qtyCtrlVal: {
     fontSize: 17,
-    fontFamily: fontFamily.bold,
-    color: '#FFFFFF',
+    fontFamily: tokens.typography.family.bold,
+    color: tokens.colors.surface,
     minWidth: 22,
     textAlign: 'center',
   },
@@ -811,7 +854,7 @@ const s = StyleSheet.create({
   },
   soldOutText: {
     fontSize: 14,
-    fontFamily: fontFamily.bold,
+    fontFamily: tokens.typography.family.bold,
     color: '#9E9E9E',
     letterSpacing: 0.3,
   },

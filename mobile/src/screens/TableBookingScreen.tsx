@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
@@ -14,8 +15,10 @@ import { api } from '../api/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import { spacing, radius } from '../theme/spacing';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { NetworkImage } from '../components/NetworkImage';
+import { useFeedback } from '../context/FeedbackContext';
 
 let RazorpayCheckout: any = null;
 try { RazorpayCheckout = require('react-native-razorpay').default; } catch (_) {}
@@ -35,6 +38,7 @@ const formatTime = (iso: string) => {
 const TableBookingScreen = ({ navigation, route }: any) => {
   const { restaurantId, restaurantName } = route.params;
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
 
   // Step state
   const [step, setStep] = useState(0);
@@ -115,41 +119,38 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     onError: (err: any) => {
       const msg = err?.message || '';
       if (msg === 'NO_TABLE_AVAILABLE') {
-        Alert.alert('No Tables Available', 'All tables are booked for this slot. Please choose a different time.');
+        showDialog({ title: 'No Tables Available', message: 'All tables are booked for this slot. Please choose a different time.', confirmText: 'Okay', type: 'warning' });
       } else if (msg === 'INSUFFICIENT_WALLET_BALANCE') {
-        Alert.alert(
-          'Insufficient Wallet Balance',
-          `Your wallet doesn't have enough balance. Pay ₹${(totalDueNow / 100).toFixed(0)} via UPI or Card instead?`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Pay via UPI / Card',
-              onPress: () => {
-                const items = Object.entries(preOrderItems)
-                  .filter(([, qty]) => qty > 0)
-                  .map(([menuItemId, quantity]) => ({ menuItemId, quantity: quantity as number }));
-                createBooking.mutate({
-                  restaurantId, slotStart: selectedSlot.slotStart, slotEnd: selectedSlot.slotEnd,
-                  partySize, preOrderItems: items,
-                  specialRequests: specialRequests.trim() || undefined,
-                  occasion: occasion.trim() || undefined,
-                  paymentMethod: 'razorpay',
-                });
-              },
-            },
-          ]
-        );
+        showDialog({
+          title: 'Insufficient Wallet Balance',
+          message: `Your wallet doesn't have enough balance. Pay ₹${(totalDueNow / 100).toFixed(0)} via UPI or Card instead?`,
+          confirmText: 'Pay via UPI / Card',
+          cancelText: 'Cancel',
+          type: 'warning',
+          onConfirm: () => {
+            const items = Object.entries(preOrderItems)
+              .filter(([, qty]) => qty > 0)
+              .map(([menuItemId, quantity]) => ({ menuItemId, quantity: quantity as number }));
+            createBooking.mutate({
+              restaurantId, slotStart: selectedSlot.slotStart, slotEnd: selectedSlot.slotEnd,
+              partySize, preOrderItems: items,
+              specialRequests: specialRequests.trim() || undefined,
+              occasion: occasion.trim() || undefined,
+              paymentMethod: 'razorpay',
+            });
+          }
+        });
       } else if (msg === 'ALREADY_BOOKED_THIS_SLOT') {
-        Alert.alert('Already Booked', 'You already have a booking for this time slot.');
+        showDialog({ title: 'Already Booked', message: 'You already have a booking for this time slot.', confirmText: 'Okay', type: 'warning' });
       } else {
-        Alert.alert('Booking Failed', msg || 'Please try again.');
+        showDialog({ title: 'Booking Failed', message: msg || 'Please try again.', confirmText: 'Okay', type: 'error' });
       }
     },
   });
 
   const openRazorpay = useCallback((rzpOrderId: string, bookingId: string, amountPaise: number, rzpKey: string) => {
     if (!RazorpayCheckout) {
-      Alert.alert('Error', 'Payment module not available.');
+      showDialog({ title: 'Error', message: 'Payment module not available.', confirmText: 'Okay', type: 'error' });
       return;
     }
     const options = {
@@ -171,16 +172,19 @@ const TableBookingScreen = ({ navigation, route }: any) => {
             razorpaySignature: response.razorpay_signature,
           });
         } catch {
-          Alert.alert('Payment Pending', 'Payment received but confirmation is delayed. Your booking details will update shortly.');
+          showDialog({ title: 'Payment Pending', message: 'Payment received but confirmation is delayed. Your booking details will update shortly.', confirmText: 'Okay', type: 'warning' });
         }
         navigation.replace('TableBookingConfirmed', { bookingId });
       })
       .catch(() => {
-        Alert.alert(
-          'Payment Pending',
-          'Your booking is saved. Complete the payment from your booking details.',
-          [{ text: 'View Booking', onPress: () => navigation.replace('TableBookingDetail', { bookingId }) }],
-        );
+        showDialog({
+          title: 'Payment Pending',
+          message: 'Your booking is saved. Complete the payment from your booking details.',
+          confirmText: 'View Booking',
+          cancelText: 'Cancel',
+          type: 'info',
+          onConfirm: () => navigation.replace('TableBookingDetail', { bookingId })
+        });
       });
   }, [restaurantName, navigation]);
 
@@ -219,7 +223,13 @@ const TableBookingScreen = ({ navigation, route }: any) => {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => step > 0 ? setStep(s => s - 1) : navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity 
+          onPress={() => step > 0 ? setStep(s => s - 1) : navigation.goBack()} 
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
           <ChevronLeft size={22} color={colors.ink} strokeWidth={2} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{restaurantName || 'Book a Table'}</Text>
@@ -255,6 +265,8 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                     key={i}
                     style={[styles.dateCard, isSelected && styles.dateCardActive]}
                     onPress={() => { setSelectedDate(d); setSelectedSlot(null); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select date: ${dStr}`}
                   >
                     <Text style={[styles.dateDay, isSelected && styles.dateTextActive]}>
                       {d.toLocaleDateString('en-IN', { weekday: 'short' })}
@@ -275,6 +287,8 @@ const TableBookingScreen = ({ navigation, route }: any) => {
               <TouchableOpacity
                 style={styles.counterBtn}
                 onPress={() => setPartySize(p => Math.max(1, p - 1))}
+                accessibilityRole="button"
+                accessibilityLabel="Decrease guests"
               >
                 <Minus size={20} color={partySize <= 1 ? colors.inkFaint : colors.ink} />
               </TouchableOpacity>
@@ -286,6 +300,8 @@ const TableBookingScreen = ({ navigation, route }: any) => {
               <TouchableOpacity
                 style={styles.counterBtn}
                 onPress={() => setPartySize(p => Math.min(20, p + 1))}
+                accessibilityRole="button"
+                accessibilityLabel="Increase guests"
               >
                 <Plus size={20} color={partySize >= 20 ? colors.inkFaint : colors.ink} />
               </TouchableOpacity>
@@ -315,10 +331,12 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                     ]}
                     disabled={!slot.available}
                     onPress={() => setSelectedSlot(slot)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select time slot ${formatTime(slot.slotStart)}`}
                   >
                     <Clock size={13} color={
                       !slot.available ? colors.inkFaint :
-                      selectedSlot?.slotStart === slot.slotStart ? '#fff' : colors.ink
+                      selectedSlot?.slotStart === slot.slotStart ? tokens.colors.surface : colors.ink
                     } />
                     <Text style={[
                       styles.slotTime,
@@ -369,6 +387,8 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                     key={cat}
                     style={[styles.catPill, activeCategory === cat && styles.catPillActive]}
                     onPress={() => setActiveCategory(cat)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Category ${cat}`}
                   >
                     <Text style={[styles.catPillText, activeCategory === cat && styles.catPillTextActive]}>{cat}</Text>
                   </TouchableOpacity>
@@ -384,7 +404,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                   {(menuError as any)?.message || 'Failed to load menu.'}
                 </Text>
                 <TouchableOpacity onPress={() => refetchMenu()} style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 }}>
-                  <Text style={{ color: '#fff', fontFamily: fontFamily.semibold, fontSize: 13 }}>Retry</Text>
+                  <Text style={{ color: tokens.colors.surface, fontFamily: fontFamily.semibold, fontSize: 13 }}>Retry</Text>
                 </TouchableOpacity>
               </View>
             ) : filteredMenuItems.length === 0 ? (
@@ -402,23 +422,38 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                           ? <NetworkImage uri={item.photo_url} style={styles.menuGridImg} />
                           : <View style={[styles.menuGridImg, styles.menuGridImgFallback]}><ChefHat size={28} color={colors.inkFaint} /></View>}
                         {/* Veg badge */}
-                        <View style={[styles.menuGridVegBadge, { borderColor: item.is_veg ? '#10B981' : '#EF4444' }]}>
-                          <View style={[styles.menuGridVegDot, { backgroundColor: item.is_veg ? '#10B981' : '#EF4444' }]} />
+                        <View style={[styles.menuGridVegBadge, { borderColor: item.is_veg ? tokens.colors.success : tokens.colors.danger }]}>
+                          <View style={[styles.menuGridVegDot, { backgroundColor: item.is_veg ? tokens.colors.success : tokens.colors.danger }]} />
                         </View>
                         {/* Add / Qty float */}
                         <View style={styles.menuGridAddFloat}>
                           {qty > 0 ? (
                             <View style={styles.menuGridQtyRow}>
-                              <TouchableOpacity style={styles.menuGridQtyBtn} onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: Math.max(0, qty - 1) }))}>
+                              <TouchableOpacity 
+                                style={styles.menuGridQtyBtn} 
+                                onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: Math.max(0, qty - 1) }))}
+                                accessibilityRole="button"
+                                accessibilityLabel="Decrease quantity"
+                              >
                                 <Text style={styles.menuGridQtyBtnText}>−</Text>
                               </TouchableOpacity>
                               <Text style={styles.menuGridQtyVal}>{qty}</Text>
-                              <TouchableOpacity style={styles.menuGridQtyBtn} onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: qty + 1 }))}>
+                              <TouchableOpacity 
+                                style={styles.menuGridQtyBtn} 
+                                onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: qty + 1 }))}
+                                accessibilityRole="button"
+                                accessibilityLabel="Increase quantity"
+                              >
                                 <Text style={styles.menuGridQtyBtnText}>+</Text>
                               </TouchableOpacity>
                             </View>
                           ) : (
-                            <TouchableOpacity style={styles.menuGridAddBtn} onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: 1 }))}>
+                            <TouchableOpacity 
+                              style={styles.menuGridAddBtn} 
+                              onPress={() => setPreOrderItems(prev => ({ ...prev, [item.id]: 1 }))}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Add ${item.name} to pre-order`}
+                            >
                               <Text style={styles.menuGridAddBtnText}>ADD</Text>
                             </TouchableOpacity>
                           )}
@@ -460,6 +495,8 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                   key={occ}
                   style={[styles.occasionPill, occasion === occ && styles.occasionPillActive]}
                   onPress={() => setOccasion(prev => prev === occ ? '' : occ)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Occasion ${occ}`}
                 >
                   <Text style={[styles.occasionText, occasion === occ && styles.occasionTextActive]}>{occ}</Text>
                 </TouchableOpacity>
@@ -505,7 +542,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                       <Text style={styles.summaryItemPrice}>₹{((item.price_paise * (preOrderItems[item.id] || 0)) / 100).toFixed(0)}</Text>
                     </View>
                   ))}
-                <View style={[styles.summaryItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB', marginTop: 6, paddingTop: 8 }]}>
+                <View style={[styles.summaryItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: tokens.colors.border, marginTop: 6, paddingTop: 8 }]}>
                   <Text style={[styles.summaryItemName, { fontFamily: fontFamily.semibold }]}>Total</Text>
                   <Text style={[styles.summaryItemPrice, { fontFamily: fontFamily.bold }]}>₹{(preOrderTotal / 100).toFixed(0)}</Text>
                 </View>
@@ -527,7 +564,7 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                     <Text style={styles.summaryItemPrice}>₹{(depositPaise / 100).toFixed(0)}</Text>
                   </View>
                 )}
-                <View style={[styles.summaryItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB', marginTop: 6, paddingTop: 8 }]}>
+                <View style={[styles.summaryItem, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: tokens.colors.border, marginTop: 6, paddingTop: 8 }]}>
                   <Text style={[styles.summaryItemName, { fontFamily: fontFamily.semibold }]}>Total</Text>
                   <Text style={[styles.summaryItemPrice, { fontFamily: fontFamily.bold }]}>₹{(totalDueNow / 100).toFixed(0)}</Text>
                 </View>
@@ -555,6 +592,8 @@ const TableBookingScreen = ({ navigation, route }: any) => {
                   });
                 }}
                 disabled={createBooking.isPending}
+                accessibilityRole="button"
+                accessibilityLabel="Pay via UPI or Card"
               >
                 <Text style={styles.upiBtnText}>Pay via UPI / Card instead</Text>
               </TouchableOpacity>
@@ -571,6 +610,8 @@ const TableBookingScreen = ({ navigation, route }: any) => {
           style={[styles.ctaBtn, !canProceed() && styles.ctaBtnDisabled]}
           onPress={nextStep}
           disabled={!canProceed() || createBooking.isPending}
+          accessibilityRole="button"
+          accessibilityLabel={step === STEPS.length - 1 ? 'Confirm booking' : 'Continue'}
         >
           {createBooking.isPending ? (
             <ActivityIndicator color="#fff" />
@@ -600,114 +641,114 @@ const SummaryRow = ({ icon, label, value }: { icon: any; label: string; value: s
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: tokens.spacing.lg, paddingVertical: tokens.spacing.md },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
   headerTitle: { flex: 1, fontSize: 17, fontFamily: fontFamily.semibold, color: colors.ink, textAlign: 'center' },
-  progressWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, marginBottom: 4 },
+  progressWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: tokens.spacing.xl, marginBottom: tokens.spacing.sm },
   progressDot: {
-    width: 26, height: 26, borderRadius: 13, backgroundColor: '#E5E7EB',
+    width: 26, height: 26, borderRadius: 13, backgroundColor: tokens.colors.border,
     justifyContent: 'center', alignItems: 'center',
   },
   progressDotActive: { backgroundColor: colors.primary },
   progressDotNum: { fontSize: 11, fontFamily: fontFamily.semibold, color: '#9CA3AF' },
-  progressLine: { flex: 1, height: 2, backgroundColor: '#E5E7EB' },
+  progressLine: { flex: 1, height: 2, backgroundColor: tokens.colors.border },
   progressLineActive: { backgroundColor: colors.primary },
-  stepLabel: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.medium, textAlign: 'center', marginBottom: 8 },
-  scroll: { flex: 1, paddingHorizontal: spacing.lg },
-  sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink, marginTop: 16, marginBottom: 6 },
-  sectionSub: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular, marginBottom: 14, lineHeight: 18 },
+  stepLabel: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.medium, textAlign: 'center', marginBottom: tokens.spacing.md },
+  scroll: { flex: 1, paddingHorizontal: tokens.spacing.lg },
+  sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink, marginTop: tokens.spacing.lg, marginBottom: tokens.spacing.sm },
+  sectionSub: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular, marginBottom: tokens.spacing.md, lineHeight: 18 },
   // Date picker
-  dateScroll: { paddingBottom: 8, gap: 8 },
+  dateScroll: { paddingBottom: tokens.spacing.sm, gap: tokens.spacing.sm },
   dateCard: {
     width: 60, paddingVertical: 12, borderRadius: 14, alignItems: 'center',
-    backgroundColor: '#F3F4F6', borderWidth: 1.5, borderColor: 'transparent',
+    backgroundColor: tokens.colors.surfaceMuted, borderWidth: 1.5, borderColor: 'transparent',
   },
-  dateCardActive: { backgroundColor: colors.primary + '15', borderColor: colors.primary },
+  dateCardActive: { backgroundColor: tokens.colors.primaryTint, borderColor: colors.primary },
   dateDay: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted },
   dateNum: { fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink, marginVertical: 2 },
   dateMonth: { fontSize: 11, fontFamily: fontFamily.medium, color: colors.inkMuted },
   dateTextActive: { color: colors.primary },
   // Counter
-  counterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: 8, marginBottom: 24 },
-  counterBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
-  counterDisplay: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 100, justifyContent: 'center' },
+  counterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: tokens.spacing.xl, marginTop: tokens.spacing.sm, marginBottom: tokens.spacing.xxl },
+  counterBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: tokens.colors.surfaceMuted, justifyContent: 'center', alignItems: 'center' },
+  counterDisplay: { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm, minWidth: 100, justifyContent: 'center' },
   counterNum: { fontSize: 28, fontFamily: fontFamily.bold, color: colors.ink },
   counterLabel: { fontSize: 14, color: colors.inkMuted, fontFamily: fontFamily.regular },
   // Slots
-  slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
+  slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.md, marginTop: tokens.spacing.sm },
   slotPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: '#F3F4F6', borderWidth: 1.5, borderColor: 'transparent',
+    backgroundColor: tokens.colors.surfaceMuted, borderWidth: 1.5, borderColor: 'transparent',
   },
   slotPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   slotPillDisabled: { opacity: 0.4 },
   slotTime: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
-  slotTimeActive: { color: '#fff' },
+  slotTimeActive: { color: tokens.colors.surface },
   slotTimeDisabled: { color: colors.inkFaint },
   slotSelectedBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: colors.primary + '12', borderRadius: 10,
-    padding: 12, marginTop: 16,
+    flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm,
+    backgroundColor: tokens.colors.primaryTint, borderRadius: 10,
+    padding: tokens.spacing.md, marginTop: tokens.spacing.lg,
   },
   slotSelectedText: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.primary },
   emptyText: { fontSize: 14, color: colors.inkMuted, textAlign: 'center', marginTop: 40, fontFamily: fontFamily.regular },
   // Pre-order
   preOrderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB',
+    paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.colors.border,
   },
   vegIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   vegDot: { width: 8, height: 8, borderRadius: 4 },
   preOrderName: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, flex: 1 },
   preOrderPrice: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular },
   qtyControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  qtyBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary + '15', justifyContent: 'center', alignItems: 'center' },
+  qtyBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: tokens.colors.primaryTint, justifyContent: 'center', alignItems: 'center' },
   qtyNum: { fontSize: 15, fontFamily: fontFamily.semibold, color: colors.ink, minWidth: 20, textAlign: 'center' },
   addBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5, borderColor: colors.primary },
   addBtnText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
-  preOrderTotalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, padding: 12, backgroundColor: colors.primary + '10', borderRadius: 10 },
+  preOrderTotalRow: { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm, marginTop: tokens.spacing.lg, padding: tokens.spacing.md, backgroundColor: tokens.colors.primaryTint, borderRadius: 10 },
   preOrderTotal: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.primary },
   // Menu search + grid
-  menuSearchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10 },
+  menuSearchBar: { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm, backgroundColor: tokens.colors.surfaceMuted, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: tokens.spacing.md },
   menuSearchInput: { flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink, padding: 0 },
-  catPillsRow: { marginBottom: 12 },
-  catPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#F3F4F6', marginRight: 8, borderWidth: 1.5, borderColor: 'transparent' },
-  catPillActive: { backgroundColor: colors.primary + '18', borderColor: colors.primary },
+  catPillsRow: { marginBottom: tokens.spacing.md },
+  catPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: tokens.colors.surfaceMuted, marginRight: 8, borderWidth: 1.5, borderColor: 'transparent' },
+  catPillActive: { backgroundColor: tokens.colors.primaryTint, borderColor: colors.primary },
   catPillText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted },
   catPillTextActive: { color: colors.primary },
   menuGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
-  menuGridCard: { width: '48%', backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
-  menuGridImgWrap: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F9FAFB', position: 'relative', marginBottom: 8 },
+  menuGridCard: { width: '48%', backgroundColor: tokens.colors.surface, borderRadius: 16, marginBottom: 12, ...tokens.shadows.soft, },
+  menuGridImgWrap: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: tokens.colors.background, position: 'relative', marginBottom: 8 },
   menuGridImg: { width: '100%', height: '100%' },
   menuGridImgFallback: { alignItems: 'center', justifyContent: 'center' },
-  menuGridVegBadge: { position: 'absolute', top: 8, left: 8, width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  menuGridVegBadge: { position: 'absolute', top: 8, left: 8, width: 14, height: 14, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: tokens.colors.surface },
   menuGridVegDot: { width: 8, height: 8, borderRadius: 4 },
   menuGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
   menuGridAddBtn: { backgroundColor: colors.primary, borderRadius: 16, height: 32, alignItems: 'center', justifyContent: 'center', elevation: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-  menuGridAddBtnText: { color: '#fff', fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
+  menuGridAddBtnText: { color: tokens.colors.surface, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
   menuGridQtyRow: { flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 16, alignItems: 'center', justifyContent: 'space-between', height: 32 },
   menuGridQtyBtn: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
-  menuGridQtyBtnText: { color: '#fff', fontSize: 18, fontFamily: fontFamily.bold },
-  menuGridQtyVal: { color: '#fff', fontSize: 13, fontFamily: fontFamily.extrabold, flex: 1, textAlign: 'center' },
+  menuGridQtyBtnText: { color: tokens.colors.surface, fontSize: 18, fontFamily: fontFamily.bold },
+  menuGridQtyVal: { color: tokens.colors.surface, fontSize: 13, fontFamily: fontFamily.extrabold, flex: 1, textAlign: 'center' },
   menuGridInfo: { paddingHorizontal: 8, paddingBottom: 10 },
   menuGridName: { fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 2, lineHeight: 17 },
   menuGridDesc: { fontSize: 10, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 13, marginBottom: 3 },
   menuGridPrice: { fontSize: 13, fontFamily: fontFamily.black, color: colors.ink },
   // Requests
-  fieldLabel: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.ink, marginBottom: 8, marginTop: 16 },
-  occasionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  occasionPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: 'transparent' },
-  occasionPillActive: { backgroundColor: colors.primary + '15', borderColor: colors.primary },
+  fieldLabel: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.ink, marginBottom: tokens.spacing.sm, marginTop: tokens.spacing.lg },
+  occasionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.sm, marginBottom: tokens.spacing.sm },
+  occasionPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: tokens.colors.surfaceMuted, borderWidth: 1, borderColor: 'transparent' },
+  occasionPillActive: { backgroundColor: tokens.colors.primaryTint, borderColor: colors.primary },
   occasionText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted },
   occasionTextActive: { color: colors.primary },
   textarea: {
-    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12,
+    borderWidth: 1.5, borderColor: tokens.colors.border, borderRadius: 12,
     padding: 14, fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink,
     backgroundColor: '#FAFAFA', minHeight: 100,
   },
   // Summary
-  summaryCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  summaryCard: { backgroundColor: tokens.colors.surface, borderRadius: 16, padding: 16, marginBottom: 12, ...tokens.shadows.soft, },
   summaryCardTitle: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 10 },
   summaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F3F4F6' },
   summaryLabel: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, width: 70 },
@@ -722,11 +763,11 @@ const styles = StyleSheet.create({
   bottomBar: {
     paddingHorizontal: spacing.lg, paddingTop: 12,
     backgroundColor: colors.background,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB',
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: tokens.colors.border,
   },
   ctaBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 16 },
   ctaBtnDisabled: { opacity: 0.5 },
-  ctaBtnText: { color: '#fff', fontSize: 16, fontFamily: fontFamily.semibold },
+  ctaBtnText: { color: tokens.colors.surface, fontSize: 16, fontFamily: fontFamily.semibold },
 });
 
 export default TableBookingScreen;

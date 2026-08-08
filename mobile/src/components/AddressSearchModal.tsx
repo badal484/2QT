@@ -1,13 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Modal, StyleSheet, TouchableOpacity, Text,
+  View, Modal, StyleSheet, Text,
   TextInput, FlatList, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, MapPin } from 'lucide-react-native';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
+import { tokens } from '../theme/tokens';
+import { haptics } from '../utils/haptics';
+import { PressableScale } from './ui/internal/PressableScale';
 import { ENV } from '../config/env';
 
 interface AddressSearchModalProps {
@@ -84,7 +84,7 @@ export const AddressSearchModal: React.FC<AddressSearchModalProps> = ({ visible,
   };
 
   const handleSelect = async (item: Prediction & { _nominatim?: { lat: string; lon: string } }) => {
-    ReactNativeHapticFeedback.trigger('impactMedium');
+    haptics.selection();
 
     // Nominatim fallback results have lat/lon directly
     if ((item as any)._nominatim) {
@@ -110,7 +110,7 @@ export const AddressSearchModal: React.FC<AddressSearchModalProps> = ({ visible,
   };
 
   const handleClose = () => {
-    ReactNativeHapticFeedback.trigger('impactLight');
+    haptics.selection();
     setQuery(''); setResults([]);
     onClose();
   };
@@ -119,9 +119,9 @@ export const AddressSearchModal: React.FC<AddressSearchModalProps> = ({ visible,
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleClose} style={styles.backBtn}>
-            <ArrowLeft color="#1A1A2E" size={24} />
-          </TouchableOpacity>
+          <PressableScale onPress={handleClose} style={styles.backBtn}>
+            <ArrowLeft color={tokens.colors.textPrimary} size={24} />
+          </PressableScale>
           <Text style={styles.headerTitle}>Search Location</Text>
         </View>
 
@@ -129,13 +129,13 @@ export const AddressSearchModal: React.FC<AddressSearchModalProps> = ({ visible,
           <TextInput
             style={styles.input}
             placeholder="Search for area, street, city..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={tokens.colors.textTertiary}
             value={query}
             onChangeText={onChangeText}
             autoFocus
             returnKeyType="search"
           />
-          {(loading || resolving) && <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 12 }} />}
+          {(loading || resolving) && <ActivityIndicator size="small" color={tokens.colors.primary} style={{ marginRight: 12 }} />}
         </View>
 
         <FlatList
@@ -143,9 +143,9 @@ export const AddressSearchModal: React.FC<AddressSearchModalProps> = ({ visible,
           keyExtractor={item => item.place_id}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} onPress={() => handleSelect(item as any)} activeOpacity={0.7}>
+            <PressableScale style={styles.row} onPress={() => handleSelect(item as any)}>
               <View style={styles.pinBox}>
-                <MapPin size={18} color={colors.primary} />
+                <MapPin size={18} color={tokens.colors.primary} />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle} numberOfLines={1}>
@@ -155,7 +155,7 @@ export const AddressSearchModal: React.FC<AddressSearchModalProps> = ({ visible,
                   {item.structured_formatting.secondary_text}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </PressableScale>
           )}
           ItemSeparatorComponent={() => <View style={styles.sep} />}
           ListEmptyComponent={
@@ -170,30 +170,30 @@ export const AddressSearchModal: React.FC<AddressSearchModalProps> = ({ visible,
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: tokens.colors.surface },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    borderBottomWidth: 1, borderBottomColor: tokens.colors.background,
   },
   backBtn: { padding: 8, marginRight: 8 },
-  headerTitle: { fontSize: 18, fontFamily: fontFamily.extrabold, color: '#1A1A2E' },
+  headerTitle: { fontSize: 18, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textPrimary },
   inputRow: {
     flexDirection: 'row', alignItems: 'center',
-    margin: 16, backgroundColor: '#F9FAFB',
-    borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
+    margin: 16, backgroundColor: tokens.colors.background,
+    borderRadius: 12, borderWidth: 1, borderColor: tokens.colors.border,
     paddingHorizontal: 14,
   },
-  input: { flex: 1, height: 48, fontSize: 15, fontFamily: fontFamily.medium, color: '#1A1A2E' },
+  input: { flex: 1, height: 48, fontSize: 15, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
   pinBox: {
     width: 36, height: 36, borderRadius: 10,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: tokens.colors.primaryTint,
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   rowText: { flex: 1 },
-  rowTitle: { fontSize: 15, fontFamily: fontFamily.semibold, color: '#1A1A2E', marginBottom: 2 },
-  rowSub: { fontSize: 13, fontFamily: fontFamily.regular, color: '#6B7280' },
-  sep: { height: 1, backgroundColor: '#F9FAFB', marginLeft: 64 },
-  empty: { textAlign: 'center', color: '#9CA3AF', marginTop: 32, fontFamily: fontFamily.medium },
+  rowTitle: { fontSize: 15, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textPrimary, marginBottom: 2 },
+  rowSub: { fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary },
+  sep: { height: 1, backgroundColor: tokens.colors.background, marginLeft: 64 },
+  empty: { textAlign: 'center', color: tokens.colors.textTertiary, marginTop: 32, fontFamily: tokens.typography.family.medium },
 });

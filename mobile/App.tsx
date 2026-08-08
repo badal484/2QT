@@ -18,6 +18,8 @@ if (!__DEV__) {
   console.warn = () => {};
 }
 
+import { FeedbackProvider } from './src/context/FeedbackContext';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -39,12 +41,14 @@ const App = () => {
           <PersistGate loading={<SplashScreen />} persistor={persistor}>
             <QueryClientProvider client={queryClient}>
               <ErrorBoundary>
-                <NetworkObserver />
-                <GlobalSocketListener />
-                <AppBootManager>
-                  <RootNavigator />
-                </AppBootManager>
-                <Toast />
+                <FeedbackProvider>
+                  <NetworkObserver />
+                  <GlobalSocketListener />
+                  <AppBootManager>
+                    <RootNavigator />
+                  </AppBootManager>
+                  <Toast />
+                </FeedbackProvider>
               </ErrorBoundary>
             </QueryClientProvider>
           </PersistGate>

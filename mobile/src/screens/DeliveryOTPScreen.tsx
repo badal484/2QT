@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator, Image,
@@ -10,12 +11,13 @@ import { ArrowLeft, ShieldCheck, CheckCircle, Camera, RefreshCw } from 'lucide-r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchCamera } from 'react-native-image-picker';
 import { uploadToImageKit } from '../utils/imageKit';
+import { useFeedback } from '../context/FeedbackContext';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8', orangeMid: '#FFE0C0',
   green: '#1BA672', greenLight: '#E8F8F1',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  border: '#E9E9EB', bg: '#F8F8F8', white: tokens.colors.surface,
   red: '#E53935', redLight: '#FFEBEE',
 };
 
@@ -90,6 +92,7 @@ const RESEND_COOLDOWN = 30;
 const DeliveryOTPScreen = ({ route, navigation }: any) => {
   const { orderId, displayId } = route.params;
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
   const [otp, setOtp] = useState('');
   const [focused, setFocused] = useState(false);
   const [delivered, setDelivered] = useState(false);
@@ -118,8 +121,8 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
         handleDone();
         return true; // prevent default behavior
       };
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
     }
   }, [delivered]);
 
@@ -148,7 +151,7 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission Denied', 'Camera permission is required to take a photo.');
+          showDialog({ title: 'Permission Denied', message: 'Camera permission is required to take a photo.', confirmText: 'Okay', type: 'error' });
           return;
         }
       }
@@ -162,13 +165,13 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
         const uploaded = await uploadToImageKit(asset, 'pod');
         setPodPhotoUrl(uploaded.url);
       } catch {
-        Alert.alert('Upload Failed', 'Could not upload the photo. You can still confirm delivery without it.');
+        showDialog({ title: 'Upload Failed', message: 'Could not upload the photo. You can still confirm delivery without it.', confirmText: 'Okay', type: 'warning' });
         setPodPhotoUri(null);
       } finally {
         setIsUploadingPhoto(false);
       }
     } catch {
-      Alert.alert('Error', 'Could not open camera.');
+      showDialog({ title: 'Error', message: 'Could not open camera.', confirmText: 'Okay', type: 'error' });
     }
   };
 
@@ -177,7 +180,7 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
     onSuccess: () => setDelivered(true),
     onError: () => {
       shake();
-      Alert.alert('Wrong Code', 'The OTP is incorrect. Ask the customer to check their app and try again.');
+      showDialog({ title: 'Wrong Code', message: 'The OTP is incorrect. Ask the customer to check their app and try again.', confirmText: 'Okay', type: 'error' });
       setOtp('');
     },
   });
@@ -186,10 +189,10 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
     mutationFn: () => api.post('/riders/resend-otp', { orderId }),
     onSuccess: () => {
       startCooldown();
-      Alert.alert('OTP Resent ✅', 'The customer has been sent their OTP again via notification.');
+      showDialog({ title: 'OTP Resent ✅', message: 'The customer has been sent their OTP again via notification.', confirmText: 'Okay', type: 'success' });
     },
     onError: () => {
-      Alert.alert('Failed', 'Could not resend the OTP. Please try again.');
+      showDialog({ title: 'Failed', message: 'Could not resend the OTP. Please try again.', confirmText: 'Okay', type: 'error' });
     },
   });
 

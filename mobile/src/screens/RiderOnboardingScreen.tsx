@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet } from 'react-native';
 import { ShieldCheck, Clock, Package, CheckCircle2, ChevronRight, Bookmark, AlertTriangle, ShieldAlert } from 'lucide-react-native';
@@ -230,13 +231,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   heroTitle: {
-    color: '#FFFFFF',
+    color: tokens.colors.surface,
     fontSize: 26,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   sectionTitle: {
-    color: '#FFFFFF',
+    color: tokens.colors.surface,
     fontSize: 18,
     fontWeight: '900',
     marginBottom: 6,
@@ -276,7 +277,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepTitle: {
-    color: '#FFFFFF',
+    color: tokens.colors.surface,
     fontWeight: '800',
     fontSize: 14,
   },
@@ -353,7 +354,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   actionBtnTextActive: {
-    color: '#FFFFFF',
+    color: tokens.colors.surface,
   },
   actionBtnTextInactive: {
     color: '#475569',

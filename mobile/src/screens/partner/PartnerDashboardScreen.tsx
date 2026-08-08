@@ -14,6 +14,7 @@ import { api } from '../../api/client';
 import { colors } from '../../theme/colors';
 import { fontFamily } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { tokens } from '../../theme/tokens';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const formatTime = (iso: string) => {
@@ -22,11 +23,11 @@ const formatTime = (iso: string) => {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  confirmed: '#10B981',
+  confirmed: tokens.colors.success,
   seated: '#3B82F6',
   completed: '#6B7280',
-  cancelled: '#EF4444',
-  no_show: '#EF4444',
+  cancelled: tokens.colors.danger,
+  no_show: tokens.colors.danger,
   pending_payment: '#F59E0B',
 };
 const STATUS_LABELS: Record<string, string> = {
@@ -186,16 +187,16 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular },
   restaurantName: { fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink, maxWidth: 240 },
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#10B98115', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10B981' },
-  liveText: { fontSize: 12, fontFamily: fontFamily.semibold, color: '#10B981' },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: tokens.colors.success },
+  liveText: { fontSize: 12, fontFamily: fontFamily.semibold, color: tokens.colors.success },
   scrollContent: { padding: spacing.lg, gap: 16 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statCard: { flex: 1, minWidth: '45%', backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  statCard: { flex: 1, minWidth: '45%', backgroundColor: tokens.colors.surface, borderRadius: 16, padding: 14, alignItems: 'flex-start', ...tokens.shadows.soft, },
   statIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
   statValue: { fontSize: 22, fontFamily: fontFamily.bold, marginBottom: 2 },
   statLabel: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular },
   sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 10 },
-  bookingRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  bookingRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: tokens.colors.surface, borderRadius: 14, padding: 14, marginBottom: 8, ...tokens.shadows.soft, },
   timeCol: { width: 48, alignItems: 'center', marginRight: 12 },
   timeText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
   timeEnd: { fontSize: 11, color: colors.inkMuted, fontFamily: fontFamily.regular },
@@ -206,10 +207,10 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 11, color: colors.inkMuted, fontFamily: fontFamily.medium },
   statusPill: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   statusText: { fontSize: 11, fontFamily: fontFamily.semibold },
-  emptyCard: { backgroundColor: '#fff', borderRadius: 16, padding: 32, alignItems: 'center', gap: 8 },
+  emptyCard: { backgroundColor: tokens.colors.surface, borderRadius: 16, padding: 32, alignItems: 'center', gap: 8 },
   emptyTitle: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink },
   emptySubtitle: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular, textAlign: 'center' },
-  commissionCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12 },
+  commissionCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: tokens.colors.background, borderRadius: 12, padding: 12 },
   commissionText: { flex: 1, fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular, lineHeight: 18 },
 });
 

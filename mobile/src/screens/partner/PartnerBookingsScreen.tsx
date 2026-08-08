@@ -17,6 +17,8 @@ import { colors } from '../../theme/colors';
 import { fontFamily } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { BouncingButton } from '../../components/ui/BouncingButton';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const formatDate = (d: Date) =>
@@ -29,9 +31,9 @@ const formatTime = (iso: string) => {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  pending_payment: '#F59E0B', confirmed: '#10B981',
+  pending_payment: '#F59E0B', confirmed: tokens.colors.success,
   seated: '#3B82F6', completed: '#6B7280',
-  cancelled: '#EF4444', no_show: '#EF4444',
+  cancelled: tokens.colors.danger, no_show: tokens.colors.danger,
 };
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Pending', confirmed: 'Confirmed',
@@ -42,6 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
 const PartnerBookingsScreen = () => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDetail, setShowDetail] = useState<any>(null);
   const [showQR, setShowQR] = useState(false);
@@ -68,10 +71,10 @@ const PartnerBookingsScreen = () => {
     mutationFn: (bookingId: string) => api.post(`/table-bookings/${bookingId}/checkin`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['partner-bookings'] });
-      Alert.alert('Checked In', 'Guest has been seated successfully.');
+      showDialog({ title: 'Checked In', message: 'Guest has been seated successfully.', confirmText: 'Okay', type: 'success' });
       setShowDetail(null);
     },
-    onError: (err: any) => Alert.alert('Error', err?.message || 'Check-in failed.'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err?.message || 'Check-in failed.', confirmText: 'Okay', type: 'error' }),
   });
 
   const noShowMutation = useMutation({
@@ -80,7 +83,7 @@ const PartnerBookingsScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['partner-bookings'] });
       setShowDetail(null);
     },
-    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed.'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err?.message || 'Failed.', confirmText: 'Okay', type: 'error' }),
   });
 
   useEffect(() => {
@@ -117,14 +120,14 @@ const PartnerBookingsScreen = () => {
   };
 
   const handleNoShow = (b: any) => {
-    Alert.alert(
-      'Mark No Show',
-      `Mark ${b.display_id} as no-show? Pre-order will be refunded, deposit forfeited.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Mark No Show', style: 'destructive', onPress: () => noShowMutation.mutate(b.id) },
-      ]
-    );
+    showDialog({
+      title: 'Mark No Show',
+      message: 'Mark this booking as No Show? Deposit will be forfeited.',
+      confirmText: 'Mark No Show',
+      cancelText: 'Cancel',
+      type: 'warning',
+      onConfirm: () => noShowMutation.mutate(b.id)
+    });
   };
 
   const renderItem = ({ item: b, index }: { item: any; index: number }) => (
@@ -273,14 +276,14 @@ const PartnerBookingsScreen = () => {
               {showDetail?.status === 'confirmed' && (
                 <TouchableOpacity
                   style={styles.checkinBtn}
-                  onPress={() => Alert.alert(
-                    'Check In Guest',
-                    `Seat ${showDetail.display_id} for ${showDetail.party_size} guests?`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Check In', onPress: () => checkinMutation.mutate(showDetail.id) },
-                    ]
-                  )}
+                  onPress={() => showDialog({
+                    title: 'Check In Guest',
+                    message: `Are you sure you want to seat this guest?`,
+                    confirmText: 'Seat Guest',
+                    cancelText: 'Cancel',
+                    type: 'info',
+                    onConfirm: () => checkinMutation.mutate(showDetail.id)
+                  })}
                   disabled={checkinMutation.isPending}
                 >
                   <Text style={styles.checkinBtnText}>
@@ -335,7 +338,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: spacing.lg, paddingVertical: 14 },
   headerTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: colors.ink },
-  dateNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB' },
+  dateNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: 10, backgroundColor: tokens.colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.colors.border },
   navBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
   dateCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dateLabel: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink },
@@ -346,7 +349,7 @@ const styles = StyleSheet.create({
   countBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   countBadgeText: { fontSize: 11, fontFamily: fontFamily.semibold },
   listContent: { padding: spacing.lg, gap: 8, paddingBottom: 40 },
-  bookingCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  bookingCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: tokens.colors.surface, borderRadius: 14, padding: 14, ...tokens.shadows.soft, },
   cardLeft: { width: 52, alignItems: 'center', marginRight: 12 },
   timeText: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink },
   timeEnd: { fontSize: 11, color: colors.inkMuted, fontFamily: fontFamily.regular },
@@ -363,7 +366,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 15, color: colors.inkMuted, fontFamily: fontFamily.regular },
   // Detail modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  detailSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%' },
+  detailSheet: { backgroundColor: tokens.colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%' },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   detailTitle: { fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink },
   detailStatus: { borderRadius: 10, padding: 10, alignItems: 'center', marginBottom: 16 },
@@ -377,15 +380,15 @@ const styles = StyleSheet.create({
   qrButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: colors.primary },
   qrButtonText: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.primary },
   checkinBtn: { marginTop: 14, paddingVertical: 13, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center' },
-  checkinBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: '#fff' },
+  checkinBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: tokens.colors.surface },
   noShowBtn: { marginTop: 10, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5', alignItems: 'center' },
-  noShowBtnText: { fontSize: 14, fontFamily: fontFamily.medium, color: '#EF4444' },
+  noShowBtnText: { fontSize: 14, fontFamily: fontFamily.medium, color: tokens.colors.danger },
   // QR modal
   qrOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 32 },
-  qrCard: { backgroundColor: '#fff', borderRadius: 24, padding: 28, alignItems: 'center', width: '100%' },
+  qrCard: { backgroundColor: tokens.colors.surface, borderRadius: 24, padding: 28, alignItems: 'center', width: '100%' },
   qrClose: { position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
   qrTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 20 },
-  qrCodeWrap: { padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 14 },
+  qrCodeWrap: { padding: 14, borderRadius: 14, borderWidth: 1, borderColor: tokens.colors.border, marginBottom: 14 },
   qrHint: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular },
 });
 

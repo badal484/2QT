@@ -1,7 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { WifiOff, RefreshCw, AlertCircle } from 'lucide-react-native';
+import { tokens } from '../../theme/tokens';
+import { PressableScale } from './internal/PressableScale';
 
 interface ScreenErrorProps {
   onRetry: () => void;
@@ -16,16 +18,16 @@ export const ScreenError: React.FC<ScreenErrorProps> = ({
 }) => {
   const Icon = type === 'network' ? WifiOff : AlertCircle;
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={s.root}>
+    <Animated.View entering={FadeIn.duration(tokens.motion.duration.slow)} style={s.root}>
       <View style={s.iconWrap}>
-        <Icon size={28} color="#9CA3AF" strokeWidth={1.5} />
+        <Icon size={28} color={tokens.colors.textTertiary} strokeWidth={1.5} />
       </View>
-      <Text style={s.title}>{message}</Text>
-      <Text style={s.sub}>Pull to refresh or tap below</Text>
-      <TouchableOpacity style={s.btn} onPress={onRetry} activeOpacity={0.85}>
-        <RefreshCw size={14} color="#FFFFFF" />
-        <Text style={s.btnText}>Try Again</Text>
-      </TouchableOpacity>
+      <Text style={s.title} allowFontScaling maxFontSizeMultiplier={1.4}>{message}</Text>
+      <Text style={s.sub} allowFontScaling maxFontSizeMultiplier={1.4}>Pull to refresh or tap below</Text>
+      <PressableScale style={s.btn} onPress={onRetry} accessibilityRole="button" accessibilityLabel="Try again">
+        <RefreshCw size={14} color={tokens.colors.textInverse} />
+        <Text style={s.btnText} allowFontScaling maxFontSizeMultiplier={1.4}>Try Again</Text>
+      </PressableScale>
     </Animated.View>
   );
 };
@@ -33,19 +35,20 @@ export const ScreenError: React.FC<ScreenErrorProps> = ({
 const s = StyleSheet.create({
   root: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 32, gap: 8,
+    paddingHorizontal: tokens.spacing.xxl, gap: tokens.spacing.sm,
   },
   iconWrap: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
-    marginBottom: 8,
+    width: 64, height: 64, borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center',
+    marginBottom: tokens.spacing.sm,
   },
-  title: { fontSize: 16, fontWeight: '700', color: '#1A1F1C', textAlign: 'center' },
-  sub: { fontSize: 13, color: '#9CA3AF', textAlign: 'center', marginBottom: 8 },
+  title: { fontSize: tokens.typography.type.bodyLarge.fontSize, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, textAlign: 'center' },
+  sub: { fontSize: tokens.typography.type.bodySmall.fontSize, fontFamily: tokens.typography.family.regular, color: tokens.colors.textTertiary, textAlign: 'center', marginBottom: tokens.spacing.sm },
   btn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FC4603', borderRadius: 12,
-    paddingHorizontal: 24, paddingVertical: 12, marginTop: 4,
+    flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm,
+    backgroundColor: tokens.colors.primary, borderRadius: tokens.radii.md,
+    paddingHorizontal: tokens.spacing.xl, paddingVertical: tokens.spacing.md, marginTop: tokens.spacing.xs,
+    minHeight: 48,
   },
-  btnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  btnText: { color: tokens.colors.textInverse, fontFamily: tokens.typography.family.bold, fontSize: tokens.typography.type.body.fontSize },
 });

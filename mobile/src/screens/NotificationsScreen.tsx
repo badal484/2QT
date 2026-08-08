@@ -1,5 +1,6 @@
+import { tokens } from '../theme/tokens';
 import React, { useCallback } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 import {
   View, Text, ScrollView, StyleSheet, RefreshControl,
 } from 'react-native';
@@ -12,11 +13,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonListItem } from '../components/ui';
 import { api } from '../api/client';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-
-const haptic = () => ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+import { haptics } from '../utils/haptics';
 
 // Strip any unicode emoji from strings coming from the backend
 const stripEmoji = (str: string) =>
@@ -32,25 +29,25 @@ function relativeTime(iso: string) {
 }
 
 const TYPE_META: Record<string, { Icon: any; iconColor: string; bg: string; accentColor: string }> = {
-  alert:   { Icon: XCircle,      iconColor: '#EF4444', bg: '#FEF2F2', accentColor: '#EF4444' },
-  cancel:  { Icon: XCircle,      iconColor: '#EF4444', bg: '#FEF2F2', accentColor: '#EF4444' },
-  fail:    { Icon: XCircle,      iconColor: '#EF4444', bg: '#FEF2F2', accentColor: '#EF4444' },
-  deliver: { Icon: CheckCircle2, iconColor: '#10B981', bg: '#ECFDF5', accentColor: '#10B981' },
-  confirm: { Icon: CheckCircle2, iconColor: '#10B981', bg: '#ECFDF5', accentColor: '#10B981' },
-  success: { Icon: CheckCircle2, iconColor: '#10B981', bg: '#ECFDF5', accentColor: '#10B981' },
-  promo:   { Icon: Sparkles,     iconColor: '#F59E0B', bg: '#FFFBEB', accentColor: '#F59E0B' },
-  offer:   { Icon: Sparkles,     iconColor: '#F59E0B', bg: '#FFFBEB', accentColor: '#F59E0B' },
+  alert:   { Icon: XCircle,      iconColor: tokens.colors.danger, bg: tokens.colors.dangerTint, accentColor: tokens.colors.danger },
+  cancel:  { Icon: XCircle,      iconColor: tokens.colors.danger, bg: tokens.colors.dangerTint, accentColor: tokens.colors.danger },
+  fail:    { Icon: XCircle,      iconColor: tokens.colors.danger, bg: tokens.colors.dangerTint, accentColor: tokens.colors.danger },
+  deliver: { Icon: CheckCircle2, iconColor: tokens.colors.success, bg: tokens.colors.successTint, accentColor: tokens.colors.success },
+  confirm: { Icon: CheckCircle2, iconColor: tokens.colors.success, bg: tokens.colors.successTint, accentColor: tokens.colors.success },
+  success: { Icon: CheckCircle2, iconColor: tokens.colors.success, bg: tokens.colors.successTint, accentColor: tokens.colors.success },
+  promo:   { Icon: Sparkles,     iconColor: tokens.colors.warning, bg: tokens.colors.warningTint, accentColor: tokens.colors.warning },
+  offer:   { Icon: Sparkles,     iconColor: tokens.colors.warning, bg: tokens.colors.warningTint, accentColor: tokens.colors.warning },
   wallet:  { Icon: Wallet,       iconColor: '#8B5CF6', bg: '#F5F3FF', accentColor: '#8B5CF6' },
   payout:  { Icon: Wallet,       iconColor: '#8B5CF6', bg: '#F5F3FF', accentColor: '#8B5CF6' },
   reward:  { Icon: Wallet,       iconColor: '#8B5CF6', bg: '#F5F3FF', accentColor: '#8B5CF6' },
-  order:   { Icon: Package,      iconColor: colors.primary, bg: colors.primaryTint, accentColor: colors.primary },
+  order:   { Icon: Package,      iconColor: tokens.colors.primary, bg: tokens.colors.primaryTint, accentColor: tokens.colors.primary },
   rider:   { Icon: Bike,         iconColor: '#3B82F6', bg: '#EFF6FF', accentColor: '#3B82F6' },
   pickup:  { Icon: Bike,         iconColor: '#3B82F6', bg: '#EFF6FF', accentColor: '#3B82F6' },
   support: { Icon: MessageCircle, iconColor: '#3B82F6', bg: '#EFF6FF', accentColor: '#3B82F6' },
 };
 
-const FALLBACK_META = { Icon: Bell, iconColor: colors.primary, bg: colors.primaryTint, accentColor: colors.primary };
-const READ_META     = { Icon: Bell, iconColor: colors.inkFaint, bg: colors.surfaceMuted, accentColor: 'transparent' };
+const FALLBACK_META = { Icon: Bell, iconColor: tokens.colors.primary, bg: tokens.colors.primaryTint, accentColor: tokens.colors.primary };
+const READ_META     = { Icon: Bell, iconColor: tokens.colors.textTertiary, bg: tokens.colors.background, accentColor: 'transparent' };
 
 function getTypeMeta(type: string, read: boolean, title?: string) {
   if (read) return READ_META;
@@ -101,10 +98,11 @@ const NotifCard = React.memo(function NotifCard({ n, onPress }: { n: any; onPres
   const { Icon, iconColor, bg, accentColor } = meta;
 
   return (
-    <BouncingButton
+    <PressableScale
       style={[styles.card, !n.is_read && styles.cardUnread]}
       onPress={() => onPress(n)}
-      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={stripEmoji(n.title)}
     >
       {/* Left accent stripe for unread */}
       {!n.is_read && <View style={[styles.accentStripe, { backgroundColor: accentColor }]} />}
@@ -135,7 +133,7 @@ const NotifCard = React.memo(function NotifCard({ n, onPress }: { n: any; onPres
 
       {/* Unread dot */}
       {!n.is_read && <View style={[styles.dot, { backgroundColor: accentColor }]} />}
-    </BouncingButton>
+    </PressableScale>
   );
 });
 
@@ -157,7 +155,7 @@ const NotificationsScreen = ({ navigation }: any) => {
   const readAllMutation = useMutation({
     mutationFn: () => api.post('/notifications/read-all', {}),
     onSuccess: () => {
-      haptic();
+      haptics.selection();
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
@@ -170,7 +168,7 @@ const NotificationsScreen = ({ navigation }: any) => {
 
   const handleNotifPress = useCallback((n: any) => {
     if (!n.is_read) {
-      haptic();
+      haptics.selection();
       readMutation.mutate(n.id);
       if (n._groupedIds?.length > 0) {
         n._groupedIds.forEach((id: string) => readMutation.mutate(id));
@@ -188,13 +186,15 @@ const NotificationsScreen = ({ navigation }: any) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <BouncingButton
+        <PressableScale
           style={styles.backBtn}
           onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home')}
-          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <ArrowLeft size={20} color={colors.ink} />
-        </BouncingButton>
+          <ArrowLeft size={20} color={tokens.colors.textPrimary} />
+        </PressableScale>
 
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Notifications</Text>
@@ -204,15 +204,16 @@ const NotificationsScreen = ({ navigation }: any) => {
         </View>
 
         {unread.length > 0 && (
-          <BouncingButton
+          <PressableScale
             style={styles.markAllBtn}
             onPress={() => readAllMutation.mutate()}
             disabled={readAllMutation.isPending}
-            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Mark all as read"
           >
-            <CheckCheck size={14} color={colors.primary} />
+            <CheckCheck size={14} color={tokens.colors.primary} />
             <Text style={styles.markAllText}>Mark all read</Text>
-          </BouncingButton>
+          </PressableScale>
         )}
       </View>
 
@@ -224,7 +225,7 @@ const NotificationsScreen = ({ navigation }: any) => {
       ) : groupedNotifications.length === 0 ? (
         <View style={styles.empty}>
           <View style={styles.emptyIcon}>
-            <Bell size={36} color={colors.primary} />
+            <Bell size={36} color={tokens.colors.primary} />
           </View>
           <Text style={styles.emptyTitle}>All caught up</Text>
           <Text style={styles.emptySub}>
@@ -234,10 +235,10 @@ const NotificationsScreen = ({ navigation }: any) => {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: tokens.spacing.lg, paddingTop: tokens.spacing.sm, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.colors.primary} />
           }
         >
           {/* Unread section */}
@@ -299,70 +300,69 @@ function deepLink(n: any, navigation: any) {
 export default NotificationsScreen;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F6F8' },
+  root: { flex: 1, backgroundColor: tokens.colors.background },
 
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
-    gap: 12,
+    paddingHorizontal: tokens.spacing.lg, paddingVertical: tokens.spacing.md,
+    backgroundColor: tokens.colors.surface,
+    borderBottomWidth: 1, borderBottomColor: tokens.colors.border,
+    gap: tokens.spacing.md,
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: tokens.colors.background,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink },
-  headerSub: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.primary, marginTop: 1 },
+  headerTitle: { fontSize: 18, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary },
+  headerSub: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.primary, marginTop: 1 },
   markAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 20, backgroundColor: colors.primaryTint,
-    borderWidth: 1, borderColor: colors.primary + '30',
+    flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.xs,
+    paddingHorizontal: tokens.spacing.md, paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radii.xl, backgroundColor: tokens.colors.primaryTint,
+    borderWidth: 1, borderColor: tokens.colors.primaryTint,
   },
-  markAllText: { fontSize: 12, fontFamily: fontFamily.bold, color: colors.primary },
+  markAllText: { fontSize: 12, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary },
 
   // Section labels
   sectionLabel: {
-    fontSize: 11, fontFamily: fontFamily.extrabold,
-    color: colors.inkFaint, letterSpacing: 1.2,
+    fontSize: 11, fontFamily: tokens.typography.family.extrabold,
+    color: tokens.colors.textTertiary, letterSpacing: 1.2,
     marginBottom: 10, marginTop: 8,
   },
 
   // Card
   card: {
     flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: colors.white,
-    borderRadius: 16, marginBottom: 8,
-    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: tokens.colors.surface,
+    borderRadius: tokens.radii.xl, marginBottom: tokens.spacing.sm,
+    borderWidth: 1, borderColor: tokens.colors.border,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.04,
-    shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    ...tokens.shadows.soft,
   },
   cardUnread: {
-    backgroundColor: colors.white,
-    borderColor: colors.border,
+    backgroundColor: tokens.colors.surface,
+    borderColor: tokens.colors.border,
     shadowOpacity: 0.07, elevation: 4,
   },
   accentStripe: {
     width: 3, alignSelf: 'stretch',
-    borderTopLeftRadius: 16, borderBottomLeftRadius: 16,
+    borderTopLeftRadius: tokens.radii.xl, borderBottomLeftRadius: tokens.radii.xl,
   },
   iconBox: {
-    width: 44, height: 44, borderRadius: 12,
+    width: 44, height: 44, borderRadius: tokens.radii.md,
     alignItems: 'center', justifyContent: 'center',
-    marginLeft: 12, marginVertical: 14, marginRight: 12,
+    marginLeft: tokens.spacing.md, marginVertical: tokens.spacing.md, marginRight: tokens.spacing.md,
   },
-  body: { flex: 1, paddingVertical: 14, paddingRight: 32 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
-  title: { fontSize: 14, fontWeight: '600', color: colors.ink, flex: 1, marginRight: 8 },
-  titleUnread: { fontWeight: '700', color: colors.ink },
-  time: { fontSize: 11, fontWeight: '500', color: colors.inkFaint },
-  timeUnread: { color: colors.primary, fontWeight: '600' },
-  message: { fontSize: 13, fontWeight: '400', color: colors.inkMuted, lineHeight: 19 },
-  messageUnread: { color: colors.ink, fontWeight: '500', fontFamily: fontFamily.medium },
+  body: { flex: 1, paddingVertical: tokens.spacing.md, paddingRight: tokens.spacing.xxxl },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: tokens.spacing.xs },
+  title: { fontSize: 14, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textPrimary, flex: 1, marginRight: tokens.spacing.sm },
+  titleUnread: { fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
+  time: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary },
+  timeUnread: { color: tokens.colors.primary, fontFamily: tokens.typography.family.semibold },
+  message: { fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary, lineHeight: 19 },
+  messageUnread: { color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.medium },
   dot: {
     position: 'absolute', top: 14, right: 12,
     width: 8, height: 8, borderRadius: 4,
@@ -372,12 +372,12 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   emptyIcon: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: tokens.colors.primaryTint,
     alignItems: 'center', justifyContent: 'center', marginBottom: 20,
   },
-  emptyTitle: { fontSize: 20, fontFamily: fontFamily.black, color: colors.ink, marginBottom: 8 },
+  emptyTitle: { fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 8 },
   emptySub: {
-    fontSize: 14, fontFamily: fontFamily.regular,
-    color: colors.inkMuted, textAlign: 'center', lineHeight: 21,
+    fontSize: 14, fontFamily: tokens.typography.family.regular,
+    color: tokens.colors.textSecondary, textAlign: 'center', lineHeight: 21,
   },
 });

@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useEffect, useState } from 'react';
 import { playKitchenAlert } from '../utils/kitchenAlert';
 import {
@@ -12,6 +13,7 @@ import { logout } from '../store/slices/authSlice';
 import { RootState } from '../store';
 import { ChefHat, LogOut, ClipboardCheck, Zap, Clock } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
+import { useFeedback } from '../context/FeedbackContext';
 
 const G = {
   bg: '#070707',
@@ -24,10 +26,10 @@ const G = {
   amber: '#F59E0B',
   amberBg: 'rgba(245,158,11,0.08)',
   amberBorder: 'rgba(245,158,11,0.18)',
-  red: '#EF4444',
+  red: tokens.colors.danger,
   redBg: 'rgba(239,68,68,0.08)',
   redBorder: 'rgba(239,68,68,0.18)',
-  white: '#FFFFFF',
+  white: tokens.colors.surface,
   dim: 'rgba(255,255,255,0.45)',
   muted: 'rgba(255,255,255,0.18)',
   faint: 'rgba(255,255,255,0.05)',
@@ -58,6 +60,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const { showDialog } = useFeedback();
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -87,11 +90,10 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/claim`, {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
     onError: (err: any) => {
-      const msg =
-        err?.message === 'Insufficient permissions'
+      const msg = err.response?.status === 403
           ? 'Your account role cannot claim orders. Ask your kitchen manager.'
           : 'Could not accept this order. It may have been claimed already.';
-      Alert.alert('Error', msg);
+      showDialog({ title: 'Error', message: msg, confirmText: 'Okay', type: 'error' });
     },
   });
 
@@ -99,13 +101,13 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     mutationFn: ({ orderId, status }: { orderId: string; status: string }) =>
       api.patch(`/kitchen/orders/${orderId}/status`, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
-    onError: () => Alert.alert('Error', 'Could not update order status.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not update order status.', confirmText: 'Okay', type: 'error' }),
   });
 
   const packMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/packed`, {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
-    onError: () => Alert.alert('Error', 'Could not mark order as packed.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not mark order as packed.', confirmText: 'Okay', type: 'error' }),
   });
 
   const { data: preTickets = [] } = useQuery({
@@ -124,7 +126,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     mutationFn: ({ bookingId, itemId, status }: { bookingId: string; itemId: string; status: string }) =>
       api.post(`/table-bookings/${bookingId}/item-status`, { itemId, status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['board-dine-in-tickets'] }),
-    onError: () => Alert.alert('Error', 'Failed to update item status.'),
+    onError: () => showDialog({ title: 'Error', message: 'Failed to update item status.', confirmText: 'Okay', type: 'error' }),
   });
 
   useEffect(() => {
@@ -133,7 +135,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     const onDineInUpdate = () => queryClient.invalidateQueries({ queryKey: ['board-dine-in-tickets'] });
     const onRiderArrived = (data: { orderId: string; riderName?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
-      Alert.alert('Rider Arrived', `${data.riderName || 'Rider'} is at the kitchen for order pickup.`);
+      showDialog({ title: 'Rider Arrived', message: `${data.riderName || 'Rider'} is at the kitchen for order pickup.`, confirmText: 'Okay', type: 'info' });
     };
 
     const attach = (socket: ReturnType<typeof getSocket>) => {
@@ -157,25 +159,27 @@ const KitchenBoardScreen = ({ navigation }: any) => {
       socket.off('connect', onOrderUpdate);
     };
 
-    // On app cold-start, React children effects run before parent (RootNavigator) effects,
-    // so getSocket() may be null here. Retry once after a short delay so the parent's
-    // connectSocket() call has time to complete. The 5s refetchInterval is the safety net
-    // in the rare window between mount and retry.
-    let socket = getSocket();
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attachedSocket: ReturnType<typeof getSocket> = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
-    if (socket) {
-      attach(socket);
-    } else {
-      retryTimer = setTimeout(() => {
-        socket = getSocket();
-        attach(socket);
-      }, 1500);
+    const tryAttach = () => {
+      if (attachedSocket) return;
+      const s = getSocket();
+      if (s) {
+        attach(s);
+        attachedSocket = s;
+        if (timer) clearInterval(timer);
+      }
+    };
+
+    tryAttach();
+    if (!attachedSocket) {
+      timer = setInterval(tryAttach, 1000);
     }
 
     return () => {
-      if (retryTimer) clearTimeout(retryTimer);
-      detach(getSocket());
+      if (timer) clearInterval(timer);
+      detach(attachedSocket);
     };
   }, [queryClient]);
 
@@ -538,7 +542,7 @@ const styles = StyleSheet.create({
     marginLeft: 10, marginBottom: 14, backgroundColor: G.red, borderRadius: 10,
     minWidth: 22, height: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
   },
-  countBadgeText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  countBadgeText: { color: tokens.colors.surface, fontSize: 11, fontWeight: '900' },
 
   chipScroll: { gap: 8 },
   chip: {

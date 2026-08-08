@@ -4,16 +4,19 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator,
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const BroadcastScreen = ({ navigation }: any) => {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [target, setTarget] = useState('all');
+  const { showDialog } = useFeedback();
 
   const mutation = useMutation({
     mutationFn: (data: any) => api.post('/admin/broadcast', data),
     onSuccess: () => {
-      Alert.alert('Broadcast Queued', 'Your mission broadcast has been added to the notification queue.');
+      showDialog({ title: 'Broadcast Queued', message: 'Your mission broadcast has been added to the notification queue.', confirmText: 'Okay', type: 'success' });
       navigation.goBack();
     },
   });
@@ -104,7 +107,7 @@ const BroadcastScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   header: {
     paddingHorizontal: 32,
@@ -178,7 +181,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   targetBtnTextActive: {
-    color: '#fff',
+    color: tokens.colors.surface,
   },
   targetBtnTextInactive: {
     color: '#9ca3af',
@@ -209,11 +212,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
+    ...tokens.shadows.soft,
   },
   launchBtnEnabled: {
     backgroundColor: '#FF6B35',
@@ -226,7 +225,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   launchBtnText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
     textTransform: 'uppercase',

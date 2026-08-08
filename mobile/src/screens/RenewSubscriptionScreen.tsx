@@ -1,18 +1,22 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { View, Text, ScrollView, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react-native';
+import { Sparkles, ArrowRight, ShieldCheck } from 'lucide-react-native';
 import RazorpayCheckout from 'react-native-razorpay';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { useFeedback } from '../context/FeedbackContext';
 
 const RenewSubscriptionScreen = ({ navigation, route }: any) => {
   const { activeSub } = route.params;
   const { user } = useSelector((state: RootState) => state.auth);
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(activeSub?.plan_id || null);
 
   const { data: plansData, isLoading } = useQuery({
@@ -36,7 +40,7 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
                 contact: user?.phone || '',
                 name: user?.name || ''
             },
-            theme: { color: '#FF6B35' }
+            theme: { color: tokens.colors.primary }
         };
 
         try {
@@ -48,26 +52,21 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
                 type: 'subscription',
                 planId: selectedPlan,
             });
-            Alert.alert('Success', 'Your membership has been renewed!');
+            showDialog({ title: 'Success', message: 'Your membership has been renewed!', confirmText: 'Okay', type: 'success' });
             queryClient.invalidateQueries({ queryKey: ['my-subscriptions'] });
             navigation.navigate('ProfileMain');
         } catch (error: any) {
-            Alert.alert('Payment Failed', error.description || 'Transaction cancelled');
+            showDialog({ title: 'Payment Failed', message: error.description || 'Transaction cancelled', confirmText: 'Okay', type: 'error' });
         }
     },
     onError: (err: any) => {
-        Alert.alert('Error', err.message || 'Failed to initiate renewal');
+        showDialog({ title: 'Error', message: err.message || 'Failed to initiate renewal', confirmText: 'Okay', type: 'error' });
     }
   });
 
   if (isLoading) return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft size={24} color="#1A1A2E" />
-        </BouncingButton>
-        <Text style={styles.headerTitle}>Renew Membership</Text>
-      </View>
+      <ScreenHeader title="Renew Membership" />
       <SkeletonScreenList item={<SkeletonListItem />} />
     </View>
   );
@@ -76,23 +75,14 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <BouncingButton 
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <ArrowLeft size={24} color="#1A1A2E" />
-        </BouncingButton>
-        <Text style={styles.headerTitle}>Renew Membership</Text>
-      </View>
+      <ScreenHeader title="Renew Membership" />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Status Card */}
         <View style={styles.statusCard}>
           <View style={styles.statusHeaderRow}>
             <View style={styles.sparkleIconWrapper}>
-              <Sparkles size={20} color="#FF6B35" />
+              <Sparkles size={20} color={tokens.colors.primary} />
             </View>
             <View>
               <Text style={styles.statusLabel}>Current Status</Text>
@@ -107,9 +97,8 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
         <Text style={styles.sectionLabel}>Choose Renewal Plan</Text>
         
         {plans.map((plan: any) => (
-          <BouncingButton 
+          <PressableScale 
             key={plan.id}
-            activeOpacity={0.9}
             onPress={() => setSelectedPlan(plan.id)}
             style={[styles.planCard, selectedPlan === plan.id ? styles.planCardActive : styles.planCardInactive]}
           >
@@ -125,12 +114,12 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
                 </View>
               )}
             </View>
-          </BouncingButton>
+          </PressableScale>
         ))}
 
         {/* Secure Note */}
         <View style={styles.secureNote}>
-          <ShieldCheck size={24} color="#10B981" />
+          <ShieldCheck size={24} color={tokens.colors.success} />
           <View style={{ marginLeft: 16, flex: 1 }}>
             <Text style={styles.secureTitle}>Secure Transaction</Text>
             <Text style={styles.secureSub}>Payments processed via Razorpay</Text>
@@ -142,8 +131,7 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
 
       {/* Action Footer */}
       <View style={styles.footer}>
-        <BouncingButton 
-          activeOpacity={0.9}
+        <PressableScale
           onPress={() => selectedPlan && renewMutation.mutate(selectedPlan)}
           disabled={!selectedPlan || renewMutation.isPending}
           style={[styles.payBtn, !selectedPlan ? styles.payBtnDisabled : styles.payBtnEnabled]}
@@ -153,13 +141,13 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
             <Text style={styles.payBtnText}>Pay Securely</Text>
           </View>
           {renewMutation.isPending ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={tokens.colors.textInverse} />
           ) : (
             <View style={styles.payBtnIconWrapper}>
-              <ArrowRight size={24} color="white" />
+              <ArrowRight size={24} color={tokens.colors.textInverse} />
             </View>
           )}
-        </BouncingButton>
+        </PressableScale>
       </View>
     </View>
   );
@@ -168,51 +156,24 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  header: {
-    paddingTop: 64,
-    paddingHorizontal: 32,
-    paddingBottom: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#f9fafb',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 24,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  headerTitle: {
-    color: '#1A1A2E',
-    fontSize: 24,
-    fontWeight: '900',
   },
   scrollView: {
     flex: 1,
     paddingHorizontal: 32,
   },
   statusCard: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: tokens.colors.textPrimary,
     padding: 32,
     borderRadius: 40,
     marginBottom: 48,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.08,
-    shadowRadius: 30,
-    elevation: 10,
+    ...tokens.shadows.soft,
   },
   statusHeaderRow: {
     flexDirection: 'row',
@@ -231,25 +192,25 @@ const styles = StyleSheet.create({
   statusLabel: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 9,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 2,
     marginBottom: 2,
   },
   statusTitle: {
-    color: '#fff',
+    color: tokens.colors.textInverse,
     fontSize: 18,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
   },
   statusDesc: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: tokens.typography.family.medium,
     lineHeight: 20,
   },
   sectionLabel: {
-    color: '#9ca3af',
-    fontWeight: '900',
+    color: tokens.colors.textTertiary,
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 2,
     fontSize: 10,
@@ -266,51 +227,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   planCardActive: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#FF6B35',
+    backgroundColor: tokens.colors.primaryTint,
+    borderColor: tokens.colors.primary,
   },
   planCardInactive: {
-    backgroundColor: '#fff',
-    borderColor: '#f3f4f6',
+    backgroundColor: tokens.colors.surface,
+    borderColor: tokens.colors.background,
   },
   planName: {
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
   },
   planNameActive: {
-    color: '#FF6B35',
+    color: tokens.colors.primary,
   },
   planNameInactive: {
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
   },
   planSubLabel: {
-    color: '#9ca3af',
+    color: tokens.colors.textTertiary,
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 1.5,
     marginTop: 4,
   },
   planPrice: {
-    color: '#1A1A2E',
-    fontWeight: '900',
+    color: tokens.colors.textPrimary,
+    fontFamily: tokens.typography.family.black,
     fontSize: 24,
   },
   selectedBadge: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: tokens.colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
     marginTop: 8,
   },
   selectedBadgeText: {
-    color: '#fff',
-    fontWeight: '900',
+    color: tokens.colors.textInverse,
+    fontFamily: tokens.typography.family.black,
     fontSize: 8,
     textTransform: 'uppercase',
   },
   secureNote: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: tokens.colors.background,
     padding: 24,
     borderRadius: 32,
     flexDirection: 'row',
@@ -318,14 +279,14 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   secureTitle: {
-    color: '#1A1A2E',
-    fontWeight: '900',
+    color: tokens.colors.textPrimary,
+    fontFamily: tokens.typography.family.black,
     fontSize: 12,
   },
   secureSub: {
-    color: '#9ca3af',
+    color: tokens.colors.textTertiary,
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: tokens.typography.family.bold,
     marginTop: 2,
   },
   footer: {
@@ -339,29 +300,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 8,
+    ...tokens.shadows.soft,
   },
   payBtnEnabled: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: tokens.colors.textPrimary,
   },
   payBtnDisabled: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: tokens.colors.border,
   },
   payBtnLabel: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 2,
   },
   payBtnText: {
-    color: '#fff',
+    color: tokens.colors.textInverse,
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 2,
   },

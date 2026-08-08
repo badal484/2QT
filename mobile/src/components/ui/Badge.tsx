@@ -1,8 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../theme/colors';
-import { radius, spacing } from '../../theme/spacing';
-import { fontFamily } from '../../theme/typography';
+import { tokens } from '../../theme/tokens';
 
 type Variant = 'success' | 'warning' | 'danger' | 'neutral' | 'accent';
 
@@ -13,11 +11,11 @@ interface BadgeProps {
 }
 
 const VARIANT_COLORS: Record<Variant, { bg: string; fg: string }> = {
-  success: { bg: colors.successTint, fg: colors.success },
-  warning: { bg: colors.warningTint, fg: colors.warning },
-  danger: { bg: colors.dangerTint, fg: colors.danger },
-  neutral: { bg: colors.surfaceMuted, fg: colors.inkMuted },
-  accent: { bg: colors.accentTint, fg: colors.accent },
+  success: { bg: tokens.colors.successTint, fg: tokens.colors.success },
+  warning: { bg: tokens.colors.warningTint, fg: tokens.colors.warning },
+  danger: { bg: tokens.colors.dangerTint, fg: tokens.colors.danger },
+  neutral: { bg: tokens.colors.surfaceMuted, fg: tokens.colors.textSecondary },
+  accent: { bg: tokens.colors.primaryTint, fg: tokens.colors.primary },
 };
 
 export const Badge: React.FC<BadgeProps> = ({ label, variant = 'neutral', icon }) => {
@@ -25,7 +23,7 @@ export const Badge: React.FC<BadgeProps> = ({ label, variant = 'neutral', icon }
   return (
     <View style={[styles.base, { backgroundColor: bg }]}>
       {icon}
-      <Text style={[styles.label, { color: fg, marginLeft: icon ? spacing.xs : 0 }]}>{label}</Text>
+      <Text style={[styles.label, { color: fg, marginLeft: icon ? tokens.spacing.xs : 0 }]}>{label}</Text>
     </View>
   );
 };
@@ -35,12 +33,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.xs,
+    borderRadius: tokens.radii.full,
   },
   label: {
-    fontFamily: fontFamily.extrabold,
+    fontFamily: tokens.typography.family.extrabold,
     fontSize: 10,
     letterSpacing: 1,
     textTransform: 'uppercase',

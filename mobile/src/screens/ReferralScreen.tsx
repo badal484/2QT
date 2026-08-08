@@ -1,6 +1,8 @@
+import { tokens } from '../theme/tokens';
 import { ArrowLeft, Copy, Gift } from 'lucide-react-native';
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Share, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Share, StyleSheet } from 'react-native';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 import { useSelector } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
 import { RootState } from '../store';
@@ -35,15 +37,18 @@ const ReferralScreen = ({ navigation }: any) => {
       {/* Header Image/Icon */}
       <View style={styles.heroSection}>
         <View style={styles.giftWrapper}>
-          <Gift size={48} color="#10B981" />
+          <Gift size={48} color={tokens.colors.success} />
         </View>
         <Text style={styles.heroTitle}>Invite & Earn</Text>
-        <TouchableOpacity 
+        <PressableScale 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <ArrowLeft size={24} color="#1A1A2E" />
-        </TouchableOpacity>
+          <ArrowLeft size={24} color={tokens.colors.textPrimary} />
+        </PressableScale>
       </View>
 
       <View style={styles.content}>
@@ -69,16 +74,23 @@ const ReferralScreen = ({ navigation }: any) => {
           <Text style={styles.codeLabel}>Your Unique Code</Text>
           <Text style={styles.codeText}>{referralCode}</Text>
           <View style={styles.codeBtnRow}>
-            <TouchableOpacity
+            <PressableScale
               style={[styles.shareBtn, styles.copyBtn]}
               onPress={() => Share.share({ message: referralCode })}
+              accessibilityRole="button"
+              accessibilityLabel="Copy referral code"
             >
-              <Copy size={16} color="#1A1A2E" style={{ marginRight: 8 }} />
+              <Copy size={16} color={tokens.colors.textPrimary} style={{ marginRight: tokens.spacing.sm }} />
               <Text style={styles.copyBtnText}>COPY</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.shareBtn} onPress={onShare}>
+            </PressableScale>
+            <PressableScale 
+              style={styles.shareBtn} 
+              onPress={onShare}
+              accessibilityRole="button"
+              accessibilityLabel="Share referral code"
+            >
               <Text style={styles.shareBtnText}>SHARE CODE</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         </View>
 
@@ -115,20 +127,16 @@ const ReferralScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   heroSection: {
     height: 300,
-    backgroundColor: '#10B981',
+    backgroundColor: tokens.colors.success,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
+    ...tokens.shadows.soft,
   },
   giftWrapper: {
     width: 140,
@@ -142,15 +150,15 @@ const styles = StyleSheet.create({
     fontSize: 80,
   },
   heroTitle: {
-    color: '#fff',
+    color: tokens.colors.textInverse,
     fontSize: 32,
-    fontWeight: '900',
-    marginTop: 16,
+    fontFamily: tokens.typography.family.black,
+    marginTop: tokens.spacing.lg,
   },
   backButton: {
     position: 'absolute',
     top: 48,
-    left: 24,
+    left: tokens.spacing.xxl,
     width: 40,
     height: 40,
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -159,157 +167,153 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
+    paddingHorizontal: tokens.spacing.xxl,
+    paddingTop: tokens.spacing.xxxl,
     paddingBottom: 64,
   },
   promoTitle: {
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
     textAlign: 'center',
     fontSize: 24,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     lineHeight: 32,
   },
   promoDesc: {
-    color: '#6b7280',
+    color: tokens.colors.textSecondary,
     textAlign: 'center',
     fontSize: 16,
-    marginTop: 12,
-    paddingHorizontal: 8,
+    marginTop: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.sm,
     lineHeight: 24,
-    fontWeight: '500',
+    fontFamily: tokens.typography.family.medium,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 32,
-    gap: 24,
+    marginTop: tokens.spacing.xxxl,
+    gap: tokens.spacing.xxl,
   },
   statItem: {
     alignItems: 'center',
   },
   statValue: {
-    color: '#1A1A2E',
-    fontWeight: '900',
+    color: tokens.colors.textPrimary,
+    fontFamily: tokens.typography.family.black,
     fontSize: 24,
   },
   statLabel: {
-    color: '#9ca3af',
+    color: tokens.colors.textTertiary,
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 2,
-    marginTop: 4,
+    marginTop: tokens.spacing.xs,
   },
   divider: {
     width: 1,
     height: 40,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: tokens.colors.background,
   },
   rewardValue: {
-    color: '#10B981',
-    fontWeight: '900',
+    color: tokens.colors.success,
+    fontFamily: tokens.typography.family.black,
     fontSize: 24,
   },
   codeBox: {
-    marginTop: 32,
-    backgroundColor: '#f9fafb',
+    marginTop: tokens.spacing.xxxl,
+    backgroundColor: tokens.colors.background,
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: '#e5e7eb',
-    borderRadius: 24,
-    padding: 24,
+    borderColor: tokens.colors.border,
+    borderRadius: tokens.radii.xxl,
+    padding: tokens.spacing.xxl,
     alignItems: 'center',
   },
   codeLabel: {
-    color: '#9ca3af',
-    fontWeight: '700',
+    color: tokens.colors.textTertiary,
+    fontFamily: tokens.typography.family.bold,
     textTransform: 'uppercase',
     letterSpacing: 2,
     marginBottom: 8,
     fontSize: 12,
   },
   codeText: {
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     letterSpacing: 2,
   },
   codeBtnRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
+    gap: tokens.spacing.md,
+    marginTop: tokens.spacing.xl,
   },
   copyBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 16,
+    backgroundColor: tokens.colors.background,
+    paddingHorizontal: tokens.spacing.xl,
+    paddingVertical: tokens.spacing.lg,
+    borderRadius: tokens.radii.xl,
     marginTop: 0,
     shadowOpacity: 0,
     elevation: 0,
   },
   copyBtnText: {
-    color: '#1A1A2E',
-    fontWeight: '900',
+    color: tokens.colors.textPrimary,
+    fontFamily: tokens.typography.family.black,
     fontSize: 14,
   },
   shareBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1A1A2E',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
+    backgroundColor: tokens.colors.textPrimary,
+    paddingHorizontal: tokens.spacing.xl,
+    paddingVertical: tokens.spacing.lg,
+    borderRadius: tokens.radii.xl,
+    ...tokens.shadows.soft,
   },
   shareBtnText: {
-    color: '#fff',
-    fontWeight: '900',
+    color: tokens.colors.textInverse,
+    fontFamily: tokens.typography.family.black,
     fontSize: 14,
   },
   stepsSection: {
     marginTop: 40,
   },
   sectionTitle: {
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
     fontSize: 18,
-    fontWeight: '900',
-    marginBottom: 24,
+    fontFamily: tokens.typography.family.black,
+    marginBottom: tokens.spacing.xl,
   },
   stepRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: tokens.spacing.xl,
   },
   stepNumWrapper: {
     width: 40,
     height: 40,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
+    backgroundColor: tokens.colors.background,
+    borderRadius: tokens.radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: tokens.spacing.lg,
   },
   stepNum: {
-    color: '#1A1A2E',
-    fontWeight: '900',
+    color: tokens.colors.textPrimary,
+    fontFamily: tokens.typography.family.black,
     fontSize: 18,
   },
   stepText: {
-    color: '#4b5563',
+    color: tokens.colors.textSecondary,
     fontSize: 16,
     flex: 1,
-    fontWeight: '500',
+    fontFamily: tokens.typography.family.medium,
   },
 });
 

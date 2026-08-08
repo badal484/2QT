@@ -12,11 +12,14 @@ import {
   IndianRupee,
   Image as ImageIcon
 } from 'lucide-react-native';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const AddEditMenuItemScreen = ({ route, navigation }: any) => {
   const { item } = route.params || {};
   const isEditing = !!item;
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
 
   const [name, setName] = useState(item?.name || '');
   const [description, setDescription] = useState(item?.description || '');
@@ -34,17 +37,17 @@ const AddEditMenuItemScreen = ({ route, navigation }: any) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-menu'] });
-      Alert.alert('Success', `Menu item ${isEditing ? 'updated' : 'created'} successfully.`);
+      showDialog({ title: 'Success', message: `Menu item ${isEditing ? 'updated' : 'created'} successfully.`, confirmText: 'Okay', type: 'success' });
       navigation.goBack();
     },
     onError: (err: any) => {
-      Alert.alert('Error', err.message || 'Something went wrong');
+      showDialog({ title: 'Error', message: err.message || 'Something went wrong', confirmText: 'Okay', type: 'error' });
     }
   });
 
   const handleSave = () => {
     if (!name || !price || !category) {
-      Alert.alert('Missing Fields', 'Please fill in all required fields.');
+      showDialog({ title: 'Missing Fields', message: 'Please fill in all required fields.', confirmText: 'Okay', type: 'warning' });
       return;
     }
 
@@ -149,7 +152,7 @@ const AddEditMenuItemScreen = ({ route, navigation }: any) => {
                 onPress={() => setCategory(cat)}
                 style={[styles.catButton, { backgroundColor: category === cat ? '#1A1A2E' : '#f9fafb', borderColor: category === cat ? '#1A1A2E' : '#f3f4f6' }]}
               >
-                <Text style={[styles.catButtonText, { color: category === cat ? '#fff' : '#9ca3af' }]}>{cat}</Text>
+                <Text style={[styles.catButtonText, { color: category === cat ? tokens.colors.surface : '#9ca3af' }]}>{cat}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -193,7 +196,7 @@ const AddEditMenuItemScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   header: {
     paddingHorizontal: 32,
@@ -373,7 +376,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveButtonText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
     textTransform: 'uppercase',

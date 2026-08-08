@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -12,9 +12,14 @@ const hapticOptions = {
 
 const triggerHaptic = (type = 'impactLight') => ReactNativeHapticFeedback.trigger(type as any, hapticOptions);
 
-export const BouncingButton = ({ onPress, style, children, disabled = false, hapticType = 'impactMedium', scaleDownTo = 0.95, ...rest }: any) => {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+// @deprecated — being phased out screen-by-screen in favor of
+// components/ui/internal/PressableScale. Press feedback is a flat opacity dim
+// (no scale/spring/bounce), matching PressableScale, so both primitives feel
+// identical while the migration is in progress. `scaleDownTo` is accepted but
+// unused, kept only so existing call sites passing it don't break.
+export const BouncingButton = ({ onPress, style, children, disabled = false, hapticType = 'impactMedium', scaleDownTo, ...rest }: any) => {
+  const opacity = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
     <AnimatedTouchable
@@ -22,11 +27,11 @@ export const BouncingButton = ({ onPress, style, children, disabled = false, hap
       disabled={disabled}
       onPressIn={() => {
         if (!disabled) {
-          scale.value = withSpring(scaleDownTo, { damping: 10, stiffness: 400 });
+          opacity.value = withTiming(0.6, { duration: 100 });
           if (hapticType) triggerHaptic(hapticType);
         }
       }}
-      onPressOut={() => { if (!disabled) scale.value = withSpring(1, { damping: 10, stiffness: 400 }); }}
+      onPressOut={() => { if (!disabled) opacity.value = withTiming(1, { duration: 150 }); }}
       onPress={() => { if (!disabled && onPress) onPress(); }}
       style={[style, animatedStyle]}
       {...rest}

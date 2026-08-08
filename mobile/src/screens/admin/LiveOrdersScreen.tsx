@@ -1,3 +1,4 @@
+import { tokens } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SkeletonScreenList, SkeletonOrderCard } from '../../components/ui';
@@ -5,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
+
   ShoppingBag, 
   Clock, 
   User, 
@@ -86,7 +88,7 @@ const LiveOrdersScreen = ({ navigation }: any) => {
               onPress={() => setFilter(f)}
               style={[styles.filterButton, { backgroundColor: filter === f ? '#FF6B35' : '#f9fafb', borderColor: filter === f ? '#FF6B35' : '#f3f4f6' }]}
             >
-              <Text style={[styles.filterButtonText, { color: filter === f ? '#fff' : '#9ca3af' }]}>
+              <Text style={[styles.filterButtonText, { color: filter === f ? tokens.colors.surface : '#9ca3af' }]}>
                 {f}
               </Text>
             </TouchableOpacity>
@@ -170,11 +172,11 @@ const LiveOrdersScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -221,14 +223,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
+    ...tokens.shadows.soft,
   },
   orderCountText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
   },
@@ -256,17 +254,13 @@ const styles = StyleSheet.create({
     paddingTop: 24,
   },
   orderCard: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     padding: 24,
     borderRadius: 32,
     marginBottom: 24,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -354,7 +348,7 @@ const styles = StyleSheet.create({
   quantityBadge: {
     width: 20,
     height: 20,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',

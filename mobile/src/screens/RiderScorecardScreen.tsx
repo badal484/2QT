@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React from 'react';
 import {
   View, Text, ScrollView, StyleSheet, StatusBar, ActivityIndicator, TouchableOpacity,
@@ -14,10 +15,10 @@ import {
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
-  red: '#EF4444', redLight: '#FEF2F2',
+  red: tokens.colors.danger, redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  border: '#E9E9EB', bg: '#F8F8F8', white: tokens.colors.surface,
 };
 
 const StatCard = ({ icon, label, value, sub, color = R.ink, delay = 0 }: any) => (
@@ -134,7 +135,7 @@ const s = StyleSheet.create({
   statCard: {
     width: '48%', borderRadius: 24, padding: 18,
     backgroundColor: R.white,
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+    ...tokens.shadows.soft,
     borderWidth: 1, borderColor: '#F0F0F0',
   },
   statCardHeader: { flexDirection: 'row', marginBottom: 14 },

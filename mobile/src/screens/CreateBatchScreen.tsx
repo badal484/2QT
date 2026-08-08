@@ -1,14 +1,17 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Save, Plus, Minus } from 'lucide-react-native';
+import { useFeedback } from '../context/FeedbackContext';
 
 const CreateBatchScreen = ({ navigation }: any) => {
   const [itemName, setItemName] = useState('');
   const [targetQuantity, setTargetQuantity] = useState('10');
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/kitchen/batches', data),
@@ -17,18 +20,18 @@ const CreateBatchScreen = ({ navigation }: any) => {
       navigation.goBack();
     },
     onError: (err: any) => {
-      Alert.alert('Error', err.message || 'Failed to create batch');
+      showDialog({ title: 'Error', message: err.message || 'Failed to create batch', confirmText: 'Okay', type: 'error' });
     }
   });
 
   const handleCreate = () => {
     if (!itemName) {
-      Alert.alert('Validation', 'Please enter an item name');
+      showDialog({ title: 'Validation', message: 'Please enter an item name', confirmText: 'Okay', type: 'warning' });
       return;
     }
     const qty = parseInt(targetQuantity, 10);
     if (!Number.isInteger(qty) || qty <= 0) {
-      Alert.alert('Validation', 'Please enter a valid target quantity');
+      showDialog({ title: 'Validation', message: 'Please enter a valid target quantity', confirmText: 'Okay', type: 'warning' });
       return;
     }
     createMutation.mutate({
@@ -169,7 +172,7 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
   },
   headerTitle: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 24,
     fontWeight: '900',
     marginTop: 4,
@@ -199,7 +202,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   nameInput: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 24,
     fontWeight: '900',
   },
@@ -237,7 +240,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   qtyInput: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 48,
     fontWeight: '900',
     textAlign: 'center',

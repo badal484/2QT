@@ -1,17 +1,16 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet,
+  View, Text, ScrollView, StyleSheet,
 } from 'react-native';
-import { ArrowLeft, Calendar, Clock } from 'lucide-react-native';
+import { Calendar, Clock } from 'lucide-react-native';
 import { useDispatch } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { setScheduledAt } from '../store/slices/cartSlice';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-
-const haptic = () => ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+import { haptics } from '../utils/haptics';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 
 // Kitchen is open 11 AM – 10 PM; slots every 30 min
 const SLOT_HOURS = [11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15, 19, 19.5, 20, 20.5, 21, 21.5];
@@ -76,22 +75,15 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
     const min = selectedHour % 1 === 0.5 ? 30 : 0;
     date.setHours(hr, min, 0, 0);
     dispatch(setScheduledAt(date.toISOString()));
-    haptic();
+    haptics.success();
     navigation.goBack();
   };
 
   const selectedDay = days[selectedDayIdx];
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <ArrowLeft size={20} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Schedule Order</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.root}>
+      <ScreenHeader title="Schedule Order" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -100,7 +92,7 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
         {/* Summary card */}
         {selectedHour !== null && (
           <Animated.View entering={FadeInDown.duration(250)} style={styles.summaryCard}>
-            <Calendar size={16} color={colors.primary} />
+            <Calendar size={16} color={tokens.colors.primary} />
             <Text style={styles.summaryText}>
               {selectedDay.label}, {selectedDay.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
               {'  ·  '}
@@ -113,11 +105,10 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
         <Text style={styles.sectionLabel}>Delivery Day</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daysRow}>
           {days.map((day, i) => (
-            <TouchableOpacity
+            <PressableScale
               key={i}
               style={[styles.dayCard, selectedDayIdx === i && styles.dayCardActive]}
-              onPress={() => { haptic(); setSelectedDayIdx(i); setSelectedHour(null); }}
-              activeOpacity={0.8}
+              onPress={() => { haptics.selection(); setSelectedDayIdx(i); setSelectedHour(null); }}
             >
               <Text style={[styles.dayShort, selectedDayIdx === i && styles.dayShortActive]}>
                 {day.shortLabel}
@@ -125,7 +116,7 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
               <Text style={[styles.dayDate, selectedDayIdx === i && styles.dayDateActive]}>
                 {day.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </ScrollView>
 
@@ -133,7 +124,7 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
         <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Lunch Slots</Text>
         <View style={styles.slotsGrid}>
           {slots.filter(s => s.hour < 16).map(slot => (
-            <TouchableOpacity
+            <PressableScale
               key={slot.hour}
               style={[
                 styles.slotChip,
@@ -142,14 +133,13 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
               ]}
               onPress={() => {
                 if (!slot.available) return;
-                haptic();
+                haptics.selection();
                 setSelectedHour(slot.hour);
               }}
-              activeOpacity={slot.available ? 0.8 : 1}
             >
               <Clock size={11} color={
-                !slot.available ? colors.inkFaint :
-                selectedHour === slot.hour ? colors.white : colors.inkMuted
+                !slot.available ? tokens.colors.textTertiary :
+                selectedHour === slot.hour ? tokens.colors.textInverse : tokens.colors.textSecondary
               } />
               <Text style={[
                 styles.slotText,
@@ -158,7 +148,7 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
               ]}>
                 {slot.label}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </View>
 
@@ -166,7 +156,7 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
         <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Dinner Slots</Text>
         <View style={styles.slotsGrid}>
           {slots.filter(s => s.hour >= 16).map(slot => (
-            <TouchableOpacity
+            <PressableScale
               key={slot.hour}
               style={[
                 styles.slotChip,
@@ -175,14 +165,13 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
               ]}
               onPress={() => {
                 if (!slot.available) return;
-                haptic();
+                haptics.selection();
                 setSelectedHour(slot.hour);
               }}
-              activeOpacity={slot.available ? 0.8 : 1}
             >
               <Clock size={11} color={
-                !slot.available ? colors.inkFaint :
-                selectedHour === slot.hour ? colors.white : colors.inkMuted
+                !slot.available ? tokens.colors.textTertiary :
+                selectedHour === slot.hour ? tokens.colors.textInverse : tokens.colors.textSecondary
               } />
               <Text style={[
                 styles.slotText,
@@ -191,7 +180,7 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
               ]}>
                 {slot.label}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </View>
 
@@ -202,20 +191,19 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
 
       {/* Save button */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) + 4 }]}>
-        <TouchableOpacity
+        <PressableScale
           style={[styles.saveBtn, selectedHour === null && styles.saveBtnDisabled]}
           onPress={handleSave}
           disabled={selectedHour === null}
-          activeOpacity={0.9}
         >
-          <Calendar size={18} color={colors.white} />
+          <Calendar size={18} color={tokens.colors.textInverse} />
           <Text style={styles.saveBtnText}>
             {selectedHour !== null
               ? `Schedule for ${formatHour(selectedHour)}`
               : 'Pick a time slot above'
             }
           </Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </View>
   );
@@ -224,75 +212,64 @@ const ScheduleOrderScreen = ({ navigation }: any) => {
 export default ScheduleOrderScreen;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: tokens.colors.background },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
-  },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink },
 
   summaryCard: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: colors.primaryTint, borderRadius: 12,
+    backgroundColor: tokens.colors.primaryTint, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 10, marginVertical: 16,
-    borderWidth: 1, borderColor: colors.primary + '30',
+    borderWidth: 1, borderColor: tokens.colors.primary + '30',
   },
-  summaryText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.primary },
+  summaryText: { fontSize: 13, fontFamily: tokens.typography.family.semibold, color: tokens.colors.primary },
 
   sectionLabel: {
-    fontSize: 11, fontFamily: fontFamily.extrabold, color: colors.inkMuted,
+    fontSize: 11, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textSecondary,
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12, marginTop: 16,
   },
 
   daysRow: { marginHorizontal: -16, paddingHorizontal: 16 },
   dayCard: {
     width: 72, alignItems: 'center', paddingVertical: 12, marginRight: 10,
-    backgroundColor: colors.white, borderRadius: 14,
-    borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: tokens.colors.textInverse, borderRadius: 14,
+    borderWidth: 1.5, borderColor: tokens.colors.border,
   },
-  dayCardActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dayShort: { fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted, marginBottom: 4 },
+  dayCardActive: { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.primary },
+  dayShort: { fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.textSecondary, marginBottom: 4 },
   dayShortActive: { color: 'rgba(255,255,255,0.85)' },
-  dayDate: { fontSize: 13, fontFamily: fontFamily.extrabold, color: colors.ink },
-  dayDateActive: { color: colors.white },
+  dayDate: { fontSize: 13, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textPrimary },
+  dayDateActive: { color: tokens.colors.textInverse },
 
   slotsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slotChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: colors.white,
-    borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: tokens.colors.textInverse,
+    borderWidth: 1.5, borderColor: tokens.colors.border,
   },
-  slotChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  slotChipDisabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.border, opacity: 0.5 },
-  slotText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.ink },
-  slotTextActive: { color: colors.white },
-  slotTextDisabled: { color: colors.inkFaint },
+  slotChipActive: { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.primary },
+  slotChipDisabled: { backgroundColor: tokens.colors.surfaceMuted, borderColor: tokens.colors.border, opacity: 0.5 },
+  slotText: { fontSize: 13, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textPrimary },
+  slotTextActive: { color: tokens.colors.textInverse },
+  slotTextDisabled: { color: tokens.colors.textTertiary },
 
   notice: {
-    fontSize: 12, fontFamily: fontFamily.regular, color: colors.inkMuted,
+    fontSize: 12, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary,
     marginTop: 24, lineHeight: 18, textAlign: 'center',
   },
 
   bottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 12,
-    borderTopWidth: 1, borderTopColor: colors.border,
+    backgroundColor: tokens.colors.textInverse, paddingHorizontal: 16, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: tokens.colors.border,
   },
   saveBtn: {
-    backgroundColor: colors.primary, borderRadius: 16,
+    backgroundColor: tokens.colors.primary, borderRadius: 16,
     paddingVertical: 16, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center', gap: 8,
-    shadowColor: colors.primary, shadowOpacity: 0.25,
+    shadowColor: tokens.colors.primary, shadowOpacity: 0.25,
     shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
-  saveBtnDisabled: { backgroundColor: colors.border, shadowOpacity: 0 },
-  saveBtnText: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.white },
+  saveBtnDisabled: { backgroundColor: tokens.colors.border, shadowOpacity: 0 },
+  saveBtnText: { fontSize: 15, fontFamily: tokens.typography.family.bold, color: tokens.colors.textInverse },
 });

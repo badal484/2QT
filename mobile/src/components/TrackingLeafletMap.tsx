@@ -13,7 +13,7 @@ interface Props {
   style?: any;
 }
 
-export const TrackingLeafletMap: React.FC<Props> = ({
+export const TrackingLeafletMap: React.FC<Props> = React.memo(({
   riderLocation,
   customerLocation,
   kitchenLocation,
@@ -385,4 +385,4 @@ window.fitAll();
       style={[{ flex: 1, backgroundColor: '#0A0F0D' }, style]}
     />
   );
-};
+});

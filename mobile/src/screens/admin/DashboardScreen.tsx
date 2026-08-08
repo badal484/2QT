@@ -1,3 +1,4 @@
+import { tokens } from '../../theme/tokens';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SkeletonDashboard, ScreenError } from '../../components/ui';
@@ -7,6 +8,7 @@ import { api } from '../../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { logout } from '../../store/slices/authSlice';
 import { 
+
   TrendingUp, 
   ShoppingBag, 
   Users, 
@@ -286,11 +288,11 @@ const DashboardScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -329,7 +331,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   restartButtonText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
     textTransform: 'uppercase',
@@ -390,11 +392,7 @@ const styles = StyleSheet.create({
     padding: 32,
     borderRadius: 48,
     marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.2,
-    shadowRadius: 30,
-    elevation: 10,
+    ...tokens.shadows.soft,
   },
   graphHeader: {
     flexDirection: 'row',
@@ -411,7 +409,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   graphValue: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 32,
     fontWeight: '900',
     letterSpacing: -1,
@@ -478,16 +476,12 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     width: '48%',
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     padding: 24,
     borderRadius: 32,
     marginBottom: 16,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   metricHeader: {
     flexDirection: 'row',
@@ -557,15 +551,11 @@ const styles = StyleSheet.create({
   navIconContainer: {
     width: 48,
     height: 48,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 1,
+    ...tokens.shadows.soft,
   },
   navTextContainer: {
     marginLeft: 16,

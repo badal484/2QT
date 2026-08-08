@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
@@ -16,7 +17,7 @@ const R = {
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: '#FFFBEB',
   ink: '#1A1F1C', gray: '#6B7570', muted: '#9CA3A0',
-  border: '#F0F0F0', bg: '#F8F9FA', white: '#FFFFFF',
+  border: '#F0F0F0', bg: '#F8F9FA', white: tokens.colors.surface,
 };
 
 const EarningsScreen = ({ navigation }: any) => {
@@ -192,7 +193,7 @@ const s = StyleSheet.create({
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: tokens.colors.border,
   },
   payoutBtn: {
     width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
@@ -203,7 +204,7 @@ const s = StyleSheet.create({
   // Sleek Dark Hero card
   heroCard: {
     marginHorizontal: 16, marginTop: 4, marginBottom: 16, backgroundColor: R.ink, borderRadius: 24, padding: 24,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6,
+    ...tokens.shadows.soft,
   },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   heroLabel: { color: R.muted, fontSize: 13, fontWeight: '600', letterSpacing: 0.5 },

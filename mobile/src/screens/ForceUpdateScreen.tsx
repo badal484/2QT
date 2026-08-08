@@ -1,6 +1,8 @@
+import { tokens } from '../theme/tokens';
 import React from 'react';
-import { View, Text, TouchableOpacity, Linking, Platform, StyleSheet } from 'react-native';
+import { View, Text, Linking, Platform, StyleSheet } from 'react-native';
 import { DownloadCloud, AlertTriangle } from 'lucide-react-native';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 
 const ForceUpdateScreen = () => {
   const handleUpdate = () => {
@@ -20,13 +22,13 @@ const ForceUpdateScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.badge}>
-        <AlertTriangle size={12} color="#FF6B35" />
+        <AlertTriangle size={12} color={tokens.colors.primary} />
         <Text style={styles.badgeText}>Critical Update</Text>
       </View>
 
       <View style={styles.iconOuter}>
         <View style={styles.iconInner}>
-          <DownloadCloud size={40} color="white" />
+          <DownloadCloud size={40} color={tokens.colors.textInverse} />
         </View>
       </View>
       
@@ -35,13 +37,12 @@ const ForceUpdateScreen = () => {
         We've supercharged the 2QT experience! You're using an older version that is no longer supported by our kitchen servers. Please update to continue.
       </Text>
 
-      <TouchableOpacity 
-        activeOpacity={0.9}
+      <PressableScale
         onPress={handleUpdate}
         style={styles.updateBtn}
       >
         <Text style={styles.updateBtnText}>Update Now</Text>
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 };
@@ -49,7 +50,7 @@ const ForceUpdateScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
@@ -60,15 +61,15 @@ const styles = StyleSheet.create({
     right: 32,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF7ED',
+    backgroundColor: tokens.colors.primaryTint,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 100,
   },
   badgeText: {
-    color: '#FF6B35',
+    color: tokens.colors.primary,
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 2,
     marginLeft: 6,
@@ -76,39 +77,39 @@ const styles = StyleSheet.create({
   iconOuter: {
     width: 160,
     height: 160,
-    backgroundColor: '#f9fafb',
+    backgroundColor: tokens.colors.background,
     borderRadius: 80,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 40,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: tokens.colors.border,
   },
   iconInner: {
     width: 96,
     height: 96,
-    backgroundColor: '#FF6B35',
+    backgroundColor: tokens.colors.primary,
     borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF6B35',
+    shadowColor: tokens.colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 8,
   },
   title: {
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     letterSpacing: -1,
     textTransform: 'uppercase',
     marginBottom: 16,
     textAlign: 'center',
   },
   description: {
-    color: '#6b7280',
-    fontWeight: '700',
+    color: tokens.colors.textSecondary,
+    fontFamily: tokens.typography.family.bold,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 64,
@@ -116,20 +117,16 @@ const styles = StyleSheet.create({
   },
   updateBtn: {
     width: '100%',
-    backgroundColor: '#1A1A2E',
+    backgroundColor: tokens.colors.textPrimary,
     height: 64,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 8,
+    ...tokens.shadows.soft,
   },
   updateBtnText: {
-    color: '#fff',
-    fontWeight: '900',
+    color: tokens.colors.textInverse,
+    fontFamily: tokens.typography.family.black,
     fontSize: 14,
     textTransform: 'uppercase',
     letterSpacing: 3,

@@ -10,14 +10,16 @@ import {
   Zap, Target, TrendingUp, Trophy, Star, Flame, ChevronRight,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: '#FFFBEB',
-  red: '#EF4444', redLight: '#FEF2F2',
+  red: tokens.colors.danger, redLight: '#FEF2F2',
   ink: '#111827', gray: '#6B7280', muted: '#9CA3AF',
-  border: '#E5E7EB', bg: '#F9FAFB', white: '#FFFFFF',
+  border: tokens.colors.border, bg: tokens.colors.background, white: tokens.colors.surface,
 };
 
 const ICONS_LIST = ['zap', 'target', 'trending-up', 'trophy', 'star', 'flame'] as const;
@@ -92,6 +94,7 @@ const TemplateModal = ({ visible, initial, onClose, onSave, isSaving }: {
   visible: boolean; initial: FormState | null; onClose: () => void;
   onSave: (f: FormState) => void; isSaving: boolean;
 }) => {
+  const { showDialog } = useFeedback();
   const [form, setForm] = useState<FormState>(initial || EMPTY_FORM);
 
   React.useEffect(() => { if (visible) setForm(initial || EMPTY_FORM); }, [visible, initial]);
@@ -109,9 +112,11 @@ const TemplateModal = ({ visible, initial, onClose, onSave, isSaving }: {
   const addTier = () => set('tiers', [...form.tiers, { target: 0, reward_paise: 0, label: '' }]);
 
   const submit = () => {
-    if (!form.title.trim()) return Alert.alert('Required', 'Enter a mission title');
-    if (form.tiers.some(t => t.target <= 0 || t.reward_paise <= 0 || !t.label.trim()))
-      return Alert.alert('Required', 'Fill all tier fields');
+    if (!form.title.trim()) { showDialog({ title: 'Required', message: 'Enter a mission title', confirmText: 'Okay', type: 'warning' }); return; }
+    if (form.tiers.some(t => t.target <= 0 || t.reward_paise <= 0 || !t.label.trim())) {
+      showDialog({ title: 'Required', message: 'Fill all tier fields', confirmText: 'Okay', type: 'warning' });
+      return;
+    }
     onSave(form);
   };
 
@@ -282,7 +287,8 @@ const tc = StyleSheet.create({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 const AdminMissionsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [modalVisible, setModalVisible] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
 
@@ -292,7 +298,7 @@ const AdminMissionsScreen = ({ navigation }: any) => {
     refetchInterval: 10000,
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-mission-templates'] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-mission-templates'] });
 
   const createMutation = useMutation({
     mutationFn: (f: FormState) => api.post('/missions/templates', {
@@ -300,7 +306,7 @@ const AdminMissionsScreen = ({ navigation }: any) => {
       type: f.type, tiers: f.tiers, windowType: f.windowType,
     }),
     onSuccess: () => { setModalVisible(false); invalidate(); },
-    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || e.message),
+    onError: (e: any) => showDialog({ title: 'Error', message: e.response?.data?.error || e.message, confirmText: 'Okay', type: 'error' }),
   });
 
   const updateMutation = useMutation({
@@ -309,7 +315,7 @@ const AdminMissionsScreen = ({ navigation }: any) => {
       type: f.type, tiers: f.tiers, windowType: f.windowType,
     }),
     onSuccess: () => { setModalVisible(false); invalidate(); },
-    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || e.message),
+    onError: (e: any) => showDialog({ title: 'Error', message: e.response?.data?.error || e.message, confirmText: 'Okay', type: 'error' }),
   });
 
   const toggleMutation = useMutation({
@@ -334,10 +340,14 @@ const AdminMissionsScreen = ({ navigation }: any) => {
   };
 
   const confirmDelete = (tpl: any) => {
-    Alert.alert('Delete Mission', `Delete "${tpl.title}"? Rider progress for this mission will also be removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(tpl.id) },
-    ]);
+    showDialog({
+      title: 'Delete Mission',
+      message: `Delete "${tpl.title}"? Rider progress for this mission will also be removed.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'warning',
+      onConfirm: () => deleteMutation.mutate(tpl.id)
+    });
   };
 
   const handleSave = (f: FormState) => {

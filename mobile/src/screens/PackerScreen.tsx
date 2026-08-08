@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
@@ -11,6 +12,7 @@ import { RootState } from '../store';
 import { Package, CheckSquare, Square, LogOut, Clock, CheckCircle2 } from 'lucide-react-native';
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
+import { useFeedback } from '../context/FeedbackContext';
 
 const G = {
   bg: '#070707',
@@ -22,7 +24,7 @@ const G = {
   amber: '#F59E0B',
   amberBg: 'rgba(245,158,11,0.08)',
   amberBorder: 'rgba(245,158,11,0.18)',
-  white: '#FFFFFF',
+  white: tokens.colors.surface,
   dim: 'rgba(255,255,255,0.45)',
   muted: 'rgba(255,255,255,0.18)',
   faint: 'rgba(255,255,255,0.05)',
@@ -128,6 +130,7 @@ const PackerScreen = () => {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const { showDialog } = useFeedback();
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['packer-orders'],
@@ -137,8 +140,11 @@ const PackerScreen = () => {
 
   const packMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/packed`, {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['packer-orders'] }),
-    onError: () => Alert.alert('Error', 'Could not mark order as packed. Please try again.'),
+    onSuccess: () => {
+      showDialog({ title: 'Success', message: 'Order packed successfully', confirmText: 'Okay', type: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['packer-orders'] });
+    },
+    onError: () => showDialog({ title: 'Error', message: 'Could not mark order as packed. Please try again.', confirmText: 'Okay', type: 'error' }),
   });
 
   useEffect(() => {
@@ -156,15 +162,15 @@ const PackerScreen = () => {
   const orders: Order[] = data?.orders ?? [];
 
   const handlePack = useCallback((order: Order) => {
-    Alert.alert(
-      'Confirm Pack',
-      `Mark order #${order.display_id} as packed and ready for rider?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Mark Packed', onPress: () => packMutation.mutate(order.id) },
-      ]
-    );
-  }, [packMutation]);
+    showDialog({
+      title: 'Confirm Pack',
+      message: `Mark order #${order.display_id} as packed and ready for rider?`,
+      confirmText: 'Mark Packed',
+      cancelText: 'Cancel',
+      type: 'info',
+      onConfirm: () => packMutation.mutate(order.id)
+    });
+  }, [packMutation, showDialog]);
 
   return (
     <View style={styles.root}>

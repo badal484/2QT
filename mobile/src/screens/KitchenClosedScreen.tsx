@@ -1,8 +1,11 @@
+import { tokens } from '../theme/tokens';
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { PowerOff, CheckCircle2 } from 'lucide-react-native';
+import { useFeedback } from '../context/FeedbackContext';
 
 const KitchenClosedScreen = ({ navigation }: any) => {
+  const { showDialog } = useFeedback();
   return (
     <View style={styles.container}>
       <View style={styles.iconOuter}>
@@ -36,20 +39,14 @@ const KitchenClosedScreen = ({ navigation }: any) => {
       <TouchableOpacity 
         activeOpacity={0.9}
         onPress={() => {
-          Alert.alert(
-            'Go Online',
-            'Are you sure you want to open the kitchen and start accepting live orders?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { 
-                text: 'Go Online', 
-                style: 'default',
-                onPress: () => {
-                  navigation.replace('MainKitchen');
-                }
-              }
-            ]
-          );
+          showDialog({
+            title: 'Go Online',
+            message: 'Are you ready to accept incoming orders?',
+            confirmText: 'Yes, Go Online',
+            cancelText: 'Cancel',
+            type: 'info',
+            onConfirm: () => navigation.replace('MainKitchen')
+          });
         }}
         style={styles.onlineBtn}
       >
@@ -79,7 +76,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   title: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 32,
     fontWeight: '900',
     letterSpacing: -1,
@@ -104,7 +101,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
   },
   checklistLabel: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 14,
     textTransform: 'uppercase',

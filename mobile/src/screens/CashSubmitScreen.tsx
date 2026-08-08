@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
@@ -11,6 +12,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import RazorpayCheckout from 'react-native-razorpay';
 import { api } from '../api/client';
+import { useFeedback } from '../context/FeedbackContext';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
@@ -18,8 +20,8 @@ const R = {
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.08)',
   blue: '#3B82F6', blueLight: '#EFF6FF',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
-  red: '#EF4444', redLight: '#FEF2F2',
+  border: '#E9E9EB', bg: '#F8F8F8', white: tokens.colors.surface,
+  red: tokens.colors.danger, redLight: '#FEF2F2',
   rzp: '#072654', rzpLight: '#EEF2FB',
 };
 
@@ -64,6 +66,7 @@ const ResultOverlay = ({
 const CashSubmitScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [method, setMethod] = useState<Method>('physical');
   const [submitted, setSubmitted] = useState(false);
   const [rzpLoading, setRzpLoading] = useState(false);
@@ -90,7 +93,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
       queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
       setSubmitted(true);
     },
-    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || e.message || 'Could not submit. Try again.'),
+    onError: (e: any) => showDialog({ title: 'Error', message: e.response?.data?.error || e.message || 'Could not submit. Try again.', confirmText: 'Okay', type: 'error' }),
   });
 
   // Razorpay native in-app checkout — no browser redirect
@@ -132,7 +135,7 @@ const CashSubmitScreen = ({ navigation }: any) => {
     } catch (e: any) {
       // error.code === 0 means user cancelled — don't show error for that
       if (e?.code !== 0) {
-        Alert.alert('Payment Failed', e?.response?.data?.error || e?.description || 'Payment could not be completed. Try again.');
+        showDialog({ title: 'Payment Failed', message: e?.response?.data?.error || e?.description || 'Payment could not be completed. Try again.', confirmText: 'Okay', type: 'error' });
       }
     } finally {
       setRzpLoading(false);
@@ -157,8 +160,8 @@ const CashSubmitScreen = ({ navigation }: any) => {
         handleDone();
         return true;
       };
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
     }
   }, [submitted]);
 
@@ -329,11 +332,14 @@ const CashSubmitScreen = ({ navigation }: any) => {
 
           <TouchableOpacity
             onPress={() =>
-              Alert.alert(
-                'Submit Later?',
-                'Finance will not be notified until you submit. You may not receive new COD orders while cash is over the limit.',
-                [{ text: 'Cancel', style: 'cancel' }, { text: 'Skip for Now', style: 'destructive', onPress: handleDone }],
-              )
+              showDialog({
+                title: 'Submit Later?',
+                message: 'Finance will not be notified until you submit. You may not receive new COD orders while cash is over the limit.',
+                confirmText: 'Skip for Now',
+                cancelText: 'Cancel',
+                type: 'info',
+                onConfirm: handleDone
+              })
             }
             style={s.skipLink}
             activeOpacity={0.7}

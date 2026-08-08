@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -9,11 +10,11 @@ import { SkeletonScreenList, SkeletonOrderCard, ScreenError } from '../component
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
-  red: '#EF4444', redLight: '#FEF2F2',
+  red: tokens.colors.danger, redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
   blue: '#3B82F6', blueLight: '#EFF6FF',
   ink: '#1A1F1C', gray: '#6B7570', muted: '#9CA3A0',
-  border: '#E5E7EB', bg: '#F8F9FA', white: '#FFFFFF',
+  border: tokens.colors.border, bg: '#F8F9FA', white: tokens.colors.surface,
 };
 
 const TABS = ['All', 'Delivered', 'Cancelled'] as const;

@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React from 'react';
 import { View, Text, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +12,7 @@ const G = {
   border: 'rgba(255,255,255,0.07)',
   faint: 'rgba(255,255,255,0.05)',
   amber: '#F59E0B',
-  white: '#FFFFFF',
+  white: tokens.colors.surface,
   dim: 'rgba(255,255,255,0.55)',
   muted: 'rgba(255,255,255,0.2)',
 };

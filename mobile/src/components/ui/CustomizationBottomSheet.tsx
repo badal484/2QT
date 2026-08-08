@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Image } from 'react-native';
-import { X, Check } from 'lucide-react-native';
-import { colors } from '../../theme/colors';
-import { fontFamily } from '../../theme/typography';
-import { BouncingButton } from './BouncingButton';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image } from 'react-native';
+import { tokens } from '../../theme/tokens';
+import { BottomSheet } from './BottomSheet';
+import { Button } from './Button';
+import { haptics } from '../../utils/haptics';
 
 interface CustomizationBottomSheetProps {
   visible: boolean;
@@ -12,8 +11,6 @@ interface CustomizationBottomSheetProps {
   item: any;
   onAddToCart: (customizations: any[], instructions: string) => void;
 }
-
-const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
 export const CustomizationBottomSheet: React.FC<CustomizationBottomSheetProps> = ({
   visible,
@@ -28,25 +25,29 @@ export const CustomizationBottomSheet: React.FC<CustomizationBottomSheetProps> =
   const basePrice = (item?.price_paise || 0) / 100;
 
   let extraCost = 0;
-  Object.keys(selectedOptions).forEach(groupName => {
-    const optName = selectedOptions[groupName];
-    const group = groups.find((g: any) => g.name === groupName);
-    const option = group?.options.find((o: any) => o.name === optName);
-    if (option?.price_paise) extraCost += option.price_paise / 100;
+  groups.forEach((g: any) => {
+    if (selectedOptions[g.name]) {
+      const opt = g.options.find((o: any) => o.name === selectedOptions[g.name]);
+      if (opt?.price_paise) extraCost += opt.price_paise / 100;
+    }
   });
 
   const totalPrice = basePrice + extraCost;
 
   const handleSelect = (groupName: string, optionName: string) => {
-    ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
-    setSelectedOptions(prev => ({
-      ...prev,
-      [groupName]: optionName
-    }));
+    haptics.selection();
+    setSelectedOptions(prev => ({ ...prev, [groupName]: optionName }));
   };
 
   const handleAdd = () => {
-    ReactNativeHapticFeedback.trigger('impactHeavy', hapticOptions);
+    for (const g of groups) {
+      if (g.required && !selectedOptions[g.name]) {
+        haptics.error();
+        return;
+      }
+    }
+
+    haptics.success();
     const customArray = Object.keys(selectedOptions).map(g => {
       const group = groups.find((gr: any) => gr.name === g);
       const option = group?.options.find((o: any) => o.name === selectedOptions[g]);
@@ -61,131 +62,106 @@ export const CustomizationBottomSheet: React.FC<CustomizationBottomSheetProps> =
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-        
-        <View style={styles.sheet}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Customise {item?.name}</Text>
-              <Text style={styles.subtitle}>₹{basePrice}</Text>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      title={`Customise ${item?.name || 'Item'}`}
+      subtitle={`₹${basePrice}`}
+    >
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Customization Groups */}
+        {groups.map((group: any, idx: number) => (
+          <View key={idx} style={styles.groupContainer}>
+            <View style={styles.groupHeader}>
+              <Text style={styles.groupTitle}>{group.name}</Text>
+              {group.required && <Text style={styles.requiredBadge}>REQUIRED</Text>}
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X size={20} color={colors.inkMuted} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-            {/* Customization Groups */}
-            {groups.map((group: any, idx: number) => (
-              <View key={idx} style={styles.groupContainer}>
-                <View style={styles.groupHeader}>
-                  <Text style={styles.groupTitle}>{group.name}</Text>
-                  {group.required && <Text style={styles.requiredBadge}>REQUIRED</Text>}
-                </View>
-                
-                {group.options.map((opt: any, optIdx: number) => {
-                  const isSelected = selectedOptions[group.name] === opt.name;
-                  return (
-                    <TouchableOpacity
-                      key={optIdx}
-                      style={[styles.optionRow, isSelected && styles.optionSelected]}
-                      activeOpacity={0.8}
-                      onPress={() => handleSelect(group.name, opt.name)}
+            
+            {group.options.map((opt: any, optIdx: number) => {
+              const isSelected = selectedOptions[group.name] === opt.name;
+              return (
+                <TouchableOpacity
+                  key={optIdx}
+                  style={[styles.optionRow, isSelected && styles.optionSelected]}
+                  activeOpacity={0.8}
+                  onPress={() => handleSelect(group.name, opt.name)}
+                >
+                  <View style={styles.optionLeft}>
+                    <View style={[styles.radio, isSelected && styles.radioActive]}>
+                      {isSelected && <View style={styles.radioInner} />}
+                    </View>
+                    {!!opt.photo_url && (
+                      <Image source={{ uri: opt.photo_url }} style={styles.optionImage} />
+                    )}
+                    <Text 
+                      style={[styles.optionName, isSelected && styles.optionNameSelected]}
+                     
                     >
-                      <View style={styles.optionLeft}>
-                        <View style={[styles.radio, isSelected && styles.radioActive]}>
-                          {isSelected && <View style={styles.radioInner} />}
-                        </View>
-                        {!!opt.photo_url && (
-                          <Image source={{ uri: opt.photo_url }} style={styles.optionImage} />
-                        )}
-                        <Text style={[styles.optionName, isSelected && styles.optionNameSelected]}>
-                          {opt.name}
-                        </Text>
-                      </View>
-                      {!!opt.price_paise && (
-                        <Text style={styles.optionPrice}>+₹{opt.price_paise / 100}</Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))}
-
-            {/* Special Instructions */}
-            <View style={styles.groupContainer}>
-              <Text style={styles.groupTitle}>Special Instructions</Text>
-              <TextInput
-                style={styles.instructionInput}
-                placeholder="e.g. Make it less spicy, no onions..."
-                placeholderTextColor={colors.inkFaint}
-                value={instructions}
-                onChangeText={setInstructions}
-                multiline
-                maxLength={100}
-              />
-            </View>
-          </ScrollView>
-
-          {/* Sticky Bottom Add Button */}
-          <View style={styles.bottomBar}>
-            <BouncingButton style={styles.addBtn} onPress={handleAdd} activeOpacity={0.9}>
-              <Text style={styles.addBtnText}>Add Item  ·  ₹{totalPrice}</Text>
-            </BouncingButton>
+                      {opt.name}
+                    </Text>
+                  </View>
+                  {!!opt.price_paise && (
+                    <Text style={styles.optionPrice}>
+                      +₹{opt.price_paise / 100}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
+        ))}
+
+        <View style={styles.groupContainer}>
+          <Text style={styles.groupTitle}>Special Instructions</Text>
+          <TextInput
+            style={styles.instructionInput}
+            placeholder="e.g. Make it less spicy, no onions..."
+            placeholderTextColor={tokens.colors.textSecondary}
+            value={instructions}
+            onChangeText={setInstructions}
+            multiline
+            maxLength={100}
+            allowFontScaling
+            maxFontSizeMultiplier={1.5}
+          />
         </View>
+      </ScrollView>
+
+      {/* Sticky Bottom Add Button */}
+      <View style={styles.bottomBar}>
+        <Button 
+          label={`Add Item  ·  ₹${totalPrice}`}
+          onPress={handleAdd}
+          variant="primary"
+          size="lg"
+        />
       </View>
-    </Modal>
+    </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdrop: { ...StyleSheet.absoluteFill as any },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '85%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  title: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink },
-  subtitle: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.inkMuted, marginTop: 4 },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  scroll: { paddingHorizontal: tokens.spacing.lg, maxHeight: '80%' },
+  groupContainer: { paddingTop: tokens.spacing.lg, paddingBottom: tokens.spacing.sm, borderBottomWidth: 1, borderBottomColor: tokens.colors.border },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: tokens.spacing.md },
+  groupTitle: { fontSize: tokens.typography.size.bodyLarge, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
+  requiredBadge: { fontSize: 10, fontFamily: tokens.typography.family.bold, color: tokens.colors.danger, backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
   
-  scroll: { paddingHorizontal: 20 },
-  groupContainer: { paddingTop: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  groupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  groupTitle: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink },
-  requiredBadge: { fontSize: 10, fontFamily: fontFamily.bold, color: '#DC2626', backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
-  
-  optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
-  optionSelected: { backgroundColor: colors.primaryTint, borderColor: colors.primary },
+  optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: tokens.spacing.md, paddingHorizontal: tokens.spacing.md, borderRadius: tokens.radii.md, marginBottom: tokens.spacing.sm, borderWidth: 1, borderColor: 'transparent' },
+  optionSelected: { backgroundColor: '#FFEDD5', borderColor: tokens.colors.primary },
   optionLeft: { flexDirection: 'row', alignItems: 'center' },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  radioActive: { borderColor: colors.primary },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-  optionImage: { width: 32, height: 32, borderRadius: 8, marginRight: 12, backgroundColor: '#f1f1f1' },
-  optionName: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
-  optionNameSelected: { fontFamily: fontFamily.bold, color: colors.primaryDark },
-  optionPrice: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.inkMuted },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: tokens.colors.border, alignItems: 'center', justifyContent: 'center', marginRight: tokens.spacing.md },
+  radioActive: { borderColor: tokens.colors.primary },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: tokens.colors.primary },
+  optionImage: { width: 32, height: 32, borderRadius: tokens.radii.sm, marginRight: tokens.spacing.md, backgroundColor: '#f1f1f1' },
+  optionName: { fontSize: tokens.typography.size.body, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary },
+  optionNameSelected: { fontFamily: tokens.typography.family.bold, color: tokens.colors.primary },
+  optionPrice: { fontSize: tokens.typography.size.body, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textSecondary },
   
   instructionInput: {
-    backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
-    padding: 16, paddingTop: 16, fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, minHeight: 100, textAlignVertical: 'top'
+    backgroundColor: tokens.colors.background, borderRadius: tokens.radii.md, borderWidth: 1, borderColor: tokens.colors.border,
+    padding: tokens.spacing.lg, paddingTop: tokens.spacing.lg, fontSize: tokens.typography.size.body, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary, minHeight: 100, textAlignVertical: 'top'
   },
   
-  bottomBar: { padding: 16, paddingBottom: 32, borderTopWidth: 1, borderTopColor: '#F3F4F6', backgroundColor: '#fff' },
-  addBtn: { backgroundColor: colors.primary, borderRadius: 16, height: 56, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
-  addBtnText: { fontSize: 16, fontFamily: fontFamily.black, color: '#fff' },
+  bottomBar: { padding: tokens.spacing.lg, paddingBottom: tokens.spacing.xxl, borderTopWidth: 1, borderTopColor: tokens.colors.border, backgroundColor: tokens.colors.surface },
 });

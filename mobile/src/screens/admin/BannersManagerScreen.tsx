@@ -8,9 +8,12 @@ import { api } from '../../api/client';
 import { ENV } from '../../config/env';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { store } from '../../store';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const BannersManagerScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newBanner, setNewBanner] = useState({
     title: '',
@@ -33,9 +36,9 @@ const BannersManagerScreen = ({ navigation }: any) => {
       queryClient.invalidateQueries({ queryKey: ['admin-banners'] });
       setShowAddForm(false);
       setNewBanner({ title: '', subtitle: '', tag_text: 'PROMO', image_url: '', action_type: 'NONE', action_payload: '' });
-      Alert.alert('Success', 'Banner created');
+      showDialog({ title: 'Success', message: 'Banner created', confirmText: 'Okay', type: 'success' });
     },
-    onError: (err: any) => Alert.alert('Error', err.message || 'Could not create banner')
+    onError: (err: any) => showDialog({ title: 'Error', message: err.message || 'Could not create banner', confirmText: 'Okay', type: 'error' })
   });
 
   const deleteMutation = useMutation({
@@ -76,9 +79,9 @@ const BannersManagerScreen = ({ navigation }: any) => {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.message || json.error || 'Upload failed');
-      setNewBanner({ ...newBanner, image_url: json.url });
+      setNewBanner(prev => ({ ...prev, image_url: json.url }));
     } catch (err: any) {
-      Alert.alert('Upload Failed', err.message);
+      showDialog({ title: 'Upload Failed', message: err.message, confirmText: 'Okay', type: 'error' });
     } finally {
       setIsUploading(false);
     }
@@ -148,7 +151,7 @@ const BannersManagerScreen = ({ navigation }: any) => {
             <TouchableOpacity 
               style={styles.saveBtn}
               onPress={() => {
-                if (!newBanner.title) return Alert.alert('Error', 'Title is required');
+                if (!newBanner.title) { showDialog({ title: 'Error', message: 'Title is required', confirmText: 'Okay', type: 'warning' }); return; }
                 addMutation.mutate({
                   ...newBanner,
                   is_active: true,
@@ -187,10 +190,14 @@ const BannersManagerScreen = ({ navigation }: any) => {
                 <TouchableOpacity 
                   style={styles.deleteBtn}
                   onPress={() => {
-                    Alert.alert('Delete', 'Are you sure?', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(b.id) }
-                    ]);
+                    showDialog({
+                      title: 'Delete',
+                      message: 'Are you sure?',
+                      confirmText: 'Delete',
+                      cancelText: 'Cancel',
+                      type: 'warning',
+                      onConfirm: () => deleteMutation.mutate(b.id)
+                    });
                   }}
                 >
                   <Trash2 size={16} color="#EF4444" />
@@ -207,24 +214,24 @@ const BannersManagerScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16, backgroundColor: '#fff' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16, backgroundColor: tokens.colors.surface },
   backButton: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 20, fontWeight: '900', color: '#1A1A2E' },
   addButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-end' },
   scrollView: { flex: 1 },
   scrollContent: { padding: 24, paddingBottom: 100 },
-  addCard: { backgroundColor: '#fff', padding: 24, borderRadius: 24, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  addCard: { backgroundColor: tokens.colors.surface, padding: 24, borderRadius: 24, marginBottom: 24, ...tokens.shadows.soft, },
   addTitle: { fontSize: 16, fontWeight: '900', marginBottom: 16, color: '#1A1A2E' },
   imagePicker: { height: 160, backgroundColor: '#f3f4f6', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 16, overflow: 'hidden' },
   previewImage: { width: '100%', height: '100%' },
   pickerText: { marginTop: 8, color: '#9ca3af', fontWeight: 'bold' },
   input: { backgroundColor: '#f3f4f6', padding: 16, borderRadius: 12, marginBottom: 12, color: '#1A1A2E', fontWeight: 'bold' },
   saveBtn: { backgroundColor: '#FF6B35', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  saveBtnText: { color: '#fff', fontWeight: '900' },
-  bannerCard: { backgroundColor: '#fff', borderRadius: 24, marginBottom: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  saveBtnText: { color: tokens.colors.surface, fontWeight: '900' },
+  bannerCard: { backgroundColor: tokens.colors.surface, borderRadius: 24, marginBottom: 16, overflow: 'hidden', ...tokens.shadows.soft, },
   bannerImage: { width: '100%', height: 160 },
   bannerMock: { width: '100%', height: 160, backgroundColor: '#1A1A2E', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  mockTitle: { color: '#fff', fontSize: 24, fontWeight: '900' },
+  mockTitle: { color: tokens.colors.surface, fontSize: 24, fontWeight: '900' },
   mockSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4 },
   bannerControls: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   bannerInfo: { flex: 1 },

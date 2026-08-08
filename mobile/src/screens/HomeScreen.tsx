@@ -1,236 +1,34 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, TextInput, Switch, FlatList, useWindowDimensions, ActivityIndicator, Image, RefreshControl, Animated as RNAnimated, PanResponder } from 'react-native';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { View, Text, ScrollView, TouchableOpacity, Alert, TextInput, Switch, FlatList, useWindowDimensions, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
 import { api } from '../api/client';
-import { addItem, setQuantity, setZone, setAddress, clearCart } from '../store/slices/cartSlice';
+import { addItem, setZone, setAddress, clearCart } from '../store/slices/cartSlice';
 import { setServiceabilityChecking, setServiceable, setUnserviceable, setNetworkError } from '../store/slices/appSlice';
 import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, Bike, ArrowRight, UtensilsCrossed } from 'lucide-react-native';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import Animated, { FadeInDown, FadeOutDown, FadeOutUp, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
-import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../utils/kitchenHours';
+import Animated, { FadeInDown, FadeOutDown, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
+import { isKitchenOpen } from '../utils/kitchenHours';
 import { NetworkImage } from '../components/NetworkImage';
 import { CustomizationBottomSheet } from '../components/ui/CustomizationBottomSheet';
 import { EmptyState, SkeletonRow, ActiveOrdersBottomSheet } from '../components/ui';
 
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import { radius, spacing } from '../theme/spacing';
-import { shadows } from '../theme/shadows';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getCurrentDeviceToken } from '../services/push';
+import { haptics } from '../utils/haptics';
+import { styles } from './home/homeStyles';
+import { AnimatedSearchPlaceholder } from './home/AnimatedSearchPlaceholder';
+import { CategoryPreviewSection } from './home/CategoryPreviewSection';
+import { MenuGridCard } from './home/MenuGridCard';
+import { ExploreMenuBanner } from './home/ExploreMenuBanner';
+import { ClosedBottomSheet } from './home/ClosedBottomSheet';
+import { useFeedback } from '../context/FeedbackContext';
+import { FlashList } from '@shopify/flash-list';
 
-
-const hapticOptions = {
-  enableVibrateFallback: true,
-  ignoreAndroidSystemSettings: false,
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Memoized sub-components — each subscribes only to the data it needs via
-// useSelector, so they re-render only when THEIR specific data changes.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Cycles through item name placeholders in isolation — no HomeScreen re-render */
-const AnimatedSearchPlaceholder = React.memo(({ names }: { names: string[] }) => {
-  const [idx, setIdx] = React.useState(0);
-  React.useEffect(() => {
-    if (names.length < 2) return;
-    const id = setInterval(() => setIdx(i => (i + 1) % names.length), 2500);
-    return () => clearInterval(id);
-  }, [names.length]);
-  const textStyle = { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted } as const;
-  if (!names.length) return <Text style={textStyle}>Search for food...</Text>;
-  return (
-    <>
-      <Text style={textStyle}>Search{' '}</Text>
-      <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
-        <Animated.Text
-          key={idx}
-          entering={FadeInDown.duration(350)}
-          exiting={FadeOutUp.duration(350)}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-          style={textStyle}
-        >
-          "{names[idx]}"
-        </Animated.Text>
-      </View>
-    </>
-  );
-});
-
-/** One card in the "Highlights" horizontal strip — re-renders only when its cart qty changes */
-const CatPreviewCard = React.memo(({ mi, kitchenPaused, navigation, dispatch, triggerHaptic, onAddToCartWithCheck }: any) => {
-  const cartQty = useSelector((state: RootState) => {
-    const ci = state.cart.items.find(i => i.menuItemId === mi.id);
-    return ci?.quantity ?? 0;
-  });
-  const vegColor = mi.is_egg ? '#EAB308' : (mi.is_veg ? '#22C55E' : colors.danger);
-  const unavailable = !mi.available || kitchenPaused;
-  return (
-    <TouchableOpacity
-      style={styles.catPreviewCard}
-      activeOpacity={0.92}
-      onPress={() => { triggerHaptic(); navigation.navigate('ItemDetail', { item: mi }); }}
-    >
-      <View style={styles.catPreviewImgBox}>
-        {mi.photo_url
-          ? <NetworkImage uri={mi.photo_url} style={styles.catPreviewImg} />
-          : <View style={[styles.catPreviewImg, styles.catPreviewImgPlaceholder]}><ChefHat size={30} color={colors.inkFaint} /></View>}
-        <View style={styles.catPreviewCatPill}>
-          <Text style={styles.catPreviewCatText} numberOfLines={1}>{mi.category}</Text>
-        </View>
-        {mi.is_bestseller && (
-          <View style={styles.catPreviewBestBadge}><Text style={styles.catPreviewBestText}>★ Bestseller</Text></View>
-        )}
-        {unavailable && (
-          <View style={styles.catPreviewSoldOut}><Text style={styles.catPreviewSoldOutText}>Sold Out</Text></View>
-        )}
-        {!unavailable && (
-          <View style={styles.catPreviewAddFloat}>
-            {cartQty > 0 ? (
-              <View style={styles.catPreviewQty}>
-                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartQty - 1 })); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} activeOpacity={0.7}>
-                  <Text style={styles.catPreviewQtyBtn}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.catPreviewQtyVal}>{cartQty}</Text>
-                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartQty + 1 })); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} activeOpacity={0.7}>
-                  <Text style={styles.catPreviewQtyBtn}>+</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.catPreviewAddBtn} onPress={() => onAddToCartWithCheck(mi)} activeOpacity={0.8}>
-                <Text style={styles.catPreviewAddText}>ADD</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
-      <View style={styles.catPreviewInfo}>
-        <View style={styles.catPreviewNameRow}>
-          <View style={[styles.catPreviewVegBadge, { borderColor: vegColor }]}>
-            <View style={[styles.catPreviewVegDot, { backgroundColor: vegColor }]} />
-          </View>
-          <Text style={styles.catPreviewName} numberOfLines={2}>{mi.name}</Text>
-        </View>
-        {mi.applied_offer && (
-          <View style={styles.itemOfferTag}>
-            <Text style={styles.itemOfferTagText}>
-              {mi.applied_offer.discount_type === 'flat'
-                ? `₹${(mi.applied_offer.discount_flat_paise || 0) / 100} OFF`
-                : `${Math.round(parseFloat(mi.applied_offer.discount_percent || '0'))}% OFF`}
-            </Text>
-          </View>
-        )}
-        <View style={styles.catPreviewPriceRow}>
-          <Text style={styles.catPreviewPrice}>₹{mi.price_paise / 100}</Text>
-          {mi.original_price_paise > mi.price_paise && (
-            <Text style={styles.catPreviewStrikePrice}>₹{mi.original_price_paise / 100}</Text>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-/** Wrapper for the horizontal "Highlights" strip — stable props prevent re-renders on cart change */
-const CategoryPreviewSection = React.memo(({ items, kitchenPaused, navigation, dispatch, triggerHaptic, onAddToCartWithCheck }: any) => (
-  <View style={styles.catPreviewWrap}>
-    <View style={styles.catPreviewHeadingRow}>
-      <View style={styles.catPreviewHeadingAccent} />
-      <Text style={styles.catPreviewHeading}>Highlights</Text>
-    </View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catPreviewScroll}>
-      {items.map((mi: any) => (
-        <CatPreviewCard
-          key={mi.id}
-          mi={mi}
-          kitchenPaused={kitchenPaused}
-          navigation={navigation}
-          dispatch={dispatch}
-          triggerHaptic={triggerHaptic}
-          onAddToCartWithCheck={onAddToCartWithCheck}
-        />
-      ))}
-    </ScrollView>
-  </View>
-));
-
-/** Single menu item grid card — re-renders only when its own cart quantity changes */
-const MenuGridCard = React.memo(({ menuItem, kitchenPaused, navigation, dispatch, triggerHaptic, onAddToCartWithCheck }: any) => {
-  const cartQty = useSelector((state: RootState) => {
-    const ci = state.cart.items.find(i => i.menuItemId === menuItem.id);
-    return ci?.quantity ?? 0;
-  });
-  const vegColor = menuItem.is_egg ? '#EAB308' : (menuItem.is_veg ? '#22C55E' : colors.danger);
-  const unavailable = !menuItem.available || kitchenPaused;
-  return (
-    <TouchableOpacity style={styles.homeGridCard} activeOpacity={0.92}
-      onPress={() => { if (menuItem.available) { triggerHaptic(); navigation.navigate('ItemDetail', { item: menuItem }); } }}>
-      <View style={styles.homeGridImageContainer}>
-        {menuItem.photo_url
-          ? <NetworkImage uri={menuItem.photo_url} style={styles.homeGridImage} />
-          : <View style={[styles.homeGridImage, styles.homeGridImagePlaceholder]}><ChefHat size={28} color={colors.inkFaint} /></View>}
-        <View style={[styles.homeGridVegBadge, { borderColor: vegColor }]}>
-          <View style={[styles.homeGridVegDot, { backgroundColor: vegColor }]} />
-        </View>
-        {menuItem.is_bestseller && <View style={styles.homeGridBestsellerBadge}><Text style={styles.homeGridBestsellerText}>★ Bestseller</Text></View>}
-        {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text style={styles.homeGridNewText}>+ New</Text></View>}
-        {unavailable && <View style={styles.homeGridSoldOut}><Text style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
-        {!unavailable && (
-          <View style={styles.homeGridAddFloat}>
-            {cartQty > 0 ? (
-              <View style={styles.homeGridQtyControl}>
-                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartQty - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} activeOpacity={0.7}>
-                  <Text style={styles.homeGridQtyBtnText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.homeGridQtyValue}>{cartQty}</Text>
-                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartQty + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} activeOpacity={0.7}>
-                  <Text style={styles.homeGridQtyBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.homeGridAddBtn} onPress={() => onAddToCartWithCheck(menuItem)} activeOpacity={0.8}>
-                <Text style={styles.homeGridAddBtnText}>ADD</Text>
-                <View style={styles.homeGridCustomiseBadge}><Text style={styles.homeGridCustomiseText}>Customise</Text></View>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
-      <View style={styles.homeGridInfo}>
-        <Text style={styles.homeGridName} numberOfLines={2}>{menuItem.name}</Text>
-        {menuItem.description ? <Text style={styles.homeGridDesc} numberOfLines={2}>{menuItem.description}</Text> : null}
-        {menuItem.applied_offer && (
-          <View style={styles.itemOfferBadge}>
-            <Text style={styles.itemOfferBadgeText}>
-              {menuItem.applied_offer.discount_type === 'flat'
-                ? `₹${(menuItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
-                : `${Math.round(parseFloat(menuItem.applied_offer.discount_percent || '0'))}% OFF`}
-            </Text>
-          </View>
-        )}
-        <View style={styles.homeGridPriceRow}>
-          <Text style={styles.homeGridPrice}>₹{menuItem.price_paise / 100}</Text>
-          {menuItem.original_price_paise > menuItem.price_paise && (
-            <Text style={styles.homeGridStrikePrice}>₹{menuItem.original_price_paise / 100}</Text>
-          )}
-        </View>
-        {menuItem.tags?.length > 0 && (
-          <View style={styles.homeGridTagRow}>
-            {menuItem.tags.slice(0, 2).map((tag: string) => (
-              <View key={tag} style={styles.homeGridTagChip}><Text style={styles.homeGridTagText}>{tag}</Text></View>
-            ))}
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-});
+const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
 
 const HomeScreen = ({ navigation }: any) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
@@ -240,8 +38,7 @@ const HomeScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const { globalLocation: location, serviceabilityStatus, activeZoneId } = useSelector((state: RootState) => state.app);
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const { showDialog } = useFeedback();
 
   // Stable ref so handleAddToCart doesn't need cartItems in its dep array
   const cartItemsRef = useRef(cartItems);
@@ -279,7 +76,7 @@ const HomeScreen = ({ navigation }: any) => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+    haptics.selection();
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['menu', effectiveZoneId] }),
       queryClient.invalidateQueries({ queryKey: ['banners'] }),
@@ -482,12 +279,6 @@ const HomeScreen = ({ navigation }: any) => {
     return items.filter((i: any) => i.available).map((i: any) => i.name as string).slice(0, 12);
   }, [enrichedItems]);
 
-  // Debounce search — filter runs 300ms after user stops typing, not on every keystroke
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
-
   const { data: zonesData } = useQuery({
     queryKey: ['zones'],
     queryFn: () => api.get('/menu/zones'),
@@ -544,42 +335,39 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
-  const triggerHaptic = useCallback(
-    () => ReactNativeHapticFeedback.trigger('impactLight', hapticOptions),
-    [],
-  );
+  // Reserved for meaningful cart-modifying actions (add to cart, qty +/-) — passed down to
+  // CatPreviewCard/MenuGridCard, and used directly in handleAddToCart below. Not used for
+  // pure navigation/filter taps in this file (those were audited and left haptic-free).
+  const triggerHaptic = useCallback(() => haptics.selection(), []);
 
   const handleAddToCart = useCallback((item: any, customizations: any[], customExtraPaise: number, instructions: string) => {
     const currentCart = cartItemsRef.current;
     if (currentCart.length > 0 && currentCart[0].kitchenId !== item.kitchen_id) {
-      Alert.alert(
-        'Different Kitchen',
-        'Your cart contains items from another kitchen. Do you want to clear the cart and add this item?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Clear & Add',
-            style: 'destructive',
-            onPress: () => {
-              dispatch(clearCart());
-              triggerHaptic();
-              dispatch(
-                addItem({
-                  menuItemId: item.id,
-                  name: item.name,
-                  pricePaise: item.price_paise + customExtraPaise,
-                  quantity: 1,
-                  photoUrl: item.photo_url,
-                  isVeg: item.is_veg,
-                  kitchenId: item.kitchen_id,
-                  customizations: customizations.length > 0 ? customizations : undefined,
-                  instructions: instructions || undefined,
-                }),
-              );
-            },
-          },
-        ],
-      );
+      showDialog({
+        title: 'Different Kitchen',
+        message: 'Your cart contains items from another kitchen. Do you want to clear the cart and add this item?',
+        type: 'warning',
+        cancelText: 'Cancel',
+        confirmText: 'Clear & Add',
+        destructive: true,
+        onConfirm: () => {
+          dispatch(clearCart());
+          triggerHaptic();
+          dispatch(
+            addItem({
+              menuItemId: item.id,
+              name: item.name,
+              pricePaise: item.price_paise + customExtraPaise,
+              quantity: 1,
+              photoUrl: item.photo_url,
+              isVeg: item.is_veg,
+              kitchenId: item.kitchen_id,
+              customizations: customizations.length > 0 ? customizations : undefined,
+              instructions: instructions || undefined,
+            }),
+          );
+        },
+      });
     } else {
       triggerHaptic();
       dispatch(
@@ -612,10 +400,6 @@ const HomeScreen = ({ navigation }: any) => {
     let items = enrichedItems;
     
     if (isVegOnly) items = items.filter((item: any) => item.is_veg);
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase();
-      items = items.filter((item: any) => item.name.toLowerCase().includes(q));
-    }
 
     const grouped: Record<string, any[]> = {};
     items.forEach((item: any) => {
@@ -645,7 +429,7 @@ const HomeScreen = ({ navigation }: any) => {
         return a.localeCompare(b);
       })
       .map(key => ({ title: key, data: grouped[key] }));
-  }, [enrichedItems, selectedCategory, isVegOnly, debouncedSearch, adminCategories]);
+  }, [enrichedItems, selectedCategory, isVegOnly, adminCategories]);
 
   const cartTotal = useMemo(
     () => cartItems.reduce((acc, item) => acc + item.quantity * item.pricePaise, 0),
@@ -690,8 +474,8 @@ const HomeScreen = ({ navigation }: any) => {
     if (item.type === 'section-header') {
       return (
         <View style={styles.categorySectionHeader}>
-          <Text style={styles.categorySectionTitle}>{item.title}</Text>
-          <Text style={styles.categorySectionCount}>{item.count} {item.count === 1 ? 'item' : 'items'}</Text>
+          <Text allowFontScaling={false} style={styles.categorySectionTitle}>{item.title}</Text>
+          <Text allowFontScaling={false} style={styles.categorySectionCount}>{item.count} {item.count === 1 ? 'item' : 'items'}</Text>
         </View>
       );
     }
@@ -744,7 +528,7 @@ const HomeScreen = ({ navigation }: any) => {
 
   const LOCATION_HEIGHT = 50;
   const LOCATION_MARGIN = 16;
-  const BASE_PADDING = Math.max(insets.top + 8, 12) + 116;
+  const BASE_PADDING = Math.max(insets.top + 8, 12) + 128;
 
   // Snap: when finger lifts mid-collapse, jump to fully open or fully closed
   const snapHeader = useCallback((offsetY: number) => {
@@ -788,23 +572,25 @@ const HomeScreen = ({ navigation }: any) => {
       ]}>
         {/* ROW 1: Address and Profile (Animated) */}
         <Animated.View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, locationRowStyle]}>
-          <View style={{ flex: 1, paddingRight: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-              <MapPin size={22} color={colors.primary} fill={colors.primaryTint} />
+          <View style={{ flex: 1, paddingRight: tokens.spacing.lg, flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ width: 40, height: 40, borderRadius: tokens.radii.full, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', marginRight: tokens.spacing.md }}>
+              <MapPin size={22} color={tokens.colors.primary} fill={'#FFEDD5'} />
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   Delivering to
                 </Text>
-                <ChevronDown size={14} color={colors.primary} style={{ marginLeft: 2 }} />
+                <ChevronDown size={14} color={tokens.colors.primary} style={{ marginLeft: 2 }} />
               </View>
               <BouncingButton
                 style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}
-                onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}
+                onPress={() => navigation.navigate('Address')}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Delivering to ${location?.addressText || selectedAddress?.address_text || 'Set location'}`}
               >
-                <Text style={{ fontSize: 16, fontFamily: fontFamily.extrabold, color: colors.ink }} numberOfLines={1}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textPrimary }} numberOfLines={1}>
                   {location?.addressText || selectedAddress?.address_text || 'Set location'}
                 </Text>
               </BouncingButton>
@@ -813,115 +599,95 @@ const HomeScreen = ({ navigation }: any) => {
 
           <BouncingButton
             style={styles.profileButton}
-            onPress={() => { triggerHaptic(); navigation.navigate('ProfileTab'); }}
+            onPress={() => navigation.navigate('ProfileTab')}
+            accessibilityRole="button"
+            accessibilityLabel="Open Profile"
           >
             {user?.photo_url ? (
-              <NetworkImage uri={user.photo_url} style={Object.assign({}, styles.profileImage as object, { borderWidth: 2, borderColor: colors.border })} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
+              <NetworkImage uri={user.photo_url} style={Object.assign({}, styles.profileImage as object, { borderWidth: 2, borderColor: tokens.colors.border })} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
             ) : (
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
-                <User size={20} color={colors.inkMuted} />
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: tokens.colors.border }}>
+                <User size={20} color={tokens.colors.textSecondary} />
               </View>
             )}
           </BouncingButton>
         </Animated.View>
 
-        {/* ROW 2: Search Bar with VEG toggle */}
+        {/* ROW 2: Search Bar (pure entry point into full-menu Search) with VEG toggle */}
         {!unserviceableLocation && !showNoLocation && !showNetworkError && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {/* Flat, premium search bar */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: tokens.colors.surface, // Premium clean surface
+            borderRadius: 16,
+            height: 48,
+            ...tokens.shadows.soft,
+          }}>
+            {/* Flat, premium search affordance — tapping navigates to the dedicated Search screen */}
+            <PressableScale
+              onPress={() => navigation.navigate('Search')}
+              accessibilityRole="button"
+              accessibilityLabel="Search menu"
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                height: '100%',
+                paddingLeft: tokens.spacing.lg,
+              }}
+            >
+              <Search size={16} color={tokens.colors.textSecondary} style={{ marginRight: 6, flexShrink: 0 }} />
+              <View style={{ flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }} pointerEvents="none">
+                <AnimatedSearchPlaceholder names={placeholderNames} />
+              </View>
+            </PressableScale>
+
             <View style={{
-              flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: colors.surfaceMuted, // Premium muted surface
-              borderRadius: 16,
-              paddingLeft: 16,
+              flexShrink: 0,
               paddingRight: 8,
-              height: 48,
-              borderWidth: 1,
-              borderColor: colors.border,
             }}>
-              <Search size={16} color={colors.inkMuted} style={{ marginRight: 6, flexShrink: 0 }} />
-              <View style={{ flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' }}>
-                <TextInput
-                  placeholder=""
-                  placeholderTextColor="transparent"
-                  style={{ 
-                    flex: 1, 
-                    fontSize: 13, 
-                    fontFamily: fontFamily.medium, 
-                    color: colors.ink, 
-                    paddingVertical: 0, 
-                    paddingHorizontal: 0,
-                    height: '100%',
-                    textAlignVertical: 'center',
-                    minWidth: 50,
-                    zIndex: 2
-                  }}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery === '' && (
-                  <View
-                    pointerEvents="none"
-                    style={{ position: 'absolute', left: 0, right: 0, height: '100%', flexDirection: 'row', alignItems: 'center', zIndex: 1 }}
-                  >
-                    <AnimatedSearchPlaceholder names={placeholderNames} />
-                  </View>
-                )}
-              </View>
-              {searchQuery.length > 0 ? (
-                <BouncingButton onPress={() => { triggerHaptic(); setSearchQuery(''); }} style={{ paddingLeft: 6, paddingRight: 2, flexShrink: 0 }}>
-                  <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted }}>Clear</Text>
-                </BouncingButton>
-              ) : (
-                <View style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  flexShrink: 0 
-                }}>
-                  <Text style={{
-                    fontSize: 9,
-                    fontFamily: fontFamily.extrabold,
-                    color: isVegOnly ? '#22C55E' : colors.inkMuted,
-                    letterSpacing: 0.5,
-                    marginLeft: 4,
-                    flexShrink: 0
-                  }} numberOfLines={1}>
-                    VEG
-                  </Text>
-                  
-                  <View style={{ 
-                    width: 1, 
-                    height: 16, 
-                    backgroundColor: colors.border, 
-                    marginHorizontal: 6,
-                    flexShrink: 0
-                  }} />
+              <Text allowFontScaling={false} style={{
+                fontSize: 9,
+                fontFamily: tokens.typography.family.extrabold,
+                color: isVegOnly ? tokens.colors.success : tokens.colors.textSecondary,
+                letterSpacing: 0.5,
+                marginLeft: 4,
+                flexShrink: 0
+              }} numberOfLines={1}>
+                VEG
+              </Text>
 
-                  <Switch
-                    value={isVegOnly}
-                    onValueChange={(val) => { triggerHaptic(); setIsVegOnly(val); }}
-                    trackColor={{ false: '#E2E8F0', true: '#BBF7D0' }}
-                    thumbColor={isVegOnly ? '#22C55E' : '#FFFFFF'}
-                    style={{ 
-                      transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }],
-                      marginRight: -4,
-                      marginLeft: -4,
-                      marginTop: -4,
-                      marginBottom: -4
-                    }}
-                  />
-                </View>
-              )}
+              <View style={{
+                width: 1,
+                height: 16,
+                backgroundColor: tokens.colors.border,
+                marginHorizontal: 6,
+                flexShrink: 0
+              }} />
+
+              <Switch
+                value={isVegOnly}
+                onValueChange={(val) => setIsVegOnly(val)}
+                trackColor={{ false: '#E2E8F0', true: tokens.colors.successTint }}
+                thumbColor={isVegOnly ? tokens.colors.success : tokens.colors.surface}
+                style={{
+                  transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }],
+                  marginRight: -4,
+                  marginLeft: -4,
+                  marginTop: -4,
+                  marginBottom: -4
+                }}
+              />
             </View>
           </View>
         )}
       </Animated.View>
 
-      <Animated.FlatList
+      <AnimatedFlashList
         ref={flatListRef}
-        style={{ flex: 1 }}
+        style={{ flex: 1, minHeight: 2 }}
         data={
           isServiceabilityChecking || unserviceableLocation || showNoLocation || showNetworkError
             ? []
@@ -929,25 +695,33 @@ const HomeScreen = ({ navigation }: any) => {
         }
         keyExtractor={(item: any) => item.id}
         renderItem={renderItem}
+        // @ts-ignore
+        estimatedItemSize={250}
+        overrideItemLayout={(layout, item: any) => {
+          if (item?.type === 'category-preview') {
+            layout.size = 280;
+          } else if (item?.type === 'explore-header') {
+            layout.size = 60;
+          } else if (item?.type === 'section-header') {
+            layout.size = 50;
+          } else if (item?.type === 'item-row') {
+            layout.size = 250;
+          } else {
+            layout.size = 250;
+          }
+        }}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         onScrollEndDrag={(e) => snapHeader(e.nativeEvent.contentOffset.y)}
         onMomentumScrollEnd={(e) => snapHeader(e.nativeEvent.contentOffset.y)}
-        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 8, 12) + 116 }]}
-        windowSize={5}
-        maxToRenderPerBatch={4}
-        initialNumToRender={6}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={true}
-        decelerationRate="fast"
-        overScrollMode="never"
+        contentContainerStyle={[styles.listContent, { paddingTop: Math.max(insets.top + 8, 12) + 128 }]}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh} 
-            tintColor={colors.primary} 
-            colors={[colors.primary]} 
+            tintColor={tokens.colors.primary} 
+            colors={[tokens.colors.primary]} 
           />
         }
         ListHeaderComponent={
@@ -963,17 +737,19 @@ const HomeScreen = ({ navigation }: any) => {
                       <BouncingButton
                         key={cat.id}
                         style={styles.categoryStripItem}
-                        onPress={() => { triggerHaptic(); navigation.navigate('Category', { categorySlug: cat.slug, categoryName: cat.name, categoryImage: cat.image_url, categoryBannerUrl: cat.banner_url }); }}
+                        onPress={() => navigation.navigate('Category', { categorySlug: cat.slug, categoryName: cat.name, categoryImage: cat.image_url, categoryBannerUrl: cat.banner_url })}
                         activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Category ${cat.name}`}
                       >
                         <View style={styles.categoryStripCircle}>
                           {cat.image_url ? (
                             <NetworkImage uri={cat.image_url} style={styles.categoryStripImage} />
                           ) : (
-                            <Text style={{ fontSize: 18 }}>🍴</Text>
+                            <Text allowFontScaling={false} style={{ fontSize: 18 }}>🍴</Text>
                           )}
                         </View>
-                        <Text style={styles.categoryStripLabel} numberOfLines={1}>
+                        <Text allowFontScaling={false} style={styles.categoryStripLabel} numberOfLines={1}>
                           {cat.name}
                         </Text>
                       </BouncingButton>
@@ -992,15 +768,16 @@ const HomeScreen = ({ navigation }: any) => {
                       key={banner.id}
                       activeOpacity={0.8}
                       onPress={() => {
-                        triggerHaptic();
                         if (banner.action_type === 'FILTER_CATEGORY') setSelectedCategory(banner.action_payload);
                       }}
                       style={styles.miniBannerCard}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Filter by ${banner.title}`}
                     >
                       <NetworkImage uri={banner.image_url} style={styles.miniBannerImage} />
                       <View style={styles.miniBannerOverlay}>
-                        <Text style={styles.miniBannerTitle}>{banner.title}</Text>
-                        {banner.subtitle && <Text style={styles.miniBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
+                        <Text allowFontScaling={false} style={styles.miniBannerTitle}>{banner.title}</Text>
+                        {banner.subtitle && <Text allowFontScaling={false} style={styles.miniBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
                       </View>
                     </BouncingButton>
                   ))}
@@ -1010,15 +787,15 @@ const HomeScreen = ({ navigation }: any) => {
 
             {menuData?.kitchenPaused && (
               <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.kitchenPausedBanner}>
-                <ChefHat size={20} color={colors.danger} style={styles.pausedIcon} />
+                <ChefHat size={20} color={tokens.colors.danger} style={styles.pausedIcon} />
                 <View style={styles.pausedTextCol}>
-                  <Text style={styles.pausedTitle}>Kitchen is currently paused</Text>
-                  <Text style={styles.pausedReason}>{menuData.pauseReason || 'Taking a short break to catch up on orders.'}</Text>
+                  <Text allowFontScaling={false} style={styles.pausedTitle}>Kitchen is currently paused</Text>
+                  <Text allowFontScaling={false} style={styles.pausedReason}>{menuData.pauseReason || 'Taking a short break to catch up on orders.'}</Text>
                 </View>
               </Animated.View>
             )}
             {infiniteBanners.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
-              <Animated.View entering={FadeInDown.delay(150).duration(400)} style={{ overflow: 'hidden', marginTop: spacing.sm }}>
+              <Animated.View entering={FadeInDown.delay(150).duration(400)} style={{ overflow: 'hidden', marginTop: tokens.spacing.sm }}>
                 <FlatList
                   ref={bannerListRef}
                   data={infiniteBanners}
@@ -1028,6 +805,10 @@ const HomeScreen = ({ navigation }: any) => {
                   keyExtractor={(b: any) => b.uniqueId || b.id}
                   snapToInterval={SCREEN_WIDTH}
                   decelerationRate="fast"
+                  initialNumToRender={1}
+                  windowSize={3}
+                  maxToRenderPerBatch={1}
+                  removeClippedSubviews={true}
                   contentContainerStyle={{ paddingHorizontal: 0 }}
                   onMomentumScrollEnd={(ev) => {
                     const newIndex = Math.round(ev.nativeEvent.contentOffset.x / SCREEN_WIDTH);
@@ -1039,19 +820,20 @@ const HomeScreen = ({ navigation }: any) => {
                     index,
                   })}
                   renderItem={({ item: b }: any) => (
-                    <View style={{ width: SCREEN_WIDTH, paddingHorizontal: spacing.lg }}>
+                    <View style={{ width: SCREEN_WIDTH, paddingHorizontal: tokens.spacing.lg }}>
                       <BouncingButton
                         activeOpacity={0.9}
                         onPress={() => {
-                          triggerHaptic();
                           if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
                         }}
                         style={[styles.bannerContainer, { height: 130 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={b.title}
                       >
                         <NetworkImage uri={b.image_url} style={[styles.bannerImage, { borderRadius: 16 }]} />
                         <View style={[styles.bannerOverlay, { borderRadius: 16 }]}>
-                          <Text style={styles.bannerTitle} numberOfLines={2}>{b.title}</Text>
-                          {b.subtitle && <Text style={styles.bannerSubtitle} numberOfLines={2}>{b.subtitle}</Text>}
+                          <Text allowFontScaling={false} style={styles.bannerTitle} numberOfLines={2}>{b.title}</Text>
+                          {b.subtitle && <Text allowFontScaling={false} style={styles.bannerSubtitle} numberOfLines={2}>{b.subtitle}</Text>}
                         </View>
                       </BouncingButton>
                     </View>
@@ -1068,15 +850,16 @@ const HomeScreen = ({ navigation }: any) => {
                     key={banner.id}
                     activeOpacity={0.9}
                     onPress={() => {
-                      triggerHaptic();
                       if (banner.action_type === 'FILTER_CATEGORY') setSelectedCategory(banner.action_payload);
                     }}
                     style={styles.stripBannerCard}
+                    accessibilityRole="button"
+                    accessibilityLabel={banner.title}
                   >
                     <NetworkImage uri={banner.image_url} style={styles.stripBannerImage} />
                     <View style={styles.stripBannerOverlay}>
-                      <Text style={styles.stripBannerTitle}>{banner.title}</Text>
-                      {banner.subtitle && <Text style={styles.stripBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
+                      <Text allowFontScaling={false} style={styles.stripBannerTitle}>{banner.title}</Text>
+                      {banner.subtitle && <Text allowFontScaling={false} style={styles.stripBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
                     </View>
                   </BouncingButton>
                 ))}
@@ -1086,32 +869,34 @@ const HomeScreen = ({ navigation }: any) => {
 
             {/* ── Book a Table ── */}
             {restaurants.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && (
-              <View style={{ marginTop: spacing.md }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, marginBottom: 10 }}>
-                  <Text style={{ fontSize: 17, fontFamily: fontFamily.bold, color: colors.ink }}>Book a Table</Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('MyTableBookings')}>
-                    <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.primary }}>My Bookings</Text>
+              <View style={{ marginTop: tokens.spacing.md }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: tokens.spacing.lg, marginBottom: 10 }}>
+                  <Text allowFontScaling={false} style={{ fontSize: 17, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary }}>Book a Table</Text>
+                  <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => navigation.navigate('MyTableBookings')} accessibilityRole="button" accessibilityLabel="My Bookings">
+                    <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.primary }}>My Bookings</Text>
                   </TouchableOpacity>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 14 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: tokens.spacing.lg, gap: 14 }}>
                   {restaurants.map((rest: any) => {
-                    const CARD_W = SCREEN_WIDTH - spacing.lg * 2;
+                    const CARD_W = SCREEN_WIDTH - tokens.spacing.lg * 2;
                     const CARD_H = Math.round(CARD_W * 0.56);
                     const cover = getRestCoverPhoto(rest.photos);
                     const hasSlots = rest.total_tables > 0 && rest.bookings_today < rest.total_tables * 3;
                     return (
-                      <TouchableOpacity
+                      <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         key={rest.id}
-                        style={{ width: CARD_W, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 5, backgroundColor: '#111' }}
+                        style={{ width: CARD_W, borderRadius: 18, overflow: 'hidden', ...tokens.shadows.soft, backgroundColor: '#111' }}
                         activeOpacity={0.88}
                         onPress={() => navigation.navigate('RestaurantDetail', { restaurantId: rest.id })}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Book table at ${rest.name}`}
                       >
                         <View style={{ width: CARD_W, height: CARD_H }}>
                           {cover ? (
                             <NetworkImage uri={cover} style={{ width: CARD_W, height: CARD_H }} width={CARD_W} height={CARD_H} />
                           ) : (
-                            <View style={{ width: CARD_W, height: CARD_H, backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center' }}>
-                              <UtensilsCrossed size={40} color={colors.primary + '50'} />
+                            <View style={{ width: CARD_W, height: CARD_H, backgroundColor: tokens.colors.primary + '18', justifyContent: 'center', alignItems: 'center' }}>
+                              <UtensilsCrossed size={40} color={tokens.colors.primary + '50'} />
                             </View>
                           )}
                           <LinearGradient
@@ -1119,13 +904,13 @@ const HomeScreen = ({ navigation }: any) => {
                             locations={[0.3, 0.6, 1]}
                             style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 90, paddingHorizontal: 14, paddingBottom: 14, justifyContent: 'flex-end' }}
                           >
-                            <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: '#fff', marginBottom: 5 }} numberOfLines={1}>{rest.name}</Text>
+                            <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: tokens.typography.family.bold, color: tokens.colors.surface, marginBottom: 5 }} numberOfLines={1}>{rest.name}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                               {rest.cuisine_type ? (
-                                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontFamily: fontFamily.regular, flex: 1, marginRight: 8 }} numberOfLines={1}>{rest.cuisine_type}</Text>
+                                <Text allowFontScaling={false} style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontFamily: tokens.typography.family.regular, flex: 1, marginRight: 8 }} numberOfLines={1}>{rest.cuisine_type}</Text>
                               ) : <View style={{ flex: 1 }} />}
                               <View style={{ backgroundColor: hasSlots ? '#10B981DD' : 'rgba(255,255,255,0.25)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                                <Text style={{ fontSize: 11, fontFamily: fontFamily.semibold, color: '#fff' }}>
+                                <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.semibold, color: tokens.colors.surface }}>
                                   {hasSlots ? '● Slots open' : 'Check slots'}
                                 </Text>
                               </View>
@@ -1161,30 +946,30 @@ const HomeScreen = ({ navigation }: any) => {
                   <Image source={{ uri: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=300&q=80' }} style={styles.foodCardImage} />
                 </View>
               </View>
-              <Text style={styles.comingSoonHeading}>Enable Location</Text>
-              <Text style={styles.comingSoonSub}>
+              <Text allowFontScaling={false} style={styles.comingSoonHeading}>Enable Location</Text>
+              <Text allowFontScaling={false} style={styles.comingSoonSub}>
                 Allow location access so we can detect your zone instantly, or pick an address manually.
               </Text>
-              <BouncingButton style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }}>
-                <Text style={styles.ctaPrimaryText}>Select Delivery Address</Text>
+              <BouncingButton style={styles.ctaPrimary} onPress={() => navigation.navigate('Address')} accessibilityRole="button" accessibilityLabel="Select Delivery Address">
+                <Text allowFontScaling={false} style={styles.ctaPrimaryText}>Select Delivery Address</Text>
               </BouncingButton>
             </Animated.View>
           ) : showNetworkError ? (
             /* ── Network error ── */
             <Animated.View entering={FadeInDown.duration(400)} style={styles.unserviceableWrap}>
               <View style={styles.foodCarousel}>
-                <View style={[styles.foodCardDeco, styles.foodCardLeft]}><ChefHat size={32} color={colors.inkFaint} /></View>
-                <View style={[styles.foodCardDeco, styles.foodCardCenter]}><ChefHat size={44} color={colors.inkMuted} /></View>
-                <View style={[styles.foodCardDeco, styles.foodCardRight]}><ChefHat size={32} color={colors.inkFaint} /></View>
+                <View style={[styles.foodCardDeco, styles.foodCardLeft]}><ChefHat size={32} color={tokens.colors.textTertiary} /></View>
+                <View style={[styles.foodCardDeco, styles.foodCardCenter]}><ChefHat size={44} color={tokens.colors.textSecondary} /></View>
+                <View style={[styles.foodCardDeco, styles.foodCardRight]}><ChefHat size={32} color={tokens.colors.textTertiary} /></View>
               </View>
-              <Text style={styles.comingSoonHeading}>Connection Issue</Text>
-              <Text style={styles.comingSoonSub}>
+              <Text allowFontScaling={false} style={styles.comingSoonHeading}>Connection Issue</Text>
+              <Text allowFontScaling={false} style={styles.comingSoonSub}>
                 Couldn't verify your delivery area. Check your connection, then retry or change address.
               </Text>
-              <BouncingButton style={styles.ctaPrimary} onPress={() => { triggerHaptic(); retryZoneCheck(); }} disabled={retrying} activeOpacity={0.85}>
+              <BouncingButton style={styles.ctaPrimary} onPress={retryZoneCheck} disabled={retrying} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Retry or Change Address">
                 {retrying
                   ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={styles.ctaPrimaryText}>Retry / Change Address</Text>}
+                  : <Text allowFontScaling={false} style={styles.ctaPrimaryText}>Retry / Change Address</Text>}
               </BouncingButton>
             </Animated.View>
           ) : unserviceableLocation ? (
@@ -1192,10 +977,10 @@ const HomeScreen = ({ navigation }: any) => {
             <Animated.View entering={FadeInDown.duration(400)} style={styles.unserviceableWrap}>
               {requestStep === 'done' ? (
                 <View style={styles.reqDoneCard}>
-                  <Text style={styles.reqDoneTitle}>You're on the list!</Text>
-                  <Text style={styles.reqDoneSub}>We'll notify you the day we launch in {reqForm.area_name || 'your area'}!</Text>
-                  <BouncingButton style={styles.ctaOutline} onPress={() => setRequestStep('info')}>
-                    <Text style={styles.ctaOutlineText}>Back</Text>
+                  <Text allowFontScaling={false} style={styles.reqDoneTitle}>You're on the list!</Text>
+                  <Text allowFontScaling={false} style={styles.reqDoneSub}>We'll notify you the day we launch in {reqForm.area_name || 'your area'}!</Text>
+                  <BouncingButton style={styles.ctaOutline} onPress={() => setRequestStep('info')} accessibilityRole="button" accessibilityLabel="Go Back">
+                    <Text allowFontScaling={false} style={styles.ctaOutlineText}>Back</Text>
                   </BouncingButton>
                 </View>
               ) : requestStep === 'form' ? (
@@ -1210,29 +995,29 @@ const HomeScreen = ({ navigation }: any) => {
                     {/* Header */}
                     <View style={styles.reqFormHeaderRow}>
                       <View style={styles.reqFormIconBadge}>
-                        <MapPin size={16} color={colors.primary} />
+                        <MapPin size={16} color={tokens.colors.primary} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.reqFormTitle}>Bring 2QT to your area</Text>
-                        <Text style={styles.reqFormSub}>Tell us where you are — we'll expand there next.</Text>
+                        <Text allowFontScaling={false} style={styles.reqFormTitle}>Bring 2QT to your area</Text>
+                        <Text allowFontScaling={false} style={styles.reqFormSub}>Tell us where you are — we'll expand there next.</Text>
                       </View>
                     </View>
 
                     {/* Area input */}
                     <View style={styles.reqInputRow}>
-                      <MapPin size={15} color={colors.inkFaint} />
+                      <MapPin size={15} color={tokens.colors.textTertiary} />
                       <TextInput
                         style={styles.reqInputField}
                         placeholder="Your area or locality"
                         value={reqForm.area_name}
                         onChangeText={(t) => setReqForm(p => ({ ...p, area_name: t }))}
-                        placeholderTextColor={colors.inkFaint}
+                        placeholderTextColor={tokens.colors.textTertiary}
                       />
                     </View>
 
                     {/* Pincode input */}
                     <View style={styles.reqInputRow}>
-                      <Text style={styles.reqPinHash}>#</Text>
+                      <Text allowFontScaling={false} style={styles.reqPinHash}>#</Text>
                       <TextInput
                         style={styles.reqInputField}
                         placeholder="6-digit pincode"
@@ -1240,20 +1025,20 @@ const HomeScreen = ({ navigation }: any) => {
                         maxLength={6}
                         value={reqForm.pincode}
                         onChangeText={(t) => setReqForm(p => ({ ...p, pincode: t.replace(/\D/g, '') }))}
-                        placeholderTextColor={colors.inkFaint}
+                        placeholderTextColor={tokens.colors.textTertiary}
                       />
                     </View>
 
-                    {!!reqError && <Text style={styles.reqErrorText}>{reqError}</Text>}
+                    {!!reqError && <Text allowFontScaling={false} style={styles.reqErrorText}>{reqError}</Text>}
 
-                    <BouncingButton style={styles.reqSubmitBtn} onPress={handleRequestService} disabled={reqLoading}>
+                    <BouncingButton style={styles.reqSubmitBtn} onPress={handleRequestService} disabled={reqLoading} accessibilityRole="button" accessibilityLabel="Submit Request">
                       {reqLoading
-                        ? <ActivityIndicator color={colors.white} />
-                        : <Text style={styles.reqSubmitBtnText}>Submit Request</Text>}
+                        ? <ActivityIndicator color={tokens.colors.surface} />
+                        : <Text allowFontScaling={false} style={styles.reqSubmitBtnText}>Submit Request</Text>}
                     </BouncingButton>
 
-                    <BouncingButton style={styles.reqCancelLink} onPress={() => { triggerHaptic(); setRequestStep('info'); }}>
-                      <Text style={styles.reqCancelLinkText}>Cancel</Text>
+                    <BouncingButton style={styles.reqCancelLink} onPress={() => setRequestStep('info')} accessibilityRole="button" accessibilityLabel="Cancel Request">
+                      <Text allowFontScaling={false} style={styles.reqCancelLinkText}>Cancel</Text>
                     </BouncingButton>
                   </View>
                 </View>
@@ -1274,8 +1059,8 @@ const HomeScreen = ({ navigation }: any) => {
                   </View>
 
                   {/* Heading */}
-                  <Text style={styles.comingSoonHeading}>COMING SOON TO{"\n"}YOUR DOORSTEP</Text>
-                  <Text style={styles.comingSoonSub}>
+                  <Text allowFontScaling={false} style={styles.comingSoonHeading}>COMING SOON TO{"\n"}YOUR DOORSTEP</Text>
+                  <Text allowFontScaling={false} style={styles.comingSoonSub}>
                     {location?.addressText
                       ? `We're not serving ${location.addressText} yet — but we're growing fast!`
                       : "We're not in your area yet, but we're expanding fast!"}
@@ -1284,12 +1069,12 @@ const HomeScreen = ({ navigation }: any) => {
                   {/* We're Live in */}
                   {liveZones.length > 0 && (
                     <View style={styles.liveInSection}>
-                      <Text style={styles.liveInTitle}>We're Live in</Text>
+                      <Text allowFontScaling={false} style={styles.liveInTitle}>We're Live in</Text>
                       <View style={styles.liveZonesRow}>
                         {liveZones.map((z: any, i: number) => (
                           <React.Fragment key={z.id}>
-                            <Text style={styles.liveZoneName}>{z.name}</Text>
-                            {i < liveZones.length - 1 && <Text style={styles.liveZoneDot}> • </Text>}
+                            <Text allowFontScaling={false} style={styles.liveZoneName}>{z.name}</Text>
+                            {i < liveZones.length - 1 && <Text allowFontScaling={false} style={styles.liveZoneDot}> • </Text>}
                           </React.Fragment>
                         ))}
                       </View>
@@ -1297,11 +1082,11 @@ const HomeScreen = ({ navigation }: any) => {
                   )}
 
                   {/* CTAs */}
-                  <BouncingButton style={styles.ctaPrimary} onPress={() => { triggerHaptic(); navigation.navigate('Address'); }} activeOpacity={0.9}>
-                    <Text style={styles.ctaPrimaryText}>Change Address</Text>
+                  <BouncingButton style={styles.ctaPrimary} onPress={() => navigation.navigate('Address')} activeOpacity={0.9} accessibilityRole="button" accessibilityLabel="Change Address">
+                    <Text allowFontScaling={false} style={styles.ctaPrimaryText}>Change Address</Text>
                   </BouncingButton>
-                  <BouncingButton style={styles.ctaOutline} onPress={() => { triggerHaptic(); setRequestStep('form'); }} activeOpacity={0.8}>
-                    <Text style={styles.ctaOutlineText}>Request Service in My Area</Text>
+                  <BouncingButton style={styles.ctaOutline} onPress={() => setRequestStep('form')} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Request Service in My Area">
+                    <Text allowFontScaling={false} style={styles.ctaOutlineText}>Request Service in My Area</Text>
                   </BouncingButton>
                 </>
               )}
@@ -1313,7 +1098,7 @@ const HomeScreen = ({ navigation }: any) => {
             </View>
           ) : (
             <EmptyState
-              icon={<PackageOpen size={32} color={colors.primary} />}
+              icon={<PackageOpen size={32} color={tokens.colors.primary} />}
               title="Nothing found"
               subtitle="Try changing your search or filters."
             />
@@ -1336,32 +1121,28 @@ const HomeScreen = ({ navigation }: any) => {
           <BouncingButton
             style={styles.floatingCartButton}
             activeOpacity={0.9}
-            onPress={() => {
-              triggerHaptic();
-              navigation.navigate('Cart');
-            }}
+            onPress={() => navigation.navigate('Cart')}
           >
             <View style={styles.cartLeftRow}>
-              <Text style={styles.cartItemCount}>{totalCartQty} {totalCartQty === 1 ? 'ITEM' : 'ITEMS'}</Text>
-              <Text style={styles.cartTotalText}>  ₹{cartTotal / 100}</Text>
+              <Text allowFontScaling={false} style={styles.cartItemCount}>{totalCartQty} {totalCartQty === 1 ? 'ITEM' : 'ITEMS'}</Text>
+              <Text allowFontScaling={false} style={styles.cartTotalText}>  ₹{cartTotal / 100}</Text>
             </View>
             <View style={styles.viewCartAction}>
-              <Text style={styles.viewCartText}>View Cart</Text>
-              <ShoppingBag size={16} color={colors.white} style={{ marginLeft: 6 }} />
+              <Text allowFontScaling={false} style={styles.viewCartText}>View Cart</Text>
+              <ShoppingBag size={16} color={tokens.colors.surface} style={{ marginLeft: 6 }} />
             </View>
           </BouncingButton>
         </Animated.View>
       )}
 
       {primaryActiveOrder && (
-        <Animated.View entering={FadeInDown.duration(400).springify().damping(15)} style={[
+        <Animated.View entering={FadeInDown.duration(300)} style={[
           styles.activeOrderPillContainer,
           safePillStyle
         ]}>
           <BouncingButton
             activeOpacity={0.8}
             onPress={() => {
-              triggerHaptic();
               if (activeOrders.length > 1) {
                 setShowActiveOrdersModal(true);
               } else {
@@ -1383,7 +1164,7 @@ const HomeScreen = ({ navigation }: any) => {
               )}
             </View>
             <View style={styles.activeOrderTextContainer}>
-              <Text style={styles.activeOrderTitle}>
+              <Text allowFontScaling={false} style={styles.activeOrderTitle}>
                 {activeOrders.length > 1 ? `${activeOrders.length} Active Orders` :
                  primaryActiveOrder.status === 'placed' ? 'Order Placed' :
                  primaryActiveOrder.status === 'accepted' ? 'Preparing food' :
@@ -1391,7 +1172,7 @@ const HomeScreen = ({ navigation }: any) => {
                  primaryActiveOrder.status === 'ready' ? 'Ready for pickup' :
                  primaryActiveOrder.status === 'out_for_delivery' ? 'Arriving soon' : 'Active Order'}
               </Text>
-              <Text style={styles.activeOrderSubtitle}>
+              <Text allowFontScaling={false} style={styles.activeOrderSubtitle}>
                 {activeOrders.length > 1 ? 'View all orders' : 'View live tracking'}
               </Text>
             </View>
@@ -1441,1352 +1222,8 @@ const HomeScreen = ({ navigation }: any) => {
 
 
 
-const ExploreMenuBanner = React.memo(() => (
-  <View style={ebS.wrapper}>
-    {/* Giant ghost "MENU" — 5% opacity, gives depth without any background */}
-    <Text style={ebS.ghost} numberOfLines={1}>MENU</Text>
 
-    {/* Top diamond rule */}
-    <View style={ebS.ruleRow}>
-      <View style={ebS.ruleLine} />
-      <Text style={ebS.diamond}>◆</Text>
-      <View style={ebS.ruleLine} />
-    </View>
 
-    {/* Eyebrow label */}
-    <Text style={ebS.eyebrow}>E X P L O R E</Text>
-
-    {/* Main title — two weights inline */}
-    <View style={ebS.titleRow}>
-      <Text style={ebS.titleLight}>our </Text>
-      <Text style={ebS.titleBold}>menu</Text>
-    </View>
-
-    {/* Bottom diamond rule */}
-    <View style={ebS.ruleRow}>
-      <View style={ebS.ruleLine} />
-      <Text style={ebS.diamond}>◆</Text>
-      <View style={ebS.ruleLine} />
-    </View>
-    <View style={{ height: 24 }} />
-  </View>
-));
-
-const ebS = StyleSheet.create({
-  wrapper: {
-    paddingVertical: 20,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
-  },
-  ghost: {
-    position: 'absolute',
-    fontFamily: fontFamily.black,
-    fontSize: 108,
-    color: 'rgba(46, 125, 50, 0.05)',
-    letterSpacing: 10,
-    top: '50%',
-    marginTop: -54,
-  },
-  ruleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    width: '78%',
-    marginVertical: 5,
-  },
-  ruleLine: {
-    flex: 1,
-    height: 0.8,
-    backgroundColor: 'rgba(94, 175, 99, 0.45)',
-  },
-  diamond: {
-    fontSize: 7,
-    color: 'rgba(94, 175, 99, 0.7)',
-  },
-  eyebrow: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 10,
-    color: '#7DC880',
-    letterSpacing: 5,
-    marginBottom: 2,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  titleLight: {
-    fontFamily: fontFamily.medium,
-    fontStyle: 'italic',
-    fontSize: 38,
-    color: '#81C784',
-    letterSpacing: 0.5,
-  },
-  titleBold: {
-    fontFamily: fontFamily.black,
-    fontSize: 42,
-    color: '#1B5E20',
-    letterSpacing: -0.5,
-  },
-});
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  minimalHeader: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F3F4F6',
-  },
-  headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-
-  // Logo
-  logoText: { fontSize: 28, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.5 },
-  logoDot: { color: colors.accent },
-  deliveryTagRow: { flexDirection: 'row', alignItems: 'center', marginTop: 1 },
-  deliveryTagIcon: { fontSize: 11, marginRight: 3 },
-  deliveryTagText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: colors.accent, letterSpacing: 1.2, textTransform: 'uppercase' },
-
-  // Header right cluster
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  addressPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.surfaceMuted, borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 6,
-    borderWidth: 1, borderColor: colors.border, maxWidth: 140,
-  },
-  addressPillText: { fontSize: 11, fontFamily: fontFamily.bold, color: colors.inkMuted, flex: 1 },
-  cartBadgeBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: colors.ink,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cartBadgeNum: { color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold },
-
-  // Kept for compatibility (used in unserviceable state)
-  locationTitleUnserviceable: { color: colors.danger },
-  addressSection: { flex: 1, marginRight: spacing.lg },
-  addressRow: { justifyContent: 'center' },
-  addressLabelRow: { flexDirection: 'row', alignItems: 'center' },
-  chevron: { marginLeft: spacing.xs },
-  locationTitle: { color: colors.ink, fontSize: 13, fontFamily: fontFamily.extrabold, letterSpacing: 0.3 },
-  addressValue: { color: colors.inkMuted, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 2 },
-  profileButton: {
-    width: 36, height: 36, backgroundColor: colors.primaryTint, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-    borderWidth: 0,
-  },
-  profileImage: { width: '100%', height: '100%' },
-
-  // ── Card layout ──────────────────────────────────────────────────────────
-  card: {
-    flexDirection: 'row',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    backgroundColor: 'transparent',
-  },
-  cardLeft: { flex: 1, paddingRight: 20, justifyContent: 'flex-start' }, // Top-align text
-  vegBadge: {
-    width: 14, height: 14, borderWidth: 1.5, borderRadius: 4,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
-  },
-  vegDot: { width: 6, height: 6, borderRadius: 3 },
-  cardName: { fontSize: 17, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 6, lineHeight: 22 },
-  cardPrice: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 8 },
-  cardDesc: { fontSize: 14, color: '#8E8E93', fontFamily: fontFamily.medium, lineHeight: 18 },
-
-  // Right column
-  cardRightWrapper: { width: 140, alignItems: 'center' }, // Outer wrapper just holds width
-  cardRightRelative: { width: 130, height: 130, position: 'relative' }, // Inner wrapper handles absolute positioning perfectly
-  cardImageContainer: {
-    width: 130, height: 130,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceMuted,
-  },
-  cardImage: { width: '100%', height: '100%' },
-  cardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-
-  // ADD / qty floats over image bottom
-  cardBtnFloat: {
-    position: 'absolute', bottom: -12, alignSelf: 'center', width: 110, zIndex: 10,
-  },
-  qtyControl: {
-    flexDirection: 'row', backgroundColor: '#FC4603', borderRadius: 16,
-    alignItems: 'center', justifyContent: 'space-between', height: 40,
-    shadowColor: '#FC4603', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 3 }, elevation: 4,
-  },
-  qtyBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
-  qtyBtnText: { color: '#FFFFFF', fontSize: 22, fontFamily: fontFamily.bold },
-  qtyValue: { color: '#FFFFFF', fontSize: 15, fontFamily: fontFamily.extrabold },
-  addBtn: {
-    backgroundColor: '#FC4603', borderRadius: 16,
-    height: 40, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#FC4603', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 3 }, elevation: 4,
-  },
-  addBtnDisabled: { backgroundColor: colors.surfaceMuted },
-  addBtnText: { color: '#FFFFFF', fontFamily: fontFamily.extrabold, fontSize: 15, letterSpacing: 0.5 },
-
-  // ── Home grid card (2-column) ──────────────────────────────────────────────
-  // Explore Menu divider
-  exploreHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: 20 },
-  exploreLine: { flex: 1, height: 1, backgroundColor: colors.border },
-  explorePill: { marginHorizontal: 12, backgroundColor: colors.surface, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: colors.border },
-  exploreText: { fontSize: 12, fontFamily: fontFamily.extrabold, color: colors.ink, letterSpacing: 0.3 },
-
-  // Category section header
-  categorySectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 4, paddingBottom: 10 },
-  categorySectionTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink, letterSpacing: -0.3 },
-  categorySectionCount: { fontSize: 12, fontFamily: fontFamily.semibold, color: colors.inkMuted },
-
-  // Grid row (2 cards per row)
-  homeGridRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 16, marginBottom: 20 },
-  homeGridCard: { flex: 1, backgroundColor: 'transparent' },
-  homeGridImageContainer: { width: '100%', aspectRatio: 1, borderRadius: 20, overflow: 'hidden', backgroundColor: colors.surfaceMuted, position: 'relative', marginBottom: 12, ...shadows.soft },
-  homeGridImage: { width: '100%', height: '100%' },
-  homeGridImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  homeGridVegBadge: { position: 'absolute', top: 8, left: 8, width: 16, height: 16, borderWidth: 1.5, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
-  homeGridVegDot: { width: 8, height: 8, borderRadius: 4 },
-  homeGridBestsellerBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: colors.warningTint, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  homeGridBestsellerText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
-  homeGridNewBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#EDE9FE', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  homeGridNewText: { fontSize: 10, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
-  homeGridSoldOut: { ...StyleSheet.absoluteFill, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' },
-  homeGridSoldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
-  homeGridAddFloat: { position: 'absolute', bottom: -1, alignSelf: 'center', width: '85%', zIndex: 10 },
-  homeGridQtyControl: { flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 16, alignItems: 'center', justifyContent: 'space-between', height: 36, ...shadows.medium },
-  homeGridQtyBtn: { width: 34, height: 36, alignItems: 'center', justifyContent: 'center' },
-  homeGridQtyBtnText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.bold },
-  homeGridQtyValue: { color: colors.white, fontSize: 14, fontFamily: fontFamily.extrabold },
-  homeGridAddBtn: { backgroundColor: colors.surface, borderRadius: 16, height: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderStrong, ...shadows.medium, position: 'relative' },
-  homeGridAddBtnText: { color: colors.primaryDark, fontFamily: fontFamily.extrabold, fontSize: 14, letterSpacing: 0.5 },
-  homeGridCustomiseBadge: { position: 'absolute', top: -10, backgroundColor: colors.white, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
-  homeGridCustomiseText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.primary, textTransform: 'uppercase' },
-  homeGridInfo: { paddingHorizontal: 4 },
-  homeGridName: { fontSize: 15, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 4, lineHeight: 20 },
-  homeGridDesc: { fontSize: 12, color: colors.inkFaint, fontFamily: fontFamily.medium, lineHeight: 16, marginBottom: 6 },
-  homeGridPrice: { fontSize: 15, fontFamily: fontFamily.black, color: colors.ink },
-  homeGridTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  homeGridTagChip: { backgroundColor: '#F9FAFB', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 0 },
-  homeGridTagText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
-  customisePill: {
-    alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 4,
-    paddingHorizontal: 6, paddingVertical: 2, marginBottom: 3,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: '#F3F4F6',
-  },
-  customisePillText: { fontSize: 8, fontFamily: fontFamily.bold, color: '#FC4603', textTransform: 'uppercase', letterSpacing: 0.3 },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 4 },
-  bestsellerBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  bestsellerBadgeText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#92400E', letterSpacing: 0.2 },
-  newBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  newBadgeText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: '#5B21B6', letterSpacing: 0.2 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  tagChip: { backgroundColor: '#F9FAFB', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 0 },
-  tagChipText: { fontSize: 9, fontFamily: fontFamily.bold, color: colors.inkMuted },
-
-  liveKitchenBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primaryTint,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    marginTop: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.primaryTint,
-  },
-  liveDotWrapper: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
-  liveDot: { position: 'absolute', width: 16, height: 16, borderRadius: 16, backgroundColor: colors.primary },
-  liveDotCore: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
-  liveKitchenTextCol: { marginLeft: spacing.md, flex: 1 },
-  liveKitchenText: { color: colors.primary, fontSize: 10, fontFamily: fontFamily.extrabold, letterSpacing: 1 },
-  liveKitchenTitle: { color: colors.ink, fontSize: 14, fontFamily: fontFamily.extrabold, marginTop: 2 },
-  deliveryTimeBadge: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  deliveryTimeText: { color: colors.primary, fontSize: 14, fontFamily: fontFamily.extrabold },
-  deliveryTimeSub: { color: colors.inkMuted, fontSize: 8, fontFamily: fontFamily.bold, letterSpacing: 0.5 },
-
-  searchBarContainer: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    height: 40,
-    marginTop: 12,
-  },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 13, fontFamily: fontFamily.semibold, color: colors.ink },
-  vegToggleContainer: { borderLeftWidth: 1, borderLeftColor: '#E5E7EB', paddingLeft: 8, marginLeft: 8 },
-  vegToggleWrapper: { flexDirection: 'row', alignItems: 'center' },
-  vegText: { fontSize: 9, fontFamily: fontFamily.extrabold, color: colors.inkFaint, marginRight: 4, letterSpacing: 0.5 },
-  vegTextActive: { color: colors.primary },
-  vegSwitch: { transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] },
-
-  listContent: { paddingBottom: 200, flexGrow: 1 },
-  itemPadding: { paddingHorizontal: spacing.lg },
-  headerSpacer: { height: spacing.xl },
-
-  kitchenPausedBanner: {
-    backgroundColor: colors.dangerTint,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.xl,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.dangerTint,
-  },
-  pausedIcon: { marginRight: spacing.md },
-  pausedTextCol: { flex: 1 },
-  pausedTitle: { color: colors.danger, fontSize: 15, fontFamily: fontFamily.extrabold },
-  pausedReason: { color: colors.danger, fontSize: 12, fontFamily: fontFamily.medium, marginTop: 2 },
-
-  mindContainer: { marginTop: 16 },
-  mindScroll: { paddingHorizontal: 12, gap: 8 },
-  categoryPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E5E7EB',
-  },
-  categoryPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  categoryPillText: { fontSize: 14, fontFamily: fontFamily.extrabold, color: colors.inkMuted },
-  categoryPillTextActive: { color: colors.white },
-
-  // ── Swish-style circular image categories ──────────────────────────────────
-  imageCategoryItem: {
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    width: 60,
-    marginRight: 4,
-  },
-  imageCategoryItemActive: {},
-  imageCategoryCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imageCategoryCircleActive: {
-    borderColor: colors.primary,
-    borderWidth: 2.5,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  imageCategoryImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 36,
-  },
-  imageCategoryLabel: {
-    fontSize: 11,
-    fontFamily: fontFamily.semibold,
-    color: colors.inkMuted,
-    textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 14,
-  },
-  imageCategoryLabelActive: {
-    color: colors.primary,
-    fontFamily: fontFamily.extrabold,
-  },
-
-  // ── Mini Banners (Quick Filters) ──────────────────────────────────────────
-  miniBannersContainer: { marginTop: spacing.md, marginBottom: spacing.sm },
-  miniBannersScroll: { paddingHorizontal: spacing.lg, gap: spacing.md },
-  miniBannerCard: {
-    width: 130,
-    height: 80,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceMuted,
-  },
-  miniBannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  miniBannerOverlay: {
-    ...StyleSheet.absoluteFill,
-    padding: spacing.sm + 2,
-    justifyContent: 'flex-start',
-    backgroundColor: 'rgba(0,0,0,0.3)'
-  },
-  miniBannerTitle: {
-    fontSize: 12,
-    fontFamily: fontFamily.extrabold,
-    color: colors.white,
-  },
-  miniBannerSubtitle: {
-    fontSize: 10,
-    fontFamily: fontFamily.bold,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
-  },
-
-  // ── Strip Banners (Wide & Short) ──────────────────────────────────────────
-  stripBannersContainer: { marginTop: spacing.md, paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.lg },
-  stripBannerCard: {
-    width: '100%',
-    height: 90,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceMuted,
-  },
-  stripBannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  stripBannerOverlay: {
-    ...StyleSheet.absoluteFill,
-    padding: spacing.lg,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  stripBannerTitle: {
-    fontSize: 16,
-    fontFamily: fontFamily.black,
-    color: colors.white,
-  },
-  stripBannerSubtitle: {
-    fontSize: 12,
-    fontFamily: fontFamily.bold,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
-  },
-
-
-  // ── Item offer tag (in price row, no image overlap) ────────────────────────
-  itemOfferTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#DCFCE7',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginBottom: 4,
-  },
-  itemOfferTagText: {
-    fontSize: 10,
-    fontFamily: fontFamily.black,
-    color: '#15803D',
-    letterSpacing: 0.2,
-  },
-  itemOfferBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#DCFCE7',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginBottom: 4,
-  },
-  itemOfferBadgeText: {
-    fontSize: 10,
-    fontFamily: fontFamily.black,
-    color: '#15803D',
-    letterSpacing: 0.2,
-  },
-
-  itemsContainer: { paddingHorizontal: 12, marginTop: 16, paddingBottom: 60 },
-  modernItemsList: { width: '100%' },
-
-  modernCard: {
-    width: '100%',
-    marginBottom: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E5E7EB',
-  },
-  modernCardInner: { flexDirection: 'row', alignItems: 'center' },
-
-  modernImageCol: { width: 70, alignItems: 'center', marginRight: 12 },
-  modernImageWrapper: { width: 70, height: 70, borderRadius: 16, backgroundColor: '#F9FAFB', overflow: 'hidden' },
-  modernImage: { width: '100%', height: '100%' },
-  modernImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  modernInfo: { flex: 1, paddingRight: 4 },
-  modernTagsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  vegIndicatorModern: { width: 10, height: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 4, borderRadius: 3 },
-  vegDotModern: { width: 4, height: 4, borderRadius: 2 },
-  bestsellerTagModern: { backgroundColor: colors.warningTint, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
-  bestsellerTagTextModern: { color: colors.warning, fontSize: 8, fontFamily: fontFamily.extrabold, textTransform: 'uppercase' },
-  modernName: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, lineHeight: 18, marginBottom: 2 },
-  modernPrice: { fontSize: 13, fontFamily: fontFamily.extrabold, color: colors.ink, marginBottom: 2 },
-  modernDesc: { fontSize: 11, color: colors.inkMuted, fontFamily: fontFamily.medium, lineHeight: 14 },
-
-  addBtnContainerRight: { marginLeft: 'auto' },
-  floatingAddButtonModern: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 6,
-    borderWidth: 0,
-  },
-  floatingAddButtonDisabled: { backgroundColor: '#F9FAFB' },
-  floatingAddButtonTextModern: { color: colors.primary, fontFamily: fontFamily.extrabold, fontSize: 13, letterSpacing: 0.5 },
-
-  floatingQuantityControlModern: {
-    width: 70,
-    height: 28,
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 6,
-  },
-  floatingQtyBtnModern: { paddingHorizontal: 6, height: '100%', justifyContent: 'center' },
-  floatingQtyTextModern: { color: colors.white, fontSize: 16, fontFamily: fontFamily.extrabold },
-  floatingQtyValueModern: { color: colors.white, fontSize: 13, fontFamily: fontFamily.extrabold },
-
-  soldOutOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  soldOutText: { color: colors.ink, fontFamily: fontFamily.extrabold, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1 },
-
-  skeletonList: { width: '100%' },
-
-  floatingCartContainer: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    zIndex: 999,
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  floatingCartButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cartLeftRow: { flexDirection: 'row', alignItems: 'center' },
-  cartItemCount: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: fontFamily.extrabold, letterSpacing: 1, textTransform: 'uppercase' },
-  cartTotalText: { color: colors.white, fontSize: 18, fontFamily: fontFamily.black, letterSpacing: -0.5 },
-  viewCartText: {
-    color: "#fff",
-    fontFamily: fontFamily.black,
-    fontSize: 14,
-  },
-  viewCartAction: { flexDirection: 'row', alignItems: 'center' },
-  bannersList: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingTop: spacing.xl },
-  bannerContainer: {
-    width: '100%',
-    height: 130,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#E0E0E0',
-  },
-  bannerImage: { width: '100%', height: '100%', opacity: 1 },
-  bannerOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    padding: spacing.lg,
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  bannerTag: { backgroundColor: colors.primary, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 8 },
-  bannerTagText: { color: colors.white, fontSize: 10, fontFamily: fontFamily.extrabold, textTransform: 'uppercase' },
-  bannerTitle: { color: colors.white, fontSize: 24, fontFamily: fontFamily.black, width: '80%' },
-  bannerSubtitle: { color: colors.white, fontSize: 14, fontFamily: fontFamily.medium, marginTop: 4, opacity: 0.9 },
-
-  requestServiceContainer: { width: '100%', paddingHorizontal: spacing.sm },
-  reqInfoCard: { alignItems: 'center', paddingVertical: spacing.xxl },
-  reqInfoIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
-  reqInfoTitle: { fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, marginBottom: spacing.sm },
-  reqInfoSub: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
-  reqActionBtn: { backgroundColor: colors.primary, width: '100%', paddingVertical: 16, borderRadius: radius.lg, alignItems: 'center' },
-  reqActionBtnText: { color: colors.white, fontSize: 16, fontFamily: fontFamily.extrabold },
-  reqFormCard: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', width: '100%' },
-  reqFormHero: { width: '100%', height: 180 },
-  reqFormBody: { padding: spacing.xl },
-  reqFormHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.md },
-  reqFormIconBadge: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center', marginTop: 2, flexShrink: 0 },
-  reqFormTitle: { fontSize: 18, fontFamily: fontFamily.black, color: colors.ink },
-  reqFormSub: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted, lineHeight: 18, marginTop: 2 },
-  reqFormLabel: { fontSize: 12, fontFamily: fontFamily.extrabold, color: colors.inkMuted, textTransform: 'uppercase', marginBottom: spacing.xs },
-  reqInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surfaceMuted, borderRadius: radius.md, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md },
-  reqInputField: { flex: 1, fontSize: 15, fontFamily: fontFamily.medium, color: colors.ink, paddingVertical: 13 },
-  reqPinHash: { fontSize: 17, fontFamily: fontFamily.extrabold, color: colors.inkFaint },
-  reqInput: { backgroundColor: colors.surfaceMuted, borderRadius: radius.md, padding: 14, fontSize: 15, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: spacing.lg },
-  reqErrorText: { color: colors.danger, fontSize: 13, fontFamily: fontFamily.bold, marginBottom: spacing.md },
-  reqSubmitBtn: { backgroundColor: colors.primary, paddingVertical: 16, borderRadius: radius.lg, alignItems: 'center', marginTop: spacing.sm },
-  reqSubmitBtnText: { color: colors.white, fontSize: 16, fontFamily: fontFamily.extrabold },
-  reqCancelLink: { marginTop: spacing.lg, alignItems: 'center', paddingVertical: spacing.sm },
-  reqCancelLinkText: { color: colors.inkMuted, fontSize: 14, fontFamily: fontFamily.bold },
-  reqBackLink: { marginTop: spacing.lg, alignItems: 'center' },
-  reqBackLinkText: { color: colors.inkMuted, fontSize: 14, fontFamily: fontFamily.bold },
-  reqDoneCard: { alignItems: 'center', paddingVertical: spacing.xl },
-  reqDoneTitle: { fontSize: 24, fontFamily: fontFamily.black, color: colors.ink, marginBottom: spacing.sm },
-  reqDoneSub: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.inkMuted, textAlign: 'center', marginBottom: spacing.xl },
-  reqBackBtn: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: radius.md, backgroundColor: colors.surfaceMuted },
-  reqBackBtnText: { color: colors.ink, fontSize: 14, fontFamily: fontFamily.extrabold },
-
-  // ── Unserviceable / Coming Soon screen ──────────────────────────────────
-  unserviceableWrap: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxxl,
-    alignItems: 'center',
-  },
-
-  // Three fanned food-card decorations
-  foodCarousel: {
-    width: '100%',
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xxl,
-  },
-  foodCardDeco: {
-    position: 'absolute',
-    width: 140,
-    height: 160,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceMuted,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  foodCardImage: { width: '100%', height: '100%' },
-  foodCardLeft: {
-    transform: [{ rotate: '-12deg' }, { translateX: -60 }],
-    backgroundColor: colors.warningTint,
-    zIndex: 1,
-  },
-  foodCardCenter: {
-    backgroundColor: colors.primaryTint,
-    zIndex: 3,
-    width: 160,
-    height: 180,
-    shadowOpacity: 0.08,
-    elevation: 8,
-  },
-  foodCardRight: {
-    transform: [{ rotate: '12deg' }, { translateX: 60 }],
-    backgroundColor: colors.accentTint,
-    zIndex: 1,
-  },
-
-  // Heading text
-  comingSoonHeading: {
-    fontSize: 26,
-    fontFamily: fontFamily.black,
-    color: colors.ink,
-    textAlign: 'center',
-    letterSpacing: -0.5,
-    lineHeight: 32,
-    marginBottom: spacing.lg,
-    textTransform: 'uppercase',
-  },
-  comingSoonSub: {
-    fontSize: 15,
-    fontFamily: fontFamily.medium,
-    color: colors.inkMuted,
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xxl,
-  },
-
-  // "We're Live in" zone list
-  liveInSection: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xxl,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  liveInTitle: {
-    fontSize: 11,
-    fontFamily: fontFamily.extrabold,
-    color: colors.inkFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  liveZonesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  liveZoneName: {
-    fontSize: 14,
-    fontFamily: fontFamily.semibold,
-    color: colors.ink,
-  },
-  liveZoneDot: {
-    fontSize: 14,
-    color: colors.inkFaint,
-  },
-
-  // CTAs
-  ctaPrimary: {
-    width: '100%',
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  ctaPrimaryText: {
-    color: colors.white,
-    fontSize: 16,
-    fontFamily: fontFamily.extrabold,
-  },
-  ctaOutline: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  ctaOutlineText: {
-    color: colors.ink,
-    fontSize: 15,
-    fontFamily: fontFamily.bold,
-  },
-
-  sectionHeader: {
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.lg,
-    paddingTop: 28,
-    paddingBottom: 8,
-  },
-  sectionHeaderText: {
-    fontSize: 18,
-    fontFamily: fontFamily.black,
-    color: colors.ink,
-    letterSpacing: -0.3,
-  },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 100,
-    alignSelf: 'center',
-    zIndex: 1000,
-  },
-  menuFab: {
-    backgroundColor: colors.ink,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: 12,
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  menuFabText: {
-    color: colors.white,
-    fontFamily: fontFamily.bold,
-    fontSize: 14,
-    marginLeft: spacing.sm,
-    letterSpacing: 1,
-  },
-  menuPopupOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    zIndex: 1001,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 160,
-  },
-  menuPopupContainer: {
-    backgroundColor: colors.surface,
-    width: 250,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  menuPopupItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  menuPopupText: {
-    fontSize: 15,
-    fontFamily: fontFamily.medium,
-    color: colors.ink,
-  },
-  menuPopupCount: {
-    fontSize: 13,
-    fontFamily: fontFamily.medium,
-    color: colors.inkFaint,
-  },
-  activeOrderPillContainer: {
-    position: 'absolute',
-    alignSelf: 'center',
-    zIndex: 999,
-  },
-  activeOrderPill: {
-    backgroundColor: '#1C1C1E', // Sleek dark capsule
-    borderRadius: 100,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  activeOrderIconContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 20,
-  },
-  activeOrderDotBase: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34D399',
-  },
-  activeOrderDotPulse: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 16,
-    backgroundColor: '#34D399',
-    top: -5,
-    left: -5,
-    opacity: 0.4,
-  },
-  activeOrderTextContainer: {
-    marginRight: 12,
-    justifyContent: 'center',
-  },
-  activeOrderTitle: {
-    color: '#F9FAFB',
-    fontFamily: fontFamily.black,
-    fontSize: 13,
-    letterSpacing: -0.2,
-  },
-  activeOrderSubtitle: {
-    color: '#9CA3AF',
-    fontFamily: fontFamily.bold,
-    fontSize: 10,
-    marginTop: 2,
-    letterSpacing: 0.1,
-  },
-  activeOrderArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeOrderArrowText: {
-    color: '#FFFFFF',
-    fontFamily: fontFamily.black,
-    fontSize: 14,
-  },
-
-  // ── Sticky category strip ──────────────────────────────────────────────────
-  categoryStrip: {
-    backgroundColor: colors.surface,
-    paddingTop: 4,
-    paddingBottom: 8,
-  },
-  categoryStripScroll: {
-    paddingHorizontal: spacing.lg,
-    gap: 6,
-  },
-  categoryStripItem: {
-    alignItems: 'center',
-    width: 64,
-    position: 'relative',
-  },
-  categoryStripCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  categoryStripCircleActive: {
-    borderColor: colors.primary,
-    borderWidth: 2.5,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  categoryStripImage: {
-    width: '100%',
-    height: '100%',
-  },
-  categoryStripLabel: {
-    fontSize: 10,
-    fontFamily: fontFamily.semibold,
-    color: colors.inkMuted,
-    textAlign: 'center',
-  },
-  categoryStripLabelActive: {
-    color: colors.primary,
-    fontFamily: fontFamily.extrabold,
-  },
-  // ── Category Preview Strip ──────────────────────────────────────
-  catPreviewWrap: { paddingTop: 10, paddingBottom: 4 },
-  catPreviewHeadingRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 12, marginBottom: 10,
-  },
-  catPreviewHeadingAccent: {
-    width: 4, height: 16, borderRadius: 2,
-    backgroundColor: colors.primary,
-  },
-  catPreviewHeading: {
-    fontFamily: fontFamily.black,
-    fontSize: 18,
-    color: colors.ink,
-    letterSpacing: -0.3,
-  },
-  catPreviewScroll: { paddingHorizontal: 12, gap: 10, paddingBottom: 4 },
-  catPreviewCard: {
-    width: 140,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#F3F4F6',
-    overflow: 'hidden',
-  },
-  catPreviewImgBox: { width: '100%', height: 100, position: 'relative' },
-  catPreviewImg: { width: '100%', height: '100%' },
-  catPreviewImgPlaceholder: {
-    backgroundColor: '#F9FAFB',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  catPreviewCatPill: {
-    position: 'absolute', top: 8, left: 8,
-    backgroundColor: 'rgba(0,0,0,0.48)',
-    borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3,
-    maxWidth: 100,
-  },
-  catPreviewCatText: { fontSize: 9, color: '#fff', fontFamily: fontFamily.bold },
-  catPreviewBestBadge: {
-    position: 'absolute', top: 8, right: 8,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 16, paddingHorizontal: 6, paddingVertical: 2,
-  },
-  catPreviewBestText: { fontSize: 9, color: '#92400E', fontFamily: fontFamily.extrabold },
-  catPreviewSoldOut: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  catPreviewSoldOutText: { color: '#fff', fontFamily: fontFamily.extrabold, fontSize: 12 },
-  catPreviewAddFloat: {
-    position: 'absolute', bottom: 8, right: 8,
-  },
-  catPreviewAddBtn: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    paddingHorizontal: 14, paddingVertical: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  catPreviewAddText: { fontFamily: fontFamily.extrabold, fontSize: 12, color: colors.primary },
-  catPreviewQty: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.primary, borderRadius: 16,
-    paddingHorizontal: 8, paddingVertical: 5, gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  catPreviewQtyBtn: { fontFamily: fontFamily.extrabold, fontSize: 16, color: '#fff', lineHeight: 18 },
-  catPreviewQtyVal: {
-    fontFamily: fontFamily.extrabold, fontSize: 13,
-    color: '#fff', minWidth: 18, textAlign: 'center',
-  },
-  catPreviewInfo: { padding: 10, paddingTop: 10 },
-  catPreviewNameRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6,
-  },
-  catPreviewVegBadge: {
-    width: 15, height: 15, borderRadius: 3, borderWidth: 1.5,
-    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0, marginTop: 1,
-  },
-  catPreviewVegDot: { width: 7, height: 7, borderRadius: 3.5 },
-  catPreviewName: {
-    fontFamily: fontFamily.bold,
-    fontSize: 13, lineHeight: 17,
-    color: colors.ink,
-    flex: 1,
-  },
-  catPreviewPrice: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 15,
-    color: colors.ink,
-    marginTop: 2,
-  },
-  catPreviewPriceRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  catPreviewStrikePrice: { fontSize: 12, color: colors.inkFaint, textDecorationLine: 'line-through', marginLeft: 6 },
-  homeGridPriceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  homeGridStrikePrice: { fontSize: 13, color: colors.inkFaint, textDecorationLine: 'line-through', marginLeft: 6 },
-  // ────────────────────────────────────────────────────────────────
-  categoryStripUnderline: {
-    position: 'absolute',
-    bottom: -10,
-    left: 8,
-    right: 8,
-    height: 2.5,
-    borderRadius: 2,
-    backgroundColor: colors.primary,
-  },
-});
-
-
-
-const ClosedBottomSheet = ({
-  openingTime,
-  paused,
-  pauseReason,
-  pauseUntil,
-  kitchenId,
-  onDismiss,
-}: {
-  openingTime?: string | null;
-  paused?: boolean;
-  pauseReason?: string | null;
-  pauseUntil?: string | null;
-  kitchenId?: string | null;
-  onDismiss: () => void;
-}) => {
-  const insets = useSafeAreaInsets();
-  const [, setTick] = useState(0);
-  const [notifyRegistered, setNotifyRegistered] = useState(false);
-  const [notifyLoading, setNotifyLoading] = useState(false);
-
-  useEffect(() => {
-    const interval = paused ? 5000 : 30000;
-    const id = setInterval(() => setTick(t => t + 1), interval);
-    return () => clearInterval(id);
-  }, [paused]);
-
-  const minsLeft = minutesUntilOpen(openingTime);
-  const opensVerySoon = minsLeft > 0 && minsLeft <= 30;
-  const openLabel = openingTime ? formatTime12h(openingTime) : '10:00 AM';
-
-  const pauseSecsLeft = pauseUntil
-    ? Math.max(0, Math.floor((new Date(pauseUntil).getTime() - Date.now()) / 1000))
-    : null;
-  const pauseMinsLeft = pauseSecsLeft !== null ? Math.floor(pauseSecsLeft / 60) : null;
-  const pauseSecsRem = pauseSecsLeft !== null ? pauseSecsLeft % 60 : null;
-
-  const handleNotifyMe = useCallback(async () => {
-    if (!kitchenId || notifyRegistered) return;
-    setNotifyLoading(true);
-    try {
-      const token = await getCurrentDeviceToken();
-      if (!token) { setNotifyLoading(false); return; }
-      await api.post('/kitchen/pause-notify', { kitchenId, fcmToken: token });
-      setNotifyRegistered(true);
-    } catch { /* silently fail */ }
-    setNotifyLoading(false);
-  }, [kitchenId, notifyRegistered]);
-
-  const { height: SCREEN_HEIGHT } = useWindowDimensions();
-  const headerHeight = Math.max(insets.top + 8, 12) + 116;
-  const sheetHeight = SCREEN_HEIGHT - headerHeight;
-
-  const translateY = useRef(new RNAnimated.Value(sheetHeight)).current;
-
-  useEffect(() => {
-    RNAnimated.spring(translateY, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 60,
-      friction: 10,
-    }).start();
-  }, []);
-
-  const dismiss = useCallback(() => {
-    RNAnimated.timing(translateY, {
-      toValue: sheetHeight,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => onDismiss());
-  }, [sheetHeight, onDismiss]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, { dy, dx }) => dy > 0 && Math.abs(dy) > Math.abs(dx),
-      onPanResponderMove: (_, { dy }) => {
-        if (dy > 0) translateY.setValue(dy);
-      },
-      onPanResponderRelease: (_, { dy, vy }) => {
-        if (dy > 50 || vy > 0.3) {
-          RNAnimated.timing(translateY, {
-            toValue: sheetHeight,
-            duration: 150,
-            useNativeDriver: true,
-          }).start(() => onDismiss());
-        } else {
-          RNAnimated.spring(translateY, { toValue: 0, tension: 100, friction: 12, useNativeDriver: true }).start();
-        }
-      },
-    })
-  ).current;
-
-  return (
-    <RNAnimated.View
-      style={[closedSS.sheet, { top: headerHeight, height: sheetHeight, transform: [{ translateY }] }]}
-      {...panResponder.panHandlers}
-    >
-      <View style={closedSS.dragHandle} />
-
-      <View style={closedSS.content}>
-        <Image
-          source={require('../images/closed_store.jpg')}
-          style={{ width: 250, height: 180, marginBottom: 24 }}
-          resizeMode="contain"
-        />
-
-        {paused ? (
-          <>
-            <Text style={closedSS.title}>Kitchen Paused</Text>
-
-            {pauseReason ? (
-              <Text style={closedSS.subtitle}>"{pauseReason}"</Text>
-            ) : (
-              <Text style={closedSS.subtitle}>Taking a short break to catch up.</Text>
-            )}
-
-            {pauseSecsLeft !== null && pauseSecsLeft > 0 ? (
-              <View style={closedSS.countdownRow}>
-                <Text style={closedSS.countdownLabel}>Back in </Text>
-                <Text style={closedSS.countdown}>
-                  {pauseMinsLeft}:{String(pauseSecsRem).padStart(2, '0')}
-                </Text>
-              </View>
-            ) : (
-              <Text style={closedSS.body}>We'll reopen shortly — thank you for your patience.</Text>
-            )}
-
-            <TouchableOpacity
-              style={[closedSS.notifyBtn, notifyRegistered && closedSS.notifyBtnDone]}
-              onPress={handleNotifyMe}
-              activeOpacity={0.8}
-              disabled={notifyRegistered || notifyLoading}
-            >
-              <Text style={[closedSS.notifyBtnText, notifyRegistered && closedSS.notifyBtnTextDone]}>
-                {notifyRegistered ? '✓ We\'ll notify you' : notifyLoading ? 'Setting up…' : '🔔 Notify me when open'}
-              </Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text style={closedSS.title}>Closed for Now, Back Soon!</Text>
-
-            {opensVerySoon ? (
-              <Text style={closedSS.subtitle}>
-                Opening in <Text style={closedSS.highlight}>{minsLeft} min</Text>
-              </Text>
-            ) : (
-              <Text style={closedSS.subtitle}>
-                We open at <Text style={closedSS.highlight}>{openLabel}</Text>
-              </Text>
-            )}
-
-            <Text style={closedSS.body}>
-              We're closed for now, but we'll be back soon!{'\n'}Thank you for your patience.
-            </Text>
-          </>
-        )}
-      </View>
-
-      <TouchableOpacity
-        style={[closedSS.btn, { marginBottom: Math.max(insets.bottom, 16) + 16 }]}
-        onPress={dismiss}
-        activeOpacity={0.85}
-      >
-        <Text style={closedSS.btnText}>Browse Menu</Text>
-      </TouchableOpacity>
-    </RNAnimated.View>
-  );
-};
-
-const closedSS = StyleSheet.create({
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 1100,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 20,
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D1D5DB',
-    marginBottom: 20,
-    alignSelf: 'center',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  title: {
-    fontSize: 22,
-    fontFamily: fontFamily.black,
-    color: colors.ink,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    fontFamily: fontFamily.medium,
-    color: colors.inkMuted,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  highlight: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.primary,
-  },
-  body: {
-    fontSize: 13,
-    fontFamily: fontFamily.medium,
-    color: colors.inkMuted,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  countdownRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  countdownLabel: {
-    fontSize: 15,
-    fontFamily: fontFamily.medium,
-    color: colors.inkMuted,
-  },
-  countdown: {
-    fontSize: 32,
-    fontFamily: fontFamily.black,
-    color: colors.primary,
-  },
-  notifyBtn: {
-    width: '100%',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  notifyBtnDone: {
-    borderColor: colors.success ?? '#22c55e',
-    backgroundColor: (colors.success ?? '#22c55e') + '1A',
-  },
-  notifyBtnText: {
-    fontSize: 15,
-    fontFamily: fontFamily.extrabold,
-    color: colors.primary,
-  },
-  notifyBtnTextDone: {
-    color: colors.success,
-  },
-  btn: {
-    width: '100%',
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  btnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: fontFamily.extrabold,
-  },
-});
 
 export default HomeScreen;
 // v2

@@ -13,10 +13,13 @@ import {
   Clock,
   ShieldCheck
 } from 'lucide-react-native';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const TicketDetailScreen = ({ route, navigation }: any) => {
   const { ticketId } = route.params;
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [resolution, setResolution] = useState('');
 
   const { data: ticketData, isLoading } = useQuery({
@@ -28,8 +31,9 @@ const TicketDetailScreen = ({ route, navigation }: any) => {
   const resolveMutation = useMutation({
     mutationFn: (res: string) => api.post(`/admin/support/tickets/${ticketId}/resolve`, { resolution: res }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-ticket-detail', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['admin-tickets'] });
-      Alert.alert('Resolved', 'Ticket has been marked as resolved.');
+      showDialog({ title: 'Resolved', message: 'Ticket has been marked as resolved.', confirmText: 'Okay', type: 'success' });
       navigation.goBack();
     },
   });
@@ -138,11 +142,11 @@ const TicketDetailScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -198,7 +202,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   statusTextOpen: {
-    color: '#EF4444',
+    color: tokens.colors.danger,
   },
   statusTextClosed: {
     color: '#00D084',
@@ -224,16 +228,12 @@ const styles = StyleSheet.create({
   customerIconWrapper: {
     width: 48,
     height: 48,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   customerCardLabel: {
     color: '#9ca3af',
@@ -264,16 +264,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   issueCard: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     padding: 24,
     borderRadius: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   subjectText: {
     color: '#1A1A2E',
@@ -325,11 +321,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
+    ...tokens.shadows.soft,
   },
   resolveBtnEnabled: {
     backgroundColor: '#1A1A2E',
@@ -338,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
   },
   resolveBtnText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
     textTransform: 'uppercase',

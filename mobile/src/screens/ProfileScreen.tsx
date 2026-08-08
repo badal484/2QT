@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import {
   CreditCard,
   User,
@@ -19,49 +20,43 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import React, { useCallback } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Image, StyleSheet } from 'react-native';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { View, Text, ScrollView, Image, StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFeedback } from '../context/FeedbackContext';
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { disconnectSocket } from '../socket/client';
 import { api } from '../api/client';
-import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
+import { haptics } from '../utils/haptics';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { tokens } from '../theme/tokens';
 
-const hapticOptions = {
-  enableVibrateFallback: true,
-  ignoreAndroidSystemSettings: false,
-};
-
-const MinimalListItem = React.memo(({ icon, title, value, onPress, subtitle, color = tokens.colors.textPrimary, isDestructive = false }: any) => (
-  <BouncingButton 
-    activeOpacity={0.7}
+const MinimalListItem = React.memo(({ icon, title, value, onPress, subtitle, isDestructive = false }: any) => (
+  <PressableScale
     style={styles.minimalListItem}
-    onPress={() => {
-      ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-      onPress();
-    }}
+    onPress={onPress}
+    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    accessibilityRole="button"
+    accessibilityLabel={title}
   >
     <View style={styles.minimalListLeft}>
       <View style={styles.minimalListIcon}>
         {icon}
       </View>
       <View>
-        <Text allowFontScaling={false} style={[styles.minimalListTitle, isDestructive && { color: tokens.colors.danger }]}>{title}</Text>
-        {subtitle && <Text allowFontScaling={false} style={styles.minimalListSub}>{subtitle}</Text>}
+        <Text allowFontScaling maxFontSizeMultiplier={1.4} style={[styles.minimalListTitle, isDestructive && { color: tokens.colors.danger }]}>{title}</Text>
+        {subtitle && <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.minimalListSub}>{subtitle}</Text>}
       </View>
     </View>
     <View style={styles.minimalListRight}>
       {value !== undefined && value !== null && value !== '' && (
-        <Text allowFontScaling={false} style={styles.minimalListValue}>{value}</Text>
+        <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.minimalListValue}>{value}</Text>
       )}
       <ChevronRight size={16} color={tokens.colors.border} />
     </View>
-  </BouncingButton>
+  </PressableScale>
 ));
 
 const ProfileScreen = ({ navigation }: any) => {
@@ -70,9 +65,10 @@ const ProfileScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
   const isRider = user?.role === 'rider';
   const accent = isRider ? tokens.colors.primary : tokens.colors.success;
-  const accentLight = isRider ? '#FFF0E8' : '#ECFDF5';
+  const accentLight = isRider ? tokens.colors.primaryTint : tokens.colors.successTint;
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet'],
@@ -93,19 +89,19 @@ const ProfileScreen = ({ navigation }: any) => {
   });
 
   const handleLogout = useCallback(() => {
-    ReactNativeHapticFeedback.trigger("impactHeavy", hapticOptions);
-    Alert.alert('Logout', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: () => {
-          dispatch(logout());
-          disconnectSocket();
-        }
+    haptics.warning();
+    showDialog({
+      title: 'Logout',
+      message: 'Are you sure you want to sign out?',
+      confirmText: 'Sign Out',
+      cancelText: 'Cancel',
+      type: 'warning',
+      onConfirm: () => {
+        dispatch(logout());
+        disconnectSocket();
       }
-    ]);
-  }, [dispatch]);
+    });
+  }, [dispatch, showDialog]);
 
   return (
     <View style={styles.container}>
@@ -113,12 +109,12 @@ const ProfileScreen = ({ navigation }: any) => {
         
         {/* REFINED HEADER */}
         <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { paddingTop: Math.max(insets.top + 16, 40) }]}>
-          <BouncingButton 
+          <PressableScale 
             style={styles.profilePicWrapper}
-            onPress={() => {
-              ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-              navigation.navigate('EditProfile');
-            }}
+            onPress={() => navigation.navigate('EditProfile')}
+            accessibilityRole="button"
+            accessibilityLabel="Edit Profile"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             {user?.photo_url ? (
               <Image source={{ uri: user.photo_url }} style={styles.profilePic} />
@@ -126,62 +122,67 @@ const ProfileScreen = ({ navigation }: any) => {
               <User size={32} color={accent} />
             )}
             <View style={[styles.editPicBadge, { backgroundColor: accent }]}>
-              <Text allowFontScaling={false} style={styles.editPicText}>EDIT</Text>
+              <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.editPicText}>EDIT</Text>
             </View>
-          </BouncingButton>
+          </PressableScale>
           <View style={styles.headerTextCol}>
-            <Text allowFontScaling={false} style={styles.headerName}>{user?.name || (isRider ? 'Rider' : 'Gourmet')}</Text>
-            <Text allowFontScaling={false} style={styles.phoneText}>+{user?.phone}</Text>
+            <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.headerName}>{user?.name || (isRider ? 'Rider' : 'Gourmet')}</Text>
+            <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.phoneText}>+{user?.phone}</Text>
           </View>
         </Animated.View>
 
         {/* STATS ROW (Swish Style) */}
         {!isRider && featureReferrals && (
           <Animated.View entering={FadeInDown.delay(120).duration(400)}>
-            <BouncingButton style={styles.referralBanner} activeOpacity={0.8} onPress={() => navigation.navigate('Referral')}>
+            <PressableScale 
+              style={styles.referralBanner} 
+              onPress={() => navigation.navigate('Referral')}
+              accessibilityRole="button"
+              accessibilityLabel="Invite and Earn"
+            >
               <View style={styles.referralIconBox}>
                 <Gift size={20} color={tokens.colors.surface} />
               </View>
               <View style={styles.referralTexts}>
-                <Text allowFontScaling={false} style={styles.referralTitle}>Invite & Earn ₹50</Text>
-                <Text allowFontScaling={false} style={styles.referralSub}>Get ₹50 for every friend who orders.</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.referralTitle}>Invite & Earn ₹50</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.referralSub}>Get ₹50 for every friend who orders.</Text>
               </View>
               <ChevronRight size={20} color={tokens.colors.surface} />
-            </BouncingButton>
+            </PressableScale>
           </Animated.View>
         )}
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statsRow}>
           {isRider ? (
             <>
-              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('Payouts')}>
+              <PressableScale style={styles.statBox} onPress={() => navigation.navigate('Payouts')} accessibilityRole="button" accessibilityLabel="Earnings">
                 <Wallet size={20} color={tokens.colors.textSecondary} />
-                <Text allowFontScaling={false} style={styles.statLabel}>Earnings</Text>
-                <Text allowFontScaling={false} style={styles.statValue}>₹{((riderStats?.totalEarnings ?? 0) / 100).toFixed(0)}</Text>
-              </BouncingButton>
-              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('RiderHistory')}>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Earnings</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>₹{((riderStats?.totalEarnings ?? 0) / 100).toFixed(0)}</Text>
+              </PressableScale>
+              <PressableScale style={styles.statBox} onPress={() => navigation.navigate('RiderHistory')} accessibilityRole="button" accessibilityLabel="Total Trips">
                 <Package size={20} color={tokens.colors.textSecondary} />
-                <Text allowFontScaling={false} style={styles.statLabel}>Total Trips</Text>
-                <Text allowFontScaling={false} style={styles.statValue}>{riderStats?.totalDeliveries || 0}</Text>
-              </BouncingButton>
-              <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => {}}>
-                <Star size={20} color="#F59E0B" />
-                <Text allowFontScaling={false} style={styles.statLabel}>Rating</Text>
-                <Text allowFontScaling={false} style={[styles.statValue, { color: '#F59E0B' }]}>{(riderStats?.rating ?? 5.0).toFixed(1)}★</Text>
-              </BouncingButton>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Total Trips</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>{riderStats?.totalDeliveries || 0}</Text>
+              </PressableScale>
+              <PressableScale style={styles.statBox} onPress={() => {}} accessibilityRole="button" accessibilityLabel="Rating">
+                <Star size={20} color={tokens.colors.warning} />
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Rating</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={[styles.statValue, { color: tokens.colors.warning }]}>{(riderStats?.rating ?? 5.0).toFixed(1)}★</Text>
+              </PressableScale>
             </>
           ) : (
             <>
-              <BouncingButton style={[styles.statBox, !featureLoyalty && { flex: 1 }]} activeOpacity={0.8} onPress={() => navigation.navigate('Wallet')}>
+              <PressableScale style={[styles.statBox, !featureLoyalty && { flex: 1 }]} onPress={() => navigation.navigate('Wallet')} accessibilityRole="button" accessibilityLabel="Wallet Balance">
                 <Wallet size={20} color={tokens.colors.textSecondary} />
-                <Text allowFontScaling={false} style={styles.statLabel}>Wallet Balance</Text>
-                <Text allowFontScaling={false} style={styles.statValue}>{wallet ? `₹${(wallet.balancePaise / 100).toFixed(2)}` : '₹0.00'}</Text>
-              </BouncingButton>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Wallet Balance</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>{wallet ? `₹${(wallet.balancePaise / 100).toFixed(2)}` : '₹0.00'}</Text>
+              </PressableScale>
               {featureLoyalty && (
-                <BouncingButton style={styles.statBox} activeOpacity={0.8} onPress={() => navigation.navigate('Loyalty')}>
+                <PressableScale style={styles.statBox} onPress={() => navigation.navigate('Loyalty')} accessibilityRole="button" accessibilityLabel="Loyalty Points">
                   <Sparkles size={20} color={tokens.colors.primary} />
-                  <Text allowFontScaling={false} style={styles.statLabel}>Loyalty Points</Text>
-                  <Text allowFontScaling={false} style={[styles.statValue, { color: tokens.colors.primary }]}>{loyalty?.points || 0}</Text>
-                </BouncingButton>
+                  <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Loyalty Points</Text>
+                  <Text allowFontScaling maxFontSizeMultiplier={1.4} style={[styles.statValue, { color: tokens.colors.primary }]}>{loyalty?.points || 0}</Text>
+                </PressableScale>
               )}
             </>
           )}
@@ -192,7 +193,7 @@ const ProfileScreen = ({ navigation }: any) => {
 
         {/* ACTIVITY GROUP */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.settingsGroup}>
-          <Text allowFontScaling={false} style={styles.groupLabel}>{isRider ? 'Fleet Management' : 'Activity'}</Text>
+          <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.groupLabel}>{isRider ? 'Fleet Management' : 'Activity'}</Text>
           {isRider ? (
             <>
               <MinimalListItem icon={<ShieldCheck size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Documents" onPress={() => navigation.navigate('RiderDocuments')} />
@@ -211,7 +212,7 @@ const ProfileScreen = ({ navigation }: any) => {
 
         {/* HELP & SUPPORT GROUP */}
         <Animated.View entering={FadeInDown.delay(400).duration(400)} style={[styles.settingsGroup, { marginBottom: 40 }]}>
-          <Text allowFontScaling={false} style={styles.groupLabel}>Support</Text>
+          <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.groupLabel}>Support</Text>
           <MinimalListItem icon={<Bell size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Notifications" onPress={() => navigation.navigate(isRider ? 'RiderNotifications' : 'Notifications')} />
           <MinimalListItem icon={<MessageCircle size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Help & Support" onPress={() => navigation.navigate(isRider ? 'RiderHelp' : 'Help')} />
           <MinimalListItem icon={<LogOut size={22} color={tokens.colors.danger} strokeWidth={1.5} />} title="Sign Out" isDestructive={true} onPress={handleLogout} />
@@ -220,30 +221,32 @@ const ProfileScreen = ({ navigation }: any) => {
         {/* Dev Role Switcher */}
         {__DEV__ && (
             <View style={styles.devCard}>
-                <Text allowFontScaling={false} style={styles.devHeader}>Developer Role Control</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.devHeader}>Developer Role Control</Text>
                 <View style={styles.devBtnRow}>
                     {['customer', 'rider', 'chef', 'super_admin'].map(r => (
-                        <BouncingButton 
+                        <PressableScale 
                             key={r}
                             onPress={() => {
                                 api.post('/auth/update-role', { role: r })
                                     .then(() => {
-                                        Alert.alert('Role Updated', `Now: ${r}. Please restart app.`);
+                                        showDialog({ title: 'Role Updated', message: `Now: ${r}. Please restart app.`, confirmText: 'Okay', type: 'info' });
                                         queryClient.invalidateQueries({ queryKey: ['me'] });
                                         dispatch(logout());
                                     });
                             }}
                             style={[styles.devBtn, user?.role === r ? styles.devBtnActive : styles.devBtnInactive]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Switch to ${r} role`}
                         >
-                            <Text allowFontScaling={false} style={[styles.devBtnText, user?.role === r ? styles.devBtnTextActive : styles.devBtnTextInactive]}>{r}</Text>
-                        </BouncingButton>
+                            <Text allowFontScaling maxFontSizeMultiplier={1.4} style={[styles.devBtnText, user?.role === r ? styles.devBtnTextActive : styles.devBtnTextInactive]}>{r}</Text>
+                        </PressableScale>
                     ))}
                 </View>
             </View>
         )}
 
         <View style={styles.footer}>
-          <Text allowFontScaling={false} style={styles.footerText}>2QT v1.0.0 Stable</Text>
+          <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.footerText}>2QT v1.0.0 Stable</Text>
         </View>
 
       </ScrollView>
@@ -258,8 +261,8 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingHorizontal: tokens.spacing.xl,
+    paddingBottom: tokens.spacing.xl,
   },
   profilePicWrapper: {
     width: 88,
@@ -270,11 +273,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: tokens.colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 4,
+    ...tokens.shadows.soft,
     marginBottom: 16,
   },
   profilePic: {
@@ -293,8 +292,8 @@ const styles = StyleSheet.create({
   },
   editPicText: {
     fontSize: 9,
-    color: '#fff',
-    fontWeight: '900',
+    color: tokens.colors.textInverse,
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -304,12 +303,12 @@ const styles = StyleSheet.create({
   headerName: {
     color: tokens.colors.textPrimary,
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: tokens.typography.family.extrabold,
     letterSpacing: -0.5,
   },
   phoneText: {
     color: tokens.colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: tokens.typography.family.semibold,
     fontSize: 14,
     marginTop: 4,
   },
@@ -317,37 +316,37 @@ const styles = StyleSheet.create({
   // Top stats row (Swish style side-by-side)
   statsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 12,
-    marginBottom: 24,
+    paddingHorizontal: tokens.spacing.xl,
+    gap: tokens.spacing.md,
+    marginBottom: tokens.spacing.xl,
   },
   statBox: {
     flex: 1,
-    backgroundColor: '#F9FAFB', // Extremely soft gray, no border, no shadow
+    backgroundColor: tokens.colors.background, // Extremely soft gray, no border, no shadow
     borderRadius: tokens.radii.lg,
     padding: 16,
   },
   statLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: tokens.typography.family.semibold,
     color: tokens.colors.textSecondary,
     marginTop: 12,
   },
   statValue: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: tokens.typography.family.extrabold,
     color: tokens.colors.textPrimary,
     marginTop: 4,
   },
 
   settingsGroup: {
-    marginBottom: 24,
-    paddingHorizontal: 20,
+    marginBottom: tokens.spacing.xl,
+    paddingHorizontal: tokens.spacing.xl,
   },
   groupLabel: {
     color: tokens.colors.textTertiary,
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: tokens.typography.family.bold,
     letterSpacing: 0.5,
     marginBottom: 8,
     marginLeft: 4,
@@ -357,6 +356,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 18, // Generous airy padding
+    minHeight: 48,
   },
   minimalListLeft: {
     flexDirection: 'row',
@@ -374,18 +374,18 @@ const styles = StyleSheet.create({
   },
   minimalListTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: tokens.typography.family.semibold,
     color: tokens.colors.textPrimary,
   },
   minimalListSub: {
     color: tokens.colors.textTertiary,
     fontSize: 13,
-    fontWeight: '400',
+    fontFamily: tokens.typography.family.regular,
     marginTop: 2,
   },
   minimalListValue: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: tokens.typography.family.semibold,
     color: tokens.colors.textSecondary,
     marginRight: 8,
   },
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   },
   devHeader: {
     color: tokens.colors.textPrimary,
-    fontWeight: '800',
+    fontFamily: tokens.typography.family.extrabold,
     marginBottom: 16,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.background,
   },
   devBtnText: {
-    fontWeight: '700',
+    fontFamily: tokens.typography.family.bold,
     fontSize: 10,
     textTransform: 'uppercase',
   },
@@ -457,19 +457,19 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   footerText: {
-    color: '#D1D5DB',
+    color: tokens.colors.textTertiary,
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: tokens.typography.family.extrabold,
     textTransform: 'uppercase',
     letterSpacing: 2,
   },
 
   // Tier + streak card
   tierCard: {
-    marginHorizontal: 16, marginBottom: 12, backgroundColor: tokens.colors.surface,
-    borderRadius: 20, padding: 16,
+    marginHorizontal: tokens.spacing.lg, marginBottom: tokens.spacing.md, backgroundColor: tokens.colors.surface,
+    borderRadius: tokens.radii.xxl, padding: tokens.spacing.lg,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-    borderWidth: 1, borderColor: '#E9E9EB',
+    borderWidth: 1, borderColor: tokens.colors.border,
   },
   tierRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   tierBadge: {
@@ -498,25 +498,26 @@ const styles = StyleSheet.create({
   referralBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    padding: 16,
+    backgroundColor: tokens.colors.successTint,
+    padding: tokens.spacing.lg,
     borderRadius: tokens.radii.lg,
-    marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 20,
+    marginHorizontal: tokens.spacing.xl,
+    marginTop: tokens.spacing.sm,
+    marginBottom: tokens.spacing.lg,
+    minHeight: 48,
   },
   referralIconBox: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#1BA672',
+    backgroundColor: tokens.colors.success,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   referralTexts: { flex: 1 },
-  referralTitle: { fontSize: 16, fontWeight: '800', color: '#1BA672', marginBottom: 2 },
-  referralSub: { fontSize: 12, color: '#333333', fontWeight: '500' },
+  referralTitle: { fontSize: 16, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.success, marginBottom: 2 },
+  referralSub: { fontSize: 12, color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.medium },
 });
 
 export default ProfileScreen;

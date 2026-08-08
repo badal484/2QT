@@ -1,9 +1,9 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { isKitchenOpen, formatTime12h } from '../utils/kitchenHours';
-import { BouncingButton } from '../components/ui/BouncingButton';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, Image,
-  ActivityIndicator, Alert, StyleSheet,
+  View, Text, ScrollView, TextInput, Image,
+  ActivityIndicator, Alert, StyleSheet, TouchableOpacity,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor, FadeIn, FadeInDown, SlideInDown } from 'react-native-reanimated';
@@ -13,23 +13,22 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { setQuantity, clearCart, setPromoCode as setPromoCodeAction, addItem as addItemAction } from '../store/slices/cartSlice';
 import { getSocket } from '../socket/client';
-import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock, Zap, ArrowLeft } from 'lucide-react-native';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock, Zap, ArrowLeft, Sparkles } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { tokens } from '../theme/tokens';
+import { haptics } from '../utils/haptics';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 import RazorpayCheckout from 'react-native-razorpay';
-
-const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
-const triggerHaptic = () => ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+import { useFeedback } from '../context/FeedbackContext';
 
 const ACCENT = tokens.colors.primary;
 const BG = tokens.colors.background;
 
 // ── Custom cross-platform toggle ──────────────────────────────────────────────
-const Toggle = ({ value, onValueChange, activeColor = ACCENT }: {
+const Toggle = ({ value, onValueChange, activeColor = ACCENT, accessibilityLabel }: {
   value: boolean;
   onValueChange: (v: boolean) => void;
   activeColor?: string;
+  accessibilityLabel?: string;
 }) => {
   const progress = useSharedValue(value ? 1 : 0);
 
@@ -38,7 +37,7 @@ const Toggle = ({ value, onValueChange, activeColor = ACCENT }: {
   }, [value]);
 
   const trackStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, [0, 1], ['#D1D5DB', activeColor]),
+    backgroundColor: interpolateColor(progress.value, [0, 1], [tokens.colors.borderStrong, activeColor]),
   }));
 
   const thumbStyle = useAnimatedStyle(() => ({
@@ -46,11 +45,16 @@ const Toggle = ({ value, onValueChange, activeColor = ACCENT }: {
   }));
 
   return (
-    <BouncingButton activeOpacity={0.8} onPress={() => { triggerHaptic(); onValueChange(!value); }}>
+    <PressableScale 
+      onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={accessibilityLabel}
+    >
       <Animated.View style={[toggleStyles.track, trackStyle]}>
         <Animated.View style={[toggleStyles.thumb, thumbStyle]} />
       </Animated.View>
-    </BouncingButton>
+    </PressableScale>
   );
 };
 
@@ -61,8 +65,8 @@ const toggleStyles = StyleSheet.create({
   },
   thumb: {
     width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16,
+    backgroundColor: tokens.colors.surface,
+    shadowColor: tokens.shadows.soft.shadowColor, shadowOpacity: 0.08, shadowRadius: 16,
     shadowOffset: { width: 0, height: 1 }, elevation: 4,
   },
 });
@@ -83,8 +87,8 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
         </View>
         <View style={styles.itemMeta}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-            <View style={[styles.vegBadgeMini, { borderColor: item.isVeg ? '#22C55E' : tokens.colors.danger }]}>
-              <View style={[styles.vegDotMini, { backgroundColor: item.isVeg ? '#22C55E' : tokens.colors.danger }]} />
+            <View style={[styles.vegBadgeMini, { borderColor: item.isVeg ? tokens.colors.success : tokens.colors.danger }]}>
+              <View style={[styles.vegDotMini, { backgroundColor: item.isVeg ? tokens.colors.success : tokens.colors.danger }]} />
             </View>
             <Text allowFontScaling={false} style={styles.itemName} numberOfLines={1}>{item.name}</Text>
           </View>
@@ -93,11 +97,11 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
               {item.customizations.map((c: any, idx: number) => (
                 <View key={idx} style={{
                   flexDirection: 'row', alignItems: 'center', flexShrink: 1,
-                  backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB',
+                  backgroundColor: tokens.colors.background, borderWidth: 1, borderColor: tokens.colors.border,
                   borderRadius: 8, padding: 4, paddingRight: 8,
                 }}>
                   {!!c.photo_url && (
-                    <FastImage source={{ uri: c.photo_url, priority: FastImage.priority.low }} style={{ width: 18, height: 18, borderRadius: 4, marginRight: 6, backgroundColor: '#f1f1f1' }} resizeMode={FastImage.resizeMode.cover} />
+                    <FastImage source={{ uri: c.photo_url, priority: FastImage.priority.low }} style={{ width: 18, height: 18, borderRadius: 4, marginRight: 6, backgroundColor: tokens.colors.background }} resizeMode={FastImage.resizeMode.cover} />
                   )}
                   <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, flexShrink: 1 }} numberOfLines={1}>
                     {c.group}: <Text allowFontScaling={false} style={{ fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary }}>{c.option}</Text>
@@ -109,19 +113,23 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
           <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
         </View>
         <View style={styles.qtyRow}>
-          <BouncingButton
+          <PressableScale
             style={styles.qtyBtn}
-            onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
+            onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
+            accessibilityRole="button"
+            accessibilityLabel="Decrease quantity"
           >
             <Text allowFontScaling={false} style={styles.qtyBtnText}>−</Text>
-          </BouncingButton>
+          </PressableScale>
           <Text allowFontScaling={false} style={styles.qtyNum}>{item.quantity}</Text>
-          <BouncingButton
+          <PressableScale
             style={[styles.qtyBtn, styles.qtyBtnActive]}
-            onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
+            onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
+            accessibilityRole="button"
+            accessibilityLabel="Increase quantity"
           >
             <Text allowFontScaling={false} style={[styles.qtyBtnText, styles.qtyBtnActiveText]}>+</Text>
-          </BouncingButton>
+          </PressableScale>
         </View>
       </View>
       {!isLast && <View style={styles.cardDivider} />}
@@ -139,6 +147,7 @@ const CartItemMemoized = React.memo(CartItem, (prevProps, nextProps) => {
 const CartScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
   
   const { items, addressId, zoneId } = useSelector((state: RootState) => state.cart);
   const activeZoneId = useSelector((state: any) => state.app.activeZoneId);
@@ -171,7 +180,6 @@ const CartScreen = ({ navigation }: any) => {
   const isOutOfZone = !!addressId && !!selectedAddress && !selectedAddress.is_serviceable;
 
   const handleAddressNavigation = () => {
-    triggerHaptic();
     // Always use push, never navigate — navigate('Address') can silently jump
     // back to a pre-existing Address screen in the stack, which removes Cart
     // from the history and causes pop(2) in AddressBook to land on Home.
@@ -266,12 +274,14 @@ const CartScreen = ({ navigation }: any) => {
         </Animated.View>
         <Text allowFontScaling={false} style={styles.emptyTitle}>Your cart is empty</Text>
         <Text allowFontScaling={false} style={styles.emptySub}>Discover our delicious menu and add something tasty!</Text>
-        <BouncingButton
+        <PressableScale
           style={styles.exploreBtn}
-          onPress={() => { triggerHaptic(); navigation.reset({ index: 0, routes: [{ name: 'Home' }] }); }}
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] })}
+          accessibilityRole="button"
+          accessibilityLabel="Explore Menu"
         >
           <Text allowFontScaling={false} style={styles.exploreBtnText}>Explore Menu</Text>
-        </BouncingButton>
+        </PressableScale>
       </View>
     );
   }
@@ -287,17 +297,17 @@ const CartScreen = ({ navigation }: any) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => { triggerHaptic(); navigation.goBack(); }}>
+          <PressableScale hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back">
             <ArrowLeft size={24} color={tokens.colors.textPrimary} style={{ marginRight: 12 }} />
-          </TouchableOpacity>
+          </PressableScale>
           <View>
             <Text allowFontScaling={false} style={styles.headerTitle}>Order confirmation</Text>
             <Text allowFontScaling={false} style={styles.headerSub}>{totalItemCount} {totalItemCount === 1 ? 'item' : 'items'}</Text>
           </View>
         </View>
-        <BouncingButton style={styles.clearCartBtn} onPress={() => { triggerHaptic(); dispatch(clearCart()); }}>
+        <PressableScale style={styles.clearCartBtn} onPress={() => { haptics.warning(); dispatch(clearCart()); }} accessibilityRole="button" accessibilityLabel="Clear Cart">
           <Text allowFontScaling={false} style={styles.clearCartText}>Clear Cart</Text>
-        </BouncingButton>
+        </PressableScale>
       </View>
 
       {/* Savings banner — shows total saved across menu offers + promo */}
@@ -314,11 +324,11 @@ const CartScreen = ({ navigation }: any) => {
         {/* Delivery Estimate */}
         <Animated.View entering={FadeInDown.duration(300)} style={styles.estimateCard}>
           <View style={[
-            styles.estimateIconBox, 
-            { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12 }
+            styles.estimateIconBox,
+            { backgroundColor: tokens.colors.surface, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 12 }
           ]}>
-            <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.black, color: '#000', letterSpacing: -0.5 }}>
-              2QT<Text allowFontScaling={false} style={{ color: '#F97316' }}>.</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>
+              2QT<Text allowFontScaling={false} style={{ color: tokens.colors.primary }}>.</Text>
             </Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -338,9 +348,9 @@ const CartScreen = ({ navigation }: any) => {
         {recommendations.length > 0 && (
           <Animated.View entering={FadeInDown.delay(50).duration(300)} style={styles.card}>
             <Text allowFontScaling={false} style={styles.cardTitle}>You might like this</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: tokens.spacing.md }}>
               {recommendations.map((rec: any) => {
-                const vegColor = rec.is_egg ? '#EAB308' : (rec.is_veg ? '#22C55E' : tokens.colors.danger);
+                const vegColor = rec.is_egg ? tokens.colors.warning : (rec.is_veg ? tokens.colors.success : tokens.colors.danger);
                 return (
                   <View key={rec.id} style={styles.recCard}>
                     {rec.photo_url ? (
@@ -350,11 +360,10 @@ const CartScreen = ({ navigation }: any) => {
                         <ChefHat size={20} color={tokens.colors.textTertiary} />
                       </View>
                     )}
-                    <BouncingButton
+                    <PressableScale
                       style={styles.recAddBtn}
-                      activeOpacity={0.85}
                       onPress={() => {
-                        triggerHaptic();
+                        haptics.selection();
                         dispatch(
                           addItemAction({
                             menuItemId: rec.id,
@@ -367,9 +376,11 @@ const CartScreen = ({ navigation }: any) => {
                           })
                         );
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add ${rec.name} to cart`}
                     >
                       <Text allowFontScaling={false} style={styles.recAddText}>+</Text>
-                    </BouncingButton>
+                    </PressableScale>
                     <View style={styles.recMeta}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
                         <View style={[styles.vegBadgeMini, { borderColor: vegColor, width: 6, height: 6 }]}>
@@ -395,14 +406,16 @@ const CartScreen = ({ navigation }: any) => {
             {!appliedPromoCode && activePromos.length > 0 && (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                 {activePromos.slice(0, 4).map((promo: any) => (
-                  <BouncingButton
+                  <PressableScale
                     key={promo.id}
                     onPress={() => {
-                      triggerHaptic();
+                      haptics.selection();
                       setPromoCode(promo.code);
                       setAppliedPromoCode(promo.code);
                     }}
                     style={styles.promoChip}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Apply promo code ${promo.code}`}
                   >
                     <Tag size={11} color={tokens.colors.success} />
                     <Text allowFontScaling={false} style={styles.promoChipCode}>{promo.code}</Text>
@@ -412,7 +425,7 @@ const CartScreen = ({ navigation }: any) => {
                         : `₹${(promo.discount_flat_paise || 0) / 100} off`}
                       {promo.min_order_paise ? ` on ₹${promo.min_order_paise / 100}+` : ''}
                     </Text>
-                  </BouncingButton>
+                  </PressableScale>
                 ))}
               </View>
             )}
@@ -442,10 +455,10 @@ const CartScreen = ({ navigation }: any) => {
                   returnKeyType="done"
                 />
               )}
-              <BouncingButton
+              <PressableScale
                 style={[styles.applyBtn, !promoCode && !appliedPromoCode && styles.applyBtnDisabled]}
                 onPress={() => {
-                  triggerHaptic();
+                  haptics.selection();
                   if (appliedPromoCode) {
                     setAppliedPromoCode('');
                     setPromoCode('');
@@ -453,21 +466,24 @@ const CartScreen = ({ navigation }: any) => {
                     setAppliedPromoCode(promoCode.toUpperCase());
                   }
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={appliedPromoCode ? 'Remove promo code' : 'Apply promo code'}
               >
                 <Text allowFontScaling={false} style={[styles.applyBtnText, !promoCode && !appliedPromoCode && styles.applyBtnTextDisabled]}>
                   {appliedPromoCode ? 'Remove' : 'Apply'}
                 </Text>
-              </BouncingButton>
+              </PressableScale>
             </View>
           </Animated.View>
         )}
 
         {/* Delivery Address Card */}
         <Animated.View entering={FadeInDown.delay(90).duration(300)} style={styles.card}>
-          <BouncingButton
+          <PressableScale
             style={styles.addressRow}
-            activeOpacity={0.7}
             onPress={handleAddressNavigation}
+            accessibilityRole="button"
+            accessibilityLabel="Change delivery address"
           >
             <View style={styles.addressIconCircle}>
               <MapPin size={16} color={ACCENT} />
@@ -488,7 +504,7 @@ const CartScreen = ({ navigation }: any) => {
               )}
             </View>
             <Text allowFontScaling={false} style={styles.changeText}>{selectedAddress ? 'Change' : 'Add'}</Text>
-          </BouncingButton>
+          </PressableScale>
         </Animated.View>
 
         {/* Alternate Receiver Card */}
@@ -501,7 +517,7 @@ const CartScreen = ({ navigation }: any) => {
                 <Text allowFontScaling={false} style={styles.cardSubInline}>Add alternate contact for rider</Text>
               </View>
             </View>
-            <Toggle value={altReceiver} onValueChange={setAltReceiver} activeColor={ACCENT} />
+            <Toggle value={altReceiver} onValueChange={setAltReceiver} activeColor={ACCENT} accessibilityLabel="Someone else will receive?" />
           </View>
           {altReceiver && (
             <Animated.View entering={FadeInDown.duration(200)} style={{ marginTop: 16, gap: 12 }}>
@@ -549,86 +565,105 @@ const CartScreen = ({ navigation }: any) => {
         {/* Tip the Rider */}
         <Animated.View entering={FadeInDown.delay(120).duration(300)} style={styles.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-            <Heart size={18} color="#FC4603" style={{ marginRight: 8 }} />
+            <Heart size={18} color={tokens.colors.primary} style={{ marginRight: 8 }} />
             <Text allowFontScaling={false} style={[styles.cardTitle, { marginBottom: 0 }]}>Tip your delivery partner</Text>
           </View>
           <Text allowFontScaling={false} style={styles.tipSub}>100% of your tip goes directly to your rider. Thank you!</Text>
           <View style={styles.tipOptionsRow}>
             {[20, 50, 100].map((amt) => (
-              <BouncingButton 
+              <PressableScale 
                 key={amt}
                 style={[styles.tipChip, riderTip === amt && styles.tipChipActive]}
                 onPress={() => {
-                  triggerHaptic();
+                  haptics.selection();
                   setRiderTip(riderTip === amt ? 0 : amt);
                 }}
+                accessibilityRole="button"
+                accessibilityState={{ checked: riderTip === amt }}
+                accessibilityLabel={`Tip ₹${amt}`}
               >
                 <Text allowFontScaling={false} style={[styles.tipChipText, riderTip === amt && styles.tipChipTextActive]}>
                   ₹{amt}
                 </Text>
-              </BouncingButton>
+              </PressableScale>
             ))}
           </View>
         </Animated.View>
 
         {/* Billing Details Card */}
         <Animated.View entering={FadeInDown.delay(110).duration(300)} style={styles.card}>
-          <Text allowFontScaling={false} style={styles.cardTitle}>Billing details</Text>
-
           <View style={styles.billRow}>
-            <Text allowFontScaling={false} style={styles.billLabel}>Subtotal</Text>
+            <Text allowFontScaling={false} style={styles.billLabel}>Cart Total</Text>
             <Text allowFontScaling={false} style={styles.billValue}>₹{subtotal}</Text>
           </View>
+          {tax > 0 && (
+            <View style={styles.billRow}>
+              <Text allowFontScaling={false} style={styles.billLabel}>GST</Text>
+              <Text allowFontScaling={false} style={styles.billValue}>₹{tax.toFixed(2)}</Text>
+            </View>
+          )}
           {addressId && (
             <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={styles.billLabel}>Delivery</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text allowFontScaling={false} style={styles.billLabel}>Delivery Fee </Text>
+                <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={() => showDialog({
+                  title: 'About Delivery Fees',
+                  message: '100% of this fee goes directly to our delivery partners to ensure they are paid fairly for their hard work. We never take a cut!',
+                  confirmText: 'Got it'
+                })}>
+                  <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.danger, marginLeft: 2 }]}>(Why this?)</Text>
+                </TouchableOpacity>
+              </View>
               {pricingErrored ? (
                 <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.danger, fontSize: 12, maxWidth: 200, textAlign: 'right' }]}>
                   {displayError}
                 </Text>
               ) : !hasPricingData ? (
                 <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.textTertiary, fontSize: 12 }]}>Calculating...</Text>
-              ) : deliveryFee === 0 ? (
-                <Text allowFontScaling={false} style={[styles.billValue, { color: '#22C55E', fontWeight: '800' }]}>Free</Text>
               ) : (
-                <Text allowFontScaling={false} style={styles.billValue}>₹{deliveryFee}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {deliveryFee === 0 ? (
+                    <>
+                      <Text allowFontScaling={false} style={[styles.billValue, { textDecorationLine: 'line-through', color: tokens.colors.textTertiary, marginRight: 6, fontFamily: tokens.typography.family.medium }]}>₹25</Text>
+                      <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>FREE</Text>
+                    </>
+                  ) : (
+                    <Text allowFontScaling={false} style={styles.billValue}>₹{deliveryFee}</Text>
+                  )}
+                </View>
               )}
             </View>
           )}
           {!addressId && (
             <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.textTertiary, fontStyle: 'italic' }]}>Delivery</Text>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.textTertiary, fontStyle: 'italic' }]}>Delivery Fees</Text>
               <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.textTertiary, fontSize: 12 }]}>Add address</Text>
             </View>
           )}
-          {tax > 0 && (
-            <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={styles.billLabel}>Taxes & GST</Text>
-              <Text allowFontScaling={false} style={styles.billValue}>₹{tax.toFixed(2)}</Text>
-            </View>
-          )}
+          <View style={styles.billRow}>
+            <Text allowFontScaling={false} style={[styles.billLabel, { textDecorationLine: 'line-through', color: tokens.colors.textTertiary }]}>Platform Fee</Text>
+            <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success, fontFamily: tokens.typography.family.black }]}>₹0 <Text style={{ fontFamily: tokens.typography.family.medium, color: tokens.colors.success }}>(Not our style)</Text></Text>
+          </View>
+          <View style={styles.billRow}>
+            <Text allowFontScaling={false} style={[styles.billLabel, { textDecorationLine: 'line-through', color: tokens.colors.textTertiary }]}>Handling Fee</Text>
+            <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success, fontFamily: tokens.typography.family.black }]}>₹0 <Text style={{ fontFamily: tokens.typography.family.medium, color: tokens.colors.success }}>(On the house)</Text></Text>
+          </View>
           {menuOfferDiscount > 0 && (
             <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={[styles.billLabel, { color: '#22C55E' }]}>Item Offers</Text>
-              <Text allowFontScaling={false} style={[styles.billValue, { color: '#22C55E' }]}>−₹{menuOfferDiscount.toFixed(2)}</Text>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.success }]}>Item Offers</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>−₹{menuOfferDiscount.toFixed(2)}</Text>
             </View>
           )}
           {p.discountPaise > 0 && (
             <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={[styles.billLabel, { color: '#22C55E' }]}>Promo ({appliedPromoCode})</Text>
-              <Text allowFontScaling={false} style={[styles.billValue, { color: '#22C55E' }]}>−₹{(p.discountPaise / 100).toFixed(2)}</Text>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.success }]}>Promo ({appliedPromoCode})</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>−₹{(p.discountPaise / 100).toFixed(2)}</Text>
             </View>
           )}
           {campaignDiscount > 0 && (
             <View style={styles.billRow}>
               <Text allowFontScaling={false} style={[styles.billLabel, { color: '#7C3AED' }]}>🎯 Campaign Deal</Text>
               <Text allowFontScaling={false} style={[styles.billValue, { color: '#7C3AED' }]}>−₹{campaignDiscount.toFixed(2)}</Text>
-            </View>
-          )}
-          {smallOrderFee > 0 && (
-            <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.textSecondary }]}>Small Order Fee</Text>
-              <Text allowFontScaling={false} style={styles.billValue}>₹{smallOrderFee.toFixed(2)}</Text>
             </View>
           )}
           {riderTip > 0 && (
@@ -639,9 +674,29 @@ const CartScreen = ({ navigation }: any) => {
           )}
 
           <View style={styles.totalSeparator} />
-          <View style={styles.totalRow}>
-            <Text allowFontScaling={false} style={styles.totalLabel}>Total</Text>
+          <View style={[styles.totalRow, { marginBottom: 16 }]}>
+            <Text allowFontScaling={false} style={styles.totalLabel}>Total Payable</Text>
             <Text allowFontScaling={false} style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
+          </View>
+          
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12 }}>
+            <View>
+              <Text allowFontScaling={false} style={{ fontSize: 13, color: tokens.colors.textSecondary, fontFamily: tokens.typography.family.medium, lineHeight: 18 }}>The 2QT Promise:</Text>
+              <Text allowFontScaling={false} style={{ fontSize: 14, color: tokens.colors.primary, fontFamily: tokens.typography.family.black, lineHeight: 18 }}>No sneaky fees. Just great food.</Text>
+            </View>
+            <View style={{ 
+              width: 86, height: 86, borderRadius: 43, 
+              backgroundColor: tokens.colors.warningTint, 
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 2, borderColor: tokens.colors.warningTint,
+              transform: [{ rotate: '8deg' }]
+            }}>
+              <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: tokens.typography.family.black, color: tokens.colors.primary, letterSpacing: 0.5, textAlign: 'center' }}>100%</Text>
+              <View style={{ width: 22, height: 22, backgroundColor: tokens.colors.primary, borderRadius: 11, marginVertical: 3, alignItems: 'center', justifyContent: 'center' }}>
+                <Sparkles size={12} color={tokens.colors.textInverse} />
+              </View>
+              <Text allowFontScaling={false} style={{ fontSize: 8, fontFamily: tokens.typography.family.black, color: tokens.colors.primary, letterSpacing: 0, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1} adjustsFontSizeToFit>TRANSPARENT</Text>
+            </View>
           </View>
 
           {totalSaved > 0 && (
@@ -669,23 +724,24 @@ const CartScreen = ({ navigation }: any) => {
             <Text allowFontScaling={false} style={{ fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>₹{grandTotal.toFixed(2)}</Text>
           </View>
           
-          <BouncingButton
+          <PressableScale
             style={[styles.footerCta, (busy || isOutOfZone || !kitchenOpen || kitchenPaused) && styles.placeOrderBtnDisabled]}
             disabled={busy || isOutOfZone || !kitchenOpen || kitchenPaused}
-            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel={addressId ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay') : 'Select Address'}
             onPress={() => {
-              triggerHaptic();
+              haptics.selection();
               if (!addressId) {
                 handleAddressNavigation();
                 return;
               }
               if (altReceiver) {
                 if (!altName.trim()) {
-                  Alert.alert('Required Field', 'Please enter the receiver\'s name.');
+                  showDialog({ title: 'Required Field', message: 'Please enter the receiver\'s name.' });
                   return;
                 }
                 if (altPhone.trim().length < 10) {
-                  Alert.alert('Required Field', 'Please enter a valid 10-digit phone number.');
+                  showDialog({ title: 'Required Field', message: 'Please enter a valid 10-digit phone number.' });
                   return;
                 }
               }
@@ -701,7 +757,7 @@ const CartScreen = ({ navigation }: any) => {
             }}
           >
             {busy ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={tokens.colors.textInverse} />
             ) : (
               <Text allowFontScaling={false} style={styles.footerCtaText}>
                 {kitchenPaused
@@ -713,7 +769,7 @@ const CartScreen = ({ navigation }: any) => {
                       : 'Select Address'}
               </Text>
             )}
-          </BouncingButton>
+          </PressableScale>
         </View>
       </Animated.View>
     </View>
@@ -728,7 +784,7 @@ const styles = StyleSheet.create({
   // Header
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10,
+    paddingHorizontal: tokens.spacing.lg, paddingTop: tokens.spacing.md, paddingBottom: 10,
     backgroundColor: tokens.colors.surface,
     zIndex: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -748,7 +804,7 @@ const styles = StyleSheet.create({
   },
 
   savingsBanner: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: tokens.colors.successTint,
     paddingVertical: 12,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -756,7 +812,7 @@ const styles = StyleSheet.create({
   savingsBannerText: {
     fontSize: 13,
     fontFamily: tokens.typography.family.black,
-    color: '#FC4603',
+    color: tokens.colors.primary,
     letterSpacing: 0.2,
   },
 
@@ -767,22 +823,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: tokens.colors.surface,
-    padding: 16,
-    gap: 12,
-    marginBottom: 8,
+    padding: tokens.spacing.lg,
+    gap: tokens.spacing.md,
+    marginBottom: tokens.spacing.sm,
   },
   estimateIconBox: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: tokens.colors.successTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   estimateTitle: {
     fontSize: 16,
     fontFamily: tokens.typography.family.black,
-    color: '#FC4603',
+    color: tokens.colors.primary,
   },
   estimateSub: {
     fontSize: 13,
@@ -793,15 +849,15 @@ const styles = StyleSheet.create({
 
   // Card base
   card: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 8,
+    backgroundColor: tokens.colors.surface,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.lg,
+    marginBottom: tokens.spacing.sm,
   },
-  cardDivider: { height: 1, backgroundColor: '#E5E7EB', borderStyle: 'solid', borderWidth: 1, borderRadius: 1, marginVertical: 12, borderColor: '#E5E7EB' },
+  cardDivider: { height: 1, backgroundColor: tokens.colors.border, borderStyle: 'solid', borderWidth: 1, borderRadius: 1, marginVertical: tokens.spacing.md, borderColor: tokens.colors.border },
   cardTitle: {
     fontSize: 16, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary,
-    marginBottom: 16, letterSpacing: -0.3,
+    marginBottom: tokens.spacing.lg, letterSpacing: -0.3,
   },
   cardSectionLabel: {
     fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.textSecondary,
@@ -813,9 +869,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 8,
   },
-  itemImgBox: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', marginRight: 14, backgroundColor: '#F7F8FA' },
+  itemImgBox: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', marginRight: 14, backgroundColor: tokens.colors.background },
   itemImg: { width: '100%', height: '100%' },
-  itemImgPlaceholder: { backgroundColor: '#F7F8FA', alignItems: 'center', justifyContent: 'center' },
+  itemImgPlaceholder: { backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center' },
   itemMeta: { flex: 1, marginRight: 12 },
   itemName: { fontSize: 14, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, lineHeight: 20, letterSpacing: -0.2 },
   itemCustomizations: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2, marginBottom: 2 },
@@ -834,67 +890,67 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F9FAFB', borderRadius: 16, padding: 2 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: tokens.colors.background, borderRadius: 16, padding: 2 },
   qtyBtn: {
     width: 28, height: 28, borderRadius: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5E7EB',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: tokens.colors.border,
   },
-  qtyBtnActive: { backgroundColor: '#FC4603' },
+  qtyBtnActive: { backgroundColor: tokens.colors.primary },
   qtyBtnText: { fontSize: 16, color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.black, lineHeight: 18 },
-  qtyBtnActiveText: { color: '#FFFFFF' },
+  qtyBtnActiveText: { color: tokens.colors.textInverse },
   qtyNum: { fontSize: 13, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, minWidth: 20, textAlign: 'center' },
 
   // Address
   addressRow: { flexDirection: 'row', alignItems: 'flex-start' },
   addressIconCircle: {
     width: 42, height: 42, borderRadius: 21,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: tokens.colors.successTint,
     alignItems: 'center', justifyContent: 'center',
     marginRight: 14, marginTop: 2,
   },
   addressBody: { flex: 1, marginRight: 8 },
   addressLabel: { fontSize: 15, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 4, letterSpacing: -0.2 },
   addressText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, lineHeight: 20 },
-  changeText: { fontSize: 13, fontFamily: tokens.typography.family.bold, color: '#FC4603', marginTop: 4 },
+  changeText: { fontSize: 13, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary, marginTop: 4 },
 
   // Promo
-  promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  promoRow: { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.md },
   promoIconBox: {
     width: 42, height: 42, borderRadius: 20,
-    backgroundColor: '#F7F8FA',
+    backgroundColor: tokens.colors.background,
     alignItems: 'center', justifyContent: 'center',
   },
   promoInput: {
     flex: 1, height: 46,
     fontSize: 14, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, textTransform: 'uppercase', letterSpacing: 1,
-    borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
+    borderBottomWidth: 1, borderBottomColor: tokens.colors.border,
   },
   promoAppliedRow: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  promoAppliedText: { fontSize: 15, fontFamily: tokens.typography.family.black, color: '#FC4603' },
+  promoAppliedText: { fontSize: 15, fontFamily: tokens.typography.family.black, color: tokens.colors.primary },
   promoSavingText: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2 },
-  promoInvalidText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: '#FEE2E2' },
+  promoInvalidText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.danger },
   applyBtn: {
     height: 46, paddingHorizontal: 20, borderRadius: 14,
-    backgroundColor: '#FC4603',
+    backgroundColor: tokens.colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
-  applyBtnDisabled: { backgroundColor: '#F7F8FA' },
-  applyBtnText: { fontSize: 14, fontFamily: tokens.typography.family.black, color: '#FFFFFF' },
+  applyBtnDisabled: { backgroundColor: tokens.colors.background },
+  applyBtnText: { fontSize: 14, fontFamily: tokens.typography.family.black, color: tokens.colors.textInverse },
   applyBtnTextDisabled: { color: tokens.colors.textTertiary },
 
   // Recommendations Carousel
   recCard: {
     width: 120,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 16,
     marginRight: 10,
     paddingBottom: 8,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: tokens.colors.border,
   },
   recImg: {
     width: '100%',
@@ -903,7 +959,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
   },
   recImgPlaceholder: {
-    backgroundColor: '#F7F8FA',
+    backgroundColor: tokens.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -914,19 +970,15 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FC4603',
+    backgroundColor: tokens.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    ...tokens.shadows.soft,
     zIndex: 5,
   },
   recAddText: {
     fontSize: 20,
-    color: '#fff',
+    color: tokens.colors.textInverse,
     fontFamily: tokens.typography.family.black,
     lineHeight: 22,
   },
@@ -950,18 +1002,18 @@ const styles = StyleSheet.create({
   // Bill
   billRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: tokens.spacing.md,
   },
   billLabel: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary },
   billValue: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
 
-  totalSeparator: { height: 1, backgroundColor: '#E5E7EB', borderStyle: 'dashed', borderWidth: 1, borderRadius: 1, marginVertical: 16, borderColor: '#E5E7EB' },
+  totalSeparator: { height: 1, backgroundColor: tokens.colors.border, borderStyle: 'dashed', borderWidth: 1, borderRadius: 1, marginVertical: 16, borderColor: tokens.colors.border },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontSize: 16, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary },
   totalValue: { fontSize: 24, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -1 },
 
   billTotalSavedBanner: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: tokens.colors.successTint,
     padding: 12,
     borderRadius: 14,
     marginTop: 16,
@@ -970,72 +1022,72 @@ const styles = StyleSheet.create({
   billTotalSavedText: {
     fontSize: 13,
     fontFamily: tokens.typography.family.black,
-    color: '#FC4603',
+    color: tokens.colors.primary,
   },
 
   // Out-of-zone
   outOfZoneBanner: {
-    backgroundColor: '#FEF2F2', borderRadius: 16,
+    backgroundColor: tokens.colors.dangerTint, borderRadius: 16,
     padding: 16,
   },
-  outOfZoneText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: '#FEE2E2', textAlign: 'center', lineHeight: 20 },
+  outOfZoneText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.danger, textAlign: 'center', lineHeight: 20 },
 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16, paddingTop: 12,
+    backgroundColor: tokens.colors.surface,
+    paddingHorizontal: tokens.spacing.lg, paddingTop: tokens.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: tokens.colors.border,
   },
   footerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   footerCta: {
     height: 48,
-    backgroundColor: '#FC4603',
+    backgroundColor: tokens.colors.primary,
     borderRadius: 20,
-    paddingHorizontal: 24,
+    paddingHorizontal: tokens.spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
   footerCtaText: {
     fontSize: 16,
     fontFamily: tokens.typography.family.black,
-    color: '#FFFFFF',
+    color: tokens.colors.textInverse,
   },
   placeOrderBtnDisabled: { opacity: 0.55 },
 
   emptyContainer: {
-    flex: 1, backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center', padding: 40,
+    flex: 1, backgroundColor: tokens.colors.surface,
+    alignItems: 'center', justifyContent: 'center', padding: tokens.spacing.xxxl,
   },
   emptyIconBox: {
     width: 110, height: 110, borderRadius: 55,
-    backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', marginBottom: 28,
+    backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center', marginBottom: 28,
   },
   emptyTitle: { fontSize: 24, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 12, letterSpacing: -0.5 },
   emptySub: { fontSize: 15, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, textAlign: 'center', lineHeight: 24 },
   exploreBtn: {
-    marginTop: 32, backgroundColor: '#FC4603',
+    marginTop: 32, backgroundColor: tokens.colors.primary,
     paddingHorizontal: 36, paddingVertical: 16, borderRadius: 20,
   },
-  exploreBtnText: { fontSize: 15, fontFamily: tokens.typography.family.black, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 },
+  exploreBtnText: { fontSize: 15, fontFamily: tokens.typography.family.black, color: tokens.colors.textInverse, textTransform: 'uppercase', letterSpacing: 1 },
 
   // New Styles for Added UI
   cardTitleInline: { fontSize: 15, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: 2 },
   cardSubInline: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary },
-  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, paddingHorizontal: 12, height: 48 },
+  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: tokens.colors.background, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 20, paddingHorizontal: 12, height: 48 },
   inputText: { flex: 1, fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary },
-  textArea: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, padding: 12, minHeight: 80, fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary, textAlignVertical: 'top' },
+  textArea: { backgroundColor: tokens.colors.background, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 20, padding: 12, minHeight: 80, fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary, textAlignVertical: 'top' },
   tipSub: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary, marginBottom: 12, lineHeight: 18 },
   tipOptionsRow: { flexDirection: 'row', gap: 10 },
-  tipChip: { flex: 1, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', alignItems: 'center' },
-  tipChipActive: { borderColor: '#FC4603', backgroundColor: '#E8F2EC' },
+  tipChip: { flex: 1, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: tokens.colors.border, backgroundColor: tokens.colors.surface, alignItems: 'center' },
+  tipChipActive: { borderColor: tokens.colors.primary, backgroundColor: tokens.colors.primaryTint },
   tipChipText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
-  tipChipTextActive: { color: '#FC4603' },
-  promoChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#D1FAE5', backgroundColor: '#F0FDF4' },
-  promoChipCode: { fontSize: 12, fontFamily: tokens.typography.family.black, color: '#FC4603', letterSpacing: 0.5 },
-  promoChipDesc: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: '#059669', maxWidth: 100 },
+  tipChipTextActive: { color: tokens.colors.primary },
+  promoChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: tokens.colors.success, backgroundColor: tokens.colors.successTint },
+  promoChipCode: { fontSize: 12, fontFamily: tokens.typography.family.black, color: tokens.colors.primary, letterSpacing: 0.5 },
+  promoChipDesc: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.success, maxWidth: 100 },
 
   plusBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

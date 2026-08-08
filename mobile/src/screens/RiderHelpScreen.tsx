@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useMemo } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
@@ -16,7 +17,7 @@ const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  border: '#E9E9EB', bg: '#F8F8F8', white: tokens.colors.surface,
 };
 
 const haptic = () => ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });

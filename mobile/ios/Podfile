@@ -31,6 +31,12 @@ target 'VeltoMobile' do
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
+  # Google Maps for iOS — required so react-native-maps compiles with HAVE_GOOGLE_MAPS=1
+  # and MapView with provider={PROVIDER_GOOGLE} actually renders on iOS.
+  # Versions must match what react-native-maps 1.27.2 expects in its podspec.
+  pod 'GoogleMaps', '9.4.0'
+  pod 'Google-Maps-iOS-Utils', '6.1.0'
+
   post_install do |installer|
     react_native_post_install(
       installer,
