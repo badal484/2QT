@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
@@ -17,8 +18,8 @@ const C = {
   amber: '#F59E0B', amberLight: '#FFFBEB',
   purple: '#7C3AED', purpleLight: '#F5F3FF',
   ink: '#111827', gray: '#6B7280', muted: '#9CA3AF',
-  border: '#F3F4F6', bg: '#F9FAFB', white: '#FFFFFF',
-  card: '#FFFFFF',
+  border: '#F3F4F6', bg: tokens.colors.background, white: tokens.colors.surface,
+  card: tokens.colors.surface,
 };
 
 // Icon map

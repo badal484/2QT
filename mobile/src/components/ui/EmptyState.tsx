@@ -1,9 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { fontFamily } from '../../theme/typography';
+import { tokens } from '../../theme/tokens';
 import { Button } from './Button';
 
 interface EmptyStateProps {
@@ -33,33 +31,33 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.huge,
-    paddingHorizontal: spacing.xxl,
+    paddingVertical: tokens.spacing.huge,
+    paddingHorizontal: tokens.spacing.xxl,
   },
   iconWrap: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.primaryTint,
+    backgroundColor: tokens.colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: tokens.spacing.xl,
   },
   title: {
-    fontFamily: fontFamily.extrabold,
+    fontFamily: tokens.typography.family.extrabold,
     fontSize: 18,
-    color: colors.ink,
+    color: tokens.colors.textPrimary,
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: tokens.spacing.sm,
   },
   subtitle: {
-    fontFamily: fontFamily.medium,
+    fontFamily: tokens.typography.family.medium,
     fontSize: 14,
-    color: colors.inkMuted,
+    color: tokens.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
   cta: {
-    marginTop: spacing.xl,
+    marginTop: tokens.spacing.xl,
   },
 });

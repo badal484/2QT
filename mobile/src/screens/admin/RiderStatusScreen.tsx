@@ -16,6 +16,7 @@ import {
   Zap
 } from 'lucide-react-native';
 import MapView, { Marker as MapMarker, UrlTile } from 'react-native-maps';
+import { tokens } from '../../theme/tokens';
 
 const RiderStatusScreen = ({ navigation }: any) => {
   const [trackingRiderId, setTrackingRiderId] = useState<string | null>(null);
@@ -183,11 +184,11 @@ const RiderStatusScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -231,14 +232,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
+    ...tokens.shadows.soft,
   },
   onlineCount: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
   },
@@ -250,17 +247,13 @@ const styles = StyleSheet.create({
     paddingTop: 24,
   },
   riderCard: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     borderRadius: 32,
     padding: 32,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -358,7 +351,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   transitText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 8,
     textTransform: 'uppercase',
@@ -370,7 +363,7 @@ const styles = StyleSheet.create({
   },
   contactButton: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     height: 56,
     borderRadius: 16,
     flexDirection: 'row',
@@ -388,11 +381,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
+    ...tokens.shadows.soft,
   },
   buttonText: {
     color: '#1A1A2E',
@@ -419,7 +408,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -459,11 +448,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: tokens.colors.surface,
   },
   modalFooter: {
     padding: 32,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderTopWidth: 1,
     borderTopColor: '#f9fafb',
     paddingBottom: 48,

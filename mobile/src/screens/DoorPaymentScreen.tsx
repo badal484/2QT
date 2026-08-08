@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ActivityIndicator,
@@ -9,13 +10,14 @@ import { api } from '../api/client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CircleCheck, Banknote, Smartphone } from 'lucide-react-native';
 import { ENV } from '../config/env';
+import { useFeedback } from '../context/FeedbackContext';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.08)',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  border: '#E9E9EB', bg: '#F8F8F8', white: tokens.colors.surface,
 };
 
 const SuccessOverlay = ({ label, amount, onContinue }: { label: string; amount: string; onContinue: () => void }) => {
@@ -73,6 +75,7 @@ const DoorPaymentScreen = ({ route, navigation }: any) => {
     orderId: string; totalAmountPaise: number; displayId: string;
   };
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
   const [done, setDone] = useState<null | 'upi' | 'cash'>(null);
 
   const amountRupees = (totalAmountPaise / 100).toFixed(2);
@@ -84,29 +87,29 @@ const DoorPaymentScreen = ({ route, navigation }: any) => {
     mutationFn: (method: 'upi' | 'cash') =>
       api.post('/riders/confirm-door-payment', { orderId, method }),
     onSuccess: (_data, method) => setDone(method),
-    onError: () => Alert.alert('Error', 'Could not record payment. Try again.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not record payment. Try again.', confirmText: 'Okay', type: 'error' }),
   });
 
   const handleUpi = () => {
-    Alert.alert(
-      'Confirm UPI Payment',
-      `Has the customer scanned the QR and paid ₹${amountDisplay}?`,
-      [
-        { text: 'Not Yet', style: 'cancel' },
-        { text: 'Yes, Paid', onPress: () => confirmMutation.mutate('upi') },
-      ]
-    );
+    showDialog({
+      title: 'Confirm UPI Payment',
+      message: `Has the customer scanned the QR and paid ₹${amountDisplay}?`,
+      confirmText: 'Yes, Paid',
+      cancelText: 'Not Yet',
+      type: 'info',
+      onConfirm: () => confirmMutation.mutate('upi')
+    });
   };
 
   const handleCash = () => {
-    Alert.alert(
-      'Confirm Cash Payment',
-      `Have you collected ₹${amountDisplay} in cash from the customer?`,
-      [
-        { text: 'Not Yet', style: 'cancel' },
-        { text: 'Yes, Collected', onPress: () => confirmMutation.mutate('cash') },
-      ]
-    );
+    showDialog({
+      title: 'Confirm Cash Payment',
+      message: `Have you collected ₹${amountDisplay} in cash from the customer?`,
+      confirmText: 'Yes, Collected',
+      cancelText: 'Not Yet',
+      type: 'info',
+      onConfirm: () => confirmMutation.mutate('cash')
+    });
   };
 
   const proceedToOTP = () => navigation.replace('DeliveryOTP', { orderId, displayId, isCashCod: true, amountPaise: totalAmountPaise });

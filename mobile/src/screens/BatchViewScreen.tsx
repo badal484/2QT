@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -101,7 +102,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 24,
     fontWeight: '900',
   },
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   newBatchText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
   },
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   itemName: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 20,
     fontWeight: '900',
   },
@@ -180,7 +181,7 @@ const styles = StyleSheet.create({
     borderColor: '#4b5563',
   },
   completeBtnText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
   },

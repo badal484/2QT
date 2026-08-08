@@ -1,10 +1,15 @@
+import { tokens } from '../theme/tokens';
+import { PermissionsAndroid } from 'react-native';
 import {
-  ArrowLeft, Home, Briefcase, MapPin, Navigation, Plus, Trash2, Search,
+  Home, Briefcase, MapPin, Navigation, Plus, Trash2, Search,
 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
+import { Button } from '../components/ui/Button';
+import { ListItem } from '../components/ui/ListItem';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert,
+  View, Text, ScrollView, ActivityIndicator, Alert,
   StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,26 +20,24 @@ import { setAddress, setZone } from '../store/slices/cartSlice';
 import { setServiceable, setUnserviceable, setGlobalLocation } from '../store/slices/appSlice';
 import { reverseGeocode } from '../utils/geocode';
 import { AddressSearchModal } from '../components/AddressSearchModal';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
+import { haptics } from '../utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-
-
-const triggerHaptic = (type = 'impactLight') =>
-  ReactNativeHapticFeedback.trigger(type as any, { enableVibrateFallback: true });
+import { useFeedback } from '../context/FeedbackContext';
 
 const AddressIcon = ({ label, serviceable }: { label: string; serviceable: boolean }) => {
-  const color = serviceable ? colors.primary : colors.inkFaint;
+  const color = serviceable ? tokens.colors.primary : tokens.colors.textTertiary;
   if (label === 'Home') return <Home size={20} color={color} />;
   if (label === 'Work') return <Briefcase size={20} color={color} />;
   return <MapPin size={20} color={color} />;
 };
 
-const AddressScreen = ({ navigation }: any) => {
+const AddressScreen = ({ navigation, route }: any) => {
+  const isFromCheckout = route?.params?.fromCheckout;
+  const returnToCart = route?.params?.returnToCart;
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const insets = useSafeAreaInsets();
 
   const [searchVisible, setSearchVisible] = useState(false);
@@ -53,20 +56,24 @@ const AddressScreen = ({ navigation }: any) => {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/customers/addresses/${id}`),
     onSuccess: () => {
-      triggerHaptic('notificationSuccess');
+      haptics.success();
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
     },
   });
 
-  const confirmDelete = (addr: any) => {
-    Alert.alert('Remove Address', `Remove "${addr.label}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => deleteMutation.mutate(addr.id) },
-    ]);
+  const handleDelete = (addr: any) => {
+    showDialog({
+      title: 'Remove Address',
+      message: `Remove "${addr.label}"?`,
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      type: 'warning',
+      onConfirm: () => deleteMutation.mutate(addr.id)
+    });
   };
 
   const selectAddress = async (addr: any) => {
-    triggerHaptic('impactMedium');
+    // Haptic now fires from ListItem's own `haptic="selection"` prop, not here.
     setSelectingId(addr.id);
     const addrLocation = { latitude: addr.lat, longitude: addr.lng, addressText: addr.address_text };
     try {
@@ -96,13 +103,48 @@ const AddressScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleUseCurrentLocation = () => {
-    triggerHaptic('impactMedium');
-    setGpsChecking(true);
-    Geolocation.requestAuthorization();
+  const handleUseCurrentLocation = async () => {
+    haptics.selection(); // a real, deliberate choice — not a plain nav tap
 
-    Geolocation.getCurrentPosition(
-      async (pos) => {
+    if (isFromCheckout) {
+      // Redirect to map pin picker to enforce a real address entry for checkout
+      navigation.push('AddressBook', { returnToCart: returnToCart || true });
+      return;
+    }
+
+    setGpsChecking(true);
+    
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setGpsChecking(false);
+          showDialog({ title: 'Permission Denied', message: 'Location permission is required.', confirmText: 'Okay', type: 'error' });
+          return;
+        }
+      } catch (err) {
+        setGpsChecking(false);
+        return;
+      }
+    } else {
+      Geolocation.requestAuthorization();
+    }
+
+    let timeoutId: any;
+    const explicitTimeout = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('TIMEOUT')), 15000);
+    });
+
+    const gpsPromise = new Promise((resolve, reject) => {
+      // Changed enableHighAccuracy to false to prevent timeouts indoors on Android
+      Geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 });
+    });
+
+    Promise.race([gpsPromise, explicitTimeout])
+      .then(async (pos: any) => {
+        clearTimeout(timeoutId);
         const { latitude, longitude } = pos.coords;
         try {
           const [addressText, res] = await Promise.all([
@@ -123,18 +165,18 @@ const AddressScreen = ({ navigation }: any) => {
           if (navigation.canGoBack()) {
             navigation.goBack();
           }
-        } catch {
-          Alert.alert('Error', 'Could not verify location.');
+        } catch (e: any) {
+          console.warn('[AddressScreen] server check error:', e);
+          showDialog({ title: 'Error', message: 'Could not verify location with server.', confirmText: 'Okay', type: 'error' });
         } finally {
           setGpsChecking(false);
         }
-      },
-      () => {
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
         setGpsChecking(false);
-        Alert.alert('Location Error', 'Could not detect your location. Please check if your GPS is enabled.');
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-    );
+        showDialog({ title: 'Location Error', message: 'Could not detect your location in time. Please check if your GPS is enabled.', confirmText: 'Okay', type: 'error' });
+      });
   };
 
   const savedList = addresses?.addresses || [];
@@ -145,15 +187,9 @@ const AddressScreen = ({ navigation }: any) => {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.root, { paddingTop: Math.max(insets.top, 20) }]}>
+      <View style={styles.root}>
 
-        {/* Clean Header */}
-        <View style={styles.header}>
-          <BouncingButton style={styles.backBtn} onPress={() => { if (navigation.canGoBack()) navigation.goBack(); }} activeOpacity={0.7}>
-            <ArrowLeft size={22} color={colors.ink} />
-          </BouncingButton>
-          <Text style={styles.headerTitle}>Select a location</Text>
-        </View>
+        <ScreenHeader title="Select a location" />
 
         <ScrollView
           style={styles.scroll}
@@ -161,99 +197,91 @@ const AddressScreen = ({ navigation }: any) => {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Search bar matching Screenshot 3 */}
-          <BouncingButton style={styles.searchBar} onPress={() => setSearchVisible(true)} activeOpacity={0.9}>
-            <Search size={20} color={colors.primary} />
-            <Text style={styles.searchPlaceholder}>Search location</Text>
-          </BouncingButton>
+          {/* Search bar — custom pill shape, PressableScale used directly (Button's fixed
+              variants don't fit this affordance) */}
+          <PressableScale 
+            style={styles.searchBar} 
+            onPress={() => setSearchVisible(true)}
+            accessibilityRole="search"
+            accessibilityLabel="Search location"
+          >
+            <Search size={20} color={tokens.colors.primary} />
+            <Text style={styles.searchPlaceholder} allowFontScaling maxFontSizeMultiplier={1.4}>Search location</Text>
+          </PressableScale>
 
           {/* Selected Address Display */}
           <View style={styles.selectedAddressSection}>
-            <Text style={styles.selectedAddressTitle}>Selected Address</Text>
-            <Text style={styles.selectedAddressText} numberOfLines={2}>
+            <Text style={styles.selectedAddressTitle} allowFontScaling maxFontSizeMultiplier={1.4}>Selected Address</Text>
+            <Text style={styles.selectedAddressText} numberOfLines={2} allowFontScaling maxFontSizeMultiplier={1.4}>
               {currentAddressId === 'gps' ? 'Current GPS Location' : (selectedAddr?.address_text || "Choose a location below")}
             </Text>
-            
-            <BouncingButton
+
+            <PressableScale
               style={styles.useCurrentLocationBtn}
               onPress={handleUseCurrentLocation}
               disabled={gpsChecking}
-              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Use current location"
             >
               {gpsChecking ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+                <ActivityIndicator size="small" color={tokens.colors.primary} style={{ marginRight: tokens.spacing.sm }} />
               ) : (
-                <Navigation size={18} color={colors.primary} style={{ marginRight: 8 }} />
+                <Navigation size={18} color={tokens.colors.primary} style={{ marginRight: tokens.spacing.sm }} />
               )}
-              <Text style={styles.useCurrentLocationText}>Use current location</Text>
-            </BouncingButton>
+              <Text style={styles.useCurrentLocationText} allowFontScaling maxFontSizeMultiplier={1.4}>Use current location</Text>
+            </PressableScale>
           </View>
 
           {/* Saved addresses */}
           {isLoading ? (
-            <ActivityIndicator color={colors.primary} style={{ marginTop: 32 }} />
+            <ActivityIndicator color={tokens.colors.primary} style={{ marginTop: tokens.spacing.xxxl }} />
           ) : isError ? (
-            <View style={{ alignItems: 'center', marginTop: 32, gap: 12 }}>
-              <Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center' }}>
+            <View style={{ alignItems: 'center', marginTop: tokens.spacing.xxxl, gap: tokens.spacing.md }}>
+              <Text style={{ fontSize: 14, color: tokens.colors.textSecondary, textAlign: 'center' }} allowFontScaling maxFontSizeMultiplier={1.4}>
                 Could not load saved addresses.
               </Text>
-              <TouchableOpacity onPress={() => refetch()} style={{ paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.primary }}>
-                <Text style={{ color: colors.primary, fontFamily: fontFamily.bold, fontSize: 14 }}>Retry</Text>
-              </TouchableOpacity>
+              <Button
+                label="Retry"
+                variant="outline"
+                size="sm"
+                fullWidth={false}
+                onPress={() => refetch()}
+              />
             </View>
           ) : savedList.length > 0 && (
             <View style={styles.savedAddressesContainer}>
-              <Text style={styles.sectionLabel}>SAVED ADDRESSES</Text>
+              <Text style={styles.sectionLabel} allowFontScaling maxFontSizeMultiplier={1.4}>SAVED ADDRESSES</Text>
               {savedList.map((addr: any, i: number) => (
                 <Animated.View key={addr.id} entering={FadeInDown.delay(i * 40).duration(250)}>
-                  <BouncingButton
-                    style={[styles.addrCard, !addr.is_serviceable && styles.addrCardDisabled]}
+                  <ListItem
+                    title={addr.label}
+                    subtitle={[addr.flat_number, addr.building_name, addr.address_text].filter(Boolean).join(', ')}
                     onPress={() => selectAddress(addr)}
-                    activeOpacity={0.85}
-                    disabled={selectingId !== null}
-                  >
-                    <View style={[
-                      styles.addrIconBox,
-                      { backgroundColor: addr.is_serviceable ? colors.primaryTint : colors.surfaceMuted },
-                    ]}>
-                      <AddressIcon label={addr.label} serviceable={addr.is_serviceable} />
-                    </View>
-
-                    <View style={styles.addrInfo}>
-                      <View style={styles.addrTopRow}>
-                        <Text style={styles.addrLabel}>{addr.label}</Text>
-                        <View style={[
-                          styles.badge,
-                          { backgroundColor: addr.is_serviceable ? colors.primaryTint : colors.surfaceMuted },
-                        ]}>
-                          <Text style={[
-                            styles.badgeText,
-                            { color: addr.is_serviceable ? colors.primary : colors.inkMuted },
-                          ]}>
-                            {addr.is_serviceable ? '✓ Deliverable' : 'Out of zone'}
-                          </Text>
-                        </View>
+                    haptic="selection" // a real selection commit — keep
+                    disabled={selectingId !== null || !addr.is_serviceable}
+                    style={{ marginBottom: tokens.spacing.md, borderRadius: tokens.radii.lg, borderWidth: 1.5, borderColor: tokens.colors.border }}
+                    leftAdornment={
+                      <View style={[styles.addrIconBox, { backgroundColor: addr.is_serviceable ? tokens.colors.primaryTint : tokens.colors.surface }]}>
+                        <AddressIcon label={addr.label} serviceable={addr.is_serviceable} />
                       </View>
-                      {(addr.flat_number || addr.building_name) && (
-                        <Text style={styles.addrDetail} numberOfLines={1}>
-                          {[addr.flat_number, addr.building_name].filter(Boolean).join(', ')}
-                        </Text>
-                      )}
-                      <Text style={styles.addrText} numberOfLines={2}>{addr.address_text}</Text>
-                    </View>
-
-                    {selectingId === addr.id ? (
-                      <ActivityIndicator size="small" color={colors.primary} style={styles.deleteBtn} />
-                    ) : (
-                      <BouncingButton
-                        onPress={() => confirmDelete(addr)}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                        style={styles.deleteBtn}
-                      >
-                        <Trash2 size={18} color={colors.danger} />
-                      </BouncingButton>
-                    )}
-                  </BouncingButton>
+                    }
+                    rightAdornment={
+                      selectingId === addr.id ? (
+                        <ActivityIndicator size="small" color={tokens.colors.primary} />
+                      ) : (
+                        <PressableScale
+                          onPress={() => handleDelete(addr)}
+                          disabled={selectingId !== null}
+                          style={styles.deleteBtn}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${addr.label}`}
+                          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        >
+                          <Trash2 size={20} color={tokens.colors.danger} />
+                        </PressableScale>
+                      )
+                    }
+                  />
                 </Animated.View>
               ))}
             </View>
@@ -261,19 +289,15 @@ const AddressScreen = ({ navigation }: any) => {
           <View style={{ height: 100 }} />
         </ScrollView>
 
-        {/* Add new address button at bottom */}
+        {/* Add new address button at bottom — pure navigation, no haptic */}
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 24) }]}>
-          <BouncingButton
-            style={styles.addBtn}
-            onPress={() => {
-              triggerHaptic();
-              navigation.push('AddressBook');
-            }}
-            activeOpacity={0.9}
-          >
-            <Plus size={20} color={colors.white} />
-            <Text style={styles.addBtnText}>Add new address</Text>
-          </BouncingButton>
+          <Button
+            label="Add new address"
+            icon={<Plus size={20} color={tokens.colors.textInverse} />}
+            onPress={() => navigation.push('AddressBook')}
+            variant="primary"
+            size="lg"
+          />
         </View>
 
         <AddressSearchModal
@@ -294,170 +318,94 @@ const AddressScreen = ({ navigation }: any) => {
 export default AddressScreen;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-
-  header: {
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingHorizontal: 16, 
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-  },
-  backBtn: {
-    width: 36, 
-    height: 36, 
-    borderRadius: 18,
-    backgroundColor: '#F9FAFB', 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  headerTitle: { 
-    fontSize: 18, 
-    fontFamily: fontFamily.bold, 
-    color: '#1A1A2E' 
-  },
+  root: { flex: 1, backgroundColor: tokens.colors.background },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 16 },
+  scrollContent: { paddingHorizontal: tokens.spacing.xl, paddingTop: tokens.spacing.lg },
 
   // Search matching Screenshot 3
   searchBar: {
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 12,
-    backgroundColor: '#fff', 
-    borderRadius: 20,
-    paddingHorizontal: 16, 
-    paddingVertical: 14,
+    gap: tokens.spacing.md,
+    backgroundColor: tokens.colors.background, 
+    borderRadius: tokens.radii.full,
+    paddingHorizontal: tokens.spacing.lg, 
+    paddingVertical: tokens.spacing.lg,
     borderWidth: 1, 
-    borderColor: '#E5E7EB',
-    marginBottom: 24,
+    borderColor: tokens.colors.border,
+    marginBottom: tokens.spacing.xxl,
   },
   searchPlaceholder: { 
     flex: 1, 
-    fontSize: 15, 
-    fontFamily: fontFamily.medium, 
-    color: '#9CA3AF' 
+    fontSize: tokens.typography.size.body, 
+    fontFamily: tokens.typography.family.medium, 
+    color: tokens.colors.textTertiary 
   },
 
   // Selected Address Section
   selectedAddressSection: {
-    marginBottom: 32,
+    marginBottom: tokens.spacing.xxxl,
   },
   selectedAddressTitle: {
-    fontSize: 16,
-    fontFamily: fontFamily.bold,
-    color: '#1A1A2E',
-    marginBottom: 6,
+    fontSize: tokens.typography.size.bodyLarge,
+    fontFamily: tokens.typography.family.bold,
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.sm,
   },
   selectedAddressText: {
-    fontSize: 14,
-    fontFamily: fontFamily.medium,
-    color: '#6B7280',
+    fontSize: tokens.typography.size.body,
+    fontFamily: tokens.typography.family.medium,
+    color: tokens.colors.textSecondary,
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: tokens.spacing.lg,
   },
   useCurrentLocationBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 20,
+    paddingVertical: tokens.spacing.lg,
+    borderRadius: tokens.radii.full,
     borderWidth: 1,
-    borderColor: colors.primary + '40',
-    backgroundColor: colors.white,
+    borderColor: tokens.colors.primaryTint,
+    backgroundColor: tokens.colors.background,
   },
   useCurrentLocationText: {
-    color: colors.primary,
-    fontSize: 15,
-    fontFamily: fontFamily.bold,
+    color: tokens.colors.primary,
+    fontSize: tokens.typography.size.body,
+    fontFamily: tokens.typography.family.bold,
   },
 
   savedAddressesContainer: {
-    marginTop: 8,
+    marginTop: tokens.spacing.sm,
   },
   sectionLabel: {
     fontSize: 11, 
-    fontFamily: fontFamily.extrabold, 
-    color: '#9CA3AF',
+    fontFamily: tokens.typography.family.extrabold, 
+    color: tokens.colors.textTertiary,
     letterSpacing: 1.2, 
-    marginBottom: 16,
+    marginBottom: tokens.spacing.lg,
   },
 
-  // Address cards
-  addrCard: {
-    flexDirection: 'row', 
-    alignItems: 'center',
-    backgroundColor: '#fff', 
-    borderRadius: 16,
-    padding: 16, 
-    marginBottom: 12,
-    borderWidth: 1, 
-    borderColor: '#F3F4F6',
-  },
-  addrCardDisabled: { opacity: 0.6 },
   addrIconBox: {
     width: 44, 
     height: 44, 
-    borderRadius: 20,
+    borderRadius: tokens.radii.full,
     alignItems: 'center', 
     justifyContent: 'center', 
-    marginRight: 14,
+    marginRight: tokens.spacing.lg,
   },
-  addrInfo: { flex: 1 },
-  addrTopRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 8, 
-    marginBottom: 4 
+  deleteBtn: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addrLabel: { 
-    fontSize: 15, 
-    fontFamily: fontFamily.bold, 
-    color: '#1A1A2E' 
-  },
-  badge: { 
-    paddingHorizontal: 8, 
-    paddingVertical: 3, 
-    borderRadius: 20 
-  },
-  badgeText: { 
-    fontSize: 10, 
-    fontFamily: fontFamily.bold 
-  },
-  addrDetail: {
-    fontSize: 13,
-    fontFamily: fontFamily.semibold,
-    color: '#374151',
-    marginBottom: 2,
-  },
-  addrText: {
-    fontSize: 13,
-    fontFamily: fontFamily.regular,
-    color: '#6B7280',
-    lineHeight: 18
-  },
-  deleteBtn: { padding: 8 },
 
   // Bottom bar
   bottomBar: {
-    backgroundColor: '#fff', 
-    paddingHorizontal: 20, 
-    paddingTop: 16,
-  },
-  addBtn: {
-    backgroundColor: colors.primary, 
-    borderRadius: 14,
-    paddingVertical: 16, 
-    flexDirection: 'row',
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: 8,
-  },
-  addBtnText: { 
-    fontSize: 16, 
-    fontFamily: fontFamily.bold, 
-    color: colors.white 
+    backgroundColor: tokens.colors.background,
+    paddingHorizontal: tokens.spacing.xl,
+    paddingTop: tokens.spacing.lg,
   },
 });

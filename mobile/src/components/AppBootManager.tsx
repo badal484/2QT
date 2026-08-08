@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { ENV } from '../config/env';
 import { View, StyleSheet, Platform, PermissionsAndroid, AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -74,7 +75,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
   const runServiceabilityCheck = useCallback(
     async (coords: { latitude: number; longitude: number }, addressText?: string) => {
       const MAX_ATTEMPTS = 2;
-      const ATTEMPT_TIMEOUT = 12000;
+      const ATTEMPT_TIMEOUT = 25000; // Increased to 25s for Render free-tier cold start
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
           const res = await api.get(
@@ -146,8 +147,10 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
       // Enforce minimum splash screen duration to allow premium animations to play
       const minimumSplashTime = new Promise<void>((resolve) => setTimeout(resolve, 3000));
 
+
+
       // Wake Render free-tier backend immediately in background — doesn't block boot
-      fetch('https://twoqt-1.onrender.com/api/v1/menu/zones').catch(() => {});
+      fetch(`${ENV.API_URL}/menu/zones`).catch(() => {});
 
       // Clear stale persisted zone — will be resolved fresh via GPS or address selection
       dispatch(setZone(null));

@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
@@ -6,10 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming,
   withDelay,
-  withSpring,
 } from 'react-native-reanimated';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
 
 const SplashScreen = () => {
   const { height } = useWindowDimensions();
@@ -48,14 +46,15 @@ const SplashScreen = () => {
       {/* Main Logo */}
       <Animated.View style={[styles.logoContainer, logoStyle]}>
         <View style={styles.logoRow}>
-          <Text style={styles.logoText}>2QT</Text>
+          {/* Decorative, transient brand moment — deliberately not Dynamic-Type-scaled */}
+          <Text style={styles.logoText} allowFontScaling={false}>2QT</Text>
           <View style={styles.accentDot} />
         </View>
       </Animated.View>
 
       {/* Subtitle */}
       <Animated.View style={[styles.subtitleContainer, subtitleStyle, { bottom: height * 0.15 }]}>
-        <Text style={styles.subtitle}>Crafted Better.</Text>
+        <Text style={styles.subtitle} allowFontScaling={false}>Crafted Better.</Text>
       </Animated.View>
     </View>
   );
@@ -73,9 +72,9 @@ const styles = StyleSheet.create({
     width: 300,
     height: 300,
     borderRadius: 150,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.surface,
     opacity: 0.03, // Ultra-soft ambient light
-    shadowColor: '#FFFFFF',
+    shadowColor: tokens.colors.surface,
     shadowOpacity: 0.1,
     shadowRadius: 100,
     elevation: 0,
@@ -89,9 +88,9 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   logoText: {
-    fontFamily: fontFamily.black, // Still using black but styling it minimally
+    fontFamily: tokens.typography.family.black, // Still using black but styling it minimally
     fontSize: 72,
-    color: '#FFFFFF',
+    color: tokens.colors.surface,
     letterSpacing: -2,
     includeFontPadding: false,
   },
@@ -99,7 +98,7 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: colors.primary, // Orange accent
+    backgroundColor: tokens.colors.primary, // Orange accent
     marginLeft: 6,
     marginBottom: 10,
   },
@@ -108,9 +107,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   subtitle: {
-    fontFamily: fontFamily.regular, // Thinner weight
+    fontFamily: tokens.typography.family.regular, // Thinner weight
     fontSize: 14,
-    color: '#FFFFFF',
+    color: tokens.colors.surface,
     letterSpacing: 6, // Generous letter spacing
     textTransform: 'uppercase',
     opacity: 0.6, // Minimalist subtle look

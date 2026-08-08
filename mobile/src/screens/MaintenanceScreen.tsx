@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React from 'react';
 import { View, Text, StyleSheet, StatusBar, Image } from 'react-native';
 import { ChefHat, Hammer, Clock } from 'lucide-react-native';
@@ -9,9 +10,9 @@ const MaintenanceScreen = () => {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.content}>
         <View style={styles.iconContainer}>
-          <ChefHat size={64} color="#FF6B35" strokeWidth={1.5} />
+          <ChefHat size={64} color={tokens.colors.primary} strokeWidth={1.5} />
           <View style={styles.toolIcon}>
-            <Hammer size={24} color="#1A1A2E" />
+            <Hammer size={24} color={tokens.colors.textPrimary} />
           </View>
         </View>
 
@@ -21,7 +22,7 @@ const MaintenanceScreen = () => {
         </Text>
 
         <View style={styles.timeCard}>
-          <Clock size={20} color="#FF6B35" />
+          <Clock size={20} color={tokens.colors.primary} />
           <Text style={styles.timeText}>ETA: 45 Minutes</Text>
         </View>
 
@@ -36,7 +37,7 @@ const MaintenanceScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   content: {
     flex: 1,
@@ -52,40 +53,40 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -8,
     right: -8,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: tokens.colors.background,
     padding: 8,
     borderRadius: 12,
     borderWidth: 4,
-    borderColor: '#fff',
+    borderColor: tokens.colors.surface,
   },
   title: {
     fontSize: 32,
-    fontWeight: '900',
-    color: '#1A1A2E',
+    fontFamily: tokens.typography.family.black,
+    color: tokens.colors.textPrimary,
     textAlign: 'center',
     marginBottom: 16,
     letterSpacing: -1,
   },
   description: {
     fontSize: 16,
-    color: '#9CA3AF',
+    color: tokens.colors.textTertiary,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 40,
   },
   timeCard: {
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
+    backgroundColor: 'rgba(252, 70, 3, 0.05)',
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: 'rgba(252, 70, 3, 0.1)',
   },
   timeText: {
-    color: '#FF6B35',
-    fontWeight: '900',
+    color: tokens.colors.primary,
+    fontFamily: tokens.typography.family.black,
     marginLeft: 12,
     fontSize: 14,
     textTransform: 'uppercase',
@@ -96,8 +97,8 @@ const styles = StyleSheet.create({
     bottom: 64,
   },
   footerText: {
-    color: '#D1D5DB',
-    fontWeight: '900',
+    color: tokens.colors.textTertiary,
+    fontFamily: tokens.typography.family.black,
     fontSize: 10,
     letterSpacing: 4,
   },

@@ -1,17 +1,14 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useMemo } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView,
   Linking, StyleSheet, TextInput,
 } from 'react-native';
-import { ArrowLeft, MessageCircle, Phone, Search, ChevronDown, ChevronUp, ExternalLink, Headphones } from 'lucide-react-native';
+import { MessageCircle, Phone, Search, ChevronDown, ChevronUp, ExternalLink, Headphones } from 'lucide-react-native';
 import Animated, { FadeInDown, useAnimatedStyle, withTiming, useSharedValue, runOnJS } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-
-const haptic = () => ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+import { haptics } from '../utils/haptics';
 
 const FAQS = [
   {
@@ -88,23 +85,24 @@ const FAQS = [
   },
 ];
 
+const CATEGORIES_LIST = FAQS.map(s => s.category);
+
 // ── Single FAQ Item (accordion) ──────────────────────────────────────────────
-const FaqItem = ({ item, idx }: { item: { q: string; a: string }; idx: number }) => {
+const FaqItem = React.memo(({ item, idx }: { item: { q: string; a: string }; idx: number }) => {
   const [open, setOpen] = useState(false);
 
   return (
     <Animated.View entering={FadeInDown.delay(idx * 30).duration(200)} style={styles.faqItem}>
-      <BouncingButton
+      <PressableScale
         style={styles.faqQuestion}
-        onPress={() => { haptic(); setOpen(v => !v); }}
-        activeOpacity={0.8}
+        onPress={() => { haptics.selection(); setOpen(v => !v); }}
       >
         <Text style={styles.faqQuestionText}>{item.q}</Text>
         {open
-          ? <ChevronUp size={16} color={colors.primary} />
-          : <ChevronDown size={16} color={colors.inkMuted} />
+          ? <ChevronUp size={16} color={tokens.colors.primary} />
+          : <ChevronDown size={16} color={tokens.colors.textSecondary} />
         }
-      </BouncingButton>
+      </PressableScale>
       {open && (
         <Animated.View entering={FadeInDown.duration(180)} style={styles.faqAnswer}>
           <Text style={styles.faqAnswerText}>{item.a}</Text>
@@ -112,11 +110,10 @@ const FaqItem = ({ item, idx }: { item: { q: string; a: string }; idx: number })
       )}
     </Animated.View>
   );
-};
+});
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 const HelpScreen = ({ navigation }: any) => {
-  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
@@ -130,18 +127,9 @@ const HelpScreen = ({ navigation }: any) => {
     })).filter(s => s.items.length > 0 && (!activeCategory || s.category === activeCategory));
   }, [query, activeCategory]);
 
-  const categories = FAQS.map(s => s.category);
-
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <BouncingButton style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <ArrowLeft size={20} color={colors.ink} />
-        </BouncingButton>
-        <Text style={styles.headerTitle}>Help Center</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.root}>
+      <ScreenHeader title="Help Center" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -151,13 +139,13 @@ const HelpScreen = ({ navigation }: any) => {
         {/* Search */}
         <View style={styles.searchWrap}>
           <View style={styles.searchBar}>
-            <Search size={16} color={colors.inkMuted} />
+            <Search size={16} color={tokens.colors.textSecondary} />
             <TextInput
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
               placeholder="Search FAQs…"
-              placeholderTextColor={colors.inkFaint}
+              placeholderTextColor={tokens.colors.textTertiary}
               returnKeyType="search"
             />
           </View>
@@ -166,22 +154,20 @@ const HelpScreen = ({ navigation }: any) => {
         {/* Category pills */}
         {!query && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillsRow}>
-            <BouncingButton
+            <PressableScale
               style={[styles.pill, !activeCategory && styles.pillActive]}
-              onPress={() => { haptic(); setActiveCategory(null); }}
-              activeOpacity={0.8}
+              onPress={() => { haptics.selection(); setActiveCategory(null); }}
             >
               <Text style={[styles.pillText, !activeCategory && styles.pillTextActive]}>All</Text>
-            </BouncingButton>
-            {categories.map(cat => (
-              <BouncingButton
+            </PressableScale>
+            {CATEGORIES_LIST.map(cat => (
+              <PressableScale
                 key={cat}
                 style={[styles.pill, activeCategory === cat && styles.pillActive]}
-                onPress={() => { haptic(); setActiveCategory(activeCategory === cat ? null : cat); }}
-                activeOpacity={0.8}
+                onPress={() => { haptics.selection(); setActiveCategory(activeCategory === cat ? null : cat); }}
               >
                 <Text style={[styles.pillText, activeCategory === cat && styles.pillTextActive]}>{cat}</Text>
-              </BouncingButton>
+              </PressableScale>
             ))}
           </ScrollView>
         )}
@@ -208,47 +194,44 @@ const HelpScreen = ({ navigation }: any) => {
         {/* Contact section */}
         <View style={styles.contactSection}>
           <View style={styles.contactHeader}>
-            <Headphones size={18} color={colors.ink} />
+            <Headphones size={18} color={tokens.colors.textPrimary} />
             <Text style={styles.contactTitle}>Still need help?</Text>
           </View>
           <Text style={styles.contactSub}>Our support team is available 9 AM – 11 PM daily.</Text>
 
-          <BouncingButton
+          <PressableScale
             style={styles.contactBtn}
             onPress={() => navigation.navigate('Support')}
-            activeOpacity={0.85}
           >
-            <MessageCircle size={18} color={colors.white} />
+            <MessageCircle size={18} color={tokens.colors.textInverse} />
             <View>
               <Text style={styles.contactBtnTitle}>Raise a Support Ticket</Text>
               <Text style={styles.contactBtnSub}>We reply within 24 hours</Text>
             </View>
             <ExternalLink size={14} color="rgba(255,255,255,0.6)" style={{ marginLeft: 'auto' }} />
-          </BouncingButton>
+          </PressableScale>
 
-          <BouncingButton
+          <PressableScale
             style={[styles.contactBtn, styles.whatsappBtn]}
             onPress={() => Linking.openURL('https://wa.me/918800000000')}
-            activeOpacity={0.85}
           >
-            <MessageCircle size={18} color={colors.white} />
+            <MessageCircle size={18} color={tokens.colors.textInverse} />
             <View>
               <Text style={styles.contactBtnTitle}>Chat on WhatsApp</Text>
               <Text style={styles.contactBtnSub}>Fastest — avg 2 min response</Text>
             </View>
-          </BouncingButton>
+          </PressableScale>
 
-          <BouncingButton
+          <PressableScale
             style={[styles.contactBtn, styles.callBtn]}
             onPress={() => Linking.openURL('tel:918800000000')}
-            activeOpacity={0.85}
           >
-            <Phone size={18} color={colors.white} />
+            <Phone size={18} color={tokens.colors.textInverse} />
             <View>
               <Text style={styles.contactBtnTitle}>Call Support</Text>
               <Text style={styles.contactBtnSub}>9 AM – 11 PM, all days</Text>
             </View>
-          </BouncingButton>
+          </PressableScale>
         </View>
       </ScrollView>
     </View>
@@ -258,83 +241,72 @@ const HelpScreen = ({ navigation }: any) => {
 export default HelpScreen;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: tokens.colors.background },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 12,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
-  },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: 18, fontFamily: fontFamily.extrabold, color: colors.ink },
 
-  searchWrap: { padding: 16, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  searchWrap: { padding: 16, backgroundColor: tokens.colors.surface, borderBottomWidth: 1, borderBottomColor: tokens.colors.border },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: colors.background, borderRadius: 14,
+    backgroundColor: tokens.colors.background, borderRadius: 14,
     paddingHorizontal: 14, paddingVertical: 11,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: tokens.colors.border,
   },
   searchInput: {
-    flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink,
+    flex: 1, fontSize: 14, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary,
   },
 
   pillsRow: { paddingHorizontal: 16, paddingVertical: 12 },
   pill: {
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8,
-    backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: tokens.colors.surface, borderWidth: 1, borderColor: tokens.colors.border,
   },
-  pillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  pillText: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.inkMuted },
-  pillTextActive: { color: colors.white },
+  pillActive: { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.primary },
+  pillText: { fontSize: 13, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textSecondary },
+  pillTextActive: { color: tokens.colors.textInverse },
 
   sectionLabel: {
-    fontSize: 11, fontFamily: fontFamily.extrabold, color: colors.inkMuted,
+    fontSize: 11, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textSecondary,
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8,
   },
 
   faqItem: {
-    backgroundColor: colors.white, borderRadius: 14, marginBottom: 8,
-    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
+    backgroundColor: tokens.colors.surface, borderRadius: 14, marginBottom: 8,
+    borderWidth: 1, borderColor: tokens.colors.border, overflow: 'hidden',
   },
   faqQuestion: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     padding: 14, gap: 8,
   },
   faqQuestionText: {
-    flex: 1, fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, lineHeight: 20,
+    flex: 1, fontSize: 14, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textPrimary, lineHeight: 20,
   },
   faqAnswer: {
-    paddingHorizontal: 14, paddingBottom: 14, borderTopWidth: 1, borderTopColor: colors.border,
+    paddingHorizontal: 14, paddingBottom: 14, borderTopWidth: 1, borderTopColor: tokens.colors.border,
   },
   faqAnswerText: {
-    fontSize: 13, fontFamily: fontFamily.regular, color: colors.inkMuted,
+    fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary,
     lineHeight: 20, paddingTop: 12,
   },
 
   noResults: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 24 },
-  noResultsText: { fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 6 },
-  noResultsSub: { fontSize: 13, fontFamily: fontFamily.regular, color: colors.inkMuted, textAlign: 'center' },
+  noResultsText: { fontSize: 16, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: 6 },
+  noResultsSub: { fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary, textAlign: 'center' },
 
   // Contact
   contactSection: {
     marginHorizontal: 16, marginTop: 8, marginBottom: 16,
-    backgroundColor: colors.white, borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: tokens.colors.surface, borderRadius: 20, padding: 20,
+    borderWidth: 1, borderColor: tokens.colors.border,
   },
   contactHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  contactTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink },
-  contactSub: { fontSize: 12, fontFamily: fontFamily.regular, color: colors.inkMuted, marginBottom: 16 },
+  contactTitle: { fontSize: 16, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
+  contactSub: { fontSize: 12, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary, marginBottom: 16 },
   contactBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.primary, borderRadius: 14, padding: 14, marginBottom: 10,
+    backgroundColor: tokens.colors.primary, borderRadius: 14, padding: 14, marginBottom: 10,
   },
   whatsappBtn: { backgroundColor: '#25D366' },
-  callBtn: { backgroundColor: colors.ink, marginBottom: 0 },
-  contactBtnTitle: { fontSize: 14, fontFamily: fontFamily.bold, color: colors.white },
-  contactBtnSub: { fontSize: 11, fontFamily: fontFamily.regular, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  callBtn: { backgroundColor: tokens.colors.textPrimary, marginBottom: 0 },
+  contactBtnTitle: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textInverse },
+  contactBtnSub: { fontSize: 11, fontFamily: tokens.typography.family.regular, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
 });

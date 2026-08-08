@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Linking, Modal,
@@ -14,14 +15,15 @@ import {
   ShieldAlert, RefreshCw, DoorOpen, RotateCcw, Wrench, MessageCircle,
 } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
+import { useFeedback } from '../context/FeedbackContext';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
-  red: '#EF4444', redLight: '#FEF2F2',
+  red: tokens.colors.danger, redLight: '#FEF2F2',
   blue: '#3B82F6', blueLight: '#EFF6FF',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  border: '#E9E9EB', bg: '#F8F8F8', white: tokens.colors.surface,
 };
 
 const STEPS = [
@@ -40,6 +42,7 @@ const statusToStep = (status: string): number => {
 const AssignedOrderScreen = ({ route, navigation }: any) => {
   const { order } = route.params;
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
   const [currentStatus, setCurrentStatus] = useState(order.status);
   const [showUnreachableModal, setShowUnreachableModal] = useState(false);
   const [showSosModal, setShowSosModal] = useState(false);
@@ -114,11 +117,11 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
       api.post(`/riders/orders/${order.id}/customer-unreachable`, { action }),
     onSuccess: (_, action) => {
       setShowUnreachableModal(false);
-      if (action === 'retry') Alert.alert('Notification Sent', 'Customer has been notified. Wait a moment and try again.');
-      else if (action === 'leave_at_door') Alert.alert('Confirmed', 'Leave the order at the door and take a photo as proof.');
-      else { Alert.alert('Return Order', 'Please return the order to the kitchen.'); navigation.goBack(); }
+      if (action === 'retry') showDialog({ title: 'Notification Sent', message: 'Customer has been notified. Wait a moment and try again.', confirmText: 'Okay', type: 'info' });
+      else if (action === 'leave_at_door') showDialog({ title: 'Confirmed', message: 'Leave the order at the door and take a photo as proof.', confirmText: 'Okay', type: 'success' });
+      else { showDialog({ title: 'Return Order', message: 'Please return the order to the kitchen.', confirmText: 'Okay', type: 'info' }); navigation.goBack(); }
     },
-    onError: () => Alert.alert('Error', 'Could not send update. Please try again.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not send update. Please try again.', confirmText: 'Okay', type: 'error' }),
   });
 
 
@@ -144,15 +147,19 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     onSuccess: (_, alertType) => {
       setShowSosModal(false);
       if (alertType === 'emergency') {
-        Alert.alert('🚨 Emergency Alert Sent', 'Our ops team has been notified with your location. Calling emergency services now.', [
-          { text: 'Call 112', onPress: () => Linking.openURL('tel:112') },
-          { text: 'OK' },
-        ]);
+        showDialog({
+          title: '🚨 Emergency Alert Sent',
+          message: 'Our ops team has been notified with your location. Calling emergency services now.',
+          confirmText: 'Call 112',
+          cancelText: 'OK',
+          type: 'warning',
+          onConfirm: () => Linking.openURL('tel:112')
+        });
       } else {
-        Alert.alert('Alert Sent', 'Your location has been shared with our safety team. We will contact you shortly.');
+        showDialog({ title: 'Alert Sent', message: 'Your location has been shared with our safety team. We will contact you shortly.', confirmText: 'Okay', type: 'info' });
       }
     },
-    onError: () => Alert.alert('Error', 'Could not send SOS. Please call 112 directly.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not send SOS. Please call 112 directly.', confirmText: 'Okay', type: 'error' }),
   });
 
   const goingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus);
@@ -178,7 +185,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   const openMaps = () => {
     const destLat = goingToKitchen ? order.kitchen_lat : order.customer_lat;
     const destLng = goingToKitchen ? order.kitchen_lng : order.customer_lng;
-    if (!destLat || !destLng) { Alert.alert('Location unavailable'); return; }
+    if (!destLat || !destLng) { showDialog({ title: 'Location unavailable', message: 'Destination coordinates not found.', confirmText: 'Okay', type: 'warning' }); return; }
     Geolocation.getCurrentPosition(
       pos => {
         const url = Platform.OS === 'android'

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
-import { colors } from '../../theme/colors';
-import { radius, spacing } from '../../theme/spacing';
-import { fontFamily } from '../../theme/typography';
+import { tokens } from '../../theme/tokens';
 
 interface TextFieldProps extends TextInputProps {
   label?: string;
@@ -10,6 +8,7 @@ interface TextFieldProps extends TextInputProps {
   leftAdornment?: React.ReactNode;
   rightAdornment?: React.ReactNode;
   containerStyle?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 }
 
 export const TextField: React.FC<TextFieldProps> = ({
@@ -21,17 +20,27 @@ export const TextField: React.FC<TextFieldProps> = ({
   style,
   onFocus,
   onBlur,
+  accessibilityLabel,
   ...rest
 }) => {
   const [focused, setFocused] = useState(false);
   return (
     <View style={containerStyle}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={styles.label} allowFontScaling={true} maxFontSizeMultiplier={1.5}>
+          {label}
+        </Text>
+      )}
       <View style={[styles.field, focused && styles.fieldFocused, error && styles.fieldError]}>
         {leftAdornment}
         <TextInput
+          accessible={true}
+          accessibilityLabel={accessibilityLabel || label || rest.placeholder || 'Text Input'}
+          accessibilityState={{ disabled: rest.editable === false }}
           style={[styles.input, style]}
-          placeholderTextColor={colors.inkFaint}
+          placeholderTextColor={tokens.colors.textSecondary}
+          allowFontScaling={true}
+          maxFontSizeMultiplier={1.5}
           onFocus={(e) => {
             setFocused(true);
             onFocus?.(e);
@@ -44,48 +53,53 @@ export const TextField: React.FC<TextFieldProps> = ({
         />
         {rightAdornment}
       </View>
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <Text style={styles.error} allowFontScaling={true} maxFontSizeMultiplier={1.5}>
+          {error}
+        </Text>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   label: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 11,
+    fontFamily: tokens.typography.family.extrabold,
+    fontSize: tokens.typography.size.caption,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: colors.inkMuted,
-    marginBottom: spacing.sm,
+    color: tokens.colors.textSecondary,
+    marginBottom: tokens.spacing.sm,
   },
   field: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: tokens.colors.background,
     borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.lg,
-    minHeight: 56,
+    borderColor: tokens.colors.border,
+    borderRadius: tokens.radii.lg,
+    paddingHorizontal: tokens.spacing.lg,
+    minHeight: 52, // Accessibility: Touch target >= 44x44
   },
   fieldFocused: {
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
+    borderColor: tokens.colors.primary,
+    backgroundColor: tokens.colors.surface,
   },
   fieldError: {
-    borderColor: colors.danger,
+    borderColor: tokens.colors.danger,
   },
   input: {
     flex: 1,
-    fontFamily: fontFamily.semibold,
-    fontSize: 16,
-    color: colors.ink,
-    paddingVertical: spacing.md,
+    fontFamily: tokens.typography.family.semibold,
+    fontSize: tokens.typography.size.bodyLarge,
+    color: tokens.colors.textPrimary,
+    paddingVertical: tokens.spacing.md,
+    minHeight: 44, // Accessibility: Input inner area
   },
   error: {
-    fontFamily: fontFamily.medium,
-    fontSize: 12,
-    color: colors.danger,
-    marginTop: spacing.xs,
+    fontFamily: tokens.typography.family.medium,
+    fontSize: tokens.typography.size.caption,
+    color: tokens.colors.danger,
+    marginTop: tokens.spacing.xs,
   },
 });

@@ -12,6 +12,8 @@ import { colors } from '../../theme/colors';
 import { fontFamily } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { BouncingButton } from '../../components/ui/BouncingButton';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const CATEGORIES = ['Starters', 'Mains', 'Breads', 'Rice & Biryani', 'Desserts', 'Beverages', 'Salads', 'Soups', 'Specials'];
 
@@ -28,6 +30,7 @@ const emptyForm = () => ({
 const PartnerMenuScreen = () => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [form, setForm] = useState(emptyForm());
@@ -76,19 +79,19 @@ const PartnerMenuScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['partner-menu'] });
       setShowForm(false);
     },
-    onError: (err: any) => Alert.alert('Error', err?.response?.data?.error || 'Failed to save item.'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err?.response?.data?.error || 'Failed to save item.', confirmText: 'Okay', type: 'error' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (itemId: string) => api.delete(`/partner/restaurant/menu/${itemId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['partner-menu'] }),
-    onError: (err: any) => Alert.alert('Error', err?.response?.data?.error || 'Failed to delete.'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err?.response?.data?.error || 'Failed to delete.', confirmText: 'Okay', type: 'error' }),
   });
 
   const handleSave = () => {
-    if (!form.name.trim()) { Alert.alert('Validation', 'Item name is required.'); return; }
+    if (!form.name.trim()) { showDialog({ title: 'Validation', message: 'Item name is required.', confirmText: 'Okay', type: 'warning' }); return; }
     const price = parseFloat(form.price_paise);
-    if (isNaN(price) || price <= 0) { Alert.alert('Validation', 'Enter a valid price.'); return; }
+    if (isNaN(price) || price <= 0) { showDialog({ title: 'Validation', message: 'Enter a valid price.', confirmText: 'Okay', type: 'warning' }); return; }
     saveMutation.mutate({
       name: form.name.trim(),
       description: form.description.trim() || undefined,
@@ -101,14 +104,14 @@ const PartnerMenuScreen = () => {
   };
 
   const handleDelete = (item: any) => {
-    Alert.alert(
-      'Delete Item',
-      `Remove "${item.name}" from your menu?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(item.id) },
-      ]
-    );
+    showDialog({
+      title: 'Delete Item',
+      message: `Are you sure you want to delete "${item.name}"?`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'warning',
+      onConfirm: () => deleteMutation.mutate(item.id)
+    });
   };
 
   return (
@@ -154,7 +157,7 @@ const PartnerMenuScreen = () => {
                 <Animated.View key={item.id} entering={FadeInDown.delay(i * 30).duration(240)}>
                   <View style={styles.menuItemRow}>
                     <View style={styles.vegDotWrap}>
-                      <View style={[styles.vegDot, { backgroundColor: item.is_veg ? '#10B981' : '#EF4444' }]} />
+                      <View style={[styles.vegDot, { backgroundColor: item.is_veg ? tokens.colors.success : tokens.colors.danger }]} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <View style={styles.itemNameRow}>
@@ -251,7 +254,7 @@ const PartnerMenuScreen = () => {
                   <Switch
                     value={form.is_veg}
                     onValueChange={v => setForm(f => ({ ...f, is_veg: v }))}
-                    trackColor={{ true: '#10B981', false: '#EF4444' }}
+                    trackColor={{ true: tokens.colors.success, false: tokens.colors.danger }}
                   />
                 </View>
 
@@ -316,7 +319,7 @@ const FieldLabel = ({ children }: { children: string }) => (
 
 const CheckCircleIcon = () => (
   <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
-    <Text style={{ color: '#fff', fontSize: 12 }}>✓</Text>
+    <Text style={{ color: tokens.colors.surface, fontSize: 12 }}>✓</Text>
   </View>
 );
 
@@ -325,10 +328,10 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: 14 },
   headerTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: colors.ink },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9 },
-  addBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: '#fff' },
+  addBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: tokens.colors.surface },
   scrollContent: { padding: spacing.lg },
   catSection: { marginBottom: 8 },
-  catHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB' },
+  catHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.colors.border },
   catName: { fontSize: 15, fontFamily: fontFamily.semibold, color: colors.ink },
   catRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   catCount: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular },
@@ -343,29 +346,29 @@ const styles = StyleSheet.create({
   itemDesc: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular, marginBottom: 2 },
   itemPrice: { fontSize: 13, fontFamily: fontFamily.semibold, color: colors.ink },
   itemActions: { flexDirection: 'row', gap: 4 },
-  actionBtn: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#F9FAFB', justifyContent: 'center', alignItems: 'center' },
+  actionBtn: { width: 34, height: 34, borderRadius: 8, backgroundColor: tokens.colors.background, justifyContent: 'center', alignItems: 'center' },
   emptyWrap: { flex: 1, alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 18, fontFamily: fontFamily.semibold, color: colors.ink, marginTop: 16, marginBottom: 8 },
   emptySubtitle: { fontSize: 13, color: colors.inkMuted, textAlign: 'center', fontFamily: fontFamily.regular, lineHeight: 20, marginBottom: 24 },
   emptyAddBtn: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14 },
-  emptyAddBtnText: { color: '#fff', fontSize: 14, fontFamily: fontFamily.semibold },
+  emptyAddBtnText: { color: tokens.colors.surface, fontSize: 14, fontFamily: fontFamily.semibold },
   // Form modal
   formOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  formSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '92%' },
+  formSheet: { backgroundColor: tokens.colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '92%' },
   formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   formTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink },
   fieldLabel: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.inkMuted, marginBottom: 6, marginTop: 14 },
-  input: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 13, fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink, backgroundColor: '#FAFAFA' },
-  catPicker: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 13, backgroundColor: '#FAFAFA' },
+  input: { borderWidth: 1.5, borderColor: tokens.colors.border, borderRadius: 12, padding: 13, fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink, backgroundColor: '#FAFAFA' },
+  catPicker: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1.5, borderColor: tokens.colors.border, borderRadius: 12, padding: 13, backgroundColor: '#FAFAFA' },
   catPickerText: { fontSize: 14, fontFamily: fontFamily.regular, color: colors.ink },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F3F4F6' },
   switchLabel: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink },
   switchSub: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular, marginTop: 2 },
   saveBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
-  saveBtnText: { color: '#fff', fontSize: 15, fontFamily: fontFamily.semibold },
+  saveBtnText: { color: tokens.colors.surface, fontSize: 15, fontFamily: fontFamily.semibold },
   // Category picker
   catPickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  catPickerSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
+  catPickerSheet: { backgroundColor: tokens.colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
   catPickerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F3F4F6' },
   catPickerRowActive: { backgroundColor: colors.primary + '08' },
   catPickerRowText: { fontSize: 15, fontFamily: fontFamily.medium, color: colors.ink },

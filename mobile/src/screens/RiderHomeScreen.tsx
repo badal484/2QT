@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StatusBar, Alert, Linking, Modal,
@@ -15,6 +16,8 @@ import { ChevronRight, Check, X, IndianRupee, Navigation, MapPin, Banknote } fro
 import Geolocation from '@react-native-community/geolocation';
 import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
 import { displayLocalNotification } from '../services/localNotif';
+import { Card } from '../components/ui/Card';
+import { useFeedback } from '../context/FeedbackContext';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371;
@@ -30,19 +33,20 @@ const S = {
   orangeLight: '#FFF0E8',
   green: '#1BA672',
   greenLight: '#E8F8F1',
-  red: '#EF4444',
+  red: tokens.colors.danger,
   redLight: '#FEF2F2',
   ink: '#282C3F',
   muted: '#93959F',
   border: '#E9E9EB',
   bg: '#F8F8F8',
-  white: '#FFFFFF',
+  white: tokens.colors.surface,
   shadow: 'rgba(0,0,0,0.10)',
 };
 
 const RiderHomeScreen = ({ navigation }: any) => {
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const insets = useSafeAreaInsets();
+  const { showDialog } = useFeedback();
   const [isOnline, setIsOnline] = useState(user?.is_online || false);
   const isOnlineRef = useRef(user?.is_online || false);
   const [currentLocation, setCurrentLocation] = useState({ latitude: 28.6139, longitude: 77.2090 });
@@ -106,13 +110,15 @@ const RiderHomeScreen = ({ navigation }: any) => {
     onSuccess: (data: any) => {
       if (data?.zoneId) dispatch(updateUser({ zoneId: data.zoneId }));
       queryClient.invalidateQueries({ queryKey: ['me'] });
-      if (data?.zoneName) Alert.alert('Zone assigned!', `You've been checked in to ${data.zoneName}. Orders will start appearing now.`);
+      if (data?.zoneName) {
+        showDialog({ title: 'Zone assigned!', message: `You've been checked in to ${data.zoneName}. Orders will start appearing now.`, confirmText: 'Okay', type: 'success' });
+      }
     },
     onError: (err: any) => {
       // API client throws plain Error — message is the backend's verbose message
       const msg: string = err?.message || '';
       if (msg.toLowerCase().includes('not close enough') || msg === 'NOT_IN_RANGE') {
-        Alert.alert('Not in range yet', 'You need to be closer to the kitchen hub. Keep moving and the app will check again automatically.');
+        showDialog({ title: 'Not in range yet', message: 'You need to be closer to the kitchen hub. Keep moving and the app will check again automatically.', confirmText: 'Got it', type: 'info' });
       }
       // other errors (network etc.) surfaced by the settled spinner disappearing — no extra alert needed
     },
@@ -174,7 +180,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     },
     onError: (err: any) => {
       const msg = err.response?.data?.message || err.message || 'Failed to change duty status';
-      Alert.alert('Cannot change status', msg);
+      showDialog({ title: 'Cannot change status', message: msg, confirmText: 'Okay', type: 'error' });
     }
   });
 
@@ -330,7 +336,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
         },
         (err) => {
           console.log('[Geolocation Error]', err);
-          Alert.alert('Location Error', 'Unable to get your location. Check that GPS is enabled and location permission is granted.');
+          showDialog({ title: 'Location Error', message: 'Unable to get your location. Check that GPS is enabled and location permission is granted.', confirmText: 'Okay', type: 'error' });
         },
         { enableHighAccuracy: true, distanceFilter: 5, interval: 4000, timeout: 15000, maximumAge: 10000 },
       );
@@ -389,7 +395,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       </View>
 
       {/* ── Top header card ───────────────────────────────────────────────── */}
-      <View style={[styles.topCard, { paddingTop: insets.top + 10 }]}>
+      <Card variant="standard" padded={true} style={{ paddingTop: insets.top + 10, marginBottom: 16 }}>
         <View style={styles.topRow}>
           {/* Rider name + status */}
           <TouchableOpacity 
@@ -429,7 +435,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </Card>
 
 
 
@@ -618,7 +624,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
                     const orderId = autoAssignedOrder!.orderId;
                     clearAutoAssign();
                     try { await api.post(`/riders/orders/${orderId}/mark-unavailable`, {}); }
-                    catch { Alert.alert('Error', 'Could not update status. Please try again.'); }
+                    catch { showDialog({ title: 'Error', message: 'Could not update status. Please try again.', confirmText: 'Okay', type: 'error' }); }
                   }}
                   activeOpacity={0.7}
                 >
@@ -653,8 +659,7 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
     backgroundColor: S.white,
     paddingHorizontal: 16, paddingBottom: 14,
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-    elevation: 6,
+    ...tokens.shadows.soft,
   },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   nameBlock: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -750,8 +755,7 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 40,
     backgroundColor: S.white, borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingTop: 12, paddingHorizontal: 16,
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: -4 },
-    elevation: 12, gap: 10,
+    ...tokens.shadows.soft, gap: 10,
   },
   orderCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: S.white,
@@ -797,8 +801,7 @@ const styles = StyleSheet.create({
   autoAssignSheet: {
     backgroundColor: S.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: -4 },
-    elevation: 24,
+    ...tokens.shadows.soft,
   },
   autoAssignStrip: {
     paddingHorizontal: 20, paddingVertical: 14,

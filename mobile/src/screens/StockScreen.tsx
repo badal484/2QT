@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
@@ -9,6 +10,7 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertTriangle, CheckCircle2, Package } from 'lucide-react-native';
+import { useFeedback } from '../context/FeedbackContext';
 
 const G = {
   bg: '#070707',
@@ -18,16 +20,17 @@ const G = {
   green: '#00D084',
   greenBg: 'rgba(0,208,132,0.08)',
   greenBorder: 'rgba(0,208,132,0.18)',
-  red: '#EF4444',
+  red: tokens.colors.danger,
   redBg: 'rgba(239,68,68,0.08)',
   redBorder: 'rgba(239,68,68,0.18)',
-  white: '#FFFFFF',
+  white: tokens.colors.surface,
   dim: 'rgba(255,255,255,0.55)',
   muted: 'rgba(255,255,255,0.2)',
 };
 
 const StockScreen = () => {
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const { user } = useSelector((state: RootState) => state.auth);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [newStock, setNewStock] = useState('');
@@ -49,7 +52,7 @@ const StockScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['inventory', isAdmin] });
       setUpdatingId(null);
       setNewStock('');
-      Alert.alert('Updated', 'Stock levels saved.');
+      showDialog({ title: 'Updated', message: 'Stock levels saved.', confirmText: 'Okay', type: 'success' });
     },
   });
 

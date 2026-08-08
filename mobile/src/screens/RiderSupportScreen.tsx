@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useEffect } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
@@ -19,6 +20,7 @@ import { getSocket } from '../socket/client';
 import { colors } from '../theme/colors';
 import { fontFamily } from '../theme/typography';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import { useFeedback } from '../context/FeedbackContext';
 
 const haptic = () => ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
 
@@ -250,9 +252,10 @@ const EarningsBreakdownCard = ({ data }: { data: EarningsBreakdown }) => {
 
 // ── Rider ticket card ─────────────────────────────────────────────────────────
 const TicketCard = ({ ticket, idx, initiallyExpanded }: { ticket: Ticket; idx: number; initiallyExpanded?: boolean }) => {
-  const [expanded, setExpanded] = useState(initiallyExpanded || false);
+  const [expanded, setExpanded] = useState(!!initiallyExpanded);
   const [replyText, setReplyText] = useState('');
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const meta = getMeta(ticket.status);
   const { Icon } = meta;
 
@@ -271,7 +274,7 @@ const TicketCard = ({ ticket, idx, initiallyExpanded }: { ticket: Ticket; idx: n
       queryClient.invalidateQueries({ queryKey: ['rider-ticket-thread', ticket.id] });
       queryClient.invalidateQueries({ queryKey: ['rider-support-tickets'] });
     },
-    onError: () => Alert.alert('Error', 'Could not send reply. Please try again.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not send reply. Please try again.', confirmText: 'Okay', type: 'error' }),
   });
 
   // Real-time: refetch when support agent replies
@@ -387,9 +390,10 @@ const TicketCard = ({ ticket, idx, initiallyExpanded }: { ticket: Ticket; idx: n
 // ── Complaint card ────────────────────────────────────────────────────────────
 const ComplaintCard = ({ complaint, idx }: { complaint: ComplaintAgainstMe; idx: number }) => {
   const [expanded, setExpanded] = useState(false);
-  const [responseText, setResponseText] = useState('');
+  const [response, setResponse] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
 
   const smeta = COMPLAINT_STATUS_META[complaint.status] ?? COMPLAINT_STATUS_META['open'];
   const canRespond = (complaint.status === 'open' || complaint.status === 'resolved') && !submitted;
@@ -399,10 +403,10 @@ const ComplaintCard = ({ complaint, idx }: { complaint: ComplaintAgainstMe; idx:
       api.post(`/riders/complaints-against-me/${complaint.id}/respond`, { message }),
     onSuccess: () => {
       setSubmitted(true);
-      setResponseText('');
-      queryClient.invalidateQueries({ queryKey: ['rider-complaints'] });
+      setResponse('');
+      queryClient.invalidateQueries({ queryKey: ['rider-complaints-against-me'] });
     },
-    onError: () => Alert.alert('Error', 'Could not submit response. Please try again.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not submit response. Please try again.', confirmText: 'Okay', type: 'error' }),
   });
 
   return (
@@ -465,8 +469,8 @@ const ComplaintCard = ({ complaint, idx }: { complaint: ComplaintAgainstMe; idx:
               </Text>
               <TextInput
                 style={[styles.replyInput, { height: 90, borderRadius: 14, paddingTop: 10 }]}
-                value={responseText}
-                onChangeText={setResponseText}
+                value={response}
+                onChangeText={setResponse}
                 placeholder="Explain your side of this complaint…"
                 placeholderTextColor={colors.inkFaint}
                 multiline
@@ -476,15 +480,15 @@ const ComplaintCard = ({ complaint, idx }: { complaint: ComplaintAgainstMe; idx:
               <BouncingButton
                 style={[
                   styles.respondBtn,
-                  (!responseText.trim() || respondMutation.isPending) && styles.submitBtnDisabled,
+                  (!response.trim() || respondMutation.isPending) && styles.submitBtnDisabled,
                 ]}
                 onPress={() => {
-                  const text = responseText.trim();
+                  const text = response.trim();
                   if (!text || respondMutation.isPending) return;
                   haptic();
                   respondMutation.mutate(text);
                 }}
-                disabled={!responseText.trim() || respondMutation.isPending}
+                disabled={!response.trim() || respondMutation.isPending}
                 activeOpacity={0.85}
               >
                 <Text style={styles.submitBtnText}>
@@ -548,6 +552,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
   const [message, setMessage] = useState('');
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [linkedOrder, setLinkedOrder] = useState<RiderOrder | null>(null);
+  const { showDialog } = useFeedback();
 
   const selectedCat = RIDER_CATEGORIES.find(c => c.key === categoryKey)!;
   const isEarnings = categoryKey === 'earnings';
@@ -562,11 +567,12 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
   const mutation = useMutation({
     mutationFn: (data: any) => api.post('/riders/support/tickets', data),
     onSuccess: () => {
-      Alert.alert(
-        'Ticket Raised ✓',
-        "We've received your message and will respond within 24 hours.",
-        [{ text: 'View My Tickets', onPress: onSuccess }],
-      );
+      showDialog({
+        title: 'Ticket Raised ✓',
+        message: 'Support has been notified and will assist you shortly.',
+        confirmText: 'Okay',
+        type: 'success'
+      });
       setSubject('');
       setMessage('');
       setCategoryKey('earnings');
@@ -574,7 +580,7 @@ const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
       setLinkedOrder(null);
       setShowOrderPicker(false);
     },
-    onError: () => Alert.alert('Error', 'Could not submit ticket. Please try again.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not submit ticket. Please try again.', confirmText: 'Okay', type: 'error' }),
   });
 
   const handleCategoryChange = (key: string) => {
@@ -1081,8 +1087,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white, borderRadius: 16,
     padding: 16, marginBottom: 10,
     borderWidth: 1, borderColor: colors.border,
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 16,
-    shadowOffset: { width: 0, height: 1 }, elevation: 4,
+    ...tokens.shadows.soft,
   },
   ticketHeader: {
     flexDirection: 'row', justifyContent: 'space-between',

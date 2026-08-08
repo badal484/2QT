@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
 import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
     borderColor: '#374151',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 24,
     fontWeight: '900',
   },
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   taskTitlePending: {
-    color: '#fff',
+    color: tokens.colors.surface,
   },
   taskTitleCompleted: {
     color: '#6b7280',
@@ -220,7 +221,7 @@ const styles = StyleSheet.create({
     borderColor: '#10b981',
   },
   checkMark: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 16,
   },

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { WifiOff, Wifi } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +25,7 @@ export const NetworkObserver = () => {
       } else if (state.isConnected === false) {
         // Disconnected
         setIsConnected(false);
-        translateY.value = withSpring(0, { damping: 15, stiffness: 100 });
+        translateY.value = withTiming(0, { duration: 300 });
       } else {
         setIsConnected(true);
       }

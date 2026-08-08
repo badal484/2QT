@@ -1,18 +1,21 @@
+import { tokens } from '../theme/tokens';
 import { ArrowLeft } from 'lucide-react-native';
 import React from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { useFeedback } from '../context/FeedbackContext';
 
 const SubscriptionDetailScreen = ({ route, navigation }: any) => {
   const { subscription } = route.params;
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
 
   const pauseMutation = useMutation({
     mutationFn: () => api.post(`/subscriptions/${subscription.id}/pause`, {}),
     onSuccess: () => {
-      Alert.alert('Success', 'Subscription paused.');
+      showDialog({ title: 'Success', message: 'Subscription paused.', confirmText: 'Okay', type: 'success' });
       queryClient.invalidateQueries({ queryKey: ['my-plans'] });
       navigation.goBack();
     },
@@ -21,7 +24,7 @@ const SubscriptionDetailScreen = ({ route, navigation }: any) => {
   const resumeMutation = useMutation({
     mutationFn: () => api.post(`/subscriptions/${subscription.id}/resume`, {}),
     onSuccess: () => {
-      Alert.alert('Success', 'Subscription resumed.');
+      showDialog({ title: 'Success', message: 'Subscription resumed.', confirmText: 'Okay', type: 'success' });
       queryClient.invalidateQueries({ queryKey: ['my-plans'] });
       navigation.goBack();
     },
@@ -30,9 +33,9 @@ const SubscriptionDetailScreen = ({ route, navigation }: any) => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <BouncingButton onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft size={24} color="#fff" />
-        </BouncingButton>
+        <PressableScale onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft size={24} color={tokens.colors.textInverse} />
+        </PressableScale>
         <Text style={styles.planName}>{subscription.plan_name}</Text>
         <View style={[styles.statusBadge, { backgroundColor: subscription.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(234, 179, 8, 0.2)' }]}>
           <Text style={[styles.statusText, { color: subscription.status === 'active' ? '#4ADE80' : '#FACC15' }]}>
@@ -72,27 +75,27 @@ const SubscriptionDetailScreen = ({ route, navigation }: any) => {
 
         {/* Actions */}
         {subscription.status === 'active' ? (
-            <BouncingButton 
+            <PressableScale 
                 style={styles.pauseBtn}
                 onPress={() => pauseMutation.mutate()}
             >
                 <Text style={styles.pauseBtnText}>PAUSE SUBSCRIPTION</Text>
-            </BouncingButton>
+            </PressableScale>
         ) : (
-            <BouncingButton 
+            <PressableScale 
                 style={styles.resumeBtn}
                 onPress={() => resumeMutation.mutate()}
             >
                 <Text style={styles.resumeBtnText}>RESUME SUBSCRIPTION</Text>
-            </BouncingButton>
+            </PressableScale>
         )}
         
-        <BouncingButton 
+        <PressableScale
             style={styles.cancelBtn}
-            onPress={() => Alert.alert('Cancel Plan', 'Cancellation is only allowed if no meals have been consumed.')}
+            onPress={() => showDialog({ title: 'Cancel Plan', message: 'Cancellation is only allowed if no meals have been consumed.', confirmText: 'Okay', type: 'info' })}
         >
             <Text style={styles.cancelBtnText}>CANCEL PLAN</Text>
-        </BouncingButton>
+        </PressableScale>
       </View>
     </ScrollView>
   );
@@ -101,13 +104,13 @@ const SubscriptionDetailScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   header: {
     paddingTop: 64,
     paddingHorizontal: 32,
     paddingBottom: 40,
-    backgroundColor: '#1A1A2E',
+    backgroundColor: tokens.colors.textPrimary,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
   },
@@ -121,9 +124,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   planName: {
-    color: '#fff',
+    color: tokens.colors.textInverse,
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
   },
   statusBadge: {
     paddingHorizontal: 16,
@@ -133,7 +136,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   statusText: {
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     fontSize: 12,
     textTransform: 'uppercase',
   },
@@ -147,34 +150,34 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   statCard: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: tokens.colors.background,
     flex: 1,
     padding: 24,
     borderRadius: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: tokens.colors.background,
   },
   statValue: {
-    color: '#1A1A2E',
+    color: tokens.colors.textPrimary,
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
   },
   statLabel: {
-    color: '#9ca3af',
+    color: tokens.colors.textTertiary,
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: tokens.typography.family.black,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginTop: 4,
   },
   infoCard: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: tokens.colors.background,
     padding: 32,
     borderRadius: 32,
     marginBottom: 32,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: tokens.colors.background,
   },
   infoRow: {
     flexDirection: 'row',
@@ -182,15 +185,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoLabel: {
-    color: '#9ca3af',
-    fontWeight: '700',
+    color: tokens.colors.textTertiary,
+    fontFamily: tokens.typography.family.bold,
   },
   infoValue: {
-    color: '#1A1A2E',
-    fontWeight: '900',
+    color: tokens.colors.textPrimary,
+    fontFamily: tokens.typography.family.black,
   },
   pauseBtn: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: tokens.colors.warningTint,
     paddingVertical: 20,
     borderRadius: 16,
     alignItems: 'center',
@@ -199,11 +202,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   pauseBtnText: {
-    color: '#92400E',
-    fontWeight: '900',
+    color: tokens.colors.warning,
+    fontFamily: tokens.typography.family.black,
   },
   resumeBtn: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: tokens.colors.successTint,
     paddingVertical: 20,
     borderRadius: 16,
     alignItems: 'center',
@@ -212,20 +215,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   resumeBtnText: {
-    color: '#166534',
-    fontWeight: '900',
+    color: tokens.colors.success,
+    fontFamily: tokens.typography.family.black,
   },
   cancelBtn: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: tokens.colors.dangerTint,
     paddingVertical: 20,
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: tokens.colors.dangerTint,
   },
   cancelBtnText: {
-    color: '#B91C1C',
-    fontWeight: '900',
+    color: tokens.colors.danger,
+    fontFamily: tokens.typography.family.black,
   },
 });
 

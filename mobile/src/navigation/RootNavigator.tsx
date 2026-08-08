@@ -16,6 +16,7 @@ import ForceUpdateScreen from '../screens/ForceUpdateScreen';
 import MaintenanceScreen from '../screens/MaintenanceScreen';
 import { APP_VERSION, api } from '../api/client';
 import { navigationRef, flushPendingNav } from './navigationRef';
+import { tokens } from '../theme/tokens';
 import {
   subscribeToNotificationTap,
   subscribeToForegroundMessages,
@@ -177,12 +178,12 @@ const RootNavigator = () => {
         dark: false,
         colors: {
           ...DefaultTheme.colors,
-          primary: '#FC4603',
-          background: '#FAF8F4',
-          card: '#FFFFFF',
-          text: '#1A1F1C',
-          border: '#E6E2DA',
-          notification: '#FC4603',
+          primary: tokens.colors.primary,
+          background: tokens.colors.background,
+          card: tokens.colors.surface,
+          text: tokens.colors.textPrimary,
+          border: tokens.colors.border,
+          notification: tokens.colors.primary,
         },
       }}
     >

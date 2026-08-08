@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
 import { DimensionValue, StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
-import { colors } from '../../theme/colors';
-import { radius } from '../../theme/spacing';
+import { tokens } from '../../theme/tokens';
 
 // ── Base shimmer box ──────────────────────────────────────────────────────────
 interface SkeletonProps {
@@ -13,7 +12,7 @@ interface SkeletonProps {
 }
 
 export const Skeleton: React.FC<SkeletonProps> = ({
-  width = '100%', height = 16, borderRadius = radius.sm, style,
+  width = '100%', height = 16, borderRadius = tokens.radii.sm, style,
 }) => {
   const opacity = useSharedValue(0.35);
   useEffect(() => {
@@ -22,7 +21,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
     <Animated.View
-      style={[{ width, height, borderRadius, backgroundColor: colors.surfaceMuted }, animStyle, style]}
+      style={[{ width, height, borderRadius, backgroundColor: tokens.colors.background }, animStyle, style]}
     />
   );
 };
@@ -31,7 +30,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 interface SkeletonRowProps { imageSize?: number }
 export const SkeletonRow: React.FC<SkeletonRowProps> = ({ imageSize = 100 }) => (
   <View style={s.row}>
-    <Skeleton width={imageSize} height={imageSize} borderRadius={radius.lg} />
+    <Skeleton width={imageSize} height={imageSize} borderRadius={tokens.radii.lg} />
     <View style={s.col}>
       <Skeleton width="70%" height={16} style={s.gapSm} />
       <Skeleton width="40%" height={13} style={s.gapMd} />
@@ -49,7 +48,7 @@ export const SkeletonListItem: React.FC<{ avatar?: boolean }> = ({ avatar = fals
       <Skeleton width="65%" height={14} style={s.mb8} />
       <Skeleton width="40%" height={11} />
     </View>
-    <Skeleton width={48} height={14} borderRadius={6} />
+    <Skeleton width={48} height={14} borderRadius={tokens.radii.sm} />
   </View>
 );
 
@@ -57,12 +56,12 @@ export const SkeletonListItem: React.FC<{ avatar?: boolean }> = ({ avatar = fals
 export const SkeletonOrderCard: React.FC = () => (
   <View style={s.orderCard}>
     <View style={s.orderCardTop}>
-      <Skeleton width={36} height={36} borderRadius={10} />
+      <Skeleton width={36} height={36} borderRadius={tokens.radii.sm} />
       <View style={s.orderCardMid}>
         <Skeleton width="55%" height={14} style={s.mb6} />
         <Skeleton width="35%" height={11} />
       </View>
-      <Skeleton width={52} height={20} borderRadius={8} />
+      <Skeleton width={52} height={20} borderRadius={tokens.radii.sm} />
     </View>
     <View style={s.orderCardDivider} />
     <View style={s.orderCardBottom}>
@@ -75,7 +74,7 @@ export const SkeletonOrderCard: React.FC = () => (
 // ── Stat card (used in Earnings, Dashboard, Wallet) ───────────────────────────
 export const SkeletonStatCard: React.FC = () => (
   <View style={s.statCard}>
-    <Skeleton width={36} height={36} borderRadius={10} style={s.mb12} />
+    <Skeleton width={36} height={36} borderRadius={tokens.radii.sm} style={s.mb12} />
     <Skeleton width="60%" height={22} style={s.mb6} />
     <Skeleton width="80%" height={11} />
   </View>
@@ -84,19 +83,19 @@ export const SkeletonStatCard: React.FC = () => (
 // ── Stat row (horizontal: icon + label + value) ───────────────────────────────
 export const SkeletonStatRow: React.FC = () => (
   <View style={s.statRow}>
-    <Skeleton width={40} height={40} borderRadius={10} />
+    <Skeleton width={40} height={40} borderRadius={tokens.radii.sm} />
     <View style={s.statRowText}>
       <Skeleton width="50%" height={13} style={s.mb6} />
       <Skeleton width="30%" height={11} />
     </View>
-    <Skeleton width={56} height={18} borderRadius={8} />
+    <Skeleton width={56} height={18} borderRadius={tokens.radii.sm} />
   </View>
 );
 
 // ── Notification item ─────────────────────────────────────────────────────────
 export const SkeletonNotification: React.FC = () => (
   <View style={s.notification}>
-    <Skeleton width={40} height={40} borderRadius={20} style={s.mr12} />
+    <Skeleton width={40} height={40} borderRadius={tokens.radii.full} style={s.mr12} />
     <View style={{ flex: 1 }}>
       <Skeleton width="75%" height={13} style={s.mb6} />
       <Skeleton width="55%" height={11} style={s.mb4} />
@@ -112,7 +111,7 @@ interface SkeletonListProps {
   gap?: number;
 }
 export const SkeletonScreenList: React.FC<SkeletonListProps> = ({
-  count = 5, item = <SkeletonListItem />, gap = 12,
+  count = 5, item = <SkeletonListItem />, gap = tokens.spacing.md,
 }) => (
   <View style={[s.screenList, { gap }]}>
     {Array.from({ length: count }).map((_, i) => (
@@ -132,69 +131,77 @@ export const SkeletonDashboard: React.FC = () => (
   </View>
 );
 
+const baseCardStyle = {
+  backgroundColor: tokens.colors.surface,
+  borderRadius: tokens.radii.lg,
+  padding: tokens.spacing.md,
+  borderWidth: 1.5,
+  borderColor: tokens.colors.border,
+  shadowColor: tokens.shadows.sm.shadowColor,
+  shadowOffset: tokens.shadows.sm.shadowOffset,
+  shadowOpacity: tokens.shadows.sm.shadowOpacity,
+  shadowRadius: tokens.shadows.sm.shadowRadius,
+  elevation: tokens.shadows.sm.elevation,
+};
+
 const s = StyleSheet.create({
   // SkeletonRow
-  row: { flexDirection: 'row', paddingVertical: 12 },
-  col: { flex: 1, marginLeft: 16, justifyContent: 'center' },
-  gapSm: { marginBottom: 8 },
-  gapMd: { marginBottom: 12 },
-  gapXs: { marginBottom: 4 },
+  row: { flexDirection: 'row', paddingVertical: tokens.spacing.md },
+  col: { flex: 1, marginLeft: tokens.spacing.lg, justifyContent: 'center' },
+  gapSm: { marginBottom: tokens.spacing.sm },
+  gapMd: { marginBottom: tokens.spacing.md },
+  gapXs: { marginBottom: tokens.spacing.xs },
 
   // SkeletonListItem
   listItem: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: '#F0F0F0',
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+    ...baseCardStyle,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  avatar: { marginRight: 12 },
-  listLines: { flex: 1, marginRight: 12 },
-  mb8: { marginBottom: 8 },
+  avatar: { marginRight: tokens.spacing.md },
+  listLines: { flex: 1, marginRight: tokens.spacing.md },
+  mb8: { marginBottom: tokens.spacing.sm },
 
   // SkeletonOrderCard
   orderCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: '#F0F0F0',
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+    ...baseCardStyle,
   },
-  orderCardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  orderCardTop: { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.md },
   orderCardMid: { flex: 1 },
   mb6: { marginBottom: 6 },
-  orderCardDivider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
+  orderCardDivider: { height: 1, backgroundColor: tokens.colors.border, marginVertical: tokens.spacing.sm },
   orderCardBottom: { flexDirection: 'row', justifyContent: 'space-between' },
 
   // SkeletonStatCard
   statCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: '#F0F0F0',
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+    ...baseCardStyle,
   },
-  mb12: { marginBottom: 12 },
+  mb12: { marginBottom: tokens.spacing.md },
 
   // SkeletonStatRow
   statRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: '#F0F0F0', gap: 12,
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+    ...baseCardStyle,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.md,
   },
   statRowText: { flex: 1 },
 
   // SkeletonNotification
   notification: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: '#F0F0F0',
+    ...baseCardStyle,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
-  mr12: { marginRight: 12 },
-  mb4: { marginBottom: 4 },
+  mr12: { marginRight: tokens.spacing.md },
+  mb4: { marginBottom: tokens.spacing.xs },
 
   // SkeletonScreenList
-  screenList: { paddingHorizontal: 16, paddingTop: 16 },
+  screenList: { paddingHorizontal: tokens.spacing.lg, paddingTop: tokens.spacing.lg },
 
   // SkeletonDashboard
-  dashPad: { padding: 16, gap: 12 },
-  dashStatRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
+  dashPad: { padding: tokens.spacing.lg, gap: tokens.spacing.md },
+  dashStatRow: { flexDirection: 'row', gap: tokens.spacing.sm, marginBottom: tokens.spacing.xs },
   dashStat: { flex: 1 },
-  dashDivider: { opacity: 0.4, marginVertical: 4 },
+  dashDivider: { opacity: 0.4, marginVertical: tokens.spacing.xs },
 });

@@ -1,14 +1,17 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setAuth } from '../store/slices/authSlice';
 import { api } from '../api/client';
 import { Lock, Delete } from 'lucide-react-native';
+import { useFeedback } from '../context/FeedbackContext';
 
 const KitchenLoginScreen = () => {
   const [pin, setPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const dispatch = useDispatch();
+  const { showDialog } = useFeedback();
 
   const handleKeyPress = (key: string) => {
     if (pin.length < 4) {
@@ -41,7 +44,7 @@ const KitchenLoginScreen = () => {
         refreshToken: response.refreshToken
       }));
     } catch (err: any) {
-      Alert.alert('Access Denied', err?.response?.data?.error || 'Invalid PIN code');
+      showDialog({ title: 'Access Denied', message: err?.response?.data?.error || 'Invalid PIN code', confirmText: 'Okay', type: 'error' });
       setPin('');
     } finally {
       setIsLoading(false);
@@ -137,14 +140,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.5,
-    shadowRadius: 30,
-    elevation: 20,
+    ...tokens.shadows.soft,
   },
   title: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 32,
     fontWeight: '900',
     letterSpacing: -1,
@@ -193,7 +192,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   keyText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 32,
     fontWeight: '900',
   },
@@ -229,7 +228,7 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
   },
   authBtnTextActive: {
-    color: '#fff',
+    color: tokens.colors.surface,
   },
   authBtnTextInactive: {
     color: '#4b5563',

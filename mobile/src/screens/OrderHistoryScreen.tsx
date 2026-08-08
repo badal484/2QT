@@ -1,20 +1,20 @@
-import { Package, RotateCcw, ArrowLeft, Bike, AlertTriangle, Download, Star, ChevronRight } from 'lucide-react-native';
+import { tokens } from '../theme/tokens';
+import { Package, RotateCcw, Bike, AlertTriangle, Download, Star, ChevronRight } from 'lucide-react-native';
 import React, { useState, useCallback, useMemo } from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, Modal, Pressable } from 'react-native';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { View, Text, ActivityIndicator, StyleSheet, Linking, Pressable } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useFeedback } from '../context/FeedbackContext';
 import { SkeletonScreenList, SkeletonOrderCard, ScreenError } from '../components/ui';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ENV } from '../config/env';
 import { useDispatch } from 'react-redux';
 import { addItem } from '../store/slices/cartSlice';
-import ReactNativeHapticFeedback from "react-native-haptic-feedback";
+import { haptics } from '../utils/haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fontFamily } from '../theme/typography';
-import { colors } from '../theme/colors';
 
-const hapticOptions = { enableVibrateFallback: true, ignoreAndroidSystemSettings: false };
 
 const STATUS_META: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   pending_payment:  { bg: '#FFF7ED', text: '#C2410C', dot: '#F97316', label: 'Pending Payment' },
@@ -23,11 +23,11 @@ const STATUS_META: Record<string, { bg: string; text: string; dot: string; label
   ready_for_pickup: { bg: '#FFF7ED', text: '#EA580C', dot: '#F97316', label: 'Ready for Pickup' },
   out_for_delivery: { bg: '#ECFEFF', text: '#0E7490', dot: '#06B6D4', label: 'On the Way' },
   delivered:        { bg: '#F0FDF4', text: '#15803D', dot: '#22C55E', label: 'Delivered' },
-  cancelled:        { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444', label: 'Cancelled' },
+  cancelled:        { bg: tokens.colors.dangerTint, text: '#DC2626', dot: tokens.colors.danger, label: 'Cancelled' },
 };
 
 const getStatusMeta = (s: string) =>
-  STATUS_META[s] ?? { bg: '#F3F4F6', text: '#374151', dot: '#9CA3AF', label: s.replace(/_/g, ' ') };
+  STATUS_META[s] ?? { bg: '#F3F4F6', text: '#374151', dot: tokens.colors.textTertiary, label: s.replace(/_/g, ' ') };
 
 const BACKEND_URL = ENV.API_URL.replace('/api/v1', '');
 const SUPPORT_PHONE = '918800000000';
@@ -35,10 +35,10 @@ const SUPPORT_PHONE = '918800000000';
 const OrderHistoryScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets();
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
   const [reorderLoadingId, setReorderLoadingId] = useState<string | null>(null);
+  const { showDialog } = useFeedback();
   const LIMIT = 20;
 
   const handleOpenInvoice = useCallback(async (orderId: string) => {
@@ -50,34 +50,49 @@ const OrderHistoryScreen = ({ navigation }: any) => {
         : `${BACKEND_URL}${res.invoiceUrl}`;
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Error', 'Could not generate invoice. Please try again.');
+      showDialog({
+        title: 'Error',
+        message: 'Could not generate invoice. Please try again.',
+        confirmText: 'Okay',
+        type: 'error'
+      });
     } finally {
       setInvoiceLoadingId(null);
     }
-  }, []);
+  }, [showDialog]);
 
   const callSupport = useCallback(() => {
-    ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
     Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() =>
-      Alert.alert('Call Support', `Please call us at +${SUPPORT_PHONE}`)
+      showDialog({
+        title: 'Call Support',
+        message: `Please call us at +${SUPPORT_PHONE}`,
+        confirmText: 'Got it',
+        type: 'info'
+      })
     );
-  }, []);
+  }, [showDialog]);
 
   const handleTrack = useCallback((orderId: string) => {
     navigation.navigate('OrderConfirmed', { orderId });
   }, [navigation]);
 
   const handleCancel = useCallback((orderId: string) => {
-    ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-    setCancelTargetId(orderId);
-  }, []);
+    haptics.warning();
+    showDialog({
+      title: 'Cancel Order?',
+      message: 'This action cannot be undone. Your order will be cancelled immediately.',
+      confirmText: 'Yes, Cancel',
+      cancelText: 'Keep Order',
+      type: 'warning',
+      onConfirm: () => cancelMutation.mutate(orderId)
+    });
+  }, [showDialog]);
 
   const handleRate = useCallback((orderId: string) => {
     navigation.navigate('RateOrder', { orderId });
   }, [navigation]);
 
   const handleReorder = useCallback(async (order: any) => {
-    ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
     setReorderLoadingId(order.id);
     try {
       const cached: any = queryClient.getQueryData(['menu', order.zone_id]);
@@ -86,21 +101,32 @@ const OrderHistoryScreen = ({ navigation }: any) => {
       const availableItems = order.items.filter((oldItem: any) =>
         currentItems.find((ci: any) => ci.id === oldItem.menu_item_id && ci.available)
       );
-      if (availableItems.length === 0) { Alert.alert('Unavailable', 'None of the items are available today.'); return; }
-      Alert.alert('Reorder', 'Add these items to your cart?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Add to Cart', onPress: () => {
+      if (availableItems.length === 0) {
+        showDialog({ title: 'Unavailable', message: 'None of the items are available today.', confirmText: 'Okay', type: 'error' });
+        return;
+      }
+      showDialog({
+        title: 'Reorder',
+        message: 'Add these items to your cart?',
+        confirmText: 'Add to Cart',
+        cancelText: 'Cancel',
+        type: 'info',
+        onConfirm: () => {
           availableItems.forEach((item: any) => {
             const menuItem = currentItems.find((ci: any) => ci.id === item.menu_item_id);
             dispatch(addItem({ menuItemId: item.menu_item_id, name: item.menu_item_name, pricePaise: menuItem.price_paise, quantity: item.quantity, photoUrl: menuItem.photo_url, isVeg: menuItem.is_veg, kitchenId: order.kitchen_id }));
           });
-          if (availableItems.length < order.items.length) Alert.alert('Partial Reorder', 'Some items were sold out and skipped.');
+          if (availableItems.length < order.items.length) {
+            showDialog({ title: 'Partial Reorder', message: 'Some items were sold out and skipped.', confirmText: 'Okay', type: 'warning' });
+          }
           navigation.navigate('Cart');
-        }},
-      ]);
-    } catch { Alert.alert('Error', 'Could not validate menu. Please try again.'); }
+        }
+      });
+    } catch {
+      showDialog({ title: 'Error', message: 'Could not validate menu. Please try again.', confirmText: 'Okay', type: 'error' });
+    }
     finally { setReorderLoadingId(null); }
-  }, [dispatch, navigation, queryClient]);
+  }, [dispatch, navigation, queryClient, showDialog]);
 
   const {
     data,
@@ -137,42 +163,13 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   const cancelMutation = useMutation({
     mutationFn: (id: string) => api.post(`/orders/${id}/cancel`),
     onSuccess: () => {
-      setCancelTargetId(null);
       queryClient.invalidateQueries({ queryKey: ['order-history'] });
+      showDialog({ title: 'Order Cancelled', message: 'Your order was successfully cancelled.', confirmText: 'Okay', type: 'success' });
     },
     onError: () => {
-      setCancelTargetId(null);
-      Alert.alert('Error', 'Could not cancel the order.');
+      showDialog({ title: 'Error', message: 'Could not cancel the order.', confirmText: 'Okay', type: 'error' });
     },
   });
-
-  if (isLoading) return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top + 12, 36) }]}>
-        <BouncingButton style={styles.backBtn} onPress={() => { ReactNativeHapticFeedback.trigger("impactLight", hapticOptions); navigation.goBack(); }}>
-          <ArrowLeft size={20} color="#1A1A2E" />
-        </BouncingButton>
-        <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={styles.headerTitle}>Your Orders</Text>
-        </View>
-      </View>
-      <SkeletonScreenList item={<SkeletonOrderCard />} />
-    </View>
-  );
-
-  if (isError) return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top + 12, 36) }]}>
-        <BouncingButton style={styles.backBtn} onPress={() => { ReactNativeHapticFeedback.trigger("impactLight", hapticOptions); navigation.goBack(); }}>
-          <ArrowLeft size={20} color="#1A1A2E" />
-        </BouncingButton>
-        <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={styles.headerTitle}>Your Orders</Text>
-        </View>
-      </View>
-      <ScreenError onRetry={refetch} />
-    </View>
-  );
 
   const active = useMemo(() => allOrders.filter((o: any) => !['delivered', 'cancelled'].includes(o.status)), [allOrders]);
   const past   = useMemo(() => allOrders.filter((o: any) => ['delivered', 'cancelled'].includes(o.status)), [allOrders]);
@@ -194,17 +191,17 @@ const OrderHistoryScreen = ({ navigation }: any) => {
 
   const renderOrderItem = useCallback(({ item }: { item: any }) => {
     if (item.type === 'header') {
-      return <View style={styles.sectionHeaderWrap}><Text style={styles.sectionLabel}>{item.label}</Text></View>;
+      return <View style={styles.sectionHeaderWrap}><Text allowFontScaling={false} style={styles.sectionLabel}>{item.label}</Text></View>;
     }
     if (item.type === 'empty') {
       return (
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconWrapper}><Package size={36} color={colors.primary} /></View>
-          <Text style={styles.emptyTitle}>No orders yet</Text>
-          <Text style={styles.emptySubText}>Your delicious journey is just one tap away.</Text>
-          <BouncingButton style={styles.browseBtn} onPress={() => navigation.navigate('Home')}>
-            <Text style={styles.browseBtnText}>Browse Menu</Text>
-          </BouncingButton>
+          <View style={styles.emptyIconWrapper}><Package size={36} color={tokens.colors.primary} /></View>
+          <Text allowFontScaling={false} style={styles.emptyTitle}>No orders yet</Text>
+          <Text allowFontScaling={false} style={styles.emptySubText}>Your delicious journey is just one tap away.</Text>
+          <PressableScale style={styles.browseBtn} onPress={() => navigation.navigate('Home')} accessibilityRole="button" accessibilityLabel="Browse Menu">
+            <Text allowFontScaling={false} style={styles.browseBtnText}>Browse Menu</Text>
+          </PressableScale>
         </View>
       );
     }
@@ -228,61 +225,44 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     );
   }, [handleTrack, handleCancel, handleOpenInvoice, callSupport, handleRate, handleReorder, invoiceLoadingId, reorderLoadingId, navigation]);
 
+  if (isLoading) return (
+    <View style={styles.container}>
+      <ScreenHeader title="Your Orders" variant="large" />
+      <SkeletonScreenList item={<SkeletonOrderCard />} />
+    </View>
+  );
+
+  if (isError) return (
+    <View style={styles.container}>
+      <ScreenHeader title="Your Orders" variant="large" />
+      <ScreenError onRetry={refetch} />
+    </View>
+  );
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top + 12, 36) }]}>
-        <BouncingButton style={styles.backBtn} onPress={() => { ReactNativeHapticFeedback.trigger("impactLight", hapticOptions); navigation.goBack(); }}>
-          <ArrowLeft size={20} color="#1A1A2E" />
-        </BouncingButton>
-        <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={styles.headerTitle}>Your Orders</Text>
-          <Text style={styles.headerSub}>{allOrders.length} orders · {deliveredCount} delivered</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Your Orders"
+        subtitle={`${allOrders.length} orders · ${deliveredCount} delivered`}
+        variant="large"
+      />
 
-      <FlatList
+      <FlashList
         data={listData}
         keyExtractor={(item: any) => item.key}
         renderItem={renderOrderItem}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={8}
-        windowSize={5}
-        removeClippedSubviews={true}
+        // @ts-ignore
+        estimatedItemSize={250}
         ListFooterComponent={hasNextPage && allOrders.length > 0 ? (
-          <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={isFetchingNextPage} activeOpacity={0.7}>
+          <PressableScale hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={styles.loadMoreBtn} onPress={loadMore} disabled={isFetchingNextPage} accessibilityRole="button" accessibilityLabel="Load more orders">
             {isFetchingNextPage
-              ? <ActivityIndicator size="small" color={colors.primary} />
-              : <Text style={styles.loadMoreText}>Load more orders</Text>}
-          </TouchableOpacity>
+              ? <ActivityIndicator size="small" color={tokens.colors.primary} />
+              : <Text allowFontScaling={false} style={styles.loadMoreText}>Load more orders</Text>}
+          </PressableScale>
         ) : null}
       />
-
-      {/* Cancel Modal */}
-      <Modal visible={!!cancelTargetId} transparent animationType="fade" onRequestClose={() => setCancelTargetId(null)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setCancelTargetId(null)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <View style={styles.modalIconWrap}>
-              <AlertTriangle size={28} color="#EF4444" strokeWidth={2} />
-            </View>
-            <Text style={styles.modalTitle}>Cancel Order?</Text>
-            <Text style={styles.modalSub}>This action cannot be undone. Your order will be cancelled immediately.</Text>
-            <View style={styles.modalBtnRow}>
-              <BouncingButton style={styles.modalKeepBtn} onPress={() => setCancelTargetId(null)} activeOpacity={0.8}>
-                <Text style={styles.modalKeepText}>Keep Order</Text>
-              </BouncingButton>
-              <BouncingButton style={styles.modalCancelBtn}
-                onPress={() => cancelTargetId && cancelMutation.mutate(cancelTargetId)}
-                activeOpacity={0.8} disabled={cancelMutation.isPending}>
-                {cancelMutation.isPending
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={styles.modalCancelText}>Yes, Cancel</Text>}
-              </BouncingButton>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 };
@@ -303,8 +283,8 @@ const OrderCard = React.memo(({ order, onTrack, onCancel, onInvoice, onSupport, 
       {/* Top: ID + status */}
       <View style={card.top}>
         <View>
-          <Text style={card.orderId}>{order.display_id}</Text>
-          <Text style={card.date}>
+          <Text allowFontScaling={false} style={card.orderId}>{order.display_id}</Text>
+          <Text allowFontScaling={false} style={card.date}>
             {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
             {'  ·  '}
             {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -312,7 +292,7 @@ const OrderCard = React.memo(({ order, onTrack, onCancel, onInvoice, onSupport, 
         </View>
         <View style={[card.statusBadge, { backgroundColor: meta.bg }]}>
           <View style={[card.statusDot, { backgroundColor: meta.dot }]} />
-          <Text style={[card.statusText, { color: meta.text }]}>{meta.label}</Text>
+          <Text allowFontScaling={false} style={[card.statusText, { color: meta.text }]}>{meta.label}</Text>
         </View>
       </View>
 
@@ -322,13 +302,13 @@ const OrderCard = React.memo(({ order, onTrack, onCancel, onInvoice, onSupport, 
           {order.items.slice(0, 3).map((item: any, i: number) => (
             <View key={i} style={card.itemRow}>
               <View style={card.qtyBadge}>
-                <Text style={card.qtyText}>{item.quantity}×</Text>
+                <Text allowFontScaling={false} style={card.qtyText}>{item.quantity}×</Text>
               </View>
-              <Text style={card.itemName} numberOfLines={1}>{item.menu_item_name}</Text>
+              <Text allowFontScaling={false} style={card.itemName} numberOfLines={1}>{item.menu_item_name}</Text>
             </View>
           ))}
           {order.items.length > 3 && (
-            <Text style={card.moreItems}>+{order.items.length - 3} more items</Text>
+            <Text allowFontScaling={false} style={card.moreItems}>+{order.items.length - 3} more items</Text>
           )}
         </View>
       )}
@@ -336,18 +316,18 @@ const OrderCard = React.memo(({ order, onTrack, onCancel, onInvoice, onSupport, 
       {/* Amount row */}
       <View style={card.amountRow}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={[card.payChip, { backgroundColor: isCOD ? '#FFF7ED' : '#F0FDF4' }]}>
-            <Text style={[card.payChipText, { color: isCOD ? '#EA580C' : '#16A34A' }]}>
+          <View style={[card.payChip, { backgroundColor: isCOD ? tokens.colors.warningTint : tokens.colors.successTint }]}>
+            <Text allowFontScaling={false} style={[card.payChipText, { color: isCOD ? tokens.colors.warning : tokens.colors.success }]}>
               {isCOD ? 'COD' : 'Online'}
             </Text>
           </View>
           {tipPaise > 0 && (
             <View style={card.tipChip}>
-              <Text style={card.tipChipText}>+₹{(tipPaise / 100).toFixed(0)} tip</Text>
+              <Text allowFontScaling={false} style={card.tipChipText}>+₹{(tipPaise / 100).toFixed(0)} tip</Text>
             </View>
           )}
         </View>
-        <Text style={[card.amountText, isCOD && isPending && { color: '#EA580C' }]}>
+        <Text allowFontScaling={false} style={[card.amountText, isCOD && isPending && { color: '#EA580C' }]}>
           ₹{totalRupees}
         </Text>
       </View>
@@ -357,50 +337,50 @@ const OrderCard = React.memo(({ order, onTrack, onCancel, onInvoice, onSupport, 
         {isActive && (
           <>
             {['pending_payment', 'confirmed'].includes(order.status) && (
-              <BouncingButton style={card.cancelBtn} onPress={() => onCancel(order.id)}>
-                <Text style={card.cancelBtnText}>Cancel</Text>
-              </BouncingButton>
+              <PressableScale style={card.cancelBtn} onPress={() => onCancel(order.id)} accessibilityRole="button" accessibilityLabel="Cancel Order">
+                <Text allowFontScaling={false} style={card.cancelBtnText}>Cancel</Text>
+              </PressableScale>
             )}
-            <BouncingButton style={card.trackBtn} onPress={() => onTrack(order.id)}>
-              <Bike size={14} color="#fff" />
-              <Text style={card.trackBtnText}>Track Order</Text>
-              <ChevronRight size={14} color="#fff" />
-            </BouncingButton>
+            <PressableScale style={card.trackBtn} onPress={() => onTrack(order.id)} accessibilityRole="button" accessibilityLabel="Track Order">
+              <Bike size={14} color={tokens.colors.textInverse} />
+              <Text allowFontScaling={false} style={card.trackBtnText}>Track Order</Text>
+              <ChevronRight size={14} color={tokens.colors.textInverse} />
+            </PressableScale>
           </>
         )}
 
         {isDelivered && (
           <>
-            <BouncingButton style={card.iconBtn} onPress={() => onInvoice(order.id)} disabled={invoiceLoading}>
+            <PressableScale style={card.iconBtn} onPress={() => onInvoice(order.id)} disabled={invoiceLoading} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Download Invoice">
               {invoiceLoading
-                ? <ActivityIndicator size="small" color={colors.primary} />
-                : <Download size={16} color={colors.primary} />}
-            </BouncingButton>
+                ? <ActivityIndicator size="small" color={tokens.colors.primary} />
+                : <Download size={16} color={tokens.colors.primary} />}
+            </PressableScale>
             {!order.has_feedback && (
-              <BouncingButton style={[card.iconBtn, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]} onPress={() => onRate(order.id)}>
-                <Star size={16} color="#D97706" />
-              </BouncingButton>
+              <PressableScale style={[card.iconBtn, { backgroundColor: tokens.colors.warningTint, borderColor: tokens.colors.warningTint }]} onPress={() => onRate(order.id)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Rate Order">
+                <Star size={16} color={tokens.colors.warning} />
+              </PressableScale>
             )}
-            <BouncingButton style={card.supportBtn} onPress={onSupport}>
+            <PressableScale style={card.supportBtn} onPress={onSupport} accessibilityRole="button" accessibilityLabel="Get Help">
               <AlertTriangle size={13} color="#DC2626" />
-              <Text style={card.supportBtnText}>Help</Text>
-            </BouncingButton>
-            <BouncingButton style={card.reorderBtn} onPress={() => onReorder(order)} disabled={reorderLoading}>
+              <Text allowFontScaling={false} style={card.supportBtnText}>Help</Text>
+            </PressableScale>
+            <PressableScale style={card.reorderBtn} onPress={() => onReorder(order)} disabled={reorderLoading} accessibilityRole="button" accessibilityLabel="Reorder">
               {reorderLoading
-                ? <ActivityIndicator size="small" color="#1A1A2E" />
-                : <RotateCcw size={13} color="#1A1A2E" />}
-              <Text style={card.reorderBtnText}>Reorder</Text>
-            </BouncingButton>
+                ? <ActivityIndicator size="small" color={tokens.colors.textPrimary} />
+                : <RotateCcw size={13} color={tokens.colors.textPrimary} />}
+              <Text allowFontScaling={false} style={card.reorderBtnText}>Reorder</Text>
+            </PressableScale>
           </>
         )}
 
         {isCancelled && (
-          <BouncingButton style={[card.reorderBtn, { flex: 1 }]} onPress={() => onReorder(order)} disabled={reorderLoading}>
+          <PressableScale style={[card.reorderBtn, { flex: 1 }]} onPress={() => onReorder(order)} disabled={reorderLoading} accessibilityRole="button" accessibilityLabel="Try Again">
             {reorderLoading
-              ? <ActivityIndicator size="small" color="#1A1A2E" />
-              : <RotateCcw size={13} color="#1A1A2E" />}
-            <Text style={card.reorderBtnText}>Try Again</Text>
-          </BouncingButton>
+              ? <ActivityIndicator size="small" color={tokens.colors.textPrimary} />
+              : <RotateCcw size={13} color={tokens.colors.textPrimary} />}
+            <Text allowFontScaling={false} style={card.reorderBtnText}>Try Again</Text>
+          </PressableScale>
         )}
       </View>
     </View>
@@ -409,88 +389,75 @@ const OrderCard = React.memo(({ order, onTrack, onCancel, onInvoice, onSupport, 
 
 /* ─── Styles ─── */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F7' },
-  loadingContainer: { flex: 1, backgroundColor: '#F5F5F7', alignItems: 'center', justifyContent: 'center' },
-  loadingText: { marginTop: 12, color: '#9CA3AF', fontFamily: fontFamily.bold, fontSize: 13 },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#F1F1F1',
-  },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#F5F5F7', alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: 20, fontFamily: fontFamily.black, color: '#1A1A2E', letterSpacing: -0.3 },
-  headerSub: { fontSize: 12, fontFamily: fontFamily.bold, color: '#9CA3AF', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
+  container: { flex: 1, backgroundColor: tokens.colors.background },
+  loadingContainer: { flex: 1, backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { marginTop: 12, color: tokens.colors.textTertiary, fontFamily: tokens.typography.family.bold, fontSize: 13 },
 
   scrollContent: { paddingBottom: 40 },
 
-  section: { paddingHorizontal: 16, paddingTop: 20 },
-  sectionHeaderWrap: { paddingHorizontal: 16, paddingTop: 20 },
-  orderItemWrap: { paddingHorizontal: 16 },
-  sectionLabel: { fontSize: 11, fontFamily: fontFamily.black, color: '#9CA3AF', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 },
+  section: { paddingHorizontal: tokens.spacing.lg, paddingTop: tokens.spacing.xl },
+  sectionHeaderWrap: { paddingHorizontal: tokens.spacing.lg, paddingTop: tokens.spacing.xl },
+  orderItemWrap: { paddingHorizontal: tokens.spacing.lg },
+  sectionLabel: { fontSize: 11, fontFamily: tokens.typography.family.black, color: tokens.colors.textTertiary, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: tokens.spacing.md },
 
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 32 },
-  emptyIconWrapper: { width: 88, height: 88, backgroundColor: '#fff', borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
-  emptyTitle: { fontSize: 18, fontFamily: fontFamily.black, color: '#1A1A2E', letterSpacing: -0.2 },
-  emptySubText: { color: '#9CA3AF', textAlign: 'center', marginTop: 8, fontFamily: fontFamily.medium, fontSize: 14, lineHeight: 22 },
-  browseBtn: { marginTop: 28, backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 24 },
-  browseBtnText: { color: '#fff', fontFamily: fontFamily.bold, letterSpacing: 1, fontSize: 13, textTransform: 'uppercase' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: tokens.spacing.xxxl },
+  emptyIconWrapper: { width: 88, height: 88, backgroundColor: tokens.colors.surface, borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowColor: tokens.colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
+  emptyTitle: { fontSize: 18, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.2 },
+  emptySubText: { color: tokens.colors.textTertiary, textAlign: 'center', marginTop: 8, fontFamily: tokens.typography.family.medium, fontSize: 14, lineHeight: 22 },
+  browseBtn: { marginTop: 28, backgroundColor: tokens.colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 24 },
+  browseBtnText: { color: tokens.colors.textInverse, fontFamily: tokens.typography.family.bold, letterSpacing: 1, fontSize: 13, textTransform: 'uppercase' },
 
-  loadMoreBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginHorizontal: 16, marginTop: 12, marginBottom: 12, borderRadius: 14, borderWidth: 1.5, borderColor: colors.primary },
-  loadMoreText: { fontFamily: fontFamily.bold, fontSize: 13, color: colors.primary },
+  loadMoreBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginHorizontal: 16, marginTop: 12, marginBottom: 12, borderRadius: 14, borderWidth: 1.5, borderColor: tokens.colors.primary },
+  loadMoreText: { fontFamily: tokens.typography.family.bold, fontSize: 13, color: tokens.colors.primary },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  modalCard: { backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 24, paddingVertical: 32, width: '100%', alignItems: 'center' },
-  modalIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontFamily: fontFamily.black, color: '#1A1A2E', marginBottom: 8, letterSpacing: -0.2 },
-  modalSub: { fontSize: 13, color: '#9CA3AF', textAlign: 'center', lineHeight: 20, marginBottom: 24, fontFamily: fontFamily.medium },
+  modalCard: { backgroundColor: tokens.colors.surface, borderRadius: 24, paddingHorizontal: 24, paddingVertical: 32, width: '100%', alignItems: 'center' },
+  modalIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: tokens.colors.dangerTint, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 8, letterSpacing: -0.2 },
+  modalSub: { fontSize: 13, color: tokens.colors.textTertiary, textAlign: 'center', lineHeight: 20, marginBottom: 24, fontFamily: tokens.typography.family.medium },
   modalBtnRow: { flexDirection: 'row', width: '100%', gap: 12 },
-  modalKeepBtn: { flex: 1, backgroundColor: '#F1F5F9', paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
-  modalKeepText: { fontFamily: fontFamily.bold, fontSize: 13, color: '#1A1A2E', textTransform: 'uppercase', letterSpacing: 0.5 },
-  modalCancelBtn: { flex: 1, backgroundColor: '#EF4444', paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
-  modalCancelText: { fontFamily: fontFamily.bold, fontSize: 13, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 },
+  modalKeepBtn: { flex: 1, backgroundColor: tokens.colors.background, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  modalKeepText: { fontFamily: tokens.typography.family.bold, fontSize: 13, color: tokens.colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  modalCancelBtn: { flex: 1, backgroundColor: tokens.colors.danger, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  modalCancelText: { fontFamily: tokens.typography.family.bold, fontSize: 13, color: tokens.colors.textInverse, textTransform: 'uppercase', letterSpacing: 0.5 },
 });
 
 const card = StyleSheet.create({
   wrap: {
-    backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+    backgroundColor: tokens.colors.surface, borderRadius: tokens.radii.xxl, padding: tokens.spacing.lg, marginBottom: tokens.spacing.md,
+    ...tokens.shadows.soft,
   },
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-  orderId: { fontSize: 16, fontFamily: fontFamily.black, color: '#1A1A2E', letterSpacing: 0.2 },
-  date: { fontSize: 11, fontFamily: fontFamily.bold, color: '#9CA3AF', marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 },
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: tokens.spacing.lg },
+  orderId: { fontSize: 16, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: 0.2 },
+  date: { fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.textTertiary, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 10, fontFamily: fontFamily.black, letterSpacing: 0.3, textTransform: 'uppercase' },
+  statusText: { fontSize: 10, fontFamily: tokens.typography.family.black, letterSpacing: 0.3, textTransform: 'uppercase' },
 
-  itemsWrap: { backgroundColor: '#F8F9FA', borderRadius: 14, padding: 12, marginBottom: 14 },
+  itemsWrap: { backgroundColor: tokens.colors.background, borderRadius: 14, padding: 12, marginBottom: 14 },
   itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   qtyBadge: { backgroundColor: '#FFE8DF', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, marginRight: 10 },
-  qtyText: { color: colors.primary, fontFamily: fontFamily.black, fontSize: 11 },
-  itemName: { flex: 1, fontSize: 13, fontFamily: fontFamily.bold, color: '#1A1A2E' },
-  moreItems: { fontSize: 11, color: colors.primary, fontFamily: fontFamily.bold, marginTop: 2 },
+  qtyText: { color: tokens.colors.primary, fontFamily: tokens.typography.family.black, fontSize: 11 },
+  itemName: { flex: 1, fontSize: 13, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
+  moreItems: { fontSize: 11, color: tokens.colors.primary, fontFamily: tokens.typography.family.bold, marginTop: 2 },
 
-  amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F1F1F1' },
+  amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: tokens.spacing.lg, paddingBottom: tokens.spacing.lg, borderBottomWidth: 1, borderBottomColor: tokens.colors.border },
   payChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  payChipText: { fontSize: 11, fontFamily: fontFamily.black, letterSpacing: 0.3 },
-  tipChip: { backgroundColor: '#FFFBEB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  tipChipText: { fontSize: 11, fontFamily: fontFamily.bold, color: '#D97706' },
-  amountText: { fontSize: 20, fontFamily: fontFamily.black, color: '#1A1A2E', letterSpacing: -0.5 },
+  payChipText: { fontSize: 11, fontFamily: tokens.typography.family.black, letterSpacing: 0.3 },
+  tipChip: { backgroundColor: tokens.colors.warningTint, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  tipChipText: { fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.warning },
+  amountText: { fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 },
 
   actions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  cancelBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, borderWidth: 1.5, borderColor: '#EF4444', alignItems: 'center', justifyContent: 'center' },
-  cancelBtnText: { color: '#EF4444', fontFamily: fontFamily.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  trackBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.primary, paddingVertical: 11, borderRadius: 14 },
-  trackBtnText: { color: '#fff', fontFamily: fontFamily.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  iconBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' },
-  supportBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
-  supportBtnText: { color: '#DC2626', fontFamily: fontFamily.bold, fontSize: 12 },
-  reorderBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, backgroundColor: '#F5F5F7', borderWidth: 1, borderColor: '#E5E5EA', justifyContent: 'center' },
-  reorderBtnText: { color: '#1A1A2E', fontFamily: fontFamily.bold, fontSize: 12 },
+  cancelBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, borderWidth: 1.5, borderColor: tokens.colors.danger, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { color: tokens.colors.danger, fontFamily: tokens.typography.family.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  trackBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: tokens.colors.primary, paddingVertical: 11, borderRadius: 14 },
+  trackBtnText: { color: tokens.colors.textInverse, fontFamily: tokens.typography.family.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  iconBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: tokens.colors.successTint, borderWidth: 1, borderColor: tokens.colors.successTint, alignItems: 'center', justifyContent: 'center' },
+  supportBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, backgroundColor: tokens.colors.dangerTint, borderWidth: 1, borderColor: tokens.colors.dangerTint },
+  supportBtnText: { color: '#DC2626', fontFamily: tokens.typography.family.bold, fontSize: 12 },
+  reorderBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, backgroundColor: tokens.colors.background, borderWidth: 1, borderColor: tokens.colors.border, justifyContent: 'center' },
+  reorderBtnText: { color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.bold, fontSize: 12 },
 });
 
 export default OrderHistoryScreen;

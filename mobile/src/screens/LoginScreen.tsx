@@ -1,5 +1,6 @@
+import { tokens } from '../theme/tokens';
 import React, { useEffect, useState } from 'react';
-import { Alert, NativeModules, StyleSheet, Text, TextInput, TouchableOpacity, View, StatusBar, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { Alert, NativeModules, StyleSheet, Text, View, StatusBar, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import Animated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { Bike, ChefHat, ShieldCheck, Flame } from 'lucide-react-native';
@@ -7,8 +8,9 @@ import { OTPWidget } from '@msg91comm/sendotp-react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { Button, TextField } from '../components/ui';
-import { tokens } from '../theme/tokens';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 import { ENV } from '../config/env';
+import { useFeedback } from '../context/FeedbackContext';
 
 const { width } = Dimensions.get('window');
 const { RoleModule } = NativeModules;
@@ -25,6 +27,7 @@ const LoginScreen = ({ navigation }: any) => {
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [devRole, setDevRole] = useState(BUILD_ROLE);
+  const { showDialog } = useFeedback();
 
   const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
 
@@ -56,7 +59,12 @@ const LoginScreen = ({ navigation }: any) => {
       });
     },
     onError: (err: any) => {
-      Alert.alert('Error', err?.message || 'Could not send OTP. Check your connection.');
+      showDialog({
+        title: 'Error',
+        message: err?.message || 'Could not send OTP. Check your connection.',
+        confirmText: 'Okay',
+        type: 'error'
+      });
     },
   });
 
@@ -78,25 +86,25 @@ const LoginScreen = ({ navigation }: any) => {
       
       <View style={styles.content}>
         
-        <Animated.View entering={ZoomIn.duration(800).springify()} style={styles.logoWrapper}>
+        <Animated.View entering={ZoomIn.duration(500)} style={styles.logoWrapper}>
           <View style={[styles.logoCard, { backgroundColor: branding.color }]}>
-            <Icon color="#FFFFFF" size={48} strokeWidth={2} />
+            <Icon color={tokens.colors.textInverse} size={48} strokeWidth={2} />
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(600).delay(100).springify()} style={styles.headerWrapper}>
-          <Text style={styles.brandingSubText}>{branding.sub}</Text>
-          <Text style={styles.brandingNameText}>{branding.name}</Text>
-          <Text style={styles.heroText}>
+        <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.headerWrapper}>
+          <Text style={styles.brandingSubText} allowFontScaling maxFontSizeMultiplier={1.4}>{branding.sub}</Text>
+          <Text style={styles.brandingNameText} allowFontScaling maxFontSizeMultiplier={1.3}>{branding.name}</Text>
+          <Text style={styles.heroText} allowFontScaling maxFontSizeMultiplier={1.4}>
             {devRole === 'customer'
               ? 'Real food, made fresh in our own\nkitchen — see exactly how.'
               : 'Sign in to access your\noperations dashboard.'}
           </Text>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(600).delay(200).springify()} style={styles.formWrapper}>
+        <Animated.View entering={FadeInDown.duration(500).delay(200)} style={styles.formWrapper}>
           <TextField
-            leftAdornment={<Text style={styles.countryCodeText}>+91</Text>}
+            leftAdornment={<Text style={styles.countryCodeText} allowFontScaling maxFontSizeMultiplier={1.3}>+91</Text>}
             placeholder="00000 00000"
             keyboardType="numeric"
             maxLength={10}
@@ -116,7 +124,7 @@ const LoginScreen = ({ navigation }: any) => {
           )}
         </Animated.View>
 
-        <Animated.View entering={FadeInUp.duration(600).delay(300).springify()} style={styles.bottomWrapper}>
+        <Animated.View entering={FadeInUp.duration(500).delay(300)} style={styles.bottomWrapper}>
           {phone.length === 10 ? (
             <Button
               label="SEND VERIFICATION CODE"
@@ -126,12 +134,12 @@ const LoginScreen = ({ navigation }: any) => {
             />
           ) : (
             <View style={styles.disabledTextContainer}>
-              <Text style={styles.disabledText}>ENTER 10 DIGITS TO PROCEED</Text>
+              <Text style={styles.disabledText} allowFontScaling maxFontSizeMultiplier={1.4}>ENTER 10 DIGITS TO PROCEED</Text>
             </View>
           )}
 
           <View style={styles.secureBadge}>
-            <Text style={styles.secureText}>SECURED BY 2QT SHIELD</Text>
+            <Text style={styles.secureText} allowFontScaling maxFontSizeMultiplier={1.4}>SECURED BY 2QT SHIELD</Text>
           </View>
         </Animated.View>
 
@@ -139,13 +147,13 @@ const LoginScreen = ({ navigation }: any) => {
           <View style={styles.devRoleContainer}>
             <View style={styles.devRoleRow}>
               {['customer', 'rider', 'kitchen', 'admin'].map((r) => (
-                <TouchableOpacity
+                <PressableScale
                   key={r}
                   onPress={() => setDevRole(r)}
                   style={[styles.devRoleBtn, devRole === r && { backgroundColor: BRANDING[r].color }]}
                 >
-                  <Text style={[styles.devRoleBtnText, devRole === r && styles.devRoleBtnTextActive]}>{r.toUpperCase()}</Text>
-                </TouchableOpacity>
+                  <Text style={[styles.devRoleBtnText, devRole === r && styles.devRoleBtnTextActive]} allowFontScaling maxFontSizeMultiplier={1.4}>{r.toUpperCase()}</Text>
+                </PressableScale>
               ))}
             </View>
           </View>
@@ -277,7 +285,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   devRoleBtnTextActive: {
-    color: '#FFFFFF',
+    color: tokens.colors.textInverse,
   },
 });
 

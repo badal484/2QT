@@ -1,3 +1,4 @@
+import { tokens } from '../../theme/tokens';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SkeletonScreenList, SkeletonListItem } from '../../components/ui';
@@ -5,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
+
   MessageSquare, 
   Clock, 
   ChevronRight, 
@@ -97,11 +99,11 @@ const TicketsScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -124,7 +126,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#EF4444',
+    backgroundColor: tokens.colors.danger,
     marginRight: 8,
   },
   headerSub: {
@@ -154,17 +156,13 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   ticketCard: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     padding: 24,
     borderRadius: 32,
     marginBottom: 24,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   cardTop: {
     flexDirection: 'row',
@@ -220,7 +218,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   statusTextOpen: {
-    color: '#EF4444',
+    color: tokens.colors.danger,
   },
   statusTextClosed: {
     color: '#00D084',

@@ -16,11 +16,14 @@ import {
   ShieldCheck,
   X
 } from 'lucide-react-native';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const AdminOrderDetailScreen = ({ route, navigation }: any) => {
   const { orderId } = route.params;
   const queryClient = useQueryClient();
   const [isRiderModalVisible, setRiderModalVisible] = useState(false);
+  const { showDialog } = useFeedback();
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['admin-order-detail', orderId],
@@ -38,7 +41,7 @@ const AdminOrderDetailScreen = ({ route, navigation }: any) => {
   const cancelMutation = useMutation({
     mutationFn: () => api.post(`/orders/${orderId}/cancel`, {}),
     onSuccess: () => {
-      Alert.alert('Cancelled', 'Order cancelled and refunded successfully.');
+      showDialog({ title: 'Cancelled', message: 'Order cancelled and refunded successfully.', confirmText: 'Okay', type: 'success' });
       queryClient.invalidateQueries({ queryKey: ['admin-live-orders'] });
       navigation.goBack();
     },
@@ -48,12 +51,12 @@ const AdminOrderDetailScreen = ({ route, navigation }: any) => {
     mutationFn: (riderId: string) => api.post(`/admin/orders/${orderId}/assign`, { riderId }),
     onSuccess: () => {
       setRiderModalVisible(false);
-      Alert.alert('Assigned', 'Pilot has been notified of the mission.');
+      showDialog({ title: 'Assigned', message: 'Pilot has been notified of the mission.', confirmText: 'Okay', type: 'success' });
       queryClient.invalidateQueries({ queryKey: ['admin-order-detail', orderId] });
       queryClient.invalidateQueries({ queryKey: ['admin-live-orders'] });
     },
     onError: (err: any) => {
-      Alert.alert('Assignment Failed', err.message || 'Could not assign rider.');
+      showDialog({ title: 'Assignment Failed', message: err.message || 'Could not assign rider.', confirmText: 'Okay', type: 'error' });
     }
   });
 
@@ -183,10 +186,14 @@ const AdminOrderDetailScreen = ({ route, navigation }: any) => {
                 activeOpacity={0.9}
                 style={styles.cancelBtn}
                 onPress={() => {
-                    Alert.alert('protocol Critical', 'Decommission this order and initiate immediate refund?', [
-                        { text: 'Abort' },
-                        { text: 'Decommission', style: 'destructive', onPress: () => cancelMutation.mutate() }
-                    ]);
+                    showDialog({
+                        title: 'Protocol Critical',
+                        message: 'Decommission this order and initiate immediate refund?',
+                        confirmText: 'Execute',
+                        cancelText: 'Abort',
+                        type: 'warning',
+                        onConfirm: () => cancelMutation.mutate()
+                    });
                 }}
              >
                 <XCircle size={20} color="#FF4B4B" />
@@ -257,11 +264,11 @@ const AdminOrderDetailScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -310,7 +317,7 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
   },
   orderId: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontSize: 40,
     fontWeight: '900',
     letterSpacing: -1,
@@ -352,15 +359,11 @@ const styles = StyleSheet.create({
   iconWrapper: {
     width: 48,
     height: 48,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   labelCol: {
     marginLeft: 16,
@@ -380,20 +383,16 @@ const styles = StyleSheet.create({
   phoneBtn: {
     width: 48,
     height: 48,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   addressBox: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     padding: 24,
     borderRadius: 24,
     borderWidth: 1,
@@ -435,16 +434,12 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   inventoryCard: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     borderRadius: 32,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   itemRow: {
     flexDirection: 'row',
@@ -542,11 +537,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
+    ...tokens.shadows.soft,
   },
   actionBtnDark: {
     backgroundColor: '#1A1A2E',
@@ -555,7 +546,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF6B35',
   },
   actionBtnText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     fontSize: 12,
     textTransform: 'uppercase',
@@ -573,7 +564,7 @@ const styles = StyleSheet.create({
     borderColor: '#FEE2E2',
   },
   cancelBtnText: {
-    color: '#EF4444',
+    color: tokens.colors.danger,
     fontWeight: '900',
     fontSize: 12,
     textTransform: 'uppercase',
@@ -586,7 +577,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderTopLeftRadius: 48,
     borderTopRightRadius: 48,
     padding: 32,
@@ -654,16 +645,12 @@ const styles = StyleSheet.create({
   riderIconWrapper: {
     width: 48,
     height: 48,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   riderName: {
     color: '#1A1A2E',

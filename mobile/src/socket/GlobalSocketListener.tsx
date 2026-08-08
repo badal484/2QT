@@ -21,6 +21,7 @@ export const GlobalSocketListener: React.FC = () => {
       };
 
       const handleNewOrder = () => {
+        console.log("🔔 [GlobalSocketListener] -> handleNewOrder TRIGGERED!");
         playKitchenAlert();
         handleOrderUpdate();
       };
@@ -187,20 +188,25 @@ export const GlobalSocketListener: React.FC = () => {
       };
     };
 
-    // GlobalSocketListener mounts before RootNavigator's connectSocket() effect
-    // runs (sibling effects fire in DOM order). Retry once after 2s so the
-    // navigator has time to call connectSocket and make the socket available.
-    let detach = attach();
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let detach: (() => void) | null = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
+    const tryAttach = () => {
+      if (detach) return; // already attached
+      detach = attach();
+      if (detach) {
+        console.log("✅ [GlobalSocketListener] -> Socket listeners ATTACHED successfully!");
+        if (timer) clearInterval(timer);
+      }
+    };
+
+    tryAttach();
     if (!detach) {
-      retryTimer = setTimeout(() => {
-        detach = attach();
-      }, 2000);
+      timer = setInterval(tryAttach, 1000);
     }
 
     return () => {
-      if (retryTimer) clearTimeout(retryTimer);
+      if (timer) clearInterval(timer);
       if (detach) detach();
     };
   }, [queryClient]);

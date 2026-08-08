@@ -14,6 +14,7 @@ import { api } from '../../api/client';
 import { colors } from '../../theme/colors';
 import { fontFamily } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { tokens } from '../../theme/tokens';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const formatDate = (iso: string) => {
@@ -24,8 +25,8 @@ const formatDate = (iso: string) => {
 const PAYOUT_STATUS_COLORS: Record<string, string> = {
   pending: '#F59E0B',
   processing: '#3B82F6',
-  paid: '#10B981',
-  failed: '#EF4444',
+  paid: tokens.colors.success,
+  failed: tokens.colors.danger,
 };
 
 const PartnerEarningsScreen = () => {
@@ -185,7 +186,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingVertical: 14 },
   headerTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: colors.ink },
   scrollContent: { padding: spacing.lg, gap: 16 },
-  summaryCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+  summaryCard: { backgroundColor: tokens.colors.surface, borderRadius: 20, padding: 20, ...tokens.shadows.soft, },
   summaryPeriod: { fontSize: 12, color: colors.inkMuted, fontFamily: fontFamily.regular, marginBottom: 2 },
   summaryLabel: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.ink, marginBottom: 12 },
   bigAmountRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 4 },
@@ -193,17 +194,17 @@ const styles = StyleSheet.create({
   bigAmountLabel: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular, marginBottom: 16 },
   breakdownToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   breakdownToggleText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.primary },
-  breakdown: { backgroundColor: '#F9FAFB', borderRadius: 14, padding: 14, marginTop: 8, marginBottom: 12, gap: 8 },
+  breakdown: { backgroundColor: tokens.colors.background, borderRadius: 14, padding: 14, marginTop: 8, marginBottom: 12, gap: 8 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   breakdownLabel: { flex: 1, fontSize: 13, color: colors.ink, fontFamily: fontFamily.regular },
   breakdownLabelBold: { fontFamily: fontFamily.semibold },
   breakdownValue: { fontSize: 13, fontFamily: fontFamily.medium },
   breakdownValueBold: { fontFamily: fontFamily.bold, fontSize: 15 },
-  breakdownDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB', marginVertical: 4 },
+  breakdownDivider: { height: StyleSheet.hairlineWidth, backgroundColor: tokens.colors.border, marginVertical: 4 },
   infoNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#F3F4F6', borderRadius: 10, padding: 10 },
   infoNoteText: { flex: 1, fontSize: 12, color: '#6B7280', fontFamily: fontFamily.regular, lineHeight: 18 },
   sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 10 },
-  payoutRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  payoutRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: tokens.colors.surface, borderRadius: 14, padding: 14, marginBottom: 8, ...tokens.shadows.soft, },
   payoutStatus: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   payoutPeriod: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.ink, marginBottom: 4 },
   payoutMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -213,10 +214,10 @@ const styles = StyleSheet.create({
   payoutNote: { fontSize: 11, color: '#F59E0B', fontFamily: fontFamily.regular, marginTop: 2 },
   payoutAmount: { fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink },
   payoutGross: { fontSize: 11, color: colors.inkMuted, fontFamily: fontFamily.regular },
-  emptyPayouts: { alignItems: 'center', padding: 32, gap: 8, backgroundColor: '#fff', borderRadius: 16 },
+  emptyPayouts: { alignItems: 'center', padding: 32, gap: 8, backgroundColor: tokens.colors.surface, borderRadius: 16 },
   emptyPayoutsText: { fontSize: 16, fontFamily: fontFamily.semibold, color: colors.ink },
   emptyPayoutsSub: { fontSize: 13, color: colors.inkMuted, textAlign: 'center', fontFamily: fontFamily.regular, lineHeight: 20 },
-  commissionCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, gap: 4 },
+  commissionCard: { backgroundColor: tokens.colors.surface, borderRadius: 16, padding: 16, gap: 4 },
   commissionTitle: { fontSize: 14, fontFamily: fontFamily.semibold, color: colors.ink, marginBottom: 4 },
   commissionText: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular, lineHeight: 20 },
 });

@@ -1,8 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../theme/colors';
-import { radius, spacing } from '../../theme/spacing';
-import { fontFamily } from '../../theme/typography';
+import { tokens } from '../../theme/tokens';
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -11,7 +9,7 @@ interface StatCardProps {
   iconBg?: string;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ icon, value, label, iconBg = colors.primaryTint }) => (
+export const StatCard: React.FC<StatCardProps> = ({ icon, value, label, iconBg = tokens.colors.primaryTint }) => (
   <View style={styles.container}>
     <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>{icon}</View>
     <Text style={styles.value}>{value}</Text>
@@ -22,31 +20,31 @@ export const StatCard: React.FC<StatCardProps> = ({ icon, value, label, iconBg =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
+    borderColor: tokens.colors.border,
+    borderRadius: tokens.radii.xl,
+    padding: tokens.spacing.lg,
   },
   iconWrap: {
     width: 40,
     height: 40,
-    borderRadius: radius.md,
+    borderRadius: tokens.radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: tokens.spacing.md,
   },
   value: {
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     fontSize: 22,
-    color: colors.ink,
+    color: tokens.colors.textPrimary,
     marginBottom: 2,
   },
   label: {
-    fontFamily: fontFamily.extrabold,
+    fontFamily: tokens.typography.family.extrabold,
     fontSize: 10,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: colors.inkMuted,
+    color: tokens.colors.textSecondary,
   },
 });

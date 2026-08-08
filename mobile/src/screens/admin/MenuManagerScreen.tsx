@@ -1,3 +1,4 @@
+import { tokens } from '../../theme/tokens';
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { SkeletonScreenList, SkeletonListItem } from '../../components/ui';
@@ -5,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
+
   ArrowLeft, 
   Plus, 
   UtensilsCrossed, 
@@ -119,11 +121,11 @@ const MenuManagerScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -182,17 +184,13 @@ const styles = StyleSheet.create({
     paddingTop: 24,
   },
   itemCard: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     borderRadius: 32,
     padding: 24,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
     overflow: 'hidden',
   },
   cardInfo: {
@@ -288,11 +286,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
+    ...tokens.shadows.soft,
   },
   emptyContainer: {
     alignItems: 'center',

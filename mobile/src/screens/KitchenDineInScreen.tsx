@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -15,6 +16,7 @@ import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { fontFamily } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { useFeedback } from '../context/FeedbackContext';
 
 const G = {
   bg: '#070707',
@@ -23,10 +25,10 @@ const G = {
   border: 'rgba(255,255,255,0.07)',
   green: '#00D084',
   amber: '#F59E0B',
-  red: '#EF4444',
+  red: tokens.colors.danger,
   blue: '#3B82F6',
   inkDim: 'rgba(255,255,255,0.45)',
-  ink: '#FFFFFF',
+  ink: tokens.colors.surface,
 } as const;
 
 const TABS = ['Today', 'Bill'] as const;
@@ -63,6 +65,7 @@ const KitchenDineInScreen = () => {
   const dispatch = useDispatch();
   const userRole = useSelector((state: RootState) => state.auth.user?.role);
   const isDineInStaff = userRole === 'dine_in_staff';
+  const { showDialog } = useFeedback();
   const [activeTab, setActiveTab] = useState<KTab>('Today');
   const [refreshing, setRefreshing] = useState(false);
   const [scannerVisible, setScannerVisible] = useState(false);
@@ -95,7 +98,7 @@ const KitchenDineInScreen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
     },
-    onError: (err: any) => Alert.alert('Error', err?.message || 'Check-in failed.'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err?.message || 'Check-in failed.', confirmText: 'Okay', type: 'error' }),
   });
 
   const noShowMutation = useMutation({
@@ -103,7 +106,7 @@ const KitchenDineInScreen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
     },
-    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed.'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err?.message || 'Failed.', confirmText: 'Okay', type: 'error' }),
   });
 
   const { data: staffMenuItems = [] } = useQuery({
@@ -133,16 +136,16 @@ const KitchenDineInScreen = () => {
       setStaffOrderItems({});
       setStaffOrderSearch('');
       setSkipKitchen(false);
-      Alert.alert('Done', variables.skip ? 'Items added directly to bill.' : 'Order sent to kitchen.');
+      showDialog({ title: 'Done', message: variables.skip ? 'Items added directly to bill.' : 'Order sent to kitchen.', confirmText: 'Okay', type: 'success' });
     },
-    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed to add items.'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err?.message || 'Failed to add items.', confirmText: 'Okay', type: 'error' }),
   });
 
   const handleStaffOrder = () => {
     const items = Object.entries(staffOrderItems)
       .filter(([, qty]) => qty > 0)
       .map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
-    if (!items.length) { Alert.alert('No Items', 'Add at least one item.'); return; }
+    if (!items.length) { showDialog({ title: 'No Items', message: 'Add at least one item.', confirmText: 'Okay', type: 'warning' }); return; }
     staffOrderMutation.mutate({ bookingId: staffOrderBooking.id, items, skip: skipKitchen });
   };
 
@@ -153,7 +156,7 @@ const KitchenDineInScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
     },
-    onError: (err: any) => Alert.alert('Error', err?.message || 'Failed.'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err?.message || 'Failed.', confirmText: 'Okay', type: 'error' }),
   });
 
   useEffect(() => {
@@ -202,7 +205,6 @@ const KitchenDineInScreen = () => {
       setScannerVisible(false);
       checkinMutation.mutate(value, {
         onSettled: () => { scanLocked.current = false; },
-        onSuccess: () => Alert.alert('Checked In', 'Guest has been checked in successfully.'),
       });
     },
   });
@@ -217,15 +219,15 @@ const KitchenDineInScreen = () => {
   };
 
   const handleMarkPaid = (bookingId: string, displayId: string) => {
-    Alert.alert(
-      `Mark ${displayId} as Paid`,
-      'Select payment method:',
-      [
-        { text: 'Cash', onPress: () => markPaidMutation.mutate({ bookingId, method: 'cash' }) },
-        { text: 'Card / POS', onPress: () => markPaidMutation.mutate({ bookingId, method: 'card_pos' }) },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    showDialog({
+      title: `Mark ${displayId} as Paid`,
+      message: 'Select payment method:',
+      confirmText: 'Cash',
+      cancelText: 'Card / POS',
+      type: 'info',
+      onConfirm: () => markPaidMutation.mutate({ bookingId, method: 'cash' }),
+      onCancel: () => markPaidMutation.mutate({ bookingId, method: 'card_pos' }),
+    });
   };
 
   // Stats summary
@@ -275,10 +277,14 @@ const KitchenDineInScreen = () => {
             <TouchableOpacity
               style={styles.logoutBtn}
               onPress={() =>
-                Alert.alert('Log Out', 'Are you sure you want to log out?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Log Out', style: 'destructive', onPress: () => dispatch(logout()) },
-                ])
+                showDialog({
+                  title: 'Log Out',
+                  message: 'Are you sure you want to log out?',
+                  confirmText: 'Log Out',
+                  cancelText: 'Cancel',
+                  type: 'warning',
+                  onConfirm: () => dispatch(logout()),
+                })
               }
             >
               <LogOut size={18} color={G.red} />
@@ -389,10 +395,14 @@ const KitchenDineInScreen = () => {
                       <TouchableOpacity
                         style={styles.noShowBtn}
                         onPress={() =>
-                          Alert.alert('Mark No-Show', `Mark ${b.display_id} as no-show?`, [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'No-Show', style: 'destructive', onPress: () => noShowMutation.mutate(b.id) },
-                          ])
+                          showDialog({
+                            title: 'Mark No-Show',
+                            message: `Mark ${b.display_id} as no-show?`,
+                            confirmText: 'No-Show',
+                            cancelText: 'Cancel',
+                            type: 'warning',
+                            onConfirm: () => noShowMutation.mutate(b.id),
+                          })
                         }
                         disabled={noShowMutation.isPending}
                       >

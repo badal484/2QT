@@ -1,11 +1,10 @@
 import React from 'react';
-import { ActivityIndicator, GestureResponderEvent, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import { colors } from '../../theme/colors';
-import { radius, spacing } from '../../theme/spacing';
-import { fontFamily } from '../../theme/typography';
+import { ActivityIndicator, GestureResponderEvent, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { tokens } from '../../theme/tokens';
+import { haptics, HapticKind } from '../../utils/haptics';
+import { PressableScale } from './internal/PressableScale';
 
-type Variant = 'primary' | 'accent' | 'outline' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'outline' | 'ghost';
 type Size = 'lg' | 'md' | 'sm';
 
 interface ButtonProps {
@@ -19,16 +18,18 @@ interface ButtonProps {
   iconPosition?: 'left' | 'right';
   style?: StyleProp<ViewStyle>;
   fullWidth?: boolean;
+  accessibilityLabel?: string;
+  /** Opt-in only — reserve for meaningful moments (order/payment success or failure,
+   *  destructive confirmation, save). Plain navigation/toggle buttons should omit this. */
+  haptic?: HapticKind | 'none';
 }
 
-const HEIGHTS: Record<Size, number> = { lg: 64, md: 52, sm: 44 };
-const FONT_SIZES: Record<Size, number> = { lg: 16, md: 15, sm: 13 };
-
-const triggerHaptic = () =>
-  ReactNativeHapticFeedback.trigger('impactLight', {
-    enableVibrateFallback: true,
-    ignoreAndroidSystemSettings: false,
-  });
+const HEIGHTS: Record<Size, number> = { lg: 56, md: 48, sm: 48 };
+const FONT_SIZES: Record<Size, number> = {
+  lg: tokens.typography.size.bodyLarge,
+  md: tokens.typography.size.bodyLarge,
+  sm: tokens.typography.size.body
+};
 
 export const Button: React.FC<ButtonProps> = ({
   label,
@@ -41,31 +42,36 @@ export const Button: React.FC<ButtonProps> = ({
   iconPosition = 'left',
   style,
   fullWidth = true,
+  accessibilityLabel,
+  haptic = 'none',
 }) => {
-  const [pressed, setPressed] = React.useState(false);
   const isDisabled = Boolean(disabled || loading);
-  const textColor = isDisabled
-    ? colors.inkFaint
-    : variant === 'outline' || variant === 'ghost'
-    ? colors.ink
-    : colors.white;
+
+  let textColor: string = tokens.colors.textPrimary;
+  if (isDisabled) {
+    textColor = tokens.colors.textSecondary;
+  } else if (variant === 'primary') {
+    textColor = tokens.colors.textInverse;
+  }
 
   return (
-    <Pressable
+    <PressableScale
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || label}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       onPress={(e: GestureResponderEvent) => {
         if (isDisabled) return;
-        triggerHaptic();
+        if (haptic !== 'none') haptics[haptic]();
         onPress(e);
       }}
-      onPressIn={() => setPressed(true)}
-      onPressOut={() => setPressed(false)}
       disabled={isDisabled}
       style={[
         styles.base,
         { height: HEIGHTS[size] },
-        isDisabled ? styles.disabled : styles[variant],
+        styles[variant],
+        isDisabled && styles.disabled,
         fullWidth && styles.fullWidth,
-        pressed && !isDisabled && styles.pressed,
         style,
       ]}
     >
@@ -74,55 +80,59 @@ export const Button: React.FC<ButtonProps> = ({
       ) : (
         <View style={styles.content}>
           {icon && iconPosition === 'left' && <View style={styles.iconLeft}>{icon}</View>}
-          <Text style={[styles.label, { color: textColor, fontSize: FONT_SIZES[size] }]}>{label}</Text>
+          <Text
+            style={[styles.label, { color: textColor, fontSize: FONT_SIZES[size] }]}
+            allowFontScaling={true} // Accessibility: dynamic font scaling
+            maxFontSizeMultiplier={1.5}
+          >
+            {label}
+          </Text>
           {icon && iconPosition === 'right' && <View style={styles.iconRight}>{icon}</View>}
         </View>
       )}
-    </Pressable>
+    </PressableScale>
   );
 };
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: radius.lg,
+    borderRadius: tokens.radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: tokens.spacing.xl,
+    minHeight: 48, // Accessibility: true 48x48dp touch target
+    minWidth: 48,
   },
   fullWidth: { width: '100%' },
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  iconLeft: { marginRight: spacing.sm },
-  iconRight: { marginLeft: spacing.sm },
-  label: { fontFamily: fontFamily.extrabold, letterSpacing: 0.3 },
-  primary: {
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+  iconLeft: { marginRight: tokens.spacing.sm },
+  iconRight: { marginLeft: tokens.spacing.sm },
+  label: { 
+    fontFamily: tokens.typography.family.black, 
+    letterSpacing: 0.3 
   },
-  accent: {
-    backgroundColor: colors.accent,
-    shadowColor: colors.accent,
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+  primary: {
+    backgroundColor: tokens.colors.primary,
+    shadowColor: tokens.shadows.medium.shadowColor,
+    shadowOpacity: tokens.shadows.medium.shadowOpacity,
+    shadowRadius: tokens.shadows.medium.shadowRadius,
+    shadowOffset: tokens.shadows.medium.shadowOffset,
+    elevation: tokens.shadows.medium.elevation,
+  },
+  secondary: {
+    backgroundColor: tokens.colors.background,
   },
   outline: {
-    backgroundColor: colors.surface,
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: tokens.colors.border,
   },
   ghost: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: 'transparent',
   },
   disabled: {
-    backgroundColor: colors.surfaceMuted,
-  },
-  pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.985 }],
+    backgroundColor: tokens.colors.border,
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });

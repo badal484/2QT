@@ -16,9 +16,12 @@ import {
   ChevronRight,
   ShieldCheck
 } from 'lucide-react-native';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const UserManagementScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
@@ -32,7 +35,7 @@ const UserManagementScreen = ({ navigation }: any) => {
       api.patch(`/admin/users/${id}/status`, { is_active }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      Alert.alert('Status Updated', 'User access permissions have been modified.');
+      showDialog({ title: 'Status Updated', message: 'User access permissions have been modified.', confirmText: 'Okay', type: 'success' });
     },
   });
 
@@ -40,7 +43,7 @@ const UserManagementScreen = ({ navigation }: any) => {
     mutationFn: (id: string) => api.post(`/admin/users/${id}/verify`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      Alert.alert('Pilot Verified', 'Rider has been authorized for missions.');
+      showDialog({ title: 'Pilot Verified', message: 'Rider has been authorized for missions.', confirmText: 'Okay', type: 'success' });
     },
   });
 
@@ -109,9 +112,9 @@ const UserManagementScreen = ({ navigation }: any) => {
             <TouchableOpacity 
               key={r}
               onPress={() => setRoleFilter(r)}
-              style={[styles.filterButton, { backgroundColor: roleFilter === r ? '#1A1A2E' : '#fff', borderColor: roleFilter === r ? '#1A1A2E' : '#f3f4f6' }]}
+              style={[styles.filterButton, { backgroundColor: roleFilter === r ? '#1A1A2E' : tokens.colors.surface, borderColor: roleFilter === r ? '#1A1A2E' : '#f3f4f6' }]}
             >
-              <Text style={[styles.filterButtonText, { color: roleFilter === r ? '#fff' : '#9ca3af' }]}>{r}</Text>
+              <Text style={[styles.filterButtonText, { color: roleFilter === r ? tokens.colors.surface : '#9ca3af' }]}>{r}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -147,14 +150,18 @@ const UserManagementScreen = ({ navigation }: any) => {
                </View>
             </View>
 
-            {user.role === 'rider' && user.onboarding_complete && !user.is_verified && (
+            {user.role === 'rider' && !user.is_verified && (
               <TouchableOpacity 
                 activeOpacity={0.8}
                 onPress={() => {
-                  Alert.alert('Verify Pilot', `Authorize ${user.name} to start taking missions?`, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Confirm Verify', onPress: () => verifyRiderMutation.mutate(user.id) }
-                  ]);
+                  showDialog({
+                    title: 'Verify Pilot',
+                    message: `Authorize ${user.name} to start taking missions?`,
+                    confirmText: 'Verify',
+                    cancelText: 'Cancel',
+                    type: 'info',
+                    onConfirm: () => verifyRiderMutation.mutate(user.id)
+                  });
                 }}
                 style={styles.verifyButton}
               >
@@ -172,14 +179,16 @@ const UserManagementScreen = ({ navigation }: any) => {
                <TouchableOpacity 
                   activeOpacity={0.7}
                   onPress={() => {
-                    Alert.alert(
-                      user.is_active ? 'Restrict Access' : 'Restore Access',
-                      `Are you sure you want to ${user.is_active ? 'deactivate' : 'activate'} ${user.name}?`,
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Confirm', onPress: () => toggleStatusMutation.mutate({ id: user.id, is_active: !user.is_active }) }
-                      ]
-                    );
+                    showDialog({
+                      title: user.is_active ? 'Restrict Access' : 'Restore Access',
+                      message: user.is_active 
+                        ? `Suspend ${user.name}'s account?` 
+                        : `Restore access for ${user.name}?`,
+                      confirmText: 'Confirm',
+                      cancelText: 'Cancel',
+                      type: user.is_active ? 'warning' : 'info',
+                      onConfirm: () => toggleStatusMutation.mutate({ id: user.id, is_active: !user.is_active })
+                    });
                   }}
                   style={[styles.statusButton, { backgroundColor: user.is_active ? 'rgba(255, 75, 75, 0.05)' : 'rgba(0, 208, 132, 0.05)', borderColor: user.is_active ? 'rgba(255, 75, 75, 0.1)' : 'rgba(0, 208, 132, 0.1)' }]}
                >
@@ -215,11 +224,11 @@ const UserManagementScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -302,17 +311,13 @@ const styles = StyleSheet.create({
     paddingTop: 24,
   },
   userCard: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     borderRadius: 32,
     padding: 24,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   cardHeader: {
     flexDirection: 'row',

@@ -85,7 +85,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-white font-semibold text-base mb-3">10. Governing Law</h2>
-            <p>These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts in [Your City], India. These Terms are subject to the Consumer Protection Act 2019 and the Information Technology Act 2000.</p>
+            <p>These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts in Ranchi, Jharkhand, India. These Terms are subject to the Consumer Protection Act 2019 and the Information Technology Act 2000.</p>
           </section>
 
           <section>

@@ -1,17 +1,15 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl,
+  View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getSocket } from '../socket/client';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { ChevronLeft, Calendar, Clock, Users, ChevronRight, UtensilsCrossed } from 'lucide-react-native';
+import { Calendar, Users, ChevronRight, UtensilsCrossed } from 'lucide-react-native';
 import { api } from '../api/client';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { BouncingButton } from '../components/ui/BouncingButton';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 
 const TABS = ['upcoming', 'past', 'cancelled'] as const;
 type Tab = typeof TABS[number];
@@ -28,11 +26,11 @@ const formatSlot = (iso: string) => {
 
 const STATUS_COLORS: Record<string, string> = {
   pending_payment: '#F59E0B',
-  confirmed: '#10B981',
+  confirmed: tokens.colors.success,
   seated: '#3B82F6',
   completed: '#6B7280',
-  cancelled: '#EF4444',
-  no_show: '#EF4444',
+  cancelled: tokens.colors.danger,
+  no_show: tokens.colors.danger,
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -45,7 +43,6 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const MyTableBookingsScreen = ({ navigation }: any) => {
-  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('upcoming');
   const [refreshing, setRefreshing] = useState(false);
@@ -76,7 +73,7 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
 
   const renderItem = ({ item, index }: { item: any; index: number }) => (
     <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
-      <BouncingButton
+      <PressableScale
         style={styles.bookingCard}
         onPress={() => navigation.navigate('TableBookingDetail', { bookingId: item.id })}
       >
@@ -93,11 +90,11 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
 
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Calendar size={13} color={colors.inkMuted} />
+            <Calendar size={13} color={tokens.colors.textSecondary} />
             <Text style={styles.metaText}>{formatSlot(item.slot_start)}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Users size={13} color={colors.inkMuted} />
+            <Users size={13} color={tokens.colors.textSecondary} />
             <Text style={styles.metaText}>{item.party_size} guests</Text>
           </View>
         </View>
@@ -112,27 +109,20 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
 
         <View style={styles.cardFooter}>
           <Text style={styles.viewDetail}>View Details</Text>
-          <ChevronRight size={16} color={colors.primary} />
+          <ChevronRight size={16} color={tokens.colors.primary} />
         </View>
-      </BouncingButton>
+      </PressableScale>
     </Animated.View>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft size={22} color={colors.ink} strokeWidth={2} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Table Bookings</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="My Table Bookings" />
 
       {/* Tabs */}
       <View style={styles.tabs}>
         {TABS.map(tab => (
-          <TouchableOpacity
+          <PressableScale
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
             onPress={() => setActiveTab(tab)}
@@ -140,12 +130,12 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
               {TAB_LABELS[tab]}
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </View>
 
       {isLoading ? (
-        <ActivityIndicator color={colors.primary} style={{ flex: 1 }} />
+        <ActivityIndicator color={tokens.colors.primary} style={{ flex: 1 }} />
       ) : (
         <FlatList
           data={bookings}
@@ -153,10 +143,10 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.colors.primary} />}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <UtensilsCrossed size={48} color={colors.inkFaint} strokeWidth={1} />
+              <UtensilsCrossed size={48} color={tokens.colors.textTertiary} strokeWidth={1} />
               <Text style={styles.emptyTitle}>No {TAB_LABELS[activeTab]} Bookings</Text>
               <Text style={styles.emptySubtitle}>
                 {activeTab === 'upcoming'
@@ -164,12 +154,12 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
                   : `Your ${TAB_LABELS[activeTab].toLowerCase()} bookings will appear here.`}
               </Text>
               {activeTab === 'upcoming' && (
-                <BouncingButton
+                <PressableScale
                   style={styles.browseCta}
                   onPress={() => navigation.navigate('Home')}
                 >
                   <Text style={styles.browseCtaText}>Browse Restaurants</Text>
-                </BouncingButton>
+                </PressableScale>
               )}
             </View>
           }
@@ -180,37 +170,34 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: 12 },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
-  headerTitle: { flex: 1, fontSize: 17, fontFamily: fontFamily.semibold, color: colors.ink, textAlign: 'center' },
-  tabs: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: 0, marginBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB' },
+  container: { flex: 1, backgroundColor: tokens.colors.background },
+  tabs: { flexDirection: 'row', paddingHorizontal: tokens.spacing.lg, gap: 0, marginBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.colors.border },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive: { borderBottomColor: colors.primary },
-  tabText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.inkMuted },
-  tabTextActive: { color: colors.primary, fontFamily: fontFamily.semibold },
-  listContent: { padding: spacing.lg, gap: 12, paddingBottom: 40 },
+  tabActive: { borderBottomColor: tokens.colors.primary },
+  tabText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary },
+  tabTextActive: { color: tokens.colors.primary, fontFamily: tokens.typography.family.semibold },
+  listContent: { padding: tokens.spacing.lg, gap: 12, paddingBottom: 40 },
   bookingCard: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    backgroundColor: tokens.colors.surface, borderRadius: 16, padding: 16,
+    ...tokens.shadows.soft,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  refId: { fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink },
+  refId: { fontSize: 15, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
   statusBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  statusText: { fontSize: 11, fontFamily: fontFamily.semibold },
-  restaurantName: { fontSize: 14, fontFamily: fontFamily.medium, color: colors.ink, marginBottom: 10 },
+  statusText: { fontSize: 11, fontFamily: tokens.typography.family.semibold },
+  restaurantName: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary, marginBottom: 10 },
   metaRow: { gap: 8, marginBottom: 8 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular },
-  preOrderNote: { backgroundColor: colors.primary + '10', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginBottom: 8 },
-  preOrderNoteText: { fontSize: 12, fontFamily: fontFamily.medium, color: colors.primary },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F3F4F6', paddingTop: 10, marginTop: 4 },
-  viewDetail: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.primary },
+  metaText: { fontSize: 13, color: tokens.colors.textSecondary, fontFamily: tokens.typography.family.regular },
+  preOrderNote: { backgroundColor: tokens.colors.primary + '10', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginBottom: 8 },
+  preOrderNoteText: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.primary },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: tokens.colors.background, paddingTop: 10, marginTop: 4 },
+  viewDetail: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.primary },
   emptyWrap: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 },
-  emptyTitle: { fontSize: 18, fontFamily: fontFamily.semibold, color: colors.ink, marginTop: 16, marginBottom: 8 },
-  emptySubtitle: { fontSize: 13, color: colors.inkMuted, fontFamily: fontFamily.regular, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  browseCta: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14 },
-  browseCtaText: { color: '#fff', fontSize: 14, fontFamily: fontFamily.semibold },
+  emptyTitle: { fontSize: 18, fontFamily: tokens.typography.family.semibold, color: tokens.colors.textPrimary, marginTop: 16, marginBottom: 8 },
+  emptySubtitle: { fontSize: 13, color: tokens.colors.textSecondary, fontFamily: tokens.typography.family.regular, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  browseCta: { backgroundColor: tokens.colors.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14 },
+  browseCtaText: { color: tokens.colors.textInverse, fontSize: 14, fontFamily: tokens.typography.family.semibold },
 });
 
 export default MyTableBookingsScreen;

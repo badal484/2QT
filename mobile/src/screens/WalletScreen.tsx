@@ -1,35 +1,39 @@
+import { tokens } from '../theme/tokens';
 import { ArrowLeft, CreditCard, Plus, History } from 'lucide-react-native';
 import React from 'react';
-import { BouncingButton } from '../components/ui/BouncingButton';
-import { View, Text, ScrollView, ActivityIndicator, Alert, StyleSheet, Modal, TextInput } from 'react-native';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { View, Text, ActivityIndicator, StyleSheet, Modal, TextInput } from 'react-native';
 import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import RazorpayCheckout from 'react-native-razorpay';
-import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { haptics } from '../utils/haptics';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-
-const hapticOptions = {
-  enableVibrateFallback: true,
-  ignoreAndroidSystemSettings: false,
-};
+import { useFeedback } from '../context/FeedbackContext';
 
 const WalletScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [isModalVisible, setModalVisible] = React.useState(false);
   const [rechargeAmount, setRechargeAmount] = React.useState('');
+  const { showDialog } = useFeedback();
 
-  const triggerHaptic = () => ReactNativeHapticFeedback.trigger("impactLight", hapticOptions);
-  const triggerHapticHeavy = () => ReactNativeHapticFeedback.trigger("impactHeavy", hapticOptions);
-
-  const { data: wallet, isLoading } = useQuery({
+  const { data: walletData, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ['wallet'],
-    queryFn: () => api.get('/customers/wallet'),
+    queryFn: ({ pageParam = 0 }) => api.get(`/customers/wallet?offset=${pageParam}&limit=50`),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const fetched = lastPage.transactions || [];
+      if (fetched.length < 50) return undefined;
+      return allPages.length * 50;
+    },
   });
+
+  const wallet = walletData?.pages[0];
+  const transactions = walletData ? walletData.pages.flatMap((p: any) => p.transactions || []) : [];
 
   const { user } = useSelector((state: RootState) => state.auth);
 
@@ -43,12 +47,12 @@ const WalletScreen = ({ navigation }: any) => {
                     type: 'wallet',
                     amountPaise: amount * 100
                 });
-                triggerHapticHeavy();
-                Alert.alert('Success', 'Wallet recharged successfully! (Mock)');
+                haptics.success();
+                showDialog({ title: 'Success', message: 'Wallet recharged successfully! (Mock)', confirmText: 'Okay', type: 'success' });
                 queryClient.invalidateQueries({ queryKey: ['wallet'] });
             } catch (error: any) {
                 console.error('MOCK_PAYMENT_ERROR:', error);
-                Alert.alert('Mock Payment Failed', error.message || 'Transaction cancelled');
+                showDialog({ title: 'Mock Payment Failed', message: error.message || 'Transaction cancelled', confirmText: 'Okay', type: 'error' });
             }
             return;
         }
@@ -66,7 +70,7 @@ const WalletScreen = ({ navigation }: any) => {
                 contact: user?.phone || '9999999999',
                 name: user?.name || '2QT User'
             },
-            theme: { color: '#FF6B35' }
+            theme: { color: tokens.colors.primary }
         };
 
         try {
@@ -76,8 +80,8 @@ const WalletScreen = ({ navigation }: any) => {
                 type: 'wallet',
                 amountPaise: amount * 100
             });
-            triggerHapticHeavy();
-            Alert.alert('Success', 'Wallet recharged successfully!');
+            haptics.success();
+            showDialog({ title: 'Success', message: 'Wallet recharged successfully!', confirmText: 'Okay', type: 'success' });
             queryClient.invalidateQueries({ queryKey: ['wallet'] });
         } catch (error: any) {
             console.error('PAYMENT_ERROR:', error);
@@ -90,11 +94,11 @@ const WalletScreen = ({ navigation }: any) => {
                         type: 'wallet',
                         amountPaise: amount * 100
                     });
-                    triggerHapticHeavy();
-                    Alert.alert('Dev Mock Success', 'Razorpay failed, but wallet recharged via Mock.');
+                    haptics.success();
+                    showDialog({ title: 'Dev Mock Success', message: 'Razorpay failed, but wallet recharged via Mock.', confirmText: 'Okay', type: 'success' });
                     queryClient.invalidateQueries({ queryKey: ['wallet'] });
                 } catch (mockErr: any) {
-                    Alert.alert('Payment Failed', error?.error?.description || error.description || 'Transaction cancelled');
+                    showDialog({ title: 'Payment Failed', message: error?.error?.description || error.description || 'Transaction cancelled', confirmText: 'Okay', type: 'error' });
                 }
             } else {
                 let msg = 'Transaction cancelled';
@@ -112,88 +116,99 @@ const WalletScreen = ({ navigation }: any) => {
                   msg = error?.description || error?.message || 'Transaction cancelled';
                 }
                 if (msg === 'undefined' || !msg) msg = 'Transaction cancelled';
-                Alert.alert('Payment Failed', msg);
+                showDialog({ title: 'Payment Failed', message: msg, confirmText: 'Okay', type: 'error' });
             }
         }
     }
   });
-
-  if (isLoading) return (
-    <View style={styles.container}>
-      <SkeletonScreenList item={<SkeletonListItem />} />
-    </View>
-  );
-
   return (
     <View style={styles.container}>
       {/* Header Card */}
       <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, { paddingTop: Math.max(insets.top + 16, 48) }]}>
-        <BouncingButton onPress={() => { triggerHaptic(); navigation.goBack(); }} style={styles.backButton}>
-          <ArrowLeft size={24} color="#fff" />
-        </BouncingButton>
+        <PressableScale onPress={() => { haptics.selection(); navigation.goBack(); }} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <ArrowLeft size={24} color={tokens.colors.textInverse} />
+        </PressableScale>
         
-        <Text style={styles.headerLabel}>2QT Wallet</Text>
-        <Text style={styles.balanceValue}>₹{wallet ? (wallet.balancePaise / 100).toFixed(2) : '0.00'}</Text>
+        <Text allowFontScaling={false} style={styles.headerLabel}>2QT Wallet</Text>
+        <Text allowFontScaling={false} style={styles.balanceValue}>₹{wallet ? (wallet.balancePaise / 100).toFixed(2) : '0.00'}</Text>
         
         <View style={styles.actionRow}>
-          <BouncingButton 
+          <PressableScale 
             style={styles.addMoneyBtn}
-            onPress={() => { triggerHaptic(); setModalVisible(true); }}
+            onPress={() => { haptics.selection(); setModalVisible(true); }}
             disabled={rechargeMutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="Add money to wallet"
           >
-            {rechargeMutation.isPending ? <ActivityIndicator color="#FF6B35" /> : (
+            {rechargeMutation.isPending ? <ActivityIndicator color={tokens.colors.primary} /> : (
                 <>
-                    <Plus size={18} color="#FF6B35" style={{ marginRight: 8 }} />
-                    <Text style={styles.addMoneyText}>Add Money</Text>
+                    <Plus size={18} color={tokens.colors.primary} style={{ marginRight: 8 }} />
+                    <Text allowFontScaling={false} style={styles.addMoneyText}>Add Money</Text>
                 </>
             )}
-          </BouncingButton>
+          </PressableScale>
         </View>
         <View style={styles.glassDecoration} />
         <View style={styles.glassDecoration2} />
       </Animated.View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.transactionHeaderRow}>
-          <History size={20} color="#1A1A2E" style={{ marginRight: 12 }} />
-          <Text style={styles.transactionTitle}>Transactions</Text>
-        </Animated.View>
-        
-        {wallet?.transactions?.length === 0 ? (
-          <Animated.View entering={FadeIn.delay(300)} style={styles.emptyContainer}>
-            <View style={styles.emptyIconWrapper}>
-              <CreditCard size={24} color="#9CA3AF" />
+      {isLoading ? (
+        <View style={{ flex: 1, padding: 20 }}>
+          <SkeletonScreenList item={<SkeletonListItem />} />
+        </View>
+      ) : (
+        <Animated.FlatList
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          data={transactions}
+          keyExtractor={(tx: any) => tx.id}
+          initialNumToRender={8}
+          windowSize={5}
+          removeClippedSubviews={true}
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={
+            <View style={styles.transactionHeaderRow}>
+              <History size={20} color={tokens.colors.textPrimary} style={{ marginRight: 12 }} />
+              <Text allowFontScaling={false} style={styles.transactionTitle}>Transactions</Text>
             </View>
-            <Text style={styles.emptyText}>No transactions yet.</Text>
-          </Animated.View>
-        ) : (
-          wallet?.transactions?.map((tx: any, index: number) => (
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconWrapper}>
+                <CreditCard size={24} color={tokens.colors.textTertiary} />
+              </View>
+              <Text allowFontScaling={false} style={styles.emptyText}>No transactions yet.</Text>
+            </View>
+          }
+          renderItem={({ item: tx, index }: any) => (
             <Animated.View
-              key={tx.id}
-              entering={FadeInDown.delay(index * 50 + 200).duration(400)}
+              entering={FadeInDown.delay(Math.min(index * 50 + 200, 1000)).duration(400)}
               style={styles.txRow}
             >
               <View style={styles.txInfo}>
-                <Text style={styles.txDesc}>{tx.description}</Text>
-                <Text style={styles.txDate}>{new Date(tx.created_at).toLocaleDateString()}</Text>
+                <Text allowFontScaling={false} style={styles.txDesc}>{tx.description}</Text>
+                <Text allowFontScaling={false} style={styles.txDate}>{new Date(tx.created_at).toLocaleDateString()}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[styles.txAmount, { color: tx.type === 'credit' ? '#22C55E' : '#EF4444' }]}>
+                <Text allowFontScaling={false} style={[styles.txAmount, { color: tx.type === 'credit' ? tokens.colors.success : tokens.colors.danger }]}>
                   {tx.type === 'credit' ? '+' : '−'}₹{(Math.abs(tx.amountPaise) / 100).toFixed(2)}
                 </Text>
-                <Text style={styles.txBalanceAfter}>Balance: ₹{(tx.balanceAfterPaise / 100).toFixed(2)}</Text>
+                <Text allowFontScaling={false} style={styles.txBalanceAfter}>Balance: ₹{(tx.balanceAfterPaise / 100).toFixed(2)}</Text>
               </View>
             </Animated.View>
-          ))
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          )}
+          ListFooterComponent={<View style={{ height: 40 }} />}
+        />
+      )}
 
       <Modal visible={isModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Money</Text>
-            <Text style={styles.modalSub}>Enter amount to add (Min ₹100)</Text>
+            <Text allowFontScaling={false} style={styles.modalTitle}>Add Money</Text>
+            <Text allowFontScaling={false} style={styles.modalSub}>Enter amount to add (Min ₹100)</Text>
             <TextInput
               style={styles.modalInput}
               keyboardType="numeric"
@@ -201,27 +216,30 @@ const WalletScreen = ({ navigation }: any) => {
               value={rechargeAmount}
               onChangeText={setRechargeAmount}
               autoFocus
+              accessibilityLabel="Amount to recharge"
             />
             <View style={styles.modalButtons}>
-              <BouncingButton style={styles.modalCancelBtn} onPress={() => { triggerHaptic(); setModalVisible(false); }}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </BouncingButton>
-              <BouncingButton 
+              <PressableScale style={styles.modalCancelBtn} onPress={() => { haptics.selection(); setModalVisible(false); }} accessibilityRole="button" accessibilityLabel="Cancel">
+                <Text allowFontScaling={false} style={styles.modalCancelText}>Cancel</Text>
+              </PressableScale>
+              <PressableScale 
                 style={styles.modalAddBtn} 
+                accessibilityRole="button"
+                accessibilityLabel="Add money"
                 onPress={() => {
-                  triggerHapticHeavy();
+                  haptics.success();
                   const amt = parseInt(rechargeAmount || '0');
                   if (amt >= 100) {
                     setModalVisible(false);
                     rechargeMutation.mutate(amt);
                     setRechargeAmount('');
                   } else {
-                    Alert.alert('Error', 'Minimum ₹100 required');
+                    showDialog({ title: 'Error', message: 'Minimum ₹100 required', confirmText: 'Okay', type: 'error' });
                   }
                 }}
               >
-                <Text style={styles.modalAddText}>Add</Text>
-              </BouncingButton>
+                <Text allowFontScaling={false} style={styles.modalAddText}>Add</Text>
+              </PressableScale>
             </View>
           </View>
         </View>
@@ -231,39 +249,39 @@ const WalletScreen = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  loadingContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  header: { paddingHorizontal: 32, paddingBottom: 48, backgroundColor: '#1A1A2E', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 8, overflow: 'hidden' },
-  glassDecoration: { position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255, 107, 53, 0.15)' },
+  container: { flex: 1, backgroundColor: tokens.colors.surface },
+  loadingContainer: { flex: 1, backgroundColor: tokens.colors.surface, alignItems: 'center', justifyContent: 'center' },
+  header: { paddingHorizontal: tokens.spacing.xxxl, paddingBottom: 48, backgroundColor: tokens.colors.textPrimary, borderBottomLeftRadius: 40, borderBottomRightRadius: 40, ...tokens.shadows.soft, overflow: 'hidden' },
+  glassDecoration: { position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(252, 70, 3, 0.15)' },
   glassDecoration2: { position: 'absolute', bottom: -20, left: -60, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
-  backButton: { marginBottom: 24, alignSelf: 'flex-start' },
-  headerLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 4, marginBottom: 8 },
-  balanceValue: { color: '#fff', fontSize: 48, fontWeight: '900', letterSpacing: -1 },
+  backButton: { marginBottom: tokens.spacing.xl, alignSelf: 'flex-start' },
+  headerLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontFamily: tokens.typography.family.black, textTransform: 'uppercase', letterSpacing: 4, marginBottom: 8 },
+  balanceValue: { color: tokens.colors.textInverse, fontSize: 48, fontFamily: tokens.typography.family.black, letterSpacing: -1 },
   actionRow: { flexDirection: 'row', marginTop: 40 },
-  addMoneyBtn: { backgroundColor: '#fff', paddingHorizontal: 32, paddingVertical: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
-  addMoneyText: { color: '#1A1A2E', fontWeight: '900', fontSize: 14, textTransform: 'uppercase' },
-  scrollView: { flex: 1, paddingHorizontal: 32, paddingTop: 32 },
-  transactionHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
-  transactionTitle: { color: '#1A1A2E', fontSize: 20, fontWeight: '900' },
+  addMoneyBtn: { backgroundColor: tokens.colors.surface, paddingHorizontal: tokens.spacing.xxxl, paddingVertical: tokens.spacing.md, borderRadius: tokens.radii.xl, flexDirection: 'row', alignItems: 'center', ...tokens.shadows.soft, },
+  addMoneyText: { color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.black, fontSize: 14, textTransform: 'uppercase' },
+  scrollView: { flex: 1, paddingHorizontal: tokens.spacing.xxxl, paddingTop: tokens.spacing.xxxl },
+  transactionHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: tokens.spacing.xl },
+  transactionTitle: { color: tokens.colors.textPrimary, fontSize: 20, fontFamily: tokens.typography.family.black },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 48 },
-  emptyIconWrapper: { width: 64, height: 64, backgroundColor: '#f9fafb', borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  emptyText: { color: '#9ca3af', fontWeight: '700', textAlign: 'center' },
-  txRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#f9fafb' },
-  txInfo: { flex: 1, marginRight: 16 },
-  txDesc: { color: '#1A1A2E', fontWeight: '700', fontSize: 17 },
-  txDate: { color: '#9ca3af', fontSize: 10, marginTop: 4, textTransform: 'uppercase', fontWeight: '900', letterSpacing: 1 },
-  txAmount: { fontSize: 18, fontWeight: '900' },
-  txBalanceAfter: { color: '#9ca3af', fontSize: 10, marginTop: 4, fontWeight: '700' },
+  emptyIconWrapper: { width: 64, height: 64, backgroundColor: tokens.colors.background, borderRadius: tokens.radii.full, alignItems: 'center', justifyContent: 'center', marginBottom: tokens.spacing.lg },
+  emptyText: { color: tokens.colors.textTertiary, fontFamily: tokens.typography.family.bold, textAlign: 'center' },
+  txRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: tokens.spacing.xl, borderBottomWidth: 1, borderBottomColor: tokens.colors.background },
+  txInfo: { flex: 1, marginRight: tokens.spacing.lg },
+  txDesc: { color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.bold, fontSize: 17 },
+  txDate: { color: tokens.colors.textTertiary, fontSize: 10, marginTop: 4, textTransform: 'uppercase', fontFamily: tokens.typography.family.black, letterSpacing: 1 },
+  txAmount: { fontSize: 18, fontFamily: tokens.typography.family.black },
+  txBalanceAfter: { color: tokens.colors.textTertiary, fontSize: 10, marginTop: 4, fontFamily: tokens.typography.family.bold },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', width: '80%', borderRadius: 24, padding: 24 },
-  modalTitle: { fontSize: 20, fontWeight: '900', color: '#1A1A2E' },
-  modalSub: { fontSize: 12, color: '#9CA3AF', marginTop: 4, marginBottom: 24 },
-  modalInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, padding: 16, fontSize: 24, fontWeight: '900', color: '#1A1A2E', marginBottom: 24, textAlign: 'center' },
+  modalContent: { backgroundColor: tokens.colors.surface, width: '80%', borderRadius: tokens.radii.xxl, padding: tokens.spacing.xxl },
+  modalTitle: { fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary },
+  modalSub: { fontSize: 12, color: tokens.colors.textTertiary, marginTop: 4, marginBottom: tokens.spacing.xl },
+  modalInput: { borderWidth: 1, borderColor: tokens.colors.border, borderRadius: tokens.radii.xl, padding: tokens.spacing.lg, fontSize: 24, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: tokens.spacing.xl, textAlign: 'center' },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  modalCancelBtn: { flex: 1, padding: 16, alignItems: 'center', marginRight: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
-  modalCancelText: { color: '#9CA3AF', fontWeight: '900' },
-  modalAddBtn: { flex: 1, padding: 16, alignItems: 'center', marginLeft: 8, backgroundColor: '#FF6B35', borderRadius: 20 },
-  modalAddText: { color: '#fff', fontWeight: '900' },
+  modalCancelBtn: { flex: 1, padding: tokens.spacing.lg, alignItems: 'center', marginRight: tokens.spacing.sm, backgroundColor: tokens.colors.background, borderRadius: tokens.radii.xl },
+  modalCancelText: { color: tokens.colors.textTertiary, fontFamily: tokens.typography.family.black },
+  modalAddBtn: { flex: 1, padding: tokens.spacing.lg, alignItems: 'center', marginLeft: tokens.spacing.sm, backgroundColor: tokens.colors.primary, borderRadius: tokens.radii.xl },
+  modalAddText: { color: tokens.colors.textInverse, fontFamily: tokens.typography.family.black },
 });
 
 export default WalletScreen;

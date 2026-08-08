@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useCallback } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import {
@@ -16,11 +17,11 @@ import { api } from '../api/client';
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
-  red: '#EF4444', redLight: '#FEF2F2',
+  red: tokens.colors.danger, redLight: '#FEF2F2',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
   purple: '#8B5CF6', purpleLight: 'rgba(139,92,246,0.1)',
   ink: '#1C1C1E', gray: '#6E6E73', muted: '#8E8E93',
-  border: '#E5E5EA', bg: '#F2F2F7', white: '#FFFFFF',
+  border: '#E5E5EA', bg: '#F2F2F7', white: tokens.colors.surface,
 };
 
 const getIcon = (type: string, read: boolean) => {
@@ -261,8 +262,7 @@ const styles = StyleSheet.create({
     backgroundColor: R.white, borderRadius: 20,
     padding: 16, marginBottom: 12,
     borderWidth: 1, borderColor: R.border,
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    ...tokens.shadows.soft,
   },
   cardUnread: {
     borderColor: '#FDDBB4',

@@ -1,15 +1,19 @@
+import { tokens } from '../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import RNOtpVerify from 'react-native-otp-verify';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+let RNOtpVerify: any;
+if (Platform.OS === 'android') {
+  RNOtpVerify = require('react-native-otp-verify').default;
+}
 import { useDispatch } from 'react-redux';
 import { useMutation } from '@tanstack/react-query';
 import { OTPWidget } from '@msg91comm/sendotp-react-native';
 import { api } from '../api/client';
 import { setAuth } from '../store/slices/authSlice';
 import { connectSocket } from '../socket/client';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import { radius, spacing } from '../theme/spacing';
+import { haptics } from '../utils/haptics';
+import { PressableScale } from '../components/ui/internal/PressableScale';
+import { useFeedback } from '../context/FeedbackContext';
 
 const OTPScreen = ({ route, navigation }: any) => {
   const { phone, referralCode, devRole, lat, lng } = route.params;
@@ -18,6 +22,7 @@ const OTPScreen = ({ route, navigation }: any) => {
   const [reqId, setReqId] = useState<string>(route.params.reqId);
   const dispatch = useDispatch();
   const inputRef = useRef<TextInput>(null);
+  const { showDialog } = useFeedback();
 
   const startAndroidAutoRead = () => {
     if (Platform.OS === 'android') {
@@ -66,19 +71,21 @@ const OTPScreen = ({ route, navigation }: any) => {
       return api.post('/auth/verify-widget-token', { accessToken, referralCode, appRole: devRole, lat, lng, platform: 'app' });
     },
     onSuccess: (data) => {
+      haptics.success();
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
       connectSocket(data.accessToken);
     },
     onError: (err: any) => {
+      haptics.error();
       const msg: string = err?.message || 'The code you entered is incorrect.';
       setOtp('');
       // MSG91 marks a reqId+otp pair as consumed the moment verifyOTP succeeds, even if OUR
       // own backend step after it fails for an unrelated reason (e.g. prelaunch gate). Retyping
       // the same code can never work again in that case -- only a fresh OTP will.
       if (/already verif/i.test(msg)) {
-        Alert.alert('Code already used', 'That code was already verified. Please tap "Resend Now" to get a new one.');
+        showDialog({ title: 'Code already used', message: 'That code was already verified. Please tap "Resend Now" to get a new one.', confirmText: 'Okay', type: 'warning' });
       } else {
-        Alert.alert('Error', msg);
+        showDialog({ title: 'Error', message: msg, confirmText: 'Okay', type: 'error' });
         inputRef.current?.focus();
       }
     },
@@ -93,15 +100,26 @@ const OTPScreen = ({ route, navigation }: any) => {
       // If MSG91 issues a fresh reqId on retry, switch to it -- otherwise keep the current one.
       const newReqId = response.message || response.reqId || response.request_id;
       if (newReqId) setReqId(newReqId);
+      return { reqId: newReqId || reqId };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      haptics.success();
+      setReqId(data.reqId);
       setTimer(30);
       setOtp('');
       startAndroidAutoRead();
-      Alert.alert('Resent', 'A new OTP has been sent to your phone.');
+      showDialog({ title: 'Resent', message: 'A new OTP has been sent to your phone.', confirmText: 'Okay', type: 'success' });
     },
     onError: (err: any) => {
-      Alert.alert('Error', err?.message || 'Could not resend the code. Please try again.');
+      haptics.error();
+      const msg: string = err?.message || 'Could not resend the code. Please try again.';
+      // Same MSG91 quirk as verifyMutation above -- surface the same friendly copy instead
+      // of the raw provider string when it's this specific, recognizable condition.
+      if (/already verif/i.test(msg)) {
+        showDialog({ title: 'Code already used', message: 'That code was already verified. Please tap "Resend Now" again to get a fresh one.', confirmText: 'Okay', type: 'warning' });
+      } else {
+        showDialog({ title: 'Error', message: msg, confirmText: 'Okay', type: 'error' });
+      }
     },
   });
 
@@ -119,9 +137,9 @@ const OTPScreen = ({ route, navigation }: any) => {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Verify Phone</Text>
-        <Text style={styles.subText}>Enter the 6-digit code sent to</Text>
-        <Text style={styles.phoneText}>
+        <Text style={styles.title} allowFontScaling maxFontSizeMultiplier={1.3}>Verify Phone</Text>
+        <Text style={styles.subText} allowFontScaling maxFontSizeMultiplier={1.4}>Enter the 6-digit code sent to</Text>
+        <Text style={styles.phoneText} allowFontScaling maxFontSizeMultiplier={1.4}>
           +{phone.slice(0, 2)} {phone.slice(2, 7)} {phone.slice(7)}
         </Text>
 
@@ -158,7 +176,7 @@ const OTPScreen = ({ route, navigation }: any) => {
                       verifyMutation.isPending && styles.otpBoxDisabled,
                     ]}
                   >
-                    <Text style={styles.otpBoxText}>{digit}</Text>
+                    <Text style={styles.otpBoxText} allowFontScaling={false}>{digit}</Text>
                     {isFocused && <View style={styles.cursor} />}
                   </View>
                 );
@@ -166,22 +184,22 @@ const OTPScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {verifyMutation.isPending && <ActivityIndicator color={colors.primary} style={styles.spinner} />}
+        {verifyMutation.isPending && <ActivityIndicator color={tokens.colors.primary} style={styles.spinner} />}
 
         <View style={styles.resendRow}>
-          <Text style={styles.resendLabel}>Didn't receive code? </Text>
+          <Text style={styles.resendLabel} allowFontScaling maxFontSizeMultiplier={1.4}>Didn't receive code? </Text>
           {timer > 0 ? (
-            <Text style={styles.timerText}>Resend in {timer}s</Text>
+            <Text style={styles.timerText} allowFontScaling maxFontSizeMultiplier={1.4}>Resend in {timer}s</Text>
           ) : (
-            <TouchableOpacity onPress={() => resendMutation.mutate()}>
-              <Text style={styles.resendBtnText}>Resend Now</Text>
-            </TouchableOpacity>
+            <PressableScale onPress={() => resendMutation.mutate()} style={styles.resendBtn} accessibilityRole="button" accessibilityLabel="Resend code">
+              <Text style={styles.resendBtnText} allowFontScaling maxFontSizeMultiplier={1.4}>Resend Now</Text>
+            </PressableScale>
           )}
         </View>
 
-        <TouchableOpacity style={styles.changePhoneBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.changePhoneText}>Change Phone Number</Text>
-        </TouchableOpacity>
+        <PressableScale style={styles.changePhoneBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Change phone number">
+          <Text style={styles.changePhoneText} allowFontScaling maxFontSizeMultiplier={1.4}>Change Phone Number</Text>
+        </PressableScale>
       </View>
     </View>
   );
@@ -190,8 +208,8 @@ const OTPScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    padding: spacing.xxl,
+    backgroundColor: tokens.colors.background,
+    padding: tokens.spacing.xxl,
   },
   content: {
     flex: 1,
@@ -199,78 +217,71 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    color: colors.ink,
+    color: tokens.colors.textPrimary,
     fontSize: 30,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     letterSpacing: -0.5,
   },
   subText: {
-    color: colors.inkMuted,
-    marginTop: spacing.sm,
+    color: tokens.colors.textSecondary,
+    marginTop: tokens.spacing.sm,
     textAlign: 'center',
-    fontFamily: fontFamily.medium,
+    fontFamily: tokens.typography.family.medium,
     fontSize: 15,
   },
   phoneText: {
-    color: colors.primary,
-    fontFamily: fontFamily.extrabold,
+    color: tokens.colors.primary,
+    fontFamily: tokens.typography.family.extrabold,
     fontSize: 19,
-    marginTop: spacing.xs,
+    marginTop: tokens.spacing.xs,
     letterSpacing: 1,
   },
   otpWrapper: {
     width: '100%',
     position: 'relative',
-    marginTop: spacing.xxxl,
-    marginBottom: spacing.xl,
+    marginTop: tokens.spacing.xxxl,
+    marginBottom: tokens.spacing.xl,
   },
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: tokens.spacing.sm,
   },
   otpBox: {
     width: 44,
     height: 56,
     borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    borderColor: tokens.colors.borderStrong,
+    borderRadius: tokens.radii.md,
+    backgroundColor: tokens.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    ...tokens.shadows.soft,
   },
   otpBoxFilled: {
-    borderColor: colors.primary,
+    borderColor: tokens.colors.primary,
   },
   otpBoxFocused: {
-    borderColor: colors.primary,
+    borderColor: tokens.colors.primary,
     borderWidth: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...tokens.shadows.medium,
   },
   otpBoxDisabled: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: tokens.colors.surfaceMuted,
     opacity: 0.6,
   },
   otpBoxText: {
     fontSize: 22,
-    fontFamily: fontFamily.black,
-    color: colors.ink,
+    fontFamily: tokens.typography.family.black,
+    color: tokens.colors.textPrimary,
   },
   cursor: {
     position: 'absolute',
     bottom: 12,
     width: 12,
     height: 2,
-    backgroundColor: colors.primary,
+    backgroundColor: tokens.colors.primary,
   },
   hiddenInput: {
     position: 'absolute',
@@ -282,34 +293,41 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   spinner: {
-    marginTop: spacing.xl,
+    marginTop: tokens.spacing.xl,
   },
   resendRow: {
-    marginTop: spacing.xxl,
+    marginTop: tokens.spacing.xxl,
     flexDirection: 'row',
     alignItems: 'center',
   },
   resendLabel: {
-    color: colors.inkMuted,
-    fontFamily: fontFamily.medium,
+    color: tokens.colors.textSecondary,
+    fontFamily: tokens.typography.family.medium,
     fontSize: 14,
   },
   timerText: {
-    color: colors.inkFaint,
-    fontFamily: fontFamily.bold,
+    color: tokens.colors.textTertiary,
+    fontFamily: tokens.typography.family.bold,
     fontSize: 14,
   },
+  resendBtn: {
+    minHeight: 48,
+    justifyContent: 'center',
+  },
   resendBtnText: {
-    color: colors.primary,
-    fontFamily: fontFamily.extrabold,
+    color: tokens.colors.primary,
+    fontFamily: tokens.typography.family.extrabold,
     fontSize: 14,
   },
   changePhoneBtn: {
-    marginTop: spacing.xxxl,
+    marginTop: tokens.spacing.xxxl,
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   changePhoneText: {
-    color: colors.inkFaint,
-    fontFamily: fontFamily.extrabold,
+    color: tokens.colors.textTertiary,
+    fontFamily: tokens.typography.family.extrabold,
     textTransform: 'uppercase',
     fontSize: 10,
     letterSpacing: 1.5,

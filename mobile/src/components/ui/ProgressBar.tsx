@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { tokens } from '../../theme/tokens';
 
 interface ProgressBarProps {
   value: number;
@@ -11,8 +11,8 @@ interface ProgressBarProps {
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   value,
-  color = colors.primary,
-  trackColor = colors.surfaceMuted,
+  color = tokens.colors.primary,
+  trackColor = tokens.colors.surfaceMuted,
   height = 8,
 }) => {
   const clamped = Math.max(0, Math.min(100, value));

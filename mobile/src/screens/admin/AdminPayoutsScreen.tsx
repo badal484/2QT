@@ -4,9 +4,12 @@ import { SkeletonScreenList, SkeletonListItem } from '../../components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { IndianRupee, CheckCircle2, User, Phone, Clock } from 'lucide-react-native';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const AdminPayoutsScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const { data, isLoading } = useQuery({
     queryKey: ['admin-pending-payouts'],
     queryFn: () => api.get('/admin/payouts/pending'),
@@ -16,10 +19,10 @@ const AdminPayoutsScreen = ({ navigation }: any) => {
     mutationFn: (payoutId: string) => api.post(`/admin/payouts/${payoutId}/approve`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-pending-payouts'] });
-      Alert.alert('Approved', 'Payout has been marked as completed.');
+      showDialog({ title: 'Approved', message: 'Payout has been marked as completed.', confirmText: 'Okay', type: 'success' });
     },
     onError: (err: any) => {
-      Alert.alert('Error', err.message || 'Failed to approve payout');
+      showDialog({ title: 'Error', message: err.message || 'Failed to approve payout', confirmText: 'Okay', type: 'error' });
     }
   });
 
@@ -65,7 +68,7 @@ const AdminPayoutsScreen = ({ navigation }: any) => {
                   {payout.upi_id && (
                     <View style={[styles.phoneRow, { marginTop: 4 }]}>
                       <IndianRupee size={12} color="#10B981" style={{ marginRight: 8 }} />
-                      <Text style={[styles.riderPhone, { color: '#10B981' }]}>{payout.upi_id}</Text>
+                      <Text style={[styles.riderPhone, { color: tokens.colors.success }]}>{payout.upi_id}</Text>
                     </View>
                   )}
                 </View>
@@ -90,10 +93,14 @@ const AdminPayoutsScreen = ({ navigation }: any) => {
               <TouchableOpacity 
                 activeOpacity={0.8}
                 onPress={() => {
-                  Alert.alert('Approve Payout', `Confirm settlement of ₹${payout.net_amount_paise / 100} to ${payout.rider_name} (${payout.upi_id || 'No UPI ID'})?`, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Confirm', onPress: () => approveMutation.mutate(payout.id) }
-                  ]);
+                  showDialog({
+                    title: 'Approve Payout',
+                    message: `Confirm settlement of ₹${payout.net_amount_paise / 100} to ${payout.rider_name} (${payout.upi_id || 'No UPI ID'})?`,
+                    confirmText: 'Approve',
+                    cancelText: 'Cancel',
+                    type: 'info',
+                    onConfirm: () => approveMutation.mutate(payout.id)
+                  });
                 }}
                 style={styles.approveBtn}
               >
@@ -115,11 +122,11 @@ const AdminPayoutsScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -180,17 +187,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   payoutCard: {
-    backgroundColor: '#fff',
+    backgroundColor: tokens.colors.surface,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     borderRadius: 40,
     padding: 28,
     marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...tokens.shadows.soft,
   },
   cardTop: {
     flexDirection: 'row',
@@ -280,7 +283,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   approveBtnText: {
-    color: '#fff',
+    color: tokens.colors.surface,
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 2,

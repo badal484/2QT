@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, ActivityIndicator,
@@ -11,6 +12,7 @@ import {
   Pencil, Building2, Smartphone, Banknote, Shield, IndianRupee, Zap,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFeedback } from '../context/FeedbackContext';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
@@ -18,13 +20,14 @@ const R = {
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.1)',
   purple: '#8B5CF6', purpleLight: 'rgba(139,92,246,0.1)',
   ink: '#1A1F1C', gray: '#6B7570', muted: '#9CA3A0',
-  border: '#E5E7EB', bg: '#F8F9FA', white: '#FFFFFF',
+  border: tokens.colors.border, bg: '#F8F9FA', white: tokens.colors.surface,
 };
 
 type PayoutTab = 'bank' | 'upi';
 
 const PayoutsScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [activeTab, setActiveTab] = useState<PayoutTab>('bank');
   const [editing, setEditing] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -56,9 +59,9 @@ const PayoutsScreen = ({ navigation }: any) => {
     onSuccess: () => {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
-      Alert.alert('Bank Account Saved', 'Earnings will be transferred to your bank every Monday at 10 AM.');
+      showDialog({ title: 'Bank Account Saved', message: 'Earnings will be transferred to your bank every Monday at 10 AM.', confirmText: 'Okay', type: 'success' });
     },
-    onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message || 'Could not save bank account'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err.response?.data?.error || err.message || 'Could not save bank account', confirmText: 'Okay', type: 'error' }),
   });
 
   const withdrawMutation = useMutation({
@@ -68,49 +71,48 @@ const PayoutsScreen = ({ navigation }: any) => {
       setShowWithdraw(false);
       setWithdrawAmt('');
       queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
-      Alert.alert('Request Sent', 'Your withdrawal request has been submitted. Finance will process it shortly.');
+      showDialog({ title: 'Request Sent', message: 'Your withdrawal request has been submitted. Finance will process it shortly.', confirmText: 'Okay', type: 'success' });
     },
     onError: (err: any) => {
-      const code = err?.response?.data?.error || err?.message;
+      const code = err.response?.data?.code;
       if (code === 'ALREADY_REQUESTED_TODAY') {
-        Alert.alert('Already Requested', 'You can only make one withdrawal request per day.');
+        showDialog({ title: 'Already Requested', message: 'You can only make one withdrawal request per day.', confirmText: 'Okay', type: 'warning' });
       } else if (code === 'INSUFFICIENT_BALANCE') {
-        Alert.alert('Insufficient Balance', 'You don\'t have enough balance for this amount.');
+        showDialog({ title: 'Insufficient Balance', message: 'You don\'t have enough balance for this amount.', confirmText: 'Okay', type: 'warning' });
       } else {
-        Alert.alert('Error', 'Could not submit withdrawal request. Try again.');
+        showDialog({ title: 'Error', message: 'Could not submit withdrawal request. Try again.', confirmText: 'Okay', type: 'error' });
       }
     },
   });
 
   const handleWithdraw = () => {
-    const paise = Math.round(parseFloat(withdrawAmt) * 100);
+    const paise = parseInt(withdrawAmt) * 100;
     if (!withdrawAmt || isNaN(paise) || paise < 10000) {
-      Alert.alert('Minimum ₹100', 'Enter an amount of at least ₹100 to withdraw.');
+      showDialog({ title: 'Minimum ₹100', message: 'Enter an amount of at least ₹100 to withdraw.', confirmText: 'Okay', type: 'warning' });
       return;
     }
     if (paise > (data?.withdrawablePaise || 0)) {
-      Alert.alert('Exceeds Balance', 'Amount cannot exceed your available balance.');
+      showDialog({ title: 'Exceeds Balance', message: 'Amount cannot exceed your available balance.', confirmText: 'Okay', type: 'warning' });
       return;
     }
-    Alert.alert(
-      'Confirm Withdrawal',
-      `Request ₹${(paise / 100).toFixed(0)} to your ${data?.payoutMethod === 'bank' ? 'bank account' : 'UPI ID'}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Confirm', onPress: () => withdrawMutation.mutate(paise) },
-      ]
-    );
+    showDialog({
+      title: 'Confirm Withdrawal',
+      message: `Request withdrawal of ₹${withdrawAmt}?`,
+      confirmText: 'Withdraw',
+      cancelText: 'Cancel',
+      type: 'info',
+      onConfirm: () => withdrawMutation.mutate(paise)
+    });
   };
 
   const saveUpiMutation = useMutation({
     mutationFn: (data: { upiId: string }) => api.patch('/riders/upi', data),
     onSuccess: () => {
       setEditing(false);
-      setUpiInput('');
       queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
-      Alert.alert('UPI Saved', 'Earnings will be transferred to your UPI every Monday at 10 AM.');
+      showDialog({ title: 'UPI Saved', message: 'Earnings will be transferred to your UPI every Monday at 10 AM.', confirmText: 'Okay', type: 'success' });
     },
-    onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message || 'Could not save UPI'),
+    onError: (err: any) => showDialog({ title: 'Error', message: err.response?.data?.error || err.message || 'Could not save UPI', confirmText: 'Okay', type: 'error' }),
   });
 
   if (isLoading) {
@@ -150,12 +152,12 @@ const PayoutsScreen = ({ navigation }: any) => {
 
   const handleSave = () => {
     if (activeTab === 'bank') {
-      if (!accountNumber.trim()) return Alert.alert('Required', 'Enter account number');
-      if (!ifsc.trim()) return Alert.alert('Required', 'Enter IFSC code');
-      if (!accountName.trim()) return Alert.alert('Required', 'Enter account holder name');
+      if (!accountNumber.trim()) { showDialog({ title: 'Required', message: 'Enter account number', confirmText: 'Okay', type: 'warning' }); return; }
+      if (!ifsc.trim()) { showDialog({ title: 'Required', message: 'Enter IFSC code', confirmText: 'Okay', type: 'warning' }); return; }
+      if (!accountName.trim()) { showDialog({ title: 'Required', message: 'Enter account holder name', confirmText: 'Okay', type: 'warning' }); return; }
       saveBankMutation.mutate({ accountNumber: accountNumber.trim(), ifsc: ifsc.trim(), accountName: accountName.trim() });
     } else {
-      if (!upiInput.trim()) return Alert.alert('Required', 'Enter your UPI ID');
+      if (!upiInput.trim()) { showDialog({ title: 'Required', message: 'Enter your UPI ID', confirmText: 'Okay', type: 'warning' }); return; }
       saveUpiMutation.mutate({ upiId: upiInput.trim() });
     }
   };
@@ -486,9 +488,9 @@ const PayoutsScreen = ({ navigation }: any) => {
                 const isFailed = p.status === 'failed';
                 const isAuto   = p.payout_mode === 'auto';
                 const method   = p.payout_method || 'upi';
-                const iconColor = isPaid ? R.green : isFailed ? '#EF4444' : R.orange;
+                const iconColor = isPaid ? R.green : isFailed ? tokens.colors.danger : R.orange;
                 const iconBg    = isPaid ? R.greenLight : isFailed ? '#FEF2F2' : R.orangeLight;
-                const badgeColor = isPaid ? R.green : isFailed ? '#EF4444' : R.orange;
+                const badgeColor = isPaid ? R.green : isFailed ? tokens.colors.danger : R.orange;
                 const badgeBg    = isPaid ? R.greenLight : isFailed ? '#FEE2E2' : R.orangeLight;
                 return (
                   <View key={p.id} style={styles.payoutRow}>
@@ -520,12 +522,12 @@ const PayoutsScreen = ({ navigation }: any) => {
                         )}
                       </View>
                       {isFailed && p.failure_reason && (
-                        <Text style={{ color: '#EF4444', fontSize: 10, marginTop: 4 }} numberOfLines={2}>
+                        <Text style={{ color: tokens.colors.danger, fontSize: 10, marginTop: 4 }} numberOfLines={2}>
                           {p.failure_reason}
                         </Text>
                       )}
                     </View>
-                    <Text style={[styles.payoutAmt, isFailed && { color: '#EF4444' }]}>
+                    <Text style={[styles.payoutAmt, isFailed && { color: tokens.colors.danger }]}>
                       ₹{(p.net_amount_paise / 100).toFixed(0)}
                     </Text>
                   </View>

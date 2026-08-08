@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, withTiming, runOnJS, Easing } from 'react-native-reanimated';
 import { AlertCircle, CheckCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fontFamily } from '../../theme/typography';
+import { tokens } from '../../theme/tokens';
 
 export type ToastType = 'error' | 'success';
 
@@ -56,13 +56,13 @@ export const Toast = () => {
   if (!current) return null;
 
   const Icon = current.type === 'error' ? AlertCircle : CheckCircle;
-  const fill = current.type === 'error' ? '#EF4444' : '#10B981';
+  const fill = current.type === 'error' ? tokens.colors.danger : tokens.colors.success;
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateY }], opacity }]} pointerEvents="none">
       <View style={styles.pill}>
-        <Icon size={18} color="#FFFFFF" fill={fill} />
-        <Text style={styles.text}>{current.message}</Text>
+        <Icon size={18} color={tokens.colors.textInverse} fill={fill} />
+        <Text style={styles.text} allowFontScaling maxFontSizeMultiplier={1.4}>{current.message}</Text>
       </View>
     </Animated.View>
   );
@@ -81,20 +81,17 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
+    // Intentionally darker-than-surface for contrast against any backdrop — not a token value.
     backgroundColor: '#1A1A1A',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 100,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    borderRadius: tokens.radii.full,
+    ...tokens.shadows.medium,
   },
   text: {
-    color: '#FFFFFF',
-    fontFamily: fontFamily.bold,
-    fontSize: 13,
-    marginLeft: 8,
+    color: tokens.colors.textInverse,
+    fontFamily: tokens.typography.family.bold,
+    fontSize: tokens.typography.type.bodySmall.fontSize,
+    marginLeft: tokens.spacing.sm,
   }
 });

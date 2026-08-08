@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
@@ -7,17 +8,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Power, Package, Timer, RefreshCw } from 'lucide-react-native';
+import { useFeedback } from '../context/FeedbackContext';
 
 const G = {
   bg: '#070707', card: '#111111', border: 'rgba(255,255,255,0.07)', faint: 'rgba(255,255,255,0.05)',
   green: '#00D084', greenBg: 'rgba(0,208,132,0.08)',
-  red: '#EF4444', redBg: 'rgba(239,68,68,0.08)',
+  red: tokens.colors.danger, redBg: 'rgba(239,68,68,0.08)',
   orange: '#FC4603', orangeBg: 'rgba(252,128,25,0.08)',
-  white: '#FFFFFF', dim: 'rgba(255,255,255,0.55)', muted: 'rgba(255,255,255,0.2)',
+  white: tokens.colors.surface, dim: 'rgba(255,255,255,0.55)', muted: 'rgba(255,255,255,0.2)',
 };
 
 const KitchenManageScreen = () => {
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [selectedDuration, setSelectedDuration] = useState<number | null>(30);
   const [pauseReason, setPauseReason] = useState('');
   const [countdownStr, setCountdownStr] = useState('');
@@ -49,13 +52,13 @@ const KitchenManageScreen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-manage'] });
       if (!kitchenPaused) {
-        Alert.alert('Kitchen Paused', 'New orders will not be accepted.');
+        showDialog({ title: 'Kitchen Paused', message: 'New orders will not be accepted.', confirmText: 'Okay', type: 'warning' });
       } else {
-        Alert.alert('Kitchen Opened', 'You are now accepting orders!');
+        showDialog({ title: 'Kitchen Opened', message: 'You are now accepting orders!', confirmText: 'Okay', type: 'success' });
         setPauseReason('');
       }
     },
-    onError: () => Alert.alert('Error', 'Could not update kitchen status.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not update kitchen status.', confirmText: 'Okay', type: 'error' }),
   });
 
   const toggleMutation = useMutation({
@@ -265,7 +268,7 @@ const styles = StyleSheet.create({
 
   btn: { height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   btnTextBlack: { color: '#000', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  btnTextWhite: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+  btnTextWhite: { color: tokens.colors.surface, fontSize: 14, fontWeight: '900', letterSpacing: 1 },
 
   menuSection: { backgroundColor: G.card, borderRadius: 24, padding: 20, borderWidth: 1, borderColor: G.border },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },

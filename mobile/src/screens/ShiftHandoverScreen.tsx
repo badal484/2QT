@@ -1,9 +1,11 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { api } from '../api/client';
+import { useFeedback } from '../context/FeedbackContext';
 
 const G = {
   bg: '#070707',
@@ -13,7 +15,7 @@ const G = {
   green: '#00D084',
   greenBg: 'rgba(0,208,132,0.1)',
   greenBorder: 'rgba(0,208,132,0.2)',
-  white: '#FFFFFF',
+  white: tokens.colors.surface,
   dim: 'rgba(255,255,255,0.55)',
   muted: 'rgba(255,255,255,0.2)',
 };
@@ -27,8 +29,9 @@ const CHECKLIST = [
 
 const ShiftHandoverScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  const [notes, setNotes] = useState('');
+  const { showDialog } = useFeedback();
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState('');
 
   const toggle = (id: string) => setChecked(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -41,11 +44,15 @@ const ShiftHandoverScreen = ({ navigation }: any) => {
       gasStatus: checked.gas || false,
     }),
     onSuccess: () => {
-      Alert.alert('Shift Ended', 'Handover notes submitted.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showDialog({
+        title: 'Shift Ended',
+        message: 'Handover notes submitted.',
+        confirmText: 'OK',
+        type: 'success',
+        onConfirm: () => navigation.goBack()
+      });
     },
-    onError: () => Alert.alert('Error', 'Could not submit handover. Try again.'),
+    onError: () => showDialog({ title: 'Error', message: 'Could not submit handover. Try again.', confirmText: 'Okay', type: 'error' }),
   });
 
   return (

@@ -5,9 +5,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Ticket, Plus, Trash2 } from 'lucide-react-native';
 import { api } from '../../api/client';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const PromoCodesManagerScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newCode, setNewCode] = useState({
     code: '',
@@ -27,9 +30,9 @@ const PromoCodesManagerScreen = ({ navigation }: any) => {
       queryClient.invalidateQueries({ queryKey: ['admin-promocodes'] });
       setShowAddForm(false);
       setNewCode({ code: '', discount_percent: '10', min_order_paise: '0', max_discount_paise: '10000' });
-      Alert.alert('Success', 'Promo code created');
+      showDialog({ title: 'Success', message: 'Promo code created', confirmText: 'Okay', type: 'success' });
     },
-    onError: (err: any) => Alert.alert('Error', err.message || 'Could not create promo code')
+    onError: (err: any) => showDialog({ title: 'Error', message: err.message || 'Could not create promo code', confirmText: 'Okay', type: 'error' })
   });
 
   const deleteMutation = useMutation({
@@ -102,7 +105,7 @@ const PromoCodesManagerScreen = ({ navigation }: any) => {
             <TouchableOpacity 
               style={styles.saveBtn}
               onPress={() => {
-                if (!newCode.code) return Alert.alert('Error', 'Code is required');
+                if (!newCode.code) { showDialog({ title: 'Error', message: 'Code is required', confirmText: 'Okay', type: 'warning' }); return; }
                 addMutation.mutate({
                   code: newCode.code,
                   discount_percent: parseInt(newCode.discount_percent) || 0,
@@ -139,10 +142,14 @@ const PromoCodesManagerScreen = ({ navigation }: any) => {
             <TouchableOpacity 
               style={styles.deleteBtn}
               onPress={() => {
-                Alert.alert('Delete', 'Are you sure?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(p.id) }
-                ]);
+                showDialog({
+                  title: 'Delete',
+                  message: 'Are you sure?',
+                  confirmText: 'Delete',
+                  cancelText: 'Cancel',
+                  type: 'warning',
+                  onConfirm: () => deleteMutation.mutate(p.id)
+                });
               }}
             >
               <Trash2 size={16} color="#EF4444" />
@@ -157,18 +164,18 @@ const PromoCodesManagerScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16, backgroundColor: '#fff' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16, backgroundColor: tokens.colors.surface },
   backButton: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 20, fontWeight: '900', color: '#1A1A2E' },
   addButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-end' },
   scrollView: { flex: 1 },
   scrollContent: { padding: 24, paddingBottom: 100 },
-  addCard: { backgroundColor: '#fff', padding: 24, borderRadius: 24, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  addCard: { backgroundColor: tokens.colors.surface, padding: 24, borderRadius: 24, marginBottom: 24, ...tokens.shadows.soft, },
   addTitle: { fontSize: 16, fontWeight: '900', marginBottom: 16, color: '#1A1A2E' },
   input: { backgroundColor: '#f3f4f6', padding: 16, borderRadius: 12, marginBottom: 12, color: '#1A1A2E', fontWeight: 'bold' },
   saveBtn: { backgroundColor: '#FF6B35', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  saveBtnText: { color: '#fff', fontWeight: '900' },
-  promoCard: { backgroundColor: '#fff', padding: 24, borderRadius: 24, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  saveBtnText: { color: tokens.colors.surface, fontWeight: '900' },
+  promoCard: { backgroundColor: tokens.colors.surface, padding: 24, borderRadius: 24, marginBottom: 16, ...tokens.shadows.soft, },
   promoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   codeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 107, 53, 0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   codeText: { color: '#FF6B35', fontWeight: '900', marginLeft: 8 },

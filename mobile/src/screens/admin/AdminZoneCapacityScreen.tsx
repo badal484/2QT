@@ -7,13 +7,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { ArrowLeft, Package, Users, ChevronDown, ChevronUp, Info } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFeedback } from '../../context/FeedbackContext';
+import { tokens } from '../../theme/tokens';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: '#FFFBEB',
   ink: '#111827', gray: '#6B7280', muted: '#9CA3AF',
-  border: '#E5E7EB', bg: '#F9FAFB', white: '#FFFFFF',
+  border: tokens.colors.border, bg: tokens.colors.background, white: tokens.colors.surface,
 };
 
 const CAP_OPTIONS = [
@@ -138,7 +140,8 @@ const zc = StyleSheet.create({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 const AdminZoneCapacityScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
+  const { showDialog } = useFeedback();
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-zones'],
@@ -149,9 +152,9 @@ const AdminZoneCapacityScreen = ({ navigation }: any) => {
     mutationFn: ({ id, cap }: { id: string; cap: number }) =>
       api.patch(`/admin/zones/${id}`, { max_concurrent_orders: cap }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-zones'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-zones'] });
     },
-    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || e.message),
+    onError: (e: any) => showDialog({ title: 'Error', message: e.response?.data?.error || e.message, confirmText: 'Okay', type: 'error' }),
   });
 
   const handleSave = async (id: string, cap: number) => {

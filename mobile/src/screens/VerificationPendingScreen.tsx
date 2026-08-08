@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
@@ -12,17 +13,19 @@ import {
   RefreshCw, CheckCircle2, Lock,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFeedback } from '../context/FeedbackContext';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
   green: '#1BA672', greenLight: '#E8F8F1',
   amber: '#F59E0B', amberLight: 'rgba(245,158,11,0.08)',
   ink: '#282C3F', gray: '#686B78', muted: '#93959F',
-  border: '#E9E9EB', bg: '#F8F8F8', white: '#FFFFFF',
+  border: '#E9E9EB', bg: '#F8F8F8', white: tokens.colors.surface,
 };
 
 const VerificationPendingScreen = () => {
   const dispatch = useDispatch();
+  const { showDialog } = useFeedback();
   const user = useSelector((state: RootState) => state.auth.user);
   const [checking, setChecking] = useState(false);
 
@@ -33,15 +36,15 @@ const VerificationPendingScreen = () => {
       if (res.user) {
         dispatch(updateUser(res.user));
         if (res.user.is_verified) {
-          Alert.alert('You\'re Approved!', 'Your account has been verified. Welcome to the team!');
+          showDialog({ title: 'You\'re Approved!', message: 'Your account has been verified. Welcome to the team!', confirmText: 'Okay', type: 'success' });
         } else {
-          Alert.alert('Still Under Review', 'Our team is still reviewing your documents. This usually takes 24-48 hours. Thank you for your patience.');
+          showDialog({ title: 'Still Under Review', message: 'Our team is still reviewing your documents. This usually takes 24-48 hours. Thank you for your patience.', confirmText: 'Okay', type: 'info' });
         }
       } else {
         throw new Error('User data not found');
       }
     } catch (err: any) {
-      Alert.alert('Check Failed', err.message || 'Unable to reach server. Please check your connection.');
+      showDialog({ title: 'Check Failed', message: err.message || 'Unable to reach server. Please check your connection.', confirmText: 'Okay', type: 'error' });
     } finally {
       setChecking(false);
     }

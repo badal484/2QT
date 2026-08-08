@@ -1,3 +1,4 @@
+import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View, TextInput, ActivityIndicator } from 'react-native';
@@ -8,15 +9,14 @@ import { ChefHat, ShieldCheck, Bike } from 'lucide-react-native';
 import { updateUser } from '../store/slices/authSlice';
 import { api } from '../api/client';
 import { Button, TextField } from '../components/ui';
-import { colors } from '../theme/colors';
-import { fontFamily } from '../theme/typography';
-import { radius, spacing } from '../theme/spacing';
 import { RootState } from '../store';
+import { useFeedback } from '../context/FeedbackContext';
 
 const OnboardingScreen = ({ navigation }: any) => {
   const [name, setName] = useState('');
   const [riderFocused, setRiderFocused] = useState(false);
   const dispatch = useDispatch();
+  const { showDialog } = useFeedback();
   const { user } = useSelector((state: RootState) => state.auth);
   
   const isRider = user?.role === 'rider' || user?.role === 'rider_captain';
@@ -39,7 +39,7 @@ const OnboardingScreen = ({ navigation }: any) => {
       }
     },
     onError: (err: any) => {
-      Alert.alert('Setup Failed', err.message || 'Could not update profile.');
+      showDialog({ title: 'Setup Failed', message: err.message || 'Could not update profile.', confirmText: 'Okay', type: 'error' });
     },
   });
 
@@ -61,15 +61,15 @@ const OnboardingScreen = ({ navigation }: any) => {
           {isRider ? (
             <Bike color="#FF6B35" size={28} strokeWidth={2.25} />
           ) : (
-            <ChefHat color={colors.white} size={28} strokeWidth={2.25} />
+            <ChefHat color={tokens.colors.textInverse} size={28} strokeWidth={2.25} />
           )}
         </View>
 
-        <Text style={[styles.title, isRider && styles.riderTitle]}>
+        <Text style={[styles.title, isRider && styles.riderTitle]} allowFontScaling maxFontSizeMultiplier={1.3}>
           {isRider ? 'Welcome, Captain' : 'Welcome aboard'}
         </Text>
-        <Text style={[styles.subText, isRider && styles.riderSubText]}>
-          {isRider 
+        <Text style={[styles.subText, isRider && styles.riderSubText]} allowFontScaling maxFontSizeMultiplier={1.4}>
+          {isRider
             ? "Let's set up your Captain profile so we know exactly who is representing 2QT on the road."
             : "Let's get your profile set up so we know exactly who we're cooking for."
           }
@@ -106,11 +106,11 @@ const OnboardingScreen = ({ navigation }: any) => {
 
         <View style={isRider ? styles.riderTrustRow : styles.trustRow}>
           <ShieldCheck 
-            color={isRider ? '#FF6B35' : colors.primary} 
+            color={isRider ? '#FF6B35' : tokens.colors.primary} 
             size={16} 
             strokeWidth={2.25} 
           />
-          <Text style={isRider ? styles.riderTrustText : styles.trustText}>
+          <Text style={isRider ? styles.riderTrustText : styles.trustText} allowFontScaling maxFontSizeMultiplier={1.4}>
             {isRider
               ? 'All active delivery missions are secured with 2QT accident coverage and navigation assistance.'
               : 'Every meal is made fresh in our own kitchen — watch how, anytime.'
@@ -156,63 +156,63 @@ const OnboardingScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: tokens.colors.background,
   },
   riderContainer: {
     backgroundColor: '#0B0C10',
   },
   content: {
     flex: 1,
-    padding: spacing.xxl,
+    padding: tokens.spacing.xxl,
     justifyContent: 'center',
   },
   logoMark: {
     width: 64,
     height: 64,
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
+    backgroundColor: tokens.colors.primary,
+    borderRadius: tokens.radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xxl,
-    shadowColor: colors.primary,
+    marginBottom: tokens.spacing.xxl,
+    shadowColor: tokens.colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 10,
   },
   title: {
-    color: colors.ink,
+    color: tokens.colors.textPrimary,
     fontSize: 30,
-    fontFamily: fontFamily.black,
+    fontFamily: tokens.typography.family.black,
     letterSpacing: -0.5,
   },
   riderTitle: {
-    color: '#FFFFFF',
+    color: tokens.colors.surface,
   },
   subText: {
-    color: colors.inkMuted,
-    marginTop: spacing.sm,
-    fontFamily: fontFamily.medium,
+    color: tokens.colors.textSecondary,
+    marginTop: tokens.spacing.sm,
+    fontFamily: tokens.typography.family.medium,
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: spacing.xxl,
+    marginBottom: tokens.spacing.xxl,
   },
   riderSubText: {
     color: '#94A3B8',
   },
   fieldSpacing: {
-    marginBottom: spacing.lg,
+    marginBottom: tokens.spacing.lg,
   },
   riderFieldContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: tokens.spacing.lg,
   },
   riderLabel: {
-    fontFamily: fontFamily.extrabold,
+    fontFamily: tokens.typography.family.extrabold,
     fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     color: '#94A3B8',
-    marginBottom: spacing.sm,
+    marginBottom: tokens.spacing.sm,
   },
   riderField: {
     flexDirection: 'row',
@@ -220,8 +220,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#161726',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.lg,
+    borderRadius: tokens.radii.lg,
+    paddingHorizontal: tokens.spacing.lg,
     minHeight: 56,
   },
   riderFieldFocused: {
@@ -230,52 +230,52 @@ const styles = StyleSheet.create({
   },
   riderInput: {
     flex: 1,
-    fontFamily: fontFamily.semibold,
+    fontFamily: tokens.typography.family.semibold,
     fontSize: 16,
-    color: '#FFFFFF',
-    paddingVertical: spacing.md,
+    color: tokens.colors.surface,
+    paddingVertical: tokens.spacing.md,
   },
   trustRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.primaryTint,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.xxl,
+    backgroundColor: tokens.colors.primaryTint,
+    borderRadius: tokens.radii.md,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.xxl,
   },
   riderTrustRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.xxl,
+    borderRadius: tokens.radii.md,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.xxl,
     borderWidth: 1,
     borderColor: 'rgba(255, 107, 53, 0.15)',
   },
   trustText: {
     flex: 1,
-    marginLeft: spacing.sm,
-    color: colors.primaryDark,
-    fontFamily: fontFamily.semibold,
+    marginLeft: tokens.spacing.sm,
+    color: tokens.colors.primaryDark,
+    fontFamily: tokens.typography.family.semibold,
     fontSize: 13,
     lineHeight: 18,
   },
   riderTrustText: {
     flex: 1,
-    marginLeft: spacing.sm,
+    marginLeft: tokens.spacing.sm,
     color: '#FF6B35',
-    fontFamily: fontFamily.semibold,
+    fontFamily: tokens.typography.family.semibold,
     fontSize: 13,
     lineHeight: 18,
   },
   saveButton: {
-    marginTop: spacing.xs,
+    marginTop: tokens.spacing.xs,
   },
   riderSaveButton: {
     backgroundColor: '#FF6B35',
     height: 64,
-    borderRadius: radius.lg,
+    borderRadius: tokens.radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
@@ -290,8 +290,8 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   riderSaveButtonText: {
-    color: '#FFFFFF',
-    fontFamily: fontFamily.extrabold,
+    color: tokens.colors.surface,
+    fontFamily: tokens.typography.family.extrabold,
     fontSize: 16,
     letterSpacing: 2,
     textTransform: 'uppercase',
