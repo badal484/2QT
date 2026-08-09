@@ -353,17 +353,50 @@ router.post('/validate-cart', async (req, res) => {
 
 router.get('/search', async (req, res) => {
     const { q, zoneId } = req.query;
-    if (!q || !zoneId) return res.status(400).json({ error: 'INVALID_QUERY' });
+    if (!q) return res.json({ results: [] });
 
-    const { rows } = await query(
-        `SELECT *, ts_rank(search_vector, websearch_to_tsquery('english', $1)) as rank
-         FROM menu_items
-         WHERE zone_id = $2 AND search_vector @@ websearch_to_tsquery('english', $1)
-         ORDER BY rank DESC LIMIT 20`,
-        [q, zoneId]
-    );
+    const queryStr = (q as string).trim();
+    if (!queryStr) return res.json({ results: [] });
 
-    res.json({ results: rows });
+    const searchPattern = `%${queryStr}%`;
+    const prefixPattern = `${queryStr}%`;
+
+    try {
+        let sql = `
+            SELECT mi.*
+            FROM menu_items mi
+            LEFT JOIN kitchen_zones kz ON kz.kitchen_id = mi.kitchen_id
+            WHERE (
+              mi.name ILIKE $1 
+              OR mi.category ILIKE $1 
+              OR mi.description ILIKE $1
+            )
+        `;
+        const params: any[] = [searchPattern, prefixPattern];
+
+        if (zoneId) {
+            params.push(zoneId);
+            sql += ` AND (mi.zone_id = $3 OR kz.zone_id = $3)`;
+        }
+
+        sql += `
+            ORDER BY 
+              CASE 
+                WHEN mi.name ILIKE $2 THEN 1
+                WHEN mi.category ILIKE $2 THEN 2
+                WHEN mi.name ILIKE $1 THEN 3
+                ELSE 4
+              END,
+              mi.name ASC 
+            LIMIT 30
+        `;
+
+        const { rows } = await query(sql, params);
+        res.json({ results: rows });
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ error: 'SEARCH_FAILED' });
+    }
 });
 
 router.get('/zones/check', async (req, res) => {
@@ -407,7 +440,8 @@ router.get('/zones/check', async (req, res) => {
             }
         }
 
-        res.json({ serviceable: false, zone: null });
+        const nearestZone = rows[0] || null;
+        res.json({ serviceable: false, zone: nearestZone, nearestZone });
     } catch (err: any) {
         console.error('[ZONES_CHECK_ERROR]', err.message);
         res.status(500).json({ error: 'CHECK_FAILED', message: err.message });
