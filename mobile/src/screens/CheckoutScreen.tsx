@@ -8,7 +8,7 @@ import { clearCart } from '../store/slices/cartSlice';
 import { RootState } from '../store';
 import RazorpayCheckout from 'react-native-razorpay';
 import Animated, { FadeInDown, SlideInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
-import { ArrowLeft, MapPin, Sparkles, ChevronRight, ShieldCheck, Wallet, Banknote, CreditCard, Lock } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Sparkles, ChevronRight, ShieldCheck, Wallet, Banknote, CreditCard, Lock, X } from 'lucide-react-native';
 import { haptics } from '../utils/haptics';
 import { PressableScale } from '../components/ui/internal/PressableScale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -85,6 +85,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
 
   const [useWallet, setUseWallet] = useState(false);
   const [useLoyalty, setUseLoyalty] = useState(false);
+  const [showDeliveryFeeInfo, setShowDeliveryFeeInfo] = useState(false);
   const [paymentSubMethod, setPaymentSubMethod] = useState<'online' | 'cod'>('online');
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -349,7 +350,38 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.card}>
           <Text allowFontScaling={false} style={styles.sectionTitle}>Order Summary</Text>
           <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Item Total</Text><Text allowFontScaling={false} style={styles.billValue}>₹{p.subtotalPaise / 100}</Text></View>
-          <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Delivery Fee</Text><Text allowFontScaling={false} style={styles.billValue}>₹{p.deliveryFeePaise / 100}</Text></View>
+          <View style={styles.billRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text allowFontScaling={false} style={styles.billLabel}>Delivery Fee</Text>
+              <PressableScale onPress={() => { haptics.selection(); setShowDeliveryFeeInfo(!showDeliveryFeeInfo); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text allowFontScaling={false} style={styles.whyThisText}>(Why this?)</Text>
+              </PressableScale>
+            </View>
+            <Text allowFontScaling={false} style={styles.billValue}>{p.deliveryFeePaise === 0 ? 'FREE' : `₹${p.deliveryFeePaise / 100}`}</Text>
+          </View>
+
+          {showDeliveryFeeInfo && (
+            <Animated.View entering={FadeInDown.duration(250)} style={styles.feeInfoCard}>
+              <View style={styles.feeInfoHeader}>
+                <Text allowFontScaling={false} style={styles.feeInfoTitle}>Why pay a Delivery Fee ?</Text>
+                <PressableScale onPress={() => setShowDeliveryFeeInfo(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <X size={16} color="#71717A" />
+                </PressableScale>
+              </View>
+              <Text allowFontScaling={false} style={styles.feeInfoBody}>
+                This goes towards fairly compensating our captains and covering the convenience of bringing yummy food right to the comfort of your home. It ensures a sustainable service for everyone involved.
+              </Text>
+            </Animated.View>
+          )}
+
+          <View style={styles.billRow}>
+            <Text allowFontScaling={false} style={[styles.billLabel, { textDecorationLine: 'line-through' }]}>Platform fees</Text>
+            <Text allowFontScaling={false} style={styles.feeStrikethroughText}>We're not those guys</Text>
+          </View>
+          <View style={styles.billRow}>
+            <Text allowFontScaling={false} style={[styles.billLabel, { textDecorationLine: 'line-through' }]}>Packaging Fees</Text>
+            <Text allowFontScaling={false} style={styles.feeStrikethroughText}>Seriously? Nope</Text>
+          </View>
           <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Taxes</Text><Text allowFontScaling={false} style={styles.billValue}>₹{((p.cgstPaise || 0) + (p.sgstPaise || 0)) / 100}</Text></View>
           {riderTip > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Rider Tip</Text><Text allowFontScaling={false} style={styles.billValue}>₹{riderTip}</Text></View>}
           
@@ -545,8 +577,39 @@ const styles = StyleSheet.create({
   pulseCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: tokens.colors.primaryTint, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   verifyingTitle: { fontSize: 22, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 8 },
   verifyingSub: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, textAlign: 'center', paddingHorizontal: 40 },
-
+  
   outOfZoneContainer: { flex: 1, backgroundColor: tokens.colors.background },
+  whyThisText: { fontSize: 12, fontFamily: tokens.typography.family.bold, color: '#E11D48' },
+  feeInfoCard: {
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#E4E4E7',
+    borderRadius: 14,
+    padding: 14,
+    marginVertical: 10,
+  },
+  feeInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  feeInfoTitle: {
+    fontSize: 14,
+    fontFamily: tokens.typography.family.extrabold,
+    color: '#18181B',
+  },
+  feeInfoBody: {
+    fontSize: 12,
+    fontFamily: tokens.typography.family.medium,
+    color: '#52525B',
+    lineHeight: 18,
+  },
+  feeStrikethroughText: {
+    fontSize: 13,
+    fontFamily: tokens.typography.family.medium,
+    color: '#71717A',
+  },
   outOfZoneBack: { position: 'absolute', top: 50, left: 20, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: tokens.colors.surface, alignItems: 'center', justifyContent: 'center', ...tokens.shadows.soft, },
   outOfZoneContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: tokens.spacing.xl },
   outOfZoneIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: tokens.colors.dangerTint, alignItems: 'center', justifyContent: 'center', marginBottom: tokens.spacing.xl },

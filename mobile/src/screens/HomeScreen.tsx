@@ -1,6 +1,7 @@
 import { tokens } from '../theme/tokens';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
+import { CustomVegToggle } from '../components/ui/internal/CustomVegToggle';
 import { PressableScale } from '../components/ui/internal/PressableScale';
 import { View, Text, ScrollView, TouchableOpacity, Alert, TextInput, Switch, FlatList, useWindowDimensions, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -572,42 +573,44 @@ const HomeScreen = ({ navigation }: any) => {
       ]}>
         {/* ROW 1: Address and Profile (Animated) */}
         <Animated.View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, locationRowStyle]}>
-          <View style={{ flex: 1, paddingRight: tokens.spacing.lg, flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 40, height: 40, borderRadius: tokens.radii.full, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', marginRight: tokens.spacing.md }}>
-              <MapPin size={22} color={tokens.colors.primary} fill={'#FFEDD5'} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  Delivering to
-                </Text>
-                <ChevronDown size={14} color={tokens.colors.primary} style={{ marginLeft: 2 }} />
+          <View style={{ flex: 1, paddingRight: tokens.spacing.lg, alignItems: 'flex-start', justifyContent: 'center' }}>
+            <BouncingButton 
+              style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '100%' }}
+              onPress={() => navigation.navigate('Address')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Delivering to ${location?.addressText || selectedAddress?.address_text || 'Set location'}`}
+            >
+              <View style={{ width: 40, height: 40, borderRadius: tokens.radii.full, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', marginRight: tokens.spacing.md }}>
+                <MapPin size={22} color={tokens.colors.primary} fill={'#FFEDD5'} />
               </View>
-              <BouncingButton
-                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}
-                onPress={() => navigation.navigate('Address')}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`Delivering to ${location?.addressText || selectedAddress?.address_text || 'Set location'}`}
-              >
-                <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textPrimary }} numberOfLines={1}>
-                  {location?.addressText || selectedAddress?.address_text || 'Set location'}
-                </Text>
-              </BouncingButton>
-            </View>
+              <View style={{ flexShrink: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Delivering to
+                  </Text>
+                  <ChevronDown size={14} color={tokens.colors.primary} style={{ marginLeft: 2 }} />
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textPrimary }} numberOfLines={1}>
+                    {location?.addressText || selectedAddress?.address_text || 'Set location'}
+                  </Text>
+                </View>
+              </View>
+            </BouncingButton>
           </View>
 
           <BouncingButton
-            style={styles.profileButton}
+            style={[styles.profileButton, { borderWidth: 2, borderColor: tokens.colors.primary }]}
             onPress={() => navigation.navigate('ProfileTab')}
             accessibilityRole="button"
             accessibilityLabel="Open Profile"
           >
             {user?.photo_url ? (
-              <NetworkImage uri={user.photo_url} style={Object.assign({}, styles.profileImage as object, { borderWidth: 2, borderColor: tokens.colors.border })} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
+              <NetworkImage uri={user.photo_url} style={styles.profileImage} fallbackText={user?.name?.[0]?.toUpperCase() || '?'} />
             ) : (
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: tokens.colors.border }}>
-                <User size={20} color={tokens.colors.textSecondary} />
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: tokens.colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
+                <User size={20} color={tokens.colors.primary} />
               </View>
             )}
           </BouncingButton>
@@ -667,18 +670,9 @@ const HomeScreen = ({ navigation }: any) => {
                 flexShrink: 0
               }} />
 
-              <Switch
+              <CustomVegToggle
                 value={isVegOnly}
                 onValueChange={(val) => setIsVegOnly(val)}
-                trackColor={{ false: '#E2E8F0', true: tokens.colors.successTint }}
-                thumbColor={isVegOnly ? tokens.colors.success : tokens.colors.surface}
-                style={{
-                  transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }],
-                  marginRight: -4,
-                  marginLeft: -4,
-                  marginTop: -4,
-                  marginBottom: -4
-                }}
               />
             </View>
           </View>

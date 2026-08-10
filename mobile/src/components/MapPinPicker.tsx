@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Animated
+  Animated, Platform
 } from 'react-native';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { ArrowLeft, Navigation, MapPin, Search } from 'lucide-react-native';
@@ -146,7 +146,7 @@ export const MapPinPicker: React.FC<Props> = ({
     <View style={styles.container}>
       <MapView
         ref={mapRef}
-        provider={PROVIDER_GOOGLE}
+        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         style={StyleSheet.absoluteFill}
         initialRegion={{
           latitude: initialLat,

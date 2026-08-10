@@ -157,19 +157,36 @@ export default function MenuPage() {
 
   const loadMenu = async (lat: number, lng: number) => {
       setCurrentLocation([lat, lng]);
+      
+      let detectedLocation = "";
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+        const data = await res.json();
+        if (data && data.display_name) {
+          detectedLocation = data.display_name.split(',').slice(0, 2).join(', ');
+          setCurrentZoneName(detectedLocation);
+        }
+      } catch (e) {
+        console.warn("Could not auto-detect location string");
+      }
+
       try {
         const check = await api.get(`/menu/zones/check?lat=${lat}&lng=${lng}`);
-        if (check.serviceable && check.zone) {
+        const activeZone = check.zone || check.nearestZone;
+
+        if (check.serviceable && activeZone) {
           setServiceable(true);
-          setZoneId(check.zone.id);
-          setCurrentZoneName(check.zone.name);
+          setZoneId(activeZone.id);
+          if (!detectedLocation) {
+            setCurrentZoneName(activeZone.name);
+          }
 
           // Clear cart if the user switched to a new zone
           try {
             const savedCart = localStorage.getItem("2qt_cart");
             if (savedCart) {
               const parsedCart = JSON.parse(savedCart);
-              if (parsedCart.length > 0 && parsedCart[0].zone_id && parsedCart[0].zone_id !== check.zone.id) {
+              if (parsedCart.length > 0 && parsedCart[0].zone_id && parsedCart[0].zone_id !== activeZone.id) {
                 clearCart();
                 toast.error("Your cart was cleared because you switched delivery zones.");
               }
@@ -177,7 +194,7 @@ export default function MenuPage() {
           } catch {}
 
           // Serve cached menu instantly, then refresh in background
-          const cacheKey = `2qt_menu_${check.zone.id}`;
+          const cacheKey = `2qt_menu_${activeZone.id}`;
           const cached = localStorage.getItem(cacheKey);
           if (cached) {
             try {
@@ -185,8 +202,7 @@ export default function MenuPage() {
               if (Date.now() - ts < MENU_CACHE_TTL) {
                 applyMenuData(cachedItems, cachedBanners);
                 setLoading(false);
-                // Refresh in background — don't await
-                api.get(`/menu?zoneId=${check.zone.id}`).then((r: any) => {
+                api.get(`/menu?zoneId=${activeZone.id}`).then((r: any) => {
                   const freshItems = r.items ?? [];
                   setItems(freshItems);
                   setCategories(["All", ...Array.from(new Set(freshItems.map((i: MenuItem) => i.category))) as string[]]);
@@ -198,7 +214,7 @@ export default function MenuPage() {
           }
 
           const [menuRes, bannerRes] = await Promise.all([
-            api.get(`/menu?zoneId=${check.zone.id}`),
+            api.get(`/menu?zoneId=${activeZone.id}`),
             api.get(`/banners`)
           ]);
           const freshItems = menuRes.items ?? [];
@@ -211,11 +227,24 @@ export default function MenuPage() {
           } catch {}
         } else {
           setServiceable(false);
+          if (activeZone) {
+            setZoneId(activeZone.id);
+            setCurrentZoneName(`${activeZone.name}`);
+            const [menuRes, bannerRes] = await Promise.all([
+              api.get(`/menu?zoneId=${activeZone.id}`).catch(() => ({ items: [] })),
+              api.get(`/banners`).catch(() => ({ banners: [] }))
+            ]);
+            applyMenuData(menuRes.items ?? [], bannerRes.banners ?? []);
+          } else {
+            setCurrentZoneName("Out of Service Area");
+          }
         }
       } catch {
         // Backend offline — load demo menu so UI is always functional
         setServiceable(true);
-        setCurrentZoneName("Demo Zone");
+        if (!detectedLocation) {
+          setCurrentZoneName("Demo Zone");
+        }
         setItems([
           { id: "1", name: "Premium Butter Naan", description: "Soft, buttery, baked in a traditional tandoor.", price_paise: 9000, category: "Breads", available: true },
           { id: "2", name: "Classic Chicken Biryani", description: "Aromatic basmati rice with tender chicken.", price_paise: 35000, category: "Main Course", available: true },
@@ -229,55 +258,61 @@ export default function MenuPage() {
       }
     };
 
-    let initialLat = 20.5937;
-    let initialLng = 78.9629;
+    let initialLat = 12.9716; // Default to Bangalore Central hub
+    let initialLng = 77.5946;
     let hasCache = false;
 
     const cachedLoc = typeof window !== "undefined" ? localStorage.getItem("2qt_last_location") : null;
     if (cachedLoc) {
       try {
         const { lat, lng } = JSON.parse(cachedLoc);
-        initialLat = lat;
-        initialLng = lng;
-        hasCache = true;
+        if (typeof lat === "number" && typeof lng === "number") {
+          initialLat = lat;
+          initialLng = lng;
+          hasCache = true;
+        }
       } catch {}
     }
 
     if (hasCache) {
-      // User has visited before — load their cached location instantly
       loadMenu(initialLat, initialLng);
-      // Silently refresh with real GPS in background
       if (typeof window !== "undefined" && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             try { localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude })); } catch {}
             loadMenu(pos.coords.latitude, pos.coords.longitude);
           },
-          () => { /* Ignore — cached location still used */ },
-          { timeout: 5000, maximumAge: 3600000 }
+          () => {},
+          { timeout: 3000, maximumAge: 3600000 }
         );
       }
     } else {
-      // First-time visitor — wait for real GPS (max 4s), then fall back to generic India center
       if (typeof window !== "undefined" && navigator.geolocation) {
         let resolved = false;
-        const fallback = setTimeout(() => {
-          if (!resolved) { resolved = true; loadMenu(initialLat, initialLng); }
-        }, 4000);
+        const fallbackTimer = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            loadMenu(initialLat, initialLng);
+          }
+        }, 2000);
 
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             if (!resolved) {
               resolved = true;
-              clearTimeout(fallback);
+              clearTimeout(fallbackTimer);
               try { localStorage.setItem("2qt_last_location", JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude })); } catch {}
               loadMenu(pos.coords.latitude, pos.coords.longitude);
             }
           },
           () => {
-            if (!resolved) { resolved = true; clearTimeout(fallback); loadMenu(initialLat, initialLng); }
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(fallbackTimer);
+              loadMenu(initialLat, initialLng);
+            }
           },
-          { timeout: 4000, maximumAge: 0 }
+          { timeout: 2000, maximumAge: 0 }
         );
       } else {
         loadMenu(initialLat, initialLng);
@@ -339,20 +374,24 @@ export default function MenuPage() {
     return () => clearInterval(id);
   }, [user]);
 
-  // Available promo chips for the cart
+  // Available promo chips for the cart (controlled from Admin Panel)
   useEffect(() => {
-    if (!zoneId) return;
-    api.get(`/promo-codes/active?zoneId=${zoneId}`)
+    const endpoint = zoneId ? `/promocodes/active?zoneId=${zoneId}` : `/promocodes/active`;
+    api.get(endpoint)
       .then((d: any) => setAvailablePromos(d.promoCodes ?? []))
       .catch(() => {});
   }, [zoneId]);
 
-  const filtered = items.filter(item =>
-    item.available &&
-    (activeCategory === "All" || item.category === activeCategory) &&
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-    (!isVegOnly || item.is_veg === true)
-  );
+  const q = searchQuery.trim().toLowerCase();
+  const filtered = items.filter(item => {
+    const matchesCategory = activeCategory === "All" || item.category === activeCategory;
+    const matchesVeg = !isVegOnly || item.is_veg === true;
+    const matchesSearch = !q || 
+      item.name.toLowerCase().includes(q) || 
+      (item.category && item.category.toLowerCase().includes(q)) || 
+      (item.description && item.description.toLowerCase().includes(q));
+    return item.available && matchesCategory && matchesVeg && matchesSearch;
+  });
 
   const qty = (id: string) => cartItems.find(i => i.id === id)?.quantity ?? 0;
 
@@ -764,10 +803,26 @@ export default function MenuPage() {
       <div className="fixed top-0 w-full z-[80] bg-white/90 backdrop-blur-xl border-b border-black/[0.03] shadow-sm pb-3">
         <nav className="px-4 py-3">
           <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <Link href="/" className="text-2xl font-black tracking-tighter shrink-0 font-outfit flex flex-col items-start leading-none">
-               <span>2QT<span className="text-brand-primary">.</span></span>
-               <span className="text-[9px] uppercase tracking-widest text-brand-primary mt-1 font-bold flex items-center gap-1"><Zap className="w-3 h-3 fill-brand-primary"/> 15-MIN DELIVERY</span>
-            </Link>
+            <div className="flex items-center gap-6">
+              <Link href="/" className="text-2xl font-black tracking-tighter shrink-0 font-outfit flex flex-col items-start leading-none">
+                 <span>2QT<span className="text-brand-primary">.</span></span>
+                 <span className="text-[9px] uppercase tracking-widest text-brand-primary mt-1 font-bold flex items-center gap-1"><Zap className="w-3 h-3 fill-brand-primary"/> 15-MIN DELIVERY</span>
+              </Link>
+
+              <button 
+                onClick={() => setIsAddressModalOpen(true)}
+                className="flex flex-col items-start hover:opacity-80 transition-opacity text-left max-w-[220px]"
+              >
+                <div className="flex items-center gap-1 text-brand-primary font-bold text-[14px]">
+                  <MapPin className="w-4 h-4 fill-brand-primary/20" />
+                  <span className="truncate">{deliveryAddress ? deliveryAddress.label : currentZoneName}</span>
+                  <ChevronRight className="w-3.5 h-3.5 rotate-90" />
+                </div>
+                <div className="text-[11px] text-zinc-500 font-medium truncate w-full pl-[20px]">
+                  {deliveryAddress ? deliveryAddress.addressText : "Click to set delivery location"}
+                </div>
+              </button>
+            </div>
 
             <div className="flex items-center gap-2">
               <Link href="/live-kitchen" className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-full bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition-colors border border-red-100">

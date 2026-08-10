@@ -203,8 +203,8 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
 
                 await client.query(`
                     INSERT INTO wallet_transactions (customer_id, amount_paise, type, reference_id, description, balance_after_paise)
-                    SELECT $1, -$2, 'debit', $3, 'Order payment', balance_paise FROM customer_wallet WHERE customer_id = $1
-                `, [order.customer_id, order.wallet_deduction_paise, order.id]);
+                    SELECT $1, $2, 'debit', $3, 'Order payment', balance_paise FROM customer_wallet WHERE customer_id = $1
+                `, [order.customer_id, -order.wallet_deduction_paise, order.id]);
 
                 // Fire wallet-low trigger if balance dropped below threshold
                 const newBalance = updatedWallet[0]?.balance_paise ?? 0;

@@ -124,7 +124,7 @@ export default function RiderLiveMap({ riderLat, riderLng, destLat, destLng, des
       `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${destLng},${destLat}?overview=full&geometries=geojson`,
       { signal: AbortSignal.timeout(8000) }
     )
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!mapRef.current || !data.routes?.[0]) return;
         const coords = data.routes[0].geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng]);

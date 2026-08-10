@@ -16,10 +16,17 @@ export default function HomePage() {
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
 
   useEffect(() => {
-    fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1') + '/app/landing-config')
-      .then(res => res.json())
+    fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1') + '/app/landing-config')
+      .then(async res => {
+        if (!res.ok) return null;
+        try {
+          return await res.json();
+        } catch {
+          return null;
+        }
+      })
       .then(data => {
-        if (data.landing_hero_images && data.landing_hero_images.length > 0) {
+        if (data && data.landing_hero_images && data.landing_hero_images.length > 0) {
           setHeroImages(data.landing_hero_images);
         }
       })

@@ -15,6 +15,7 @@ async function gateEnabled(): Promise<boolean> {
       cache: 'no-store',
       signal: AbortSignal.timeout(2000),
     });
+    if (!res.ok) return false;
     const data = await res.json();
     const on = data.isPrelaunch === true || data.isPrelaunch === 'true';
     _cache = { on, t: Date.now() };

@@ -97,7 +97,7 @@ const AddressScreen = ({ navigation, route }: any) => {
       dispatch(setUnserviceable(addrLocation));
     } finally {
       setSelectingId(null);
-      if (navigation.canGoBack()) {
+      if (navigation.canGoBack?.()) {
         navigation.goBack();
       }
     }
@@ -162,7 +162,7 @@ const AddressScreen = ({ navigation, route }: any) => {
             dispatch(setUnserviceable(location));
           }
           dispatch(setAddress('gps'));
-          if (navigation.canGoBack()) {
+          if (navigation.canGoBack?.()) {
             navigation.goBack();
           }
         } catch (e: any) {

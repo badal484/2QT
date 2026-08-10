@@ -18,6 +18,7 @@ import {
   Award,
   BarChart2,
   Sparkles,
+  ArrowLeft,
 } from 'lucide-react-native';
 import React, { useCallback } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
@@ -105,12 +106,32 @@ const ProfileScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
+      {/* TOP NAVIGATION BAR */}
+      <View style={[styles.navHeader, { paddingTop: Math.max(insets.top + 8, 16) }]}>
+        <PressableScale
+          onPress={() => {
+            if (navigation.canGoBack?.()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('HomeTab');
+            }
+          }}
+          style={styles.backButton}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go Back"
+        >
+          <ArrowLeft size={20} color={tokens.colors.textPrimary} />
+        </PressableScale>
+        <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.navHeaderTitle}>My Profile</Text>
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         
-        {/* REFINED HEADER */}
-        <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { paddingTop: Math.max(insets.top + 16, 40) }]}>
+        {/* REFINED UPPER PROFILE CARD */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.headerCard}>
           <PressableScale 
-            style={styles.profilePicWrapper}
+            style={[styles.profilePicWrapper, { borderColor: accent }]}
             onPress={() => navigation.navigate('EditProfile')}
             accessibilityRole="button"
             accessibilityLabel="Edit Profile"
@@ -119,12 +140,15 @@ const ProfileScreen = ({ navigation }: any) => {
             {user?.photo_url ? (
               <Image source={{ uri: user.photo_url }} style={styles.profilePic} />
             ) : (
-              <User size={32} color={accent} />
+              <View style={[styles.profilePic, { backgroundColor: tokens.colors.primaryTint, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: tokens.colors.primary + '30' }]}>
+                <User size={48} color={tokens.colors.primary} />
+              </View>
             )}
             <View style={[styles.editPicBadge, { backgroundColor: accent }]}>
               <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.editPicText}>EDIT</Text>
             </View>
           </PressableScale>
+
           <View style={styles.headerTextCol}>
             <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.headerName}>{user?.name || (isRider ? 'Rider' : 'Gourmet')}</Text>
             <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.phoneText}>+{user?.phone}</Text>
@@ -259,58 +283,72 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: tokens.colors.surface, // Pure white Swish style
   },
-  header: {
+  headerCard: {
     alignItems: 'center',
     paddingHorizontal: tokens.spacing.xl,
-    paddingBottom: tokens.spacing.xl,
+    paddingVertical: 20,
+    marginHorizontal: tokens.spacing.lg,
+    marginTop: 8,
+    marginBottom: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
   },
   profilePicWrapper: {
-    width: 88,
-    height: 88,
-    backgroundColor: tokens.colors.surface,
-    borderRadius: 44,
+    width: 92,
+    height: 92,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: tokens.colors.border,
-    ...tokens.shadows.soft,
-    marginBottom: 16,
+    borderWidth: 3,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   profilePic: {
     width: '100%',
     height: '100%',
-    borderRadius: 44,
+    borderRadius: 46,
   },
   editPicBadge: {
     position: 'absolute',
-    bottom: -4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+    bottom: -6,
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 14,
     borderWidth: 2,
-    borderColor: tokens.colors.background,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   editPicText: {
     fontSize: 9,
-    color: tokens.colors.textInverse,
-    fontFamily: tokens.typography.family.black,
+    color: '#FFFFFF',
+    fontFamily: tokens.typography.family.extrabold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   headerTextCol: {
     alignItems: 'center',
   },
   headerName: {
-    color: tokens.colors.textPrimary,
-    fontSize: 24,
+    color: '#111827',
+    fontSize: 26,
     fontFamily: tokens.typography.family.extrabold,
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
   },
   phoneText: {
-    color: tokens.colors.textSecondary,
+    color: '#6B7280',
     fontFamily: tokens.typography.family.semibold,
     fontSize: 14,
-    marginTop: 4,
+    marginTop: 3,
+    letterSpacing: 0.3,
   },
 
   // Top stats row (Swish style side-by-side)
@@ -518,6 +556,30 @@ const styles = StyleSheet.create({
   referralTexts: { flex: 1 },
   referralTitle: { fontSize: 16, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.success, marginBottom: 2 },
   referralSub: { fontSize: 12, color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.medium },
+  navHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  navHeaderTitle: {
+    fontSize: 22,
+    fontFamily: tokens.typography.family.extrabold,
+    color: '#111827',
+    letterSpacing: -0.6,
+  },
 });
 
 export default ProfileScreen;
