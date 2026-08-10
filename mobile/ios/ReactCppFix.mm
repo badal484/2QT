@@ -13,8 +13,11 @@
 #define RN_DEBUG_STRING_CONVERTIBLE 1
 #endif
 
-#include <react/renderer/core/Sealable.h>
+#include <react/renderer/core/Props.h>
 #include <react/renderer/core/ShadowNode.h>
+#include <react/renderer/core/LayoutableShadowNode.h>
+#include <react/renderer/components/view/BaseViewProps.h>
+#include <react/renderer/components/view/YogaStylableProps.h>
 #include <react/renderer/debug/DebugStringConvertible.h>
 
 namespace facebook::react {
@@ -27,7 +30,17 @@ std::string ShadowNode::getDebugName() const { return ""; }
 std::string ShadowNode::getDebugValue() const { return ""; }
 SharedDebugStringConvertibleList ShadowNode::getDebugChildren() const { return {}; }
 
-SharedDebugStringConvertibleList DebugStringConvertible::getDebugProps() const { return {}; }
+SharedDebugStringConvertibleList BaseViewProps::getDebugProps() const { return {}; }
+SharedDebugStringConvertibleList YogaStylableProps::getDebugProps() const { return {}; }
+SharedDebugStringConvertibleList LayoutableShadowNode::getDebugProps() const { return {}; }
+SharedDebugStringConvertibleList Props::getDebugProps() const { return {}; }
+
+std::string DebugStringConvertible::getDebugName() const { return ""; }
+std::string DebugStringConvertible::getDebugValue() const { return ""; }
+SharedDebugStringConvertibleList DebugStringConvertible::getDebugChildren() const { return {}; }
+std::string DebugStringConvertible::getDebugDescription(DebugStringConvertibleOptions) const { return ""; }
+std::string DebugStringConvertible::getDebugPropsDescription(DebugStringConvertibleOptions) const { return ""; }
+std::string DebugStringConvertible::getDebugChildrenDescription(DebugStringConvertibleOptions) const { return ""; }
 
 }
 
