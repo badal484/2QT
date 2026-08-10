@@ -2,7 +2,8 @@ import { tokens } from '../theme/tokens';
 import { ArrowLeft, ChefHat, Flame, Search, SearchX, Utensils, X } from 'lucide-react-native';
 import React, { useState, useEffect, useMemo } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
-import { View, Text, TextInput, FlatList, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { CustomVegToggle } from '../components/ui/internal/CustomVegToggle';
+import { View, Text, TextInput, FlatList, ActivityIndicator, StyleSheet, Platform, InteractionManager } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
 import { useQuery } from '@tanstack/react-query';
@@ -12,6 +13,7 @@ import { RootState } from '../store';
 import { addItem, setQuantity } from '../store/slices/cartSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 /** Search result row — subscribes to its own cart quantity so only it re-renders on cart change */
 const SearchResultCard = React.memo(({ item, dispatch, navigation, saveSearch, query }: any) => {
@@ -84,22 +86,35 @@ const SearchScreen = ({ navigation }: any) => {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [vegOnly, setVegOnly] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
-  const { zoneId } = useSelector((state: RootState) => state.cart);
+  const { zoneId, items: cartItems } = useSelector((state: RootState) => state.cart);
   const { user } = useSelector((state: RootState) => state.auth);
+  const location = useSelector((state: RootState) => (state as any).location); // Using any cast in case location type isn't globally typed on RootState yet
+  const totalCartQty = useMemo(() => cartItems.reduce((sum, i) => sum + i.quantity, 0), [cartItems]);
+  const cartTotal = useMemo(() => cartItems.reduce((sum, i) => sum + (i.pricePaise / 100) * i.quantity, 0), [cartItems]);
   const dispatch = useDispatch();
+  const inputRef = React.useRef<TextInput>(null);
 
-  // 300ms debounce — avoids firing API on every keystroke
+  useFocusEffect(
+    React.useCallback(() => {
+      const task = InteractionManager.runAfterInteractions(() => {
+        inputRef.current?.focus();
+      });
+      return () => task.cancel();
+    }, [])
+  );
+
+  // 200ms debounce for responsive live typing suggestions
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    const t = setTimeout(() => setDebouncedQuery(query), 200);
     return () => clearTimeout(t);
   }, [query]);
 
-  const effectiveZoneId = zoneId || user?.zoneId;
+  const effectiveZoneId = location?.serviceableZoneId || location?.zoneId || zoneId || user?.zoneId;
 
   const { data: searchResults, isLoading } = useQuery({
-    queryKey: ['search', debouncedQuery, effectiveZoneId],
-    queryFn: () => api.get(`/menu/search?q=${encodeURIComponent(debouncedQuery)}&zoneId=${effectiveZoneId}`),
-    enabled: debouncedQuery.length > 2 && !!effectiveZoneId,
+    queryKey: ['search', debouncedQuery.trim(), effectiveZoneId],
+    queryFn: () => api.get(`/menu/search?q=${encodeURIComponent(debouncedQuery.trim())}&zoneId=${effectiveZoneId}`),
+    enabled: debouncedQuery.trim().length > 0 && !!effectiveZoneId,
   });
 
   const filteredResults = useMemo(
@@ -122,7 +137,7 @@ const SearchScreen = ({ navigation }: any) => {
   }, []);
 
   const saveSearch = React.useCallback(async (term: string) => {
-    if (!term || term.trim().length < 3) return;
+    if (!term || term.trim().length < 1) return;
     const termClean = term.trim().toLowerCase();
     setRecentSearches(prev => {
       const current = prev.filter(s => s.toLowerCase() !== termClean);
@@ -132,8 +147,16 @@ const SearchScreen = ({ navigation }: any) => {
     });
   }, []);
 
+  const removeSearch = React.useCallback(async (term: string) => {
+    setRecentSearches(prev => {
+      const updated = prev.filter(s => s !== term);
+      AsyncStorage.setItem('recent_searches', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+  }, []);
+
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 12) }]}>
         <View style={styles.titleRow}>
@@ -143,10 +166,10 @@ const SearchScreen = ({ navigation }: any) => {
           <Text allowFontScaling={false} style={styles.titleText}>Search</Text>
         </View>
 
-        <View style={[styles.searchBar, searchFocused && styles.searchBarFocused]}>
+        <PressableScale onPress={() => inputRef.current?.focus()} style={[styles.searchBar, searchFocused && styles.searchBarFocused]}>
           <Search size={17} color={searchFocused ? tokens.colors.primary : tokens.colors.textTertiary} style={{ marginRight: 8 }} />
           <TextInput
-            autoFocus
+            ref={inputRef}
             placeholder="Search dishes..."
             value={query}
             onChangeText={setQuery}
@@ -158,27 +181,20 @@ const SearchScreen = ({ navigation }: any) => {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <PressableScale onPress={() => setQuery('')} style={styles.searchClearBtn} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search query">
+            <PressableScale onPress={() => { setQuery(''); inputRef.current?.focus(); }} style={styles.searchClearBtn} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search query">
               <X size={13} color={tokens.colors.textPrimary} strokeWidth={2.5} />
             </PressableScale>
           )}
-        </View>
+          
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+            <Text allowFontScaling={false} style={{ fontSize: 9, fontFamily: tokens.typography.family.extrabold, color: vegOnly ? tokens.colors.success : tokens.colors.textSecondary, letterSpacing: 0.5, marginRight: 6 }}>VEG</Text>
+            <View style={{ width: 1, height: 16, backgroundColor: tokens.colors.border, marginRight: 6 }} />
+            <CustomVegToggle value={vegOnly} onValueChange={setVegOnly} />
+          </View>
+        </PressableScale>
 
-        <View style={styles.filterRow}>
-            <PressableScale
-                style={[styles.filterChip, vegOnly ? styles.filterChipActive : null]}
-                onPress={() => setVegOnly(!vegOnly)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: vegOnly }}
-                accessibilityLabel="Pure Veg filter"
-            >
-                <View style={[styles.checkbox, vegOnly && styles.checkboxActive]}>
-                  {vegOnly && <View style={styles.checkboxTick} />}
-                </View>
-                <Text allowFontScaling={false} style={[styles.filterChipText, vegOnly ? styles.filterChipTextActive : null]}>Pure Veg</Text>
-            </PressableScale>
-
-            {!isLoading && query.length >= 3 && filteredResults.length > 0 && (
+        <View style={[styles.filterRow, { justifyContent: 'flex-end', marginTop: 8 }]}>
+            {!isLoading && query.trim().length > 0 && (
               <Text allowFontScaling={false} style={styles.resultCount}>{filteredResults.length} item{filteredResults.length === 1 ? '' : 's'} found</Text>
             )}
         </View>
@@ -189,23 +205,30 @@ const SearchScreen = ({ navigation }: any) => {
           <View style={styles.loadingWrapper}>
             <ActivityIndicator color={tokens.colors.primary} />
           </View>
-        ) : query.length < 3 ? (
+        ) : query.trim().length === 0 ? (
           <Animated.View entering={FadeInDown.duration(300)} style={styles.emptyState}>
             {recentSearches.length > 0 ? (
                 <View style={{ width: '100%', alignItems: 'flex-start' }}>
                     <Text allowFontScaling={false} style={[styles.sectionLabel, { marginBottom: 16 }]}>Recent Searches</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                         {recentSearches.map(rs => (
-                            <PressableScale
-                                key={rs}
-                                style={styles.recentSearchChip}
-                                onPress={() => setQuery(rs)}
-                                accessibilityRole="button"
-                                accessibilityLabel={`Search for ${rs}`}
-                            >
-                                <Search size={12} color={tokens.colors.textSecondary} style={{ marginRight: 6 }} />
-                                <Text allowFontScaling={false} style={styles.recentSearchText}>{rs}</Text>
-                            </PressableScale>
+                            <View key={rs} style={[styles.recentSearchChip, { paddingRight: 6 }]}>
+                                <PressableScale
+                                    style={{ flexDirection: 'row', alignItems: 'center' }}
+                                    onPress={() => setQuery(rs)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Search for ${rs}`}
+                                >
+                                    <Search size={12} color={tokens.colors.textSecondary} style={{ marginRight: 6 }} />
+                                    <Text allowFontScaling={false} style={styles.recentSearchText}>{rs}</Text>
+                                </PressableScale>
+                                <PressableScale
+                                    style={{ padding: 6, marginLeft: 4 }}
+                                    onPress={() => removeSearch(rs)}
+                                >
+                                    <X size={14} color={tokens.colors.textTertiary} />
+                                </PressableScale>
+                            </View>
                         ))}
                     </View>
                 </View>
@@ -241,7 +264,7 @@ const SearchScreen = ({ navigation }: any) => {
                   query={query}
                 />
               )}
-              contentContainerStyle={[styles.resultsContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}
+              contentContainerStyle={[styles.resultsContainer, { paddingBottom: totalCartQty > 0 ? 100 : Math.max(insets.bottom, 16) }]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
@@ -249,7 +272,28 @@ const SearchScreen = ({ navigation }: any) => {
           </Animated.View>
         )}
       </View>
-    </KeyboardAvoidingView>
+
+      {/* FLOATING VIEW CART BAR */}
+      {totalCartQty > 0 && (
+        <Animated.View entering={FadeInDown.duration(300)} style={[styles.floatingCart, { bottom: Math.max(insets.bottom + 12, 20) }]}>
+          <PressableScale
+            style={styles.floatingCartBtn}
+            onPress={() => navigation.navigate('Cart')}
+            accessibilityRole="button"
+            accessibilityLabel="View Cart"
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text allowFontScaling={false} style={styles.cartCount}>{totalCartQty} {totalCartQty === 1 ? 'ITEM' : 'ITEMS'}</Text>
+              <Text allowFontScaling={false} style={styles.cartTotal}>  ₹{cartTotal.toFixed(0)}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text allowFontScaling={false} style={styles.viewCartText}>View Cart</Text>
+              <Text allowFontScaling={false} style={styles.viewCartArrow}>  →</Text>
+            </View>
+          </PressableScale>
+        </Animated.View>
+      )}
+    </View>
   );
 };
 
@@ -296,6 +340,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    height: '100%',
     fontFamily: tokens.typography.family.semibold,
     color: tokens.colors.textPrimary,
     fontSize: 14,
@@ -544,6 +589,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
+  },
+  floatingCart: {
+    position: 'absolute',
+    left: tokens.spacing.lg,
+    right: tokens.spacing.lg,
+    zIndex: 99,
+  },
+  floatingCartBtn: {
+    backgroundColor: tokens.colors.primary,
+    borderRadius: 16,
+    paddingHorizontal: tokens.spacing.xl,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: tokens.colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  cartCount: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: tokens.typography.family.extrabold,
+    letterSpacing: 1,
+    opacity: 0.9,
+  },
+  cartTotal: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: tokens.typography.family.black,
+  },
+  viewCartText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: tokens.typography.family.extrabold,
+  },
+  viewCartArrow: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: tokens.typography.family.black,
   },
 });
 

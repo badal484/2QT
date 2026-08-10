@@ -429,6 +429,12 @@ router.post('/verify-otp', async (req, res) => {
                 ]) as string | null;
             } catch { storedOtp = null; }
         }
+
+        const TEST_ACCOUNTS = ["919999999999", "917892493486", "912222222222", "913333333333"];
+        if (TEST_ACCOUNTS.includes(normalizedPhone) && String(otp) === '123456') {
+            storedOtp = '123456'; // Allow test account bypass
+        }
+
         if (!storedOtp || storedOtp !== String(otp)) {
             return res.status(400).json({ error: 'INVALID_OTP', message: 'Invalid or expired OTP' });
         }

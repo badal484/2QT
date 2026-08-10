@@ -69,8 +69,14 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
           lng
         });
       }
-    } catch (err) {
-      console.error("Geocoding error", err);
+    } catch (err: any) {
+      console.warn("Geocoding error:", err.message);
+      onLocationSelect({
+        area: 'Selected Location',
+        landmark: '',
+        lat,
+        lng
+      });
     } finally {
       setLoading(false);
     }

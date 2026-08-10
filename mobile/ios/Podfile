@@ -9,6 +9,13 @@ platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
 target 'VeltoMobile' do
+  # Disable VisionCamera frame processors — the app only uses useCodeScanner (QR scanning).
+  # Without this, VisionCamera auto-enables frame processors because react-native-worklets-core
+  # is present, which pulls in FrameHostObject.mm that references Fabric C++ debug symbols
+  # (ShadowNode::getDebugName, BaseViewProps vtable, etc.) not exported by RN 0.76's
+  # prebuilt xcframeworks, causing "Undefined symbol: facebook::react::" linker errors.
+  $VCEnableFrameProcessors = false
+
   config = use_native_modules!
   use_modular_headers!
   
@@ -36,6 +43,9 @@ target 'VeltoMobile' do
   # Versions must match what react-native-maps 1.27.2 expects in its podspec.
   pod 'GoogleMaps', '9.4.0'
   pod 'Google-Maps-iOS-Utils', '6.1.0'
+  
+  # Explicitly include the Google subspec of react-native-maps
+  pod 'react-native-maps', path: '../node_modules/react-native-maps', subspecs: ['Google']
 
   post_install do |installer|
     react_native_post_install(
@@ -74,7 +84,7 @@ target 'VeltoMobile' do
       target.build_configurations.each do |config|
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
-      
+
       if target.name == 'react-native-worklets-core'
         target.build_configurations.each do |config|
           config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited) '

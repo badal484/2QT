@@ -104,7 +104,7 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
                     <FastImage source={{ uri: c.photo_url, priority: FastImage.priority.low }} style={{ width: 18, height: 18, borderRadius: 4, marginRight: 6, backgroundColor: tokens.colors.background }} resizeMode={FastImage.resizeMode.cover} />
                   )}
                   <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, flexShrink: 1 }} numberOfLines={1}>
-                    {c.group}: <Text allowFontScaling={false} style={{ fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary }}>{c.option}</Text>
+                    {c.group}: <Text allowFontScaling={false} style={{ fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary }}>{c.option}</Text>
                   </Text>
                 </View>
               ))}
@@ -160,6 +160,7 @@ const CartScreen = ({ navigation }: any) => {
   const [altReceiver, setAltReceiver] = useState(false);
   const [altName, setAltName] = useState('');
   const [altPhone, setAltPhone] = useState('');
+  const [showDeliveryFeeInfo, setShowDeliveryFeeInfo] = useState(false);
 
   const { data: activePromosData } = useQuery({
     queryKey: ['active-promos', effectiveZoneId],
@@ -327,7 +328,7 @@ const CartScreen = ({ navigation }: any) => {
             styles.estimateIconBox,
             { backgroundColor: tokens.colors.surface, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 12 }
           ]}>
-            <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>
+            <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>
               2QT<Text allowFontScaling={false} style={{ color: tokens.colors.primary }}>.</Text>
             </Text>
           </View>
@@ -603,36 +604,66 @@ const CartScreen = ({ navigation }: any) => {
             </View>
           )}
           {addressId && (
-            <View style={styles.billRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text allowFontScaling={false} style={styles.billLabel}>Delivery Fee </Text>
-                <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={() => showDialog({
-                  title: 'About Delivery Fees',
-                  message: '100% of this fee goes directly to our delivery partners to ensure they are paid fairly for their hard work. We never take a cut!',
-                  confirmText: 'Got it'
-                })}>
-                  <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.danger, marginLeft: 2 }]}>(Why this?)</Text>
-                </TouchableOpacity>
-              </View>
-              {pricingErrored ? (
-                <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.danger, fontSize: 12, maxWidth: 200, textAlign: 'right' }]}>
-                  {displayError}
-                </Text>
-              ) : !hasPricingData ? (
-                <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.textTertiary, fontSize: 12 }]}>Calculating...</Text>
-              ) : (
+            <>
+              <View style={styles.billRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {deliveryFee === 0 ? (
-                    <>
-                      <Text allowFontScaling={false} style={[styles.billValue, { textDecorationLine: 'line-through', color: tokens.colors.textTertiary, marginRight: 6, fontFamily: tokens.typography.family.medium }]}>₹25</Text>
-                      <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>FREE</Text>
-                    </>
-                  ) : (
-                    <Text allowFontScaling={false} style={styles.billValue}>₹{deliveryFee}</Text>
-                  )}
+                  <Text allowFontScaling={false} style={styles.billLabel}>Delivery Fee </Text>
+                  <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={() => {
+                    haptics.selection();
+                    setShowDeliveryFeeInfo(!showDeliveryFeeInfo);
+                  }}>
+                    <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.danger, marginLeft: 2 }]}>(Why this?)</Text>
+                  </TouchableOpacity>
                 </View>
+                {pricingErrored ? (
+                  <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.danger, fontSize: 12, maxWidth: 200, textAlign: 'right' }]}>
+                    {displayError}
+                  </Text>
+                ) : !hasPricingData ? (
+                  <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.textTertiary, fontSize: 12 }]}>Calculating...</Text>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {deliveryFee === 0 ? (
+                      <>
+                        <Text allowFontScaling={false} style={[styles.billValue, { textDecorationLine: 'line-through', color: tokens.colors.textTertiary, marginRight: 6, fontFamily: tokens.typography.family.medium }]}>₹25</Text>
+                        <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>FREE</Text>
+                      </>
+                    ) : (
+                      <Text allowFontScaling={false} style={styles.billValue}>₹{deliveryFee}</Text>
+                    )}
+                  </View>
+                )}
+              </View>
+              
+              {showDeliveryFeeInfo && (
+                <Animated.View entering={FadeInDown.duration(200)} style={{
+                  backgroundColor: tokens.colors.background,
+                  borderRadius: 12,
+                  padding: 16,
+                  marginTop: -4,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: tokens.colors.border,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 8,
+                  elevation: 2,
+                }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary }}>
+                      Why pay a Delivery Fee ?
+                    </Text>
+                    <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={() => setShowDeliveryFeeInfo(false)}>
+                      <X size={16} color={tokens.colors.textTertiary} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textSecondary, lineHeight: 18 }}>
+                    This goes towards fairly compensating our captains and covering the convenience of bringing yummy food right to the comfort of your home. It ensures a sustainable service for everyone involved.
+                  </Text>
+                </Animated.View>
               )}
-            </View>
+            </>
           )}
           {!addressId && (
             <View style={styles.billRow}>
@@ -642,11 +673,11 @@ const CartScreen = ({ navigation }: any) => {
           )}
           <View style={styles.billRow}>
             <Text allowFontScaling={false} style={[styles.billLabel, { textDecorationLine: 'line-through', color: tokens.colors.textTertiary }]}>Platform Fee</Text>
-            <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success, fontFamily: tokens.typography.family.black }]}>₹0 <Text style={{ fontFamily: tokens.typography.family.medium, color: tokens.colors.success }}>(Not our style)</Text></Text>
+            <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success, fontFamily: tokens.typography.family.regular }]}>₹0 <Text style={{ fontFamily: tokens.typography.family.medium, color: tokens.colors.success }}>(Not our style)</Text></Text>
           </View>
           <View style={styles.billRow}>
             <Text allowFontScaling={false} style={[styles.billLabel, { textDecorationLine: 'line-through', color: tokens.colors.textTertiary }]}>Handling Fee</Text>
-            <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success, fontFamily: tokens.typography.family.black }]}>₹0 <Text style={{ fontFamily: tokens.typography.family.medium, color: tokens.colors.success }}>(On the house)</Text></Text>
+            <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success, fontFamily: tokens.typography.family.regular }]}>₹0 <Text style={{ fontFamily: tokens.typography.family.medium, color: tokens.colors.success }}>(On the house)</Text></Text>
           </View>
           {menuOfferDiscount > 0 && (
             <View style={styles.billRow}>
@@ -682,7 +713,7 @@ const CartScreen = ({ navigation }: any) => {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12 }}>
             <View>
               <Text allowFontScaling={false} style={{ fontSize: 13, color: tokens.colors.textSecondary, fontFamily: tokens.typography.family.medium, lineHeight: 18 }}>The 2QT Promise:</Text>
-              <Text allowFontScaling={false} style={{ fontSize: 14, color: tokens.colors.primary, fontFamily: tokens.typography.family.black, lineHeight: 18 }}>No sneaky fees. Just great food.</Text>
+              <Text allowFontScaling={false} style={{ fontSize: 14, color: tokens.colors.primary, fontFamily: tokens.typography.family.regular, lineHeight: 18 }}>No sneaky fees. Just great food.</Text>
             </View>
             <View style={{ 
               width: 86, height: 86, borderRadius: 43, 
@@ -691,11 +722,11 @@ const CartScreen = ({ navigation }: any) => {
               borderWidth: 2, borderColor: tokens.colors.warningTint,
               transform: [{ rotate: '8deg' }]
             }}>
-              <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: tokens.typography.family.black, color: tokens.colors.primary, letterSpacing: 0.5, textAlign: 'center' }}>100%</Text>
+              <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: tokens.typography.family.regular, color: tokens.colors.primary, letterSpacing: 0.5, textAlign: 'center' }}>100%</Text>
               <View style={{ width: 22, height: 22, backgroundColor: tokens.colors.primary, borderRadius: 11, marginVertical: 3, alignItems: 'center', justifyContent: 'center' }}>
                 <Sparkles size={12} color={tokens.colors.textInverse} />
               </View>
-              <Text allowFontScaling={false} style={{ fontSize: 8, fontFamily: tokens.typography.family.black, color: tokens.colors.primary, letterSpacing: 0, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1} adjustsFontSizeToFit>TRANSPARENT</Text>
+              <Text allowFontScaling={false} style={{ fontSize: 8, fontFamily: tokens.typography.family.regular, color: tokens.colors.primary, letterSpacing: 0, textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1} adjustsFontSizeToFit>TRANSPARENT</Text>
             </View>
           </View>
 
@@ -720,8 +751,8 @@ const CartScreen = ({ navigation }: any) => {
       >
         <View style={styles.footerRow}>
           <View style={{ flex: 1 }}>
-            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textTertiary, textTransform: 'uppercase' }}>Item Total</Text>
-            <Text allowFontScaling={false} style={{ fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>₹{grandTotal.toFixed(2)}</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.regular, color: tokens.colors.textTertiary, textTransform: 'uppercase' }}>Item Total</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 20, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>₹{grandTotal.toFixed(2)}</Text>
           </View>
           
           <PressableScale
@@ -790,7 +821,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: tokens.colors.border,
   },
-  headerTitle: { fontSize: 20, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -0.5 },
+  headerTitle: { fontSize: 20, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, letterSpacing: -0.5 },
   headerSub: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2 },
   clearCartBtn: {
     paddingHorizontal: 12, paddingVertical: 6,
@@ -800,7 +831,7 @@ const styles = StyleSheet.create({
     borderColor: tokens.colors.border,
   },
   clearCartText: {
-    fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.textSecondary,
+    fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary,
   },
 
   savingsBanner: {
@@ -811,7 +842,7 @@ const styles = StyleSheet.create({
   },
   savingsBannerText: {
     fontSize: 13,
-    fontFamily: tokens.typography.family.black,
+    fontFamily: tokens.typography.family.regular,
     color: tokens.colors.primary,
     letterSpacing: 0.2,
   },
@@ -837,7 +868,7 @@ const styles = StyleSheet.create({
   },
   estimateTitle: {
     fontSize: 16,
-    fontFamily: tokens.typography.family.black,
+    fontFamily: tokens.typography.family.regular,
     color: tokens.colors.primary,
   },
   estimateSub: {
@@ -856,11 +887,11 @@ const styles = StyleSheet.create({
   },
   cardDivider: { height: 1, backgroundColor: tokens.colors.border, borderStyle: 'solid', borderWidth: 1, borderRadius: 1, marginVertical: tokens.spacing.md, borderColor: tokens.colors.border },
   cardTitle: {
-    fontSize: 16, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary,
+    fontSize: 16, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary,
     marginBottom: tokens.spacing.lg, letterSpacing: -0.3,
   },
   cardSectionLabel: {
-    fontSize: 11, fontFamily: tokens.typography.family.bold, color: tokens.colors.textSecondary,
+    fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary,
     letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4,
   },
 
@@ -873,9 +904,9 @@ const styles = StyleSheet.create({
   itemImg: { width: '100%', height: '100%' },
   itemImgPlaceholder: { backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center' },
   itemMeta: { flex: 1, marginRight: 12 },
-  itemName: { fontSize: 14, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, lineHeight: 20, letterSpacing: -0.2 },
+  itemName: { fontSize: 14, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, lineHeight: 20, letterSpacing: -0.2 },
   itemCustomizations: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2, marginBottom: 2 },
-  itemPrice: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginTop: 4 },
+  itemPrice: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary, marginTop: 4 },
   vegBadgeMini: {
     width: 10,
     height: 10,
@@ -898,9 +929,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: tokens.colors.border,
   },
   qtyBtnActive: { backgroundColor: tokens.colors.primary },
-  qtyBtnText: { fontSize: 16, color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.black, lineHeight: 18 },
+  qtyBtnText: { fontSize: 16, color: tokens.colors.textPrimary, fontFamily: tokens.typography.family.regular, lineHeight: 18 },
   qtyBtnActiveText: { color: tokens.colors.textInverse },
-  qtyNum: { fontSize: 13, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, minWidth: 20, textAlign: 'center' },
+  qtyNum: { fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, minWidth: 20, textAlign: 'center' },
 
   // Address
   addressRow: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -911,9 +942,9 @@ const styles = StyleSheet.create({
     marginRight: 14, marginTop: 2,
   },
   addressBody: { flex: 1, marginRight: 8 },
-  addressLabel: { fontSize: 15, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 4, letterSpacing: -0.2 },
+  addressLabel: { fontSize: 15, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, marginBottom: 4, letterSpacing: -0.2 },
   addressText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, lineHeight: 20 },
-  changeText: { fontSize: 13, fontFamily: tokens.typography.family.bold, color: tokens.colors.primary, marginTop: 4 },
+  changeText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.primary, marginTop: 4 },
 
   // Promo
   promoRow: { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.md },
@@ -924,13 +955,13 @@ const styles = StyleSheet.create({
   },
   promoInput: {
     flex: 1, height: 46,
-    fontSize: 14, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, textTransform: 'uppercase', letterSpacing: 1,
+    fontSize: 14, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, textTransform: 'uppercase', letterSpacing: 1,
     borderBottomWidth: 1, borderBottomColor: tokens.colors.border,
   },
   promoAppliedRow: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  promoAppliedText: { fontSize: 15, fontFamily: tokens.typography.family.black, color: tokens.colors.primary },
+  promoAppliedText: { fontSize: 15, fontFamily: tokens.typography.family.regular, color: tokens.colors.primary },
   promoSavingText: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2 },
   promoInvalidText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.danger },
   applyBtn: {
@@ -939,7 +970,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   applyBtnDisabled: { backgroundColor: tokens.colors.background },
-  applyBtnText: { fontSize: 14, fontFamily: tokens.typography.family.black, color: tokens.colors.textInverse },
+  applyBtnText: { fontSize: 14, fontFamily: tokens.typography.family.regular, color: tokens.colors.textInverse },
   applyBtnTextDisabled: { color: tokens.colors.textTertiary },
 
   // Recommendations Carousel
@@ -979,7 +1010,7 @@ const styles = StyleSheet.create({
   recAddText: {
     fontSize: 20,
     color: tokens.colors.textInverse,
-    fontFamily: tokens.typography.family.black,
+    fontFamily: tokens.typography.family.regular,
     lineHeight: 22,
   },
   recMeta: {
@@ -988,14 +1019,14 @@ const styles = StyleSheet.create({
   },
   recName: {
     fontSize: 12,
-    fontFamily: tokens.typography.family.bold,
+    fontFamily: tokens.typography.family.medium,
     color: tokens.colors.textPrimary,
     marginVertical: 4,
     lineHeight: 16,
   },
   recPrice: {
     fontSize: 13,
-    fontFamily: tokens.typography.family.black,
+    fontFamily: tokens.typography.family.regular,
     color: tokens.colors.textPrimary,
   },
 
@@ -1005,12 +1036,12 @@ const styles = StyleSheet.create({
     marginBottom: tokens.spacing.md,
   },
   billLabel: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary },
-  billValue: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
+  billValue: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary },
 
   totalSeparator: { height: 1, backgroundColor: tokens.colors.border, borderStyle: 'dashed', borderWidth: 1, borderRadius: 1, marginVertical: 16, borderColor: tokens.colors.border },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 16, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary },
-  totalValue: { fontSize: 24, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, letterSpacing: -1 },
+  totalLabel: { fontSize: 16, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary },
+  totalValue: { fontSize: 24, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, letterSpacing: -1 },
 
   billTotalSavedBanner: {
     backgroundColor: tokens.colors.successTint,
@@ -1021,7 +1052,7 @@ const styles = StyleSheet.create({
   },
   billTotalSavedText: {
     fontSize: 13,
-    fontFamily: tokens.typography.family.black,
+    fontFamily: tokens.typography.family.regular,
     color: tokens.colors.primary,
   },
 
@@ -1030,7 +1061,7 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.dangerTint, borderRadius: 16,
     padding: 16,
   },
-  outOfZoneText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.danger, textAlign: 'center', lineHeight: 20 },
+  outOfZoneText: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.danger, textAlign: 'center', lineHeight: 20 },
 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -1052,7 +1083,7 @@ const styles = StyleSheet.create({
   },
   footerCtaText: {
     fontSize: 16,
-    fontFamily: tokens.typography.family.black,
+    fontFamily: tokens.typography.family.regular,
     color: tokens.colors.textInverse,
   },
   placeOrderBtnDisabled: { opacity: 0.55 },
@@ -1065,16 +1096,16 @@ const styles = StyleSheet.create({
     width: 110, height: 110, borderRadius: 55,
     backgroundColor: tokens.colors.background, alignItems: 'center', justifyContent: 'center', marginBottom: 28,
   },
-  emptyTitle: { fontSize: 24, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary, marginBottom: 12, letterSpacing: -0.5 },
+  emptyTitle: { fontSize: 24, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, marginBottom: 12, letterSpacing: -0.5 },
   emptySub: { fontSize: 15, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, textAlign: 'center', lineHeight: 24 },
   exploreBtn: {
     marginTop: 32, backgroundColor: tokens.colors.primary,
     paddingHorizontal: 36, paddingVertical: 16, borderRadius: 20,
   },
-  exploreBtnText: { fontSize: 15, fontFamily: tokens.typography.family.black, color: tokens.colors.textInverse, textTransform: 'uppercase', letterSpacing: 1 },
+  exploreBtnText: { fontSize: 15, fontFamily: tokens.typography.family.regular, color: tokens.colors.textInverse, textTransform: 'uppercase', letterSpacing: 1 },
 
   // New Styles for Added UI
-  cardTitleInline: { fontSize: 15, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary, marginBottom: 2 },
+  cardTitleInline: { fontSize: 15, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary, marginBottom: 2 },
   cardSubInline: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary },
   inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: tokens.colors.background, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 20, paddingHorizontal: 12, height: 48 },
   inputText: { flex: 1, fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary },
@@ -1083,10 +1114,10 @@ const styles = StyleSheet.create({
   tipOptionsRow: { flexDirection: 'row', gap: 10 },
   tipChip: { flex: 1, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: tokens.colors.border, backgroundColor: tokens.colors.surface, alignItems: 'center' },
   tipChipActive: { borderColor: tokens.colors.primary, backgroundColor: tokens.colors.primaryTint },
-  tipChipText: { fontSize: 14, fontFamily: tokens.typography.family.bold, color: tokens.colors.textPrimary },
+  tipChipText: { fontSize: 14, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary },
   tipChipTextActive: { color: tokens.colors.primary },
   promoChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: tokens.colors.success, backgroundColor: tokens.colors.successTint },
-  promoChipCode: { fontSize: 12, fontFamily: tokens.typography.family.black, color: tokens.colors.primary, letterSpacing: 0.5 },
+  promoChipCode: { fontSize: 12, fontFamily: tokens.typography.family.regular, color: tokens.colors.primary, letterSpacing: 0.5 },
   promoChipDesc: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.success, maxWidth: 100 },
 
   plusBanner: {
@@ -1101,6 +1132,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center',
   },
   plusBannerText: { flex: 1 },
-  plusBannerTitle: { fontSize: 13, fontFamily: tokens.typography.family.bold, color: '#4C1D95', lineHeight: 18 },
+  plusBannerTitle: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: '#4C1D95', lineHeight: 18 },
   plusBannerSub: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: '#7C3AED', marginTop: 2 },
 });

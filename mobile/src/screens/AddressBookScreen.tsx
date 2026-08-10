@@ -5,7 +5,7 @@ import { PressableScale } from '../components/ui/internal/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import {
   View, Text, ActivityIndicator, TextInput,
-  StyleSheet, Alert, ScrollView,
+  StyleSheet, Alert, ScrollView, Platform,
 } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
@@ -237,7 +237,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
           {/* Mini map preview — non-interactive */}
           <View style={styles.mapPreview} pointerEvents="none">
             <MapView
-              provider={PROVIDER_GOOGLE}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
               style={StyleSheet.absoluteFill}
               region={{
                 latitude: mapRegion.latitude,
@@ -322,7 +322,7 @@ const AddressBookScreen = ({ navigation, route }: any) => {
         <View style={styles.mapContainer}>
           <MapView
             ref={mapRef}
-            provider={PROVIDER_GOOGLE}
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
             style={StyleSheet.absoluteFill}
             initialRegion={{
               latitude: startLat,

@@ -188,7 +188,7 @@ const NotificationsScreen = ({ navigation }: any) => {
       <View style={styles.header}>
         <PressableScale
           style={styles.backBtn}
-          onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home')}
+          onPress={() => navigation.canGoBack?.() ? navigation.goBack() : navigation.navigate('Home')}
           accessibilityRole="button"
           accessibilityLabel="Go back"
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}

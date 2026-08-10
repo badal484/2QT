@@ -29,7 +29,7 @@ export default function PreLaunchPage() {
     if (urlRef) setReferredBy(urlRef);
 
     fetch('/api/proxy/prelaunch/config')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : null)
       .then(d => { const v = d.config?.prelaunch_bg_video_url; if (v) setBgVideoUrl(String(v)); })
       .catch(() => {});
 

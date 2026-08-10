@@ -267,7 +267,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
         <PressableScale
           style={[styles.backBtn, { top: insets.top + 12 }]}
           onPress={() => {
-            if (navigation.canGoBack()) {
+            if (navigation.canGoBack?.()) {
               navigation.goBack();
             } else {
               navigation.navigate('Home');

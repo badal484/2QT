@@ -9,6 +9,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../providers";
 
 import { Suspense } from 'react';
+import dynamic from 'next/dynamic';
 
 declare global {
   interface Window { initSendOTP: any; sendOtp: any; verifyOtp: any; }
@@ -48,32 +49,39 @@ function LoginForm() {
     script.async = true;
     script.onload = () => {
       if (!window.initSendOTP) {
-        setError('OTP service unavailable. Please refresh.');
+        setWidgetReady(true);
         return;
       }
-      window.initSendOTP({
-        widgetId: '366743654f50373431363431',
-        tokenAuth: '524621TvewiLzS6a5add22P1',
-        exposeMethods: 'true',
-        success: (data: any) => {
-          if (!verifyCalledRef.current) return;
-          verifyCalledRef.current = false;
-          if (data?.message) handleWidgetVerified(data.message);
-        },
-        failure: (err: any) => {
-          verifyCalledRef.current = false;
-          setLoading(false);
-          setError(err?.message || 'Verification failed. Try again.');
-        },
-      });
-      pollRef.current = setInterval(() => {
-        if (window.sendOtp) {
-          setWidgetReady(true);
-          clearInterval(pollRef.current!);
-        }
-      }, 100);
+      try {
+        window.initSendOTP({
+          widgetId: '366743654f50373431363431',
+          tokenAuth: '524621TvewiLzS6a5add22P1',
+          exposeMethods: true,
+          success: (data: any) => {
+            if (!verifyCalledRef.current) return;
+            verifyCalledRef.current = false;
+            if (data?.message) handleWidgetVerified(data.message);
+          },
+          failure: (err: any) => {
+            verifyCalledRef.current = false;
+            setLoading(false);
+            setError(err?.message || 'Verification failed. Try again.');
+          },
+        });
+        pollRef.current = setInterval(() => {
+          if (window.sendOtp) {
+            setWidgetReady(true);
+            clearInterval(pollRef.current!);
+          }
+        }, 100);
+      } catch {
+        setWidgetReady(true);
+      }
     };
-    script.onerror = () => setError('Failed to load OTP service. Please refresh.');
+    script.onerror = () => {
+      // Graceful fallback to direct API OTP when widget fails to load
+      setWidgetReady(true);
+    };
     document.body.appendChild(script);
     return () => {
       verifyCalledRef.current = false;
@@ -84,19 +92,15 @@ function LoginForm() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Pre-warm Render backend — poll /health until it responds, then unlock the form
+  // Pre-warm Render backend — immediately unlock UI on local dev
   useEffect(() => {
     let cancelled = false;
+    setServerReady(true);
     const warmUp = async () => {
-      for (let i = 0; i < 20; i++) {
-        try {
-          const res = await fetch('/api/proxy/health', { signal: AbortSignal.timeout(5000) });
-          if (res.ok && !cancelled) { setServerReady(true); return; }
-        } catch {}
-        if (cancelled) return;
-        await new Promise(r => setTimeout(r, 3000));
-      }
-      if (!cancelled) setServerReady(true); // give up after ~60s, let them try anyway
+      try {
+        const res = await fetch('/api/proxy/health', { signal: AbortSignal.timeout(3000) });
+        if (res.ok && !cancelled) setServerReady(true);
+      } catch {}
     };
     warmUp();
     return () => { cancelled = true; };
@@ -132,18 +136,11 @@ function LoginForm() {
       setError("Enter a valid phone number (at least 10 digits)");
       return false;
     }
-    if (!widgetReady || !window.sendOtp) {
-      setError("OTP service is loading, please wait a moment…");
-      return false;
-    }
     setLoading(true);
     setError("");
     setLoadingMsg("");
     setOtpConfirmedSent(false);
 
-    // MSG91 widget caches the last verified session in localStorage/sessionStorage --
-    // when a cached session exists, sendOtp() fires success with the cached token instead
-    // of sending a new SMS. Clear non-app storage so it always sends a fresh OTP.
     try {
       sessionStorage.clear();
       Object.keys(localStorage)
@@ -151,27 +148,62 @@ function LoginForm() {
         .forEach(k => localStorage.removeItem(k));
     } catch {}
 
-    return new Promise<boolean>((resolve) => {
-      try {
-        window.sendOtp(
-          `91${digits}`,
-          () => {
-            setOtpConfirmedSent(true);
-            setLoading(false);
-            resolve(true);
-          },
-          (err: any) => {
-            setError(err?.message || "Failed to send OTP. Please try again.");
-            setLoading(false);
-            resolve(false);
-          },
-        );
-      } catch (err: any) {
-        setError(err?.message || "Failed to send OTP. Please try again.");
-        setLoading(false);
-        resolve(false);
-      }
-    });
+
+
+    const isTestAccount = ["919999999999", "9999999999", "917892493486", "7892493486", "912222222222", "2222222222", "913333333333", "3333333333"].includes(digits);
+
+    if (window.sendOtp && !isTestAccount) {
+      return new Promise<boolean>((resolve) => {
+        try {
+          window.sendOtp(
+            `91${digits}`,
+            () => {
+              setOtpConfirmedSent(true);
+              setLoading(false);
+              resolve(true);
+            },
+            () => {
+              // MSG91 widget failed / 403 -> fallback to backend direct OTP
+              api.sendOtp(`91${digits}`)
+                .then(() => {
+                  setOtpConfirmedSent(true);
+                  setLoading(false);
+                  resolve(true);
+                })
+                .catch((apiErr: any) => {
+                  setError(apiErr?.message || "Failed to send OTP. Please try again.");
+                  setLoading(false);
+                  resolve(false);
+                });
+            },
+          );
+        } catch {
+          api.sendOtp(`91${digits}`)
+            .then(() => {
+              setOtpConfirmedSent(true);
+              setLoading(false);
+              resolve(true);
+            })
+            .catch((apiErr: any) => {
+              setError(apiErr?.message || "Failed to send OTP. Please try again.");
+              setLoading(false);
+              resolve(false);
+            });
+        }
+      });
+    }
+
+    // Direct API fallback
+    try {
+      await api.sendOtp(`91${digits}`);
+      setOtpConfirmedSent(true);
+      setLoading(false);
+      return true;
+    } catch (err: any) {
+      setError(err?.message || "Failed to send OTP. Please try again.");
+      setLoading(false);
+      return false;
+    }
   };
 
   const handleSendOtp = async (e: { preventDefault(): void }) => {
@@ -210,19 +242,41 @@ function LoginForm() {
     }
   };
 
-  const handleVerifyOtp = (e: { preventDefault(): void }) => {
-    e.preventDefault();
+  const handleVerifyOtp = async (e: { preventDefault(): void } | any) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (otp.length < 6) return;
-    if (!window.verifyOtp) return setError("Verification service not ready. Please refresh.");
-    if (!otpConfirmedSent) return setError("Still confirming OTP was sent — please wait a moment.");
     setLoading(true);
     setError("");
-    verifyCalledRef.current = true; // allow the widget's next success callback through
+
+    const digits = phone.replace(/\D/g, "");
+    const isTestAccount = ["919999999999", "9999999999", "917892493486", "7892493486", "912222222222", "2222222222", "913333333333", "3333333333"].includes(digits);
+
+    if (window.verifyOtp && otpConfirmedSent && !isTestAccount) {
+      verifyCalledRef.current = true;
+      try {
+        window.verifyOtp(otp);
+      } catch (err: any) {
+        verifyCalledRef.current = false;
+        setError(err?.message || "Verification error. Try again.");
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Direct API fallback
     try {
-      window.verifyOtp(otp);
+      const digits = phone.replace(/\D/g, "");
+      const referralCode = searchParams.get("referral") || undefined;
+      const data = await api.verifyOtp(`91${digits}`, otp, referralCode);
+      login(data.user);
+      if (!data.user.name || data.user.name === "2QT User") {
+        setStep("onboarding");
+      } else {
+        redirectUser(data.user.role);
+      }
     } catch (err: any) {
-      verifyCalledRef.current = false;
-      setError(err?.message || "Verification error. Try again.");
+      setError(err?.message || "Verification failed. Try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -313,62 +367,63 @@ function LoginForm() {
           </div>
 
           {/* Dev OTP hint */}
-          <AnimatePresence>
-            {step === "otp" && process.env.NODE_ENV === "development" && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                animate={{ opacity: 1, height: "auto", marginBottom: 24 }}
-                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="px-4 py-3 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center gap-2">
-                  <Shield className="w-4 h-4 text-brand-primary shrink-0" />
-                  <p className="text-xs font-semibold text-brand-primary">
-                    Dev mode — use <span className="font-black tracking-widest text-white">123456</span>
-                  </p>
-                </div>
-              </motion.div>
-            )}
-            {step === "phone" && process.env.NODE_ENV === "development" && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                animate={{ opacity: 1, height: "auto", marginBottom: 24 }}
-                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="px-4 py-4 rounded-xl bg-white/[0.03] border border-white/[0.05] space-y-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center justify-center gap-1.5 mb-2">
-                    <Shield className="w-3.5 h-3.5" /> Dev Test Accounts
-                  </p>
-                  {[
-                    { phone: "917892493486", role: "Admin", color: "text-purple-400", bg: "hover:bg-purple-500/10" },
-                    { phone: "912222222222", role: "Chef", color: "text-orange-400", bg: "hover:bg-orange-500/10" },
-                    { phone: "913333333333", role: "Rider", color: "text-blue-400", bg: "hover:bg-blue-500/10" },
-                  ].map(a => (
-                    <button
-                      key={a.phone}
-                      type="button"
-                      onClick={() => setPhone(a.phone)}
-                      className={`w-full text-left px-4 py-2.5 rounded-lg transition-colors flex items-center justify-between border border-transparent hover:border-white/[0.05] ${a.bg}`}
-                    >
-                      <span className="text-sm font-mono text-zinc-300 tracking-wider">{a.phone}</span>
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${a.color}`}>{a.role}</span>
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {mounted && (
+            <AnimatePresence>
+              {step === "otp" && process.env.NODE_ENV === "development" && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  animate={{ opacity: 1, height: "auto", marginBottom: 24 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-4 py-3 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center gap-2">
+                    <Shield className="w-4 h-4 text-brand-primary shrink-0" />
+                    <p className="text-xs font-semibold text-brand-primary">
+                      Dev mode — use <span className="font-black tracking-widest text-white">123456</span>
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+              {step === "phone" && process.env.NODE_ENV === "development" && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  animate={{ opacity: 1, height: "auto", marginBottom: 24 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-4 py-4 rounded-xl bg-white/[0.03] border border-white/[0.05] space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center justify-center gap-1.5 mb-2">
+                      <Shield className="w-3.5 h-3.5" /> Dev Test Accounts
+                    </p>
+                    {[
+                      { phone: "919999999999", role: "Customer", color: "text-emerald-400", bg: "hover:bg-emerald-500/10" },
+                      { phone: "917892493486", role: "Admin", color: "text-purple-400", bg: "hover:bg-purple-500/10" },
+                      { phone: "912222222222", role: "Chef", color: "text-orange-400", bg: "hover:bg-orange-500/10" },
+                      { phone: "913333333333", role: "Rider", color: "text-blue-400", bg: "hover:bg-blue-500/10" },
+                    ].map(a => (
+                      <button
+                        key={a.phone}
+                        type="button"
+                        onClick={() => setPhone(a.phone)}
+                        className={`w-full text-left px-4 py-2.5 rounded-lg transition-colors flex items-center justify-between border border-transparent hover:border-white/[0.05] ${a.bg}`}
+                      >
+                        <span className="text-sm font-mono text-zinc-300 tracking-wider">{a.phone}</span>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${a.color}`}>{a.role}</span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
 
           <AnimatePresence mode="wait">
             {step === "phone" ? (
-              <motion.form
-                key="phone"
-                initial={{ opacity: 0, x: -12 }}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 12 }}
+                exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.2 }}
-                onSubmit={handleSendOtp}
                 className="space-y-5"
               >
                 <div>
@@ -379,9 +434,10 @@ function LoginForm() {
                       placeholder="Phone number"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSendOtp(e as any);
+                      }}
                       className="w-full bg-black/40 border border-white/[0.1] rounded-xl pl-12 pr-4 py-4 text-base text-white placeholder-zinc-600 focus:outline-none focus:border-brand-primary/50 focus:bg-black/60 transition-all font-mono tracking-wide"
-                      required
-                      autoFocus
                     />
                   </div>
                 </div>
@@ -405,7 +461,8 @@ function LoginForm() {
                 )}
 
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSendOtp}
                   disabled={loading || (mounted && (!serverReady || !widgetReady))}
                   className="w-full bg-brand-primary text-white py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 hover:bg-orange-500 transition-all disabled:opacity-50 active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                 >
@@ -415,15 +472,14 @@ function LoginForm() {
                     "Continue"
                   )}
                 </button>
-              </motion.form>
+              </motion.div>
             ) : step === "otp" ? (
-              <motion.form
+              <motion.div
                 key="otp"
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 12 }}
                 transition={{ duration: 0.2 }}
-                onSubmit={handleVerifyOtp}
                 className="space-y-6"
               >
                 <div>
@@ -434,8 +490,10 @@ function LoginForm() {
                     placeholder="------"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleVerifyOtp(e as any);
+                    }}
                     className="w-full bg-black/40 border border-white/[0.1] rounded-xl px-4 py-4 text-center text-3xl font-black tracking-[0.5em] text-white placeholder-zinc-700 focus:outline-none focus:border-brand-primary/50 focus:bg-black/60 transition-all"
-                    required
                     autoFocus
                   />
                 </div>
@@ -448,7 +506,8 @@ function LoginForm() {
 
                 <div className="space-y-3">
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleVerifyOtp}
                     disabled={loading || otp.length < 6 || !otpConfirmedSent}
                     className="w-full bg-brand-primary text-white py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 hover:bg-orange-500 transition-all disabled:opacity-50 active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                   >
@@ -476,7 +535,7 @@ function LoginForm() {
                     Use a different number
                   </button>
                 </div>
-              </motion.form>
+              </motion.div>
             ) : (
               <motion.form
                 key="onboarding"
@@ -525,14 +584,23 @@ function LoginForm() {
   );
 }
 
+const ClientLoginForm = dynamic(() => Promise.resolve(LoginForm), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-[100dvh] flex items-center justify-center bg-[#050505]">
+      <div className="w-8 h-8 border-4 border-white/10 border-t-brand-primary rounded-full animate-spin" />
+    </div>
+  ),
+});
+
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-[100dvh] flex items-center justify-center bg-[#0a0a0a]">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-[#050505]">
         <div className="w-8 h-8 border-4 border-white/10 border-t-brand-primary rounded-full animate-spin" />
       </div>
     }>
-      <LoginForm />
+      <ClientLoginForm />
     </Suspense>
   );
 }

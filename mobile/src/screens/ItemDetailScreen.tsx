@@ -2,9 +2,8 @@ import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  StatusBar, useWindowDimensions, Alert, Image
+  StatusBar, useWindowDimensions, Alert, Image, Share
 } from 'react-native';
-import Share from 'react-native-share';
 import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,57 +31,61 @@ const PremiumBag = () => (
   </View>
 );
 
-const RelatedItemCard = React.memo(({ ri, onAdd, dispatch, navigation }: any) => {
+const RelatedItemCard = React.memo(({ ri, onAdd, dispatch, navigation, cardWidth }: any) => {
   const riCart = useSelector((state: RootState) => state.cart.items.find(ci => ci.menuItemId === ri.id));
   const riVeg = ri.is_egg ? tokens.colors.warning : ri.is_veg ? tokens.colors.success : tokens.colors.danger;
   return (
     <PressableScale
-      style={s.relatedCard}
+      style={[s.relatedCardGrid, { width: cardWidth }]}
       onPress={() => navigation.replace('ItemDetail', { item: ri })}
       accessibilityRole="button"
       accessibilityLabel={`View ${ri.name}`}
     >
-      <View style={s.relatedImgBox}>
-        {ri.photo_url ? (
-          <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
-        ) : (
-          <View style={[s.relatedImg, s.heroPlaceholder]}>
-            <Text allowFontScaling={false} style={{ fontSize: 24 }}>🍽️</Text>
-          </View>
-        )}
-        {ri.is_bestseller && (
-          <View style={s.relatedBadge}>
-            <Text allowFontScaling={false} style={s.relatedBadgeText}>★ Bestseller</Text>
-          </View>
-        )}
-      </View>
-      {ri.available && !riCart ? (
-        <PressableScale style={s.relatedAddBtn} onPress={() => { haptics.selection(); onAdd(ri); }} accessibilityRole="button" accessibilityLabel="Add to cart">
-          <Text allowFontScaling={false} style={s.relatedAddText}>ADD</Text>
-        </PressableScale>
-      ) : ri.available && riCart ? (
-        <View style={s.relatedQtyBox}>
-          <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }} accessibilityRole="button" accessibilityLabel="Decrease quantity">
-            <Text allowFontScaling={false} style={s.relatedQtyBtn}>−</Text>
-          </PressableScale>
-          <Text allowFontScaling={false} style={s.relatedQtyVal}>{riCart.quantity}</Text>
-          <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }} accessibilityRole="button" accessibilityLabel="Increase quantity">
-            <Text allowFontScaling={false} style={s.relatedQtyBtn}>+</Text>
-          </PressableScale>
+      <View style={s.relatedImgContainerGrid}>
+        <View style={s.relatedImgBoxGrid}>
+          {ri.photo_url ? (
+            <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
+          ) : (
+            <View style={[s.relatedImg, s.heroPlaceholder]}>
+              <Text allowFontScaling={false} style={{ fontSize: 24 }}>🍽️</Text>
+            </View>
+          )}
         </View>
-      ) : null}
-      <View style={s.relatedMeta}>
-        <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
-          <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
+        
+        {/* ADD Button overlapping the bottom of the image box */}
+        <View style={s.relatedAddBtnWrapperGrid}>
+          {ri.available && !riCart ? (
+            <PressableScale style={s.relatedAddBtnVertical} onPress={() => { haptics.selection(); onAdd(ri); }} accessibilityRole="button" accessibilityLabel="Add to cart">
+              <Text allowFontScaling={false} style={s.relatedAddText}>ADD</Text>
+            </PressableScale>
+          ) : ri.available && riCart ? (
+            <View style={s.relatedQtyBoxVertical}>
+              <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }} accessibilityRole="button" accessibilityLabel="Decrease quantity">
+                <Text allowFontScaling={false} style={s.relatedQtyBtn}>−</Text>
+              </PressableScale>
+              <Text allowFontScaling={false} style={s.relatedQtyVal}>{riCart.quantity}</Text>
+              <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }} accessibilityRole="button" accessibilityLabel="Increase quantity">
+                <Text allowFontScaling={false} style={s.relatedQtyBtn}>+</Text>
+              </PressableScale>
+            </View>
+          ) : null}
         </View>
-        {ri.tags?.[0] && (
-          <View style={[s.servePill, { paddingHorizontal: 6, paddingVertical: 2 }]}>
-            <Text allowFontScaling={false} style={[s.servePillText, { fontSize: 9 }]}>{ri.tags[0]}</Text>
-          </View>
-        )}
       </View>
-      <Text allowFontScaling={false} style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
-      <Text allowFontScaling={false} style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
+
+      <View style={s.relatedContentGrid}>
+        <View style={s.relatedMeta}>
+          <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
+            <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
+          </View>
+          {ri.is_bestseller && (
+            <View style={[s.bestsellerPill, { paddingHorizontal: 6, paddingVertical: 2, marginLeft: 6 }]}>
+              <Text allowFontScaling={false} style={[s.bestsellerText, { fontSize: 9 }]}>★ Bestseller</Text>
+            </View>
+          )}
+        </View>
+        <Text allowFontScaling={false} style={s.relatedNameGrid} numberOfLines={2}>{ri.name}</Text>
+        <Text allowFontScaling={false} style={s.relatedPriceGrid}>₹{ri.price_paise / 100}</Text>
+      </View>
     </PressableScale>
   );
 });
@@ -184,24 +187,13 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
     try {
       haptics.selection();
       const appLink = `https://2qt.in/menu/${item.id}`;
-      const message = `Check out ${item.name} at 2QT for just ₹${item.price_paise / 100}! It's incredibly fresh and delicious!\n\n${appLink}`;
+      const message = `Check out ${item.name} at 2QT for just ₹${item.price_paise / 100}! It's incredibly fresh and delicious!`;
       
-      if (item.photo_url) {
-        const response = await fetch(item.photo_url);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64data = reader.result as string;
-          await Share.open({
-            message: message,
-            url: base64data,
-            type: 'image/jpeg',
-          });
-        };
-        reader.readAsDataURL(blob);
-      } else {
-        await Share.open({ message });
-      }
+      await Share.share({
+        message: `${message}\n\n${appLink}`,
+        url: appLink,
+        title: item.name,
+      });
     } catch (error) {
       console.log('User cancelled or error:', error);
     }
@@ -311,17 +303,20 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={s.relatedRow}
+                contentContainerStyle={s.relatedGrid}
               >
-                {relatedItems.map(ri => (
-                  <RelatedItemCard
-                    key={ri.id}
-                    ri={ri}
-                    onAdd={handleAddWithCheck}
-                    dispatch={dispatch}
-                    navigation={navigation}
-                  />
-                ))}
+                <View style={s.relatedGridInner}>
+                  {relatedItems.map(ri => (
+                    <RelatedItemCard
+                      key={ri.id}
+                      ri={ri}
+                      onAdd={handleAddWithCheck}
+                      dispatch={dispatch}
+                      navigation={navigation}
+                      cardWidth={140}
+                    />
+                  ))}
+                </View>
               </ScrollView>
             </View>
           </>
@@ -579,40 +574,44 @@ const s = StyleSheet.create({
     marginBottom: tokens.spacing.md,
     paddingHorizontal: tokens.spacing.lg,
   },
-  relatedRow: { paddingHorizontal: tokens.spacing.lg, paddingBottom: tokens.spacing.lg },
-
-  relatedCard: {
-    width: 130,
-    backgroundColor: tokens.colors.surface,
-    marginRight: tokens.spacing.lg,
+  relatedGrid: {
+    paddingHorizontal: tokens.spacing.lg,
+    paddingBottom: 16,
   },
-  relatedImgBox: {
+  relatedGridInner: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: 140 * 3 + 24, // Enough width for items to wrap into 2 rows (3 items per row)
+    rowGap: 24,
+    columnGap: 12,
+  },
+  relatedCardGrid: {
+    backgroundColor: tokens.colors.surface,
+    marginBottom: 8,
+  },
+  relatedImgContainerGrid: {
     width: '100%',
-    height: 120,
+    aspectRatio: 1,
+    alignItems: 'center',
+    marginBottom: 20, // Space for the floating button
+  },
+  relatedImgBoxGrid: {
+    width: '100%',
+    height: '100%',
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: tokens.colors.background,
-    marginBottom: 24, // Space for the floating button
   },
   relatedImg: { width: '100%', height: '100%' },
-  relatedBadge: {
+  
+  relatedAddBtnWrapperGrid: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  relatedBadgeText: {
-    fontSize: 9,
-    fontFamily: tokens.typography.family.semibold,
-    color: '#92400E',
-  },
-  relatedAddBtn: {
-    position: 'absolute',
-    top: 104, // 120 (img height) - 16 (half of btn height)
+    bottom: -16,
     alignSelf: 'center',
+    zIndex: 10,
+    ...tokens.shadows.soft,
+  },
+  relatedAddBtnVertical: {
     width: 90,
     height: 32,
     borderRadius: 16,
@@ -622,7 +621,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...tokens.shadows.soft,
-    zIndex: 10,
   },
   relatedAddText: {
     fontSize: 14,
@@ -630,10 +628,7 @@ const s = StyleSheet.create({
     fontFamily: tokens.typography.family.black,
     letterSpacing: 0.5,
   },
-  relatedQtyBox: {
-    position: 'absolute',
-    top: 104,
-    alignSelf: 'center',
+  relatedQtyBoxVertical: {
     width: 90,
     height: 32,
     flexDirection: 'row',
@@ -643,7 +638,6 @@ const s = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 12,
     ...tokens.shadows.soft,
-    zIndex: 10,
   },
   relatedQtyBtn: {
     fontSize: 18,
@@ -657,15 +651,18 @@ const s = StyleSheet.create({
     fontFamily: tokens.typography.family.bold,
     textAlign: 'center',
   },
-  relatedMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  relatedName: {
-    fontSize: 13,
+  relatedContentGrid: {
+    paddingHorizontal: 4,
+  },
+  relatedMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  relatedNameGrid: {
+    fontSize: 14,
     fontFamily: tokens.typography.family.bold,
     color: tokens.colors.textPrimary,
     lineHeight: 18,
     marginBottom: 4,
   },
-  relatedPrice: {
+  relatedPriceGrid: {
     fontSize: 14,
     fontFamily: tokens.typography.family.extrabold,
     color: tokens.colors.textPrimary,

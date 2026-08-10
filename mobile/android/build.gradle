@@ -20,3 +20,11 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+
+
+allprojects {
+    configurations.all {
+        exclude group: "com.google.android.play", module: "core-common"
+    }
+}
