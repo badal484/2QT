@@ -5,15 +5,15 @@
 #include <vector>
 #include <memory>
 
-#ifndef REACT_NATIVE_DEBUG
-#define REACT_NATIVE_DEBUG 1
+#ifdef REACT_NATIVE_DEBUG
+#undef REACT_NATIVE_DEBUG
 #endif
 
-#ifndef RN_DEBUG_STRING_CONVERTIBLE
-#define RN_DEBUG_STRING_CONVERTIBLE 1
+#ifndef REACT_NATIVE_PRODUCTION
+#define REACT_NATIVE_PRODUCTION 1
 #endif
 
-#include <react/renderer/core/Props.h>
+#include <react/renderer/core/Sealable.h>
 #include <react/renderer/core/ShadowNode.h>
 #include <react/renderer/core/LayoutableShadowNode.h>
 #include <react/renderer/components/view/BaseViewProps.h>
@@ -22,6 +22,7 @@
 
 namespace facebook::react {
 
+// Out-of-line Sealable implementations matching production libReact-Fabric.a binary layout
 Sealable::Sealable() {}
 Sealable::~Sealable() {}
 void Sealable::ensureUnsealed() const {}
@@ -35,7 +36,6 @@ SharedDebugStringConvertibleList YogaStylableProps::getDebugProps() const { retu
 SharedDebugStringConvertibleList LayoutableShadowNode::getDebugProps() const { return {}; }
 SharedDebugStringConvertibleList Props::getDebugProps() const { return {}; }
 
-// Explicit declaration and definition for DebugStringConvertible::getDebugProps to satisfy third-party Pods
 SharedDebugStringConvertibleList DebugStringConvertible::getDebugProps() const { return {}; }
 std::string DebugStringConvertible::getDebugName() const { return ""; }
 std::string DebugStringConvertible::getDebugValue() const { return ""; }
