@@ -85,10 +85,20 @@ target 'VeltoMobile' do
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
 
-      if target.name == 'react-native-worklets-core'
+      if target.name == 'RNWorklets'
         target.build_configurations.each do |config|
           config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited) '
           config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/ReactCodegen/ReactCodegen.framework/Headers"'
+
+          # react-native-worklets-core is compiled in Debug mode with
+          # RN_DEBUG_STRING_CONVERTIBLE set, which makes it reference virtual debug
+          # methods on ShadowNode/DebugStringConvertible that are absent from the
+          # prebuilt Release libReact-Fabric.a — causing "Undefined symbol" linker
+          # errors.  Undefining the flag here makes the pod see the same lean class
+          # layout the prebuilt was compiled with, so no debug-symbol references are
+          # generated and no stub vtables are needed.
+          flags = config.build_settings['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = "#{flags} -URN_DEBUG_STRING_CONVERTIBLE"
         end
       end
     end
