@@ -35,6 +35,8 @@ SharedDebugStringConvertibleList YogaStylableProps::getDebugProps() const { retu
 SharedDebugStringConvertibleList LayoutableShadowNode::getDebugProps() const { return {}; }
 SharedDebugStringConvertibleList Props::getDebugProps() const { return {}; }
 
+// Explicit declaration and definition for DebugStringConvertible::getDebugProps to satisfy third-party Pods
+SharedDebugStringConvertibleList DebugStringConvertible::getDebugProps() const { return {}; }
 std::string DebugStringConvertible::getDebugName() const { return ""; }
 std::string DebugStringConvertible::getDebugValue() const { return ""; }
 SharedDebugStringConvertibleList DebugStringConvertible::getDebugChildren() const { return {}; }
