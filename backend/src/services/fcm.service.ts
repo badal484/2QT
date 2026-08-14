@@ -61,10 +61,7 @@ export async function sendFCM(
         const isChat = data.type === 'chat_message';
         const skipNotif = isChat || dataOnly;
 
-        const channelId = data.android_channel_id || (
-            data.type === 'broadcast_message' || data.type === 'winback' || data.type === 'promo' ? 'promotions' :
-            data.type === 'new_kitchen_order' ? 'order_dispatch_v2' : 'order_updates'
-        );
+        const channelId = data.android_channel_id || 'order_updates';
 
         await getMessaging(a).send({
             token,
