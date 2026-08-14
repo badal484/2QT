@@ -652,6 +652,20 @@ router.patch('/orders/:id/status', authenticate, requireRole('super_admin', 'adm
     res.json({ success: true });
 });
 
+router.post('/orders/complete-all-live', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(
+            `UPDATE orders 
+             SET status = 'delivered', delivered_at = NOW(), updated_at = NOW() 
+             WHERE status NOT IN ('delivered', 'cancelled') 
+             RETURNING id, display_id`
+        );
+        res.json({ success: true, count: rows.length, completedOrders: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/riders/:id/verify', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const id = req.params.id as string;
     await query('UPDATE users SET is_verified = true, is_active = true WHERE id = $1', [id]);

@@ -374,6 +374,17 @@ function OrdersTab() {
   };
 
 
+  const handleCompleteAllLive = async () => {
+    if (!confirm("Are you sure you want to mark ALL live active orders as DELIVERED?")) return;
+    try {
+      const res: any = await api.post("/admin/orders/complete-all-live");
+      toast.success(`Completed ${res.count || 0} live orders!`);
+      load();
+    } catch (e) {
+      toast.error("Failed to complete live orders");
+    }
+  };
+
   const statusSteps = ["confirmed", "preparing", "packing", "ready_for_pickup", "out_for_delivery", "delivered"];
   const statusColor: Record<string, string> = {
     confirmed: "text-amber-500 bg-amber-500/10",
@@ -388,8 +399,17 @@ function OrdersTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-4xl font-black tracking-tighter text-white text-white">Orders</h2>
+        <h2 className="text-4xl font-black tracking-tighter text-white">Orders</h2>
         <div className="flex items-center gap-4">
+          {orders.length > 0 && (
+            <button
+              onClick={handleCompleteAllLive}
+              className="px-4 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs hover:bg-emerald-500/30 transition-all flex items-center gap-2 shadow-lg"
+            >
+              <CheckCircle className="w-4 h-4" />
+              Complete All Live Orders ({orders.length})
+            </button>
+          )}
           <button onClick={load} className="w-10 h-10 rounded-xl bg-white/[0.03] backdrop-blur-2xl border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
             <RefreshCw className="w-4 h-4" />
           </button>
