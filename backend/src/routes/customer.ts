@@ -79,7 +79,7 @@ router.get('/wallet', authenticate, async (req: AuthRequest, res) => {
 
     res.json({ 
         balancePaise: wallet[0]?.balance_paise || 0,
-        transactions: transactions.map((t: any) => ({
+        transactions: (transactions || []).map((t: any) => ({
             ...t,
             amountPaise: t.amount_paise,
             balanceAfterPaise: t.balance_after_paise,
@@ -108,8 +108,8 @@ router.get('/loyalty', authenticate, async (req: AuthRequest, res) => {
     `, [userId, limit, offset]);
 
     res.json({
-        points: parseInt(pointsRes[0].total_points),
-        history: history.map((h: any) => ({
+        points: parseInt(pointsRes[0]?.total_points || 0),
+        history: (history || []).map((h: any) => ({
             ...h,
             createdAt: h.created_at
         })),
