@@ -18,7 +18,7 @@ const mockQuery = query as jest.Mock;
 const mockRedisGet = redis.get as jest.Mock;
 const mockRedisSetEx = redis.setEx as jest.Mock;
 
-const MOCK_USER = {
+const MOCK_USER: { id: string; phone: string; device_token: string | null; name: string } = {
   id: 'user-1',
   phone: '919876543210',
   device_token: 'fcm-token-abc123',
