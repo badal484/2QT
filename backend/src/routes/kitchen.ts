@@ -674,12 +674,29 @@ router.post('/orders/:id/force-reassign', authenticate, requireRole('kitchen_man
     }
 });
 
+async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> {
+    const override = (req.query.kitchen_id || req.headers['x-kitchen-id']) as string;
+    if (override) return override;
+    if (req.user!.kitchenId) return req.user!.kitchenId;
+    if (req.user!.role === 'super_admin') {
+        const { rows } = await query('SELECT id FROM kitchens LIMIT 1');
+        if (rows.length > 0) return rows[0].id;
+    }
+    res.status(400).json({ error: 'KITCHEN_NOT_ASSIGNED' });
+    return null;
+}
+
 // ─── Dispatch: get unassigned ready orders for dispatch panel ─────────────────
 router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
-    const kitchenId = await getKitchenId(req, res);
-    if (!kitchenId) return;
-
     try {
+        const explicitKitchenId = (req.query.kitchen_id || req.headers['x-kitchen-id']) as string || req.user!.kitchenId || null;
+        const params: any[] = [];
+        let kitchenFilter = '';
+        if (explicitKitchenId) {
+            params.push(explicitKitchenId);
+            kitchenFilter = ` AND o.kitchen_id = $${params.length}`;
+        }
+
         const { rows } = await query(`
             SELECT o.id, o.display_id, o.status, o.created_at,
                    u.name AS customer_name, u.phone AS customer_phone,
@@ -694,10 +711,10 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
             LEFT JOIN order_items oi ON oi.order_id = o.id
-            WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup') AND o.rider_id IS NULL AND o.kitchen_id = $1
+            WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup') AND o.rider_id IS NULL${kitchenFilter}
             GROUP BY o.id, u.id, a.id, k.id
             ORDER BY o.created_at ASC
-        `, [kitchenId]);
+        `, params);
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'max_batch_size'");
         const maxBatchSize = settings.length > 0 ? parseInt(settings[0].value, 10) || 1 : 1;
