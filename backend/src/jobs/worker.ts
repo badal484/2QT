@@ -96,11 +96,33 @@ const emailWorker = new Worker('2qt:emails', async (job: Job) => {
 }, { connection });
 
 // ─── Lifecycle logging ────────────────────────────────────────────────────────
+// Identifies queue, job id/type, and outcome — never logs job payloads (may contain
+// phone numbers/tokens), matching the "never log secrets" requirement.
 
-notifWorker.on('completed', job => console.log(`[WORKER] ✓ ${job.name} (${job.id})`));
-notifWorker.on('failed', (job, err) => console.error(`[WORKER] ✗ ${job?.name}: ${err.message}`));
-invoiceWorker.on('failed', (job, err) => console.error(`[INVOICE_WORKER] ✗ ${job?.id}: ${err.message}`));
+notifWorker.on('active',    job => console.log(`[WORKER][2qt:notifications] ▶ ${job.name} (${job.id})`));
+notifWorker.on('completed', job => console.log(`[WORKER][2qt:notifications] ✓ ${job.name} (${job.id})`));
+notifWorker.on('failed',    (job, err) => console.error(`[WORKER][2qt:notifications] ✗ ${job?.name} (${job?.id}) attempt ${job?.attemptsMade}: ${err.message}`));
+
+invoiceWorker.on('active',    job => console.log(`[WORKER][2qt:invoices] ▶ (${job.id})`));
+invoiceWorker.on('completed', job => console.log(`[WORKER][2qt:invoices] ✓ (${job.id})`));
+invoiceWorker.on('failed',    (job, err) => console.error(`[WORKER][2qt:invoices] ✗ (${job?.id}) attempt ${job?.attemptsMade}: ${err.message}`));
+
+emailWorker.on('failed', (job, err) => console.error(`[WORKER][2qt:emails] ✗ (${job?.id}): ${err.message}`));
 
 console.log('[WORKER] All workers initialised on queue 2qt:*');
+
+// Called by the worker process's SIGTERM/SIGINT handler. BullMQ's Worker.close() stops
+// pulling new jobs immediately and waits for any job currently in flight to finish
+// before resolving — that's what "allow currently running jobs to finish" means here.
+export const closeWorkers = async () => {
+    console.log('[WORKER] Closing BullMQ workers (waiting for in-flight jobs)...');
+    await Promise.allSettled([
+        notifWorker.close(),
+        invoiceWorker.close(),
+        emailWorker.close(),
+    ]);
+    await connection.quit().catch(() => {});
+    console.log('[WORKER] BullMQ workers closed.');
+};
 
 export { notifWorker, invoiceWorker, emailWorker };

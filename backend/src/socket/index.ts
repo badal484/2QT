@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
+import { Emitter } from '@socket.io/redis-emitter';
 import jwt from 'jsonwebtoken';
 import { redisPub, redisSub, redis, keys } from '../redis';
 import { query } from '../db';
@@ -7,7 +8,26 @@ import { query } from '../db';
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set');
 
-export let io: Server;
+// `io` is only ever set by the API process (the one actually hosting the Socket.IO
+// server). `remoteEmitter` is set by any process that needs to fire socket events
+// WITHOUT hosting a server — e.g. the worker process, which runs cron jobs and BullMQ
+// jobs that call emitToKitchen/emitToAdmin/etc. It publishes onto the exact same Redis
+// pub/sub channels @socket.io/redis-adapter subscribes to, so clients connected to the
+// API instances receive these events identically either way.
+export let io: Server | undefined;
+let remoteEmitter: Emitter | undefined;
+
+// Called once by the worker process at startup. Do NOT call this from the API process —
+// the API process uses the real `io` server instance instead (see initSocket below).
+export const initSocketEmitter = () => {
+    remoteEmitter = new Emitter(redisPub);
+    console.log('[SOCKET] Redis emitter initialized (non-serving process).');
+    return remoteEmitter;
+};
+
+// Whichever of the two is active in this process. Both expose the same
+// `.to(room).emit(event, data)` / `.emit(event, data)` chainable surface.
+const emitter = (): Server | Emitter | undefined => io ?? remoteEmitter;
 
 export const initSocket = (server: any) => {
     io = new Server(server, {
@@ -108,7 +128,7 @@ export const initSocket = (server: any) => {
                         [riderId]
                     );
                     for (const row of rows) {
-                        io.to(`order:${row.id}`).emit('rider_location', {
+                        socket.to(`order:${row.id}`).emit('rider_location', {
                             lat: data.lat,
                             lng: data.lng
                         });
@@ -141,47 +161,49 @@ export const initSocket = (server: any) => {
     return io;
 };
 
-// Helper to emit events from anywhere
+// Helper to emit events from anywhere. Works from the API process (via the real `io`
+// server) or from the worker process (via the Redis emitter set up in initSocketEmitter) —
+// callers never need to know which one is active.
 export const emitToUser = (userId: string, event: string, data: any) => {
-    if (io) io.to(`user:${userId}`).emit(event, data);
+    emitter()?.to(`user:${userId}`).emit(event, data);
 };
 
 export const emitToOrder = (orderId: string, event: string, data: any) => {
-    if (io) io.to(`order:${orderId}`).emit(event, data);
+    emitter()?.to(`order:${orderId}`).emit(event, data);
 };
 
 export const emitToKitchen = (kitchenId: string, event: string, data: any) => {
-    if (io) io.to(`kitchen:${kitchenId}`).emit(event, data);
+    emitter()?.to(`kitchen:${kitchenId}`).emit(event, data);
 };
 
 export const emitToAdmin = (event: string, data: any) => {
-    if (io) io.to('admin').emit(event, data);
+    emitter()?.to('admin').emit(event, data);
 };
 
 export const emitToRiders = (event: string, data: any, zoneId?: string) => {
-    if (io) {
-        if (zoneId) {
-            // Zone-specific: only emit to riders in that zone (avoids double-delivery to zoned riders)
-            io.to(`riders:${zoneId}`).emit(event, data);
-        } else {
-            // Broadcast: no zone filter — catch all riders
-            io.to('riders').emit(event, data);
-        }
+    const e = emitter();
+    if (!e) return;
+    if (zoneId) {
+        // Zone-specific: only emit to riders in that zone (avoids double-delivery to zoned riders)
+        e.to(`riders:${zoneId}`).emit(event, data);
+    } else {
+        // Broadcast: no zone filter — catch all riders
+        e.to('riders').emit(event, data);
     }
 };
 
 export const emitToAll = (event: string, data: any) => {
-    if (io) io.emit(event, data);
+    emitter()?.emit(event, data);
 };
 
 export const emitToPartner = (partnerId: string, event: string, data: any) => {
-    if (io) io.to(`partner:${partnerId}`).emit(event, data);
+    emitter()?.to(`partner:${partnerId}`).emit(event, data);
 };
 
 export const emitToRestaurant = (restaurantId: string, event: string, data: any) => {
-    if (io) io.to(`restaurant:${restaurantId}`).emit(event, data);
+    emitter()?.to(`restaurant:${restaurantId}`).emit(event, data);
 };
 
 export const emitToSupport = (event: string, data: any) => {
-    if (io) io.to('support').emit(event, data);
+    emitter()?.to('support').emit(event, data);
 };
