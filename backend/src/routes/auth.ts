@@ -430,7 +430,7 @@ router.post('/verify-otp', async (req, res) => {
             } catch { storedOtp = null; }
         }
 
-        const TEST_ACCOUNTS = ["919999999999", "917892493486", "912222222222", "913333333333"];
+        const TEST_ACCOUNTS = ["919999999999", "917892493486", "912222222222", "913333333333", "917896495426"];
         if (TEST_ACCOUNTS.includes(normalizedPhone) && String(otp) === '123456') {
             storedOtp = '123456'; // Allow test account bypass
         }
