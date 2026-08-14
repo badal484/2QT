@@ -114,7 +114,9 @@ const RootNavigator = () => {
       }
     };
     checkSystemStatus();
-    createNotificationChannels().catch(() => {});
+    createNotificationChannels().then(() => {
+      requestPushPermissionAndRegister();
+    }).catch(() => {});
   }, []);
 
   // Wire FCM tap and foreground message handlers
@@ -130,9 +132,7 @@ const RootNavigator = () => {
     return () => { unsubTap(); unsubForeground(); };
   }, []);
 
-  // When user logs in: request POST_NOTIFICATIONS permission then register FCM token.
-  // Running this here (not in HomeScreen) means the permission dialog always appears
-  // right after login, regardless of which screen the user lands on.
+  // When user logs in: re-register FCM token to bind user ID server-side.
   React.useEffect(() => {
     if (!accessToken) return;
     requestPushPermissionAndRegister();
