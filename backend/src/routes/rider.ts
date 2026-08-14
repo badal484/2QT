@@ -170,11 +170,18 @@ router.post('/location', authenticate, requireRole('rider', 'rider_captain', 'su
     const zoneId = req.user!.zoneId;
 
     try {
+        // Update user record in DB
+        query('UPDATE users SET current_lat = $1, current_lng = $2, updated_at = NOW() WHERE id = $3', [lat, lng, riderId]).catch(() => {});
+
         // 1. Emit to customer order rooms immediately (non-blocking)
         const { rows } = await query("SELECT id FROM orders WHERE rider_id = $1 AND status NOT IN ('delivered', 'cancelled')", [riderId]);
         for (const row of rows) {
             emitToOrder(row.id, 'rider_location', { lat, lng });
         }
+
+        // Emit to admin & kitchen maps
+        emitToAdmin('rider_location_update', { riderId, lat, lng });
+        emitToAll('rider_location_update', { riderId, lat, lng });
 
         // 2. Persist location to Redis (fire-and-forget, 5 min TTL)
         redis.set(keys.riderLocation(riderId), JSON.stringify({ lat, lng, updatedAt: new Date() }), { EX: 300 })
