@@ -694,7 +694,7 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
             LEFT JOIN order_items oi ON oi.order_id = o.id
-            WHERE o.status = 'ready_for_pickup' AND o.rider_id IS NULL AND o.kitchen_id = $1
+            WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup') AND o.rider_id IS NULL AND o.kitchen_id = $1
             GROUP BY o.id, u.id, a.id, k.id
             ORDER BY o.created_at ASC
         `, [kitchenId]);
