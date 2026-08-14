@@ -7,6 +7,7 @@ import { generalLimiter } from '../middleware/rateLimiter';
 import { emitToAll, emitToUser, emitToKitchen, emitToAdmin, emitToPartner } from '../socket';
 import { processWalletRefund, processBankRefund } from '../services/refund.service';
 import { ensureRiderFundAccount, ensureKitchenFundAccount, firePayout, isAutoPayConfigured } from '../services/razorpay-payout.service';
+import { generateKitchenPayout } from '../services/kitchen-payout.service';
 import { NotificationService } from '../services/notification.service';
 import { ActivityLogService } from '../services/activity.service';
 
@@ -570,11 +571,8 @@ router.post('/kitchen-payouts/generate', financeAccess, financeRole, async (req:
     return res.status(400).json({ error: 'kitchenId, periodStart, periodEnd required' });
   }
 
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-
-    const { rows: kitchenRows } = await client.query(
+    const { rows: kitchenRows } = await query(
       'SELECT id, name, commission_rate, is_partner FROM kitchens WHERE id = $1', [kitchenId]
     );
     if (!kitchenRows.length || !kitchenRows[0].is_partner) {
@@ -582,40 +580,27 @@ router.post('/kitchen-payouts/generate', financeAccess, financeRole, async (req:
     }
     const kitchen = kitchenRows[0];
 
-    // Use delivery date (updated_at) and pre-stored commission values — same as daily auto cron
-    const { rows: orderStats } = await client.query(`
-      SELECT
-        COUNT(*) AS orders_count,
-        COALESCE(SUM(subtotal_paise), 0)        AS gross_sales_paise,
-        COALESCE(SUM(commission_paise), 0)      AS commission_paise,
-        COALESCE(SUM(kitchen_payout_paise), 0)  AS net_payout_paise
-      FROM orders
-      WHERE kitchen_id = $1
-        AND status = 'delivered'
-        AND DATE(updated_at AT TIME ZONE 'Asia/Kolkata') BETWEEN $2 AND $3
-    `, [kitchenId, periodStart, periodEnd]);
+    // generateKitchenPayout nets this range against anything already paid for a period
+    // overlapping it (the daily auto-payout cron, the weekly cron, or an earlier manual
+    // generate for an overlapping range) — so requesting a range that's already been
+    // paid out, in full or in part, can never create a duplicate/overlapping payout.
+    const result = await generateKitchenPayout(kitchenId, periodStart, periodEnd);
+    if (!result.created) {
+      return res.status(400).json({
+        error: result.reason === 'already_covered' ? 'ALREADY_COVERED' : 'BELOW_MINIMUM',
+        message: result.reason === 'already_covered'
+          ? 'This period is already fully covered by existing payouts (daily auto-payout or a prior generation) for this kitchen — no additional payout is owed.'
+          : 'The remaining amount owed for this period is below the minimum payout threshold.',
+        remainingPaise: result.netPayoutPaise,
+      });
+    }
 
-    const stats = orderStats[0];
-    const grossSalesPaise = parseInt(stats.gross_sales_paise);
-    const commissionPaise = parseInt(stats.commission_paise);
-    const netPayoutPaise  = parseInt(stats.net_payout_paise);
-
-    const { rows: inserted } = await client.query(`
-      INSERT INTO kitchen_payouts
-        (kitchen_id, period_start, period_end, gross_sales_paise, commission_paise, net_payout_paise, orders_count, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-      RETURNING *
-    `, [kitchenId, periodStart, periodEnd, grossSalesPaise, commissionPaise, netPayoutPaise, parseInt(stats.orders_count)]);
-
-    await client.query('COMMIT');
-    emitToAll('kitchen_payout_updated', { action: 'generate', kitchenId, payoutId: inserted[0].id });
-    res.json({ success: true, payout: { ...inserted[0], kitchen_name: kitchen.name } });
+    const { rows: payoutRows } = await query('SELECT * FROM kitchen_payouts WHERE id = $1', [result.payoutId]);
+    emitToAll('kitchen_payout_updated', { action: 'generate', kitchenId, payoutId: result.payoutId });
+    res.json({ success: true, payout: { ...payoutRows[0], kitchen_name: kitchen.name } });
   } catch (err) {
-    await client.query('ROLLBACK');
     console.error('[finance/kitchen-payouts/generate]', err);
     res.status(500).json({ error: 'Failed to generate payout' });
-  } finally {
-    client.release();
   }
 });
 

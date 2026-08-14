@@ -12,7 +12,21 @@ import {
 import { processDueTriggerJobs, runDailyTriggers } from '../services/trigger.service';
 import { fireCampaignNotification } from '../routes/campaigns';
 
+// Defense in depth only — the real fix for "crons run more than once" is architectural:
+// initCrons() is called from exactly one place now (src/worker.ts, the singleton worker
+// process; see that file). This guard just stops a stray second call within the SAME
+// process from double-registering every job — it does NOT protect against two separate
+// processes both calling initCrons() (that's what pinning the worker service to
+// min=max=1 Cloud Run instances is for).
+let cronsInitialized = false;
+
 export const initCrons = () => {
+    if (cronsInitialized) {
+        console.warn('[CRON] initCrons() called again in this process — ignoring, jobs are already scheduled.');
+        return;
+    }
+    cronsInitialized = true;
+
     // Daily limit reset at midnight
     cron.schedule('0 0 * * *', async () => {
         console.log('[CRON] Resetting daily limits...');
@@ -52,21 +66,39 @@ export const initCrons = () => {
         for (const rider of riders) {
             const topup = TWO_QT.RIDER.GUARANTEE_MINIMUM_PAISE - rider.total_paise;
             if (topup > 0) {
-                console.log(`[CRON] Topping up rider ${rider.rider_id} with Rs. ${topup/100}`);
-                await withTransaction(async (client) => {
-                    await client.query(`
-                        UPDATE rider_daily_earnings 
-                        SET guarantee_topup_paise = guarantee_topup_paise + $1,
-                            total_paise = total_paise + $1
-                        WHERE rider_id = $2 AND date = CURRENT_DATE
-                    `, [topup, rider.rider_id]);
-                    
-                    // Also notify the rider
-                    notificationsQueue.add('rider_guarantee_payout', { 
-                        riderId: rider.rider_id, 
-                        amountPaise: topup 
+                try {
+                    await withTransaction(async (client) => {
+                        // Idempotency guard (migration 126): claims (rider_id, date) via a
+                        // unique index before touching money. If this rider was already
+                        // topped up today — an overlapping run during a deploy, or a retry —
+                        // this INSERT throws a unique violation and the whole transaction
+                        // rolls back before the additive UPDATE below ever runs.
+                        await client.query(
+                            `INSERT INTO rider_guarantee_topups (rider_id, date, amount_paise) VALUES ($1, CURRENT_DATE, $2)`,
+                            [rider.rider_id, topup]
+                        );
+
+                        await client.query(`
+                            UPDATE rider_daily_earnings
+                            SET guarantee_topup_paise = guarantee_topup_paise + $1,
+                                total_paise = total_paise + $1
+                            WHERE rider_id = $2 AND date = CURRENT_DATE
+                        `, [topup, rider.rider_id]);
+
+                        // Also notify the rider
+                        notificationsQueue.add('rider_guarantee_payout', {
+                            riderId: rider.rider_id,
+                            amountPaise: topup
+                        });
                     });
-                });
+                    console.log(`[CRON] Topped up rider ${rider.rider_id} with Rs. ${topup / 100}`);
+                } catch (err: any) {
+                    if (err.code === '23505') {
+                        console.log(`[CRON] Rider ${rider.rider_id} already topped up today — skipping duplicate.`);
+                    } else {
+                        console.error(`[CRON_ERROR] Rider guarantee top-up failed for ${rider.rider_id}:`, err.message);
+                    }
+                }
             }
         }
     });
@@ -83,16 +115,31 @@ export const initCrons = () => {
         const leadTimeMinutes = 45; // Prepare orders 45 mins before scheduled time
         
         const { rows: scheduled } = await query(`
-            SELECT * FROM scheduled_orders 
-            WHERE status = 'scheduled' 
+            SELECT id FROM scheduled_orders
+            WHERE status = 'scheduled'
             AND scheduled_for <= NOW() + INTERVAL '1 minute' * $1
             AND (payment_status = 'paid' OR payment_method = 'cod')
         `, [leadTimeMinutes]);
 
-        for (const s of scheduled) {
-            console.log(`[CRON] Activating scheduled order: ${s.id}`);
+        for (const row of scheduled) {
             try {
                 await withTransaction(async (client) => {
+                    // Atomically claim this scheduled order before doing anything else.
+                    // If a concurrent run (e.g. two worker instances briefly overlapping
+                    // during a deploy rollout) already claimed it, this UPDATE matches 0
+                    // rows and we return early — no duplicate order is ever created for
+                    // the same scheduled_order.
+                    const { rows: claimedRows } = await client.query(
+                        `UPDATE scheduled_orders SET status = 'converting' WHERE id = $1 AND status = 'scheduled' RETURNING *`,
+                        [row.id]
+                    );
+                    const s = claimedRows[0];
+                    if (!s) {
+                        console.log(`[CRON] Scheduled order ${row.id} already claimed by another run — skipping.`);
+                        return;
+                    }
+                    console.log(`[CRON] Activating scheduled order: ${s.id}`);
+
                     // 1. Find a suitable kitchen in the zone (for now, pick first one or based on load)
                     const { rows: kitchens } = await client.query('SELECT id FROM kitchens WHERE zone_id = $1 AND is_active = true AND is_paused = false LIMIT 1', [s.zone_id]);
                     const kitchenId = kitchens[0]?.id;
@@ -147,8 +194,10 @@ export const initCrons = () => {
                     }
                 });
             } catch (err) {
-                console.error(`[CRON_ERROR] Failed to convert scheduled order ${s.id}:`, err);
-                await query('UPDATE scheduled_orders SET status = \'failed\' WHERE id = $1', [s.id]);
+                console.error(`[CRON_ERROR] Failed to convert scheduled order ${row.id}:`, err);
+                // Runs outside the transaction above, so it still commits even though that
+                // transaction (including the 'converting' claim) rolled back on failure.
+                await query('UPDATE scheduled_orders SET status = \'failed\' WHERE id = $1', [row.id]).catch(() => {});
             }
         }
     });
@@ -667,5 +716,16 @@ export const initCrons = () => {
         }
     });
 
-    console.log('Crons initialized.');
+    console.log(`[CRON] ${cron.getTasks().size} jobs initialized.`);
+};
+
+// Called by the worker process on SIGTERM/SIGINT so no cron job fires mid-shutdown.
+// node-cron 3.x tracks every task it created in a process-wide registry, so this stops
+// all of them without us having to keep our own array of task handles in sync.
+export const stopCrons = () => {
+    for (const task of cron.getTasks().values()) {
+        task.stop();
+    }
+    cronsInitialized = false;
+    console.log('[CRON] All scheduled jobs stopped.');
 };

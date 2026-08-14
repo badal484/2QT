@@ -6,8 +6,27 @@ import { NotificationService } from './services/notification.service';
 import { emitToUser, emitToAdmin } from './socket';
 import { redis, keys } from './redis';
 import { haversineMetres } from './services/distance.service';
+import { generateKitchenPayout } from './services/kitchen-payout.service';
+
+// NOTE: this is a SEPARATE module from src/crons/index.ts (same base name, one is a
+// file and one is a directory) — Node resolves `./crons` to this file before it ever
+// looks at `./crons/index.ts`. The two used to be initialized from two different-looking
+// imports in src/index.ts that both got called, which looked like (and was diagnosed as)
+// "the same cron job running twice" — it wasn't; these are 12 entirely different jobs
+// plus the auto-dispatch interval below, all of which are real, needed functionality
+// (booking reminders, mission assignment, loyalty expiry, weekly payout reconciliation).
+// Both this file and src/crons/index.ts are now only ever initialized from
+// src/worker.ts, the singleton worker process — see that file.
+
+let cronsInitialized = false;
+let autoDispatchInterval: ReturnType<typeof setInterval> | undefined;
 
 export const initCrons = () => {
+    if (cronsInitialized) {
+        console.warn('[CRON] initCrons() (crons.ts) called again in this process — ignoring.');
+        return;
+    }
+    cronsInitialized = true;
     console.log('Crons initialized.');
 
     // 06:00 AM - Reset Daily Subscription Credits
@@ -278,37 +297,19 @@ export const initCrons = () => {
             let generated = 0;
             for (const k of kitchens) {
                 try {
-                    const { rows: stats } = await query(`
-                        SELECT
-                            COUNT(*)                                       AS orders_count,
-                            COALESCE(SUM(subtotal_paise), 0)              AS gross_sales_paise,
-                            COALESCE(SUM(commission_paise), 0)            AS commission_paise,
-                            COALESCE(SUM(kitchen_payout_paise), 0)        AS net_payout_paise
-                        FROM orders
-                        WHERE kitchen_id = $1
-                          AND status = 'delivered'
-                          AND DATE(updated_at AT TIME ZONE 'Asia/Kolkata') BETWEEN $2 AND $3
-                    `, [k.id, periodStart, periodEnd]);
-
-                    const netPayout = parseInt(stats[0].net_payout_paise);
-                    if (netPayout < 100) continue; // skip if less than ₹1
-
-                    const { rows: inserted } = await query(`
-                        INSERT INTO kitchen_payouts
-                          (kitchen_id, period_start, period_end, gross_sales_paise, commission_paise,
-                           net_payout_paise, orders_count, status)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-                        ON CONFLICT (kitchen_id, period_start, period_end) DO NOTHING
-                        RETURNING id
-                    `, [k.id, periodStart, periodEnd,
-                        parseInt(stats[0].gross_sales_paise),
-                        parseInt(stats[0].commission_paise),
-                        netPayout,
-                        parseInt(stats[0].orders_count)]);
-
-                    if (inserted.length) {
+                    // generateKitchenPayout nets this week's revenue against anything
+                    // already paid for a period overlapping this week — including every
+                    // night's daily auto-payout (src/crons/index.ts) for kitchens with
+                    // auto_payout_enabled=TRUE. A kitchen paid daily all week nets to ~0
+                    // and no duplicate weekly payout is created; a kitchen with a partial
+                    // week of daily payouts (e.g. it enabled auto-pay mid-week) gets a
+                    // weekly payout for exactly the remainder. See that service for why.
+                    const result = await generateKitchenPayout(k.id, periodStart, periodEnd);
+                    if (result.created) {
                         generated++;
-                        console.log(`[CRON] Kitchen payout generated for ${k.name}: ₹${(netPayout / 100).toFixed(0)}`);
+                        console.log(`[CRON] Kitchen payout generated for ${k.name}: ₹${(result.netPayoutPaise / 100).toFixed(0)}`);
+                    } else if (result.reason === 'already_covered') {
+                        console.log(`[CRON] Kitchen ${k.name}: week already covered by daily/prior payouts — no weekly payout needed`);
                     }
                 } catch (innerErr) {
                     console.error(`[CRON] Kitchen payout failed for ${k.id}:`, innerErr);
@@ -516,7 +517,7 @@ export const initCrons = () => {
     // --- Strict Auto-Dispatch Engine ---
     // Runs every 30 seconds to intelligently batch and assign orders
     let autoDispatchRunning = false;
-    setInterval(async () => {
+    autoDispatchInterval = setInterval(async () => {
         if (autoDispatchRunning) return;
         autoDispatchRunning = true;
         try {
@@ -638,4 +639,17 @@ export const initCrons = () => {
             autoDispatchRunning = false;
         }
     }, 30000);
+};
+
+// Called by the worker process on SIGTERM/SIGINT.
+export const stopCrons = () => {
+    for (const task of cron.getTasks().values()) {
+        task.stop();
+    }
+    if (autoDispatchInterval) {
+        clearInterval(autoDispatchInterval);
+        autoDispatchInterval = undefined;
+    }
+    cronsInitialized = false;
+    console.log('[CRON] (crons.ts) All scheduled jobs stopped.');
 };

@@ -72,7 +72,7 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
     // Generate OTP — store in memory FIRST (instant, no network), then try Redis
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setMemOtp(normalizedPhone, otp);          // always succeeds, no await
-    console.log(`[OTP] ${normalizedPhone} → ${otp}`);
+    if (process.env.NODE_ENV === 'development') console.log(`[OTP] ${normalizedPhone} → ${otp}`);
     try {
         await Promise.race([
             redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 }),
