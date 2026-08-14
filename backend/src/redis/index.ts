@@ -13,7 +13,7 @@ if (redisUrl.includes('redis://') || redisUrl.includes('rediss://')) {
     }
 }
 
-const isTls = (process.env.REDIS_URL || '').includes('--tls') || redisUrl.startsWith('rediss://');
+const isTls = (process.env.REDIS_URL || '').includes('--tls') || redisUrl.startsWith('rediss://') || redisUrl.includes('upstash.io');
 
 const redisConfig = {
     url: redisUrl,
