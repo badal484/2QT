@@ -3,11 +3,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+let redisUrl = (process.env.REDIS_URL || 'redis://localhost:6379').trim();
+
+// Auto-clean if user pasted `redis-cli --tls -u redis://...` command snippet from Upstash
+if (redisUrl.includes('redis://') || redisUrl.includes('rediss://')) {
+    const match = redisUrl.match(/(rediss?:\/\/[^\s"']+)/);
+    if (match) {
+        redisUrl = match[1];
+    }
+}
+
+const isTls = (process.env.REDIS_URL || '').includes('--tls') || redisUrl.startsWith('rediss://');
 
 const redisConfig = {
     url: redisUrl,
-    socket: redisUrl.startsWith('rediss://') ? { tls: true, rejectUnauthorized: false } : undefined
+    socket: isTls ? { tls: true, rejectUnauthorized: false } : undefined
 };
 
 export const redis = createClient(redisConfig);
