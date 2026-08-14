@@ -152,13 +152,20 @@ const RootNavigator = () => {
           console.log('--- SYSTEMATIC USER UPDATE RECEIVED ---', data);
           dispatch(updateUser(data));
         });
+        socket.on('new_notification', (data) => {
+          console.log('--- NEW NOTIFICATION RECEIVED OVER SOCKET ---', data);
+          displayLocalNotification(data.title || '2QT', data.body || '', data).catch(() => {});
+        });
       }
     } else {
       disconnectSocket();
     }
     return () => {
       const socket = getSocket();
-      if (socket) socket.off('user_updated');
+      if (socket) {
+        socket.off('user_updated');
+        socket.off('new_notification');
+      }
       disconnectSocket();
     };
   }, [accessToken, dispatch]);

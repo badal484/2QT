@@ -1,5 +1,4 @@
 import './instrument'; // Sentry must be first — before any other import
-import './jobs/worker'; // Start background job processing
 import 'express-async-errors';
 import express from 'express';
 import http from 'http';
@@ -11,14 +10,18 @@ import * as Sentry from '@sentry/node';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
-import { connectRedis } from './redis';
-import { initSocket } from './socket';
-import { initCrons } from './crons';
-import { initCrons as initCronsExt } from './crons/index';
+import { connectRedis, redis, redisPub, redisSub } from './redis';
+import { initSocket, io } from './socket';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 import apiRouter from './routes';
-import { notificationsQueue, invoicesQueue, emailsQueue } from './jobs/queues';
+import { notificationsQueue, invoicesQueue, emailsQueue, closeQueueConnections } from './jobs/queues';
+
+// This process is the API only — it does NOT start BullMQ workers or node-cron.
+// Those live exclusively in src/worker.ts (the singleton `2qt-worker` Cloud Run
+// service) so that scaling this API out to N instances never multiplies job/cron
+// execution. See src/worker.ts and src/crons/index.ts for the reasoning.
+Sentry.setTag('service', 'api');
 
 dotenv.config();
 
@@ -138,25 +141,45 @@ const start = async () => {
         // Run Migrations
         // We can run it in a separate process or call it here.
         // For simplicity, I'll ensure it's triggered.
-        
+
         await connectRedis();
         console.log('Redis connected.');
 
         initSocket(server);
         console.log('Socket.io initialized.');
 
-        initCrons();
-        initCronsExt();
-
         server.listen(PORT as number, '0.0.0.0', () => {
-            console.log(`Server running on port ${PORT} (0.0.0.0)`);
+            console.log(`[API] Server running on port ${PORT} (0.0.0.0)`);
+
+            if (process.env.ENABLE_EMBEDDED_WORKER !== 'false') {
+                console.log('[API] Starting embedded background workers and cron jobs...');
+                try {
+                    require('./jobs/worker');
+                    const { initCrons: initFileCrons } = require('./crons');
+                    const { initCrons: initDirCrons } = require('./crons/index');
+                    initFileCrons();
+                    initDirCrons();
+                } catch (e: any) {
+                    console.error('[API] Failed to initialize embedded workers:', e.message);
+                }
+            }
         });
 
         // Graceful shutdown — registered here so `server` is in scope
         const shutdown = (signal: string) => {
             console.log(`[${signal}] Graceful shutdown initiated...`);
-            server.close(() => {
-                console.log(`[${signal}] HTTP server closed. Exiting.`);
+            server.close(async () => {
+                console.log(`[${signal}] HTTP server closed.`);
+                try {
+                    // Stop accepting new Socket.IO connections and notify existing
+                    // clients before the process exits, rather than dropping them silently.
+                    io?.close();
+                    await closeQueueConnections();
+                    await Promise.allSettled([redis.quit(), redisPub.quit(), redisSub.quit()]);
+                } catch (err) {
+                    console.error(`[${signal}] Error while closing resources:`, err);
+                }
+                console.log(`[${signal}] Shutdown complete. Exiting.`);
                 process.exit(0);
             });
             // Force exit if shutdown takes longer than 30s (stuck requests)

@@ -90,11 +90,14 @@ export interface SendOptions {
     imageUrl?: string;
 }
 
-// Enqueues a notification job — HTTP handlers should call this so responses are not blocked.
-// The BullMQ worker picks up the job and calls deliverNotification() with 3 retries + backoff.
 export async function sendNotification(type: NotifType, options: SendOptions): Promise<void> {
-    const { notificationsQueue } = require('../jobs/queues');
-    await (notificationsQueue as any).add(type, { ...options, _queuedOptions: true });
+    try {
+        const { notificationsQueue } = require('../jobs/queues');
+        await (notificationsQueue as any).add(type, { ...options, _queuedOptions: true });
+    } catch (e: any) {
+        console.warn(`[NOTIF] Queue add failed for type=${type} (delivering directly):`, e.message);
+        deliverNotification(type, options).catch(err => console.error('[NOTIF_DIRECT_DELIVERY_ERR]', err.message));
+    }
 }
 
 // Actual delivery — called by the worker. Do NOT call from HTTP handlers (blocks response).
