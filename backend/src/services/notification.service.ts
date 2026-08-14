@@ -84,6 +84,8 @@ function interpolate(template: string, vars: Record<string, string>): string {
 export interface SendOptions {
     userId?: string;
     phone?: string;
+    title?: string;
+    body?: string;
     vars?: Record<string, string>;
     dedupeKey?: string;
     overrideChannels?: ('push' | 'whatsapp' | 'sms')[];
@@ -174,9 +176,9 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     }
 
     // 6. Build content
-    const title   = interpolate(tmpl.title_template, vars);
-    const body    = interpolate(tmpl.body_template, vars);
-    const waText  = interpolate(tmpl.whatsapp_template || tmpl.body_template, vars);
+    const title   = options.title || vars.title || interpolate(tmpl.title_template, vars);
+    const body    = options.body  || vars.body  || interpolate(tmpl.body_template, vars);
+    const waText  = options.body  || vars.body  || interpolate(tmpl.whatsapp_template || tmpl.body_template, vars);
     const channels: string[] = overrideChannels ?? tmpl.channels ?? ['push', 'whatsapp'];
 
     // 7. Insert to DB first so we get notifId to embed in FCM data (enables click tracking)
