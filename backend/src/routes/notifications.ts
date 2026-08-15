@@ -326,11 +326,16 @@ router.delete('/admin/triggers/:id', authenticate, requireRole('super_admin', 'a
 // ─── Admin: notification log ──────────────────────────────────────────────────
 
 router.get('/admin/log', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res: Response) => {
-    const { type, status, limit = '100' } = req.query as Record<string, string>;
+    const { type, status, limit = '100', search, q } = req.query as Record<string, string>;
     const conditions: string[] = [];
     const params: any[] = [];
     if (type) { conditions.push(`n.type = $${params.length + 1}`); params.push(type); }
     if (status) { conditions.push(`n.delivery_status = $${params.length + 1}`); params.push(status); }
+    const term = search || q;
+    if (term) {
+        conditions.push(`(u.phone LIKE $${params.length + 1} OR u.name ILIKE $${params.length + 1} OR n.title ILIKE $${params.length + 1} OR n.body ILIKE $${params.length + 1})`);
+        params.push(`%${term}%`);
+    }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     params.push(Math.min(parseInt(limit), 500));
 
