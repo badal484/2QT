@@ -25,9 +25,9 @@ function loadNotifee() {
 
 function channelForType(type: string): string {
   if (type === 'order_update' || type === 'new_kitchen_order') return 'order_dispatch_v2';
-  if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates_v3';
-  if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account_v3';
-  return 'promotions_v3';
+  if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates_v4';
+  if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account_v4';
+  return 'promotions_v4';
 }
 
 export async function createNotificationChannels() {
@@ -45,7 +45,7 @@ export async function createNotificationChannels() {
     }),
     // HIGH-importance heads-up banner channels for order updates, promotions, and account alerts
     _notifee.createChannel({
-      id: 'order_updates_v3',
+      id: 'order_updates_v4',
       name: 'Order Updates',
       importance: _AndroidImportance.HIGH,
       sound: 'default',
@@ -54,7 +54,7 @@ export async function createNotificationChannels() {
       lights: [0xFFFC4603, 500, 500],
     }),
     _notifee.createChannel({
-      id: 'promotions_v3',
+      id: 'promotions_v4',
       name: 'Promotions & Offers',
       importance: _AndroidImportance.HIGH,
       sound: 'default',
@@ -63,7 +63,7 @@ export async function createNotificationChannels() {
       lights: [0xFFFC4603, 500, 500],
     }),
     _notifee.createChannel({
-      id: 'account_v3',
+      id: 'account_v4',
       name: 'Account & Wallet Alerts',
       importance: _AndroidImportance.HIGH,
       sound: 'default',
