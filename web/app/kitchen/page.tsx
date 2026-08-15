@@ -418,10 +418,19 @@ export default function KitchenPage() {
     };
     const handleCriticalAlert = (data: any) => {
       playKitchenAlert();
-      toast.error(`Critical Alert: ${data.type}`, {
-        description: data.message,
+      toast.error(`Critical Alert: ${data.type || 'NO_RIDER'}`, {
+        description: `${data.message || 'No rider assigned'} (Order #${data.displayId || ''})`,
+        action: {
+          label: "Assign Rider",
+          onClick: () => {
+            setView("dispatch");
+            fetchDispatch();
+          },
+        },
         duration: Infinity,
       });
+      setNeedsManualAssignment(true);
+      fetchDispatch();
       try { playDispatchAlarm(); } catch {}
     };
     const handleOrderCancelled = ({ orderId }: { orderId: string }) => {
@@ -671,8 +680,8 @@ export default function KitchenPage() {
     }
   };
 
-  const idleRiders = riders.filter(r => !r.active_orders || r.active_orders.length === 0);
-  const busyRiders = riders.filter(r => r.active_orders && r.active_orders.length > 0);
+  const idleRiders = riders.filter(r => !r.active_orders || r.active_orders.filter(Boolean).length === 0);
+  const busyRiders = riders.filter(r => r.active_orders && r.active_orders.filter(Boolean).length > 0);
   const activeCount = orders.filter(o => ["confirmed", "preparing"].includes(o.status)).length;
   const currentTime = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   const lowStock = inventory.filter(i => i.current_stock < i.reorder_threshold);

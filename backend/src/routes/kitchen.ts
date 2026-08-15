@@ -521,7 +521,7 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
         const { rows: riders } = await query(`
             SELECT u.id, u.name, u.phone, u.is_online, u.current_lat, u.current_lng,
                    k.lat AS kitchen_lat, k.lng AS kitchen_lng,
-                   (
+                   COALESCE((
                        SELECT json_agg(json_build_object(
                            'id', o.id,
                            'display_id', o.display_id,
@@ -531,7 +531,7 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
                        FROM orders o
                        LEFT JOIN addresses a ON o.address_id = a.id
                        WHERE o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
-                   ) as active_orders
+                   ), '[]'::json) as active_orders
             FROM users u
             LEFT JOIN kitchens k ON k.id = $1
             WHERE (u.role IN ('rider','rider_captain','super_admin','admin')) AND (
@@ -740,8 +740,7 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
             LEFT JOIN order_items oi ON oi.order_id = o.id
             WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
-              AND (o.rider_id IS NULL OR o.needs_reassign = true OR o.status = 'ready_for_pickup')
-              ${explicitKitchenId ? `AND (o.kitchen_id = $1 OR o.kitchen_id IS NULL)` : ''}
+              AND (o.rider_id IS NULL OR o.needs_reassign = true OR o.status = 'ready_for_pickup' OR o.created_at < NOW() - INTERVAL '5 minutes')
             GROUP BY o.id, u.id, r.id, a.id, k.id
             ORDER BY o.created_at ASC
         `, params);
