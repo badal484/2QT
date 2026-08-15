@@ -212,13 +212,13 @@ function BroadcastPanel() {
       <div>
         <label className="text-xs text-zinc-500 mb-1.5 block">Audience</label>
         <div className="flex gap-2 flex-wrap">
-          {(["all", "zone", "active_last_7", "riders", "kitchens"] as const).map(s => (
+          {(["all", "zone", "active_last_7", "riders", "kitchens", "everyone"] as const).map(s => (
             <button
               key={s}
               onClick={() => setSegment(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${segment === s ? "bg-white text-black" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
             >
-              {s === "all" ? "All Customers" : s === "zone" ? "By Zone" : s === "active_last_7" ? "Active (7d)" : s === "riders" ? "Riders" : "Kitchen Partners"}
+              {s === "all" ? "All Customers" : s === "zone" ? "By Zone" : s === "active_last_7" ? "Active (7d)" : s === "riders" ? "Riders" : s === "kitchens" ? "Kitchen Partners" : "Everyone"}
             </button>
           ))}
         </div>
