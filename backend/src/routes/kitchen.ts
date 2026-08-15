@@ -517,9 +517,9 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
     if (!kitchenId) return;
 
     try {
-        // Show idle riders (available to all) + riders delivering THIS kitchen's orders
+        // Show idle riders + riders delivering THIS kitchen's orders
         const { rows: riders } = await query(`
-            SELECT u.id, u.name, u.phone, u.is_online, k.lat AS kitchen_lat, k.lng AS kitchen_lng,
+            SELECT u.id, u.name, u.phone, u.is_online, u.current_lat, u.current_lng,
                    (
                        SELECT json_agg(json_build_object(
                            'id', o.id,
@@ -532,14 +532,13 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
                        WHERE o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
                    ) as active_orders
             FROM users u
-            LEFT JOIN kitchens k ON k.id = $1
             WHERE u.role IN ('rider','rider_captain') AND u.is_online = true
             ORDER BY u.name
-        `, [kitchenId]);
+        `);
 
-        // Attach GPS from Redis (non-blocking — missing is fine, with kitchen fallback)
+        // Attach real live GPS from Redis, fallback to real DB current_lat/current_lng
         const ridersWithLocation = await Promise.all(
-            riders.map(async (r: any, idx: number) => {
+            riders.map(async (r: any) => {
                 let loc: any = null;
                 try {
                     const raw = await redis.get(keys.riderLocation(r.id));
@@ -555,24 +554,21 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
                     }
                 } catch {}
 
-                // Fallback location around kitchen if mobile app hasn't pushed live GPS ping yet
-                if (!loc && r.kitchen_lat && r.kitchen_lng) {
-                    const angle = (idx * (2 * Math.PI / Math.max(1, riders.length)));
-                    loc = {
-                        lat: parseFloat(r.kitchen_lat) + 0.003 * Math.cos(angle),
-                        lng: parseFloat(r.kitchen_lng) + 0.003 * Math.sin(angle),
-                        isFallback: true
-                    };
+                // Fallback to real DB current_lat/current_lng if available
+                if (!loc && r.current_lat !== null && r.current_lng !== null) {
+                    const lat = parseFloat(r.current_lat);
+                    const lng = parseFloat(r.current_lng);
+                    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+                        loc = { lat, lng };
+                    }
                 }
 
                 return { ...r, location: loc };
             })
         );
 
-        // Include online riders with locations (including fallback) or active orders
-        const trulyOnlineRiders = ridersWithLocation.filter(r => 
-            r.location !== null || (r.active_orders && r.active_orders.length > 0)
-        );
+        // Filter: ONLY return riders who have a real GPS location ping
+        const trulyOnlineRiders = ridersWithLocation.filter(r => r.location !== null);
 
         res.json({ riders: trulyOnlineRiders });
     } catch (err: any) {
