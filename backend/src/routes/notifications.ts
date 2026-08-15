@@ -59,6 +59,26 @@ router.get('/debug-tokens', async (_req, res: Response) => {
     }
 });
 
+router.get('/test-fcm-direct', async (_req, res: Response) => {
+    try {
+        const { rows } = await db.query(
+            `SELECT id, name, phone, device_token FROM users WHERE device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1`
+        );
+        if (rows.length === 0) return res.json({ error: 'NO_ACTIVE_TOKENS' });
+
+        const user = rows[0];
+        const result = await sendFCM(
+            user.device_token,
+            '🔔 Live 2QT Push Test',
+            'This is a real FCM push notification sent to your system tray!',
+            { type: 'order_confirmed', orderId: '2QT-TEST-999' }
+        );
+        res.json({ success: true, userId: user.id, name: user.name, phone: user.phone, fcmResult: result });
+    } catch (err: any) {
+        res.status(500).json({ error: 'FCM_FAILED', message: err.message, stack: err.stack });
+    }
+});
+
 // ─── FCM device token (mobile) ───────────────────────────────────────────────
 
 router.patch('/device-token', authenticate, async (req: AuthRequest, res: Response) => {
