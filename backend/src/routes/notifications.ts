@@ -96,11 +96,19 @@ router.patch('/device-token', authenticate, async (req: AuthRequest, res: Respon
     console.log(`[DEVICE_TOKEN] PATCH received user=${req.user!.userId} tokenPresent=${!!token} tokenPrefix=${token ? token.slice(0, 15) : 'n/a'}`);
     if (!token) return res.status(400).json({ error: 'token required' });
 
-    // Strict Deduplication: guarantee this token is bound to exactly ONE active user.
-    // This prevents duplicate/cross-app notifications when a single device has logged into multiple accounts.
-    await query('UPDATE users SET device_token = NULL WHERE device_token = $1 AND id != $2', [token, req.user!.userId]);
-    await query('UPDATE users SET device_token = $1 WHERE id = $2', [token, req.user!.userId]);
-    console.log(`[DEVICE_TOKEN] Saved for user=${req.user!.userId}`);
+    // Bind this device token to the user's account and any sibling role accounts sharing the same phone number
+    const { rows: uRows } = await query('SELECT phone FROM users WHERE id = $1', [req.user!.userId]);
+    const userPhone = uRows[0]?.phone;
+
+    if (userPhone) {
+        // Clear token from other phone numbers (different physical devices)
+        await query('UPDATE users SET device_token = NULL WHERE device_token = $1 AND phone != $2', [token, userPhone]);
+        // Set token for all user accounts belonging to this phone number
+        await query('UPDATE users SET device_token = $1 WHERE phone = $2 AND is_active = true', [token, userPhone]);
+    } else {
+        await query('UPDATE users SET device_token = $1 WHERE id = $2', [token, req.user!.userId]);
+    }
+    console.log(`[DEVICE_TOKEN] Saved for user=${req.user!.userId} (phone=${userPhone})`);
 
     res.json({ success: true });
 });
