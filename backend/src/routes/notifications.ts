@@ -364,7 +364,16 @@ router.get('/admin/log', authenticate, requireRole('super_admin', 'admin'), asyn
     res.json({ notifications: rows });
 });
 
-// ─── Debug: check notification pipeline for current user ─────────────────────
+router.get('/db-check', async (req: any, res: Response) => {
+    try {
+        const dbUrl = process.env.DATABASE_URL || '';
+        const host = dbUrl.split('@')[1]?.split('/')[0] || 'unknown';
+        const { rows } = await query("SELECT id, name, phone, role, device_token FROM users WHERE phone LIKE '%6204646300%'");
+        res.json({ dbHost: host, user: rows[0] || null });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
