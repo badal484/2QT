@@ -61,12 +61,8 @@ async function loadTemplate(type: NotifType) {
     }
 
     // Fallback to hardcoded templates
-    const fallback = FALLBACK_TEMPLATES[type];
-    if (fallback) {
-        console.warn(`[NOTIF] Using fallback template for type=${type} — run migration 054 to use DB templates`);
-        return { ...fallback, whatsapp_template: fallback.body_template };
-    }
-    return null;
+    const fallback = FALLBACK_TEMPLATES[type] || { title_template: '{{title}}', body_template: '{{body}}', channels: ['push', 'whatsapp'] };
+    return { ...fallback, whatsapp_template: fallback.body_template };
 }
 
 export async function bustTemplateCache(type: string) {
