@@ -1,11 +1,11 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
+import { getCleanRedisUrl, isRedisTls } from '../redis/parseRedisUrl';
 
-const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+const redisUrl = getCleanRedisUrl();
+const connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,
-    tls: process.env.REDIS_URL?.startsWith('rediss://')
-        ? { rejectUnauthorized: false }
-        : undefined,
+    tls: isRedisTls(redisUrl) ? { rejectUnauthorized: false } : undefined,
 });
 
 const defaultJobOptions = {
