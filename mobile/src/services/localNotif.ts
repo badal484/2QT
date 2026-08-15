@@ -50,7 +50,7 @@ export async function createNotificationChannels() {
       vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800, 400, 800],
     }),
     _notifee.createChannel({ id: 'order_updates', name: 'Order Updates', importance: _AndroidImportance.HIGH }),
-    _notifee.createChannel({ id: 'promotions',    name: 'Promotions',    importance: _AndroidImportance.DEFAULT }),
+    _notifee.createChannel({ id: 'promotions',    name: 'Promotions',    importance: _AndroidImportance.HIGH }),
     _notifee.createChannel({ id: 'account',       name: 'Account',       importance: _AndroidImportance.HIGH }),
   ]);
   results.forEach((r, i) => {
