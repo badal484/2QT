@@ -343,7 +343,7 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
         } else if (audience === 'kitchens' || audience === 'partners') {
             queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('chef', 'kitchen_manager', 'partner_kitchen')`;
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
-        } else if (audience === 'customers' || audience === 'all_customers' || audience === 'buyers' || audience === 'buyer') {
+        } else if (audience === 'customers' || audience === 'all_customers' || audience === 'buyers' || audience === 'buyer' || audience === 'all') {
             if (zoneId) {
                 queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer') AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
