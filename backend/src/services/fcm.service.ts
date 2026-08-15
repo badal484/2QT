@@ -3,7 +3,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 
 let app: App | null = null;
 
-function parseServiceAccount(): any | null {
+export function parseServiceAccount(): any | null {
     // Prefer base64-encoded version — immune to newline/escaping issues in env var editors
     const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
     if (b64) {

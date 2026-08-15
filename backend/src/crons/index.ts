@@ -4,7 +4,7 @@ import { redis, keys } from '../redis';
 import { notificationsQueue } from '../jobs/queues';
 import { TWO_QT } from '../config/constants';
 import { emitToKitchen, emitToAdmin, emitToRiders, emitToPartner } from '../socket';
-import { notifyKitchenStaff } from '../services/notification.service';
+import { notifyKitchenStaff, notifyRidersInZone } from '../services/notification.service';
 import {
     ensureKitchenFundAccount, ensureRiderFundAccount,
     firePayout, isAutoPayConfigured,
@@ -191,6 +191,12 @@ export const initCrons = () => {
                     const autoDispatchEnabled = settings[0]?.value === 'true';
                     if (!autoDispatchEnabled) {
                         emitToRiders('new_available_mission', { orderId, displayId, zoneId: s.zone_id }, s.zone_id);
+                        notifyRidersInZone(
+                            s.zone_id,
+                            '🛵 New Delivery Available!',
+                            `Order #${displayId} is ready for pickup nearby.`,
+                            { orderId: String(orderId), displayId, screen: 'RiderHome' }
+                        ).catch(() => {});
                     }
                 });
             } catch (err) {

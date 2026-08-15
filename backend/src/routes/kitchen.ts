@@ -10,6 +10,8 @@ import { redis, keys } from '../redis';
 import { sendFCM } from '../services/fcm.service';
 import { pushService } from '../services/push.service';
 
+const router = Router();
+
 async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> {
     const override = (req.query.kitchen_id || req.headers['x-kitchen-id']) as string;
     if (override) return override;
@@ -665,6 +667,15 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
             assignedBy: 'kitchen',
             deliveryAddress: addrRows[0]?.address_text || null,
         });
+        // FCM fallback — a kitchen manager assigning a rider directly is a deliberate,
+        // time-sensitive action; it shouldn't silently fail to reach a rider whose app
+        // happens to be closed at that exact moment.
+        NotificationService.send('broadcast_message', {
+            userId: riderId,
+            title: '🛵 New Delivery Assigned!',
+            body: `Order #${order.display_id} has been assigned to you by the kitchen.`,
+            screen: 'RiderHome',
+        }).catch(() => {});
 
         // Notify customer that a rider was assigned
         emitToUser(order.customer_id, 'order_status_update', {
@@ -735,18 +746,12 @@ router.post('/orders/:id/force-reassign', authenticate, requireRole('kitchen_man
 // ─── Dispatch: get unassigned ready orders for dispatch panel ─────────────────
 router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     try {
-        const explicitKitchenId = (req.query.kitchen_id || req.headers['x-kitchen-id']) as string || req.user!.kitchenId || null;
-        const params: any[] = [];
-        let kitchenFilter = '';
-        if (explicitKitchenId) {
-            params.push(explicitKitchenId);
-            kitchenFilter = ` AND o.kitchen_id = $${params.length}`;
-        }
-
         const { rows } = await query(`
             SELECT o.id, o.display_id, o.status, o.created_at, o.rider_id,
-                   u.name AS customer_name, u.phone AS customer_phone,
-                   a.address_text AS delivery_address, a.lat AS customer_lat, a.lng AS customer_lng,
+                   COALESCE(u.name, 'Customer') AS customer_name,
+                   COALESCE(u.phone, '') AS customer_phone,
+                   COALESCE(a.address_text, 'Pickup') AS delivery_address,
+                   a.lat AS customer_lat, a.lng AS customer_lng,
                    k.name AS kitchen_name,
                    r.name AS assigned_rider_name,
                    COALESCE(json_agg(json_build_object(
@@ -754,16 +759,15 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
                        'quantity',       oi.quantity
                    ) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
             FROM orders o
-            JOIN users u ON o.customer_id = u.id
+            LEFT JOIN users u ON o.customer_id = u.id
             LEFT JOIN users r ON o.rider_id = r.id
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
             LEFT JOIN order_items oi ON oi.order_id = o.id
             WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
-              AND (o.rider_id IS NULL OR o.needs_reassign = true OR o.status = 'ready_for_pickup' OR o.created_at < NOW() - INTERVAL '5 minutes')
             GROUP BY o.id, u.id, r.id, a.id, k.id
             ORDER BY o.created_at ASC
-        `, params);
+        `);
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'max_batch_size'");
         const maxBatchSize = settings.length > 0 ? parseInt(settings[0].value, 10) || 1 : 1;

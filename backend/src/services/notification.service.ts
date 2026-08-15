@@ -303,6 +303,39 @@ async function sendSMS(phone: string, message: string) {
     }
 }
 
+// ─── Rider zone FCM push (new delivery available in the pool) ────────────────
+// The mission-pool broadcast (emitToRiders('new_available_mission', ...)) is
+// Socket.IO-only — it never reaches a rider whose app isn't open and connected.
+// This is the push counterpart: same audience, delivered via FCM so it still
+// arrives when the app is backgrounded or fully closed. Kept as a direct
+// per-rider sendFCM (not routed through deliverNotification's per-user DB
+// insert/template lookup) since this can fan out to many riders in a zone and
+// is inherently ambient/best-effort, not a per-user transactional record.
+export async function notifyRidersInZone(
+    zoneId: string,
+    title: string,
+    body: string,
+    data: Record<string, string> = {}
+): Promise<void> {
+    try {
+        const { rows } = await query(
+            `SELECT device_token FROM users
+             WHERE role IN ('rider', 'rider_captain')
+               AND zone_id = $1
+               AND is_online = TRUE
+               AND is_active = TRUE
+               AND device_token IS NOT NULL`,
+            [zoneId]
+        );
+        const sends = rows.map(({ device_token }: { device_token: string }) =>
+            sendFCM(device_token, title, body, { type: 'broadcast_message', ...data }).catch(() => {})
+        );
+        await Promise.allSettled(sends);
+    } catch (err) {
+        console.error('[NOTIF] notifyRidersInZone failed:', err);
+    }
+}
+
 // ─── Kitchen staff FCM push (background alert for new orders) ────────────────
 // Sends FCM push to all active kitchen staff of the given kitchenId so they
 // get an alert even when the app is backgrounded (socket closes in background).

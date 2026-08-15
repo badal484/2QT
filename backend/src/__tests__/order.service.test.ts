@@ -5,6 +5,7 @@ import { finalizeOrder, createPendingOrder, finalizeWalletRecharge } from '../se
 jest.mock('../services/notification.service', () => ({
   NotificationService: { send: jest.fn().mockResolvedValue(undefined) },
   notifyKitchenStaff: jest.fn().mockResolvedValue(undefined),
+  notifyRidersInZone: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../services/referral.service', () => ({ processReferral: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('../services/trigger.service', () => ({
