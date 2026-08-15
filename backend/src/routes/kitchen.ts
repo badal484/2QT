@@ -71,7 +71,7 @@ async function notifyPauseWaiters(kitchenId: string): Promise<void> {
 router.get('/debug-dispatch', async (_req, res) => {
     try {
         const { rows: orderRows } = await query(`
-            SELECT o.id, o.display_id, o.status, o.rider_id, o.kitchen_id, o.needs_reassign, o.created_at,
+            SELECT o.id, o.display_id, o.status, o.rider_id, o.kitchen_id, o.created_at,
                    u.name as customer_name, r.name as rider_name, r.is_online as rider_is_online
             FROM orders o
             LEFT JOIN users u ON o.customer_id = u.id
@@ -761,7 +761,7 @@ router.get('/orders/unassigned', authenticate, requireRole('chef', 'kitchen_mana
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
             LEFT JOIN order_items oi ON oi.order_id = o.id
             WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
-              AND (o.rider_id IS NULL OR o.needs_reassign = true)
+              AND o.rider_id IS NULL
             GROUP BY o.id, u.id, r.id, a.id, k.id
             ORDER BY o.created_at ASC
         `);
