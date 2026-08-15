@@ -66,6 +66,7 @@ export async function displayLocalNotification(
   data: Record<string, string> = {}
 ) {
   if (!loadNotifee()) return;
+  await createNotificationChannels().catch(() => {});
   const channelId = channelForType(data.type ?? '');
   const isDispatch = channelId === 'order_dispatch_v2';
   const isChat = data.type === 'chat_message';
