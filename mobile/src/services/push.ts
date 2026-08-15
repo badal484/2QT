@@ -24,19 +24,12 @@ export async function registerDeviceToken() {
         return;
     }
     try {
-        if (Platform.OS === 'android' && Platform.Version >= 33) {
-            try {
-                await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
-            } catch (e) {
-                console.warn('[PUSH] Android 13 POST_NOTIFICATIONS request failed:', e);
-            }
-        }
-        const authStatus = await msg.requestPermission();
-        console.log('[PUSH] Permission status:', authStatus);
+        let authStatus = await msg.hasPermission();
         if (authStatus < 1) {
-            console.warn('[PUSH] Notification permission not granted (status=' + authStatus + ')');
-            return;
+            authStatus = await msg.requestPermission();
         }
+        console.log('[PUSH] Notification permission status:', authStatus);
+        
         const token = await msg.getToken();
         console.log('[PUSH] Got FCM token:', token ? token.slice(0, 20) + '…' : 'null');
         if (token) {

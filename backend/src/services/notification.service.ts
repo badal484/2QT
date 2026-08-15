@@ -197,7 +197,13 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     }
 
     // 8. Dispatch channels in parallel (fire-and-forget individually)
-    const fcmData: Record<string, string> = { type, ...vars, ...(notifId ? { notifId } : {}) };
+    const rawData: Record<string, any> = { type, ...vars, ...(notifId ? { notifId } : {}) };
+    const fcmData: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawData)) {
+        if (v !== undefined && v !== null) {
+            fcmData[k] = typeof v === 'object' ? JSON.stringify(v) : String(v);
+        }
+    }
     const tasks: Promise<any>[] = [];
 
     // FCM mobile push
