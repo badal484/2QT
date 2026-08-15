@@ -43,6 +43,22 @@ router.get('/fcm-status', async (_req, res: Response) => {
     });
 });
 
+router.get('/debug-tokens', async (_req, res: Response) => {
+    try {
+        const { rows } = await db.query(
+            `SELECT id, name, phone, role, 
+                    CASE WHEN device_token IS NULL THEN false ELSE true END as has_token,
+                    SUBSTRING(device_token FROM 1 FOR 15) as token_prefix,
+                    updated_at
+             FROM users 
+             ORDER BY updated_at DESC LIMIT 20`
+        );
+        res.json({ count: rows.length, users: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── FCM device token (mobile) ───────────────────────────────────────────────
 
 router.patch('/device-token', authenticate, async (req: AuthRequest, res: Response) => {
