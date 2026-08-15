@@ -112,30 +112,45 @@ router.get('/test-fcm-direct', async (_req, res: Response) => {
 
 // ─── FCM device token (mobile) ───────────────────────────────────────────────
 
-router.patch('/device-token', authenticate, async (req: AuthRequest, res: Response) => {
-    const { token } = req.body as { token: string };
-    console.log(`[DEVICE_TOKEN] PATCH received user=${req.user!.userId} tokenPresent=${!!token} tokenPrefix=${token ? token.slice(0, 15) : 'n/a'}`);
-    if (!token) return res.status(400).json({ error: 'token required' });
-
-    // Bind FCM device token strictly to this user account
-    await query('UPDATE users SET device_token = $1, fcm_token = $1 WHERE id = $2', [token, req.user!.userId]);
-
-    // Sync token to any sibling user rows sharing the same phone number
+router.patch('/device-token', async (req: any, res: Response) => {
     try {
-        const { rows: uRows } = await query('SELECT phone FROM users WHERE id = $1', [req.user!.userId]);
-        if (uRows[0]?.phone) {
-            const cleanPhone = uRows[0].phone.replace(/\D/g, '').slice(-10);
+        const { token, phone } = (req.body || {}) as { token: string; phone?: string };
+        const authHeader = req.headers?.authorization;
+        let userId: string | undefined;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            try {
+                const jwt = require('jsonwebtoken');
+                const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET || 'velto_secret_key');
+                userId = decoded.userId || decoded.id;
+            } catch {}
+        }
+
+        if (!token) return res.status(400).json({ error: 'token required' });
+
+        if (userId) {
+            await query('UPDATE users SET device_token = $1, fcm_token = $1 WHERE id = $2', [token, userId]);
+        }
+
+        let targetPhone = phone;
+        if (!targetPhone && userId) {
+            const { rows: uRows } = await query('SELECT phone FROM users WHERE id = $1', [userId]);
+            targetPhone = uRows[0]?.phone;
+        }
+
+        if (targetPhone) {
+            const cleanPhone = targetPhone.replace(/\D/g, '').slice(-10);
             await query(
-                "UPDATE users SET device_token = $1, fcm_token = $1 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3) AND (COALESCE(device_token, '') != $1 OR COALESCE(fcm_token, '') != $1)",
-                [token, uRows[0].phone, cleanPhone]
+                "UPDATE users SET device_token = $1, fcm_token = $1 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3)",
+                [token, targetPhone, cleanPhone]
             );
         }
-    } catch (err: any) {
-        console.warn('[DEVICE_TOKEN] Sibling phone sync warning:', err.message);
-    }
 
-    console.log(`[DEVICE_TOKEN] Saved token for user=${req.user!.userId}`);
-    res.json({ success: true });
+        console.log(`[DEVICE_TOKEN] Saved token userId=${userId || 'unauth'} phone=${targetPhone || 'none'} tokenPrefix=${token.slice(0, 15)}...`);
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('[DEVICE_TOKEN_ERR]', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ─── In-app notification bell ─────────────────────────────────────────────────
