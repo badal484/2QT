@@ -120,9 +120,14 @@ router.patch('/device-token', async (req: any, res: Response) => {
         if (authHeader && authHeader.startsWith('Bearer ')) {
             try {
                 const jwt = require('jsonwebtoken');
-                const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET || 'velto_secret_key');
-                userId = decoded.userId || decoded.id;
-            } catch {}
+                const secret = process.env.JWT_SECRET;
+                if (secret) {
+                    const decoded = jwt.verify(authHeader.split(' ')[1], secret) as any;
+                    userId = decoded.userId || decoded.id;
+                }
+            } catch (jwtErr: any) {
+                console.warn('[DEVICE_TOKEN] JWT decode warning:', jwtErr.message);
+            }
         }
 
         if (!token) return res.status(400).json({ error: 'token required' });
@@ -145,8 +150,8 @@ router.patch('/device-token', async (req: any, res: Response) => {
             );
         }
 
-        console.log(`[DEVICE_TOKEN] Saved token userId=${userId || 'unauth'} phone=${targetPhone || 'none'} tokenPrefix=${token.slice(0, 15)}...`);
-        res.json({ success: true });
+        console.log(`[DEVICE_TOKEN] ✅ Token saved to database userId=${userId || 'none'} phone=${targetPhone || 'none'} tokenPrefix=${token.slice(0, 15)}...`);
+        res.json({ success: true, registered: true });
     } catch (err: any) {
         console.error('[DEVICE_TOKEN_ERR]', err.message);
         res.status(500).json({ error: err.message });

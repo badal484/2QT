@@ -46,9 +46,14 @@ export async function registerDeviceToken(retries = 3) {
             while (!saved && apiAttempt < retries) {
                 try {
                     apiAttempt++;
-                    const userPhone = await getItem('user_phone') || undefined;
+                    let userPhone: string | undefined;
+                    try {
+                        const m = require('../store');
+                        const s = (m.store || m.default || m)?.getState?.();
+                        userPhone = s?.auth?.user?.phone || s?.user?.phone || undefined;
+                    } catch {}
                     await api.patch('/notifications/device-token', { token, phone: userPhone });
-                    console.log('[PUSH_LOGGER] ✅ Device token registered with backend database successfully');
+                    console.log('[PUSH_LOGGER] ✅ Device token registered with backend database successfully (phone:', userPhone || 'none', ')');
                     saved = true;
                 } catch (apiErr: any) {
                     const status = apiErr?.response?.status;
