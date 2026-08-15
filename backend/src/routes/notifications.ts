@@ -131,7 +131,7 @@ const handleDeviceToken = async (req: any, res: Response) => {
         if (!token) return res.status(400).json({ error: 'token required' });
 
         if (userId) {
-            await query('UPDATE users SET device_token = $1, fcm_token = $1 WHERE id = $2', [token, userId]);
+            await query('UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW() WHERE id = $2', [token, userId]);
         }
 
         let targetPhone = phone;
@@ -143,7 +143,7 @@ const handleDeviceToken = async (req: any, res: Response) => {
         if (targetPhone) {
             const cleanPhone = targetPhone.replace(/\D/g, '').slice(-10);
             await query(
-                "UPDATE users SET device_token = $1, fcm_token = $1 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3)",
+                "UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW() WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3)",
                 [token, targetPhone, cleanPhone]
             );
         } else if (!userId) {
@@ -154,7 +154,7 @@ const handleDeviceToken = async (req: any, res: Response) => {
             if (fallbackRows[0]) {
                 userId = fallbackRows[0].id;
                 targetPhone = fallbackRows[0].phone;
-                await query('UPDATE users SET device_token = $1, fcm_token = $1 WHERE id = $2', [token, userId]);
+                await query('UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW() WHERE id = $2', [token, userId]);
             }
         }
 
