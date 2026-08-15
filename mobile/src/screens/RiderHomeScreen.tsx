@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StatusBar, Alert, Linking, Modal,
+  View, Text, TouchableOpacity, StatusBar, Alert, Linking, Modal, ScrollView,
   StyleSheet, Animated, Platform, PermissionsAndroid, Vibration,
 } from 'react-native';
 import { LeafletMap } from '../components/LeafletMap';
