@@ -68,7 +68,27 @@ async function notifyPauseWaiters(kitchenId: string): Promise<void> {
     );
 }
 
-const router = Router();
+router.get('/debug-dispatch', async (_req, res) => {
+    try {
+        const { rows: orderRows } = await query(`
+            SELECT o.id, o.display_id, o.status, o.rider_id, o.kitchen_id, o.needs_reassign, o.created_at,
+                   u.name as customer_name, r.name as rider_name, r.is_online as rider_is_online
+            FROM orders o
+            LEFT JOIN users u ON o.customer_id = u.id
+            LEFT JOIN users r ON o.rider_id = r.id
+            ORDER BY o.created_at DESC LIMIT 10
+        `);
+        const { rows: riderRows } = await query(`
+            SELECT id, name, phone, role, is_online, current_lat, current_lng
+            FROM users
+            WHERE role IN ('rider', 'rider_captain', 'super_admin', 'admin')
+            ORDER BY is_online DESC, name ASC
+        `);
+        res.json({ orders: orderRows, riders: riderRows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 router.get('/menu', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
