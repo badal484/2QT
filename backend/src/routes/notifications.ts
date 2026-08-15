@@ -35,6 +35,14 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     }
 });
 
+router.get('/fcm-status', async (_req, res: Response) => {
+    res.json({
+        configured: isFCMConfigured(),
+        hasB64: !!process.env.FIREBASE_SERVICE_ACCOUNT_B64,
+        hasJson: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+    });
+});
+
 // ─── FCM device token (mobile) ───────────────────────────────────────────────
 
 router.patch('/device-token', authenticate, async (req: AuthRequest, res: Response) => {
