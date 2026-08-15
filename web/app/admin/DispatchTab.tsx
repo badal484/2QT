@@ -75,7 +75,7 @@ export function DispatchTab() {
   const handleAssignRider = async (orderId: string, riderId: string) => {
     if (!riderId) return;
     try {
-      await api.post(`/admin/orders/${orderId}/assign-rider`, { riderId });
+      await api.post(`/admin/orders/${orderId}/assign`, { riderId });
       toast.success("Rider assigned successfully!");
       load(page);
     } catch (err: any) {

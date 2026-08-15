@@ -564,13 +564,21 @@ router.get('/riders', authenticate, requireRole('super_admin', 'admin'), async (
     res.json({ riders });
 });
 
-router.post('/orders/:id/assign', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.post(['/orders/:id/assign', '/orders/:id/assign-rider'], authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { riderId } = req.body;
     if (!riderId) return res.status(400).json({ error: 'MISSING_RIDER_ID' });
     const { rows: oRows } = await query('UPDATE orders SET rider_id = $1, status = \'out_for_delivery\' WHERE id = $2 RETURNING customer_id', [riderId, id]);
     if (oRows[0]) {
-        emitToUser(oRows[0].customer_id, 'order_status_update', { orderId: id, status: 'out_for_delivery' });
+        const { rows: rRows } = await query('SELECT name, phone FROM users WHERE id = $1', [riderId]);
+        const rider = rRows[0];
+        emitToUser(oRows[0].customer_id, 'order_status_update', {
+            orderId: id,
+            status: 'out_for_delivery',
+            riderAssigned: true,
+            riderName: rider?.name,
+            riderPhone: rider?.phone
+        });
         emitToUser(riderId, 'order_auto_assigned', { orderId: id });
     }
     emitToAdmin('order_status_update', { orderId: id, status: 'out_for_delivery' });
