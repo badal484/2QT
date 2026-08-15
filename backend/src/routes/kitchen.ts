@@ -517,7 +517,7 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
     if (!kitchenId) return;
 
     try {
-        // Show all online riders + riders currently assigned active orders
+        // Show all online riders + ANY rider assigned active undelivered orders (even if offline)
         const { rows: riders } = await query(`
             SELECT u.id, u.name, u.phone, u.is_online, u.current_lat, u.current_lng,
                    k.lat AS kitchen_lat, k.lng AS kitchen_lng,
@@ -534,7 +534,13 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
                    ) as active_orders
             FROM users u
             LEFT JOIN kitchens k ON k.id = $1
-            WHERE u.role IN ('rider','rider_captain') AND u.is_online = true
+            WHERE u.role IN ('rider','rider_captain') AND (
+                u.is_online = true
+                OR u.id IN (
+                    SELECT DISTINCT o.rider_id FROM orders o 
+                    WHERE o.rider_id IS NOT NULL AND o.status NOT IN ('delivered', 'cancelled')
+                )
+            )
             ORDER BY u.name
         `, [kitchenId]);
 
