@@ -2,6 +2,7 @@ import { query } from '../db';
 import { redis, keys } from '../redis';
 import { emitToUser, emitToRiders, emitToAdmin, emitToKitchen } from '../socket';
 import { getAppSettingInt } from '../utils/appSettings';
+import { NotificationService } from './notification.service';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
@@ -274,6 +275,15 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
             batchDisplayId,
             optOutWindowMs: 30000,
         });
+        // Push fallback — the socket event above never reaches a rider whose app is
+        // closed, and unlike the pool broadcast this is a specific assignment they
+        // need to know about even if they're not actively looking at the app.
+        NotificationService.send('broadcast_message', {
+            userId: riderId,
+            title: '🛵 New Delivery Assigned!',
+            body: `Order #${order.display_id} has been assigned to you — open the app to accept.`,
+            screen: 'RiderHome',
+        }).catch(() => {});
 
     } catch (err) {
         console.error('[AUTO-ASSIGN] Error:', err);

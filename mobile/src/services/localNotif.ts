@@ -32,22 +32,32 @@ function channelForType(type: string): string {
 
 export async function createNotificationChannels() {
   if (!loadNotifee()) return;
-  try {
-    // Separate MAX-importance channel for direct rider dispatch & kitchen orders — custom sound + heads-up on lock screen
-    await _notifee.createChannel({
+  // Each channel created independently — a single shared try/catch around all four
+  // meant one failure (e.g. a transient native-bridge hiccup) silently aborted every
+  // channel after it too, since await stops at the first rejection. A push whose
+  // channelId was never created is silently dropped by Android with no error visible
+  // anywhere, which is exactly the kind of failure that's invisible until someone
+  // notices notifications aren't arriving. Promise.allSettled means one bad channel
+  // can't take the others down with it.
+  const results = await Promise.allSettled([
+    // MAX-importance channel for direct rider dispatch & kitchen orders — custom sound + heads-up on lock screen
+    _notifee.createChannel({
       id: 'order_dispatch_v2',
       name: 'Order Dispatch Alerts',
       importance: _AndroidImportance.HIGH,
       sound: 'alert', // Plays alert.mp3 from res/raw
       vibration: true,
       vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800, 400, 800],
-    });
-    await _notifee.createChannel({ id: 'order_updates', name: 'Order Updates',   importance: _AndroidImportance.HIGH });
-    await _notifee.createChannel({ id: 'promotions',   name: 'Promotions',       importance: _AndroidImportance.DEFAULT });
-    await _notifee.createChannel({ id: 'account',      name: 'Account',          importance: _AndroidImportance.HIGH });
-  } catch (e) {
-    console.warn('[Notifee] createChannels failed:', e);
-  }
+    }),
+    _notifee.createChannel({ id: 'order_updates', name: 'Order Updates', importance: _AndroidImportance.HIGH }),
+    _notifee.createChannel({ id: 'promotions',    name: 'Promotions',    importance: _AndroidImportance.DEFAULT }),
+    _notifee.createChannel({ id: 'account',       name: 'Account',       importance: _AndroidImportance.HIGH }),
+  ]);
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      console.warn(`[Notifee] createChannel #${i} failed:`, r.reason);
+    }
+  });
 }
 
 export async function displayLocalNotification(
