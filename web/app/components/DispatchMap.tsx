@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 interface Location {
   lat: number;
   lng: number;
+  isFallback?: boolean;
 }
 
 interface Rider {
