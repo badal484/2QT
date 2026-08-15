@@ -117,10 +117,24 @@ router.patch('/device-token', authenticate, async (req: AuthRequest, res: Respon
     console.log(`[DEVICE_TOKEN] PATCH received user=${req.user!.userId} tokenPresent=${!!token} tokenPrefix=${token ? token.slice(0, 15) : 'n/a'}`);
     if (!token) return res.status(400).json({ error: 'token required' });
 
-    // Bind FCM device token strictly to this user account (each role app - buyer, rider, kitchen - has a distinct package name & FCM token)
+    // Bind FCM device token strictly to this user account
     await query('UPDATE users SET device_token = $1 WHERE id = $2', [token, req.user!.userId]);
-    console.log(`[DEVICE_TOKEN] Saved token for user=${req.user!.userId}`);
 
+    // Sync token to any sibling user rows sharing the same phone number
+    try {
+        const { rows: uRows } = await query('SELECT phone FROM users WHERE id = $1', [req.user!.userId]);
+        if (uRows[0]?.phone) {
+            const cleanPhone = uRows[0].phone.replace(/\D/g, '').slice(-10);
+            await query(
+                "UPDATE users SET device_token = $1 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3) AND (device_token IS NULL OR device_token != $1)",
+                [token, uRows[0].phone, cleanPhone]
+            );
+        }
+    } catch (err: any) {
+        console.warn('[DEVICE_TOKEN] Sibling phone sync warning:', err.message);
+    }
+
+    console.log(`[DEVICE_TOKEN] Saved token for user=${req.user!.userId}`);
     res.json({ success: true });
 });
 

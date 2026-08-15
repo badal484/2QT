@@ -10,7 +10,6 @@ import {
   ArrowLeft, Bell, CheckCheck, Package, Bike,
   Sparkles, Wallet, CheckCircle2, XCircle, MessageCircle,
 } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonListItem } from '../components/ui';
 import { api } from '../api/client';
@@ -62,30 +61,38 @@ function getTypeMeta(type: string, read: boolean, title?: string) {
 function groupNotifications(notifs: any[]) {
   const grouped: any[] = [];
   const map = new Map();
+  const seenIds = new Set();
 
-  for (const n of notifs) {
-    let key = n.id;
+  for (let i = 0; i < notifs.length; i++) {
+    const n = notifs[i];
+    if (!n) continue;
+    const notifId = String(n.id ?? `notif_${i}`);
+    if (seenIds.has(notifId)) continue;
+    seenIds.add(notifId);
+
+    const safeNotif = { ...n, id: notifId };
+    let key = notifId;
     try {
-      const d = n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : {};
+      const d = safeNotif.data ? (typeof safeNotif.data === 'string' ? JSON.parse(safeNotif.data) : safeNotif.data) : {};
       if (d.ticketId) {
         key = `ticket_${d.ticketId}`;
-      } else if (n.title?.includes('Support Team Replied') || n.type === 'support_message') {
+      } else if (safeNotif.title?.includes('Support Team Replied') || safeNotif.type === 'support_message') {
         key = `support_replies`;
       }
     } catch {}
 
-    if (key === n.id) {
-      grouped.push({ ...n, _count: 1, _groupedIds: [] });
+    if (key === notifId) {
+      grouped.push({ ...safeNotif, _count: 1, _groupedIds: [] });
     } else {
       if (map.has(key)) {
         const existing = map.get(key);
         existing._count += 1;
-        if (!n.is_read) {
+        if (!safeNotif.is_read) {
           existing.is_read = false;
-          existing._groupedIds.push(n.id);
+          existing._groupedIds.push(notifId);
         }
       } else {
-        const newGroup = { ...n, _count: 1, _groupedIds: !n.is_read ? [n.id] : [] };
+        const newGroup = { ...safeNotif, _count: 1, _groupedIds: !safeNotif.is_read ? [notifId] : [] };
         grouped.push(newGroup);
         map.set(key, newGroup);
       }
@@ -252,10 +259,10 @@ const NotificationsScreen = ({ navigation }: any) => {
           {unread.length > 0 && (
             <>
               <Text style={styles.sectionLabel}>UNREAD</Text>
-              {unread.map((n: any, i: number) => (
-                <Animated.View key={n.id} entering={FadeInDown.delay(i * 30).duration(200)}>
+              {unread.map((n: any) => (
+                <View key={`unread_${n.id}`} style={styles.cardWrapper}>
                   <NotifCard n={n} onPress={handleNotifPress} />
-                </Animated.View>
+                </View>
               ))}
             </>
           )}
@@ -264,10 +271,10 @@ const NotificationsScreen = ({ navigation }: any) => {
           {earlier.length > 0 && (
             <>
               <Text style={[styles.sectionLabel, unread.length > 0 && { marginTop: 20 }]}>EARLIER</Text>
-              {earlier.map((n: any, i: number) => (
-                <Animated.View key={n.id} entering={FadeInDown.delay(i * 20).duration(200)}>
+              {earlier.map((n: any) => (
+                <View key={`earlier_${n.id}`} style={styles.cardWrapper}>
                   <NotifCard n={n} onPress={handleNotifPress} />
-                </Animated.View>
+                </View>
               ))}
             </>
           )}
@@ -340,10 +347,14 @@ const styles = StyleSheet.create({
   },
 
   // Card
+  cardWrapper: {
+    marginBottom: tokens.spacing.sm,
+    width: '100%',
+  },
   card: {
     flexDirection: 'row', alignItems: 'flex-start',
     backgroundColor: tokens.colors.surface,
-    borderRadius: tokens.radii.xl, marginBottom: tokens.spacing.sm,
+    borderRadius: tokens.radii.xl,
     borderWidth: 1, borderColor: tokens.colors.border,
     overflow: 'hidden',
     ...tokens.shadows.soft,

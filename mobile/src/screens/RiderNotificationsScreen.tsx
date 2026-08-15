@@ -10,7 +10,6 @@ import {
   ArrowLeft, Bell, CheckCheck, Bike, ShieldCheck,
   IndianRupee, CheckCircle2, XCircle, AlertTriangle, Star,
 } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api/client';
 
@@ -79,30 +78,38 @@ const RiderNotificationsScreen = ({ navigation }: any) => {
 function groupNotifications(notifs: any[]) {
   const grouped: any[] = [];
   const map = new Map();
+  const seenIds = new Set();
 
-  for (const n of notifs) {
-    let key = n.id;
+  for (let i = 0; i < notifs.length; i++) {
+    const n = notifs[i];
+    if (!n) continue;
+    const notifId = String(n.id ?? `rider_notif_${i}`);
+    if (seenIds.has(notifId)) continue;
+    seenIds.add(notifId);
+
+    const safeNotif = { ...n, id: notifId };
+    let key = notifId;
     try {
-      const d = n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : {};
+      const d = safeNotif.data ? (typeof safeNotif.data === 'string' ? JSON.parse(safeNotif.data) : safeNotif.data) : {};
       if (d.ticketId) {
         key = `ticket_${d.ticketId}`;
-      } else if (n.title?.includes('Support Team Replied') || n.type === 'support_message') {
+      } else if (safeNotif.title?.includes('Support Team Replied') || safeNotif.type === 'support_message') {
         key = `support_replies`;
       }
     } catch {}
 
-    if (key === n.id) {
-      grouped.push({ ...n, _count: 1, _groupedIds: [] });
+    if (key === notifId) {
+      grouped.push({ ...safeNotif, _count: 1, _groupedIds: [] });
     } else {
       if (map.has(key)) {
         const existing = map.get(key);
         existing._count += 1;
-        if (!n.is_read) {
+        if (!safeNotif.is_read) {
           existing.is_read = false;
-          existing._groupedIds.push(n.id);
+          existing._groupedIds.push(notifId);
         }
       } else {
-        const newGroup = { ...n, _count: 1, _groupedIds: !n.is_read ? [n.id] : [] };
+        const newGroup = { ...safeNotif, _count: 1, _groupedIds: !safeNotif.is_read ? [notifId] : [] };
         grouped.push(newGroup);
         map.set(key, newGroup);
       }
@@ -184,10 +191,10 @@ function groupNotifications(notifs: any[]) {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={R.orange} />}
           >
-            {groupedNotifications.map((n: any, i: number) => {
+            {groupedNotifications.map((n: any) => {
               const { icon, bg } = getIcon(n.type, n.is_read);
               return (
-                <Animated.View key={n.id} entering={FadeInDown.delay(i * 30).duration(200)}>
+                <View key={`rider_notif_${n.id}`} style={styles.cardWrapper}>
                   <BouncingButton
                     style={[styles.card, !n.is_read && styles.cardUnread]}
                     onPress={() => handlePress(n)}
@@ -210,7 +217,7 @@ function groupNotifications(notifs: any[]) {
                       </Text>
                     </View>
                   </BouncingButton>
-                </Animated.View>
+                </View>
               );
             })}
           </ScrollView>
@@ -257,10 +264,14 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 22, fontWeight: '900', color: R.ink, marginBottom: 8 },
   emptySub: { fontSize: 15, fontWeight: '500', color: R.gray, textAlign: 'center', lineHeight: 22 },
 
+  cardWrapper: {
+    marginBottom: 12,
+    width: '100%',
+  },
   card: {
     flexDirection: 'row', alignItems: 'flex-start',
     backgroundColor: R.white, borderRadius: 20,
-    padding: 16, marginBottom: 12,
+    padding: 16,
     borderWidth: 1, borderColor: R.border,
     ...tokens.shadows.soft,
   },

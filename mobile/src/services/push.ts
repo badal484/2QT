@@ -17,10 +17,10 @@ function getMessaging() {
     return messagingInstance;
 }
 
-export async function registerDeviceToken() {
+export async function registerDeviceToken(retries = 3) {
     const msg = getMessaging();
     if (!msg) {
-        console.warn('[PUSH] Firebase messaging module not available');
+        console.warn('[PUSH_LOGGER] ❌ Firebase messaging module not available on device');
         return;
     }
     try {
@@ -28,18 +28,44 @@ export async function registerDeviceToken() {
         if (authStatus < 1) {
             authStatus = await msg.requestPermission();
         }
-        console.log('[PUSH] Notification permission status:', authStatus);
+        console.log('[PUSH_LOGGER] 📱 Notification permission status code:', authStatus, '(1=Authorized, 0=Denied)');
         
-        const token = await msg.getToken();
-        console.log('[PUSH] Got FCM token:', token ? token.slice(0, 20) + '…' : 'null');
-        if (token) {
-            await api.patch('/notifications/device-token', { token });
-            console.log('[PUSH] Device token saved to backend ✓');
-        } else {
-            console.warn('[PUSH] FCM getToken() returned null — check Google Play Services');
+        let token = await msg.getToken();
+        let attempt = 0;
+        while (!token && attempt < retries) {
+            attempt++;
+            console.log(`[PUSH_LOGGER] ⏳ Retrying getToken() attempt ${attempt}/${retries}...`);
+            await new Promise(r => setTimeout(r, 1500 * attempt));
+            token = await msg.getToken();
         }
-    } catch (err) {
-        console.warn('[PUSH] Token registration failed:', err);
+
+        console.log('[PUSH_LOGGER] 🔑 FCM Token:', token ? `${token.slice(0, 25)}...` : 'NULL');
+        if (token) {
+            let apiAttempt = 0;
+            let saved = false;
+            while (!saved && apiAttempt < retries) {
+                try {
+                    apiAttempt++;
+                    await api.patch('/notifications/device-token', { token });
+                    console.log('[PUSH_LOGGER] ✅ Device token registered with backend database successfully');
+                    saved = true;
+                } catch (apiErr: any) {
+                    const status = apiErr?.response?.status;
+                    console.warn(`[PUSH_LOGGER] ⚠️ Failed to save token to backend (attempt ${apiAttempt}/${retries}):`, status || apiErr?.message);
+                    if (status === 401) {
+                        // User not authenticated yet — break loop, will re-trigger upon auth
+                        break;
+                    }
+                    if (apiAttempt < retries) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+            }
+        } else {
+            console.warn('[PUSH_LOGGER] ⚠️ FCM getToken() returned null — Google Play Services missing or unconfigured');
+        }
+    } catch (err: any) {
+        console.warn('[PUSH_LOGGER] ❌ Token registration process error:', err?.message || err);
     }
 }
 
