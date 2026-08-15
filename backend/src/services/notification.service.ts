@@ -153,7 +153,7 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     if (PAYOUT_TYPES.has(type) && !prefs.payouts) return;
 
     // 5. Quiet hours (10pm–8am IST) and rate limit for promotional messages
-    if (PROMO_TYPES.has(type)) {
+    if (PROMO_TYPES.has(type) && !options.overrideQuietHours) {
         // IST = UTC+5:30
         const nowIST = new Date(Date.now() + 330 * 60 * 1000);
         const hourIST = nowIST.getUTCHours();
@@ -380,7 +380,7 @@ export async function notifyKitchenStaff(
 
 export class NotificationService {
     static async send(type: NotifType, data: any) {
-        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl, screen, bookingId, ticketId, senderName, timestamp } = data;
+        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl, screen, bookingId, ticketId, senderName, timestamp, overrideQuietHours } = data;
         // Calls deliverNotification directly — no re-queueing (used by the worker itself)
         await deliverNotification(type, {
             userId: userId || undefined,
@@ -405,6 +405,7 @@ export class NotificationService {
             },
             dedupeKey: displayId || undefined,
             imageUrl:  imageUrl  || undefined,
+            overrideQuietHours: !!overrideQuietHours,
         });
     }
 }

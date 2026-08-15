@@ -351,12 +351,12 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
                 queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
             }
         } else {
-            // "all" or "zone" — default to CUSTOMERS ONLY
+            // "all" or "zone" — send to all active users (customers, riders, staff)
             if (zoneId) {
-                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
+                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true`;
             }
         }
 
@@ -377,6 +377,7 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
                 title,
                 body: message,
                 imageUrl: imageUrl || undefined,
+                overrideQuietHours: true,
             }).catch(() => {});
         }
 
