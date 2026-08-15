@@ -231,12 +231,8 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
                     .then((result: any) => {
                         console.log(`[NOTIF] FCM result=${result} type=${type} user=${user!.id}`);
                         if (result === 'invalid_token') {
-                            console.warn(`[NOTIF] Stale token cleared for user=${user!.id} (phone=${user!.phone})`);
-                            if (user!.phone) {
-                                return query('UPDATE users SET device_token = NULL WHERE phone = $1', [user!.phone]);
-                            } else {
-                                return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
-                            }
+                            console.warn(`[NOTIF] Stale token cleared for user=${user!.id}`);
+                            return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
                         }
                     })
                     .catch((err: any) => console.error('[NOTIF_FCM_ERR]', err.message))

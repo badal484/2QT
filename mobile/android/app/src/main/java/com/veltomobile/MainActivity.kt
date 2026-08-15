@@ -21,9 +21,10 @@ class MainActivity : ReactActivity() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     listOf(
-      Triple("order_updates",  "Order Updates",  "Order confirmations, status updates and delivery notifications"),
-      Triple("promotions",     "Promotions",     "Offers, campaigns and special deals"),
-      Triple("account",        "Account",        "Wallet, loyalty and subscription alerts"),
+      Triple("order_updates",     "Order Updates",         "Order confirmations, status updates and delivery notifications"),
+      Triple("order_dispatch_v2", "Order Dispatch Alerts", "High-priority order alerts and dispatch updates"),
+      Triple("promotions",        "Promotions",            "Offers, campaigns and special deals"),
+      Triple("account",           "Account",               "Wallet, loyalty and subscription alerts"),
     ).forEach { (id, name, desc) ->
       if (nm.getNotificationChannel(id) == null) {
         val ch = NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH).apply {
