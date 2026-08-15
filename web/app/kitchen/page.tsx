@@ -79,7 +79,7 @@ interface LiveRider {
   phone: string;
   is_online?: boolean;
   active_orders: { id: string; display_id: string; status: string; delivery_address: string }[] | null;
-  location: { lat: number; lng: number; updatedAt: string } | null;
+  location: { lat: number; lng: number; isFallback?: boolean; updatedAt?: string } | null;
 }
 
 interface UnassignedOrder {
