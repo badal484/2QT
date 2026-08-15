@@ -24,19 +24,28 @@ export async function registerDeviceToken(retries = 3, explicitPhone?: string) {
         return;
     }
     try {
-        let authStatus = await msg.hasPermission();
-        if (authStatus < 1) {
-            authStatus = await msg.requestPermission();
+        try {
+            const authStatus = await msg.requestPermission();
+            console.log('[PUSH_LOGGER] 📱 Notification permission status code:', authStatus, '(1=Authorized, 0=Denied)');
+        } catch (permErr: any) {
+            console.warn('[PUSH_LOGGER] Permission request warning:', permErr?.message || permErr);
         }
-        console.log('[PUSH_LOGGER] 📱 Notification permission status code:', authStatus, '(1=Authorized, 0=Denied)');
         
-        let token = await msg.getToken();
+        let token: string | null = null;
+        try {
+            token = await msg.getToken();
+        } catch (tokenErr: any) {
+            console.warn('[PUSH_LOGGER] Initial getToken error:', tokenErr?.message || tokenErr);
+        }
+
         let attempt = 0;
         while (!token && attempt < retries) {
             attempt++;
             console.log(`[PUSH_LOGGER] ⏳ Retrying getToken() attempt ${attempt}/${retries}...`);
             await new Promise(r => setTimeout(r, 1500 * attempt));
-            token = await msg.getToken();
+            try {
+                token = await msg.getToken();
+            } catch {}
         }
 
         console.log('[PUSH_LOGGER] 🔑 FCM Token:', token ? `${token.slice(0, 25)}...` : 'NULL');

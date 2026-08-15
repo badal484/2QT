@@ -50,7 +50,7 @@ const HomeScreen = ({ navigation }: any) => {
     useCallback(() => {
       queryClient.invalidateQueries({ queryKey: ['menu'] });
       queryClient.invalidateQueries({ queryKey: ['zones'] });
-      registerDeviceToken().catch(() => {});
+      registerDeviceToken(3, user?.phone).catch(() => {});
     }, [queryClient])
   );
   cartItemsRef.current = cartItems;
