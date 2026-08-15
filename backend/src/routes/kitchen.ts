@@ -534,7 +534,7 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
                    ) as active_orders
             FROM users u
             LEFT JOIN kitchens k ON k.id = $1
-            WHERE u.role IN ('rider','rider_captain') AND (
+            WHERE (u.role IN ('rider','rider_captain','super_admin','admin')) AND (
                 u.is_online = true
                 OR u.id IN (
                     SELECT DISTINCT o.rider_id FROM orders o 
