@@ -586,8 +586,8 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
         // Assign atomically — also guards that this order belongs to this kitchen
         const { rows: orderRows } = await query(
             `UPDATE orders SET rider_id = $1
-             WHERE id = $2 AND kitchen_id = $3 AND rider_id IS NULL AND status = 'ready_for_pickup'
-             RETURNING id, display_id, customer_id, kitchen_id, zone_id, address_id`,
+             WHERE id = $2 AND kitchen_id = $3 AND status NOT IN ('delivered', 'cancelled')
+             RETURNING id, display_id, customer_id, kitchen_id, zone_id, address_id, status`,
             [riderId, id, kitchenId]
         );
         if (!orderRows[0]) return res.status(409).json({ error: 'ORDER_UNAVAILABLE' });
