@@ -74,11 +74,10 @@ async function requestPushPermissionAndRegister() {
         }
       );
       if (status !== PermissionsAndroid.RESULTS.GRANTED) {
-        console.warn('[PUSH] POST_NOTIFICATIONS permission denied');
-        return;
+        console.warn('[PUSH] POST_NOTIFICATIONS permission not granted — registering token anyway');
       }
     }
-    // Permission granted (or iOS / Android < 13) — register FCM token
+    // Always attempt token registration so backend has device token ready
     await registerDeviceToken();
     console.log('[PUSH] Device token registered successfully');
   } catch (err) {

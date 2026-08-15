@@ -121,6 +121,19 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
         return;
     }
 
+    // Fallback: If target user row has no device token, check if any active user account with the same phone number has one
+    if (!user.device_token && user.phone) {
+        const cleanPhone = user.phone.replace(/\D/g, '').slice(-10);
+        const { rows: siblingRows } = await query(
+            "SELECT device_token FROM users WHERE (phone = $1 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2) AND device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+            [user.phone, cleanPhone]
+        );
+        if (siblingRows[0]?.device_token) {
+            user.device_token = siblingRows[0].device_token;
+            query('UPDATE users SET device_token = $1 WHERE id = $2', [user.device_token, user.id]).catch(() => {});
+        }
+    }
+
     // 2. Deduplicate within 60 s (non-fatal — skip dedup if Redis is down)
     if (dedupeKey) {
         try {
@@ -218,8 +231,12 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
                     .then((result: any) => {
                         console.log(`[NOTIF] FCM result=${result} type=${type} user=${user!.id}`);
                         if (result === 'invalid_token') {
-                            console.warn(`[NOTIF] Stale token cleared for user=${user!.id}`);
-                            return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
+                            console.warn(`[NOTIF] Stale token cleared for user=${user!.id} (phone=${user!.phone})`);
+                            if (user!.phone) {
+                                return query('UPDATE users SET device_token = NULL WHERE phone = $1', [user!.phone]);
+                            } else {
+                                return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
+                            }
                         }
                     })
                     .catch((err: any) => console.error('[NOTIF_FCM_ERR]', err.message))
