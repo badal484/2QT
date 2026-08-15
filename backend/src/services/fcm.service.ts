@@ -76,7 +76,7 @@ export async function sendFCM(
                         body,
                         sound: data.sound || 'default', 
                         channelId: channelId, 
-                        icon: 'ic_launcher',
+                        icon: 'ic_notification',
                         imageUrl: imageUrl || undefined,
                         priority: 'high',
                         visibility: 'public',
