@@ -110,7 +110,7 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     // 1. Resolve user
     let user: { id: string; phone: string; device_token: string | null; name: string } | null = null;
     if (userId) {
-        const { rows } = await query('SELECT id, phone, device_token, name FROM users WHERE id = $1', [userId]);
+        const { rows } = await query('SELECT id, phone, device_token, name, role FROM users WHERE id = $1', [userId]);
         user = rows[0] ?? null;
     } else if (phone) {
         const { rows } = await query("SELECT id, phone, device_token, name FROM users WHERE phone = $1 AND device_token IS NOT NULL ORDER BY (role = 'customer') DESC, updated_at DESC", [phone]);
@@ -121,12 +121,12 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
         return;
     }
 
-    // Fallback: If target user row has no device token, check if any active user account with the same phone number has one
+    // Fallback: If target user row has no device token, check if any active user account with the same phone and role has one
     if (!user.device_token && user.phone) {
         const cleanPhone = user.phone.replace(/\D/g, '').slice(-10);
         const { rows: siblingRows } = await query(
-            "SELECT device_token FROM users WHERE (phone = $1 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2) AND device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
-            [user.phone, cleanPhone]
+            "SELECT device_token FROM users WHERE (phone = $1 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2) AND role = $3 AND device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+            [user.phone, cleanPhone, (user as any).role || 'customer']
         );
         if (siblingRows[0]?.device_token) {
             user.device_token = siblingRows[0].device_token;
