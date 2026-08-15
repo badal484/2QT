@@ -519,7 +519,7 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
     try {
         // Show idle riders (available to all) + riders delivering THIS kitchen's orders
         const { rows: riders } = await query(`
-            SELECT u.id, u.name, u.phone, u.is_online,
+            SELECT u.id, u.name, u.phone, u.is_online, k.lat AS kitchen_lat, k.lng AS kitchen_lng,
                    (
                        SELECT json_agg(json_build_object(
                            'id', o.id,
@@ -532,24 +532,44 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
                        WHERE o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
                    ) as active_orders
             FROM users u
+            LEFT JOIN kitchens k ON k.id = $1
             WHERE u.role IN ('rider','rider_captain') AND u.is_online = true
             ORDER BY u.name
-        `);
+        `, [kitchenId]);
 
-        // Attach GPS from Redis (non-blocking — missing is fine)
+        // Attach GPS from Redis (non-blocking — missing is fine, with kitchen fallback)
         const ridersWithLocation = await Promise.all(
-            riders.map(async (r: any) => {
+            riders.map(async (r: any, idx: number) => {
+                let loc: any = null;
                 try {
                     const raw = await redis.get(keys.riderLocation(r.id));
-                    return { ...r, location: raw ? JSON.parse(raw) : null };
-                } catch {
-                    return { ...r, location: null };
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && parsed.lat !== undefined && parsed.lng !== undefined) {
+                            loc = {
+                                lat: parseFloat(parsed.lat),
+                                lng: parseFloat(parsed.lng),
+                                updatedAt: parsed.updatedAt
+                            };
+                        }
+                    }
+                } catch {}
+
+                // Fallback location around kitchen if mobile app hasn't pushed live GPS ping yet
+                if (!loc && r.kitchen_lat && r.kitchen_lng) {
+                    const angle = (idx * (2 * Math.PI / Math.max(1, riders.length)));
+                    loc = {
+                        lat: parseFloat(r.kitchen_lat) + 0.003 * Math.cos(angle),
+                        lng: parseFloat(r.kitchen_lng) + 0.003 * Math.sin(angle),
+                        isFallback: true
+                    };
                 }
+
+                return { ...r, location: loc };
             })
         );
 
-        // Filter out ghost riders (app killed without toggling offline):
-        // Only return them if they have a recent location ping OR they are currently assigned an order
+        // Include online riders with locations (including fallback) or active orders
         const trulyOnlineRiders = ridersWithLocation.filter(r => 
             r.location !== null || (r.active_orders && r.active_orders.length > 0)
         );
