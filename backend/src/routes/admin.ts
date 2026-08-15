@@ -345,10 +345,10 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
         } else if (audience === 'customers' || audience === 'all' || audience === 'all_customers') {
             if (zoneId) {
-                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role IN ('customer', 'admin', 'super_admin') AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
+                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role IN ('customer', 'admin', 'super_admin')`;
             }
         } else if (audience === 'everyone' || audience === 'all_users') {
             if (zoneId) {
