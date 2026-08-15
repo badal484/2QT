@@ -406,7 +406,7 @@ function OrdersTab() {
               onClick={handleCompleteAllLive}
               className="px-4 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs hover:bg-emerald-500/30 transition-all flex items-center gap-2 shadow-lg"
             >
-              <CheckCircle className="w-4 h-4" />
+              <CheckCircle2 className="w-4 h-4" />
               Complete All Live Orders ({orders.length})
             </button>
           )}

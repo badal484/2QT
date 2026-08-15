@@ -1,6 +1,6 @@
 import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, StyleSheet, RefreshControl } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ArrowLeft, Package, IndianRupee, CheckCircle2, XCircle, Navigation } from 'lucide-react-native';
@@ -54,6 +54,16 @@ const RiderHistoryScreen = ({ navigation }: any) => {
     queryKey: ['rider-order-history'],
     queryFn: () => api.get('/riders/orders/history'),
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const allOrders = data?.orders || [];
 
@@ -113,7 +123,11 @@ const RiderHistoryScreen = ({ navigation }: any) => {
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={{ paddingBottom: 40 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={R.green} />}
+        >
           
           {/* Vibrant Compact Stats */}
           <View style={s.statsWrapper}>

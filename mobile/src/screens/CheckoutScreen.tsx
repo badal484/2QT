@@ -126,7 +126,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   });
 
   const { data: loyaltyData } = useQuery({
-    queryKey: ['loyalty'],
+    queryKey: ['loyalty', 'balance'],
     queryFn: () => api.get('/customers/loyalty'),
   });
 

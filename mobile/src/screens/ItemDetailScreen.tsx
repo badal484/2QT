@@ -1,8 +1,10 @@
 import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { StackActions } from '@react-navigation/native';
 import {
   View, Text, ScrollView, StyleSheet,
-  StatusBar, useWindowDimensions, Alert, Image, Share
+  StatusBar, useWindowDimensions, Image, Share
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
@@ -31,61 +33,58 @@ const PremiumBag = () => (
   </View>
 );
 
-const RelatedItemCard = React.memo(({ ri, onAdd, dispatch, navigation, cardWidth }: any) => {
+const RelatedItemCard = React.memo(({ ri, onAdd, dispatch }: any) => {
+  const nav = useNavigation<any>();
   const riCart = useSelector((state: RootState) => state.cart.items.find(ci => ci.menuItemId === ri.id));
   const riVeg = ri.is_egg ? tokens.colors.warning : ri.is_veg ? tokens.colors.success : tokens.colors.danger;
   return (
     <PressableScale
-      style={[s.relatedCardGrid, { width: cardWidth }]}
-      onPress={() => navigation.replace('ItemDetail', { item: ri })}
+      style={s.relatedCard}
+      onPress={() => nav.dispatch(StackActions.push('ItemDetailPush', { item: ri }))}
       accessibilityRole="button"
       accessibilityLabel={`View ${ri.name}`}
     >
-      <View style={s.relatedImgContainerGrid}>
-        <View style={s.relatedImgBoxGrid}>
-          {ri.photo_url ? (
-            <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
-          ) : (
-            <View style={[s.relatedImg, s.heroPlaceholder]}>
-              <Text allowFontScaling={false} style={{ fontSize: 24 }}>🍽️</Text>
-            </View>
-          )}
-        </View>
-        
-        {/* ADD Button overlapping the bottom of the image box */}
-        <View style={s.relatedAddBtnWrapperGrid}>
-          {ri.available && !riCart ? (
-            <PressableScale style={s.relatedAddBtnVertical} onPress={() => { haptics.selection(); onAdd(ri); }} accessibilityRole="button" accessibilityLabel="Add to cart">
-              <Text allowFontScaling={false} style={s.relatedAddText}>ADD</Text>
-            </PressableScale>
-          ) : ri.available && riCart ? (
-            <View style={s.relatedQtyBoxVertical}>
-              <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }} accessibilityRole="button" accessibilityLabel="Decrease quantity">
-                <Text allowFontScaling={false} style={s.relatedQtyBtn}>−</Text>
-              </PressableScale>
-              <Text allowFontScaling={false} style={s.relatedQtyVal}>{riCart.quantity}</Text>
-              <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }} accessibilityRole="button" accessibilityLabel="Increase quantity">
-                <Text allowFontScaling={false} style={s.relatedQtyBtn}>+</Text>
-              </PressableScale>
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      <View style={s.relatedContentGrid}>
-        <View style={s.relatedMeta}>
-          <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
-            <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
+      <View style={s.relatedImgBox}>
+        {ri.photo_url ? (
+          <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
+        ) : (
+          <View style={[s.relatedImg, s.heroPlaceholder]}>
+            <Text allowFontScaling={false} style={{ fontSize: 24 }}>🍽️</Text>
           </View>
-          {ri.is_bestseller && (
-            <View style={[s.bestsellerPill, { paddingHorizontal: 6, paddingVertical: 2, marginLeft: 6 }]}>
-              <Text allowFontScaling={false} style={[s.bestsellerText, { fontSize: 9 }]}>★ Bestseller</Text>
-            </View>
-          )}
-        </View>
-        <Text allowFontScaling={false} style={s.relatedNameGrid} numberOfLines={2}>{ri.name}</Text>
-        <Text allowFontScaling={false} style={s.relatedPriceGrid}>₹{ri.price_paise / 100}</Text>
+        )}
+        {ri.is_bestseller && (
+          <View style={s.relatedBadge}>
+            <Text allowFontScaling={false} style={s.relatedBadgeText}>★ Bestseller</Text>
+          </View>
+        )}
       </View>
+      {ri.available && !riCart ? (
+        <PressableScale style={s.relatedAddBtn} onPress={() => { haptics.selection(); onAdd(ri); }} accessibilityRole="button" accessibilityLabel="Add to cart">
+          <Text allowFontScaling={false} style={s.relatedAddText}>ADD</Text>
+        </PressableScale>
+      ) : ri.available && riCart ? (
+        <View style={s.relatedQtyBox}>
+          <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }} accessibilityRole="button" accessibilityLabel="Decrease quantity">
+            <Text allowFontScaling={false} style={s.relatedQtyBtn}>−</Text>
+          </PressableScale>
+          <Text allowFontScaling={false} style={s.relatedQtyVal}>{riCart.quantity}</Text>
+          <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }} accessibilityRole="button" accessibilityLabel="Increase quantity">
+            <Text allowFontScaling={false} style={s.relatedQtyBtn}>+</Text>
+          </PressableScale>
+        </View>
+      ) : null}
+      <View style={s.relatedMeta}>
+        <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
+          <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
+        </View>
+        {ri.tags?.[0] && (
+          <View style={[s.servePill, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+            <Text allowFontScaling={false} style={[s.servePillText, { fontSize: 9 }]}>{ri.tags[0]}</Text>
+          </View>
+        )}
+      </View>
+      <Text allowFontScaling={false} style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
+      <Text allowFontScaling={false} style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
     </PressableScale>
   );
 });
@@ -303,20 +302,16 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={s.relatedGrid}
+                contentContainerStyle={s.relatedRow}
               >
-                <View style={s.relatedGridInner}>
-                  {relatedItems.map(ri => (
-                    <RelatedItemCard
-                      key={ri.id}
-                      ri={ri}
-                      onAdd={handleAddWithCheck}
-                      dispatch={dispatch}
-                      navigation={navigation}
-                      cardWidth={140}
-                    />
-                  ))}
-                </View>
+                {relatedItems.map(ri => (
+                  <RelatedItemCard
+                    key={ri.id}
+                    ri={ri}
+                    onAdd={handleAddWithCheck}
+                    dispatch={dispatch}
+                  />
+                ))}
               </ScrollView>
             </View>
           </>
@@ -574,44 +569,40 @@ const s = StyleSheet.create({
     marginBottom: tokens.spacing.md,
     paddingHorizontal: tokens.spacing.lg,
   },
-  relatedGrid: {
-    paddingHorizontal: tokens.spacing.lg,
-    paddingBottom: 16,
-  },
-  relatedGridInner: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    width: 140 * 3 + 24, // Enough width for items to wrap into 2 rows (3 items per row)
-    rowGap: 24,
-    columnGap: 12,
-  },
-  relatedCardGrid: {
+  relatedRow: { paddingHorizontal: tokens.spacing.lg, paddingBottom: tokens.spacing.lg },
+
+  relatedCard: {
+    width: 136,
     backgroundColor: tokens.colors.surface,
-    marginBottom: 8,
+    marginRight: tokens.spacing.lg,
   },
-  relatedImgContainerGrid: {
+  relatedImgBox: {
     width: '100%',
-    aspectRatio: 1,
-    alignItems: 'center',
-    marginBottom: 20, // Space for the floating button
-  },
-  relatedImgBoxGrid: {
-    width: '100%',
-    height: '100%',
+    height: 120,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: tokens.colors.background,
+    marginBottom: 24, // Space for the floating button
   },
   relatedImg: { width: '100%', height: '100%' },
-  
-  relatedAddBtnWrapperGrid: {
+  relatedBadge: {
     position: 'absolute',
-    bottom: -16,
-    alignSelf: 'center',
-    zIndex: 10,
-    ...tokens.shadows.soft,
+    top: 8,
+    left: 8,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  relatedAddBtnVertical: {
+  relatedBadgeText: {
+    fontSize: 9,
+    fontFamily: tokens.typography.family.semibold,
+    color: '#92400E',
+  },
+  relatedAddBtn: {
+    position: 'absolute',
+    top: 104,
+    alignSelf: 'center',
     width: 90,
     height: 32,
     borderRadius: 16,
@@ -621,6 +612,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...tokens.shadows.soft,
+    zIndex: 10,
   },
   relatedAddText: {
     fontSize: 14,
@@ -628,7 +620,10 @@ const s = StyleSheet.create({
     fontFamily: tokens.typography.family.black,
     letterSpacing: 0.5,
   },
-  relatedQtyBoxVertical: {
+  relatedQtyBox: {
+    position: 'absolute',
+    top: 104,
+    alignSelf: 'center',
     width: 90,
     height: 32,
     flexDirection: 'row',
@@ -638,6 +633,7 @@ const s = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 12,
     ...tokens.shadows.soft,
+    zIndex: 10,
   },
   relatedQtyBtn: {
     fontSize: 18,
@@ -651,18 +647,15 @@ const s = StyleSheet.create({
     fontFamily: tokens.typography.family.bold,
     textAlign: 'center',
   },
-  relatedContentGrid: {
-    paddingHorizontal: 4,
-  },
-  relatedMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  relatedNameGrid: {
-    fontSize: 14,
+  relatedMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  relatedName: {
+    fontSize: 13,
     fontFamily: tokens.typography.family.bold,
     color: tokens.colors.textPrimary,
     lineHeight: 18,
     marginBottom: 4,
   },
-  relatedPriceGrid: {
+  relatedPrice: {
     fontSize: 14,
     fontFamily: tokens.typography.family.extrabold,
     color: tokens.colors.textPrimary,

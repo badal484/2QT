@@ -1,3 +1,4 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -49,7 +50,20 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const { showDialog } = useFeedback();
   const [isOnline, setIsOnline] = useState(user?.is_online || false);
   const isOnlineRef = useRef(user?.is_online || false);
-  const [currentLocation, setCurrentLocation] = useState({ latitude: 28.6139, longitude: 77.2090 });
+  const [currentLocation, setCurrentLocation] = useState({
+    latitude: user?.current_lat ? parseFloat(user.current_lat) : 28.6139,
+    longitude: user?.current_lng ? parseFloat(user.current_lng) : 77.2090
+  });
+
+  useEffect(() => {
+    if (user?.current_lat && user?.current_lng) {
+      const lat = parseFloat(user.current_lat);
+      const lng = parseFloat(user.current_lng);
+      if (!isNaN(lat) && !isNaN(lng) && currentLocation.latitude === 28.6139) {
+        setCurrentLocation({ latitude: lat, longitude: lng });
+      }
+    }
+  }, [user?.current_lat, user?.current_lng]);
 
   const latestLocationRef = useRef({ latitude: 0, longitude: 0 });
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -101,6 +115,14 @@ const RiderHomeScreen = ({ navigation }: any) => {
       dispatch(updateUser({ zoneId: zonesData.currentZoneId }));
     }
   }, [zonesData?.currentZoneId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['rider-active-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
+      queryClient.invalidateQueries({ queryKey: ['rider-zones'] });
+    }, [queryClient])
+  );
 
   const [checkingIn, setCheckingIn] = useState(false);
   const checkingInRef = useRef(false);
@@ -309,40 +331,60 @@ const RiderHomeScreen = ({ navigation }: any) => {
     let interval: ReturnType<typeof setInterval>;
     const startTracking = async () => {
       if (Platform.OS === 'android') {
-        try { await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION); } catch {}
+        try {
+          await PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+          ]);
+        } catch {}
       }
       if (isOnline) {
         if (accessToken) startRiderLocationService(accessToken);
-        // Don't emit immediately — getCurrentPosition below will send the first real fix
       } else {
         stopRiderLocationService();
       }
-      // Get a fast first fix so the map doesn't start on the default Delhi coordinates
-      Geolocation.getCurrentPosition(
-        pos => {
-          const { latitude, longitude } = pos.coords;
-          setCurrentLocation({ latitude, longitude });
-          if (isOnline) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
-        },
-        () => { /* silent — watchPosition will recover */ },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
-      );
 
-      watchId = Geolocation.watchPosition(
-        pos => {
-          const { latitude, longitude } = pos.coords;
-          setCurrentLocation({ latitude, longitude });
-          if (isOnline) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
-        },
-        (err) => {
-          console.log('[Geolocation Error]', err);
-          showDialog({ title: 'Location Error', message: 'Unable to get your location. Check that GPS is enabled and location permission is granted.', confirmText: 'Okay', type: 'error' });
-        },
-        { enableHighAccuracy: true, distanceFilter: 5, interval: 4000, timeout: 15000, maximumAge: 10000 },
-      );
+      // Fast location fix with GPS -> Network fallback
+      const getFix = (highAcc: boolean) => {
+        Geolocation.getCurrentPosition(
+          pos => {
+            const { latitude, longitude } = pos.coords;
+            setCurrentLocation({ latitude, longitude });
+            if (isOnline) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
+          },
+          () => {
+            if (highAcc) getFix(false); // Retry with Network provider if GPS times out
+          },
+          { enableHighAccuracy: highAcc, timeout: highAcc ? 6000 : 15000, maximumAge: 10000 },
+        );
+      };
+      getFix(true);
+
+      const setupWatch = (highAcc: boolean) => {
+        watchId = Geolocation.watchPosition(
+          pos => {
+            const { latitude, longitude } = pos.coords;
+            setCurrentLocation({ latitude, longitude });
+            if (isOnline) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
+          },
+          (err) => {
+            console.log('[Geolocation Error]', err);
+            if (highAcc) {
+              setupWatch(false); // Fallback to network watch
+            } else {
+              showDialog({ title: 'Location Error', message: 'Unable to get your real location. Please check that GPS/Location is enabled in phone settings.', confirmText: 'Okay', type: 'error' });
+            }
+          },
+          { enableHighAccuracy: highAcc, distanceFilter: 5, interval: 4000, timeout: 15000, maximumAge: 10000 },
+        );
+      };
+      setupWatch(true);
+
       interval = setInterval(() => {
-        if (isOnline) getSocket()?.emit('update_location', { lat: latestLocationRef.current.latitude, lng: latestLocationRef.current.longitude });
-      }, 60000);
+        if (isOnline && latestLocationRef.current.latitude !== 28.6139) {
+          getSocket()?.emit('update_location', { lat: latestLocationRef.current.latitude, lng: latestLocationRef.current.longitude });
+        }
+      }, 30000);
     };
     startTracking();
     return () => {

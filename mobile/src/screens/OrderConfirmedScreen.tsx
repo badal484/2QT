@@ -319,60 +319,64 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          {/* Rider card */}
-          <Animated.View entering={FadeInDown.delay(80).duration(300)}>
-          {status === 'delivered' && o?.invoice_url ? (
-            <View style={[styles.riderCard, styles.riderCardGreen]}>
-              <View style={[styles.riderAvatar, { backgroundColor: tokens.colors.primary }]}>
-                <Check size={22} color={tokens.colors.textInverse} strokeWidth={3} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text allowFontScaling={false} style={[styles.riderMeta, { color: tokens.colors.primary }]}>FINANCIAL RECORD</Text>
-                <Text allowFontScaling={false} style={styles.riderName}>Invoice is Ready</Text>
-              </View>
-              <PressableScale
-                style={[styles.riderAction, { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.primary }]}
-                onPress={() => Linking.openURL(o.invoice_url)}
-                accessibilityRole="button"
-                accessibilityLabel="View invoice"
+          {/* Rider card / Invoice card */}
+          {status === 'delivered' ? (
+            o?.invoice_url ? (
+              <Animated.View entering={FadeInDown.delay(80).duration(300)}>
+                <View style={[styles.riderCard, styles.riderCardGreen]}>
+                  <View style={[styles.riderAvatar, { backgroundColor: tokens.colors.primary }]}>
+                    <Check size={22} color={tokens.colors.textInverse} strokeWidth={3} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text allowFontScaling={false} style={[styles.riderMeta, { color: tokens.colors.primary }]}>FINANCIAL RECORD</Text>
+                    <Text allowFontScaling={false} style={styles.riderName}>Invoice is Ready</Text>
+                  </View>
+                  <PressableScale
+                    style={[styles.riderAction, { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.primary }]}
+                    onPress={() => Linking.openURL(o.invoice_url)}
+                    accessibilityRole="button"
+                    accessibilityLabel="View invoice"
+                  >
+                    <Text allowFontScaling={false} style={{ color: tokens.colors.textInverse, fontFamily: tokens.typography.family.extrabold, fontSize: 10 }}>VIEW</Text>
+                  </PressableScale>
+                </View>
+              </Animated.View>
+            ) : null
+          ) : status === 'cancelled' ? null : (
+            <Animated.View entering={FadeInDown.delay(80).duration(300)}>
+              <View
+                style={[
+                  styles.riderCard,
+                  o?.rider_name && styles.riderCardAssigned,
+                  riderJustAssigned && styles.riderCardPulse,
+                ]}
               >
-                <Text allowFontScaling={false} style={{ color: tokens.colors.textInverse, fontFamily: tokens.typography.family.extrabold, fontSize: 10 }}>VIEW</Text>
-              </PressableScale>
-            </View>
-          ) : (
-            <View
-              style={[
-                styles.riderCard,
-                o?.rider_name && styles.riderCardAssigned,
-                riderJustAssigned && styles.riderCardPulse,
-              ]}
-            >
-              <View style={[styles.riderAvatar, o?.rider_name && { backgroundColor: tokens.colors.successTint }]}>
-                {o?.rider_photo_url ? (
-                  <Image source={{ uri: o.rider_photo_url }} style={styles.riderAvatarPhoto} />
-                ) : (
-                  <UserCircle size={26} color={o?.rider_name ? tokens.colors.primary : tokens.colors.textTertiary} />
+                <View style={[styles.riderAvatar, o?.rider_name && { backgroundColor: tokens.colors.successTint }]}>
+                  {o?.rider_photo_url ? (
+                    <Image source={{ uri: o.rider_photo_url }} style={styles.riderAvatarPhoto} />
+                  ) : (
+                    <UserCircle size={26} color={o?.rider_name ? tokens.colors.primary : tokens.colors.textTertiary} />
+                  )}
+                </View>
+                <View style={{ flex: 1, flexShrink: 1 }}>
+                  <Text allowFontScaling={false} style={styles.riderMeta}>{o?.rider_name ? 'DELIVERY PARTNER' : 'FINDING PARTNER'}</Text>
+                  <Text allowFontScaling={false} style={[styles.riderName, !o?.rider_name && { color: tokens.colors.textSecondary, fontSize: 15 }]} numberOfLines={1}>
+                    {o?.rider_name || 'Assigning...'}
+                  </Text>
+                </View>
+                {o?.rider_phone && (
+                  <PressableScale
+                    style={[styles.riderAction, styles.riderCallBtn]}
+                    onPress={() => Linking.openURL(`tel:${o.rider_phone}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Call delivery partner"
+                  >
+                    <Phone size={17} color={tokens.colors.textInverse} />
+                  </PressableScale>
                 )}
               </View>
-              <View style={{ flex: 1, flexShrink: 1 }}>
-                <Text allowFontScaling={false} style={styles.riderMeta}>{o?.rider_name ? 'DELIVERY PARTNER' : 'FINDING PARTNER'}</Text>
-                <Text allowFontScaling={false} style={[styles.riderName, !o?.rider_name && { color: tokens.colors.textSecondary, fontSize: 15 }]} numberOfLines={1}>
-                  {o?.rider_name || 'Assigning...'}
-                </Text>
-              </View>
-              {o?.rider_phone && (
-                <PressableScale
-                  style={[styles.riderAction, styles.riderCallBtn]}
-                  onPress={() => Linking.openURL(`tel:${o.rider_phone}`)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Call delivery partner"
-                >
-                  <Phone size={17} color={tokens.colors.textInverse} />
-                </PressableScale>
-              )}
-            </View>
+            </Animated.View>
           )}
-          </Animated.View>
 
           {/* Delivery address */}
           {o && (

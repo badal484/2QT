@@ -1,7 +1,7 @@
 import { tokens } from '../theme/tokens';
 import React, { useEffect, useState } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
-import { View, Text, ScrollView, StyleSheet, Modal } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Modal, RefreshControl } from 'react-native';
 import { ArrowLeft, Play, ShieldCheck, Thermometer, Info, ChevronRight, UserCircle, Droplets, Utensils, X } from 'lucide-react-native';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { haptics } from '../utils/haptics';
@@ -26,12 +26,22 @@ const LiveKitchenScreen = ({ navigation }: any) => {
 
   const zoneId = useSelector((state: RootState) => state.cart.zoneId);
 
-  const { data: metricsData } = useQuery({
+  const { data: metricsData, refetch } = useQuery({
     queryKey: ['kitchen_metrics', zoneId],
     queryFn: () => api.get(`/menu/kitchen-metrics?zoneId=${zoneId}`),
     enabled: !!zoneId,
     refetchInterval: 30000, // Refetch every 30s
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const metrics = metricsData?.metrics || {
       fssai_status: 'FSSAI Certified',
@@ -63,7 +73,11 @@ const LiveKitchenScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 60 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.colors.primary} />}
+      >
         
         {/* CINEMATIC LIVE STREAM PLAYER */}
         <Animated.View entering={FadeInDown.duration(400)} style={styles.videoPlayerContainer}>

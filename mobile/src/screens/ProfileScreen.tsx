@@ -1,3 +1,4 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import {
   CreditCard,
@@ -22,7 +23,7 @@ import {
 } from 'lucide-react-native';
 import React, { useCallback } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
-import { View, Text, ScrollView, Image, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Image, StyleSheet, RefreshControl } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFeedback } from '../context/FeedbackContext';
@@ -71,23 +72,48 @@ const ProfileScreen = ({ navigation }: any) => {
   const accent = isRider ? tokens.colors.primary : tokens.colors.success;
   const accentLight = isRider ? tokens.colors.primaryTint : tokens.colors.successTint;
 
-  const { data: wallet } = useQuery({
-    queryKey: ['wallet'],
+  const { data: wallet, refetch: refetchWallet } = useQuery({
+    queryKey: ['wallet', 'balance'],
     queryFn: () => api.get('/customers/wallet'),
     enabled: !isRider
   });
 
-  const { data: loyalty } = useQuery({
-    queryKey: ['loyalty'],
+  const { data: loyalty, refetch: refetchLoyalty } = useQuery({
+    queryKey: ['loyalty', 'balance'],
     queryFn: () => api.get('/customers/loyalty'),
     enabled: !isRider
   });
 
-  const { data: riderStats } = useQuery({
+  const { data: riderStats, refetch: refetchRiderStats } = useQuery({
     queryKey: ['rider-stats'],
     queryFn: () => api.get('/riders/stats'),
     enabled: isRider
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isRider) {
+        refetchRiderStats();
+      } else {
+        refetchWallet();
+        refetchLoyalty();
+      }
+    }, [isRider, refetchRiderStats, refetchWallet, refetchLoyalty])
+  );
+
+  const [refreshing, setRefreshing] = React.useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (isRider) {
+        await refetchRiderStats();
+      } else {
+        await Promise.all([refetchWallet(), refetchLoyalty()]);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [isRider, refetchRiderStats, refetchWallet, refetchLoyalty]);
 
   const handleLogout = useCallback(() => {
     haptics.warning();
@@ -126,7 +152,11 @@ const ProfileScreen = ({ navigation }: any) => {
         <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.navHeaderTitle}>My Profile</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.colors.primary} />}
+      >
         
         {/* REFINED UPPER PROFILE CARD */}
         <Animated.View entering={FadeInDown.duration(400)} style={styles.headerCard}>
@@ -181,7 +211,14 @@ const ProfileScreen = ({ navigation }: any) => {
               <PressableScale style={styles.statBox} onPress={() => navigation.navigate('Payouts')} accessibilityRole="button" accessibilityLabel="Earnings">
                 <Wallet size={20} color={tokens.colors.textSecondary} />
                 <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Earnings</Text>
-                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>₹{((riderStats?.totalEarnings ?? 0) / 100).toFixed(0)}</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>
+                  ₹{(() => {
+                    const raw = riderStats?.totalEarnings ?? riderStats?.total_earnings ?? 0;
+                    const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+                    const val = isNaN(num) ? 0 : num;
+                    return (val / 100).toFixed(0);
+                  })()}
+                </Text>
               </PressableScale>
               <PressableScale style={styles.statBox} onPress={() => navigation.navigate('RiderHistory')} accessibilityRole="button" accessibilityLabel="Total Trips">
                 <Package size={20} color={tokens.colors.textSecondary} />
@@ -191,7 +228,14 @@ const ProfileScreen = ({ navigation }: any) => {
               <PressableScale style={styles.statBox} onPress={() => {}} accessibilityRole="button" accessibilityLabel="Rating">
                 <Star size={20} color={tokens.colors.warning} />
                 <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Rating</Text>
-                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={[styles.statValue, { color: tokens.colors.warning }]}>{(riderStats?.rating ?? 5.0).toFixed(1)}★</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={[styles.statValue, { color: tokens.colors.warning }]}>
+                  {(() => {
+                    const raw = riderStats?.rating ?? 5.0;
+                    const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+                    const val = isNaN(num) ? 5.0 : num;
+                    return val.toFixed(1);
+                  })()}★
+                </Text>
               </PressableScale>
             </>
           ) : (
@@ -199,7 +243,15 @@ const ProfileScreen = ({ navigation }: any) => {
               <PressableScale style={[styles.statBox, !featureLoyalty && { flex: 1 }]} onPress={() => navigation.navigate('Wallet')} accessibilityRole="button" accessibilityLabel="Wallet Balance">
                 <Wallet size={20} color={tokens.colors.textSecondary} />
                 <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Wallet Balance</Text>
-                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>{wallet ? `₹${(wallet.balancePaise / 100).toFixed(2)}` : '₹0.00'}</Text>
+                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>
+                  {(() => {
+                    if (!wallet) return '₹0.00';
+                    const raw = wallet?.balancePaise ?? wallet?.balance_paise ?? 0;
+                    const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+                    const safePaise = isNaN(num) ? 0 : num;
+                    return `₹${(safePaise / 100).toFixed(2)}`;
+                  })()}
+                </Text>
               </PressableScale>
               {featureLoyalty && (
                 <PressableScale style={styles.statBox} onPress={() => navigation.navigate('Loyalty')} accessibilityRole="button" accessibilityLabel="Loyalty Points">

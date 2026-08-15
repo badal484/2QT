@@ -1,5 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl,
 } from 'react-native';
@@ -47,11 +48,17 @@ const MyTableBookingsScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<Tab>('upcoming');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: bookings = [], isLoading } = useQuery({
+  const { data: bookings = [], isLoading, refetch } = useQuery({
     queryKey: ['my-table-bookings', activeTab],
     queryFn: () =>
       api.get(`/table-bookings/mine?status=${activeTab}`).then((r: any) => r.bookings as any[]),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   useEffect(() => {
     const socket = getSocket();

@@ -52,6 +52,10 @@ const CustomerNavigator = () => {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="ItemDetail" component={ItemDetailScreen} options={{ animation: 'slide_from_bottom', animationDuration: 280, gestureDirection: 'vertical' }} />
+      {/* Same screen, regular push animation — used when navigating from one ItemDetail
+          to a related item so the stack stays intact and back returns to the previous item,
+          not to Home (iOS collapses modal-on-modal groups on dismiss). */}
+      <Stack.Screen name="ItemDetailPush" component={ItemDetailScreen} options={{ animation: 'slide_from_right', animationDuration: 220 }} />
       <Stack.Screen name="Cart" component={CartScreen} options={{ animation: 'slide_from_bottom', animationDuration: 280, gestureDirection: 'vertical' }} />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       <Stack.Screen name="Address" component={AddressScreen} />

@@ -1,8 +1,9 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import { ArrowLeft, Star, Crown, Pizza } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
-import { View, Text, StyleSheet, AppState, FlatList } from 'react-native';
+import { View, Text, StyleSheet, AppState, FlatList, RefreshControl } from 'react-native';
 import { SkeletonScreenList, SkeletonStatCard } from '../components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,19 +25,38 @@ const LoyaltyScreen = ({ navigation }: any) => {
     return () => sub.remove();
   }, [queryClient]);
 
-  const { data: loyaltyData, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ['loyalty'],
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const { data: loyaltyData, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery({
+    queryKey: ['loyalty', 'history'],
     queryFn: ({ pageParam = 0 }) => api.get(`/customers/loyalty?offset=${pageParam}&limit=20`),
     initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const fetched = lastPage.history || [];
-      if (fetched.length < 20) return undefined;
-      return allPages.length * 20;
+    getNextPageParam: (lastPage: any, allPages: any) => {
+      if (!lastPage || !Array.isArray(lastPage?.history)) return undefined;
+      if ((lastPage.history?.length ?? 0) < 20) return undefined;
+      return (Array.isArray(allPages) ? allPages.length : 1) * 20;
     },
   });
 
-  const loyalty = loyaltyData?.pages[0];
-  const history = loyaltyData ? loyaltyData.pages.flatMap((p: any) => p.history || []) : [];
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  const loyalty = loyaltyData?.pages?.[0];
+  const history = Array.isArray(loyaltyData?.pages)
+    ? loyaltyData.pages.flatMap((p: any) => (Array.isArray(p?.history) ? p.history : []))
+    : [];
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
 
 
@@ -89,6 +109,7 @@ const LoyaltyScreen = ({ navigation }: any) => {
       <FlatList
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.colors.primary} />}
         data={history}
         keyExtractor={(tx: any) => tx.id}
         initialNumToRender={8}

@@ -1,6 +1,7 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import { ArrowLeft, Copy, Gift } from 'lucide-react-native';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, ScrollView, Share, StyleSheet } from 'react-native';
 import { PressableScale } from '../components/ui/internal/PressableScale';
 import { useSelector } from 'react-redux';
@@ -11,10 +12,16 @@ import { api } from '../api/client';
 const ReferralScreen = ({ navigation }: any) => {
   const { user } = useSelector((state: RootState) => state.auth);
   
-  const { data: stats } = useQuery({
+  const { data: stats, refetch } = useQuery({
     queryKey: ['referral-stats'],
     queryFn: () => api.get('/customers/referrals/stats'),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const referralCode = stats?.referralCode || user?.phone?.slice(-6).toUpperCase() || '2QT50';
 

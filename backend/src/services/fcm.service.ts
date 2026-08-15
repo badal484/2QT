@@ -58,8 +58,9 @@ export async function sendFCM(
     if (!a) return 'skipped';
 
     try {
-        const isChat = data.type === 'chat_message';
-        const skipNotif = isChat || dataOnly;
+        // Ensure native notification payload is ALWAYS included when dataOnly is false,
+        // allowing Android OS and iOS to render status bar notifications natively when app is closed/killed.
+        const skipNotif = dataOnly;
 
         const channelId = data.android_channel_id || 'order_updates';
 
@@ -78,6 +79,8 @@ export async function sendFCM(
                         imageUrl: imageUrl || undefined,
                         priority: 'high',
                         visibility: 'public',
+                        defaultSound: true,
+                        defaultVibrateTimings: true,
                     } 
                 } : {}),
             },

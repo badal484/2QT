@@ -21,7 +21,15 @@ export const CustomizationBottomSheet: React.FC<CustomizationBottomSheetProps> =
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [instructions, setInstructions] = useState('');
 
-  const groups = item?.customization_groups || [];
+  let groups: any[] = [];
+  if (Array.isArray(item?.customization_groups)) {
+    groups = item.customization_groups;
+  } else if (typeof item?.customization_groups === 'string') {
+    try {
+      const parsed = JSON.parse(item.customization_groups);
+      if (Array.isArray(parsed)) groups = parsed;
+    } catch {}
+  }
   const basePrice = (item?.price_paise || 0) / 100;
 
   let extraCost = 0;

@@ -1,3 +1,4 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import React, { useCallback } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
@@ -142,10 +143,16 @@ const NotificationsScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = React.useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => api.get('/notifications'),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const readMutation = useMutation({
     mutationFn: (id: string) => api.patch(`/notifications/${id}/read`, {}),

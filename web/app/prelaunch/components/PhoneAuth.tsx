@@ -52,12 +52,14 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
   };
 
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
     const script = document.createElement('script');
     script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
     script.async = true;
     script.onload = () => {
       if (!window.initSendOTP) {
         toast.error('OTP service unavailable. Please refresh.');
+        setWidgetReady(true);
         return;
       }
       window.initSendOTP({
@@ -65,7 +67,6 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
         tokenAuth: '524621TvewiLzS6a5add22P1',
         exposeMethods: true,
         success: (data: any) => {
-          // Only handle the callback after user clicks "Verify Code"
           if (!verifyCalledRef.current) return;
           verifyCalledRef.current = false;
           if (data?.message) handleWidgetVerified(data.message);
@@ -76,16 +77,25 @@ export function PhoneAuth({ onVerified }: PhoneAuthProps) {
           toast.error(error?.message || 'Verification failed. Try again.');
         },
       });
+      let pollCount = 0;
       pollRef.current = setInterval(() => {
-        if (window.sendOtp) {
+        pollCount++;
+        if (window.sendOtp || pollCount > 15) {
           setWidgetReady(true);
-          clearInterval(pollRef.current!);
+          if (pollRef.current) clearInterval(pollRef.current);
         }
       }, 100);
     };
-    script.onerror = () => toast.error('Failed to load OTP service. Please refresh.');
+    script.onerror = () => {
+      setWidgetReady(true);
+      toast.error('Failed to load OTP service. Please refresh.');
+    };
+    timeoutId = setTimeout(() => {
+      setWidgetReady(true);
+    }, 1500);
     document.body.appendChild(script);
     return () => {
+      clearTimeout(timeoutId);
       verifyCalledRef.current = false;
       if (pollRef.current) clearInterval(pollRef.current);
       if (cooldownRef.current) clearInterval(cooldownRef.current);

@@ -1,3 +1,4 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import { Package, RotateCcw, Bike, AlertTriangle, Download, Star, ChevronRight } from 'lucide-react-native';
 import React, { useState, useCallback, useMemo } from 'react';
@@ -39,7 +40,37 @@ const OrderHistoryScreen = ({ navigation }: any) => {
   const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
   const [reorderLoadingId, setReorderLoadingId] = useState<string | null>(null);
   const { showDialog } = useFeedback();
-  const LIMIT = 20;
+  const LIMIT = 10;
+
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['order-history'],
+    queryFn: async ({ pageParam }) => {
+      const res = await api.get(`/orders/mine?limit=${LIMIT}&offset=${pageParam}`);
+      return res;
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any, allPages: any) => {
+      if (!lastPage || !Array.isArray(lastPage.orders)) return undefined;
+      if (lastPage.orders.length < LIMIT) return undefined;
+      return (allPages?.length || 1) * LIMIT;
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const handleOpenInvoice = useCallback(async (orderId: string) => {
     setInvoiceLoadingId(orderId);
@@ -128,31 +159,25 @@ const OrderHistoryScreen = ({ navigation }: any) => {
     finally { setReorderLoadingId(null); }
   }, [dispatch, navigation, queryClient, showDialog]);
 
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['order-history'],
-    queryFn: async ({ pageParam }) => {
-      const res = await api.get(`/orders/mine?limit=${LIMIT}&offset=${pageParam}`);
-      return res;
-    },
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const fetched = lastPage.orders || [];
-      if (fetched.length < LIMIT) return undefined;
-      return allPages.length * LIMIT;
-    },
-    staleTime: 0,
-    refetchOnMount: 'always',
-  });
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
-  const allOrders = data ? data.pages.flatMap((page: any) => page.orders || []) : [];
+  const allOrders = Array.isArray(data?.pages)
+    ? data.pages.flatMap((page: any) => (Array.isArray(page?.orders) ? page.orders : []))
+    : [];
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const loadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -248,6 +273,8 @@ const OrderHistoryScreen = ({ navigation }: any) => {
       />
 
       <FlashList
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         data={listData}
         keyExtractor={(item: any) => item.key}
         renderItem={renderOrderItem}

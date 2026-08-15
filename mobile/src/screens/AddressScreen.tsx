@@ -1,16 +1,17 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import { PermissionsAndroid } from 'react-native';
 import {
   Home, Briefcase, MapPin, Navigation, Plus, Trash2, Search,
 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Button } from '../components/ui/Button';
 import { ListItem } from '../components/ui/ListItem';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { PressableScale } from '../components/ui/internal/PressableScale';
 import {
   View, Text, ScrollView, ActivityIndicator, Alert,
-  StyleSheet, KeyboardAvoidingView, Platform,
+  StyleSheet, KeyboardAvoidingView, Platform, RefreshControl
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
@@ -52,6 +53,22 @@ const AddressScreen = ({ navigation, route }: any) => {
     gcTime: 0,          // don't serve inactive-zone data from cache
     retry: 1,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/customers/addresses/${id}`),
@@ -196,6 +213,7 @@ const AddressScreen = ({ navigation, route }: any) => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.colors.primary} />}
         >
           {/* Search bar — custom pill shape, PressableScale used directly (Button's fixed
               variants don't fit this affordance) */}

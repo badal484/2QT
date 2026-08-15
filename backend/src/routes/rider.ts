@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { query, withTransaction } from '../db';
 import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest, invalidateUserCache } from '../middleware/auth';
-import { emitToUser, emitToRiders, emitToAdmin, emitToOrder, emitToKitchen } from '../socket';
+import { emitToUser, emitToRiders, emitToAdmin, emitToOrder, emitToKitchen, emitToAll } from '../socket';
 import { unassignAndReassign } from '../services/autoAssign';
 import { invoicesQueue } from '../jobs/queues';
 import { NotificationService } from '../services/notification.service';
