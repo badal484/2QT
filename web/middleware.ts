@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export const runtime = 'edge';
-
 const BACKEND = process.env.BACKEND_URL || 'http://localhost:8000/api/v1';
 const TTL = 30_000;
 const BYPASS_COOKIE = 'prelaunch_bypass';
@@ -27,7 +25,7 @@ async function gateEnabled(): Promise<boolean> {
   }
 }
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (
@@ -44,8 +42,6 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Preview-link bypass: visiting once with ?preview_key=<secret> sets a cookie so the
-  // site owner can see the real site while everyone else still sees /prelaunch.
   const previewKey = req.nextUrl.searchParams.get('preview_key');
   if (BYPASS_SECRET && previewKey === BYPASS_SECRET) {
     const url = new URL(req.url);
