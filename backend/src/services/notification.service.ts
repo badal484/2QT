@@ -121,8 +121,8 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     if (!user.device_token && user.phone) {
         const cleanPhone = user.phone.replace(/\D/g, '').slice(-10);
         const { rows: siblingRows } = await query(
-            "SELECT device_token FROM users WHERE (phone = $1 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2) AND role = $3 AND device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
-            [user.phone, cleanPhone, (user as any).role || 'customer']
+            "SELECT device_token FROM users WHERE (phone = $1 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2) AND device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+            [user.phone, cleanPhone]
         );
         if (siblingRows[0]?.device_token) {
             user.device_token = siblingRows[0].device_token;
