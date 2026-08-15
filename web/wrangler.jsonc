@@ -2,8 +2,9 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "2qt",
   "compatibility_date": "2026-08-15",
+  "main": ".open-next/worker.js",
   "assets": {
-    "directory": ".next"
+    "directory": ".open-next/assets"
   },
   "observability": {
     "enabled": true
