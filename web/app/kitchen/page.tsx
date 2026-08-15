@@ -827,7 +827,7 @@ export default function KitchenPage() {
                 <h2 className="text-base font-black uppercase tracking-widest text-orange-400 flex items-center gap-2">
                   <Bike className="w-4 h-4" /> Riders Online
                 </h2>
-                <p className="text-zinc-500 text-xs mt-1">{riders.length} online · {idleRiders.length} idle · {busyRiders.length} delivering</p>
+                <p className="text-zinc-500 text-xs mt-1">{riders.filter(r => r.is_online).length} online · {idleRiders.length} idle · {busyRiders.length} delivering</p>
               </div>
 
               {riders.length === 0 && (
