@@ -464,7 +464,11 @@ router.post('/verify-widget-token', async (req, res) => {
         });
         const verifyData: any = await verifyRes.json();
         if (verifyData.type !== 'success') {
-            return res.status(401).json({ error: 'INVALID_TOKEN', message: verifyData.message || 'Widget token verification failed' });
+            const isAlreadyVerified = String(verifyData.message || '').toLowerCase().includes('already verif');
+            const message = isAlreadyVerified
+                ? 'This OTP code has already been used. Please click Resend OTP to get a new code.'
+                : (verifyData.message || 'Widget token verification failed');
+            return res.status(401).json({ error: 'INVALID_TOKEN', message });
         }
 
         const rawPhone = verifyData.message || verifyData.mobile || verifyData.messageData?.mobile;
