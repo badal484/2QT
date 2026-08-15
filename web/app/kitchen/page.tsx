@@ -488,7 +488,15 @@ export default function KitchenPage() {
   useEffect(() => {
     const handler = () => { if (view === "dispatch") fetchDispatch(); };
     socket.on("order_updated", handler);
-    return () => { socket.off("order_updated", handler); };
+    socket.on("order_assigned", handler);
+    socket.on("rider_location_update", handler);
+    socket.on("rider_status_changed", handler);
+    return () => {
+      socket.off("order_updated", handler);
+      socket.off("order_assigned", handler);
+      socket.off("rider_location_update", handler);
+      socket.off("rider_status_changed", handler);
+    };
   }, [view, fetchDispatch]);
 
   // ── Manual assignment alert (all 3 layers + sound) ────────────────────────
