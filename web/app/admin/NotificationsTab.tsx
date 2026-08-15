@@ -159,7 +159,7 @@ function TemplateCard({ tmpl, onSaved }: { tmpl: NotifTemplate; onSaved: () => v
 // ─── Broadcast sub-tab ────────────────────────────────────────────────────────
 
 function BroadcastPanel() {
-  const [segment, setSegment] = useState<"all" | "zone" | "active_last_7" | "riders" | "kitchens">("all");
+  const [segment, setSegment] = useState<"all" | "zone" | "active_last_7" | "riders" | "kitchens" | "everyone">("all");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
