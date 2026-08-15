@@ -223,19 +223,19 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     // FCM mobile push
     if (channels.includes('push') && prefs.push_enabled) {
         if (!user.device_token) {
-            console.warn(`[NOTIF] No device_token for user ${user.id} (${user.phone}) — skipping FCM push for type=${type}`);
+            console.warn(`[NOTIF_LOGGER] ❌ Skipping FCM push for type=${type} user=${user.id} (${user.phone}) — REASON: device_token is NULL in DB (user has not registered FCM token or is logged out)`);
         } else {
-            console.log(`[NOTIF] Sending FCM type=${type} to user=${user.id} token=${(user.device_token as string).slice(0, 15)}…`);
+            console.log(`[NOTIF_LOGGER] 🚀 Dispatching FCM push type=${type} to user=${user.id} token=${(user.device_token as string).slice(0, 15)}...`);
             tasks.push(
                 sendFCM(user.device_token, title, body, fcmData, imageUrl)
                     .then((result: any) => {
-                        console.log(`[NOTIF] FCM result=${result} type=${type} user=${user!.id}`);
+                        console.log(`[NOTIF_LOGGER] 📊 FCM result=${result} for type=${type} user=${user!.id}`);
                         if (result === 'invalid_token') {
-                            console.warn(`[NOTIF] Stale token cleared for user=${user!.id}`);
+                            console.warn(`[NOTIF_LOGGER] ⚠️ Stale token cleared from DB for user=${user!.id}`);
                             return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
                         }
                     })
-                    .catch((err: any) => console.error('[NOTIF_FCM_ERR]', err.message))
+                    .catch((err: any) => console.error('[NOTIF_LOGGER] ❌ FCM Dispatch Error:', err.message))
             );
         }
     }

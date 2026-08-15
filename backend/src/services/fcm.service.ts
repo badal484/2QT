@@ -8,7 +8,9 @@ export function parseServiceAccount(): any | null {
     const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
     if (b64) {
         try {
-            return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+            const sa = JSON.parse(Buffer.from(b64.trim(), 'base64').toString('utf8'));
+            if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+            return sa;
         } catch (e) {
             console.error('[FCM] Failed to decode FIREBASE_SERVICE_ACCOUNT_B64:', e);
         }
@@ -34,14 +36,14 @@ function getApp(): App | null {
 
     const sa = parseServiceAccount();
     if (!sa) {
-        console.warn('[FCM] No Firebase credentials — set FIREBASE_SERVICE_ACCOUNT_B64 or FIREBASE_SERVICE_ACCOUNT_JSON');
+        console.warn('[FCM_DIAGNOSTIC] ❌ Firebase Admin skipped — No FIREBASE_SERVICE_ACCOUNT_B64 or FIREBASE_SERVICE_ACCOUNT_JSON configured on server');
         return null;
     }
     try {
         app = initializeApp({ credential: cert(sa) });
-        console.log('[FCM] Firebase Admin initialized ✓');
+        console.log('[FCM_DIAGNOSTIC] ✅ Firebase Admin initialized successfully for project:', sa.project_id);
     } catch (err) {
-        console.error('[FCM] Init failed:', err);
+        console.error('[FCM_DIAGNOSTIC] ❌ Firebase Admin init failed:', err);
     }
     return app;
 }
@@ -55,14 +57,17 @@ export async function sendFCM(
     dataOnly = false
 ): Promise<'ok' | 'invalid_token' | 'skipped'> {
     const a = getApp();
-    if (!a) return 'skipped';
+    if (!a) {
+        console.warn('[FCM_SEND] ⚠️ FCM send skipped — Firebase Admin app is not initialized');
+        return 'skipped';
+    }
 
     try {
-        // Ensure native notification payload is ALWAYS included when dataOnly is false,
-        // allowing Android OS and iOS to render status bar notifications natively when app is closed/killed.
         const skipNotif = dataOnly;
-
         const channelId = data.android_channel_id || 'order_updates';
+        const tokenPrefix = token ? `${token.slice(0, 15)}...` : 'NULL';
+
+        console.log(`[FCM_SEND] 🚀 Sending push to token=${tokenPrefix} title="${title}" channelId=${channelId}`);
 
         await getMessaging(a).send({
             token,
@@ -94,14 +99,18 @@ export async function sendFCM(
                 fcmOptions: { imageUrl: imageUrl || undefined },
             },
         });
+        console.log(`[FCM_SEND] ✅ FCM push delivered successfully to token=${tokenPrefix}`);
         return 'ok';
     } catch (err: any) {
         const stale = [
             'messaging/registration-token-not-registered',
             'messaging/invalid-registration-token',
         ];
-        if (stale.includes(err.code)) return 'invalid_token';
-        console.error('[FCM_ERROR]', err.message);
+        if (stale.includes(err.code)) {
+            console.warn(`[FCM_SEND] ⚠️ Target token is invalid/stale: code=${err.code}`);
+            return 'invalid_token';
+        }
+        console.error('[FCM_ERROR] ❌ FCM send failed:', err.code || err.message);
         throw err;
     }
 }
