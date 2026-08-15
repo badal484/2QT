@@ -41,12 +41,12 @@ router.get('/debug-broadcast', async (_req, res: Response) => {
             "SELECT * FROM notification_templates WHERE type = 'broadcast_message'"
         );
         const { rows: userRows } = await db.query(
-            "SELECT id, name, phone, device_token FROM users WHERE device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 5"
+            "SELECT id, name, phone, role, device_token FROM users WHERE device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 10"
         );
         res.json({
             template: tmplRows[0] || 'NOT_FOUND',
             activeUsersWithToken: userRows.length,
-            users: userRows.map(u => ({ id: u.id, name: u.name, phone: u.phone, tokenPrefix: u.device_token ? u.device_token.slice(0, 15) : null }))
+            users: userRows.map(u => ({ id: u.id, name: u.name, phone: u.phone, role: u.role, tokenPrefix: u.device_token ? u.device_token.slice(0, 15) : null }))
         });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -64,6 +64,27 @@ router.get('/debug-tokens', async (_req, res: Response) => {
              ORDER BY updated_at DESC LIMIT 20`
         );
         res.json({ count: rows.length, users: rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/broadcast-test-now', async (_req, res: Response) => {
+    try {
+        const { rows } = await db.query(
+            "SELECT id, name, phone, role, device_token FROM users WHERE device_token IS NOT NULL AND is_active = true"
+        );
+        const results = [];
+        for (const u of rows) {
+            const fcmRes = await sendFCM(
+                u.device_token,
+                '🎉 Special Offer for You!',
+                'Get 20% OFF on your next order with code 2QT20',
+                { type: 'broadcast_message', title: '🎉 Special Offer for You!', body: 'Get 20% OFF on your next order with code 2QT20' }
+            );
+            results.push({ id: u.id, name: u.name, phone: u.phone, role: u.role, fcmResult: fcmRes });
+        }
+        res.json({ count: rows.length, results });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
