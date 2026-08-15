@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+export const runtime = 'edge';
+
 const BACKEND = process.env.BACKEND_URL || 'http://localhost:8000/api/v1';
 const TTL = 30_000;
 const BYPASS_COOKIE = 'prelaunch_bypass';
