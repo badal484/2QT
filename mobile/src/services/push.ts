@@ -54,7 +54,11 @@ export async function registerDeviceToken(retries = 3, explicitPhone?: string) {
                             userPhone = s?.auth?.user?.phone || s?.user?.phone || undefined;
                         } catch {}
                     }
-                    await api.patch('/notifications/device-token', { token, phone: userPhone });
+                    try {
+                        await api.patch('/notifications/device-token', { token, phone: userPhone });
+                    } catch {
+                        await api.post('/notifications/device-token', { token, phone: userPhone });
+                    }
                     console.log('[PUSH_LOGGER] ✅ Device token registered with backend database successfully (phone:', userPhone || 'none', ')');
                     saved = true;
                 } catch (apiErr: any) {
