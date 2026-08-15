@@ -137,7 +137,7 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
     let hasValidLocation = false;
 
     riders.forEach((rider) => {
-      if (rider.location) {
+      if (rider.location && !rider.location.isFallback) {
         const lat = typeof rider.location.lat === "number" ? rider.location.lat : parseFloat(rider.location.lat as any);
         const lng = typeof rider.location.lng === "number" ? rider.location.lng : parseFloat(rider.location.lng as any);
         if (!isNaN(lat) && !isNaN(lng)) {
@@ -197,7 +197,7 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
         options={mapOptions}
       >
         {riders.map((rider) => {
-          if (!rider.location) return null;
+          if (!rider.location || rider.location.isFallback) return null;
           const lat = typeof rider.location.lat === "number" ? rider.location.lat : parseFloat(rider.location.lat as any);
           const lng = typeof rider.location.lng === "number" ? rider.location.lng : parseFloat(rider.location.lng as any);
           if (isNaN(lat) || isNaN(lng)) return null;
