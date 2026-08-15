@@ -16,10 +16,8 @@ async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> 
     const override = (req.query.kitchen_id || req.headers['x-kitchen-id']) as string;
     if (override) return override;
     if (req.user!.kitchenId) return req.user!.kitchenId;
-    if (req.user!.role === 'super_admin') {
-        const { rows } = await query('SELECT id FROM kitchens LIMIT 1');
-        if (rows.length > 0) return rows[0].id;
-    }
+    const { rows } = await query('SELECT id FROM kitchens LIMIT 1');
+    if (rows.length > 0) return rows[0].id;
     res.status(400).json({ error: 'KITCHEN_NOT_ASSIGNED' });
     return null;
 }
@@ -534,7 +532,7 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
 });
 
 // ─── Dispatch: live rider list with GPS + order status ───────────────────────
-router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/riders/live', authenticate, requireRole('chef', 'kitchen_manager', 'admin', 'super_admin', 'packer'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
 
@@ -744,7 +742,7 @@ router.post('/orders/:id/force-reassign', authenticate, requireRole('kitchen_man
 
 
 // ─── Dispatch: get unassigned ready orders for dispatch panel ─────────────────
-router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+router.get('/orders/unassigned', authenticate, requireRole('chef', 'kitchen_manager', 'admin', 'super_admin', 'packer'), async (req: AuthRequest, res) => {
     try {
         const { rows } = await query(`
             SELECT o.id, o.display_id, o.status, o.created_at, o.rider_id,

@@ -476,13 +476,19 @@ export default function KitchenPage() {
   // ── Dispatch ──────────────────────────────────────────────────────────────
   const fetchDispatch = useCallback(async () => {
     try {
-      const [ridersData, unassignedData] = await Promise.all([
-        api.get("/kitchen/riders/live"),
-        api.get("/kitchen/orders/unassigned"),
-      ]);
+      const ridersData = await api.get("/kitchen/riders/live").catch(e => {
+        console.error("fetch /kitchen/riders/live failed:", e);
+        return { riders: [] };
+      });
+      const unassignedData = await api.get("/kitchen/orders/unassigned").catch(e => {
+        console.error("fetch /kitchen/orders/unassigned failed:", e);
+        return { batches: [] };
+      });
       setRiders(ridersData.riders || []);
       setUnassignedBatches(unassignedData.batches || []);
-    } catch {}
+    } catch (err) {
+      console.error("fetchDispatch error:", err);
+    }
   }, []);
 
   useEffect(() => {
