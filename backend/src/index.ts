@@ -58,9 +58,12 @@ app.use(cors({
         if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
-        // Allow all Vercel preview deployments and tunnel tools
+        // Allow all Cloudflare Workers, Vercel preview deployments, 2QT domains and tunnel tools
         if (
+            origin.endsWith('.workers.dev') ||
             origin.endsWith('.vercel.app') ||
+            origin.endsWith('2qthello.com') ||
+            origin.endsWith('go2qt.com') ||
             origin.endsWith('.loca.lt') ||
             origin.endsWith('.ngrok.io') ||
             origin.endsWith('.ngrok-free.app')
