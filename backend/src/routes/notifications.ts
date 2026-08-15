@@ -112,7 +112,7 @@ router.get('/test-fcm-direct', async (_req, res: Response) => {
 
 // ─── FCM device token (mobile) ───────────────────────────────────────────────
 
-router.patch('/device-token', async (req: any, res: Response) => {
+const handleDeviceToken = async (req: any, res: Response) => {
     try {
         const { token, phone } = (req.body || {}) as { token: string; phone?: string };
         const authHeader = req.headers?.authorization;
@@ -164,7 +164,10 @@ router.patch('/device-token', async (req: any, res: Response) => {
         console.error('[DEVICE_TOKEN_ERR]', err.message);
         res.status(500).json({ error: err.message });
     }
-});
+};
+
+router.patch('/device-token', handleDeviceToken);
+router.post('/device-token', handleDeviceToken);
 
 // ─── In-app notification bell ─────────────────────────────────────────────────
 
