@@ -2,6 +2,8 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import { api } from '../api/client';
 import { navigateFromNotification } from '../navigation/navigationRef';
 
+let messagingInstance: any = null;
+
 function getMessaging() {
     if (messagingInstance) return messagingInstance;
     try {
