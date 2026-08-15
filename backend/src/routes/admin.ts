@@ -343,26 +343,20 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
         } else if (audience === 'kitchens' || audience === 'partners') {
             queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role IN ('chef', 'kitchen_manager', 'partner_kitchen')`;
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
-        } else if (audience === 'customers' || audience === 'all' || audience === 'all_customers') {
+        } else if (audience === 'customers' || audience === 'all_customers') {
             if (zoneId) {
                 queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
                 queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
             }
-        } else if (audience === 'everyone' || audience === 'all_users') {
+        } else {
+            // "all", "everyone", "zone" — send to all active users (customers, riders, staff, admins)
             if (zoneId) {
                 queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
                 queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true`;
-            }
-        } else {
-            if (zoneId) {
-                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
-                params.push(zoneId);
-            } else {
-                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
             }
         }
 
