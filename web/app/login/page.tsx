@@ -65,7 +65,11 @@ function LoginForm() {
           failure: (err: any) => {
             verifyCalledRef.current = false;
             setLoading(false);
-            setError(err?.message || 'Verification failed. Try again.');
+            const rawMsg = err?.message || '';
+            const msg = String(rawMsg).toLowerCase().includes('already verif')
+              ? 'This OTP code has already been used. Please click Resend OTP to get a new code.'
+              : (rawMsg || 'Verification failed. Try again.');
+            setError(msg);
           },
         });
         let pollCount = 0;
@@ -284,7 +288,11 @@ function LoginForm() {
         redirectUser(data.user.role);
       }
     } catch (err: any) {
-      setError(err?.message || "Verification failed. Try again.");
+      const rawMsg = err?.message || '';
+      const msg = String(rawMsg).toLowerCase().includes('already verif')
+        ? 'This OTP code has already been used. Please click Resend OTP to get a new code.'
+        : (rawMsg || 'Verification failed. Try again.');
+      setError(msg);
     } finally {
       setLoading(false);
     }
