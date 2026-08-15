@@ -1,5 +1,6 @@
 import { Platform, PermissionsAndroid } from 'react-native';
 import { api } from '../api/client';
+import { getItem } from '../utils/storage';
 import { navigateFromNotification } from '../navigation/navigationRef';
 
 let messagingInstance: any = null;
@@ -45,16 +46,13 @@ export async function registerDeviceToken(retries = 3) {
             while (!saved && apiAttempt < retries) {
                 try {
                     apiAttempt++;
-                    await api.patch('/notifications/device-token', { token });
+                    const userPhone = await getItem('user_phone') || undefined;
+                    await api.patch('/notifications/device-token', { token, phone: userPhone });
                     console.log('[PUSH_LOGGER] ✅ Device token registered with backend database successfully');
                     saved = true;
                 } catch (apiErr: any) {
                     const status = apiErr?.response?.status;
                     console.warn(`[PUSH_LOGGER] ⚠️ Failed to save token to backend (attempt ${apiAttempt}/${retries}):`, status || apiErr?.message);
-                    if (status === 401) {
-                        // User not authenticated yet — break loop, will re-trigger upon auth
-                        break;
-                    }
                     if (apiAttempt < retries) {
                         await new Promise(r => setTimeout(r, 2000));
                     }
