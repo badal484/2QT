@@ -79,7 +79,7 @@ router.get('/debug-dispatch', async (_req, res) => {
             ORDER BY o.created_at DESC LIMIT 10
         `);
         const { rows: riderRows } = await query(`
-            SELECT id, name, phone, role, is_online, current_lat, current_lng
+            SELECT id, name, phone, role, is_online
             FROM users
             WHERE role IN ('rider', 'rider_captain', 'super_admin', 'admin')
             ORDER BY is_online DESC, name ASC
@@ -539,7 +539,7 @@ router.get('/riders/live', authenticate, requireRole('chef', 'kitchen_manager', 
     try {
         // Show all online riders + ANY rider assigned active undelivered orders (even if offline)
         const { rows: riders } = await query(`
-            SELECT u.id, u.name, u.phone, u.is_online, u.current_lat, u.current_lng,
+            SELECT u.id, u.name, u.phone, u.is_online,
                    k.lat AS kitchen_lat, k.lng AS kitchen_lng,
                    COALESCE((
                        SELECT json_agg(json_build_object(
@@ -562,7 +562,7 @@ router.get('/riders/live', authenticate, requireRole('chef', 'kitchen_manager', 
             ORDER BY u.name
         `, [kitchenId]);
 
-        // Attach location: Redis -> DB current_lat/lng -> Kitchen location fallback -> Default Ranchi location
+        // Attach location: Redis live GPS -> Kitchen location fallback -> Default Ranchi location
         const ridersWithLocation = await Promise.all(
             riders.map(async (r: any, idx: number) => {
                 let loc: any = null;
@@ -582,16 +582,7 @@ router.get('/riders/live', authenticate, requireRole('chef', 'kitchen_manager', 
                     }
                 } catch {}
 
-                // 2. Try DB last known current_lat/lng
-                if (!loc && r.current_lat !== null && r.current_lng !== null) {
-                    const lat = parseFloat(r.current_lat);
-                    const lng = parseFloat(r.current_lng);
-                    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-                        loc = { lat, lng };
-                    }
-                }
-
-                // 3. Fallback to kitchen location offset or default city (Ranchi)
+                // 2. Fallback to kitchen location offset or default city (Ranchi)
                 if (!loc) {
                     const baseLat = parseFloat(r.kitchen_lat || '23.3441');
                     const baseLng = parseFloat(r.kitchen_lng || '85.3096');
