@@ -30,6 +30,8 @@ import {
   displayLocalNotification,
   setupNotifeeHandlers,
 } from '../services/localNotif';
+import { shouldShowBatteryPrompt } from '../services/batteryOptimization';
+import { BatteryOptimizationPrompt } from '../components/BatteryOptimizationPrompt';
 
 const { RoleModule } = NativeModules;
 const BUILD_ROLE = RoleModule?.BUILD_ROLE;
@@ -139,6 +141,21 @@ const RootNavigator = () => {
     return () => { unsubRefresh(); };
   }, [accessToken]);
 
+  // One-time, dismissible prompt to exempt the app from OEM background-process
+  // restrictions (OnePlus/Oppo/Xiaomi etc.) that can delay push delivery while the
+  // screen is off. Shown once per install, a few seconds after login so it doesn't
+  // compete with anything on first launch; never re-shown automatically after either choice.
+  const [showBatteryPrompt, setShowBatteryPrompt] = React.useState(false);
+  React.useEffect(() => {
+    if (!accessToken) return;
+    const timer = setTimeout(() => {
+      shouldShowBatteryPrompt().then(shouldShow => {
+        if (shouldShow) setShowBatteryPrompt(true);
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [accessToken]);
+
   // Socket connection
   React.useEffect(() => {
     if (accessToken) {
@@ -175,8 +192,10 @@ const RootNavigator = () => {
   const activeRole = BUILD_ROLE || user?.role;
 
   return (
-    <NavigationContainer 
-      ref={navigationRef} 
+    <>
+    <BatteryOptimizationPrompt visible={showBatteryPrompt} onDone={() => setShowBatteryPrompt(false)} />
+    <NavigationContainer
+      ref={navigationRef}
       linking={linking as any} 
       onReady={flushPendingNav}
       theme={{
@@ -207,6 +226,7 @@ const RootNavigator = () => {
         <AdminNavigator />
       )}
     </NavigationContainer>
+    </>
   );
 };
 
