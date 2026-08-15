@@ -724,21 +724,25 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
         }
 
         const { rows } = await query(`
-            SELECT o.id, o.display_id, o.status, o.created_at,
+            SELECT o.id, o.display_id, o.status, o.created_at, o.rider_id,
                    u.name AS customer_name, u.phone AS customer_phone,
                    a.address_text AS delivery_address, a.lat AS customer_lat, a.lng AS customer_lng,
                    k.name AS kitchen_name,
+                   r.name AS assigned_rider_name,
                    COALESCE(json_agg(json_build_object(
                        'menu_item_name', oi.menu_item_name,
                        'quantity',       oi.quantity
                    ) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
             FROM orders o
             JOIN users u ON o.customer_id = u.id
+            LEFT JOIN users r ON o.rider_id = r.id
             LEFT JOIN addresses a ON o.address_id = a.id
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
             LEFT JOIN order_items oi ON oi.order_id = o.id
-            WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup') AND o.rider_id IS NULL${kitchenFilter}
-            GROUP BY o.id, u.id, a.id, k.id
+            WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
+              AND (o.rider_id IS NULL OR o.needs_reassign = true OR o.status = 'ready_for_pickup')
+              ${explicitKitchenId ? `AND (o.kitchen_id = $1 OR o.kitchen_id IS NULL)` : ''}
+            GROUP BY o.id, u.id, r.id, a.id, k.id
             ORDER BY o.created_at ASC
         `, params);
 
