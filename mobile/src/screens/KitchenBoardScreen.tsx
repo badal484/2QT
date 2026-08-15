@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { playKitchenAlert } from '../utils/kitchenAlert';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StatusBar, StyleSheet, Alert,
+  ActivityIndicator, StatusBar, StyleSheet, Alert, RefreshControl
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -68,6 +68,20 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   }, []);
 
 
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] }),
+        queryClient.invalidateQueries({ queryKey: ['board-dine-in-tickets'] })
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [queryClient]);
 
   const { data: menuData } = useQuery({
     queryKey: ['kitchen-menu'],
@@ -226,7 +240,12 @@ const KitchenBoardScreen = ({ navigation }: any) => {
           <Text style={styles.loaderText}>SYNCING KITCHEN</Text>
         </View>
       ) : (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scroll} 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={G.green} />}
+        >
 
           {/* Stats */}
           <View style={styles.statsRow}>

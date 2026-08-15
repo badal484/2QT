@@ -26,11 +26,13 @@
 -keep class com.veltomobile.MainActivity { *; }
 -keep class com.veltomobile.MainApplication { *; }
 
-# ─── Firebase ─────────────────────────────────────────────────────────────────
+# ─── Firebase & Play Services ──────────────────────────────────────────────────
 -keep class com.google.firebase.** { *; }
 -keep class com.google.android.gms.** { *; }
+-keep class com.google.android.play.core.** { *; }
 -dontwarn com.google.firebase.**
 -dontwarn com.google.android.gms.**
+-dontwarn com.google.android.play.core.**
 
 # ─── OkHttp / Networking ──────────────────────────────────────────────────────
 -dontwarn okhttp3.**

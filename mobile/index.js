@@ -11,9 +11,15 @@ try {
   const messaging = require('@react-native-firebase/messaging').default;
   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     console.log('[PUSH_BACKGROUND] Message received in background/killed state:', remoteMessage);
+    // If remoteMessage already contains native notification object, Android/iOS OS displays it natively.
+    // Do not show duplicate local notification.
+    if (remoteMessage?.notification) {
+      return;
+    }
+
     const data = remoteMessage?.data ?? {};
-    let title = remoteMessage?.notification?.title ?? data?.title ?? '';
-    let body  = remoteMessage?.notification?.body  ?? data?.body  ?? '';
+    let title = data?.title ?? '';
+    let body  = data?.body  ?? '';
 
     if (!title && !body && data.type) {
       const TYPE_LABELS = {

@@ -1,3 +1,4 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useEffect } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
@@ -482,6 +483,12 @@ const MyTicketsTab = ({ initialExpandedId }: { initialExpandedId?: string }) => 
     queryKey: ['support-tickets'],
     queryFn: () => api.get('/customers/support/tickets'),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

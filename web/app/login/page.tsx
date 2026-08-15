@@ -40,10 +40,10 @@ function LoginForm() {
   const verifyCalledRef = useRef(false);
   const { login } = useAuth()!;
 
-  // Load the MSG91 widget — same product/widgetId the prelaunch page already uses
-  // successfully, and now the mobile app too, as an alternative to the transactional OTP
-  // API (which is stuck on a template/DLT registration issue independent of this).
+  // Load the MSG91 widget — with a safety timeout so slow networks/adblockers never freeze UI
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const script = document.createElement('script');
     script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
     script.async = true;
@@ -68,10 +68,12 @@ function LoginForm() {
             setError(err?.message || 'Verification failed. Try again.');
           },
         });
+        let pollCount = 0;
         pollRef.current = setInterval(() => {
-          if (window.sendOtp) {
+          pollCount++;
+          if (window.sendOtp || pollCount > 15) {
             setWidgetReady(true);
-            clearInterval(pollRef.current!);
+            if (pollRef.current) clearInterval(pollRef.current);
           }
         }, 100);
       } catch {
@@ -82,8 +84,15 @@ function LoginForm() {
       // Graceful fallback to direct API OTP when widget fails to load
       setWidgetReady(true);
     };
+
+    // Safety fallback: if widget isn't ready within 1.5s, unblock UI so direct API can be used
+    timeoutId = setTimeout(() => {
+      setWidgetReady(true);
+    }, 1500);
+
     document.body.appendChild(script);
     return () => {
+      clearTimeout(timeoutId);
       verifyCalledRef.current = false;
       if (pollRef.current) clearInterval(pollRef.current);
       try { document.body.removeChild(script); } catch {}

@@ -13,6 +13,8 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
+    "clean:gradle": "pkill -9 -f GradleDaemon || true; cd android && ./gradlew --stop",
+    "clean:android": "pkill -9 -f GradleDaemon || true; find node_modules -type d \\( -name 'build' -o -name 'buildOutput*' \\) -exec rm -rf {} +; cd android && ./gradlew clean",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -63,17 +65,18 @@
     "react-native-video": "^6.19.2",
     "react-native-vision-camera": "^5.2.2",
     "react-native-webview": "^13.16.1",
-    "react-native-worklets": "^0.8.3",
+    "react-native-worklets": "^0.10.3",
     "react-redux": "^9.2.0",
     "redux-persist": "^6.0.0",
     "socket.io-client": "^4.8.3",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
-    "@react-native-community/cli": "20.1.0",
+    "@react-native-community/cli": "^20.1.0",
     "@react-native-community/cli-platform-android": "20.1.0",
     "@react-native-community/cli-platform-ios": "20.1.0",
     "@react-native/babel-preset": "0.85.2",

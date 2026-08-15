@@ -1,3 +1,4 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
@@ -43,6 +44,13 @@ const HomeScreen = ({ navigation }: any) => {
 
   // Stable ref so handleAddToCart doesn't need cartItems in its dep array
   const cartItemsRef = useRef(cartItems);
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+      queryClient.invalidateQueries({ queryKey: ['zones'] });
+    }, [queryClient])
+  );
   cartItemsRef.current = cartItems;
 
   const [isVegOnly, setIsVegOnly] = useState(false);
@@ -78,14 +86,9 @@ const HomeScreen = ({ navigation }: any) => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     haptics.selection();
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['menu', effectiveZoneId] }),
-      queryClient.invalidateQueries({ queryKey: ['banners'] }),
-      queryClient.invalidateQueries({ queryKey: ['zones'] }),
-      queryClient.invalidateQueries({ queryKey: ['addresses'] })
-    ]);
+    await queryClient.refetchQueries();
     setRefreshing(false);
-  }, [queryClient, effectiveZoneId]);
+  }, [queryClient]);
 
   // Serviceability derived flags — trigger even with an address if effectiveZoneId is still null
   // Also treat 'serviceable' with no zone as checking — happens when persist is stale/corrupt
@@ -388,8 +391,17 @@ const HomeScreen = ({ navigation }: any) => {
   }, [dispatch, triggerHaptic]); // cartItems removed — read from cartItemsRef.current instead
 
   const handleAddToCartWithCheck = useCallback((item: any) => {
-    if (item.customization_groups?.length > 0) {
-      setActiveCustomizationItem(item);
+    let groups: any[] = [];
+    if (Array.isArray(item.customization_groups)) {
+      groups = item.customization_groups;
+    } else if (typeof item.customization_groups === 'string') {
+      try {
+        const parsed = JSON.parse(item.customization_groups);
+        if (Array.isArray(parsed)) groups = parsed;
+      } catch {}
+    }
+    if (groups.length > 0) {
+      setActiveCustomizationItem({ ...item, customization_groups: groups });
     } else {
       handleAddToCart(item, [], 0, '');
     }
@@ -716,6 +728,7 @@ const HomeScreen = ({ navigation }: any) => {
             onRefresh={onRefresh} 
             tintColor={tokens.colors.primary} 
             colors={[tokens.colors.primary]} 
+            progressViewOffset={Math.max(insets.top + 8, 12) + 128}
           />
         }
         ListHeaderComponent={

@@ -1,12 +1,17 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import { ArrowLeft, CreditCard, Plus, History } from 'lucide-react-native';
 import React from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
-import { View, Text, ActivityIndicator, StyleSheet, Modal, TextInput } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Modal, TextInput, RefreshControl } from 'react-native';
 import { SkeletonScreenList, SkeletonListItem } from '../components/ui';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import RazorpayCheckout from 'react-native-razorpay';
+let RazorpayCheckout: any = null;
+try {
+  const r = require('react-native-razorpay');
+  RazorpayCheckout = r.default || r;
+} catch (_) {}
 import { haptics } from '../utils/haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,19 +26,38 @@ const WalletScreen = ({ navigation }: any) => {
   const [rechargeAmount, setRechargeAmount] = React.useState('');
   const { showDialog } = useFeedback();
 
-  const { data: walletData, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ['wallet'],
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const { data: walletData, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery({
+    queryKey: ['wallet', 'history'],
     queryFn: ({ pageParam = 0 }) => api.get(`/customers/wallet?offset=${pageParam}&limit=50`),
     initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      const fetched = lastPage.transactions || [];
-      if (fetched.length < 50) return undefined;
-      return allPages.length * 50;
+    getNextPageParam: (lastPage: any, allPages: any) => {
+      if (!lastPage || !Array.isArray(lastPage?.transactions)) return undefined;
+      if ((lastPage.transactions?.length ?? 0) < 50) return undefined;
+      return (Array.isArray(allPages) ? allPages.length : 1) * 50;
     },
   });
 
-  const wallet = walletData?.pages[0];
-  const transactions = walletData ? walletData.pages.flatMap((p: any) => p.transactions || []) : [];
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  const wallet = walletData?.pages?.[0];
+  const transactions = Array.isArray(walletData?.pages)
+    ? walletData.pages.flatMap((p: any) => (Array.isArray(p?.transactions) ? p.transactions : []))
+    : [];
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const { user } = useSelector((state: RootState) => state.auth);
 
@@ -129,8 +153,14 @@ const WalletScreen = ({ navigation }: any) => {
           <ArrowLeft size={24} color={tokens.colors.textInverse} />
         </PressableScale>
         
-        <Text allowFontScaling={false} style={styles.headerLabel}>2QT Wallet</Text>
-        <Text allowFontScaling={false} style={styles.balanceValue}>₹{wallet ? (wallet.balancePaise / 100).toFixed(2) : '0.00'}</Text>
+        <Text allowFontScaling={false} style={styles.balanceValue}>
+          ₹{(() => {
+            const raw = wallet?.balancePaise ?? wallet?.balance_paise ?? 0;
+            const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+            const safePaise = isNaN(num) ? 0 : num;
+            return (safePaise / 100).toFixed(2);
+          })()}
+        </Text>
         
         <View style={styles.actionRow}>
           <PressableScale 
@@ -160,8 +190,9 @@ const WalletScreen = ({ navigation }: any) => {
         <Animated.FlatList
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.colors.primary} />}
           data={transactions}
-          keyExtractor={(tx: any) => tx.id}
+          keyExtractor={(tx: any, idx: number) => String(tx?.id || tx?.transaction_id || tx?.transactionId || idx)}
           initialNumToRender={8}
           windowSize={5}
           removeClippedSubviews={true}
@@ -183,23 +214,30 @@ const WalletScreen = ({ navigation }: any) => {
               <Text allowFontScaling={false} style={styles.emptyText}>No transactions yet.</Text>
             </View>
           }
-          renderItem={({ item: tx, index }: any) => (
-            <Animated.View
-              entering={FadeInDown.delay(Math.min(index * 50 + 200, 1000)).duration(400)}
-              style={styles.txRow}
-            >
-              <View style={styles.txInfo}>
-                <Text allowFontScaling={false} style={styles.txDesc}>{tx.description}</Text>
-                <Text allowFontScaling={false} style={styles.txDate}>{new Date(tx.created_at).toLocaleDateString()}</Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text allowFontScaling={false} style={[styles.txAmount, { color: tx.type === 'credit' ? tokens.colors.success : tokens.colors.danger }]}>
-                  {tx.type === 'credit' ? '+' : '−'}₹{(Math.abs(tx.amountPaise) / 100).toFixed(2)}
-                </Text>
-                <Text allowFontScaling={false} style={styles.txBalanceAfter}>Balance: ₹{(tx.balanceAfterPaise / 100).toFixed(2)}</Text>
-              </View>
-            </Animated.View>
-          )}
+          renderItem={({ item: tx, index }: any) => {
+            const dateStr = tx?.created_at || tx?.createdAt;
+            const dateVal = dateStr ? new Date(dateStr).toLocaleDateString() : '';
+            const amount = Math.abs(tx?.amountPaise ?? tx?.amount_paise ?? 0);
+            const balance = tx?.balanceAfterPaise ?? tx?.balance_after_paise ?? 0;
+
+            return (
+              <Animated.View
+                entering={FadeInDown.delay(Math.min(index * 50 + 200, 1000)).duration(400)}
+                style={styles.txRow}
+              >
+                <View style={styles.txInfo}>
+                  <Text allowFontScaling={false} style={styles.txDesc}>{tx?.description || 'Transaction'}</Text>
+                  <Text allowFontScaling={false} style={styles.txDate}>{dateVal}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text allowFontScaling={false} style={[styles.txAmount, { color: tx?.type === 'credit' ? tokens.colors.success : tokens.colors.danger }]}>
+                    {tx?.type === 'credit' ? '+' : '−'}₹{(amount / 100).toFixed(2)}
+                  </Text>
+                  <Text allowFontScaling={false} style={styles.txBalanceAfter}>Balance: ₹{(balance / 100).toFixed(2)}</Text>
+                </View>
+              </Animated.View>
+            );
+          }}
           ListFooterComponent={<View style={{ height: 40 }} />}
         />
       )}
