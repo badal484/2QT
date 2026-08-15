@@ -6,20 +6,21 @@ import { name as appName } from './app.json';
 
 enableScreens(false);
 
+// Pre-create notification channels at top-level native boot
+try {
+  const { createNotificationChannels } = require('./src/services/localNotif');
+  createNotificationChannels().catch(() => {});
+} catch (e) {}
+
 // Register top-level background message handler for when app is closed / killed / background
 try {
   const messaging = require('@react-native-firebase/messaging').default;
   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     console.log('[PUSH_BACKGROUND] Message received in background/killed state:', remoteMessage);
-    // If remoteMessage already contains native notification object, Android/iOS OS displays it natively.
-    // Do not show duplicate local notification.
-    if (remoteMessage?.notification) {
-      return;
-    }
 
     const data = remoteMessage?.data ?? {};
-    let title = data?.title ?? '';
-    let body  = data?.body  ?? '';
+    let title = remoteMessage?.notification?.title || data?.title || '';
+    let body  = remoteMessage?.notification?.body  || data?.body  || '';
 
     if (!title && !body && data.type) {
       const TYPE_LABELS = {
@@ -40,7 +41,7 @@ try {
     if (title || body) {
       try {
         const { displayLocalNotification } = require('./src/services/localNotif');
-        await displayLocalNotification(title, body, data);
+        await displayLocalNotification(title || '2QT', body || '', data);
       } catch (e) {
         console.warn('[PUSH_BACKGROUND] Failed to display local notif:', e);
       }
