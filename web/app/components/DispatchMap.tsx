@@ -137,9 +137,13 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
     let hasValidLocation = false;
 
     riders.forEach((rider) => {
-      if (rider.location && typeof rider.location.lat === "number" && typeof rider.location.lng === "number") {
-        bounds.extend({ lat: rider.location.lat, lng: rider.location.lng });
-        hasValidLocation = true;
+      if (rider.location) {
+        const lat = typeof rider.location.lat === "number" ? rider.location.lat : parseFloat(rider.location.lat as any);
+        const lng = typeof rider.location.lng === "number" ? rider.location.lng : parseFloat(rider.location.lng as any);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          bounds.extend({ lat, lng });
+          hasValidLocation = true;
+        }
       }
     });
 
@@ -148,7 +152,6 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
         map.fitBounds(bounds);
         isFirstRender.current = false;
       } else {
-        // smooth pan to center instead of hard fitting bounds constantly
         map.panTo(bounds.getCenter());
       }
     }
@@ -195,13 +198,16 @@ function DispatchMapInner({ riders, apiKey }: DispatchMapProps & { apiKey: strin
       >
         {riders.map((rider) => {
           if (!rider.location) return null;
-          
+          const lat = typeof rider.location.lat === "number" ? rider.location.lat : parseFloat(rider.location.lat as any);
+          const lng = typeof rider.location.lng === "number" ? rider.location.lng : parseFloat(rider.location.lng as any);
+          if (isNaN(lat) || isNaN(lng)) return null;
+
           const isBusy = rider.active_orders && rider.active_orders.length > 0;
           
           return (
             <MarkerF
               key={rider.id}
-              position={{ lat: rider.location.lat, lng: rider.location.lng }}
+              position={{ lat, lng }}
               icon={createPinIcon(isBusy ? "#f59e0b" : "#22c55e")}
               onClick={() => setSelectedRider(rider)}
             />
