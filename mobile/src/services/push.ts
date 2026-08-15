@@ -17,7 +17,7 @@ function getMessaging() {
     return messagingInstance;
 }
 
-export async function registerDeviceToken(retries = 3) {
+export async function registerDeviceToken(retries = 3, explicitPhone?: string) {
     const msg = getMessaging();
     if (!msg) {
         console.warn('[PUSH_LOGGER] ❌ Firebase messaging module not available on device');
@@ -46,12 +46,14 @@ export async function registerDeviceToken(retries = 3) {
             while (!saved && apiAttempt < retries) {
                 try {
                     apiAttempt++;
-                    let userPhone: string | undefined;
-                    try {
-                        const m = require('../store');
-                        const s = (m.store || m.default || m)?.getState?.();
-                        userPhone = s?.auth?.user?.phone || s?.user?.phone || undefined;
-                    } catch {}
+                    let userPhone = explicitPhone;
+                    if (!userPhone) {
+                        try {
+                            const m = require('../store');
+                            const s = (m.store || m.default || m)?.getState?.();
+                            userPhone = s?.auth?.user?.phone || s?.user?.phone || undefined;
+                        } catch {}
+                    }
                     await api.patch('/notifications/device-token', { token, phone: userPhone });
                     console.log('[PUSH_LOGGER] ✅ Device token registered with backend database successfully (phone:', userPhone || 'none', ')');
                     saved = true;
