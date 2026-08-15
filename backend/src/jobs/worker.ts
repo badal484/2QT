@@ -4,12 +4,12 @@ import IORedis from 'ioredis';
 import { NotificationService, NotifType, deliverNotification } from '../services/notification.service';
 import { generateInvoicePDF } from '../services/invoice.service';
 import { query } from '../db';
+import { getCleanRedisUrl, isRedisTls } from '../redis/parseRedisUrl';
 
-const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+const redisUrl = getCleanRedisUrl();
+const connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,
-    tls: process.env.REDIS_URL?.startsWith('rediss://')
-        ? { rejectUnauthorized: false }
-        : undefined,
+    tls: isRedisTls(redisUrl) ? { rejectUnauthorized: false } : undefined,
 });
 
 // ─── Notifications worker ─────────────────────────────────────────────────────
