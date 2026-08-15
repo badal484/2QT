@@ -73,8 +73,8 @@ export function subscribeToForegroundMessages(
     try {
         return msg.onMessage(async (remoteMessage: any) => {
             const data = remoteMessage.data ?? {};
-            let title = remoteMessage.notification?.title ?? '';
-            let body  = remoteMessage.notification?.body  ?? '';
+            let title = remoteMessage.notification?.title || data?.title || '';
+            let body  = remoteMessage.notification?.body  || data?.body  || data?.message || '';
 
             if (!title && !body) {
                 const TYPE_LABELS: Record<string, string> = {
@@ -85,11 +85,10 @@ export function subscribeToForegroundMessages(
                     order_delivered:        'Order Delivered! 🎉',
                     order_cancelled:        'Order Cancelled',
                     rider_payout:           'Payment Sent! 💰',
-                    broadcast_message:      data.title,
+                    broadcast_message:      '2QT Announcement',
                     new_kitchen_order:      '🍽️ New Order!',
                 };
-                title = TYPE_LABELS[data.type] ?? data.title ?? '';
-                body  = data.body ?? '';
+                title = TYPE_LABELS[data.type] || '2QT Notification';
             }
 
             if (!title && !body) return; // Prevent blank 2QT notifications
