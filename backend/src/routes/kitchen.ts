@@ -570,6 +570,15 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
         // Filter: ONLY return riders who have a real GPS location ping
         const trulyOnlineRiders = ridersWithLocation.filter(r => r.location !== null);
 
+        // Auto-cleanup stale DB flags: mark riders offline if they have no active GPS ping and no active orders
+        const staleRiderIds = ridersWithLocation
+            .filter(r => r.location === null && (!r.active_orders || r.active_orders.length === 0))
+            .map(r => r.id);
+            
+        if (staleRiderIds.length > 0) {
+            query('UPDATE users SET is_online = false WHERE id = ANY($1::uuid[])', [staleRiderIds]).catch(() => {});
+        }
+
         res.json({ riders: trulyOnlineRiders });
     } catch (err: any) {
         res.status(500).json({ error: 'FETCH_FAILED', message: err.message });
