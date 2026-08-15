@@ -335,34 +335,34 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
 
         if (audience === 'active_last_7' || audience === 'active') {
             queryStr = `SELECT u.id, u.phone FROM users u
-                        WHERE u.is_active = true AND u.role = 'customer'
+                        WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer')
                         AND EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id AND o.created_at > NOW() - INTERVAL '7 days')`;
         } else if (audience === 'riders') {
-            queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true AND u.role IN ('rider', 'rider_captain')`;
+            queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('rider', 'rider_captain')`;
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
         } else if (audience === 'kitchens' || audience === 'partners') {
-            queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true AND u.role IN ('chef', 'kitchen_manager', 'partner_kitchen')`;
+            queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('chef', 'kitchen_manager', 'partner_kitchen')`;
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
         } else if (audience === 'customers' || audience === 'all' || audience === 'all_customers') {
             if (zoneId) {
-                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role IN ('customer', 'admin', 'super_admin') AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer', 'admin', 'super_admin') AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true AND u.role IN ('customer', 'admin', 'super_admin')`;
+                queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer', 'admin', 'super_admin')`;
             }
         } else if (audience === 'everyone' || audience === 'all_users') {
             if (zoneId) {
-                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE (u.is_active = true OR u.is_active IS NULL) AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true`;
+                queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL)`;
             }
         } else {
             if (zoneId) {
-                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer') AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
+                queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer')`;
             }
         }
 
