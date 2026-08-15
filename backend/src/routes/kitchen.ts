@@ -554,13 +554,11 @@ router.get('/riders/live', authenticate, requireRole('chef', 'kitchen_manager', 
                    ), '[]'::json) as active_orders
             FROM users u
             LEFT JOIN kitchens k ON k.id = $1
-            WHERE (u.role IN ('rider','rider_captain','super_admin','admin')) AND (
-                u.is_online = true
-                OR u.id IN (
-                    SELECT DISTINCT o.rider_id FROM orders o 
-                    WHERE o.rider_id IS NOT NULL AND o.status NOT IN ('delivered', 'cancelled')
-                )
-            )
+            WHERE u.is_online = true
+               OR u.id IN (
+                   SELECT DISTINCT o.rider_id FROM orders o 
+                   WHERE o.rider_id IS NOT NULL AND o.status NOT IN ('delivered', 'cancelled')
+               )
             ORDER BY u.name
         `, [kitchenId]);
 
@@ -763,6 +761,7 @@ router.get('/orders/unassigned', authenticate, requireRole('chef', 'kitchen_mana
             LEFT JOIN kitchens k ON o.kitchen_id = k.id
             LEFT JOIN order_items oi ON oi.order_id = o.id
             WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
+              AND (o.rider_id IS NULL OR o.needs_reassign = true)
             GROUP BY o.id, u.id, r.id, a.id, k.id
             ORDER BY o.created_at ASC
         `);
