@@ -117,12 +117,13 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
         return;
     }
 
-    // Fallback: If target user row has no device token, check if any active user account with the same phone has one
+    // Fallback: If target user row has no device token, check if any active user account with the same phone and role has one
     if (!user.device_token && user.phone) {
         const cleanPhone = user.phone.replace(/\D/g, '').slice(-10);
+        const userRole = (user as any).role || 'customer';
         const { rows: siblingRows } = await query(
-            "SELECT COALESCE(device_token, fcm_token) AS device_token FROM users WHERE (phone = $1 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2) AND COALESCE(device_token, fcm_token) IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
-            [user.phone, cleanPhone]
+            "SELECT COALESCE(device_token, fcm_token) AS device_token FROM users WHERE (phone = $1 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2) AND LOWER(role::text) = LOWER($3) AND COALESCE(device_token, fcm_token) IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+            [user.phone, cleanPhone, userRole]
         );
         if (siblingRows[0]?.device_token) {
             user.device_token = siblingRows[0].device_token;
