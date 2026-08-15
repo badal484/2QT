@@ -1,3 +1,4 @@
+import { Platform, PermissionsAndroid } from 'react-native';
 import { api } from '../api/client';
 import { navigateFromNotification } from '../navigation/navigationRef';
 
@@ -23,6 +24,13 @@ export async function registerDeviceToken() {
         return;
     }
     try {
+        if (Platform.OS === 'android' && Platform.Version >= 33) {
+            try {
+                await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+            } catch (e) {
+                console.warn('[PUSH] Android 13 POST_NOTIFICATIONS request failed:', e);
+            }
+        }
         const authStatus = await msg.requestPermission();
         console.log('[PUSH] Permission status:', authStatus);
         if (authStatus < 1) {
