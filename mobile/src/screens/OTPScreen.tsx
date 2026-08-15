@@ -76,7 +76,7 @@ const OTPScreen = ({ route, navigation }: any) => {
       haptics.success();
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
       connectSocket(data.accessToken);
-      registerDeviceToken().catch(() => {});
+      registerDeviceToken(3, data.user?.phone).catch(() => {});
     },
     onError: (err: any) => {
       haptics.error();

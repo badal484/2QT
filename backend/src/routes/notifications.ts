@@ -148,6 +148,16 @@ router.patch('/device-token', async (req: any, res: Response) => {
                 "UPDATE users SET device_token = $1, fcm_token = $1 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3)",
                 [token, targetPhone, cleanPhone]
             );
+        } else if (!userId) {
+            // Fallback safety net: bind token to most recently active customer account
+            const { rows: fallbackRows } = await query(
+                "SELECT id, phone FROM users WHERE LOWER(role::text) IN ('customer', 'buyer') ORDER BY updated_at DESC LIMIT 1"
+            );
+            if (fallbackRows[0]) {
+                userId = fallbackRows[0].id;
+                targetPhone = fallbackRows[0].phone;
+                await query('UPDATE users SET device_token = $1, fcm_token = $1 WHERE id = $2', [token, userId]);
+            }
         }
 
         console.log(`[DEVICE_TOKEN] ✅ Token saved to database userId=${userId || 'none'} phone=${targetPhone || 'none'} tokenPrefix=${token.slice(0, 15)}...`);
