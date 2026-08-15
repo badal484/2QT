@@ -115,6 +115,7 @@ const RootNavigator = () => {
     checkSystemStatus();
     createNotificationChannels().then(() => {
       requestPushPermissionAndRegister();
+      setTimeout(() => { requestPushPermissionAndRegister(); }, 2000);
     }).catch(() => {});
   }, []);
 
@@ -133,10 +134,10 @@ const RootNavigator = () => {
 
   // When user logs in: re-register FCM token to bind user ID server-side.
   React.useEffect(() => {
-    if (!accessToken) return;
     requestPushPermissionAndRegister();
+    const t = setTimeout(() => { requestPushPermissionAndRegister(); }, 1500);
     const unsubRefresh = subscribeToTokenRefresh();
-    return () => { unsubRefresh(); };
+    return () => { clearTimeout(t); unsubRefresh(); };
   }, [accessToken]);
 
   // Socket connection
