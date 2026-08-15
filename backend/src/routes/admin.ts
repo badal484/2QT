@@ -7,7 +7,7 @@ import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToAdmin, emitToKitchen, emitToAll, emitToRiders } from '../socket';
 import { createPendingRefund } from '../services/refund.service';
-import { NotificationService } from '../services/notification.service';
+import { NotificationService, deliverNotification } from '../services/notification.service';
 import { logSystemEvent } from '../utils/logger';
 import ImageKit from '@imagekit/nodejs';
 import multer from 'multer';
@@ -376,9 +376,9 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
             [title, message, imageUrl || null, audience, zoneId || null, segment || null, scheduledFor || null, rows.length, status]
         );
 
-        // Fire notifications (fire-and-forget per target user)
+        // Fire notifications directly (bypasses BullMQ queue worker latency for live broadcasts)
         for (const user of rows) {
-            NotificationService.send('broadcast_message', {
+            deliverNotification('broadcast_message', {
                 userId: user.id,
                 phone: user.phone,
                 title,
