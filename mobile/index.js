@@ -6,9 +6,10 @@ import { name as appName } from './app.json';
 
 enableScreens(false);
 
-// Pre-create notification channels at top-level native boot
+// Pre-create notification channels & Notifee background event handlers at top-level native boot
 try {
-  const { createNotificationChannels } = require('./src/services/localNotif');
+  const { createNotificationChannels, setupNotifeeHandlers } = require('./src/services/localNotif');
+  setupNotifeeHandlers();
   createNotificationChannels().catch(() => {});
 } catch (e) {}
 

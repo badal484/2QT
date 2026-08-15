@@ -90,6 +90,7 @@ export interface SendOptions {
     dedupeKey?: string;
     overrideChannels?: ('push' | 'whatsapp' | 'sms')[];
     imageUrl?: string;
+    overrideQuietHours?: boolean;
 }
 
 export async function sendNotification(type: NotifType, options: SendOptions): Promise<void> {

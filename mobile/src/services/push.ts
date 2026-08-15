@@ -134,34 +134,7 @@ export async function handleInitialNotification() {
 }
 
 export function setupBackgroundHandler() {
-    const msg = getMessaging();
-    if (!msg) return;
-    try {
-        msg.setBackgroundMessageHandler(async (remoteMessage: any) => {
-            // Notification messages are shown automatically by the OS — nothing to do
-            if (remoteMessage.notification) return;
-
-            // Data-only messages: build a meaningful title from the type field
-            const data = remoteMessage.data ?? {};
-            const TYPE_LABELS: Record<string, string> = {
-                order_confirmed:        'Order Confirmed! 🎉',
-                order_preparing:        'Your food is being prepared 👨‍🍳',
-                order_ready:            'Order Ready! 🛵',
-                order_out_for_delivery: 'Rider on the way! 🛵',
-                order_delivered:        'Order Delivered! 🎉',
-                order_cancelled:        'Order Cancelled',
-                rider_payout:           'Payment Sent! 💰',
-                broadcast_message:      data.title ?? '2QT',
-                new_kitchen_order:      '🍽️ New Order!',
-            };
-            const title = TYPE_LABELS[data.type] ?? data.title ?? '';
-            const body  = data.body ?? '';
-            if (!title && !body) return; // nothing to show
-
-            const { displayLocalNotification } = require('./localNotif');
-            await displayLocalNotification(title, body, data);
-        });
-    } catch (e) { console.warn('[FCM] onMessage handler setup failed:', e); }
+    // Background message handler is registered at top-level in index.js to prevent duplicate registration race conditions.
 }
 
 export async function getInitialNotification() {
