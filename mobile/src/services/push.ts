@@ -48,7 +48,7 @@ export async function registerDeviceToken(retries = 3, explicitPhone?: string) {
             } catch {}
         }
 
-        console.error('[PUSH_LOGGER] 🔑 FCM TOKEN RESULT:', token ? `${token.slice(0, 30)}...` : 'NULL');
+        console.log('[PUSH_LOGGER] 🔑 FCM TOKEN RESULT:', token ? `${token.slice(0, 30)}...` : 'NULL');
         if (token) {
             let apiAttempt = 0;
             let saved = false;
@@ -63,13 +63,13 @@ export async function registerDeviceToken(retries = 3, explicitPhone?: string) {
                             userPhone = s?.auth?.user?.phone || s?.user?.phone || undefined;
                         } catch {}
                     }
-                    console.error('[PUSH_LOGGER] 🚀 Sending token to backend for phone:', userPhone || 'none');
+                    console.log('[PUSH_LOGGER] 🚀 Sending token to backend for phone:', userPhone || 'none');
                     try {
                         await api.patch('/notifications/device-token', { token, phone: userPhone });
                     } catch {
                         await api.post('/notifications/device-token', { token, phone: userPhone });
                     }
-                    console.error('[PUSH_LOGGER] ✅ Device token registered with backend database successfully (phone:', userPhone || 'none', ')');
+                    console.log('[PUSH_LOGGER] ✅ Device token registered with backend database successfully (phone:', userPhone || 'none', ')');
                     saved = true;
                 } catch (apiErr: any) {
                     const status = apiErr?.response?.status;
