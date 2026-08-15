@@ -1,8 +1,9 @@
 const getApiUrl = () => {
-  // In the browser, call through the Next.js proxy (same-origin — no CORS, no Pinggy timeouts)
-  if (typeof window !== 'undefined') return '/api/proxy';
-  // Server-side (SSR) calls go directly to the backend
-  const rawBackend = (process.env.BACKEND_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
+  const rawBackend = (
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.BACKEND_URL ||
+    'https://twoqt-3kjw.onrender.com/api/v1'
+  ).replace(/\/$/, '');
   return rawBackend.endsWith('/api/v1') ? rawBackend : `${rawBackend}/api/v1`;
 };
 
