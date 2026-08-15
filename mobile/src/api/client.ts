@@ -29,13 +29,7 @@ interface RequestOptions {
 
 const request = async (path: string, options: RequestOptions = {}): Promise<any> => {
   const store = getStore();
-
-  if (!store || typeof store.getState !== 'function') {
-    console.error('--- CLIENT: STORE NOT FOUND OR INVALID', store);
-    throw new Error('INTERNAL_ERROR: Store not initialized');
-  }
-
-  const state = store.getState();
+  const state = store && typeof store.getState === 'function' ? store.getState() : null;
   const token = state?.auth?.accessToken;
 
   const isFormData = options.body instanceof FormData;
