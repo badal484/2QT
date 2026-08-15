@@ -64,15 +64,23 @@ export async function sendFCM(
 
     try {
         const skipNotif = dataOnly;
-        const channelId = data.android_channel_id || 'order_updates';
+        const channelId = data.android_channel_id || 
+            (data.type === 'broadcast_message' || data.type === 'promo' || data.type === 'offer' ? 'promotions_v3' : 'order_updates_v3');
         const tokenPrefix = token ? `${token.slice(0, 15)}...` : 'NULL';
+        const img = imageUrl || data.imageUrl || data.image || data.bannerUrl || undefined;
 
-        console.log(`[FCM_SEND] 🚀 Sending push to token=${tokenPrefix} title="${title}" channelId=${channelId}`);
+        console.log(`[FCM_SEND] 🚀 Sending push to token=${tokenPrefix} title="${title}" channelId=${channelId} img=${img || 'none'}`);
 
         await getMessaging(a).send({
             token,
-            ...(!skipNotif ? { notification: { title, body, imageUrl: imageUrl || undefined } } : {}),
-            data,
+            ...(!skipNotif ? { notification: { title, body, imageUrl: img } } : {}),
+            data: {
+                ...data,
+                title,
+                body,
+                ...(img ? { imageUrl: img, image: img } : {}),
+                android_channel_id: channelId,
+            },
             android: {
                 priority: 'high',
                 ...(!skipNotif ? { 
@@ -82,7 +90,7 @@ export async function sendFCM(
                         sound: data.sound || 'default', 
                         channelId: channelId, 
                         icon: 'ic_notification',
-                        imageUrl: imageUrl || undefined,
+                        imageUrl: img,
                         priority: 'high',
                         visibility: 'public',
                         defaultSound: true,
@@ -96,7 +104,7 @@ export async function sendFCM(
                     'apns-push-type': 'alert',
                 },
                 payload: { aps: { alert: { title, body }, sound: 'default', badge: 1, 'content-available': 1 } },
-                fcmOptions: { imageUrl: imageUrl || undefined },
+                fcmOptions: { imageUrl: img },
             },
         });
         console.log(`[FCM_SEND] ✅ FCM push delivered successfully to token=${tokenPrefix}`);

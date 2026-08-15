@@ -25,20 +25,13 @@ function loadNotifee() {
 
 function channelForType(type: string): string {
   if (type === 'order_update' || type === 'new_kitchen_order') return 'order_dispatch_v2';
-  if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates';
-  if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account';
-  return 'promotions';
+  if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates_v3';
+  if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account_v3';
+  return 'promotions_v3';
 }
 
 export async function createNotificationChannels() {
   if (!loadNotifee()) return;
-  // Each channel created independently — a single shared try/catch around all four
-  // meant one failure (e.g. a transient native-bridge hiccup) silently aborted every
-  // channel after it too, since await stops at the first rejection. A push whose
-  // channelId was never created is silently dropped by Android with no error visible
-  // anywhere, which is exactly the kind of failure that's invisible until someone
-  // notices notifications aren't arriving. Promise.allSettled means one bad channel
-  // can't take the others down with it.
   const results = await Promise.allSettled([
     // MAX-importance channel for direct rider dispatch & kitchen orders — custom sound + heads-up on lock screen
     _notifee.createChannel({
@@ -48,10 +41,36 @@ export async function createNotificationChannels() {
       sound: 'alert', // Plays alert.mp3 from res/raw
       vibration: true,
       vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800, 400, 800],
+      lights: [0xFFFC4603, 500, 500],
     }),
-    _notifee.createChannel({ id: 'order_updates', name: 'Order Updates', importance: _AndroidImportance.HIGH }),
-    _notifee.createChannel({ id: 'promotions',    name: 'Promotions',    importance: _AndroidImportance.HIGH }),
-    _notifee.createChannel({ id: 'account',       name: 'Account',       importance: _AndroidImportance.HIGH }),
+    // HIGH-importance heads-up banner channels for order updates, promotions, and account alerts
+    _notifee.createChannel({
+      id: 'order_updates_v3',
+      name: 'Order Updates',
+      importance: _AndroidImportance.HIGH,
+      sound: 'default',
+      vibration: true,
+      badge: true,
+      lights: [0xFFFC4603, 500, 500],
+    }),
+    _notifee.createChannel({
+      id: 'promotions_v3',
+      name: 'Promotions & Offers',
+      importance: _AndroidImportance.HIGH,
+      sound: 'default',
+      vibration: true,
+      badge: true,
+      lights: [0xFFFC4603, 500, 500],
+    }),
+    _notifee.createChannel({
+      id: 'account_v3',
+      name: 'Account & Wallet Alerts',
+      importance: _AndroidImportance.HIGH,
+      sound: 'default',
+      vibration: true,
+      badge: true,
+      lights: [0xFFFC4603, 500, 500],
+    }),
   ]);
   results.forEach((r, i) => {
     if (r.status === 'rejected') {
@@ -70,6 +89,7 @@ export async function displayLocalNotification(
   const channelId = channelForType(data.type ?? '');
   const isDispatch = channelId === 'order_dispatch_v2';
   const isChat = data.type === 'chat_message';
+  const bannerUrl = data.imageUrl || data.image || data.bannerUrl || data.picture;
   
   let chatMessages: any[] = [];
   if (isChat && data.ticketId) {
@@ -100,10 +120,17 @@ export async function displayLocalNotification(
         pressAction: { id: 'default' },
         importance: _AndroidImportance.HIGH,
         sound: isDispatch ? 'alert' : 'default',
+        vibrationPattern: [0, 400, 200, 400],
+        lights: [0xFFFC4603, 500, 500],
         ...(isDispatch && {
           fullScreenAction: { id: 'default', launchActivity: 'default' },
           vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800, 400, 800],
-          lights: [0xFFFC4603, 500, 500],
+        }),
+        ...(bannerUrl && !isChat && {
+          style: {
+            type: _AndroidStyle.BIGPICTURE,
+            picture: bannerUrl,
+          },
         }),
         ...(isChat && {
           style: {
@@ -122,8 +149,6 @@ export async function displayLocalNotification(
       },
       ios: {
         sound: 'default',
-        // timeSensitive breaks through Focus mode (does not require Apple entitlement)
-        // critical bypasses silent mode but requires explicit Apple approval — skip
         interruptionLevel: isDispatch ? 'timeSensitive' : 'active',
         foregroundPresentationOptions: { alert: true, badge: true, sound: true, banner: true, list: true },
       },
