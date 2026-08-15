@@ -644,6 +644,7 @@ function ScheduledTab() {
 function CustomersTab() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [creditPhone, setCreditPhone] = useState('');
   const [creditAmount, setCreditAmount] = useState('');
   const [creditNote, setCreditNote] = useState('');
@@ -651,7 +652,8 @@ function CustomersTab() {
 
   const load = async () => {
     try {
-      const d = await api.get("/admin/users");
+      const queryParam = searchQuery.trim() ? `?search=${encodeURIComponent(searchQuery.trim())}` : '';
+      const d = await api.get(`/admin/users${queryParam}`);
       setUsers(d.users ?? []);
     } catch (e: any) {
       toast.error(e.message || "Failed to load users");
@@ -660,7 +662,7 @@ function CustomersTab() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [searchQuery]);
   useSocketRefresh(['user_updated'], load);
 
   const toggleStatus = async (id: string, current: boolean) => {
@@ -689,9 +691,22 @@ function CustomersTab() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h2 className="text-4xl font-black tracking-tighter text-white text-white mb-2">Customers</h2>
-        <p className="text-zinc-400 text-sm font-medium">Platform user database.</p>
+      <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h2 className="text-4xl font-black tracking-tighter text-white mb-2">Customers</h2>
+          <p className="text-zinc-400 text-sm font-medium">Platform user database.</p>
+        </div>
+
+        {/* Customer Search Bar */}
+        <div className="relative min-w-[280px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <input
+            className="w-full pl-10 pr-4 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 transition-colors"
+            placeholder="Search phone number (+91...) or name…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Wallet Credit Panel */}
