@@ -491,6 +491,17 @@ export default function KitchenPage() {
     }
   }, []);
 
+  const handleTransferOrder = async (orderId: string, newRiderId: string) => {
+    if (!newRiderId) return;
+    try {
+      await api.post(`/kitchen/orders/${orderId}/assign-rider`, { riderId: newRiderId });
+      toast.success("Order transferred successfully!");
+      fetchDispatch();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to transfer order");
+    }
+  };
+
   useEffect(() => {
     if (view === "dispatch") {
       fetchDispatch();
@@ -866,15 +877,49 @@ export default function KitchenPage() {
                   </div>
                 ))}
                 {busyRiders.map(rider => (
-                  <div key={rider.id} className="bg-[#1a1200] border border-amber-500/20 rounded-2xl p-3 sm:p-4 shrink-0 w-52 lg:w-auto">
+                  <div key={rider.id} className="bg-[#1a1200] border border-amber-500/20 rounded-2xl p-3 sm:p-4 shrink-0 w-64 lg:w-auto space-y-2">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
                       <span className="font-black text-white text-sm truncate">{rider.name}</span>
                       <span className="ml-auto text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded-full shrink-0">
-                        {rider.active_orders?.length}×
+                        {rider.active_orders?.length ?? 0}×
                       </span>
                     </div>
                     <p className="text-zinc-500 text-xs">{rider.phone}</p>
+
+                    {/* Active Order Numbers & Transfer Option */}
+                    {rider.active_orders && rider.active_orders.length > 0 && (
+                      <div className="pt-2 border-t border-amber-500/20 space-y-2">
+                        <p className="text-[9px] font-black text-amber-400/80 uppercase tracking-wider">Holding Orders</p>
+                        {rider.active_orders.map((ord: any) => (
+                          <div key={ord.id} className="bg-white/[0.04] border border-white/10 rounded-xl p-2 flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-xs font-black text-amber-300">
+                                {ord.display_id || ord.id?.slice(-6)?.toUpperCase()}
+                              </span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 uppercase">
+                                {ord.status?.replace(/_/g, " ")}
+                              </span>
+                            </div>
+
+                            {/* Transfer Dropdown */}
+                            <select
+                              defaultValue=""
+                              onChange={(e) => {
+                                const targetId = e.target.value;
+                                if (targetId) handleTransferOrder(ord.id, targetId);
+                              }}
+                              className="bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-300 rounded-lg px-2 py-1 focus:outline-none focus:border-amber-400 w-full cursor-pointer"
+                            >
+                              <option value="" disabled>Transfer order to…</option>
+                              {riders.filter(r => r.id !== rider.id).map(r => (
+                                <option key={r.id} value={r.id}>{r.name} ({r.phone})</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
