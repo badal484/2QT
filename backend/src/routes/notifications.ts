@@ -118,7 +118,7 @@ router.patch('/device-token', authenticate, async (req: AuthRequest, res: Respon
     if (!token) return res.status(400).json({ error: 'token required' });
 
     // Bind FCM device token strictly to this user account
-    await query('UPDATE users SET device_token = $1 WHERE id = $2', [token, req.user!.userId]);
+    await query('UPDATE users SET device_token = $1, fcm_token = $1 WHERE id = $2', [token, req.user!.userId]);
 
     // Sync token to any sibling user rows sharing the same phone number
     try {
@@ -126,7 +126,7 @@ router.patch('/device-token', authenticate, async (req: AuthRequest, res: Respon
         if (uRows[0]?.phone) {
             const cleanPhone = uRows[0].phone.replace(/\D/g, '').slice(-10);
             await query(
-                "UPDATE users SET device_token = $1 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3) AND (device_token IS NULL OR device_token != $1)",
+                "UPDATE users SET device_token = $1, fcm_token = $1 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3) AND (COALESCE(device_token, '') != $1 OR COALESCE(fcm_token, '') != $1)",
                 [token, uRows[0].phone, cleanPhone]
             );
         }
