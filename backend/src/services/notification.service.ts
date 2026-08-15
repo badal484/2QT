@@ -113,7 +113,7 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
         const { rows } = await query('SELECT id, phone, device_token, name FROM users WHERE id = $1', [userId]);
         user = rows[0] ?? null;
     } else if (phone) {
-        const { rows } = await query('SELECT id, phone, device_token, name FROM users WHERE phone = $1', [phone]);
+        const { rows } = await query("SELECT id, phone, device_token, name FROM users WHERE phone = $1 AND device_token IS NOT NULL ORDER BY (role = 'customer') DESC, updated_at DESC", [phone]);
         user = rows[0] ?? null;
     }
     if (!user) {

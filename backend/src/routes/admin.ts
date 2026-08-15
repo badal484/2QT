@@ -334,35 +334,35 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
         let queryStr = '';
 
         if (audience === 'active_last_7' || audience === 'active') {
-            queryStr = `SELECT DISTINCT u.phone FROM users u
+            queryStr = `SELECT u.id, u.phone FROM users u
                         WHERE u.is_active = true AND u.role = 'customer'
                         AND EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id AND o.created_at > NOW() - INTERVAL '7 days')`;
         } else if (audience === 'riders') {
-            queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role IN ('rider', 'rider_captain')`;
+            queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true AND u.role IN ('rider', 'rider_captain')`;
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
         } else if (audience === 'kitchens' || audience === 'partners') {
-            queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role IN ('chef', 'kitchen_manager', 'partner_kitchen')`;
+            queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true AND u.role IN ('chef', 'kitchen_manager', 'partner_kitchen')`;
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
         } else if (audience === 'customers' || audience === 'all' || audience === 'all_customers') {
             if (zoneId) {
-                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role IN ('customer', 'admin', 'super_admin') AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role IN ('customer', 'admin', 'super_admin') AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role IN ('customer', 'admin', 'super_admin')`;
+                queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true AND u.role IN ('customer', 'admin', 'super_admin')`;
             }
         } else if (audience === 'everyone' || audience === 'all_users') {
             if (zoneId) {
-                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true`;
+                queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true`;
             }
         } else {
             if (zoneId) {
-                queryStr = `SELECT DISTINCT u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
+                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE u.is_active = true AND u.role = 'customer' AND (u.zone_id = $1 OR a.zone_id = $1)`;
                 params.push(zoneId);
             } else {
-                queryStr = `SELECT DISTINCT u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
+                queryStr = `SELECT u.id, u.phone FROM users u WHERE u.is_active = true AND u.role = 'customer'`;
             }
         }
 
@@ -376,9 +376,10 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
             [title, message, imageUrl || null, audience, zoneId || null, segment || null, scheduledFor || null, rows.length, status]
         );
 
-        // Fire notifications (fire-and-forget per user)
+        // Fire notifications (fire-and-forget per target user)
         for (const user of rows) {
             NotificationService.send('broadcast_message', {
+                userId: user.id,
                 phone: user.phone,
                 title,
                 body: message,
