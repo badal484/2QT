@@ -35,12 +35,22 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     }
 });
 
-router.get('/fcm-status', async (_req, res: Response) => {
-    res.json({
-        configured: isFCMConfigured(),
-        hasB64: !!process.env.FIREBASE_SERVICE_ACCOUNT_B64,
-        hasJson: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
-    });
+router.get('/debug-broadcast', async (_req, res: Response) => {
+    try {
+        const { rows: tmplRows } = await db.query(
+            "SELECT * FROM notification_templates WHERE type = 'broadcast_message'"
+        );
+        const { rows: userRows } = await db.query(
+            "SELECT id, name, phone, device_token FROM users WHERE device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 5"
+        );
+        res.json({
+            template: tmplRows[0] || 'NOT_FOUND',
+            activeUsersWithToken: userRows.length,
+            users: userRows.map(u => ({ id: u.id, name: u.name, phone: u.phone, tokenPrefix: u.device_token ? u.device_token.slice(0, 15) : null }))
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 router.get('/debug-tokens', async (_req, res: Response) => {
