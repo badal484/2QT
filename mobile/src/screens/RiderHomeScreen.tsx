@@ -485,7 +485,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       {/* ── Cash-in-hand badge ───────────────────────────────────────────── */}
       {cashInHandPaise > 0 && (
         <TouchableOpacity
-          style={[styles.cashBadge, cashOverLimit && styles.cashBadgeUrgent]}
+          style={[styles.cashBadge, { top: insets.top + 78 }, cashOverLimit && styles.cashBadgeUrgent]}
           onPress={() => navigation.navigate('CashSubmit')}
           activeOpacity={0.85}
         >
@@ -594,40 +594,46 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
       {/* ── Active orders list ────────────────────────────────────────────── */}
       {activeOrders.length > 0 && (
-        <View style={[styles.ordersSheet, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={[styles.ordersSheet, { paddingBottom: insets.bottom + 12, maxHeight: '55%' }]}>
           {activeOrders.length > 1 && (
             <View style={styles.batchBanner}>
               <Text style={styles.batchBannerText}>📦 BATCH · {activeOrders.length} orders · pick up all from kitchen</Text>
             </View>
           )}
-          {activeOrders.map((order: any, idx: number) => {
-            const goingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(order.status);
-            const dest = goingToKitchen ? (order.kitchen_name || 'Kitchen') : (order.customer_name || 'Customer');
-            const label = goingToKitchen ? 'PICK UP FROM' : 'DELIVER TO';
-            return (
-              <TouchableOpacity
-                key={order.id}
-                style={styles.orderCard}
-                onPress={() => navigation.navigate('AssignedOrder', { order })}
-                activeOpacity={0.85}
-              >
-                <View style={[styles.orderCardStripe, { backgroundColor: goingToKitchen ? S.orange : S.green }]} />
-                <View style={styles.orderCardBody}>
-                  <View style={styles.orderCardTop}>
-                    <Text style={styles.orderIdText}>{order.display_id}</Text>
-                    {activeOrders.length > 1 && (
-                      <View style={styles.orderIndexBadge}>
-                        <Text style={styles.orderIndexText}>{idx + 1}/{activeOrders.length}</Text>
-                      </View>
-                    )}
+          <ScrollView
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={{ gap: 10, paddingBottom: 8 }}
+            nestedScrollEnabled={true}
+          >
+            {activeOrders.map((order: any, idx: number) => {
+              const goingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(order.status);
+              const dest = goingToKitchen ? (order.kitchen_name || 'Kitchen') : (order.customer_name || 'Customer');
+              const label = goingToKitchen ? 'PICK UP FROM' : 'DELIVER TO';
+              return (
+                <TouchableOpacity
+                  key={order.id}
+                  style={styles.orderCard}
+                  onPress={() => navigation.navigate('AssignedOrder', { order })}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.orderCardStripe, { backgroundColor: goingToKitchen ? S.orange : S.green }]} />
+                  <View style={styles.orderCardBody}>
+                    <View style={styles.orderCardTop}>
+                      <Text style={styles.orderIdText}>{order.display_id}</Text>
+                      {activeOrders.length > 1 && (
+                        <View style={styles.orderIndexBadge}>
+                          <Text style={styles.orderIndexText}>{idx + 1}/{activeOrders.length}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.orderDestLabel}>{label}</Text>
+                    <Text style={styles.orderDestText} numberOfLines={1}>{dest}</Text>
                   </View>
-                  <Text style={styles.orderDestLabel}>{label}</Text>
-                  <Text style={styles.orderDestText} numberOfLines={1}>{dest}</Text>
-                </View>
-                <ChevronRight size={20} color={S.muted} />
-              </TouchableOpacity>
-            );
-          })}
+                  <ChevronRight size={20} color={S.muted} />
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
       )}
 

@@ -517,9 +517,10 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
     if (!kitchenId) return;
 
     try {
-        // Show idle riders + riders delivering THIS kitchen's orders
+        // Show all online riders + riders currently assigned active orders
         const { rows: riders } = await query(`
             SELECT u.id, u.name, u.phone, u.is_online, u.current_lat, u.current_lng,
+                   k.lat AS kitchen_lat, k.lng AS kitchen_lng,
                    (
                        SELECT json_agg(json_build_object(
                            'id', o.id,
@@ -532,29 +533,32 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
                        WHERE o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
                    ) as active_orders
             FROM users u
+            LEFT JOIN kitchens k ON k.id = $1
             WHERE u.role IN ('rider','rider_captain') AND u.is_online = true
             ORDER BY u.name
-        `);
+        `, [kitchenId]);
 
-        // Attach real live GPS from Redis, fallback to real DB current_lat/current_lng
+        // Attach location: Redis -> DB current_lat/lng -> Kitchen location fallback -> Default Ranchi location
         const ridersWithLocation = await Promise.all(
-            riders.map(async (r: any) => {
+            riders.map(async (r: any, idx: number) => {
                 let loc: any = null;
+
+                // 1. Try Redis live GPS
                 try {
                     const raw = await redis.get(keys.riderLocation(r.id));
                     if (raw) {
                         const parsed = JSON.parse(raw);
                         if (parsed && parsed.lat !== undefined && parsed.lng !== undefined) {
-                            loc = {
-                                lat: parseFloat(parsed.lat),
-                                lng: parseFloat(parsed.lng),
-                                updatedAt: parsed.updatedAt
-                            };
+                            const lat = parseFloat(parsed.lat);
+                            const lng = parseFloat(parsed.lng);
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                                loc = { lat, lng, updatedAt: parsed.updatedAt };
+                            }
                         }
                     }
                 } catch {}
 
-                // Fallback to real DB current_lat/current_lng if available
+                // 2. Try DB last known current_lat/lng
                 if (!loc && r.current_lat !== null && r.current_lng !== null) {
                     const lat = parseFloat(r.current_lat);
                     const lng = parseFloat(r.current_lng);
@@ -563,23 +567,23 @@ router.get('/riders/live', authenticate, requireRole('kitchen_manager', 'super_a
                     }
                 }
 
+                // 3. Fallback to kitchen location offset or default city (Ranchi)
+                if (!loc) {
+                    const baseLat = parseFloat(r.kitchen_lat || '23.3441');
+                    const baseLng = parseFloat(r.kitchen_lng || '85.3096');
+                    const angle = (idx * (2 * Math.PI / Math.max(1, riders.length)));
+                    loc = {
+                        lat: baseLat + 0.003 * Math.cos(angle),
+                        lng: baseLng + 0.003 * Math.sin(angle),
+                        isFallback: true
+                    };
+                }
+
                 return { ...r, location: loc };
             })
         );
 
-        // Filter: ONLY return riders who have a real GPS location ping
-        const trulyOnlineRiders = ridersWithLocation.filter(r => r.location !== null);
-
-        // Auto-cleanup stale DB flags: mark riders offline if they have no active GPS ping and no active orders
-        const staleRiderIds = ridersWithLocation
-            .filter(r => r.location === null && (!r.active_orders || r.active_orders.length === 0))
-            .map(r => r.id);
-            
-        if (staleRiderIds.length > 0) {
-            query('UPDATE users SET is_online = false WHERE id = ANY($1::uuid[])', [staleRiderIds]).catch(() => {});
-        }
-
-        res.json({ riders: trulyOnlineRiders });
+        res.json({ riders: ridersWithLocation });
     } catch (err: any) {
         res.status(500).json({ error: 'FETCH_FAILED', message: err.message });
     }
@@ -743,10 +747,13 @@ router.get('/orders/unassigned', authenticate, requireRole('kitchen_manager', 's
                 for (const batch of batches) {
                     if (batch.orders.length < maxBatchSize) {
                         const firstOrder = batch.orders[0];
-                        const dist = haversineMetres(
-                            parseFloat(order.customer_lat), parseFloat(order.customer_lng),
-                            parseFloat(firstOrder.customer_lat), parseFloat(firstOrder.customer_lng)
-                        );
+                        const cLat1 = parseFloat(order.customer_lat || '0');
+                        const cLng1 = parseFloat(order.customer_lng || '0');
+                        const cLat2 = parseFloat(firstOrder.customer_lat || '0');
+                        const cLng2 = parseFloat(firstOrder.customer_lng || '0');
+                        const dist = (!isNaN(cLat1) && !isNaN(cLat2) && cLat1 !== 0 && cLat2 !== 0)
+                            ? haversineMetres(cLat1, cLng1, cLat2, cLng2)
+                            : 99999;
                         // Group if within 1.5km
                         if (dist <= 1500) {
                             batch.orders.push(order);
