@@ -294,6 +294,7 @@ function LogPanel() {
       const params = new URLSearchParams();
       if (typeFilter) params.set("type", typeFilter);
       if (statusFilter) params.set("status", statusFilter);
+      if (search) params.set("search", search);
       const d: any = await api.get(`/notifications/admin/log?${params.toString()}`);
       setLogs(d.notifications ?? []);
     } catch {
@@ -301,7 +302,7 @@ function LogPanel() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, statusFilter]);
+  }, [typeFilter, statusFilter, search]);
 
   useEffect(() => { load(); }, [load]);
 
