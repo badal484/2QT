@@ -93,7 +93,7 @@ const ProfileScreen = ({ navigation }: any) => {
 
   useFocusEffect(
     useCallback(() => {
-      registerDeviceToken().catch(() => {});
+      registerDeviceToken(3, user?.phone).catch(() => {});
       if (isRider) {
         refetchRiderStats();
       } else {
