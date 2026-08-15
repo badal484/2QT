@@ -117,7 +117,7 @@ export async function displayLocalNotification(
       android: {
         channelId,
         groupId,
-        smallIcon: 'ic_launcher',
+        smallIcon: 'ic_notification',
         largeIcon: 'ic_launcher',
         pressAction: { id: 'default' },
         importance: _AndroidImportance.HIGH,
