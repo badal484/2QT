@@ -90,7 +90,7 @@ export async function displayLocalNotification(
 
   try {
     await _notifee.displayNotification({
-      id: isChat && data.ticketId ? data.ticketId : undefined,
+      ...(isChat && data.ticketId ? { id: data.ticketId } : {}),
       title,
       body,
       data,
