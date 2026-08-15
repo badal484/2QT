@@ -42,6 +42,7 @@ export function DispatchTab() {
   const [date, setDate] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [alerting, setAlerting] = useState<string | null>(null);
+  const [activeRiders, setActiveRiders] = useState<any[]>([]);
 
   const load = useCallback(async (p = page) => {
     setLoading(true);
@@ -60,12 +61,26 @@ export function DispatchTab() {
   }, [search, status, date, page]);
 
   useEffect(() => { load(1); }, []);
+  useEffect(() => {
+    api.get("/admin/users?role=rider").then((d: any) => setActiveRiders(d.users ?? [])).catch(() => {});
+  }, []);
 
   useSocketRefresh(["new_order", "order_status_update"], () => load(page));
 
   const handleSearch = (e: { preventDefault: () => void }) => {
     e.preventDefault();
     load(1);
+  };
+
+  const handleAssignRider = async (orderId: string, riderId: string) => {
+    if (!riderId) return;
+    try {
+      await api.post(`/admin/orders/${orderId}/assign-rider`, { riderId });
+      toast.success("Rider assigned successfully!");
+      load(page);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to assign rider");
+    }
   };
 
   const handleAlertRiders = async (e: React.MouseEvent, orderId: string) => {
@@ -203,12 +218,12 @@ export function DispatchTab() {
                   </div>
 
                   {/* Rider */}
-                  <div className="flex items-center gap-2 min-w-[140px] flex-1">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${order.rider_name ? "bg-emerald-500/10" : "bg-white/[0.04]"}`}>
-                      <Bike className={`w-4 h-4 ${order.rider_name ? "text-emerald-400" : "text-zinc-600"}`} />
+                  <div className="flex items-center gap-2 min-w-[160px] flex-1">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${order.rider_name ? "bg-emerald-500/10" : "bg-amber-500/10"}`}>
+                      <Bike className={`w-4 h-4 ${order.rider_name ? "text-emerald-400" : "text-amber-400"}`} />
                     </div>
                     <div>
-                      <div className="text-white text-sm font-bold">{order.rider_name ?? <span className="text-zinc-600 font-normal">Unassigned</span>}</div>
+                      <div className="text-white text-sm font-bold">{order.rider_name ?? <span className="text-amber-400 font-medium text-xs">Unassigned</span>}</div>
                       {order.rider_phone ? (
                         <a
                           href={`tel:${order.rider_phone}`}
@@ -217,7 +232,19 @@ export function DispatchTab() {
                         >
                           <Phone className="w-3 h-3" />{order.rider_phone}
                         </a>
-                      ) : <span className="text-zinc-600 text-[11px]">—</span>}
+                      ) : (
+                        <select
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => handleAssignRider(order.id, e.target.value)}
+                          defaultValue=""
+                          className="mt-1 bg-zinc-900 border border-zinc-800 rounded-lg text-[11px] text-zinc-300 px-2 py-0.5 focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="" disabled>Assign Rider…</option>
+                          {activeRiders.map(r => (
+                            <option key={r.id} value={r.id}>{r.name} ({r.phone})</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   </div>
 
