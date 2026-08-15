@@ -117,6 +117,8 @@ export async function displayLocalNotification(
       android: {
         channelId,
         groupId,
+        smallIcon: 'ic_launcher',
+        largeIcon: 'ic_launcher',
         pressAction: { id: 'default' },
         importance: _AndroidImportance.HIGH,
         sound: isDispatch ? 'alert' : 'default',
