@@ -40,8 +40,8 @@ export async function createNotificationChannels() {
       importance: _AndroidImportance.HIGH,
       sound: 'alert', // Plays alert.mp3 from res/raw
       vibration: true,
-      vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800, 400, 800],
-      lights: [0xFFFC4603, 500, 500],
+      vibrationPattern: [0, 500, 250, 500, 250, 500],
+      lights: ['#FC4603', 500, 500],
     }),
     // HIGH-importance heads-up banner channels for order updates, promotions, and account alerts
     _notifee.createChannel({
@@ -51,7 +51,7 @@ export async function createNotificationChannels() {
       sound: 'default',
       vibration: true,
       badge: true,
-      lights: [0xFFFC4603, 500, 500],
+      lights: ['#FC4603', 500, 500],
     }),
     _notifee.createChannel({
       id: 'promotions_v4',
@@ -60,7 +60,7 @@ export async function createNotificationChannels() {
       sound: 'default',
       vibration: true,
       badge: true,
-      lights: [0xFFFC4603, 500, 500],
+      lights: ['#FC4603', 500, 500],
     }),
     _notifee.createChannel({
       id: 'account_v4',
@@ -69,7 +69,7 @@ export async function createNotificationChannels() {
       sound: 'default',
       vibration: true,
       badge: true,
-      lights: [0xFFFC4603, 500, 500],
+      lights: ['#FC4603', 500, 500],
     }),
   ]);
   results.forEach((r, i) => {
@@ -116,17 +116,17 @@ export async function displayLocalNotification(
       data,
       android: {
         channelId,
-        groupId,
+        ...(groupId ? { groupId } : {}),
         smallIcon: 'ic_notification',
         largeIcon: 'ic_launcher',
         pressAction: { id: 'default' },
         importance: _AndroidImportance.HIGH,
         sound: isDispatch ? 'alert' : 'default',
-        vibrationPattern: [0, 400, 200, 400],
-        lights: [0xFFFC4603, 500, 500],
+        vibrationPattern: [0, 500, 250, 500, 250, 500],
+        lights: ['#FC4603', 500, 500],
         ...(isDispatch && {
           fullScreenAction: { id: 'default', launchActivity: 'default' },
-          vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800, 400, 800],
+          vibrationPattern: [0, 500, 250, 500, 250, 500],
         }),
         ...(bannerUrl && !isChat && {
           style: {
