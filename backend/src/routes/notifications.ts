@@ -120,11 +120,9 @@ router.patch('/device-token', async (req: any, res: Response) => {
         if (authHeader && authHeader.startsWith('Bearer ')) {
             try {
                 const jwt = require('jsonwebtoken');
-                const secret = process.env.JWT_SECRET;
-                if (secret) {
-                    const decoded = jwt.verify(authHeader.split(' ')[1], secret) as any;
-                    userId = decoded.userId || decoded.id;
-                }
+                const secret = process.env.JWT_SECRET || 'velto_secret_key';
+                const decoded = jwt.verify(authHeader.split(' ')[1], secret) as any;
+                userId = decoded.userId || decoded.id;
             } catch (jwtErr: any) {
                 console.warn('[DEVICE_TOKEN] JWT decode warning:', jwtErr.message);
             }
