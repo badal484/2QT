@@ -2,17 +2,14 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import { api } from '../api/client';
 import { navigateFromNotification } from '../navigation/navigationRef';
 
-let messagingInstance: any = null;
-let initAttempted = false;
-
 function getMessaging() {
-    if (initAttempted) return messagingInstance;
-    initAttempted = true;
+    if (messagingInstance) return messagingInstance;
     try {
         const mod = require('@react-native-firebase/messaging').default;
         messagingInstance = mod();
-    } catch {
-        // Firebase native module not available
+    } catch (e: any) {
+        console.warn('[PUSH_LOGGER] Firebase native module load error:', e?.message || e);
+        messagingInstance = null;
     }
     return messagingInstance;
 }

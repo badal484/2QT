@@ -197,12 +197,13 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
 
     // 7. Insert to DB first so we get notifId to embed in FCM data (enables click tracking)
     let notifId: string | undefined;
+    const initialStatus = user.device_token ? 'sent' : 'no_device_token';
     try {
         const { rows: notifRows } = await query(
             `INSERT INTO notifications (user_id, type, title, body, data, channel, delivery_status)
-             VALUES ($1, $2, $3, $4, $5, $6, 'sent')
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING id`,
-            [user.id, type, title, body, JSON.stringify(vars), channels[0] ?? 'push']
+            [user.id, type, title, body, JSON.stringify(vars), channels[0] ?? 'push', initialStatus]
         );
         notifId = notifRows[0]?.id;
         emitToUser(user.id, 'new_notification', { type, title, body, notifId });
@@ -231,6 +232,9 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     if (channels.includes('push') && prefs.push_enabled) {
         if (!user.device_token) {
             console.warn(`[NOTIF_LOGGER] ❌ Skipping FCM push for type=${type} user=${user.id} (${user.phone}) — REASON: device_token is NULL in DB (user has not registered FCM token or is logged out)`);
+            if (notifId) {
+                query("UPDATE notifications SET delivery_status = 'no_device_token' WHERE id = $1", [notifId]).catch(() => {});
+            }
         } else {
             console.log(`[NOTIF_LOGGER] 🚀 Dispatching FCM push type=${type} to user=${user.id} token=${(user.device_token as string).slice(0, 15)}...`);
             tasks.push(
@@ -239,10 +243,16 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
                         console.log(`[NOTIF_LOGGER] 📊 FCM result=${result} for type=${type} user=${user!.id}`);
                         if (result === 'invalid_token') {
                             console.warn(`[NOTIF_LOGGER] ⚠️ Stale token cleared from DB for user=${user!.id}`);
+                            query("UPDATE notifications SET delivery_status = 'invalid_token' WHERE id = $1", [notifId]).catch(() => {});
                             return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
+                        } else if (result === 'skipped' && notifId) {
+                            query("UPDATE notifications SET delivery_status = 'skipped' WHERE id = $1", [notifId]).catch(() => {});
                         }
                     })
-                    .catch((err: any) => console.error('[NOTIF_LOGGER] ❌ FCM Dispatch Error:', err.message))
+                    .catch((err: any) => {
+                        console.error('[NOTIF_LOGGER] ❌ FCM Dispatch Error:', err.message);
+                        if (notifId) query("UPDATE notifications SET delivery_status = 'failed' WHERE id = $1", [notifId]).catch(() => {});
+                    })
             );
         }
     }
