@@ -211,7 +211,14 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     }
 
     // 8. Dispatch channels in parallel (fire-and-forget individually)
-    const rawData: Record<string, any> = { type, ...vars, ...(notifId ? { notifId } : {}) };
+    const rawData: Record<string, any> = {
+        type,
+        title,
+        body,
+        ...(imageUrl ? { imageUrl, image: imageUrl } : {}),
+        ...vars,
+        ...(notifId ? { notifId } : {})
+    };
     const fcmData: Record<string, string> = {};
     for (const [k, v] of Object.entries(rawData)) {
         if (v !== undefined && v !== null) {
