@@ -1,59 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Edge runtime: no 10s serverless cap — handles Render free-tier cold start (~50s)
-export const runtime = 'edge';
-export const maxDuration = 60;
-export const dynamic = 'force-dynamic'; // never cache — health pings must hit origin
+const BACKEND_URL = (process.env.BACKEND_URL || 'https://twoqt-3kjw.onrender.com/api/v1').replace(/\/$/, '');
+const TARGET_BASE = BACKEND_URL.endsWith('/api/v1') ? BACKEND_URL : `${BACKEND_URL}/api/v1`;
 
-const rawBackend = (process.env.BACKEND_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
-const BACKEND = rawBackend.endsWith('/api/v1') ? rawBackend : `${rawBackend}/api/v1`;
+async function handleProxy(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const resolvedParams = await params;
+  const pathStr = (resolvedParams.path || []).join('/');
+  const searchParams = req.nextUrl.search;
+  const targetUrl = `${TARGET_BASE}/${pathStr}${searchParams}`;
 
-async function handler(
-  req: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
-) {
-  const { path } = await context.params;
-  const targetUrl = `${BACKEND}/${path.join('/')}${req.nextUrl.search}`;
-
-  const headers = new Headers();
-  const auth = req.headers.get('authorization');
-  const ct = req.headers.get('content-type');
-  const pinggy = req.headers.get('x-pinggy-no-screen');
-  if (auth) headers.set('authorization', auth);
-  if (ct) headers.set('content-type', ct);
-  if (pinggy) headers.set('x-pinggy-no-screen', pinggy);
-
-  let body: ArrayBuffer | undefined;
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    body = await req.arrayBuffer();
-  }
+  const headers = new Headers(req.headers);
+  headers.delete('host');
+  headers.delete('connection');
 
   try {
-    const upstream = await fetch(targetUrl, {
+    const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await req.blob();
+
+    const backendRes = await fetch(targetUrl, {
       method: req.method,
       headers,
-      body: body?.byteLength ? body : undefined,
+      body,
+      redirect: 'manual',
     });
 
-    const resHeaders = new Headers();
-    upstream.headers.forEach((v, k) => {
-      if (!['transfer-encoding', 'connection'].includes(k.toLowerCase())) {
-        resHeaders.set(k, v);
-      }
-    });
+    const resHeaders = new Headers(backendRes.headers);
+    resHeaders.delete('transfer-encoding');
 
-    return new NextResponse(upstream.body, {
-      status: upstream.status,
+    const data = await backendRes.arrayBuffer();
+    return new NextResponse(data, {
+      status: backendRes.status,
+      statusText: backendRes.statusText,
       headers: resHeaders,
     });
-  } catch {
-    return NextResponse.json({ error: 'BACKEND_UNREACHABLE' }, { status: 503 });
+  } catch (err: any) {
+    console.error('[API Proxy Error]', err);
+    return NextResponse.json(
+      { error: 'PROXY_ERROR', message: err.message || 'Failed to connect to backend server' },
+      { status: 502 }
+    );
   }
 }
 
-export const GET     = handler;
-export const POST    = handler;
-export const PATCH   = handler;
-export const PUT     = handler;
-export const DELETE  = handler;
-export const OPTIONS = handler;
+export const GET = handleProxy;
+export const POST = handleProxy;
+export const PUT = handleProxy;
+export const PATCH = handleProxy;
+export const DELETE = handleProxy;
+export const OPTIONS = handleProxy;

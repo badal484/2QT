@@ -61,6 +61,18 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  // ── Rewrites ────────────────────────────────────────────────────────────────
+  async rewrites() {
+    const rawBackend = (process.env.BACKEND_URL || 'https://twoqt-3kjw.onrender.com/api/v1').replace(/\/$/, '');
+    const target = rawBackend.endsWith('/api/v1') ? rawBackend : `${rawBackend}/api/v1`;
+    return [
+      {
+        source: '/api/proxy/:path*',
+        destination: `${target}/:path*`,
+      },
+    ];
+  },
+
   // ── Redirects ───────────────────────────────────────────────────────────────
   async redirects() {
     return [
