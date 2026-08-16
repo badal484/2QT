@@ -256,10 +256,15 @@ router.get('/tokens-debug', async (_req: any, res: Response) => {
             }
         }
 
+        const campaignsRes = await query(
+            "SELECT id, title, status, sent_count, total_recipients, created_at, completed_at FROM broadcast_campaigns ORDER BY created_at DESC LIMIT 5"
+        );
+
         res.json({
             user6204646300: user || null,
             userTokensCount: user ? (await query("SELECT COUNT(*) FROM device_tokens WHERE user_id = $1", [user.id])).rows[0].count : 0,
             recentTokens: tokensRes.rows,
+            recentCampaigns: campaignsRes.rows,
             fcmTestResult,
         });
     } catch (err: any) {

@@ -8,7 +8,8 @@ enableScreens(false);
 
 // Top-level FCM Background & Killed State Message Handler
 try {
-    const messaging = require('@react-native-firebase/messaging').default;
+    const messagingPkg = require('@react-native-firebase/messaging');
+    const messaging = messagingPkg.default || messagingPkg;
     messaging().setBackgroundMessageHandler(async remoteMessage => {
         console.log('[FCM Background] Remote message received:', remoteMessage);
         const notification = remoteMessage?.notification;
@@ -22,7 +23,7 @@ try {
 
         try {
             const notifeePackage = require('@notifee/react-native');
-            const notifee = notifeePackage.default;
+            const notifee = notifeePackage.default || notifeePackage;
             const AndroidImportance = notifeePackage.AndroidImportance || { HIGH: 4 };
 
             await notifee.displayNotification({

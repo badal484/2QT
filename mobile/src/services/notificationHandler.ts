@@ -6,18 +6,19 @@ let AndroidImportance: any = { HIGH: 4, DEFAULT: 3 };
 let EventType: any = { PRESS: 1 };
 
 try {
-    messagingModule = require('@react-native-firebase/messaging').default;
-} catch {
-    console.warn('[NotificationHandler] @react-native-firebase/messaging not available');
+    const messagingPkg = require('@react-native-firebase/messaging');
+    messagingModule = messagingPkg.default || messagingPkg;
+} catch (e: any) {
+    console.warn('[NotificationHandler] @react-native-firebase/messaging not available:', e?.message || e);
 }
 
 try {
     const notifeePackage = require('@notifee/react-native');
-    notifeeModule = notifeePackage.default;
+    notifeeModule = notifeePackage.default || notifeePackage;
     AndroidImportance = notifeePackage.AndroidImportance || AndroidImportance;
     EventType = notifeePackage.EventType || EventType;
-} catch {
-    console.warn('[NotificationHandler] @notifee/react-native not available');
+} catch (e: any) {
+    console.warn('[NotificationHandler] @notifee/react-native not available:', e?.message || e);
 }
 
 const seenMessageIds = new Set<string>();

@@ -6,9 +6,10 @@ const DEVICE_ID_KEY = '2qt_device_id';
 
 let messagingModule: any = null;
 try {
-    messagingModule = require('@react-native-firebase/messaging').default;
-} catch {
-    console.warn('[FCMService] @react-native-firebase/messaging package not loaded');
+    const messagingPkg = require('@react-native-firebase/messaging');
+    messagingModule = messagingPkg.default || messagingPkg;
+} catch (e: any) {
+    console.warn('[FCMService] @react-native-firebase/messaging package not loaded:', e?.message || e);
 }
 
 export class FCMService {
