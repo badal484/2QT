@@ -403,27 +403,17 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
     }
 
     try {
-        const cleanId = String(id).replace(/^#/, '');
+        const cleanId = String(id).replace(/^#/, '').trim();
+        const displayWithPrefix = cleanId.startsWith('2QT-') ? cleanId : `2QT-${cleanId}`;
+
         const { rows } = await query(
-            `UPDATE orders SET status = $1
-             WHERE (id::text = $2 OR display_id = $2 OR display_id = $3) AND (rider_id = $4 OR $5 = 'super_admin')
+            `UPDATE orders SET status = $1, rider_id = COALESCE(rider_id, $4)
+             WHERE id::text = $2 OR display_id = $2 OR display_id = $3 OR display_id = $5
              RETURNING id, display_id, customer_id, kitchen_id, status, delivery_otp`,
-            [status, id, cleanId, riderId, req.user!.role]
+            [status, id, cleanId, riderId, displayWithPrefix]
         );
-
-        // Fallback update if rider_id wasn't exact match
-        let order = rows[0];
-        if (!order) {
-            const fallbackRes = await query(
-                `UPDATE orders SET status = $1, rider_id = COALESCE(rider_id, $4)
-                 WHERE id::text = $2 OR display_id = $2 OR display_id = $3
-                 RETURNING id, display_id, customer_id, kitchen_id, status, delivery_otp`,
-                [status, id, cleanId, riderId]
-            );
-            order = fallbackRes.rows[0];
-        }
-
-        if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND', message: 'Order not found or status cannot be updated.' });
+        const order = rows[0];
 
         emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });
         emitToOrder(id, 'order_status_update', { orderId: id, status });
