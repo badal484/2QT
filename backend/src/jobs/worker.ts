@@ -27,10 +27,11 @@ const notifWorker = new Worker('2qt:notifications', async (job: Job) => {
         let sent = 0;
         let failed = 0;
 
-        const { rows: userRows } = await query(
+        const userRes = await query(
             `SELECT id, name FROM users WHERE id = ANY($1)`,
             [userIdsBatch]
-        );
+        ).catch(() => ({ rows: [] }));
+        const userRows = userRes?.rows || [];
         const userMap = new Map(userRows.map((u: any) => [u.id, u.name]));
 
         for (const userId of userIdsBatch) {

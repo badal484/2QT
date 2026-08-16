@@ -1,6 +1,7 @@
 import { query } from '../../../db';
 import { redis } from '../../../redis';
 import { CreateBroadcastInput } from './broadcast.dto';
+import { NotificationDispatcherService } from '../services/notification-dispatcher.service';
 
 export class BroadcastService {
     static async createCampaign(input: CreateBroadcastInput, adminUserId: string) {
@@ -73,17 +74,17 @@ export class BroadcastService {
     ) {
         (async () => {
             const BATCH_SIZE = 50;
-            const { NotificationDispatcherService } = require('../services/notification-dispatcher.service');
 
             for (let i = 0; i < recipientUserIds.length; i += BATCH_SIZE) {
                 const batch = recipientUserIds.slice(i, i + BATCH_SIZE);
                 let sent = 0;
                 let failed = 0;
 
-                const { rows: userRows } = await query(
+                const userRes = await query(
                     `SELECT id, name FROM users WHERE id = ANY($1)`,
                     [batch]
-                );
+                ).catch(() => ({ rows: [] }));
+                const userRows = userRes?.rows || [];
                 const userMap = new Map(userRows.map(u => [u.id, u.name]));
 
                 for (const userId of batch) {
