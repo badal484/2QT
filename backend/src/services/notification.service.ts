@@ -1,8 +1,6 @@
 import axios from 'axios';
 import { query } from '../db';
 import { redis } from '../redis';
-import { sendFCM } from './fcm.service';
-import { pushService } from './push.service'; // web-push VAPID for browser
 import { emitToUser } from '../socket';
 
 export type NotifType =
@@ -71,7 +69,8 @@ export async function bustTemplateCache(type: string) {
 
 // ─── Variable interpolation ───────────────────────────────────────────────────
 
-function interpolate(template: string, vars: Record<string, string>): string {
+function interpolate(template: string | undefined | null, vars: Record<string, string>): string {
+    if (!template) return '';
     return template.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? '');
 }
 
@@ -109,34 +108,20 @@ export async function sendNotification(type: NotifType, options: SendOptions): P
 
 // Actual delivery — called by the worker. Do NOT call from HTTP handlers (blocks response).
 export async function deliverNotification(type: NotifType, options: SendOptions): Promise<void> {
-    const { userId, phone, vars = {}, dedupeKey, overrideChannels, imageUrl } = options;
+    const { userId, phone, vars = {}, dedupeKey, overrideChannels } = options;
 
     // 1. Resolve user
-    let user: { id: string; phone: string; device_token: string | null; name: string } | null = null;
+    let user: { id: string; phone: string; name: string } | null = null;
     if (userId) {
-        const { rows } = await query('SELECT id, phone, COALESCE(device_token, fcm_token) AS device_token, name, role FROM users WHERE id = $1', [userId]);
+        const { rows } = await query('SELECT id, phone, name, role FROM users WHERE id = $1', [userId]);
         user = rows[0] ?? null;
     } else if (phone) {
-        const { rows } = await query("SELECT id, phone, COALESCE(device_token, fcm_token) AS device_token, name FROM users WHERE phone = $1 AND COALESCE(device_token, fcm_token) IS NOT NULL ORDER BY (role = 'customer') DESC, updated_at DESC", [phone]);
+        const { rows } = await query("SELECT id, phone, name FROM users WHERE phone = $1 ORDER BY (role = 'customer') DESC, updated_at DESC", [phone]);
         user = rows[0] ?? null;
     }
     if (!user) {
         console.warn(`[NOTIF] User not found type=${type} userId=${userId} phone=${phone}`);
         return;
-    }
-
-    // Fallback: If target user row has no device token, check if any active user account with the same phone and role has one
-    if (!user.device_token && user.phone) {
-        const cleanPhone = user.phone.replace(/\D/g, '').slice(-10);
-        const userRole = (user as any).role || 'customer';
-        const { rows: siblingRows } = await query(
-            "SELECT COALESCE(device_token, fcm_token) AS device_token FROM users WHERE (phone = $1 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $2) AND LOWER(role::text) = LOWER($3) AND COALESCE(device_token, fcm_token) IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
-            [user.phone, cleanPhone, userRole]
-        );
-        if (siblingRows[0]?.device_token) {
-            user.device_token = siblingRows[0].device_token;
-            query('UPDATE users SET device_token = $1, fcm_token = $1 WHERE id = $2', [user.device_token, user.id]).catch(() => {});
-        }
     }
 
     // 2. Deduplicate within 60 s (non-fatal — skip dedup if Redis is down)
@@ -158,7 +143,7 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
     }
 
     // 4. Check user preferences (non-fatal — default to all enabled if table missing)
-    let prefs = { order_updates: true, promotions: true, payouts: true, push_enabled: true, whatsapp_enabled: true };
+    let prefs = { order_updates: true, promotions: true, payouts: true, whatsapp_enabled: true };
     try {
         const { rows: pRows } = await query(
             'SELECT * FROM notification_preferences WHERE user_id = $1',
@@ -194,81 +179,36 @@ export async function deliverNotification(type: NotifType, options: SendOptions)
         }
     }
 
-    // 6. Build content
+    // 6. Resolve App Type and Build content
+    let appType: 'buyer' | 'rider' | 'kitchen' = 'buyer';
+    if (['rider', 'rider_captain'].includes((user as any).role)) {
+        appType = 'rider';
+    } else if (['chef', 'partner_kitchen', 'kitchen_manager', 'packer'].includes((user as any).role)) {
+        appType = 'kitchen';
+    }
+
     const title   = options.title || vars.title || interpolate(tmpl.title_template, vars);
     const body    = options.body  || vars.body  || interpolate(tmpl.body_template, vars);
     const waText  = options.body  || vars.body  || interpolate(tmpl.whatsapp_template || tmpl.body_template, vars);
     const channels: string[] = overrideChannels ?? tmpl.channels ?? ['push', 'whatsapp'];
 
-    // 7. Insert to DB first so we get notifId to embed in FCM data (enables click tracking)
-    let notifId: string | undefined;
-    const initialStatus = user.device_token ? 'sent' : 'no_device_token';
-    try {
-        const { rows: notifRows } = await query(
-            `INSERT INTO notifications (user_id, type, title, body, data, channel, delivery_status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             RETURNING id`,
-            [user.id, type, title, body, JSON.stringify(vars), channels[0] ?? 'push', initialStatus]
-        );
-        notifId = notifRows[0]?.id;
-        emitToUser(user.id, 'new_notification', { type, title, body, notifId });
-    } catch (err: any) {
-        console.error('[NOTIF_DB_ERR]', err.message);
-    }
-
-    // 8. Dispatch channels in parallel (fire-and-forget individually)
-    const rawData: Record<string, any> = {
+    // 7. Dispatch through Strategy Engine (DBStrategy, SocketStrategy, FCMStrategy)
+    const { NotificationDispatcherService } = require('../modules/notifications/services/notification-dispatcher.service');
+    
+    await NotificationDispatcherService.dispatch({
+        userId: user.id,
         type,
         title,
         body,
-        ...(imageUrl ? { imageUrl, image: imageUrl } : {}),
-        ...vars,
-        ...(notifId ? { notifId } : {})
-    };
-    const fcmData: Record<string, string> = {};
-    for (const [k, v] of Object.entries(rawData)) {
-        if (v !== undefined && v !== null) {
-            fcmData[k] = typeof v === 'object' ? JSON.stringify(v) : String(v);
-        }
-    }
+        data: vars,
+        appType,
+        channels,
+        userPhone: user.phone,
+        imageUrl: options.imageUrl,
+    });
+
+    // 8. Dispatch external fallback channels in parallel (WhatsApp/SMS)
     const tasks: Promise<any>[] = [];
-
-    // FCM mobile push
-    if (channels.includes('push') && prefs.push_enabled) {
-        if (!user.device_token) {
-            console.warn(`[NOTIF_LOGGER] ❌ Skipping FCM push for type=${type} user=${user.id} (${user.phone}) — REASON: device_token is NULL in DB (user has not registered FCM token or is logged out)`);
-            if (notifId) {
-                query("UPDATE notifications SET delivery_status = 'no_device_token' WHERE id = $1", [notifId]).catch(() => {});
-            }
-        } else {
-            console.log(`[NOTIF_LOGGER] 🚀 Dispatching FCM push type=${type} to user=${user.id} token=${(user.device_token as string).slice(0, 15)}...`);
-            tasks.push(
-                sendFCM(user.device_token, title, body, fcmData, imageUrl)
-                    .then((result: any) => {
-                        console.log(`[NOTIF_LOGGER] 📊 FCM result=${result} for type=${type} user=${user!.id}`);
-                        if (result === 'invalid_token') {
-                            console.warn(`[NOTIF_LOGGER] ⚠️ Stale token cleared from DB for user=${user!.id}`);
-                            query("UPDATE notifications SET delivery_status = 'invalid_token' WHERE id = $1", [notifId]).catch(() => {});
-                            return query('UPDATE users SET device_token = NULL WHERE id = $1', [user!.id]);
-                        } else if (result === 'skipped' && notifId) {
-                            query("UPDATE notifications SET delivery_status = 'skipped' WHERE id = $1", [notifId]).catch(() => {});
-                        }
-                    })
-                    .catch((err: any) => {
-                        console.error('[NOTIF_LOGGER] ❌ FCM Dispatch Error:', err.message);
-                        if (notifId) query("UPDATE notifications SET delivery_status = 'failed' WHERE id = $1", [notifId]).catch(() => {});
-                    })
-            );
-        }
-    }
-
-    // Web-push (VAPID) — for browser customers
-    if (channels.includes('push') && prefs.push_enabled) {
-        tasks.push(
-            pushService.sendNotificationToUser(user.id, { title, body })
-                .catch(() => {}) // non-fatal
-        );
-    }
 
     // WhatsApp
     if (channels.includes('whatsapp') && prefs.whatsapp_enabled) {
@@ -345,87 +285,10 @@ async function sendSMS(phone: string, message: string) {
     }
 }
 
-// ─── Rider zone FCM push (new delivery available in the pool) ────────────────
-// The mission-pool broadcast (emitToRiders('new_available_mission', ...)) is
-// Socket.IO-only — it never reaches a rider whose app isn't open and connected.
-// This is the push counterpart: same audience, delivered via FCM so it still
-// arrives when the app is backgrounded or fully closed. Kept as a direct
-// per-rider sendFCM (not routed through deliverNotification's per-user DB
-// insert/template lookup) since this can fan out to many riders in a zone and
-// is inherently ambient/best-effort, not a per-user transactional record.
-export async function notifyRidersInZone(
-    zoneId: string,
-    title: string,
-    body: string,
-    data: Record<string, string> = {}
-): Promise<void> {
-    try {
-        const { rows } = await query(
-            `SELECT device_token FROM users
-             WHERE role IN ('rider', 'rider_captain')
-               AND zone_id = $1
-               AND is_online = TRUE
-               AND is_active = TRUE
-               AND device_token IS NOT NULL`,
-            [zoneId]
-        );
-        const sends = rows.map(({ device_token }: { device_token: string }) =>
-            sendFCM(
-                device_token,
-                title,
-                body,
-                { type: 'new_available_mission', android_channel_id: 'order_dispatch_v2', sound: 'alert', ...data },
-                undefined,
-                true // data-only — Notifee renders the full-screen dispatch alert reliably in bg/killed
-            ).catch(() => {})
-        );
-        await Promise.allSettled(sends);
-    } catch (err) {
-        console.error('[NOTIF] notifyRidersInZone failed:', err);
-    }
-}
-
-// ─── Kitchen staff FCM push (background alert for new orders) ────────────────
-// Sends FCM push to all active kitchen staff of the given kitchenId so they
-// get an alert even when the app is backgrounded (socket closes in background).
-export async function notifyKitchenStaff(
-    kitchenId: string,
-    title: string,
-    body: string,
-    data: Record<string, string> = {}
-): Promise<void> {
-    try {
-        const { rows } = await query(
-            `SELECT device_token FROM users
-             WHERE kitchen_id = $1
-               AND role IN ('chef', 'kitchen_manager', 'packer', 'partner_kitchen')
-               AND device_token IS NOT NULL
-               AND is_active = TRUE`,
-            [kitchenId]
-        );
-        const sends = rows.map(({ device_token }: { device_token: string }) =>
-            sendFCM(
-                device_token, 
-                title, 
-                body, 
-                { ...data, body, sound: 'alert', android_channel_id: 'order_dispatch_v2' },
-                undefined,
-                true // data-only — Notifee renders the full-screen dispatch alert reliably in bg/killed
-            ).catch(() => {})
-        );
-        await Promise.allSettled(sends);
-    } catch (err) {
-        console.error('[NOTIF] notifyKitchenStaff failed:', err);
-    }
-}
-
-// ─── Legacy class wrapper — keeps flat-data call sites (routes, workers) working ──
-
 export class NotificationService {
     static async send(type: NotifType, data: any) {
         const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl, screen, bookingId, ticketId, senderName, timestamp, overrideQuietHours } = data;
-        // Calls deliverNotification directly — no re-queueing (used by the worker itself)
-        await deliverNotification(type, {
+        await sendNotification(type, {
             userId: userId || undefined,
             phone: phone || undefined,
             vars: {

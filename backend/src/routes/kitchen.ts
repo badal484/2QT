@@ -7,8 +7,6 @@ import { NotificationService } from '../services/notification.service';
 import { haversineMetres } from '../services/distance.service';
 import { autoAssignOrder } from '../services/autoAssign';
 import { redis, keys } from '../redis';
-import { sendFCM } from '../services/fcm.service';
-import { pushService } from '../services/push.service';
 
 const router = Router();
 
@@ -44,8 +42,6 @@ async function autoResumeIfExpired(kitchenId: string): Promise<void> {
         [kitchenId]
     );
     if (rows.length > 0) {
-        // Notify waiting customers and clear the list
-        await notifyPauseWaiters(kitchenId);
         const zoneId = await getZoneId(kitchenId);
         if (zoneId) {
             await redis.del(keys.menu(zoneId));
@@ -53,19 +49,6 @@ async function autoResumeIfExpired(kitchenId: string): Promise<void> {
             emitToAll('menu_updated', { zoneId });
         }
     }
-}
-
-// Send FCM push to all registered "notify me" tokens for this kitchen
-async function notifyPauseWaiters(kitchenId: string): Promise<void> {
-    const redisKey = `pause_notify:${kitchenId}`;
-    const tokens = await redis.sMembers(redisKey);
-    if (!tokens.length) return;
-    await redis.del(redisKey);
-    await Promise.allSettled(
-        tokens.map(token =>
-            sendFCM(token, '🍽️ Kitchen is back open!', 'Place your order now — we\'re ready to cook.', { type: 'kitchen_resumed' })
-        )
-    );
 }
 
 router.get('/debug-dispatch', async (_req, res) => {
@@ -128,11 +111,6 @@ router.patch('/status', authenticate, requireRole('chef', 'kitchen_manager', 'su
         'UPDATE kitchens SET is_paused = $1, pause_reason = $2, pause_until = $3 WHERE id = $4',
         [paused, paused ? (reason || null) : null, paused ? pauseUntil : null, kitchenId]
     );
-
-    // If resuming manually, notify waiting customers
-    if (!paused) {
-        await notifyPauseWaiters(kitchenId);
-    }
 
     const zoneId = await getZoneId(kitchenId);
     if (zoneId) {
@@ -654,9 +632,9 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
             assignedBy: 'kitchen',
             deliveryAddress: addrRows[0]?.address_text || null,
         });
-        // FCM fallback — a kitchen manager assigning a rider directly is a deliberate,
-        // time-sensitive action; it shouldn't silently fail to reach a rider whose app
-        // happens to be closed at that exact moment.
+        // In-app notification fallback — a kitchen manager assigning a rider directly
+        // is a deliberate, time-sensitive action; it shouldn't silently fail to reach
+        // the rider just because the socket event above was missed.
         NotificationService.send('broadcast_message', {
             userId: riderId,
             title: '🛵 New Delivery Assigned!',
@@ -711,12 +689,6 @@ router.post('/orders/:id/force-reassign', authenticate, requireRole('kitchen_man
             message: 'We are finding a new rider for your order. Sorry for the inconvenience!',
             riderAssigned: false,
         });
-
-        // Push notification to customer
-        pushService.sendNotificationToUser(customer_id, {
-            title: 'Slight delay on your order',
-            body: `We're finding a new rider for ${display_id}. Sorry for the wait!`
-        }).catch(() => {});
 
         // Refresh dispatch panel — order now appears in unassigned list automatically
         emitToKitchen(kitchenId, 'order_updated', { orderId: id, needsRider: true, reason });
@@ -798,20 +770,6 @@ router.get('/orders/unassigned', authenticate, requireRole('chef', 'kitchen_mana
     } catch (err: any) {
         res.status(500).json({ error: 'FETCH_FAILED', message: err.message });
     }
-});
-
-// Customer registers their FCM token to be notified when the kitchen resumes
-// Called from the mobile "Notify me when open" button
-router.post('/pause-notify', authenticate, requireRole('chef', 'kitchen_manager', 'partner_kitchen', 'packer', 'super_admin'), async (req: AuthRequest, res) => {
-    const { kitchenId, fcmToken } = req.body;
-    if (!kitchenId || !fcmToken) return res.status(400).json({ error: 'MISSING_FIELDS' });
-
-    // Verify kitchen is actually paused
-    const { rows } = await query('SELECT is_paused FROM kitchens WHERE id = $1', [kitchenId]);
-    if (!rows[0]?.is_paused) return res.json({ registered: false, reason: 'kitchen_not_paused' });
-
-    await redis.sAdd(`pause_notify:${kitchenId}`, fcmToken);
-    res.json({ registered: true });
 });
 
 // ─── Kitchen Analytics (kitchen_manager only — own kitchen ops view) ─────────

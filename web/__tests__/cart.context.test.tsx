@@ -12,7 +12,6 @@ jest.mock('../app/lib/api', () => ({
     getProfile: jest.fn().mockResolvedValue(null),
   },
 }));
-jest.mock('../app/lib/webPush', () => ({ registerWebPush: jest.fn() }));
 jest.mock('../hooks/useHaptics', () => ({
   useHaptics: () => ({ tap: jest.fn(), success: jest.fn(), error: jest.fn() }),
 }));

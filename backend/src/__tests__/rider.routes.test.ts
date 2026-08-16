@@ -37,9 +37,6 @@ jest.mock('../services/trigger.service', () => ({
 jest.mock('../services/autoAssign', () => ({
   unassignAndReassign: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../services/push.service', () => ({
-  pushService: { send: jest.fn().mockResolvedValue(undefined) },
-}));
 jest.mock('../utils/appSettings', () => ({
   getAppSetting: jest.fn().mockResolvedValue(null),
   getAppSettingInt: jest.fn().mockResolvedValue(0),

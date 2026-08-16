@@ -1,5 +1,5 @@
 import React from 'react';
-import { NativeModules, Platform, PermissionsAndroid } from 'react-native';
+import { NativeModules } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { getSocket, connectSocket, disconnectSocket } from '../socket/client';
@@ -17,27 +17,10 @@ import MaintenanceScreen from '../screens/MaintenanceScreen';
 import { APP_VERSION, api } from '../api/client';
 import { navigationRef, flushPendingNav } from './navigationRef';
 import { tokens } from '../theme/tokens';
-import {
-  subscribeToNotificationTap,
-  subscribeToForegroundMessages,
-  handleInitialNotification,
-  setupBackgroundHandler,
-  registerDeviceToken,
-  subscribeToTokenRefresh,
-} from '../services/push';
-import {
-  createNotificationChannels,
-  displayLocalNotification,
-  setupNotifeeHandlers,
-} from '../services/localNotif';
 
 const { RoleModule } = NativeModules;
 const BUILD_ROLE = RoleModule?.BUILD_ROLE;
 console.log('--- DETECTED BUILD ROLE:', BUILD_ROLE);
-
-// Must be called at module load time (before any component mounts)
-setupBackgroundHandler();
-setupNotifeeHandlers();
 
 const linking = {
   prefixes: ['2qt://', 'https://2qt.app'],
@@ -59,39 +42,13 @@ const linking = {
   },
 };
 
-// Request POST_NOTIFICATIONS runtime permission (Android 13+) then register FCM token.
-// Must be called after the user is authenticated so the token can be saved server-side.
-async function requestPushPermissionAndRegister() {
-  try {
-    if (Platform.OS === 'android' && Platform.Version >= 33) {
-      const status = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-        {
-          title: 'Allow Notifications',
-          message: 'Enable notifications to get live order updates, delivery alerts and offers.',
-          buttonPositive: 'Allow',
-          buttonNegative: 'Not now',
-        }
-      );
-      if (status !== PermissionsAndroid.RESULTS.GRANTED) {
-        console.warn('[PUSH] POST_NOTIFICATIONS permission not granted — registering token anyway');
-      }
-    }
-    // Always attempt token registration so backend has device token ready
-    await registerDeviceToken();
-    console.log('[PUSH] Device token registered successfully');
-  } catch (err) {
-    console.warn('[PUSH] Permission/token error:', err);
-  }
-}
-
 const RootNavigator = () => {
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch();
   const [forceUpdateRequired, setForceUpdateRequired] = React.useState(false);
   const [isMaintenance, setIsMaintenance] = React.useState(false);
 
-  // One-time setup: notification channels + system status
+  // One-time setup: system status
   React.useEffect(() => {
     const checkSystemStatus = async () => {
       try {
@@ -113,37 +70,12 @@ const RootNavigator = () => {
       }
     };
     checkSystemStatus();
-    createNotificationChannels().then(() => {
-      requestPushPermissionAndRegister();
-      setTimeout(() => { requestPushPermissionAndRegister(); }, 2000);
-    }).catch(() => {});
   }, []);
 
-  // Wire FCM tap and foreground message handlers
-  React.useEffect(() => {
-    const unsubTap = subscribeToNotificationTap();
-    handleInitialNotification();
-
-    // Foreground FCM → post real system notification via notifee (appears in tray)
-    const unsubForeground = subscribeToForegroundMessages((title, body, data) => {
-      displayLocalNotification(title, body, data).catch(() => {});
-    });
-
-    return () => { unsubTap(); unsubForeground(); };
-  }, []);
-
-  // When user logs in: re-register FCM token to bind user ID server-side.
-  React.useEffect(() => {
-    requestPushPermissionAndRegister();
-    const t = setTimeout(() => { requestPushPermissionAndRegister(); }, 1500);
-    const unsubRefresh = subscribeToTokenRefresh();
-    return () => { clearTimeout(t); unsubRefresh(); };
-  }, [accessToken]);
-
-  // Socket connection
+  // Socket connection & Push Notification setup
   React.useEffect(() => {
     if (accessToken) {
-      console.log('--- INITIALIZING SOCKET CONNECTION ---');
+      console.log('--- INITIALIZING SOCKET & PUSH NOTIFICATION CONNECTION ---');
       connectSocket(accessToken);
 
       const socket = getSocket();
@@ -152,23 +84,29 @@ const RootNavigator = () => {
           console.log('--- SYSTEMATIC USER UPDATE RECEIVED ---', data);
           dispatch(updateUser(data));
         });
-        socket.on('new_notification', (data) => {
-          console.log('--- NEW NOTIFICATION RECEIVED OVER SOCKET ---', data);
-          displayLocalNotification(data.title || '2QT', data.body || '', data).catch(() => {});
-        });
       }
+
+      // FCM & Notification Handlers
+      const { FCMService } = require('../services/fcm.service');
+      const { NotificationHandler } = require('../services/notificationHandler');
+
+      FCMService.registerDeviceToken(user?.role);
+      const unsubscribeRefresh = FCMService.setupTokenRefreshListener(user?.role);
+      const unsubscribeNotif = NotificationHandler.setupListeners(navigationRef.current);
+
+      return () => {
+        if (unsubscribeRefresh) unsubscribeRefresh();
+        if (unsubscribeNotif) unsubscribeNotif();
+        const sock = getSocket();
+        if (sock) sock.off('user_updated');
+        disconnectSocket();
+      };
     } else {
+      const { FCMService } = require('../services/fcm.service');
+      FCMService.deactivateDeviceToken(user?.role);
       disconnectSocket();
     }
-    return () => {
-      const socket = getSocket();
-      if (socket) {
-        socket.off('user_updated');
-        socket.off('new_notification');
-      }
-      disconnectSocket();
-    };
-  }, [accessToken, dispatch]);
+  }, [accessToken, user?.role, dispatch]);
 
   if (isMaintenance) return <MaintenanceScreen />;
   if (forceUpdateRequired) return <ForceUpdateScreen />;

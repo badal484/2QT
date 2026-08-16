@@ -9,7 +9,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers";
 import { api } from "../lib/api";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
-import PushNotifier from "../../components/PushNotifier";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 
@@ -51,7 +50,7 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
     order_updates: true, promotions: true, payouts: true,
-    push_enabled: true, whatsapp_enabled: true,
+    whatsapp_enabled: true,
   });
 
   useEffect(() => {
@@ -165,7 +164,6 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
                     <Clock className="w-4 h-4 text-brand-primary" />
                     Member Since {new Date(user?.created_at || Date.now()).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
                   </span>
-                  <PushNotifier />
                 </div>
               </>
             )}
@@ -317,7 +315,6 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
             { key: "order_updates", label: "Order updates", desc: "Confirmed, preparing, out for delivery, delivered" },
             { key: "promotions", label: "Offers & promotions", desc: "Flash sales, coupons, personalised deals" },
             { key: "payouts", label: "Payout alerts", desc: "When your earnings are transferred" },
-            { key: "push_enabled", label: "Push notifications", desc: "App & browser push" },
             { key: "whatsapp_enabled", label: "WhatsApp messages", desc: "Key alerts via WhatsApp" },
           ].map(({ key, label, desc }) => (
             <div key={key} className="flex items-center justify-between gap-4 py-2">

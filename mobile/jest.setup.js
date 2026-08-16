@@ -15,20 +15,6 @@ jest.mock('@react-native-firebase/auth', () => () => ({
   onAuthStateChanged: jest.fn(() => jest.fn()),
   signOut: jest.fn(),
 }));
-jest.mock('@react-native-firebase/messaging', () => () => ({
-  getToken: jest.fn(() => Promise.resolve('mock-token')),
-  onMessage: jest.fn(() => jest.fn()),
-  requestPermission: jest.fn(() => Promise.resolve(1)),
-}));
-
-jest.mock('@notifee/react-native', () => ({
-  createChannel: jest.fn(() => Promise.resolve('channel-id')),
-  displayNotification: jest.fn(() => Promise.resolve()),
-  onForegroundEvent: jest.fn(() => jest.fn()),
-  onBackgroundEvent: jest.fn(),
-  AndroidImportance: { HIGH: 4 },
-  EventType: { PRESS: 1, DISMISSED: 0 },
-}));
 
 jest.mock('react-native-share', () => ({
   default: { open: jest.fn(() => Promise.resolve()), shareSingle: jest.fn() },
@@ -90,20 +76,6 @@ jest.mock('@react-native-firebase/app', () => () => ({ apps: [] }));
 jest.mock('@react-native-firebase/auth', () => () => ({
   onAuthStateChanged: jest.fn(() => jest.fn()),
   signOut: jest.fn(),
-}));
-jest.mock('@react-native-firebase/messaging', () => () => ({
-  getToken: jest.fn(() => Promise.resolve('mock-token')),
-  onMessage: jest.fn(() => jest.fn()),
-  requestPermission: jest.fn(() => Promise.resolve(1)),
-}));
-
-jest.mock('@notifee/react-native', () => ({
-  createChannel: jest.fn(() => Promise.resolve('channel-id')),
-  displayNotification: jest.fn(() => Promise.resolve()),
-  onForegroundEvent: jest.fn(() => jest.fn()),
-  onBackgroundEvent: jest.fn(),
-  AndroidImportance: { HIGH: 4 },
-  EventType: { PRESS: 1, DISMISSED: 0 },
 }));
 
 jest.mock('react-native-encrypted-storage', () => ({

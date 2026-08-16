@@ -16,7 +16,6 @@ import { getSocket } from '../socket/client';
 import { ChevronRight, Check, X, IndianRupee, Navigation, MapPin, Banknote } from 'lucide-react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
-import { displayLocalNotification } from '../services/localNotif';
 import { Card } from '../components/ui/Card';
 import { useFeedback } from '../context/FeedbackContext';
 
@@ -222,7 +221,6 @@ const RiderHomeScreen = ({ navigation }: any) => {
     setAutoAssignCountdown(30);
     // 3-burst vibration on arrival
     Vibration.vibrate([0, 500, 150, 500, 150, 500], false);
-    displayLocalNotification('🚴 New Order Assigned!', `${data.displayId} — tap to view. You have 30s to opt out.`, { type: 'order_update' });
 
     if (autoAssignTimerRef.current) clearInterval(autoAssignTimerRef.current);
     let remaining = 30;

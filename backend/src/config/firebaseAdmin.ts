@@ -1,15 +1,37 @@
 // src/config/firebaseAdmin.ts
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { parseServiceAccount } from '../services/fcm.service';
 
-// Single source of truth for credential parsing (see fcm.service.ts) — checks
-// FIREBASE_SERVICE_ACCOUNT_B64 first, then FIREBASE_SERVICE_ACCOUNT_JSON. This file
-// used to maintain its own separate copy that only checked FIREBASE_SERVICE_ACCOUNT_JSON
-// (and an undocumented, never-used FIREBASE_SERVICE_ACCOUNT name) — if only the B64 var
-// was set in production, this file silently fell back to default credentials while
-// fcm.service.ts worked fine, causing prelaunch login token verification specifically
-// to break while push notifications kept working. One parser now, can't drift again.
+// Parses the Firebase service-account credential used to initialize Firebase Admin
+// (needed for Firebase Auth — phone-login OTP token verification in routes/prelaunch.ts).
+// Prefers FIREBASE_SERVICE_ACCOUNT_B64 (immune to newline/escaping issues in env var
+// editors) and falls back to FIREBASE_SERVICE_ACCOUNT_JSON.
+export function parseServiceAccount(): any | null {
+    const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
+    if (b64) {
+        try {
+            const sa = JSON.parse(Buffer.from(b64.trim(), 'base64').toString('utf8'));
+            if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+            return sa;
+        } catch (e) {
+            console.error('[FIREBASE_ADMIN] Failed to decode FIREBASE_SERVICE_ACCOUNT_B64:', e);
+        }
+    }
+
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (raw) {
+        try {
+            const sa = JSON.parse(raw);
+            if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+            return sa;
+        } catch (e) {
+            console.error('[FIREBASE_ADMIN] Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', e);
+        }
+    }
+
+    return null;
+}
+
 const serviceAccount = parseServiceAccount();
 
 if (getApps().length === 0) {
@@ -28,5 +50,9 @@ if (getApps().length === 0) {
   }
 }
 
+import { getMessaging } from 'firebase-admin/messaging';
+
 export const firebaseAdminAuth = getAuth();
-export { getAuth };
+export const firebaseAdminMessaging = getMessaging();
+export { getAuth, getMessaging };
+

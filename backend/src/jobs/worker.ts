@@ -18,6 +18,63 @@ const notifWorker = new Worker('2qt:notifications', async (job: Job) => {
     const type = job.name as NotifType;
     const data = job.data;
 
+    // Admin Campaign Broadcast Batch
+    if (type === ('broadcast_batch' as any)) {
+        const { campaignId, userIdsBatch = [], title, body, imageUrl, targetType } = data;
+        const { redis } = require('../redis');
+        const { NotificationDispatcherService } = require('../modules/notifications/services/notification-dispatcher.service');
+
+        let sent = 0;
+        let failed = 0;
+
+        for (const userId of userIdsBatch) {
+            const dedupeKey = `broadcast_dedup:${campaignId}:${userId}`;
+            const alreadySent = await redis.get(dedupeKey).catch(() => null);
+            if (alreadySent) continue;
+
+            try {
+                let appType: 'buyer' | 'rider' | 'kitchen' = 'buyer';
+                if (targetType === 'riders') appType = 'rider';
+                else if (targetType === 'kitchens') appType = 'kitchen';
+
+                await NotificationDispatcherService.dispatch({
+                    userId,
+                    type: 'broadcast_message',
+                    title,
+                    body,
+                    data: { campaignId, title, body },
+                    appType,
+                    imageUrl: imageUrl || undefined,
+                });
+
+                await redis.setEx(dedupeKey, 86400, '1').catch(() => {});
+                sent++;
+            } catch (e) {
+                failed++;
+            }
+        }
+
+        await query(
+            `UPDATE broadcast_campaigns 
+             SET sent_count = sent_count + $1, failed_count = failed_count + $2
+             WHERE id = $3`,
+            [sent, failed, campaignId]
+        ).catch(() => {});
+
+        const { rows } = await query(
+            `SELECT total_recipients, sent_count, failed_count FROM broadcast_campaigns WHERE id = $1`,
+            [campaignId]
+        ).catch(() => ({ rows: [] }));
+
+        if (rows[0] && (rows[0].sent_count + rows[0].failed_count >= rows[0].total_recipients)) {
+            await query(
+                `UPDATE broadcast_campaigns SET status = 'COMPLETED', completed_at = NOW() WHERE id = $1`,
+                [campaignId]
+            ).catch(() => {});
+        }
+        return;
+    }
+
     // Broadcast: send to list of phones or userIds
     if (type === 'broadcast_message' && (data.phones || data.userIds)) {
         const { broadcastNotification } = require('../services/notification.service');

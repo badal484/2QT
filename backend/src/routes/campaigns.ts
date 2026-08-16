@@ -45,7 +45,7 @@ export async function fireCampaignNotification(campaign: any) {
             users.slice(i, i + BATCH).map(u =>
                 sendNotification(campaign.notif_template_type as NotifType, {
                     userId: u.id,
-                    overrideChannels: ['push', 'whatsapp'],
+                    overrideChannels: ['whatsapp'],
                     dedupeKey: `campaign:${campaign.id}:${u.id}`,
                 })
             )

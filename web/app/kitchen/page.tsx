@@ -526,7 +526,7 @@ export default function KitchenPage() {
     };
   }, [view, fetchDispatch]);
 
-  // ── Manual assignment alert (all 3 layers + sound) ────────────────────────
+  // ── Manual assignment alert (sound + in-app banner) ────────────────────────
   useEffect(() => {
     const handler = (data: { displayId: string; message: string }) => {
       setNeedsManualAssignment(true);
@@ -540,15 +540,6 @@ export default function KitchenPage() {
 
       // Layer 1: sound
       playDispatchAlarm();
-
-      // Layer 3: browser notification
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification("⚠ Rider needed", {
-          body: `Order ${data.displayId} has no rider. Assign manually in Dispatch.`,
-          icon: "/favicon.ico",
-          tag: "dispatch-alert", // replaces itself instead of stacking
-        });
-      }
     };
     socket.on("order_needs_manual_assignment", handler);
     return () => { socket.off("order_needs_manual_assignment", handler); };
@@ -558,13 +549,6 @@ export default function KitchenPage() {
   useEffect(() => {
     if (unassignedCount === 0) setNeedsManualAssignment(false);
   }, [unassignedCount]);
-
-  // Request browser notification permission once on mount
-  useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
-    }
-  }, []);
 
   const assignRiderBatch = async (batchId: string, batchOrders: UnassignedOrder[]) => {
     const riderId = selectedRider[batchId];

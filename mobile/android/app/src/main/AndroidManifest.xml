@@ -6,9 +6,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
       android:name="com.veltomobile.MainApplication"
@@ -24,21 +23,6 @@
       <meta-data
         android:name="com.google.android.geo.API_KEY"
         android:value="AIzaSyCwvUrO91u81DGsCr4YoJZWzrIC9Pr5kaA" />
-
-      <!-- FCM background notification defaults -->
-      <meta-data
-        tools:replace="android:value"
-        android:name="com.google.firebase.messaging.default_notification_channel_id"
-        android:value="promotions_v5" />
-      <meta-data
-        android:name="com.google.firebase.messaging.default_notification_icon"
-        android:resource="@drawable/ic_notification" />
-      <meta-data
-        tools:replace="android:resource"
-        android:name="com.google.firebase.messaging.default_notification_color"
-        android:resource="@color/notification_color" />
-
-
 
       <activity
         android:name=".MainActivity"

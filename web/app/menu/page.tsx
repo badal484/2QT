@@ -14,7 +14,6 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useCart, useAuth } from "../providers";
 import { api } from "../lib/api";
-import PushNotifier from "../../components/PushNotifier";
 import { NotificationBell } from "../../components/NotificationBell";
 import { useHaptics } from "../../hooks/useHaptics";
 import { Toaster, toast } from "sonner";
@@ -79,10 +78,6 @@ function OrderSuccess({ onDone }: { onDone: () => void }) {
       >
         Track Order <ChevronRight className="inline-block w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
       </button>
-
-      <div className="mt-12 scale-125">
-        <PushNotifier />
-      </div>
     </motion.div>
   );
 }

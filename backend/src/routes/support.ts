@@ -4,7 +4,6 @@ import { authenticate, requireRole } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToAdmin, emitToSupport, emitToKitchen } from '../socket';
 import { NotificationService } from '../services/notification.service';
-import { pushService } from '../services/push.service';
 
 const router = Router();
 const supportAccess = authenticate, supportRole = requireRole('support', 'super_admin');
@@ -558,12 +557,6 @@ router.post('/orders/:id/handle-breakdown', supportAccess, supportRole, async (r
 
         // Wake up kitchen dispatch panel — order reappears in unassigned list
         emitToKitchen(order.kitchen_id, 'order_updated', { orderId: id, needsRider: true, reason: 'breakdown' });
-
-        // Push notification to customer
-        pushService.sendNotificationToUser(order.customer_id, {
-            title: 'Slight delay on your order',
-            body: `We're finding a new rider for ${order.display_id}. Sorry for the wait!`,
-        }).catch(() => {});
 
         res.json({ success: true, message: 'Breakdown processed. Order released back to pool.' });
     } catch (err) {

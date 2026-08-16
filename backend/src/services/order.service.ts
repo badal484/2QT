@@ -1,6 +1,6 @@
 import { withTransaction, query } from '../db';
 import { redis, keys } from '../redis';
-import { NotificationService, notifyKitchenStaff, notifyRidersInZone } from './notification.service';
+import { NotificationService } from './notification.service';
 import { emitToKitchen, emitToUser, emitToAdmin, emitToRiders } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { TWO_QT } from '../config/constants';
@@ -301,26 +301,11 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
         }
 
         emitToKitchen(newOrder.kitchen_id, 'new_order', { orderId: newOrder.id });
-        notifyKitchenStaff(
-            newOrder.kitchen_id,
-            '🍽️ New Order!',
-            `Order #${newOrder.display_id} just came in — start preparing!`,
-            { type: 'new_kitchen_order', orderId: String(newOrder.id) }
-        ).catch(() => {});
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
         const autoDispatchEnabled = settings[0]?.value === 'true';
         if (!autoDispatchEnabled) {
             emitToRiders('new_available_mission', { orderId: newOrder.id, displayId: newOrder.display_id }, newOrder.zone_id);
-            // Socket.IO above only reaches riders whose app is open. This is the push
-            // fallback so a rider with the app closed still finds out a delivery is
-            // available — see notifyRidersInZone's comment for why this exists.
-            notifyRidersInZone(
-                newOrder.zone_id,
-                '🛵 New Delivery Available!',
-                `Order #${newOrder.display_id} is ready for pickup nearby.`,
-                { orderId: String(newOrder.id), displayId: newOrder.display_id, screen: 'RiderHome' }
-            ).catch(() => {});
         }
 
         emitToUser(newOrder.customer_id, 'order_status_update', { orderId: newOrder.id, status: 'confirmed' });
