@@ -211,24 +211,44 @@ const ProfileScreen = ({ navigation }: any) => {
               <PressableScale style={styles.statBox} onPress={() => navigation.navigate('Payouts')} accessibilityRole="button" accessibilityLabel="Earnings">
                 <Wallet size={20} color={tokens.colors.textSecondary} />
                 <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Earnings</Text>
-                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>
+                <Text 
+                  allowFontScaling={false} 
+                  numberOfLines={1} 
+                  adjustsFontSizeToFit 
+                  style={styles.statValue}
+                >
                   ₹{(() => {
                     const raw = riderStats?.totalEarnings ?? riderStats?.total_earnings ?? 0;
                     const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
                     const val = isNaN(num) ? 0 : num;
-                    return (val / 100).toFixed(0);
+                    const rupees = Math.round(val > 100000 ? val / 100 : val / 100);
+                    if (rupees >= 100000) return `${(rupees / 100000).toFixed(2)}L`;
+                    if (rupees >= 10000) return `${(rupees / 1000).toFixed(1)}k`;
+                    return rupees.toLocaleString('en-IN');
                   })()}
                 </Text>
               </PressableScale>
               <PressableScale style={styles.statBox} onPress={() => navigation.navigate('RiderHistory')} accessibilityRole="button" accessibilityLabel="Total Trips">
                 <Package size={20} color={tokens.colors.textSecondary} />
                 <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Total Trips</Text>
-                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statValue}>{riderStats?.totalDeliveries || 0}</Text>
+                <Text 
+                  allowFontScaling={false} 
+                  numberOfLines={1} 
+                  adjustsFontSizeToFit 
+                  style={styles.statValue}
+                >
+                  {riderStats?.totalDeliveries || 0}
+                </Text>
               </PressableScale>
               <PressableScale style={styles.statBox} onPress={() => {}} accessibilityRole="button" accessibilityLabel="Rating">
                 <Star size={20} color={tokens.colors.warning} />
                 <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Rating</Text>
-                <Text allowFontScaling maxFontSizeMultiplier={1.4} style={[styles.statValue, { color: tokens.colors.warning }]}>
+                <Text 
+                  allowFontScaling={false} 
+                  numberOfLines={1} 
+                  adjustsFontSizeToFit 
+                  style={[styles.statValue, { color: tokens.colors.warning }]}
+                >
                   {(() => {
                     const raw = riderStats?.rating ?? 5.0;
                     const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);

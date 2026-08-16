@@ -682,7 +682,7 @@ router.patch('/orders/:id/status', authenticate, requireRole('super_admin', 'adm
     res.json({ success: true });
 });
 
-router.post('/orders/complete-all-live', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+router.post('/orders/complete-all-live', authenticate, requireRole('super_admin', 'admin', 'manager', 'kitchen_manager', 'partner_kitchen', 'chef'), async (req: AuthRequest, res) => {
     try {
         const { rows } = await query(
             `UPDATE orders 
@@ -692,7 +692,8 @@ router.post('/orders/complete-all-live', authenticate, requireRole('super_admin'
         );
         res.json({ success: true, count: rows.length, completedOrders: rows });
     } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('[orders/complete-all-live]', err);
+        res.status(500).json({ error: err.message || 'Failed to complete live orders' });
     }
 });
 
