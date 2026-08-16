@@ -118,6 +118,50 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   const [activeCustomizationItem, setActiveCustomizationItem] = useState<any>(null);
 
   const menuData = queryClient.getQueryData<any>(['menu', effectiveZoneId]);
+  
+  const enrichedItem = useMemo(() => {
+    if (!menuData?.items) return item;
+    const offers = menuData.offers || [];
+    const itemInMenu = menuData.items.find((i: any) => i.id === item.id) || item;
+    let basePrice = itemInMenu.price_paise;
+    let offerDiscountPaise = 0;
+    let appliedOffer = null;
+    
+    for (const offer of offers) {
+         const tIds: string[] = Array.isArray(offer.target_ids) ? offer.target_ids : [];
+         const isMatch = offer.target_type === 'all' ||
+                         (offer.target_type === 'item' && (tIds.includes(itemInMenu.id) || offer.target_id === itemInMenu.id)) ||
+                         (offer.target_type === 'category' && (
+                             tIds.some((t: string) => String(t) === String(itemInMenu.category)) ||
+                             String(offer.target_id) === String(itemInMenu.category)
+                         )) ||
+                         (offer.target_type === 'kitchen' && (tIds.includes(itemInMenu.kitchen_id) || offer.target_id === itemInMenu.kitchen_id));
+         
+         if (isMatch) {
+              let discount = 0;
+              if (offer.discount_type === 'flat') {
+                  discount = offer.discount_flat_paise || 0;
+              } else if (offer.discount_type === 'percent' || offer.discount_type === 'percentage') {
+                  discount = Math.floor((basePrice * (parseFloat(offer.discount_percent || '0') || 0)) / 100);
+                  if (offer.max_discount_paise && discount > offer.max_discount_paise) {
+                      discount = offer.max_discount_paise;
+                  }
+              }
+              if (discount > offerDiscountPaise) {
+                  offerDiscountPaise = discount;
+                  appliedOffer = offer;
+              }
+         }
+    }
+    
+    return {
+       ...itemInMenu,
+       original_price_paise: basePrice,
+       price_paise: Math.max(0, basePrice - offerDiscountPaise),
+       applied_offer: appliedOffer || item.applied_offer
+    };
+  }, [menuData?.items, menuData?.offers, item]);
+
   const relatedItems: any[] = useMemo(() =>
     (menuData?.items ?? [])
       .filter((i: any) => i.category === item.category && i.id !== item.id && i.available)
@@ -133,7 +177,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   const promos: any[] = promosData?.codes ?? [];
 
   const vegColor = item.is_egg ? tokens.colors.warning : item.is_veg ? tokens.colors.success : tokens.colors.danger;
-  const price = item.price_paise / 100;
+  const price = enrichedItem.price_paise / 100;
   const qty = cartItem?.quantity ?? 0;
   const totalPrice = price * (qty || 1);
 
@@ -262,6 +306,27 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
           </View>
 
           <Text allowFontScaling={false} style={s.itemName}>{item.name}</Text>
+
+          {/* ── Price & Offer Badge ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, marginBottom: 10 }}>
+            <Text allowFontScaling={false} style={{ fontSize: 22, fontFamily: tokens.typography.family.black, color: tokens.colors.textPrimary }}>
+              ₹{enrichedItem.price_paise / 100}
+            </Text>
+            {enrichedItem.applied_offer && (
+              <>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary, textDecorationLine: 'line-through' }}>
+                  ₹{enrichedItem.original_price_paise / 100}
+                </Text>
+                <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                  <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: tokens.typography.family.extrabold, color: '#15803D' }}>
+                    {enrichedItem.applied_offer.discount_type === 'flat'
+                      ? `₹${(enrichedItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
+                      : `${Math.round(parseFloat(enrichedItem.applied_offer.discount_percent || '0'))}% OFF`}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
 
           {!!item.description && (
             <Text allowFontScaling={false} style={s.itemDesc}>{item.description}</Text>
@@ -429,7 +494,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                 ) : (
                   <PressableScale
                     style={s.addBtn}
-                    onPress={() => { haptics.selection(); handleAddWithCheck(item); }}
+                    onPress={() => { haptics.selection(); handleAddWithCheck(enrichedItem); }}
                     accessibilityRole="button"
                     accessibilityLabel="Add to cart"
                   >

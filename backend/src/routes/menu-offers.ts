@@ -7,6 +7,20 @@ const router = express.Router();
 
 const VALID_AUDIENCES = ['all','new_users','plus_subscribers','loyal','at_risk','churned','high_spenders'];
 
+const clearMenuCache = async () => {
+    try {
+        const { redis } = require('../config/redis');
+        if (redis) {
+            const keys = await redis.keys('menu:customer:full:*');
+            if (keys && keys.length > 0) {
+                await redis.del(...keys);
+            }
+        }
+    } catch (e) {
+        // non-blocking
+    }
+};
+
 // ── Customer: active offers for zone ──────────────────────────────────────────
 router.get('/active', async (req, res) => {
     const zoneId = req.query.zoneId as string | undefined;
@@ -89,6 +103,7 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
             zone_id || null, start_time || null, end_time || null,
             is_active ?? true,
         ]);
+        await clearMenuCache();
         emitToAll('offer_updated', { action: 'create', offerId: rows[0].id });
         res.status(201).json({ offer: rows[0] });
     } catch (err: any) {
@@ -143,6 +158,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
             is_active ?? null, id,
         ]);
         if (rows.length === 0) return res.status(404).json({ error: 'Offer not found' });
+        await clearMenuCache();
         emitToAll('offer_updated', { action: 'update', offerId: id });
         res.json({ offer: rows[0] });
     } catch (err: any) {
@@ -156,6 +172,7 @@ router.delete('/admin/:id', authenticate, requireRole('super_admin', 'admin'), a
     try {
         const { rowCount } = await query('DELETE FROM menu_offers WHERE id = $1', [id]);
         if (rowCount === 0) return res.status(404).json({ error: 'Offer not found' });
+        await clearMenuCache();
         emitToAll('offer_updated', { action: 'delete', offerId: id });
         res.json({ message: 'Offer deleted' });
     } catch (err: any) {
