@@ -47,6 +47,14 @@ export const safeNotifee = {
         } catch (e) {
             return () => {};
         }
+    },
+    onBackgroundEvent(callback: any) {
+        if (!notifeeInstance || typeof notifeeInstance.onBackgroundEvent !== 'function') return;
+        try {
+            notifeeInstance.onBackgroundEvent(callback);
+        } catch (e) {
+            console.warn('[NotifeeSafe] onBackgroundEvent error:', e);
+        }
     }
 };
 

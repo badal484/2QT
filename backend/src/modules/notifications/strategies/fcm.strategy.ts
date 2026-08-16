@@ -30,15 +30,19 @@ export class FCMStrategy implements NotificationChannelStrategy {
             const sound = this.getSoundForApp(appType, type);
             const channelId = this.getChannelIdForApp(appType);
 
-            // Convert data object to key-value strings required by FCM SDK
+            // Convert data object to key-value strings required by FCM SDK (always include title & body)
             const stringifiedData: Record<string, string> = {
                 type: String(type || ''),
                 notifId: String(notifId || ''),
                 appType: String(appType || 'buyer'),
+                title: String(title || ''),
+                body: String(body || ''),
             };
 
             for (const [key, value] of Object.entries(data)) {
-                stringifiedData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                if (value !== undefined && value !== null) {
+                    stringifiedData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                }
             }
 
             const multicastPayload: MulticastMessage = {
