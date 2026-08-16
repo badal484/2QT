@@ -371,8 +371,8 @@ router.get('/orders/active', authenticate, requireRole('rider', 'rider_captain',
         JOIN users u ON o.customer_id = u.id
         LEFT JOIN addresses a ON o.address_id = a.id
         LEFT JOIN kitchens k ON o.kitchen_id = k.id
-        WHERE o.rider_id = $1 AND o.status NOT IN ('delivered', 'cancelled')
-        ORDER BY o.created_at ASC
+         WHERE o.rider_id = $1 AND o.status NOT IN ('delivered', 'cancelled') AND o.created_at >= NOW() - INTERVAL '24 HOURS'
+         ORDER BY o.created_at DESC
     `, [riderId]);
 
     for (const order of rows) {
