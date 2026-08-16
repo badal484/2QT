@@ -237,24 +237,7 @@ router.get('/tokens-debug', async (_req: any, res: Response) => {
             "SELECT dt.*, u.phone, u.name FROM device_tokens dt JOIN users u ON dt.user_id = u.id ORDER BY dt.updated_at DESC LIMIT 20"
         );
 
-        let fcmTestResult: any = null;
-        if (user) {
-            const userTokens = await query(
-                "SELECT fcm_token, app_type FROM device_tokens WHERE user_id = $1 AND is_active = true",
-                [user.id]
-            );
-            if (userTokens.rows.length > 0) {
-                const { FCMStrategy } = require('../modules/notifications/strategies/fcm.strategy');
-                const strategy = new FCMStrategy();
-                fcmTestResult = await strategy.send({
-                    userId: user.id,
-                    type: 'broadcast_message',
-                    title: '🔥 Live Debug Push Alert!',
-                    body: 'Testing direct FCM push banner to phone 6204646300',
-                    appType: 'buyer'
-                }).catch((e: any) => ({ error: e.message }));
-            }
-        }
+        let fcmTestResult: any = { message: "Debug endpoint read-only check" };
 
         // Cleanup duplicate active device tokens (keep only the newest record per fcm_token + user_id)
         if (user) {
