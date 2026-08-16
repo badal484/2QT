@@ -214,7 +214,7 @@ export function MenuOffersTab() {
       title: offer.title ?? "",
       description: offer.description ?? "",
       target_type: offer.target_type,
-      discount_type: offer.discount_type,
+      discount_type: offer.discount_type === "percentage" ? "percent" : offer.discount_type,
       discount_percent: offer.discount_percent ?? "",
       discount_flat_paise: offer.discount_flat_paise ?? "",
       max_discount_paise: offer.max_discount_paise ?? "",
@@ -342,7 +342,7 @@ export function MenuOffersTab() {
                   }
                 </div>
                 <div className="text-xs text-zinc-400 font-medium">
-                  {offer.discount_type === "percent"
+                  {offer.discount_type === "percent" || offer.discount_type === "percentage"
                     ? `${offer.discount_percent}% off${offer.max_discount_paise ? ` · max ₹${offer.max_discount_paise / 100}` : ""}`
                     : `₹${(offer.discount_flat_paise / 100).toFixed(0)} flat off`}
                   {offer.end_time && ` · expires ${new Date(offer.end_time).toLocaleDateString()}`}
