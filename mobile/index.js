@@ -19,6 +19,13 @@ try {
   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     console.log('[PUSH_BACKGROUND] Message received in background/killed state:', remoteMessage);
 
+    // If native FCM notification payload is present, Android OS has already rendered
+    // the system notification tray item natively. Only render Notifee fallback if data-only.
+    if (remoteMessage?.notification) {
+      console.log('[PUSH_BACKGROUND] Native notification already displayed by Android OS in system tray');
+      return;
+    }
+
     const data = remoteMessage?.data ?? {};
     let title = remoteMessage?.notification?.title || data?.title || '';
     let body  = remoteMessage?.notification?.body  || data?.body  || data?.message || '';

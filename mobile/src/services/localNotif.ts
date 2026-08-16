@@ -24,7 +24,7 @@ function loadNotifee() {
 }
 
 function channelForType(type: string): string {
-  if (type === 'order_update' || type === 'new_kitchen_order') return 'order_dispatch_v2';
+  if (type === 'order_update' || type === 'new_kitchen_order' || type === 'new_available_mission') return 'order_dispatch_v2';
   if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates_v5';
   if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account_v5';
   return 'promotions_v5';

@@ -35,130 +35,37 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     }
 });
 
-router.get('/debug-broadcast', async (_req, res: Response) => {
-    try {
-        const { rows: tmplRows } = await db.query(
-            "SELECT * FROM notification_templates WHERE type = 'broadcast_message'"
-        );
-        const { rows: userRows } = await db.query(
-            "SELECT id, name, phone, role, device_token FROM users WHERE device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 10"
-        );
-        res.json({
-            template: tmplRows[0] || 'NOT_FOUND',
-            activeUsersWithToken: userRows.length,
-            users: userRows.map(u => ({ id: u.id, name: u.name, phone: u.phone, role: u.role, tokenPrefix: u.device_token ? u.device_token.slice(0, 15) : null }))
-        });
-    } catch (err: any) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-router.get('/debug-tokens', async (_req, res: Response) => {
-    try {
-        const { rows } = await db.query(
-            `SELECT id, name, phone, role, 
-                    CASE WHEN device_token IS NULL THEN false ELSE true END as has_token,
-                    SUBSTRING(device_token FROM 1 FOR 15) as token_prefix,
-                    updated_at
-             FROM users 
-             ORDER BY updated_at DESC LIMIT 20`
-        );
-        res.json({ count: rows.length, users: rows });
-    } catch (err: any) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-router.get('/broadcast-test-now', async (_req, res: Response) => {
-    try {
-        const { rows } = await db.query(
-            "SELECT id, name, phone, role, device_token FROM users WHERE device_token IS NOT NULL AND is_active = true"
-        );
-        const results = [];
-        for (const u of rows) {
-            const fcmRes = await sendFCM(
-                u.device_token,
-                '🎉 Special Offer for You!',
-                'Get 20% OFF on your next order with code 2QT20',
-                { type: 'broadcast_message', title: '🎉 Special Offer for You!', body: 'Get 20% OFF on your next order with code 2QT20' }
-            );
-            results.push({ id: u.id, name: u.name, phone: u.phone, role: u.role, fcmResult: fcmRes });
-        }
-        res.json({ count: rows.length, results });
-    } catch (err: any) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-router.get('/test-fcm-direct', async (_req, res: Response) => {
-    try {
-        const { rows } = await db.query(
-            `SELECT id, name, phone, device_token FROM users WHERE device_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1`
-        );
-        if (rows.length === 0) return res.json({ error: 'NO_ACTIVE_TOKENS' });
-
-        const user = rows[0];
-        const result = await sendFCM(
-            user.device_token,
-            '🔔 Live 2QT Push Test',
-            'This is a real FCM push notification sent to your system tray!',
-            { type: 'order_confirmed', orderId: '2QT-TEST-999' }
-        );
-        res.json({ success: true, userId: user.id, name: user.name, phone: user.phone, fcmResult: result });
-    } catch (err: any) {
-        res.status(500).json({ error: 'FCM_FAILED', message: err.message, stack: err.stack });
-    }
-});
-
 // ─── FCM device token (mobile) ───────────────────────────────────────────────
+// Requires a valid session — anonymous registration was removed because it let
+// any caller with no token/phone bind an arbitrary device to whichever account
+// happened to be most recently active, hijacking that user's push notifications.
+// The phone-based sync below is scoped to the calling user's own role so a
+// phone number shared across a customer/rider/kitchen account (common in this
+// app's data) can't cross-contaminate another role's device_token.
 
-const handleDeviceToken = async (req: any, res: Response) => {
+const handleDeviceToken = async (req: AuthRequest, res: Response) => {
     try {
-        const { token, phone } = (req.body || {}) as { token: string; phone?: string };
-        const authHeader = req.headers?.authorization;
-        let userId: string | undefined;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            try {
-                const jwt = require('jsonwebtoken');
-                const secret = process.env.JWT_SECRET || 'velto_secret_key';
-                const decoded = jwt.verify(authHeader.split(' ')[1], secret) as any;
-                userId = decoded.userId || decoded.id;
-            } catch (jwtErr: any) {
-                console.warn('[DEVICE_TOKEN] JWT decode warning:', jwtErr.message);
-            }
-        }
-
+        const { token } = (req.body || {}) as { token: string };
         if (!token) return res.status(400).json({ error: 'token required' });
 
-        if (userId) {
-            await query('UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW() WHERE id = $2', [token, userId]);
-        }
+        const userId = req.user!.userId;
+        const { rows: uRows } = await query('SELECT phone, role FROM users WHERE id = $1', [userId]);
+        const self = uRows[0];
+        if (!self) return res.status(404).json({ error: 'user not found' });
 
-        let targetPhone = phone;
-        if (!targetPhone && userId) {
-            const { rows: uRows } = await query('SELECT phone FROM users WHERE id = $1', [userId]);
-            targetPhone = uRows[0]?.phone;
-        }
+        await query('UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW() WHERE id = $2', [token, userId]);
 
-        if (targetPhone) {
-            const cleanPhone = targetPhone.replace(/\D/g, '').slice(-10);
+        if (self.phone) {
+            const cleanPhone = self.phone.replace(/\D/g, '').slice(-10);
             await query(
-                "UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW() WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3)",
-                [token, targetPhone, cleanPhone]
+                `UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW()
+                 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3)
+                   AND LOWER(role::text) = LOWER($4)`,
+                [token, self.phone, cleanPhone, self.role]
             );
-        } else if (!userId) {
-            // Fallback safety net: bind token to most recently active customer account
-            const { rows: fallbackRows } = await query(
-                "SELECT id, phone FROM users WHERE LOWER(role::text) IN ('customer', 'buyer') ORDER BY updated_at DESC LIMIT 1"
-            );
-            if (fallbackRows[0]) {
-                userId = fallbackRows[0].id;
-                targetPhone = fallbackRows[0].phone;
-                await query('UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW() WHERE id = $2', [token, userId]);
-            }
         }
 
-        console.log(`[DEVICE_TOKEN] ✅ Token saved to database userId=${userId || 'none'} phone=${targetPhone || 'none'} tokenPrefix=${token.slice(0, 15)}...`);
+        console.log(`[DEVICE_TOKEN] ✅ Token saved userId=${userId} role=${self.role} tokenPrefix=${token.slice(0, 15)}...`);
         res.json({ success: true, registered: true });
     } catch (err: any) {
         console.error('[DEVICE_TOKEN_ERR]', err.message);
@@ -166,8 +73,8 @@ const handleDeviceToken = async (req: any, res: Response) => {
     }
 };
 
-router.patch('/device-token', handleDeviceToken);
-router.post('/device-token', handleDeviceToken);
+router.patch('/device-token', authenticate, handleDeviceToken);
+router.post('/device-token', authenticate, handleDeviceToken);
 
 // ─── In-app notification bell ─────────────────────────────────────────────────
 
@@ -362,17 +269,6 @@ router.get('/admin/log', authenticate, requireRole('super_admin', 'admin'), asyn
         params
     );
     res.json({ notifications: rows });
-});
-
-router.get('/db-check', async (req: any, res: Response) => {
-    try {
-        const dbUrl = process.env.DATABASE_URL || '';
-        const host = dbUrl.split('@')[1]?.split('/')[0] || 'unknown';
-        const { rows } = await query("SELECT id, name, phone, role, device_token FROM users WHERE phone LIKE '%6204646300%'");
-        res.json({ dbHost: host, user: rows[0] || null });
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
 });
 
 router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {

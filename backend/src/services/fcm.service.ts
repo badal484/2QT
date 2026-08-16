@@ -3,20 +3,6 @@ import { getMessaging } from 'firebase-admin/messaging';
 
 let app: App | null = null;
 
-const DEFAULT_SERVICE_ACCOUNT = {
-    type: "service_account",
-    project_id: "qqtt-ddd83",
-    private_key_id: "52362073166770c9a1228adcb0ce74b05e0f72d4",
-    private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCkSBDwT3gioA+0\nsROZQdwcgA6UDP+llW44aJ67BszbGUDBXKqTJRkjCz7JcZzTicQEUiOrqiYh23Iz\nCK7J6HqYtxQYuUquy3ADRtcj9kk8Scn8unwh0AG1No2S1uF4ruGa5aWORJj3dAnN\nkXdu/c5FHvxhQYswcUAJbVOrvR6f1QtB+XaqHMKk4kQNF4HVP3uBl9P7YcJyZ04F\n5IionYLI73gwAxHeFxC52Jeg4u15oYQohzcLYt5S62aYEoRpPLBcfMy2lybK4pe9\nD0GxJQ8bCEszIuHugWYNKa7A+ajnwSHMdpzl8VhxFDR/IDwKxKtpwcfM4Ih9pgt2\ncHgl8ucfAgMBAAECggEAOVZDvzPlWKRnxud00S0o3zOcovSkd0zfwsVU/S7C6gd2\nz+YBTMkKbG481D8YfsZbCS0H8R66H2ABjClQI/1FaK6hT33AQKCVcDdV2GHZrraM\nTm5h68U3C2HGaMUhvaa/6/mR3kU35En2L+7A8haYWwyVBnbDVz13nbKwHMUtfpfk\nHTsTuSI3kVtedRPEQIXNSXiDLkFKBeHxYhKq7QH3tnlFsnHzLWsZEk5FQjj2vAoL\nJc01Uc0JSjuvLHxl3irp6jQ2W8Drd/h398sQkHSZpB62uWHszot1jjb5q0BuDS6Q\nwMVoKEuNyWPyzXKEAHAsT8UG7myAoD06A3I1FtgQwQKBgQDRxEQd4572izl12W9B\nzLABfADQLSZMAk3IMEgsYWIPHVQ4oFvmf/kdjRzMGr7Zrmkjq36Kp1rgFZWU4dOt\ngMnOmNER/zH/PGfdtzK56uerFqy56DKQGR5LIzI1qXt4UtIPWmlArFTWnAVfOZnC\nyNUElftkiYuHhJ9p7/PEHLs23wKBgQDIfWBG560jGx7jfsIx8IIdlBr46xuilp93\nLxWnV0nQdUwnDze5SgY3p21zSsD0uB+iiih5XcmnGIIePaallvqmqHp74Rwz3+QB\nOqAvS73bXEAA4DRkkE009hqjuaFUSHDfNG7SJx09+z97hjBliazCi3tqe36Dq40O\nHRtBE6+XwQKBgF4mUEh2DLgtvwmVISmQXIMeDCNj0GeXNSAgA5Tf1KpiCJYt63Gm\niMJpvr4hVv3PGWOoKnDDMreXGH8taNvcDTgMQPJp7x/XFeteuYbW10pkL/x1KpSg\noYcp8fRB8KgNzDiV5N3hO2bjukmGSewyReH8C0yRq62UqhRbXbbtCl5TAoGANqog\nrxSKG5FQebzdHBq0j3YLaKVKEqm47xkycT8WjDT/P4MhsW6ihVgsOow+UjtFvN6o\nrHbK/blr+OzcXDfvPbOgOdimBOrd0wv2Ew82w/HCLbrz7ht+QZt8pfl+KGncBK/a\nK4ioq3au13I+DeFc7mpzixQC6cnDmv6KqNLCRMECgYEAksZuufmjeIlVoK2KfzJ4\nYKj9x7kfbOJz9pwOQXYGik0MmzjtT4SEWYIv86e8dHaTwalfxyiEe4ZWtop3IViZ\nXE8R+aPv/sH4z9UnPJQM3H0PwV7XR1JTkjd9UW0raF17fau0Qfvj0XMPBKzeQJoP\nVZMFHqv39X309KC+ItFnS5o=\n-----END PRIVATE KEY-----\n",
-    client_email: "firebase-adminsdk-fbsvc@qqtt-ddd83.iam.gserviceaccount.com",
-    client_id: "108268321947046671702",
-    auth_uri: "https://accounts.google.com/o/oauth2/auth",
-    token_uri: "https://oauth2.googleapis.com/token",
-    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-    client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40qqtt-ddd83.iam.gserviceaccount.com",
-    universe_domain: "googleapis.com"
-};
-
 export function parseServiceAccount(): any | null {
     // Prefer base64-encoded version — immune to newline/escaping issues in env var editors
     const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
@@ -41,8 +27,7 @@ export function parseServiceAccount(): any | null {
         }
     }
 
-    // Fallback: Return embedded production project credentials
-    return DEFAULT_SERVICE_ACCOUNT;
+    return null;
 }
 
 function getApp(): App | null {
@@ -78,18 +63,24 @@ export async function sendFCM(
     }
 
     try {
-        // Pure data-only payload forces Notifee native module to handle high-importance heads-up banner rendering
-        const skipNotif = true;
+        // Send native notification payload by default (unless dataOnly=true) so Android OS renders system tray notifications natively when app is closed
+        const skipNotif = dataOnly;
         const channelId = data.android_channel_id || 
             (data.type === 'broadcast_message' || data.type === 'promo' || data.type === 'offer' ? 'promotions_v5' : 'order_updates_v5');
         const tokenPrefix = token ? `${token.slice(0, 15)}...` : 'NULL';
         const img = imageUrl || data.imageUrl || data.image || data.bannerUrl || undefined;
 
-        console.log(`[FCM_SEND] 🚀 Sending push to token=${tokenPrefix} title="${title}" channelId=${channelId} img=${img || 'none'}`);
+        console.log(`[FCM_SEND] 🚀 Sending push to token=${tokenPrefix} title="${title}" channelId=${channelId} img=${img || 'none'} skipNotif=${skipNotif}`);
 
         await getMessaging(a).send({
             token,
-            ...(!skipNotif ? { notification: { title, body, imageUrl: img } } : {}),
+            ...(!skipNotif ? { 
+                notification: { 
+                    title, 
+                    body, 
+                    ...(img ? { imageUrl: img } : {}) 
+                } 
+            } : {}),
             data: {
                 ...data,
                 title,
@@ -106,7 +97,7 @@ export async function sendFCM(
                         sound: data.sound || 'default', 
                         channelId: channelId, 
                         icon: 'ic_notification',
-                        imageUrl: img,
+                        ...(img ? { imageUrl: img } : {}),
                         priority: 'high',
                         visibility: 'public',
                         defaultSound: true,
@@ -120,7 +111,7 @@ export async function sendFCM(
                     'apns-push-type': 'alert',
                 },
                 payload: { aps: { alert: { title, body }, sound: 'default', badge: 1, 'content-available': 1 } },
-                fcmOptions: { imageUrl: img },
+                ...(img ? { fcmOptions: { imageUrl: img } } : {}),
             },
         });
         console.log(`[FCM_SEND] ✅ FCM push delivered successfully to token=${tokenPrefix}`);

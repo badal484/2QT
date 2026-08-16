@@ -362,7 +362,14 @@ export async function notifyRidersInZone(
             [zoneId]
         );
         const sends = rows.map(({ device_token }: { device_token: string }) =>
-            sendFCM(device_token, title, body, { type: 'broadcast_message', ...data }).catch(() => {})
+            sendFCM(
+                device_token,
+                title,
+                body,
+                { type: 'new_available_mission', android_channel_id: 'order_dispatch_v2', sound: 'alert', ...data },
+                undefined,
+                true // data-only — Notifee renders the full-screen dispatch alert reliably in bg/killed
+            ).catch(() => {})
         );
         await Promise.allSettled(sends);
     } catch (err) {
@@ -393,9 +400,9 @@ export async function notifyKitchenStaff(
                 device_token, 
                 title, 
                 body, 
-                { ...data, body, sound: 'alert', android_channel_id: 'order_dispatch_v2' }, 
-                undefined, 
-                false
+                { ...data, body, sound: 'alert', android_channel_id: 'order_dispatch_v2' },
+                undefined,
+                true // data-only — Notifee renders the full-screen dispatch alert reliably in bg/killed
             ).catch(() => {})
         );
         await Promise.allSettled(sends);
