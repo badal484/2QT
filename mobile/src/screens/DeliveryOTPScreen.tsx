@@ -237,32 +237,38 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
         </View>
 
         {/* OTP boxes */}
-        <Animated.View style={[st.otpWrapper, { transform: [{ translateX: shakeAnim }] }]}>
-          <View style={st.boxRow}>
-            {Array.from({ length: 6 }).map((_, i) => {
-              const char = otp[i] || '';
-              const isCurrent = i === otp.length && focused;
-              const filled = char.length > 0;
-              return (
-                <View key={i} style={[st.otpBox, filled && st.otpBoxFilled, isCurrent && st.otpBoxActive]}>
-                  {isCurrent ? <View style={st.cursor} /> : <Text style={[st.otpChar, filled && { color: R.orange }]}>{char}</Text>}
-                </View>
-              );
-            })}
-          </View>
-          <TextInput
-            ref={inputRef}
-            style={st.hiddenInput}
-            keyboardType="number-pad"
-            caretHidden={true}
-            maxLength={6}
-            value={otp}
-            onChangeText={(t: string) => setOtp(t.replace(/\D/g, ''))}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            autoFocus
-          />
-        </Animated.View>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => inputRef.current?.focus()}
+          style={{ width: '100%' }}
+        >
+          <Animated.View style={[st.otpWrapper, { transform: [{ translateX: shakeAnim }] }]}>
+            <View style={st.boxRow} pointerEvents="none">
+              {Array.from({ length: 6 }).map((_, i) => {
+                const char = otp[i] || '';
+                const isCurrent = i === otp.length && focused;
+                const filled = char.length > 0;
+                return (
+                  <View key={i} style={[st.otpBox, filled && st.otpBoxFilled, isCurrent && st.otpBoxActive]}>
+                    {isCurrent ? <View style={st.cursor} /> : <Text style={[st.otpChar, filled && { color: R.orange }]}>{char}</Text>}
+                  </View>
+                );
+              })}
+            </View>
+            <TextInput
+              ref={inputRef}
+              style={st.hiddenInput}
+              keyboardType="number-pad"
+              caretHidden={true}
+              maxLength={6}
+              value={otp}
+              onChangeText={(t: string) => setOtp(t.replace(/\D/g, ''))}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              autoFocus
+            />
+          </Animated.View>
+        </TouchableOpacity>
 
         {/* Resend OTP */}
         <View style={st.resendRow}>
@@ -378,8 +384,8 @@ const st = StyleSheet.create({
   otpChar: { color: R.ink, fontSize: 24, fontWeight: '900' },
   cursor: { width: 2, height: 28, backgroundColor: R.orange },
   hiddenInput: {
-    position: 'absolute', top: 0, left: 20, right: 20, bottom: 0,
-    opacity: 1, color: 'transparent', backgroundColor: 'transparent', fontSize: 1,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    opacity: 0.01, color: 'transparent', backgroundColor: 'transparent', fontSize: 1, zIndex: 10,
   },
 
   resendRow: {
