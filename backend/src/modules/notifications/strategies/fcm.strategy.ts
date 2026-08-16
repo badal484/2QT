@@ -16,8 +16,11 @@ export class FCMStrategy implements NotificationChannelStrategy {
         try {
             const { userId, type, title, body, data = {}, appType, imageUrl, notifId } = payload;
 
-            // 1. Fetch active tokens for user (optionally scoped by appType)
-            const tokens = await DeviceTokenService.getActiveTokensForUser(userId, appType);
+            // 1. Fetch active tokens for user (scoped by appType with fallback to any active token)
+            let tokens = await DeviceTokenService.getActiveTokensForUser(userId, appType);
+            if (!tokens || tokens.length === 0) {
+                tokens = await DeviceTokenService.getActiveTokensForUser(userId);
+            }
 
             if (!tokens || tokens.length === 0) {
                 return { success: true, channel: this.name, deliveredCount: 0 };

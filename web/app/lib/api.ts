@@ -2,7 +2,7 @@ const getApiUrl = () => {
   const rawBackend = (
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.BACKEND_URL ||
-    'https://twoqt-3kjw.onrender.com/api/v1'
+    'https://twoqt-1.onrender.com/api/v1'
   ).replace(/\/$/, '');
   return rawBackend.endsWith('/api/v1') ? rawBackend : `${rawBackend}/api/v1`;
 };

@@ -5,7 +5,7 @@ export const CreateBroadcastSchema = z.object({
     body: z.string().optional(),
     message: z.string().optional(),
     imageUrl: z.string().optional().or(z.literal('')),
-    targetType: z.enum(['all', 'buyers', 'riders', 'kitchens', 'zone', 'users']).optional(),
+    targetType: z.enum(['all', 'everyone', 'buyers', 'riders', 'kitchens', 'zone', 'users']).optional(),
     segment: z.string().optional(),
     audience: z.string().optional(),
     zoneId: z.string().optional(),
