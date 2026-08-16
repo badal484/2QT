@@ -541,10 +541,12 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
                 <View style={s.actionBtnRow}>
                   <Text style={s.actionBtnText}>
                     {canPickup
-                      ? allItemsChecked
+                      ? (allItemsChecked
                         ? "I've Picked Up the Order"
-                        : `Verify items (${checkedItems.size}/${totalItems})`
-                      : 'Arrived at Customer'}
+                        : `Verify items (${checkedItems.size}/${totalItems})`)
+                      : isOutForDelivery
+                      ? 'Arrived at Customer'
+                      : 'Waiting for Kitchen...'}
                   </Text>
                   <ChevronRight size={20} color={R.white} strokeWidth={2.5} />
                 </View>
