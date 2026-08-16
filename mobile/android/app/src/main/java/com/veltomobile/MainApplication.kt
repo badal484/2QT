@@ -23,6 +23,38 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    createNativeNotificationChannels()
     loadReactNative(this)
+  }
+
+  private fun createNativeNotificationChannels() {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+      val notificationManager = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+
+      val promoChannel = android.app.NotificationChannel(
+        "promotions_v5",
+        "Promotions & Offers",
+        android.app.NotificationManager.IMPORTANCE_HIGH
+      ).apply {
+        description = "Promotions & Broadcast Announcements"
+        enableVibration(true)
+        vibrationPattern = longArrayOf(0, 500, 250, 500)
+        enableLights(true)
+      }
+
+      val orderChannel = android.app.NotificationChannel(
+        "order_updates_v5",
+        "Order Updates",
+        android.app.NotificationManager.IMPORTANCE_HIGH
+      ).apply {
+        description = "Order Status Updates"
+        enableVibration(true)
+        vibrationPattern = longArrayOf(0, 500, 250, 500)
+        enableLights(true)
+      }
+
+      notificationManager.createNotificationChannel(promoChannel)
+      notificationManager.createNotificationChannel(orderChannel)
+    }
   }
 }
