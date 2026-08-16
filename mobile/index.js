@@ -21,6 +21,8 @@ try {
             return;
         }
 
+        const notification = remoteMessage?.notification;
+        const data = remoteMessage?.data || {};
         const title = (notification?.title || data.title || '').trim();
         const body = (notification?.body || data.body || data.message || '').trim();
         const appType = data.appType || 'buyer';
