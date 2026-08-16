@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import {
   ArrowLeft, MapPin, Package, ChefHat, Bike,
-  CircleCheck, ShoppingBag, MessageCircle, Phone, UserCircle, Check, ShieldCheck,
+  CircleCheck, ShoppingBag, MessageCircle, Phone, UserCircle, Check, ShieldCheck, FileText, Download,
 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
@@ -319,30 +319,8 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          {/* Rider card / Invoice card */}
-          {status === 'delivered' ? (
-            o?.invoice_url ? (
-              <Animated.View entering={FadeInDown.delay(80).duration(300)}>
-                <View style={[styles.riderCard, styles.riderCardGreen]}>
-                  <View style={[styles.riderAvatar, { backgroundColor: tokens.colors.primary }]}>
-                    <Check size={22} color={tokens.colors.textInverse} strokeWidth={3} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text allowFontScaling={false} style={[styles.riderMeta, { color: tokens.colors.primary }]}>FINANCIAL RECORD</Text>
-                    <Text allowFontScaling={false} style={styles.riderName}>Invoice is Ready</Text>
-                  </View>
-                  <PressableScale
-                    style={[styles.riderAction, { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.primary }]}
-                    onPress={() => Linking.openURL(o.invoice_url)}
-                    accessibilityRole="button"
-                    accessibilityLabel="View invoice"
-                  >
-                    <Text allowFontScaling={false} style={{ color: tokens.colors.textInverse, fontFamily: tokens.typography.family.extrabold, fontSize: 10 }}>VIEW</Text>
-                  </PressableScale>
-                </View>
-              </Animated.View>
-            ) : null
-          ) : status === 'cancelled' ? null : (
+          {/* Rider card */}
+          {status === 'delivered' || status === 'cancelled' ? null : (
             <Animated.View entering={FadeInDown.delay(80).duration(300)}>
               <View
                 style={[
