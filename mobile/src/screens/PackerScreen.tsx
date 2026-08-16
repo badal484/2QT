@@ -2,7 +2,7 @@ import { tokens } from '../theme/tokens';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StatusBar, StyleSheet, Alert,
+  ActivityIndicator, StatusBar, StyleSheet, Alert, RefreshControl,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,109 +30,111 @@ const G = {
   faint: 'rgba(255,255,255,0.05)',
 };
 
-function elapsed(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60) return `${diff}s`;
-  const m = Math.floor(diff / 60);
-  if (m < 60) return `${m}m`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
+interface OrderItem {
+  id: string;
+  name: string;
+  quantity: number;
 }
 
-function LiveClock() {
-  const [t, setT] = useState(new Date());
-  useEffect(() => {
-    const id = setInterval(() => setT(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <Text style={styles.clock}>
-      {t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
-    </Text>
-  );
-}
-
-interface OrderItem { name: string; quantity: number; special_instructions?: string; }
 interface Order {
   id: string;
   display_id: string;
   customer_name: string;
-  updated_at: string;
+  created_at: string;
   items: OrderItem[];
 }
 
-const OrderPackCard = ({ order, onPacked }: { order: Order; onPacked: () => void }) => {
-  const [checked, setChecked] = useState<Record<number, boolean>>({});
-  const totalItems = order.items.reduce((s, i) => s + i.quantity, 0);
-  const checkedCount = Object.values(checked).filter(Boolean).length;
-  const allChecked = checkedCount >= order.items.length;
+const LiveClock = () => {
+  const [time, setTime] = useState(() =>
+    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  );
+  useEffect(() => {
+    const t = setInterval(() => {
+      setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <Text style={styles.clock}>{time}</Text>;
+};
 
-  const toggle = (i: number) =>
-    setChecked(prev => ({ ...prev, [i]: !prev[i] }));
+const OrderPackCard = ({ order, onPacked }: { order: Order; onPacked: () => void }) => {
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+
+  const toggle = (id: string) => {
+    setChecked(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const totalItems = order.items.length;
+  const checkedCount = order.items.filter(i => checked[i.id]).length;
+  const isAllChecked = totalItems > 0 && checkedCount === totalItems;
+
+  const elapsedMins = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isAllChecked ? styles.cardReady : null]}>
       {/* Header */}
       <View style={styles.cardHeader}>
         <View>
           <Text style={styles.orderId}>#{order.display_id}</Text>
           <Text style={styles.customerName}>{order.customer_name}</Text>
         </View>
-        <View style={styles.ageChip}>
-          <Clock size={10} color={G.amber} />
-          <Text style={styles.ageText}>{elapsed(order.updated_at)}</Text>
+        <View style={styles.badge}>
+          <Clock size={12} color={G.amber} />
+          <Text style={styles.badgeText}>{elapsedMins}m</Text>
         </View>
       </View>
 
-      {/* Item checklist */}
-      <View style={styles.itemsSection}>
-        <Text style={styles.itemsLabel}>
-          {checkedCount}/{order.items.length} ITEMS CHECKED
+      {/* Checklist */}
+      <View style={styles.itemList}>
+        <Text style={styles.checkProgress}>
+          {checkedCount}/{totalItems} ITEMS CHECKED
         </Text>
-        {order.items.map((item, i) => (
-          <TouchableOpacity
-            key={i}
-            style={[styles.itemRow, checked[i] && styles.itemRowChecked]}
-            onPress={() => toggle(i)}
-            activeOpacity={0.7}
-          >
-            {checked[i]
-              ? <CheckSquare size={18} color={G.green} />
-              : <Square size={18} color={G.muted} />
-            }
-            <View style={styles.itemTextWrap}>
-              <Text style={[styles.itemName, checked[i] && styles.itemNameChecked]}>
+
+        {order.items.map(item => {
+          const isDone = !!checked[item.id];
+          return (
+            <TouchableOpacity
+              key={item.id}
+              activeOpacity={0.7}
+              onPress={() => toggle(item.id)}
+              style={[styles.itemRow, isDone ? styles.itemRowChecked : null]}
+            >
+              {isDone ? (
+                <CheckSquare size={20} color={G.green} />
+              ) : (
+                <Square size={20} color={G.dim} />
+              )}
+              <Text style={[styles.itemName, isDone ? styles.itemNameChecked : null]}>
                 {item.quantity}× {item.name}
               </Text>
-              {!!item.special_instructions && (
-                <Text style={styles.itemNote}>{item.special_instructions}</Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Pack button */}
+      {/* Action Button */}
       <TouchableOpacity
-        style={[styles.packBtn, allChecked && styles.packBtnReady]}
-        onPress={onPacked}
         activeOpacity={0.8}
+        disabled={!isAllChecked}
+        onPress={onPacked}
+        style={[styles.packBtn, isAllChecked ? styles.packBtnActive : styles.packBtnDisabled]}
       >
-        <CheckCircle2 size={16} color={allChecked ? '#000' : G.muted} strokeWidth={2.5} />
-        <Text style={[styles.packBtnText, allChecked && styles.packBtnTextReady]}>
-          {allChecked ? 'MARK PACKED' : `CHECK ALL ITEMS FIRST (${totalItems - checkedCount} left)`}
+        <CheckCircle2 size={18} color={isAllChecked ? G.bg : G.muted} />
+        <Text style={[styles.packBtnText, isAllChecked ? styles.packBtnTextActive : null]}>
+          MARK PACKED
         </Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-const PackerScreen = () => {
+export const PackerScreen = () => {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   const { showDialog } = useFeedback();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['packer-orders'],
     queryFn: () => api.get('/kitchen/packer/orders'),
     refetchInterval: 10000,
@@ -193,16 +195,27 @@ const PackerScreen = () => {
           <Text style={styles.loaderText}>LOADING QUEUE</Text>
         </View>
       ) : orders.length === 0 ? (
-        <View style={styles.empty}>
-          <Package size={48} color={G.muted} strokeWidth={1.2} />
-          <Text style={styles.emptyTitle}>Queue Empty</Text>
-          <Text style={styles.emptyBody}>Orders ready to pack will appear here.</Text>
-        </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.scrollContent, { flexGrow: 1, justifyContent: 'center' }]}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} colors={[G.amber]} tintColor={G.amber} />
+          }
+        >
+          <View style={styles.empty}>
+            <Package size={48} color={G.muted} strokeWidth={1.2} />
+            <Text style={styles.emptyTitle}>Queue Empty</Text>
+            <Text style={styles.emptyBody}>Orders ready to pack will appear here.</Text>
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} colors={[G.amber]} tintColor={G.amber} />
+          }
         >
           <View style={styles.queueHeader}>
             <Text style={styles.queueCount}>{orders.length} ORDER{orders.length !== 1 ? 'S' : ''} TO PACK</Text>
