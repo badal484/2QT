@@ -256,7 +256,7 @@ const HomeScreen = ({ navigation }: any) => {
                   if (offer.discount_type === 'flat') {
                       discount = offer.discount_flat_paise || 0;
                   } else if (offer.discount_type === 'percent' || offer.discount_type === 'percentage') {
-                      discount = Math.floor((basePrice * (offer.discount_percent || 0)) / 100);
+                      discount = Math.floor((basePrice * (parseFloat(offer.discount_percent || '0') || 0)) / 100);
                       if (offer.max_discount_paise && discount > offer.max_discount_paise) {
                           discount = offer.max_discount_paise;
                       }
