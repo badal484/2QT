@@ -383,7 +383,7 @@ function LogPanel() {
       </div>
 
       {loading ? (
-        <SkeletonList count={5} />
+        <SkeletonList rows={5} />
       ) : (
         <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900">
           <table className="w-full text-left text-xs">
@@ -426,7 +426,7 @@ function LogPanel() {
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
-export default function NotificationsTab() {
+export function NotificationsTab() {
   const [activeTab, setActiveTab] = useState<"templates" | "broadcast" | "log">("broadcast");
   const [templates, setTemplates] = useState<NotifTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -474,7 +474,7 @@ export default function NotificationsTab() {
 
       {activeTab === "templates" && (
         loading ? (
-          <SkeletonList count={4} />
+          <SkeletonList rows={4} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {templates.map(tmpl => (
@@ -488,3 +488,5 @@ export default function NotificationsTab() {
     </div>
   );
 }
+
+export default NotificationsTab;
