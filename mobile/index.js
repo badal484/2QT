@@ -13,6 +13,14 @@ enableScreens(false);
 try {
     messaging().setBackgroundMessageHandler(async remoteMessage => {
         console.log('[FCM Background] Remote message received:', remoteMessage);
+        
+        // If Android OS native FCM SDK already displayed the notification banner (notification object exists),
+        // suppress duplicate JS Notifee display call to prevent double banners on system tray.
+        if (remoteMessage?.notification) {
+            console.log('[FCM Background] Native FCM banner rendered by Android OS. Suppressing duplicate JS banner.');
+            return;
+        }
+
         const notification = remoteMessage?.notification;
         const data = remoteMessage?.data || {};
 
