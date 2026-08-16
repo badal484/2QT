@@ -163,7 +163,7 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
              LEFT JOIN order_items oi ON oi.order_id = o.id
              LEFT JOIN menu_items m ON oi.menu_item_id = m.id
              WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
-               AND o.created_at > NOW() - INTERVAL '48 hours'
+               AND o.created_at > NOW() - INTERVAL '90 DAYS'
              GROUP BY o.id, u.id, k.id
              ORDER BY o.created_at ASC`
         );
@@ -180,7 +180,7 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
              LEFT JOIN order_items oi ON oi.order_id = o.id
              LEFT JOIN menu_items m ON oi.menu_item_id = m.id
              WHERE o.kitchen_id = $1 AND o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
-               AND o.created_at > NOW() - INTERVAL '48 hours'
+               AND o.created_at > NOW() - INTERVAL '90 DAYS'
              GROUP BY o.id, u.id, k.id
              ORDER BY o.created_at ASC`,
             [kitchenId]
