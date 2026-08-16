@@ -57,14 +57,18 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     if (!socket) return;
     socket.emit('join_order', order.id);
     const handleStatusUpdate = (data: any) => {
-      if (data.orderId === order.id) {
+      if (data.orderId === order.id || data.id === order.id) {
         setCurrentStatus(data.status);
         queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       }
     };
     socket.on('order_status_update', handleStatusUpdate);
+    socket.on('order_updated', handleStatusUpdate);
     // Pass handler ref so we don't remove other screens' listeners
-    return () => { socket.off('order_status_update', handleStatusUpdate); };
+    return () => {
+      socket.off('order_status_update', handleStatusUpdate);
+      socket.off('order_updated', handleStatusUpdate);
+    };
   }, [order.id, queryClient]);
 
   // Geolocation — share location
@@ -118,23 +122,8 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     },
   });
 
-
-
-  const unreachableMutation = useMutation({
-    mutationFn: (action: 'retry' | 'leave_at_door' | 'return') =>
-      api.post(`/riders/orders/${order.id}/customer-unreachable`, { action }),
-    onSuccess: (_, action) => {
-      setShowUnreachableModal(false);
-      if (action === 'retry') showDialog({ title: 'Notification Sent', message: 'Customer has been notified. Wait a moment and try again.', confirmText: 'Okay', type: 'info' });
-      else if (action === 'leave_at_door') showDialog({ title: 'Confirmed', message: 'Leave the order at the door and take a photo as proof.', confirmText: 'Okay', type: 'success' });
-      else { showDialog({ title: 'Return Order', message: 'Please return the order to the kitchen.', confirmText: 'Okay', type: 'info' }); navigation.goBack(); }
-    },
-    onError: () => showDialog({ title: 'Error', message: 'Could not send update. Please try again.', confirmText: 'Okay', type: 'error' }),
-  });
-
-
   const sosMutation = useMutation({
-    mutationFn: async (alertType: string) => {
+    mutationFn: async (alertType: 'emergency' | 'safety_hazard' | 'accident') => {
       // Try a fresh GPS fix first; fall back to cached watchPosition value
       let { lat, lng } = currentLocationRef.current;
       try {
@@ -170,10 +159,28 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     onError: () => showDialog({ title: 'Error', message: 'Could not send SOS. Please call 112 directly.', confirmText: 'Okay', type: 'error' }),
   });
 
-  const goingToKitchen = ['confirmed', 'preparing', 'ready_for_pickup'].includes(currentStatus);
+  const unreachableMutation = useMutation({
+    mutationFn: (actionType: string) => api.post(`/riders/orders/${order.id}/unreachable`, { actionType }),
+    onSuccess: (_, actionType) => {
+      setShowUnreachableModal(false);
+      if (actionType === 'cancel_order') {
+        showDialog({ title: 'Order Cancelled', message: 'The order has been cancelled after 5 minutes of customer unreachability.', confirmText: 'Okay', type: 'info' });
+        navigation.reset({ index: 0, routes: [{ name: 'RiderTabs' }] });
+      } else if (actionType === 'start_timer') {
+        showDialog({ title: 'Timer Started', message: '5-minute unreachability timer started. Customer notified via push and SMS.', confirmText: 'Okay', type: 'info' });
+      } else {
+        showDialog({ title: 'Customer Notified', message: 'A high-priority alert and SMS have been sent to the customer.', confirmText: 'Okay', type: 'info' });
+      }
+    },
+    onError: (err: any) => {
+      showDialog({ title: 'Error', message: err?.response?.data?.message || 'Action failed. Please try again.', confirmText: 'Okay', type: 'error' });
+    },
+  });
+
+  const goingToKitchen = ['confirmed', 'preparing', 'packing', 'ready_for_pickup'].includes(currentStatus);
   const canPickup = currentStatus === 'ready_for_pickup';
   const isOutForDelivery = currentStatus === 'out_for_delivery';
-  const isWaiting = ['confirmed', 'preparing'].includes(currentStatus);
+  const isWaiting = ['confirmed', 'preparing', 'packing'].includes(currentStatus);
   const isDelivered = currentStatus === 'delivered';
   const currentStep = statusToStep(currentStatus);
   const totalItems = order.items?.length || 0;
