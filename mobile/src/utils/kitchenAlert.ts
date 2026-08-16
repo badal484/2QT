@@ -1,39 +1,61 @@
-import { Platform, Vibration } from 'react-native';
-import Sound from 'react-native-sound';
+import { Platform, Vibration, NativeModules } from 'react-native';
+import { safeNotifee, AndroidImportance } from '../services/notifeeSafe';
 
-Sound.setCategory('Playback', true);
+let SoundPkg: any = null;
+let alertSound: any = null;
 
-let alertSound: Sound | null = null;
+try {
+  if (NativeModules.RNSound || NativeModules.SoundManager || NativeModules.Sound) {
+    const pkg = require('react-native-sound');
+    SoundPkg = pkg?.default || pkg;
+    if (SoundPkg && typeof SoundPkg.setCategory === 'function') {
+      SoundPkg.setCategory('Playback', true);
+    }
+  }
+} catch (e) {
+  console.warn('[KitchenAlert] Safe load react-native-sound warning:', e);
+}
 
 export function playKitchenAlert() {
   try {
-    // Aggressive vibration for kitchen orders (approx 6 seconds to match audio)
+    // 1. Aggressive 6-second multi-pulse vibration
     Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800, 400, 800]);
 
-    const fileName = Platform.OS === 'android' ? 'alert' : 'alert.mp3';
+    // 2. Play sound via Notifee local alert notification if available
+    if (safeNotifee.isAvailable) {
+      safeNotifee.displayNotification({
+        title: '⚡ New Order Assigned!',
+        body: 'You have a new active delivery order.',
+        android: {
+          channelId: 'rider_alerts',
+          importance: AndroidImportance.HIGH,
+          pressAction: { id: 'default' },
+        },
+      }).catch(() => {});
+    }
 
-    if (!alertSound) {
-      alertSound = new Sound(fileName, Sound.MAIN_BUNDLE, (error) => {
-        if (error) {
-          console.warn("[KitchenAlert] Sound load error:", error);
-          alertSound = null; // Clear broken instance
-          return;
-        }
-        alertSound?.setVolume(1.0);
-        alertSound?.play((success) => {
-          if (!success) {
-            console.warn("[KitchenAlert] Sound playback failed");
+    // 3. Play sound via react-native-sound if native module is present
+    if (SoundPkg) {
+      const fileName = Platform.OS === 'android' ? 'alert' : 'alert.mp3';
+      if (!alertSound) {
+        alertSound = new SoundPkg(fileName, SoundPkg.MAIN_BUNDLE, (error: any) => {
+          if (error) {
+            console.warn('[KitchenAlert] Sound load error:', error);
+            alertSound = null;
+            return;
           }
+          alertSound?.setVolume(1.0);
+          alertSound?.play();
         });
-      });
-    } else {
-      alertSound.stop(() => {
-        alertSound?.setCurrentTime(0);
-        alertSound?.setVolume(1.0);
-        alertSound?.play();
-      });
+      } else {
+        alertSound.stop(() => {
+          alertSound?.setCurrentTime(0);
+          alertSound?.setVolume(1.0);
+          alertSound?.play();
+        });
+      }
     }
   } catch (e) {
-    console.warn("[KitchenAlert] Failed to play kitchen alert:", e);
+    console.warn('[KitchenAlert] Failed to play kitchen alert sound:', e);
   }
 }
