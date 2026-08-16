@@ -21,20 +21,7 @@ export function playKitchenAlert() {
     // 1. Aggressive 6-second multi-pulse vibration
     Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800, 400, 800]);
 
-    // 2. Play sound via Notifee local alert notification if available
-    if (safeNotifee.isAvailable) {
-      safeNotifee.displayNotification({
-        title: '⚡ New Order Assigned!',
-        body: 'You have a new active delivery order.',
-        android: {
-          channelId: 'rider_alerts',
-          importance: AndroidImportance.HIGH,
-          pressAction: { id: 'default' },
-        },
-      }).catch(() => {});
-    }
-
-    // 3. Play sound via react-native-sound if native module is present
+    // 2. Play sound via react-native-sound if native module is present
     if (SoundPkg) {
       const fileName = Platform.OS === 'android' ? 'alert' : 'alert.mp3';
       if (!alertSound) {

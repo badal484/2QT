@@ -118,6 +118,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
   useFocusEffect(
     useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       queryClient.invalidateQueries({ queryKey: ['rider-active-orders'] });
       queryClient.invalidateQueries({ queryKey: ['rider-earnings'] });
       queryClient.invalidateQueries({ queryKey: ['rider-zones'] });
