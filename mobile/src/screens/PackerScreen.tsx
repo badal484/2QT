@@ -58,17 +58,17 @@ const LiveClock = () => {
 };
 
 const OrderPackCard = ({ order, onPacked }: { order: Order; onPacked: () => void }) => {
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [checked, setChecked] = useState<Record<number, boolean>>({});
 
-  const toggle = (id: string) => {
-    setChecked(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggle = (idx: number) => {
+    setChecked(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
   const totalItems = order.items.length;
-  const checkedCount = order.items.filter(i => checked[i.id]).length;
+  const checkedCount = order.items.filter((_, idx) => checked[idx]).length;
   const isAllChecked = totalItems > 0 && checkedCount === totalItems;
 
-  const elapsedMins = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000);
+  const elapsedMins = Math.max(0, Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000));
 
   return (
     <View style={[styles.card, isAllChecked ? styles.cardReady : null]}>
@@ -90,13 +90,14 @@ const OrderPackCard = ({ order, onPacked }: { order: Order; onPacked: () => void
           {checkedCount}/{totalItems} ITEMS CHECKED
         </Text>
 
-        {order.items.map(item => {
-          const isDone = !!checked[item.id];
+        {order.items.map((item, idx) => {
+          const isDone = !!checked[idx];
+          const itemKey = `item-${order.id}-${idx}`;
           return (
             <TouchableOpacity
-              key={item.id}
+              key={itemKey}
               activeOpacity={0.7}
-              onPress={() => toggle(item.id)}
+              onPress={() => toggle(idx)}
               style={[styles.itemRow, isDone ? styles.itemRowChecked : null]}
             >
               {isDone ? (
