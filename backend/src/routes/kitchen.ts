@@ -203,6 +203,7 @@ router.post('/orders/complete-all-live', authenticate, requireRole('chef', 'kitc
              RETURNING id, display_id`
         );
         res.json({ success: true, count: rows.length, completedOrders: rows });
+    } catch (err: any) {
         console.error('[kitchen/orders/complete-all-live]', err);
         res.status(500).json({ error: err.message || 'Failed to complete live orders' });
     }
