@@ -439,8 +439,8 @@ export function MenuOffersTab() {
                 { value: "percent", label: "Percentage (%)" },
                 { value: "flat", label: "Flat Amount (₹)" },
               ])}
-              {form.discount_type === "percent"
-                ? f("Discount %", "discount_percent", "number", "e.g. 50")
+              {form.discount_type === "percent" || form.discount_type === "percentage"
+                ? f("Discount Percentage (%)", "discount_percent", "number", "e.g. 50")
                 : f("Flat Discount (paise)", "discount_flat_paise", "number", "e.g. 5000 = ₹50")}
               {f("Max Discount Cap (paise)", "max_discount_paise", "number", "e.g. 15000 = ₹150 cap")}
               <div />
