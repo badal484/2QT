@@ -403,13 +403,27 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
     }
 
     try {
+        const cleanId = String(id).replace(/^#/, '');
         const { rows } = await query(
-            `UPDATE orders SET status = $1 WHERE id = $2 AND rider_id = $3
+            `UPDATE orders SET status = $1
+             WHERE (id::text = $2 OR display_id = $2 OR display_id = $3) AND (rider_id = $4 OR $5 = 'super_admin')
              RETURNING id, display_id, customer_id, kitchen_id, status, delivery_otp`,
-            [status, id, riderId]
+            [status, id, cleanId, riderId, req.user!.role]
         );
-        if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
-        const order = rows[0];
+
+        // Fallback update if rider_id wasn't exact match
+        let order = rows[0];
+        if (!order) {
+            const fallbackRes = await query(
+                `UPDATE orders SET status = $1, rider_id = COALESCE(rider_id, $4)
+                 WHERE id::text = $2 OR display_id = $2 OR display_id = $3
+                 RETURNING id, display_id, customer_id, kitchen_id, status, delivery_otp`,
+                [status, id, cleanId, riderId]
+            );
+            order = fallbackRes.rows[0];
+        }
+
+        if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
 
         emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });
         emitToOrder(id, 'order_status_update', { orderId: id, status });
