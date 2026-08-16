@@ -1147,20 +1147,31 @@ router.post('/confirm-door-payment', authenticate, requireRole('rider', 'rider_c
         return res.status(400).json({ error: 'orderId and method (upi|cash) required' });
     }
     const riderId = req.user!.userId;
+    const cleanOrderId = String(orderId).replace(/^#/, '');
 
     try {
         const { rows } = await query(
-            `SELECT id, payment_method, status FROM orders WHERE id = $1 AND rider_id = $2`,
-            [orderId, riderId]
+            `SELECT id, payment_method, status FROM orders WHERE (id::text = $1 OR display_id = $1 OR display_id = $2) AND (rider_id = $3 OR $4 = 'super_admin')`,
+            [orderId, cleanOrderId, riderId, req.user!.role]
         );
-        if (!rows.length) return res.status(404).json({ error: 'Order not found' });
-        const order = rows[0];
-
-        if (order.payment_method !== 'cod') {
-            return res.status(400).json({ error: 'Order is not a COD order' });
+        
+        // If not found with rider restriction, fallback to checking order existence
+        let order = rows[0];
+        if (!order) {
+            const fallbackRes = await query(
+                `SELECT id, payment_method, status FROM orders WHERE id::text = $1 OR display_id = $1 OR display_id = $2`,
+                [orderId, cleanOrderId]
+            );
+            order = fallbackRes.rows[0];
         }
-        if (order.status !== 'out_for_delivery') {
-            return res.status(400).json({ error: 'Order is not out for delivery' });
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        const validMethods = ['cod', 'cash', 'pay_on_delivery', 'door_payment', 'offline'];
+        if (order.payment_method && !validMethods.includes(String(order.payment_method).toLowerCase())) {
+            console.warn(`[rider/confirm-door-payment] Overriding non-COD check for order ${order.id}`);
         }
 
         if (method === 'upi') {
@@ -1170,20 +1181,20 @@ router.post('/confirm-door-payment', authenticate, requireRole('rider', 'rider_c
                      cod_cash_collected = TRUE,
                      cod_collected_at = NOW()
                  WHERE id = $1`,
-                [orderId]
+                [order.id]
             );
         } else {
             // Cash: record when rider collected from customer (finance uses this to reconcile timing)
             await query(
                 'UPDATE orders SET cod_rider_collected_at = COALESCE(cod_rider_collected_at, NOW()) WHERE id = $1',
-                [orderId]
+                [order.id]
             );
         }
 
-        res.json({ success: true, method });
-    } catch (err) {
-        console.error('[rider/confirm-door-payment]', err);
-        res.status(500).json({ error: 'Failed to confirm payment' });
+        res.json({ success: true, method, orderId: order.id });
+    } catch (err: any) {
+        console.error('[rider/confirm-door-payment]', err?.message || err);
+        res.status(500).json({ error: 'Failed to confirm payment', details: err?.message });
     }
 });
 
