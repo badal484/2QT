@@ -162,15 +162,8 @@ const PackerScreen = () => {
   const orders: Order[] = data?.orders ?? [];
 
   const handlePack = useCallback((order: Order) => {
-    showDialog({
-      title: 'Confirm Pack',
-      message: `Mark order #${order.display_id} as packed and ready for rider?`,
-      confirmText: 'Mark Packed',
-      cancelText: 'Cancel',
-      type: 'info',
-      onConfirm: () => packMutation.mutate(order.id)
-    });
-  }, [packMutation, showDialog]);
+    packMutation.mutate(order.id);
+  }, [packMutation]);
 
   return (
     <View style={styles.root}>
