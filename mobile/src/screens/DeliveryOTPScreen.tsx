@@ -187,12 +187,22 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
 
   const resendMutation = useMutation({
     mutationFn: () => api.post('/riders/resend-otp', { orderId }),
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       startCooldown();
-      showDialog({ title: 'OTP Resent ✅', message: 'The customer has been sent their OTP again via notification.', confirmText: 'Okay', type: 'success' });
+      showDialog({
+        title: 'OTP Resent ✅',
+        message: `Delivery OTP (Code: ${data?.otp || 'Sent'}) has been resent to the customer via notification.`,
+        confirmText: 'Okay',
+        type: 'success',
+      });
     },
-    onError: () => {
-      showDialog({ title: 'Failed', message: 'Could not resend the OTP. Please try again.', confirmText: 'Okay', type: 'error' });
+    onError: (err: any) => {
+      showDialog({
+        title: 'Failed',
+        message: err?.response?.data?.message || err?.response?.data?.error || 'Could not resend the OTP. Please try again.',
+        confirmText: 'Okay',
+        type: 'error',
+      });
     },
   });
 

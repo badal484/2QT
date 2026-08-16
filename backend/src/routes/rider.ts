@@ -444,24 +444,41 @@ router.post('/resend-otp', authenticate, requireRole('rider', 'rider_captain', '
     const riderId = req.user!.userId;
     try {
         const { rows } = await query(
-            `SELECT o.id, o.display_id, o.customer_id, o.delivery_otp, o.status
-             FROM orders o WHERE o.id = $1 AND o.rider_id = $2`,
-            [orderId, riderId]
+            `SELECT o.id, o.display_id, o.customer_id, o.delivery_otp, o.status, u.phone AS customer_phone
+             FROM orders o
+             JOIN users u ON u.id = o.customer_id
+             WHERE o.id = $1 AND (o.rider_id = $2 OR $3 = 'super_admin')`,
+            [orderId, riderId, req.user!.role]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
         const order = rows[0];
-        if (order.status !== 'out_for_delivery') return res.status(400).json({ error: 'ORDER_NOT_OUT_FOR_DELIVERY' });
 
-        // Re-send OTP notification to customer
+        // Generate a fresh 6-digit OTP if missing
+        let otpCode = order.delivery_otp;
+        if (!otpCode || String(otpCode).length < 4) {
+            otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+            await query(`UPDATE orders SET delivery_otp = $1 WHERE id = $2`, [otpCode, orderId]);
+        }
+
+        // 1. Emit live socket event directly to customer app
+        emitToUser(order.customer_id, 'delivery_otp_resent', {
+            orderId: order.id,
+            displayId: order.display_id,
+            otp: String(otpCode),
+        });
+
+        // 2. Send Push / WhatsApp / SMS notification to customer with structured vars
         NotificationService.send('order_out_for_delivery', {
             userId: order.customer_id,
-            displayId: order.display_id,
-            orderId: order.id,
-            riderName: 'Your rider',
-            otp: String(order.delivery_otp ?? ''),
+            vars: {
+                displayId: order.display_id,
+                orderId: order.id,
+                riderName: 'Your rider',
+                otp: String(otpCode),
+            },
         }).catch(() => {});
 
-        res.json({ success: true });
+        res.json({ success: true, otp: String(otpCode) });
     } catch (err) {
         console.error('[resend-otp]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
