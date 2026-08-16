@@ -56,7 +56,7 @@ const server = http.createServer((req, res) => {
     res.end();
 });
 
-const PORT = process.env.PORT || 8081;
+const PORT = process.env.WORKER_PORT || (process.env.NODE_ENV !== 'production' ? 8081 : (process.env.PORT || 8081));
 
 const start = async () => {
     try {

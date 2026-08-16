@@ -225,16 +225,6 @@ router.get('/', async (req, res) => {
             const { emitToAll } = require('../socket');
             emitToAll('kitchen_resumed', { kitchenId: k.id, zoneId });
             emitToAll('menu_updated', { zoneId });
-            // notify waiting customers
-            redis.sMembers(`pause_notify:${k.id}`).then((tokens: string[]) => {
-                if (!tokens.length) return;
-                redis.del(`pause_notify:${k.id}`).catch(() => {});
-                const { sendFCM } = require('../services/fcm.service');
-                tokens.forEach((token: string) =>
-                    sendFCM(token, '🍽️ Kitchen is back open!', "Place your order now — we're ready to cook.", { type: 'kitchen_resumed' })
-                        .catch(() => {})
-                );
-            }).catch(() => {});
         }).catch(() => {});
     }
 

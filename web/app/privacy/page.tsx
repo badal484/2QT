@@ -52,7 +52,7 @@ export default function PrivacyPage() {
             <ul className="space-y-2 list-disc list-inside text-zinc-400">
               <li>To create and manage your account</li>
               <li>To process and deliver your orders</li>
-              <li>To send order status notifications via push, WhatsApp, or SMS</li>
+              <li>To send order status notifications via the app and WhatsApp</li>
               <li>To process payments and refunds</li>
               <li>To detect and prevent fraud</li>
               <li>To improve our products and services</li>
@@ -69,7 +69,7 @@ export default function PrivacyPage() {
               <li><strong className="text-zinc-300">Kitchen partners:</strong> Your order details (no personal contact info) for preparation.</li>
               <li><strong className="text-zinc-300">Payment processor (Razorpay):</strong> For transaction processing, governed by Razorpay's privacy policy.</li>
               <li><strong className="text-zinc-300">Communication providers (MSG91, Interakt):</strong> Your phone number, for OTP and WhatsApp order notifications.</li>
-              <li><strong className="text-zinc-300">Firebase (Google):</strong> For authentication and push notifications.</li>
+              <li><strong className="text-zinc-300">Firebase (Google):</strong> For authentication.</li>
               <li><strong className="text-zinc-300">ImageKit:</strong> For image hosting and delivery.</li>
               <li><strong className="text-zinc-300">Law enforcement:</strong> When required by law or to protect rights and safety.</li>
             </ul>
@@ -91,8 +91,8 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-white font-semibold text-base mb-3">8. Push Notifications</h2>
-            <p>With your permission, we send push notifications for order updates, promotions, and account activity. You can disable notifications at any time in your device settings or in the app's notification preferences screen. Promotional notifications are automatically suppressed between 10pm and 8am.</p>
+            <h2 className="text-white font-semibold text-base mb-3">8. Notifications</h2>
+            <p>We send in-app and WhatsApp notifications for order updates, promotions, and account activity. You can manage these preferences at any time on the app's notification preferences screen. Promotional notifications are automatically suppressed between 10pm and 8am.</p>
           </section>
 
           <section>

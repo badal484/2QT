@@ -28,7 +28,6 @@ jest.mock('../app/lib/api', () => ({
   },
 }));
 
-jest.mock('../app/lib/webPush', () => ({ registerWebPush: jest.fn() }));
 jest.mock('../app/lib/socket', () => ({ initSocket: jest.fn(), getSocket: jest.fn(() => null) }));
 jest.mock('../hooks/useHaptics', () => ({
   useHaptics: () => ({ tap: jest.fn(), success: jest.fn(), error: jest.fn() }),

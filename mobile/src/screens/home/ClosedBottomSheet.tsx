@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated as RNAnimated, Easing, Image, PanResponder, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../../api/client';
 import { tokens } from '../../theme/tokens';
 import { isKitchenOpen, minutesUntilOpen, formatTime12h } from '../../utils/kitchenHours';
-import { getCurrentDeviceToken } from '../../services/push';
 
 export const ClosedBottomSheet = ({
   openingTime,
@@ -23,8 +21,6 @@ export const ClosedBottomSheet = ({
 }) => {
   const insets = useSafeAreaInsets();
   const [, setTick] = useState(0);
-  const [notifyRegistered, setNotifyRegistered] = useState(false);
-  const [notifyLoading, setNotifyLoading] = useState(false);
 
   useEffect(() => {
     const interval = paused ? 5000 : 30000;
@@ -41,18 +37,6 @@ export const ClosedBottomSheet = ({
     : null;
   const pauseMinsLeft = pauseSecsLeft !== null ? Math.floor(pauseSecsLeft / 60) : null;
   const pauseSecsRem = pauseSecsLeft !== null ? pauseSecsLeft % 60 : null;
-
-  const handleNotifyMe = useCallback(async () => {
-    if (!kitchenId || notifyRegistered) return;
-    setNotifyLoading(true);
-    try {
-      const token = await getCurrentDeviceToken();
-      if (!token) { setNotifyLoading(false); return; }
-      await api.post('/kitchen/pause-notify', { kitchenId, fcmToken: token });
-      setNotifyRegistered(true);
-    } catch { /* silently fail */ }
-    setNotifyLoading(false);
-  }, [kitchenId, notifyRegistered]);
 
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const headerHeight = Math.max(insets.top + 8, 12) + 128;
@@ -132,17 +116,6 @@ export const ClosedBottomSheet = ({
             ) : (
               <Text allowFontScaling={false} style={closedSS.body}>We'll reopen shortly — thank you for your patience.</Text>
             )}
-
-            <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[closedSS.notifyBtn, notifyRegistered && closedSS.notifyBtnDone]}
-              onPress={handleNotifyMe}
-              activeOpacity={0.8}
-              disabled={notifyRegistered || notifyLoading}
-            >
-              <Text allowFontScaling={false} style={[closedSS.notifyBtnText, notifyRegistered && closedSS.notifyBtnTextDone]}>
-                {notifyRegistered ? '✓ We\'ll notify you' : notifyLoading ? 'Setting up…' : '🔔 Notify me when open'}
-              </Text>
-            </TouchableOpacity>
           </>
         ) : (
           <>
@@ -246,27 +219,6 @@ const closedSS = StyleSheet.create({
     fontSize: 32,
     fontFamily: tokens.typography.family.black,
     color: tokens.colors.primary,
-  },
-  notifyBtn: {
-    width: '100%',
-    borderWidth: 1.5,
-    borderColor: tokens.colors.primary,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  notifyBtnDone: {
-    borderColor: tokens.colors.success ?? '#22c55e',
-    backgroundColor: (tokens.colors.success ?? '#22c55e') + '1A',
-  },
-  notifyBtnText: {
-    fontSize: 15,
-    fontFamily: tokens.typography.family.extrabold,
-    color: tokens.colors.primary,
-  },
-  notifyBtnTextDone: {
-    color: tokens.colors.success,
   },
   btn: {
     width: '100%',

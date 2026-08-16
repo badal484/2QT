@@ -10,7 +10,6 @@ import { NotificationService } from '../services/notification.service';
 import { scheduleTriggerSend, cancelTriggerJobs } from '../services/trigger.service';
 import { TWO_QT } from '../config/constants';
 import { getAppSetting, getAppSettingInt } from '../utils/appSettings';
-import { pushService } from '../services/push.service';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { PRIORITY_SLA } from './support';

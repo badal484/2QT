@@ -377,7 +377,7 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
 
         // Enqueue through BullMQ (same path as campaigns.ts) instead of firing every send
         // concurrently and directly — a large "All Customers"/"Everyone" broadcast could
-        // otherwise open thousands of simultaneous DB/Redis/FCM calls with no backpressure.
+        // otherwise open thousands of simultaneous DB/Redis calls with no backpressure.
         // The worker (concurrency: 10) drains this with automatic retry/backoff per user.
         //
         // Not awaited before responding — the enqueue itself depends on Redis, and this

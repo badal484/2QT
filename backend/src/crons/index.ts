@@ -4,7 +4,6 @@ import { redis, keys } from '../redis';
 import { notificationsQueue } from '../jobs/queues';
 import { TWO_QT } from '../config/constants';
 import { emitToKitchen, emitToAdmin, emitToRiders, emitToPartner } from '../socket';
-import { notifyKitchenStaff, notifyRidersInZone } from '../services/notification.service';
 import {
     ensureKitchenFundAccount, ensureRiderFundAccount,
     firePayout, isAutoPayConfigured,
@@ -180,23 +179,11 @@ export const initCrons = () => {
 
                     // SYSTEMATIC INTEGRATION: Notify Kitchen and Rider Pool
                     emitToKitchen(kitchenId, 'new_order', { orderId, displayId });
-                    notifyKitchenStaff(
-                        kitchenId,
-                        '🍽️ New Order!',
-                        `Order #${displayId} just came in — start preparing!`,
-                        { type: 'new_kitchen_order', orderId: String(orderId) }
-                    ).catch(() => {});
 
                     const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
                     const autoDispatchEnabled = settings[0]?.value === 'true';
                     if (!autoDispatchEnabled) {
                         emitToRiders('new_available_mission', { orderId, displayId, zoneId: s.zone_id }, s.zone_id);
-                        notifyRidersInZone(
-                            s.zone_id,
-                            '🛵 New Delivery Available!',
-                            `Order #${displayId} is ready for pickup nearby.`,
-                            { orderId: String(orderId), displayId, screen: 'RiderHome' }
-                        ).catch(() => {});
                     }
                 });
             } catch (err) {

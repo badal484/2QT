@@ -32,7 +32,6 @@ import { logout } from '../store/slices/authSlice';
 import { disconnectSocket } from '../socket/client';
 import { api } from '../api/client';
 import { haptics } from '../utils/haptics';
-import { registerDeviceToken } from '../services/push';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -93,7 +92,6 @@ const ProfileScreen = ({ navigation }: any) => {
 
   useFocusEffect(
     useCallback(() => {
-      registerDeviceToken(3, user?.phone).catch(() => {});
       if (isRider) {
         refetchRiderStats();
       } else {

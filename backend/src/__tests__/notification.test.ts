@@ -1,10 +1,6 @@
 import { redis } from '../redis';
 import { query } from '../db';
 
-jest.mock('../services/fcm.service', () => ({
-  sendFCM: jest.fn().mockResolvedValue('ok'),
-  isFCMConfigured: jest.fn().mockReturnValue(true),
-}));
 jest.mock('../jobs/queues', () => ({
   notificationsQueue: { add: jest.fn().mockResolvedValue({ id: 'job-1' }) },
   invoicesQueue: { add: jest.fn() },
@@ -12,16 +8,14 @@ jest.mock('../jobs/queues', () => ({
 }));
 
 import { deliverNotification, sendNotification } from '../services/notification.service';
-import { sendFCM } from '../services/fcm.service';
 
 const mockQuery = query as jest.Mock;
 const mockRedisGet = redis.get as jest.Mock;
 const mockRedisSetEx = redis.setEx as jest.Mock;
 
-const MOCK_USER: { id: string; phone: string; device_token: string | null; name: string } = {
+const MOCK_USER: { id: string; phone: string; name: string } = {
   id: 'user-1',
   phone: '919876543210',
-  device_token: 'fcm-token-abc123',
   name: 'Test User',
 };
 
@@ -41,6 +35,10 @@ function setupDeliveryMocks(user = MOCK_USER) {
     .mockResolvedValueOnce({ rows: [{ id: 'notif-1' }] }); // 4. notifications INSERT
 }
 
+function findInsertCall() {
+  return mockQuery.mock.calls.find((c: any[]) => typeof c[0] === 'string' && c[0].includes('INSERT INTO notifications'));
+}
+
 describe('deliverNotification', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -50,35 +48,26 @@ describe('deliverNotification', () => {
   it('returns early when user not found', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] });
     await deliverNotification('order_confirmed', { userId: 'ghost', vars: {} });
-    expect(sendFCM).not.toHaveBeenCalled();
+    expect(findInsertCall()).toBeUndefined();
   });
 
-  it('sends FCM when user has a device_token', async () => {
+  it('inserts a notification row with delivery_status "sent"', async () => {
     setupDeliveryMocks();
     await deliverNotification('order_confirmed', {
       userId: 'user-1',
       vars: { displayId: '2QT-000001', minutes: '25' },
     });
-    expect(sendFCM).toHaveBeenCalledWith(
-      MOCK_USER.device_token,
-      expect.stringContaining('Order Confirmed'),
-      expect.any(String),
-      expect.any(Object),
-      undefined
-    );
-  });
-
-  it('does not call FCM when device_token is null', async () => {
-    setupDeliveryMocks({ ...MOCK_USER, device_token: null });
-    await deliverNotification('order_confirmed', { userId: 'user-1', vars: {} });
-    expect(sendFCM).not.toHaveBeenCalled();
+    const insertCall = findInsertCall();
+    expect(insertCall).toBeDefined();
+    // params: [user.id, type, title, body, data, channel, delivery_status]
+    expect(insertCall![1][6]).toBe('sent');
   });
 
   it('skips delivery if dedupe key was already seen within 60s', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [MOCK_USER] }); // user found
     mockRedisGet.mockResolvedValueOnce('1'); // dedup hit
     await deliverNotification('order_confirmed', { userId: 'user-1', vars: {}, dedupeKey: 'order-1' });
-    expect(sendFCM).not.toHaveBeenCalled();
+    expect(findInsertCall()).toBeUndefined();
   });
 
   it('sets dedupe key in redis after successful delivery', async () => {
@@ -91,34 +80,27 @@ describe('deliverNotification', () => {
     );
   });
 
-  it('clears stale FCM token when FCM returns invalid_token', async () => {
-    (sendFCM as jest.Mock).mockResolvedValueOnce('invalid_token');
-    setupDeliveryMocks();
-    mockQuery.mockResolvedValueOnce({ rows: [] }); // UPDATE SET device_token = NULL
-
-    await deliverNotification('order_confirmed', { userId: 'user-1', vars: {} });
-
-    const clearCall = mockQuery.mock.calls.find((c: any[]) => c[0]?.includes('device_token = NULL'));
-    expect(clearCall).toBeDefined();
-  });
-
   it('interpolates template variables — riderName and otp appear in body', async () => {
     setupDeliveryMocks();
     await deliverNotification('order_out_for_delivery', {
       userId: 'user-1',
       vars: { riderName: 'Arjun', otp: '654321' },
     });
-    const [, , body] = (sendFCM as jest.Mock).mock.calls[0];
+    const insertCall = findInsertCall();
+    // params: [user.id, type, title, body, data, channel, delivery_status]
+    const body = insertCall![1][3];
     expect(body).toContain('654321');
   });
 
-  it('produces no un-replaced {{}} placeholders in FCM payload', async () => {
+  it('produces no un-replaced {{}} placeholders in the stored notification', async () => {
     setupDeliveryMocks();
     await deliverNotification('order_confirmed', {
       userId: 'user-1',
       vars: { displayId: '2QT-000042', minutes: '30' },
     });
-    const [, title, body] = (sendFCM as jest.Mock).mock.calls[0];
+    const insertCall = findInsertCall();
+    // params: [user.id, type, title, body, data, channel, delivery_status]
+    const [, , title, body] = insertCall![1];
     expect(title).not.toMatch(/\{\{/);
     expect(body).not.toMatch(/\{\{/);
   });
@@ -145,7 +127,7 @@ describe('deliverNotification', () => {
       vars: { title: 'Flash Sale!', body: '50% off' },
     });
 
-    expect(sendFCM).not.toHaveBeenCalled();
+    expect(findInsertCall()).toBeUndefined();
     jest.restoreAllMocks();
   });
 
@@ -164,7 +146,7 @@ describe('deliverNotification', () => {
       vars: { title: 'Offer', body: 'Get 10% off' },
     });
 
-    expect(sendFCM).toHaveBeenCalled();
+    expect(findInsertCall()).toBeDefined();
     jest.restoreAllMocks();
   });
 });

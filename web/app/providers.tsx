@@ -4,7 +4,6 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "./lib/api";
-import { registerWebPush } from "./lib/webPush";
 
 const webQueryClient = new QueryClient({
   defaultOptions: {
@@ -81,11 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [user]);
-
-  // Register browser for VAPID web-push once the user is authenticated
-  useEffect(() => {
-    if (user) registerWebPush().catch(() => {});
-  }, [user?.id]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>

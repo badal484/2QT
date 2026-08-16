@@ -29,6 +29,8 @@ import partnerRoutes from './partner';
 import missionsRoutes from './missions';
 import supportRoutes from './support';
 import prelaunchRoutes from './prelaunch';
+import deviceTokensRoutes from './device-tokens';
+import adminBroadcastRoutes from './admin-broadcast';
 // ... other routes
 
 import { ActivityLogService } from '../services/activity.service';
@@ -97,6 +99,7 @@ router.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 router.use('/home', homeRoutes);
 router.use('/collections', collectionsRoutes);
+router.use('/admin/broadcast', adminBroadcastRoutes);
 router.use('/admin', adminRoutes);
 router.use('/app', appRoutes);
 router.use('/auth', authRoutes);
@@ -126,6 +129,7 @@ router.use('/partner', partnerRoutes);
 router.use('/missions', missionsRoutes);
 router.use('/support', supportRoutes);
 router.use('/prelaunch', prelaunchRoutes);
+router.use('/device-tokens', deviceTokensRoutes);
 // ...
 
 export default router;

@@ -4,77 +4,8 @@ import { query } from '../db';
 import { redis } from '../redis';
 import { emitToAdmin } from '../socket';
 import { bustTemplateCache } from '../services/notification.service';
-import { sendFCM, isFCMConfigured } from '../services/fcm.service';
-import { z } from 'zod';
-import db from '../db';
 
 const router = Router();
-
-// ─── Web-push VAPID subscribe (browser) ──────────────────────────────────────
-
-router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) => {
-    try {
-        const { subscription } = z.object({
-            subscription: z.object({
-                endpoint: z.string(),
-                keys: z.object({ p256dh: z.string(), auth: z.string() }),
-            }),
-        }).parse(req.body);
-
-        await db.query(
-            `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (endpoint) DO UPDATE
-             SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh,
-                 auth = EXCLUDED.auth, updated_at = NOW()`,
-            [req.user!.userId, subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth]
-        );
-        res.json({ success: true });
-    } catch (err: any) {
-        res.status(400).json({ error: 'Invalid subscription data' });
-    }
-});
-
-// ─── FCM device token (mobile) ───────────────────────────────────────────────
-// Requires a valid session — anonymous registration was removed because it let
-// any caller with no token/phone bind an arbitrary device to whichever account
-// happened to be most recently active, hijacking that user's push notifications.
-// The phone-based sync below is scoped to the calling user's own role so a
-// phone number shared across a customer/rider/kitchen account (common in this
-// app's data) can't cross-contaminate another role's device_token.
-
-const handleDeviceToken = async (req: AuthRequest, res: Response) => {
-    try {
-        const { token } = (req.body || {}) as { token: string };
-        if (!token) return res.status(400).json({ error: 'token required' });
-
-        const userId = req.user!.userId;
-        const { rows: uRows } = await query('SELECT phone, role FROM users WHERE id = $1', [userId]);
-        const self = uRows[0];
-        if (!self) return res.status(404).json({ error: 'user not found' });
-
-        await query('UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW() WHERE id = $2', [token, userId]);
-
-        if (self.phone) {
-            const cleanPhone = self.phone.replace(/\D/g, '').slice(-10);
-            await query(
-                `UPDATE users SET device_token = $1, fcm_token = $1, updated_at = NOW()
-                 WHERE (phone = $2 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3)
-                   AND LOWER(role::text) = LOWER($4)`,
-                [token, self.phone, cleanPhone, self.role]
-            );
-        }
-
-        console.log(`[DEVICE_TOKEN] ✅ Token saved userId=${userId} role=${self.role} tokenPrefix=${token.slice(0, 15)}...`);
-        res.json({ success: true, registered: true });
-    } catch (err: any) {
-        console.error('[DEVICE_TOKEN_ERR]', err.message);
-        res.status(500).json({ error: err.message });
-    }
-};
-
-router.patch('/device-token', authenticate, handleDeviceToken);
-router.post('/device-token', authenticate, handleDeviceToken);
 
 // ─── In-app notification bell ─────────────────────────────────────────────────
 
@@ -120,26 +51,25 @@ router.get('/preferences', authenticate, async (req: AuthRequest, res: Response)
     res.json({
         preferences: rows[0] ?? {
             order_updates: true, promotions: true, payouts: true,
-            push_enabled: true, whatsapp_enabled: true,
+            whatsapp_enabled: true,
         },
     });
 });
 
 router.patch('/preferences', authenticate, async (req: AuthRequest, res: Response) => {
-    const { order_updates, promotions, payouts, push_enabled, whatsapp_enabled } = req.body;
+    const { order_updates, promotions, payouts, whatsapp_enabled } = req.body;
     await query(
         `INSERT INTO notification_preferences
-           (user_id, order_updates, promotions, payouts, push_enabled, whatsapp_enabled)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (user_id, order_updates, promotions, payouts, whatsapp_enabled)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (user_id) DO UPDATE SET
            order_updates    = COALESCE($2, notification_preferences.order_updates),
            promotions       = COALESCE($3, notification_preferences.promotions),
            payouts          = COALESCE($4, notification_preferences.payouts),
-           push_enabled     = COALESCE($5, notification_preferences.push_enabled),
-           whatsapp_enabled = COALESCE($6, notification_preferences.whatsapp_enabled),
+           whatsapp_enabled = COALESCE($5, notification_preferences.whatsapp_enabled),
            updated_at       = NOW()`,
         [req.user!.userId, order_updates ?? null, promotions ?? null,
-         payouts ?? null, push_enabled ?? null, whatsapp_enabled ?? null]
+         payouts ?? null, whatsapp_enabled ?? null]
     );
     res.json({ success: true });
 });
@@ -185,7 +115,7 @@ router.get('/admin/triggers', authenticate, requireRole('super_admin', 'admin'),
 router.post('/admin/triggers', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res: Response) => {
     const {
         name, event_type, delay_minutes = 0,
-        template_type, channels = ['push', 'whatsapp'],
+        template_type, channels = ['whatsapp'],
         audience_type = 'all', segment, conditions = {},
     } = req.body;
 
@@ -274,17 +204,12 @@ router.get('/admin/log', authenticate, requireRole('super_admin', 'admin'), asyn
 router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
 
-    const { rows: userRows } = await query(
-        'SELECT id, name, phone, device_token FROM users WHERE id = $1', [userId]
-    );
-    const user = userRows[0];
-
     const tmplCheck = await query(
         "SELECT type, is_active FROM notification_templates WHERE type = 'order_confirmed'"
     ).then(r => r.rows[0] ?? 'NOT FOUND').catch(() => 'TABLE MISSING');
 
     const prefsCheck = await query(
-        'SELECT push_enabled FROM notification_preferences WHERE user_id = $1', [userId]
+        'SELECT user_id FROM notification_preferences WHERE user_id = $1', [userId]
     ).then(r => r.rows[0] ?? 'NO ROW').catch(() => 'TABLE MISSING');
 
     const redisCheck = await redis.ping().then(() => 'OK').catch((e: any) => `FAIL: ${e.message}`);
@@ -294,46 +219,11 @@ router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {
     ).then(() => 'OK').catch(() => 'TABLE MISSING');
 
     res.json({
-        fcmConfigured: isFCMConfigured(),
-        hasDeviceToken: !!user?.device_token,
-        deviceTokenPreview: user?.device_token ? (user.device_token as string).slice(0, 20) + '…' : null,
         redis: redisCheck,
         orderConfirmedTemplate: tmplCheck,
         notificationPreferences: prefsCheck,
         notificationsTable: notifTableCheck,
     });
-});
-
-// ─── Test: send a real FCM push to the current user ──────────────────────────
-
-router.post('/test-push', authenticate, async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.userId;
-    const { rows } = await query('SELECT device_token FROM users WHERE id = $1', [userId]);
-    const token = rows[0]?.device_token;
-
-    if (!token) {
-        return res.status(400).json({
-            error: 'NO_DEVICE_TOKEN',
-            message: 'No FCM token saved for this user. Open the app and allow notifications, then try again.',
-        });
-    }
-    if (!isFCMConfigured()) {
-        return res.status(500).json({ error: 'FCM_NOT_CONFIGURED', message: 'FIREBASE_SERVICE_ACCOUNT_JSON not set.' });
-    }
-
-    try {
-        const result = await sendFCM(
-            token,
-            '🔔 Test Notification',
-            'FCM is working! You will now receive order updates.',
-            { type: 'broadcast_message' }
-        );
-        console.log(`[TEST_PUSH] result=${result} userId=${userId} token=${(token as string).slice(0,15)}…`);
-        res.json({ result }); // 'ok' | 'invalid_token' | 'skipped'
-    } catch (err: any) {
-        console.error('[TEST_PUSH] FCM error:', err.message);
-        res.status(500).json({ error: 'FCM_SEND_FAILED', message: err.message });
-    }
 });
 
 export default router;

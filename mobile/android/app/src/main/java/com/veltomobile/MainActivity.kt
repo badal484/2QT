@@ -10,10 +10,6 @@ class MainActivity : ReactActivity() {
 
   // Passing null (not savedInstanceState) to super.onCreate() avoids a
   // react-native-screens Fragment-restoration crash on Activity recreation.
-  // Notification channels are created once in MainApplication.onCreate() instead —
-  // that runs before this Activity even in a headless (killed-app FCM) launch, so
-  // it's the only place channel creation is guaranteed to have happened before a
-  // push can arrive.
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
   }

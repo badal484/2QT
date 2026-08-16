@@ -15,8 +15,6 @@ import { haptics } from '../utils/haptics';
 import { PressableScale } from '../components/ui/internal/PressableScale';
 import { useFeedback } from '../context/FeedbackContext';
 
-import { registerDeviceToken } from '../services/push';
-
 const OTPScreen = ({ route, navigation }: any) => {
   const { phone, referralCode, devRole, lat, lng } = route.params;
   const [otp, setOtp] = useState('');
@@ -76,7 +74,6 @@ const OTPScreen = ({ route, navigation }: any) => {
       haptics.success();
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
       connectSocket(data.accessToken);
-      registerDeviceToken(3, data.user?.phone).catch(() => {});
     },
     onError: (err: any) => {
       haptics.error();

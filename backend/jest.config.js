@@ -10,11 +10,19 @@ module.exports = {
     '^../redis$': '<rootDir>/src/__tests__/__mocks__/redis.ts',
     '^../socket$': '<rootDir>/src/__tests__/__mocks__/socket.ts',
     '^../middleware/auth$': '<rootDir>/src/__tests__/__mocks__/auth-middleware.ts',
+    '^../config/firebaseAdmin$': '<rootDir>/src/__tests__/__mocks__/firebaseAdmin.ts',
     // Depth-2 relative imports — route files import from ../../db relative to services, etc.
     '^../../db$': '<rootDir>/src/__tests__/__mocks__/db.ts',
     '^../../redis$': '<rootDir>/src/__tests__/__mocks__/redis.ts',
     '^../../socket$': '<rootDir>/src/__tests__/__mocks__/socket.ts',
     '^../../middleware/auth$': '<rootDir>/src/__tests__/__mocks__/auth-middleware.ts',
+    '^../../config/firebaseAdmin$': '<rootDir>/src/__tests__/__mocks__/firebaseAdmin.ts',
+    // Depth-3 relative imports — nested modules like src/modules/notifications/strategies
+    '^../../../db$': '<rootDir>/src/__tests__/__mocks__/db.ts',
+    '^../../../redis$': '<rootDir>/src/__tests__/__mocks__/redis.ts',
+    '^../../../socket$': '<rootDir>/src/__tests__/__mocks__/socket.ts',
+    '^../../../middleware/auth$': '<rootDir>/src/__tests__/__mocks__/auth-middleware.ts',
+    '^../../../config/firebaseAdmin$': '<rootDir>/src/__tests__/__mocks__/firebaseAdmin.ts',
   },
   setupFiles: ['<rootDir>/src/__tests__/setup.ts'],
   collectCoverageFrom: [
