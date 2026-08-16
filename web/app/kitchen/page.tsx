@@ -331,6 +331,7 @@ export default function KitchenPage() {
   // Analytics
   const [analytics, setAnalytics] = useState<any>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   const { user, logout, loading: authLoading } = useAuth()!;
   const router = useRouter();
@@ -397,7 +398,16 @@ export default function KitchenPage() {
             }).catch(() => {});
           }
         }
-  // Global Web Audio Context helper & Siren generator
+      } catch (e) {}
+    };
+
+    window.addEventListener('click', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
   const getGlobalAudioContext = useCallback(() => {
     if (typeof window === 'undefined') return null;
     try {
