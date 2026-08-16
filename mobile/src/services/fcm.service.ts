@@ -75,14 +75,25 @@ export class FCMService {
                 appType = 'kitchen';
             }
 
-            await api.post('/device-tokens', {
-                deviceId,
-                appType,
-                platform,
-                fcmToken,
-            });
+            let attempts = 0;
+            let success = false;
+            while (attempts < 3 && !success) {
+                try {
+                    await api.post('/device-tokens', {
+                        deviceId,
+                        appType,
+                        platform,
+                        fcmToken,
+                    });
+                    success = true;
+                    console.log('[FCMService] Device token registered successfully on backend:', { deviceId, appType, platform });
+                } catch (err: any) {
+                    attempts++;
+                    console.warn(`[FCMService] Device token registration attempt ${attempts} failed:`, err?.message || err);
+                    if (attempts < 3) await new Promise(r => setTimeout(r, 1500));
+                }
+            }
 
-            console.log('[FCMService] Device token registered successfully:', { deviceId, appType, platform });
             return fcmToken;
         } catch (error: any) {
             console.error('[FCMService] Failed registering device token:', error.message || error);

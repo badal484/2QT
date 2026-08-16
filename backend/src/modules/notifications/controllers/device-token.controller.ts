@@ -21,6 +21,8 @@ export class DeviceTokenController {
             fcmToken,
         });
 
+        console.log(`[DEVICE_TOKEN_REGISTERED] User: ${userId}, App: ${appType}, Platform: ${platform}, TokenPrefix: ${fcmToken.slice(0, 15)}`);
+
         return res.status(200).json({ success: true, deviceToken: record });
     }
 
