@@ -232,6 +232,9 @@ router.post('/orders/:id/claim', authenticate, requireRole('chef', 'kitchen_mana
         vars: { displayId: display_id, orderId: id },
     }).catch(() => {});
     
+    // Auto-assign rider ON START PREP
+    autoAssignOrder(id).catch(() => {});
+
     res.json({ success: true });
 });
 
@@ -257,10 +260,12 @@ router.patch('/orders/:id/status', authenticate, requireRole('chef', 'kitchen_ma
         emitToKitchen(order.kitchen_id, 'order_updated', { orderId: id, status });
         emitToAdmin('order_status_update', { orderId: id, status, display_id: order.display_id });
 
-        // 2. Notification Queue
+        // 2. Notification Queue & Rider Auto-Assign
         let notificationType: string | null = null;
         if (status === 'preparing') {
             notificationType = 'order_preparing';
+            // Auto-assign rider ON START PREP
+            autoAssignOrder(id).catch(() => {});
         }
         // No push for 'packing' — customer doesn't need to know about internal kitchen stages
         if (status === 'ready_for_pickup') {
