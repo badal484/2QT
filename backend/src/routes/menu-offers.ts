@@ -46,7 +46,18 @@ router.get('/active', async (req, res) => {
 router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
         const { rows } = await query(`
-            SELECT o.*, z.name AS zone_name
+            SELECT o.*, z.name AS zone_name,
+                   (
+                     SELECT ARRAY_AGG(m.name)
+                     FROM menu_items m
+                     WHERE m.id = ANY(o.target_ids)
+                   ) AS target_names,
+                   CASE 
+                     WHEN o.target_type = 'item' THEN (SELECT name FROM menu_items WHERE id = o.target_id)
+                     WHEN o.target_type = 'category' THEN (SELECT name FROM menu_categories WHERE id = o.target_id)
+                     WHEN o.target_type = 'kitchen' THEN (SELECT name FROM kitchens WHERE id = o.target_id)
+                     ELSE NULL
+                   END AS target_name
             FROM menu_offers o
             LEFT JOIN zones z ON o.zone_id = z.id
             ORDER BY o.created_at DESC
