@@ -49,4 +49,14 @@ try {
     console.warn('[FCM Background] Messaging setBackgroundMessageHandler error:', e);
 }
 
+if (safeNotifee.isAvailable) {
+    try {
+        safeNotifee.notifee.onBackgroundEvent(async ({ type, detail }) => {
+            console.log('[Notifee Background Event]', type, detail?.notification?.title);
+        });
+    } catch (e) {
+        console.warn('[Notifee Background Event Handler Registration Error]', e);
+    }
+}
+
 AppRegistry.registerComponent(appName, () => App);
