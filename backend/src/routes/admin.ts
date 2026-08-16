@@ -379,24 +379,30 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
         // concurrently and directly — a large "All Customers"/"Everyone" broadcast could
         // otherwise open thousands of simultaneous DB/Redis/FCM calls with no backpressure.
         // The worker (concurrency: 10) drains this with automatic retry/backoff per user.
+        //
+        // Not awaited before responding — the enqueue itself depends on Redis, and this
+        // endpoint must still respond promptly even if Redis is slow/unhealthy (matches
+        // the previous fire-and-forget behavior; the old code never awaited sends either).
         const BATCH = 50;
-        for (let i = 0; i < rows.length; i += BATCH) {
-            const batch = rows.slice(i, i + BATCH);
-            await Promise.allSettled(
-                batch.map(user =>
-                    sendNotification('broadcast_message', {
-                        userId: user.id,
-                        phone: user.phone,
-                        title,
-                        body: message,
-                        imageUrl: imageUrl || undefined,
-                        overrideQuietHours: true,
-                    })
-                )
-            );
-        }
+        (async () => {
+            for (let i = 0; i < rows.length; i += BATCH) {
+                const batch = rows.slice(i, i + BATCH);
+                await Promise.allSettled(
+                    batch.map(user =>
+                        sendNotification('broadcast_message', {
+                            userId: user.id,
+                            phone: user.phone,
+                            title,
+                            body: message,
+                            imageUrl: imageUrl || undefined,
+                            overrideQuietHours: true,
+                        })
+                    )
+                );
+            }
+            console.log(`[ADMIN] Broadcast queued for ${rows.length} users (audience=${audience} zone=${zoneId}): ${title}`);
+        })().catch(err => console.error('[ADMIN] Broadcast background enqueue error:', err.message));
 
-        console.log(`[ADMIN] Broadcast queued for ${rows.length} users (audience=${audience} zone=${zoneId}): ${title}`);
         res.json({ success: true, count: rows.length });
     } catch (err: any) {
         console.error('[ADMIN] Broadcast error:', err.message);
