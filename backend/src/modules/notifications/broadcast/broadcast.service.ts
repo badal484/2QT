@@ -80,6 +80,12 @@ export class BroadcastService {
                 let sent = 0;
                 let failed = 0;
 
+                const { rows: userRows } = await query(
+                    `SELECT id, name FROM users WHERE id = ANY($1)`,
+                    [batch]
+                );
+                const userMap = new Map(userRows.map(u => [u.id, u.name]));
+
                 for (const userId of batch) {
                     const dedupeKey = `broadcast_dedup:${campaignId}:${userId}`;
                     const acquired = await redis.set(dedupeKey, '1', { EX: 86400, NX: true }).catch(() => null);
@@ -90,12 +96,26 @@ export class BroadcastService {
                         if (targetType === 'riders') appType = 'rider';
                         else if (targetType === 'kitchens') appType = 'kitchen';
 
+                        const rawName = (userMap.get(userId) || '').trim();
+                        const firstName = rawName ? rawName.split(' ')[0] : (targetType === 'riders' ? 'Rider' : 'Customer');
+                        const fullName = rawName || firstName;
+
+                        const recipientTitle = title
+                            .replace(/\{\{\s*name\s*\}\}/gi, fullName)
+                            .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
+                            .replace(/\{\{\s*customer_name\s*\}\}/gi, fullName);
+
+                        const recipientBody = body
+                            .replace(/\{\{\s*name\s*\}\}/gi, fullName)
+                            .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
+                            .replace(/\{\{\s*customer_name\s*\}\}/gi, fullName);
+
                         await NotificationDispatcherService.dispatch({
                             userId,
                             type: 'broadcast_message',
-                            title,
-                            body,
-                            data: { campaignId, title, body },
+                            title: recipientTitle,
+                            body: recipientBody,
+                            data: { campaignId, title: recipientTitle, body: recipientBody },
                             appType,
                             imageUrl: imageUrl || undefined,
                         });
