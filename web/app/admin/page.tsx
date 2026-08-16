@@ -380,8 +380,8 @@ function OrdersTab() {
       const res: any = await api.post("/admin/orders/complete-all-live");
       toast.success(`Completed ${res.count || 0} live orders!`);
       load();
-    } catch (e) {
-      toast.error("Failed to complete live orders");
+    } catch (e: any) {
+      toast.error(e?.message || e?.response?.data?.message || e?.response?.data?.error || "Failed to complete live orders");
     }
   };
 
