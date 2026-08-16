@@ -153,16 +153,6 @@ export class BroadcastService {
     }
 
     static async getCampaigns(limit = 50, offset = 0) {
-        // Auto-heal older stuck processing records created > 1 min ago
-        await query(
-            `UPDATE broadcast_campaigns
-             SET sent_count = CASE WHEN sent_count = 0 THEN total_recipients ELSE sent_count END,
-                 status = 'COMPLETED',
-                 completed_at = COALESCE(completed_at, NOW())
-             WHERE status = 'PROCESSING'
-               AND created_at < NOW() - INTERVAL '1 minute'`
-        ).catch(() => {});
-
         const { rows } = await query(
             `SELECT b.*, u.name AS created_by_name
              FROM broadcast_campaigns b
