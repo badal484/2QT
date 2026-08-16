@@ -328,17 +328,18 @@ router.post('/orders/:id/packed', authenticate, requireRole('packer', 'kitchen_m
     const id = req.params.id as string;
     const { rows } = await query(
         `UPDATE orders SET status = 'ready_for_pickup', packed_by_id = $1, packed_at = NOW()
-         WHERE id = $2 AND status = 'packing'
+         WHERE id = $2 AND status IN ('packing', 'preparing', 'ready_for_pickup', 'confirmed')
          RETURNING id, display_id, customer_id, kitchen_id, zone_id`,
         [req.user!.userId, id]
     );
-    if (!rows[0]) return res.status(400).json({ error: 'ORDER_NOT_IN_PACKING' });
+    if (!rows[0]) return res.status(400).json({ error: 'ORDER_NOT_FOUND' });
     const order = rows[0];
 
     emitToUser(order.customer_id, 'order_status_update', { orderId: id, status: 'ready_for_pickup' });
     emitToOrder(id, 'order_status_update', { orderId: id, status: 'ready_for_pickup' });
     emitToKitchen(order.kitchen_id, 'order_updated', { orderId: id, status: 'ready_for_pickup' });
     emitToAdmin('order_status_update', { orderId: id, status: 'ready_for_pickup', display_id: order.display_id });
+    emitToRiders('order_status_update', { orderId: id, status: 'ready_for_pickup' });
 
     // Rider escalation safety net
     const { notificationsQueue } = require('../jobs/queues');
