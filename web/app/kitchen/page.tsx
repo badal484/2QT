@@ -376,9 +376,17 @@ export default function KitchenPage() {
 
     const unlock = async () => {
       try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx && !audioCtxRef.current) {
+          audioCtxRef.current = new AudioCtx();
+        }
+        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+          await audioCtxRef.current.resume();
+        }
+        setSoundEnabled(true);
+
         const el = document.getElementById('kds-alert-audio') as HTMLAudioElement;
         if (el) {
-          // Play and immediately pause to unlock the audio element for future programmatic calls
           const playPromise = el.play();
           if (playPromise !== undefined) {
             playPromise.then(() => {
