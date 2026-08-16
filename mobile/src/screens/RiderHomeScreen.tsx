@@ -678,9 +678,23 @@ const RiderHomeScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.acceptBtn, { backgroundColor: '#5B21B6' }]}
-                  onPress={() => {
+                  onPress={async () => {
+                    const currentAssigned = autoAssignedOrder;
                     clearAutoAssign();
                     queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+                    if (currentAssigned?.orderId) {
+                      try {
+                        const res = await api.get('/riders/orders/active');
+                        const foundOrder = res?.orders?.find((o: any) => o.id === currentAssigned.orderId || o.display_id === currentAssigned.displayId) || res?.orders?.[0];
+                        if (foundOrder) {
+                          navigation.navigate('AssignedOrder', { order: foundOrder });
+                        } else {
+                          navigation.navigate('AssignedOrder', { order: { id: currentAssigned.orderId, display_id: currentAssigned.displayId } });
+                        }
+                      } catch {
+                        navigation.navigate('AssignedOrder', { order: { id: currentAssigned.orderId, display_id: currentAssigned.displayId } });
+                      }
+                    }
                   }}
                   activeOpacity={0.9}
                 >
