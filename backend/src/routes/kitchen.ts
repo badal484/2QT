@@ -626,15 +626,12 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
         if (!rider) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
         if (!rider.is_online) return res.status(409).json({ error: 'RIDER_OFFLINE' });
 
-        const cleanDisplayId = id.replace('#', '').replace('2QT-', '');
-
-        // Assign atomically — matches internal UUID, display_id (e.g. 2QT-100131), or raw number 100131
+        // Assign atomically — also guards that this order belongs to this kitchen
         const { rows: orderRows } = await query(
             `UPDATE orders SET rider_id = $1
-             WHERE (id::text = $2 OR display_id = $2 OR display_id = $3 OR display_id = $4)
-               AND status NOT IN ('delivered', 'cancelled')
+             WHERE id = $2 AND kitchen_id = $3 AND status NOT IN ('delivered', 'cancelled')
              RETURNING id, display_id, customer_id, kitchen_id, zone_id, address_id, status`,
-            [riderId, id, `2QT-${cleanDisplayId}`, cleanDisplayId]
+            [riderId, id, kitchenId]
         );
         if (!orderRows[0]) return res.status(409).json({ error: 'ORDER_UNAVAILABLE' });
 
@@ -649,18 +646,13 @@ router.post('/orders/:id/assign-rider', authenticate, requireRole('kitchen_manag
             [order.address_id]
         );
 
-        // Push real-time event to rider — triggers immediate sound alert, vibration, and navigation
-        const payload = {
-            orderId: order.id,
+        // Push to rider — they'll see accept/decline modal with full context
+        emitToUser(riderId, 'order_assigned', {
+            orderId: id,
             displayId: order.display_id,
             assignedBy: 'kitchen',
             deliveryAddress: addrRows[0]?.address_text || null,
-        };
-        emitToUser(riderId, 'order_auto_assigned', payload);
-        emitToUser(riderId, 'order_assigned', payload);
-        emitToOrder(order.id, 'order_status_update', { orderId: order.id, status: order.status, riderId });
-        emitToKitchen(order.kitchen_id, 'order_updated', { orderId: order.id, status: order.status, riderId });
-        emitToAdmin('order_status_update', { orderId: order.id, status: order.status, riderId });
+        });
         // In-app notification fallback — a kitchen manager assigning a rider directly
         // is a deliberate, time-sensitive action; it shouldn't silently fail to reach
         // the rider just because the socket event above was missed.

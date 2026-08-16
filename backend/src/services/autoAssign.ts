@@ -18,15 +18,16 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 const MAX_SECOND_ORDER_DIST_KM = 5.0;
 
 async function findBestRider(
-    zoneId: string,
+    zoneId: string | null,
     kitchenLat: number,
     kitchenLng: number,
     isCodOrder = false,
     newDeliveryLat: number | null = null,
     newDeliveryLng: number | null = null,
 ): Promise<string | null> {
-    const { rows: riders } = await query(`
-        SELECT u.id,
+    // 1. Try matching riders in the specific zone first
+    let { rows: riders } = await query(`
+        SELECT u.id, u.current_lat, u.current_lng,
                COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) AS active_orders
         FROM users u
         LEFT JOIN orders o ON o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
@@ -37,70 +38,109 @@ async function findBestRider(
         GROUP BY u.id
         HAVING COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) < 2
         ORDER BY COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) ASC
-    `, [zoneId]);
+    `, [zoneId || null]);
+
+    // Fallback: If no online riders in zone, search ALL online verified riders
+    if (riders.length === 0) {
+        const { rows: fallbackRiders } = await query(`
+            SELECT u.id, u.current_lat, u.current_lng,
+                   COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) AS active_orders
+            FROM users u
+            LEFT JOIN orders o ON o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
+            WHERE u.is_online = true
+              AND u.is_verified = true
+              AND u.role IN ('rider', 'rider_captain')
+            GROUP BY u.id
+            HAVING COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) < 2
+            ORDER BY COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) ASC
+        `);
+        riders = fallbackRiders;
+    }
 
     if (riders.length === 0) return null;
 
-    const candidates: { id: string; activeOrders: number; distKm: number }[] = [];
+    const evaluateRiders = async (enforceCashLimit: boolean) => {
+        const candidates: { id: string; activeOrders: number; distKm: number }[] = [];
 
-    for (const rider of riders) {
-        // Skip riders in 60s opt-out cooldown
-        const unavail = await redis.get(`2qt:auto_unavail:${rider.id}`).catch(() => null);
-        if (unavail) continue;
+        for (const rider of riders) {
+            // Skip riders in 60s opt-out cooldown
+            const unavail = await redis.get(`2qt:auto_unavail:${rider.id}`).catch(() => null);
+            if (unavail) continue;
 
-        // For COD orders: skip riders at or above the admin-configurable cash-in-hand limit
-        if (isCodOrder) {
-            const [limitPaise, { rows: cashRows }] = await Promise.all([
-                getAppSettingInt('cod_cash_limit_paise', 200_000),
-                query(`
-                    SELECT COALESCE(SUM(total_amount_paise), 0)::int AS cash_paise
-                    FROM orders
-                    WHERE rider_id = $1 AND payment_method = 'cod'
-                      AND status = 'delivered' AND cod_cash_collected = FALSE
-                `, [rider.id]),
-            ]);
-            const cashInHand = parseInt(cashRows[0].cash_paise, 10);
-            if (cashInHand >= limitPaise) continue;
-        }
+            // For COD orders: check cash limit if enforced
+            if (isCodOrder && enforceCashLimit) {
+                const [limitPaise, { rows: cashRows }] = await Promise.all([
+                    getAppSettingInt('cod_cash_limit_paise', 200_000),
+                    query(`
+                        SELECT COALESCE(SUM(total_amount_paise), 0)::int AS cash_paise
+                        FROM orders
+                        WHERE rider_id = $1 AND payment_method = 'cod'
+                          AND status = 'delivered' AND cod_cash_collected = FALSE
+                    `, [rider.id]),
+                ]);
+                const cashInHand = parseInt(cashRows[0].cash_paise, 10);
+                if (cashInHand >= limitPaise) continue;
+            }
 
-        const activeOrders = parseInt(rider.active_orders, 10);
+            const activeOrders = parseInt(rider.active_orders, 10);
 
-        // If this rider already has an active order, only give them the new order if
-        // its delivery destination is within MAX_SECOND_ORDER_DIST_KM of their current
-        // delivery. This prevents a rider delivering to Ranchi from getting an order
-        // going to Bachra (or any other distant location).
-        if (activeOrders > 0 && newDeliveryLat && newDeliveryLng) {
-            const { rows: activeRows } = await query(`
-                SELECT COALESCE(o.delivery_location_lat, a.lat) AS dlat,
-                       COALESCE(o.delivery_location_lng, a.lng) AS dlng
-                FROM orders o
-                LEFT JOIN addresses a ON a.id = o.address_id
-                WHERE o.rider_id = $1
-                  AND o.status NOT IN ('delivered', 'cancelled')
-                LIMIT 1
-            `, [rider.id]);
+            if (activeOrders > 0 && newDeliveryLat && newDeliveryLng) {
+                const { rows: activeRows } = await query(`
+                    SELECT COALESCE(o.delivery_location_lat, a.lat) AS dlat,
+                           COALESCE(o.delivery_location_lng, a.lng) AS dlng
+                    FROM orders o
+                    LEFT JOIN addresses a ON a.id = o.address_id
+                    WHERE o.rider_id = $1
+                      AND o.status NOT IN ('delivered', 'cancelled')
+                    LIMIT 1
+                `, [rider.id]);
 
-            if (activeRows[0]) {
-                const dlat = parseFloat(activeRows[0].dlat);
-                const dlng = parseFloat(activeRows[0].dlng);
-                if (!isNaN(dlat) && !isNaN(dlng)) {
-                    const distBetweenDeliveries = haversineKm(dlat, dlng, newDeliveryLat, newDeliveryLng);
-                    if (distBetweenDeliveries > MAX_SECOND_ORDER_DIST_KM) {
-                        console.log(`[AUTO-ASSIGN] Skipping busy rider ${rider.id} — new delivery ${distBetweenDeliveries.toFixed(1)}km from current delivery (limit ${MAX_SECOND_ORDER_DIST_KM}km)`);
-                        continue;
+                if (activeRows[0]) {
+                    const dlat = parseFloat(activeRows[0].dlat);
+                    const dlng = parseFloat(activeRows[0].dlng);
+                    if (!isNaN(dlat) && !isNaN(dlng)) {
+                        const distBetweenDeliveries = haversineKm(dlat, dlng, newDeliveryLat, newDeliveryLng);
+                        if (distBetweenDeliveries > MAX_SECOND_ORDER_DIST_KM) {
+                            console.log(`[AUTO-ASSIGN] Skipping busy rider ${rider.id} — new delivery ${distBetweenDeliveries.toFixed(1)}km from current delivery (limit ${MAX_SECOND_ORDER_DIST_KM}km)`);
+                            continue;
+                        }
                     }
                 }
             }
+
+            // Check Redis location first, then fall back to database current_lat/lng
+            let lat: number | null = null;
+            let lng: number | null = null;
+            const locRaw = await redis.get(keys.riderLocation(rider.id)).catch(() => null);
+            if (locRaw) {
+                try {
+                    const loc = JSON.parse(locRaw);
+                    lat = loc.lat;
+                    lng = loc.lng;
+                } catch {}
+            }
+            if (lat === null || lng === null) {
+                if (rider.current_lat && rider.current_lng) {
+                    lat = parseFloat(rider.current_lat);
+                    lng = parseFloat(rider.current_lng);
+                }
+            }
+
+            const distKm = (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) && !isNaN(kitchenLat) && !isNaN(kitchenLng))
+                ? haversineKm(kitchenLat, kitchenLng, lat, lng)
+                : 0;
+
+            candidates.push({ id: rider.id, activeOrders, distKm });
         }
 
-        const locRaw = await redis.get(keys.riderLocation(rider.id)).catch(() => null);
-        if (!locRaw) continue; // no GPS — rider not actively sharing location
+        return candidates;
+    };
 
-        try {
-            const loc = JSON.parse(locRaw);
-            const distKm = haversineKm(kitchenLat, kitchenLng, loc.lat, loc.lng);
-            candidates.push({ id: rider.id, activeOrders, distKm });
-        } catch { /* malformed GPS — skip */ }
+    // First attempt with cash limit enforced
+    let candidates = await evaluateRiders(true);
+    // If no eligible rider found due to cash limit, relax cash limit as fallback
+    if (candidates.length === 0 && isCodOrder) {
+        candidates = await evaluateRiders(false);
     }
 
     if (candidates.length === 0) return null;
