@@ -7,7 +7,7 @@ import { redis, keys } from '../redis';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToAdmin, emitToKitchen, emitToAll, emitToRiders } from '../socket';
 import { createPendingRefund } from '../services/refund.service';
-import { NotificationService, deliverNotification } from '../services/notification.service';
+import { NotificationService, sendNotification } from '../services/notification.service';
 import { logSystemEvent } from '../utils/logger';
 import ImageKit from '@imagekit/nodejs';
 import multer from 'multer';
@@ -350,13 +350,19 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
             } else {
                 queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer')`;
             }
+        } else if (audience === 'zone') {
+            // "By Zone" — everyone (any role) local to a zone, e.g. for an operational
+            // announcement. Distinct from "customers" + zoneId, which is customer-only.
+            if (!zoneId) return res.status(400).json({ error: 'zoneId required for zone audience' });
+            queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE (u.is_active = true OR u.is_active IS NULL) AND (u.zone_id = $1 OR a.zone_id = $1)`;
+            params.push(zoneId);
+        } else if (audience === 'everyone') {
+            queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL)`;
         } else {
-            if (zoneId) {
-                queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE (u.is_active = true OR u.is_active IS NULL) AND (u.zone_id = $1 OR a.zone_id = $1)`;
-                params.push(zoneId);
-            } else {
-                queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL)`;
-            }
+            // Unrecognized audience value — fail closed instead of silently broadcasting
+            // to every role in the database (the previous behavior for any value that
+            // didn't match one of the branches above, including typos).
+            return res.status(400).json({ error: `Unknown audience: ${audience}` });
         }
 
         const { rows } = await query(queryStr, params);
@@ -369,19 +375,28 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
             [title, message, imageUrl || null, audience, zoneId || null, segment || null, scheduledFor || null, rows.length, status]
         );
 
-        // Fire notifications directly (bypasses BullMQ queue worker latency for live broadcasts)
-        for (const user of rows) {
-            deliverNotification('broadcast_message', {
-                userId: user.id,
-                phone: user.phone,
-                title,
-                body: message,
-                imageUrl: imageUrl || undefined,
-                overrideQuietHours: true,
-            }).catch(() => {});
+        // Enqueue through BullMQ (same path as campaigns.ts) instead of firing every send
+        // concurrently and directly — a large "All Customers"/"Everyone" broadcast could
+        // otherwise open thousands of simultaneous DB/Redis/FCM calls with no backpressure.
+        // The worker (concurrency: 10) drains this with automatic retry/backoff per user.
+        const BATCH = 50;
+        for (let i = 0; i < rows.length; i += BATCH) {
+            const batch = rows.slice(i, i + BATCH);
+            await Promise.allSettled(
+                batch.map(user =>
+                    sendNotification('broadcast_message', {
+                        userId: user.id,
+                        phone: user.phone,
+                        title,
+                        body: message,
+                        imageUrl: imageUrl || undefined,
+                        overrideQuietHours: true,
+                    })
+                )
+            );
         }
 
-        console.log(`[ADMIN] Broadcast sent to ${rows.length} users (audience=${audience} zone=${zoneId}): ${title}`);
+        console.log(`[ADMIN] Broadcast queued for ${rows.length} users (audience=${audience} zone=${zoneId}): ${title}`);
         res.json({ success: true, count: rows.length });
     } catch (err: any) {
         console.error('[ADMIN] Broadcast error:', err.message);
