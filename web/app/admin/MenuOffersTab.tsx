@@ -154,7 +154,7 @@ function AudienceConfig({ audience, config, onChange }: {
 const EMPTY_FORM = {
   title: "", description: "",
   target_type: "all",
-  discount_type: "percent", discount_percent: "", discount_flat_paise: "",
+  discount_type: "percentage", discount_percent: "", discount_flat_paise: "",
   max_discount_paise: "",
   audience: "all", audience_config: {} as any,
   zone_id: "", start_time: "", end_time: "", is_active: true,
@@ -214,7 +214,7 @@ export function MenuOffersTab() {
       title: offer.title ?? "",
       description: offer.description ?? "",
       target_type: offer.target_type,
-      discount_type: offer.discount_type === "percentage" ? "percent" : offer.discount_type,
+      discount_type: (offer.discount_type === "percent" || offer.discount_type === "percentage") ? "percentage" : offer.discount_type,
       discount_percent: offer.discount_percent ?? "",
       discount_flat_paise: offer.discount_flat_paise ? offer.discount_flat_paise / 100 : "",
       max_discount_paise: offer.max_discount_paise ? offer.max_discount_paise / 100 : "",
@@ -436,13 +436,13 @@ export function MenuOffersTab() {
               </div>
 
               {sel("Discount Type", "discount_type", [
-                { value: "percent", label: "Percentage (%)" },
+                { value: "percentage", label: "Percentage (%)" },
                 { value: "flat", label: "Flat Amount (₹)" },
               ])}
               {form.discount_type === "percent" || form.discount_type === "percentage"
                 ? f("Discount Percentage (%)", "discount_percent", "number", "e.g. 50")
-                : f("Flat Discount (paise)", "discount_flat_paise", "number", "e.g. 5000 = ₹50")}
-              {f("Max Discount Cap (paise)", "max_discount_paise", "number", "e.g. 15000 = ₹150 cap")}
+                : f("Flat Discount (₹)", "discount_flat_paise", "number", "e.g. 50 = ₹50")}
+              {f("Max Discount Cap (₹)", "max_discount_paise", "number", "e.g. 200 = ₹200 cap")}
               <div />
 
               {/* ── Schedule ── */}
