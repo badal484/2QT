@@ -55,7 +55,70 @@ export class BroadcastService {
 
         await Promise.all(jobs);
 
+        // 5. Fire-and-forget inline background dispatch (protected by Redis deduplication)
+        // Guarantees immediate processing & stats update even if worker process is separate
+        this.processCampaignBatchesInline(campaign.id, recipientUserIds, title, body, imageUrl, targetType);
+
         return { ...campaign, total_recipients: recipientUserIds.length, status: 'PROCESSING' };
+    }
+
+    static processCampaignBatchesInline(
+        campaignId: string,
+        recipientUserIds: string[],
+        title: string,
+        body: string,
+        imageUrl?: string,
+        targetType?: string
+    ) {
+        (async () => {
+            const BATCH_SIZE = 50;
+            const { NotificationDispatcherService } = require('../services/notification-dispatcher.service');
+
+            for (let i = 0; i < recipientUserIds.length; i += BATCH_SIZE) {
+                const batch = recipientUserIds.slice(i, i + BATCH_SIZE);
+                let sent = 0;
+                let failed = 0;
+
+                for (const userId of batch) {
+                    const dedupeKey = `broadcast_dedup:${campaignId}:${userId}`;
+                    const alreadySent = await redis.get(dedupeKey).catch(() => null);
+                    if (alreadySent) continue;
+
+                    try {
+                        let appType: 'buyer' | 'rider' | 'kitchen' = 'buyer';
+                        if (targetType === 'riders') appType = 'rider';
+                        else if (targetType === 'kitchens') appType = 'kitchen';
+
+                        await NotificationDispatcherService.dispatch({
+                            userId,
+                            type: 'broadcast_message',
+                            title,
+                            body,
+                            data: { campaignId, title, body },
+                            appType,
+                            imageUrl: imageUrl || undefined,
+                        });
+
+                        await redis.setEx(dedupeKey, 86400, '1').catch(() => {});
+                        sent++;
+                    } catch {
+                        failed++;
+                    }
+                }
+
+                await query(
+                    `UPDATE broadcast_campaigns 
+                     SET sent_count = sent_count + $1, failed_count = failed_count + $2
+                     WHERE id = $3`,
+                    [sent, failed, campaignId]
+                ).catch(() => {});
+            }
+
+            await query(
+                `UPDATE broadcast_campaigns SET status = 'COMPLETED', completed_at = NOW() WHERE id = $1`,
+                [campaignId]
+            ).catch(() => {});
+        })().catch(err => console.error('[BroadcastService] Async batch dispatch error:', err));
     }
 
     static async resolveRecipients(targetType: string, filter: Record<string, any>): Promise<string[]> {
