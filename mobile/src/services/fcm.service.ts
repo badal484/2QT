@@ -2,15 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { api } from '../api/client';
 
-const DEVICE_ID_KEY = '2qt_device_id';
+import messaging from '@react-native-firebase/messaging';
 
-let messagingModule: any = null;
-try {
-    const messagingPkg = require('@react-native-firebase/messaging');
-    messagingModule = messagingPkg.default || messagingPkg;
-} catch (e: any) {
-    console.warn('[FCMService] @react-native-firebase/messaging package not loaded:', e?.message || e);
-}
+const DEVICE_ID_KEY = '2qt_device_id';
 
 export class FCMService {
     static async getDeviceId(): Promise<string> {
@@ -27,7 +21,6 @@ export class FCMService {
     }
 
     static async requestPermission(): Promise<boolean> {
-        if (!messagingModule) return false;
         try {
             if (Platform.OS === 'android') {
                 const androidApiLevel = typeof Platform.Version === 'string' ? parseInt(Platform.Version, 10) : (Platform.Version || 0);
@@ -37,13 +30,9 @@ export class FCMService {
                         PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
                     );
                     console.log('[FCMService] POST_NOTIFICATIONS permission result:', granted);
-                    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-                        console.warn('[FCMService] POST_NOTIFICATIONS permission denied on Android');
-                        // Still continue to attempt token retrieval
-                    }
                 }
             }
-            const authStatus = await messagingModule().requestPermission();
+            const authStatus = await messaging().requestPermission();
             console.log('[FCMService] messaging().requestPermission authStatus:', authStatus);
             return true;
         } catch (error) {
@@ -53,7 +42,6 @@ export class FCMService {
     }
 
     static async registerDeviceToken(userRole?: string): Promise<string | null> {
-        if (!messagingModule) return null;
         try {
             const hasPermission = await this.requestPermission();
             if (!hasPermission) {
@@ -61,7 +49,7 @@ export class FCMService {
                 return null;
             }
 
-            const fcmToken = await messagingModule().getToken();
+            const fcmToken = await messaging().getToken();
             if (!fcmToken) {
                 console.warn('[FCMService] No FCM token retrieved from Firebase');
                 return null;
@@ -115,8 +103,7 @@ export class FCMService {
     }
 
     static setupTokenRefreshListener(userRole?: string) {
-        if (!messagingModule) return () => {};
-        return messagingModule().onTokenRefresh(async (newToken: string) => {
+        return messaging().onTokenRefresh(async (newToken: string) => {
             console.log('[FCMService] Token refreshed by Firebase SDK:', newToken);
             const deviceId = await this.getDeviceId();
             const platform = Platform.OS === 'ios' ? 'ios' : 'android';
