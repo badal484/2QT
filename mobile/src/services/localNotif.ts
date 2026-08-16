@@ -32,6 +32,8 @@ function channelForType(type: string): string {
 
 export async function createNotificationChannels() {
   if (!loadNotifee()) return;
+  await _notifee.deleteChannel('order_updates').catch(() => {});
+  await _notifee.deleteChannel('promotions').catch(() => {});
   const results = await Promise.allSettled([
     // MAX-importance channel for direct rider dispatch & kitchen orders — custom sound + heads-up on lock screen
     _notifee.createChannel({
