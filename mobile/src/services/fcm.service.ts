@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import { api } from '../api/client';
 
 import messaging from '@react-native-firebase/messaging';
@@ -58,13 +58,17 @@ export class FCMService {
             const deviceId = await this.getDeviceId();
             const platform = Platform.OS === 'ios' ? 'ios' : 'android';
             
-            // Resolve appType from user role
+            // Resolve appType dynamically from NativeModules.RoleModule.BUILD_ROLE or userRole parameter
+            const buildRole = NativeModules.RoleModule?.BUILD_ROLE;
             let appType: 'buyer' | 'rider' | 'kitchen' = 'buyer';
-            if (userRole === 'rider' || userRole === 'rider_captain') {
+
+            if (buildRole === 'rider' || userRole === 'rider' || userRole === 'rider_captain') {
                 appType = 'rider';
-            } else if (['chef', 'partner_kitchen', 'kitchen_manager', 'packer'].includes(userRole || '')) {
+            } else if (buildRole === 'kitchen' || buildRole === 'partner_kitchen' || ['chef', 'partner_kitchen', 'kitchen_manager', 'packer', 'kitchen'].includes(userRole || '')) {
                 appType = 'kitchen';
             }
+
+            console.log('[FCMService] Resolved appType for device token registration:', { buildRole, userRole, resolvedAppType: appType });
 
             let attempts = 0;
             let success = false;
@@ -108,10 +112,12 @@ export class FCMService {
             const deviceId = await this.getDeviceId();
             const platform = Platform.OS === 'ios' ? 'ios' : 'android';
             
+            const buildRole = NativeModules.RoleModule?.BUILD_ROLE;
             let appType: 'buyer' | 'rider' | 'kitchen' = 'buyer';
-            if (userRole === 'rider' || userRole === 'rider_captain') {
+
+            if (buildRole === 'rider' || userRole === 'rider' || userRole === 'rider_captain') {
                 appType = 'rider';
-            } else if (['chef', 'partner_kitchen', 'kitchen_manager', 'packer'].includes(userRole || '')) {
+            } else if (buildRole === 'kitchen' || buildRole === 'partner_kitchen' || ['chef', 'partner_kitchen', 'kitchen_manager', 'packer', 'kitchen'].includes(userRole || '')) {
                 appType = 'kitchen';
             }
 
