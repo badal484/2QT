@@ -78,7 +78,8 @@ export async function sendFCM(
     }
 
     try {
-        const skipNotif = dataOnly;
+        // Pure data-only payload forces Notifee native module to handle high-importance heads-up banner rendering
+        const skipNotif = true;
         const channelId = data.android_channel_id || 
             (data.type === 'broadcast_message' || data.type === 'promo' || data.type === 'offer' ? 'promotions_v5' : 'order_updates_v5');
         const tokenPrefix = token ? `${token.slice(0, 15)}...` : 'NULL';
