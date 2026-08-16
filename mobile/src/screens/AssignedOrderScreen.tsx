@@ -108,6 +108,14 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
       setCurrentStatus(data.status || currentStatus);
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
     },
+    onError: (err: any) => {
+      showDialog({
+        title: 'Update Failed',
+        message: err?.response?.data?.message || err?.response?.data?.error || 'Could not update order status. Please try again.',
+        confirmText: 'Okay',
+        type: 'error',
+      });
+    },
   });
 
 
