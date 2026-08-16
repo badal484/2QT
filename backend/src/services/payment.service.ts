@@ -146,7 +146,7 @@ export const calculatePricing = async ({
             if (offer.discount_type === 'flat') {
                 discount = offer.discount_flat_paise || 0;
             } else {
-                discount = Math.floor((itemPrice * (offer.discount_percent || 0)) / 100);
+                discount = Math.floor((itemPrice * (parseFloat(offer.discount_percent || '0') || 0)) / 100);
                 if (offer.max_discount_paise) discount = Math.min(discount, offer.max_discount_paise);
             }
             // Cap: discount cannot exceed item price
