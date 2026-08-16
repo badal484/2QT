@@ -28,6 +28,7 @@ import {
   IndianRupee,
   ShoppingBag,
   ClipboardCheck,
+  Volume2,
   Coffee,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -394,16 +395,60 @@ export default function KitchenPage() {
     return () => events.forEach(e => window.removeEventListener(e, unlock as EventListener));
   }, []);
 
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
+  const playWebAudioChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const playTone = (freq: number, start: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+        gain.gain.setValueAtTime(0.7, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + duration);
+      };
+      playTone(880, 0, 0.25);
+      playTone(1320, 0.15, 0.35);
+      playTone(880, 0.45, 0.25);
+      playTone(1320, 0.60, 0.45);
+    } catch {}
+  };
+
   const playKitchenAlert = () => {
+    setSoundEnabled(true);
+    let played = false;
     try {
       const el = document.getElementById('kds-alert-audio') as HTMLAudioElement;
       if (el) {
         el.currentTime = 0;
-        el.play().catch(() => {});
+        const p = el.play();
+        if (p !== undefined) {
+          p.then(() => { played = true; }).catch(() => {
+            playWebAudioChime();
+          });
+        }
       } else {
-        new Audio('/alert.mp3').play().catch(() => {});
+        const audio = new Audio('/alert.mp3');
+        audio.play().then(() => { played = true; }).catch(() => {
+          playWebAudioChime();
+        });
       }
-    } catch {}
+    } catch {
+      playWebAudioChime();
+    }
+    setTimeout(() => {
+      if (!played) playWebAudioChime();
+    }, 150);
   };
 
   useEffect(() => {
@@ -715,6 +760,22 @@ export default function KitchenPage() {
               <span className="text-white font-black text-sm">{activeCount}</span>
               <span className="text-zinc-500 text-xs font-medium hidden sm:inline">Active</span>
             </div>
+
+            {/* Sound Alert Toggle Button */}
+            <button
+              onClick={() => {
+                playKitchenAlert();
+                toast.success("Sound Alerts Active 🔔", { description: "Sound tested and enabled for all incoming orders." });
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                soundEnabled
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse shadow-lg"
+              }`}
+            >
+              <Volume2 className="w-4 h-4" />
+              <span className="hidden sm:inline">{soundEnabled ? "Sound Active 🔔" : "Enable Sound 🔔"}</span>
+            </button>
 
             {/* Live pill */}
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-green-500 bg-green-500/10">
