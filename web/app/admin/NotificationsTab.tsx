@@ -183,15 +183,13 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
     if (!file) return;
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res: any = await api.post("/upload", fd);
-      if (res.url) {
+      const res: any = await api.uploadImage(file);
+      if (res?.url) {
         setImageUrl(res.url);
         toast.success("Image uploaded!");
       }
-    } catch {
-      toast.error("Image upload failed");
+    } catch (err: any) {
+      toast.error(err?.message || "Image upload failed");
     } finally {
       setUploading(false);
     }
