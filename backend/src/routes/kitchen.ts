@@ -194,6 +194,20 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
     res.json({ orders: rows, kitchen_name: kitchenName });
 });
 
+router.post('/orders/complete-all-live', authenticate, requireRole('chef', 'kitchen_manager', 'partner_kitchen', 'manager', 'admin', 'super_admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows } = await query(
+            `UPDATE orders 
+             SET status = 'delivered', delivered_at = NOW(), updated_at = NOW() 
+             WHERE status NOT IN ('delivered', 'cancelled') 
+             RETURNING id, display_id`
+        );
+        res.json({ success: true, count: rows.length, completedOrders: rows });
+        console.error('[kitchen/orders/complete-all-live]', err);
+        res.status(500).json({ error: err.message || 'Failed to complete live orders' });
+    }
+});
+
 router.post('/orders/:id/claim', authenticate, requireRole('chef', 'kitchen_manager', 'partner_kitchen', 'super_admin'), async (req: AuthRequest, res) => {
     const id = req.params.id as string;
     const chefId = req.user!.userId;
