@@ -395,14 +395,6 @@ export default function KitchenPage() {
             }).catch(() => {});
           }
         }
-      } catch {}
-    };
-    
-    const events = ['click', 'keydown', 'touchstart'] as const;
-    events.forEach(e => window.addEventListener(e, unlock, { once: true }));
-    return () => events.forEach(e => window.removeEventListener(e, unlock as EventListener));
-  }, []);
-
   // Global Web Audio Context helper & Siren generator
   const getGlobalAudioContext = useCallback(() => {
     if (typeof window === 'undefined') return null;
@@ -413,22 +405,21 @@ export default function KitchenPage() {
           (window as any)._kdsAudioCtx = new AudioCtx();
         }
       }
-      const ctx = (window as any)._kdsAudioCtx;
-      if (ctx && ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-      return ctx;
+      return (window as any)._kdsAudioCtx;
     } catch {
       return null;
     }
   }, []);
 
-  const playKitchenAlert = useCallback(() => {
+  const playKitchenAlert = useCallback(async () => {
     setSoundEnabled(true);
-    // 1. Web Audio Frequency-Sweep Sawtooth Siren
+    // 1. Web Audio Frequency-Sweep Sawtooth Siren (await resume if suspended)
     try {
       const ctx = getGlobalAudioContext();
       if (ctx) {
+        if (ctx.state === 'suspended') {
+          await ctx.resume().catch(() => {});
+        }
         const now = ctx.currentTime;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -436,18 +427,18 @@ export default function KitchenPage() {
         
         // 4-step Siren frequency sweep (880Hz -> 1760Hz -> 880Hz -> 1760Hz)
         osc.frequency.setValueAtTime(880, now);
-        osc.frequency.linearRampToValueAtTime(1760, now + 0.18);
-        osc.frequency.linearRampToValueAtTime(880, now + 0.36);
-        osc.frequency.linearRampToValueAtTime(1760, now + 0.54);
-        osc.frequency.linearRampToValueAtTime(880, now + 0.72);
+        osc.frequency.linearRampToValueAtTime(1760, now + 0.20);
+        osc.frequency.linearRampToValueAtTime(880, now + 0.40);
+        osc.frequency.linearRampToValueAtTime(1760, now + 0.60);
+        osc.frequency.linearRampToValueAtTime(880, now + 0.80);
 
         gain.gain.setValueAtTime(1.0, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.90);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.90);
+        osc.stop(now + 1.0);
       }
     } catch (e) {
       console.warn('[KDS] Siren Web Audio error:', e);
