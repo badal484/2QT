@@ -396,60 +396,70 @@ export default function KitchenPage() {
   }, []);
 
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
-  const playWebAudioChime = () => {
+  const getAudioContext = useCallback(() => {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      if (ctx.state === 'suspended') {
-        ctx.resume();
+      if (!audioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          audioCtxRef.current = new AudioCtx();
+        }
       }
-      const playTone = (freq: number, start: number, duration: number) => {
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+    } catch {}
+    return audioCtxRef.current;
+  }, []);
+
+  const playWebAudioChime = useCallback(() => {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      // Loud 6-note ascending siren chime (880, 1100, 1320, 1760 Hz)
+      const tones: [number, number, number][] = [
+        [880, 0, 0.2],
+        [1100, 0.12, 0.2],
+        [1320, 0.24, 0.25],
+        [1760, 0.38, 0.35],
+        [1320, 0.60, 0.25],
+        [1760, 0.75, 0.45],
+      ];
+
+      tones.forEach(([freq, offset, duration]) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-        gain.gain.setValueAtTime(0.7, ctx.currentTime + start);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + offset);
+        gain.gain.setValueAtTime(0.85, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + duration);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(ctx.currentTime + start);
-        osc.stop(ctx.currentTime + start + duration);
-      };
-      playTone(880, 0, 0.25);
-      playTone(1320, 0.15, 0.35);
-      playTone(880, 0.45, 0.25);
-      playTone(1320, 0.60, 0.45);
-    } catch {}
-  };
+        osc.start(now + offset);
+        osc.stop(now + offset + duration);
+      });
+    } catch (e) {
+      console.warn('[KDS] Web Audio chime error:', e);
+    }
+  }, [getAudioContext]);
 
-  const playKitchenAlert = () => {
+  const playKitchenAlert = useCallback(() => {
     setSoundEnabled(true);
-    let played = false;
+    playWebAudioChime();
     try {
       const el = document.getElementById('kds-alert-audio') as HTMLAudioElement;
       if (el) {
         el.currentTime = 0;
-        const p = el.play();
-        if (p !== undefined) {
-          p.then(() => { played = true; }).catch(() => {
-            playWebAudioChime();
-          });
-        }
+        el.play().catch(() => {});
       } else {
         const audio = new Audio('/alert.mp3');
-        audio.play().then(() => { played = true; }).catch(() => {
-          playWebAudioChime();
-        });
+        audio.play().catch(() => {});
       }
-    } catch {
-      playWebAudioChime();
-    }
-    setTimeout(() => {
-      if (!played) playWebAudioChime();
-    }, 150);
-  };
+    } catch {}
+  }, [playWebAudioChime]);
 
   useEffect(() => {
     fetchOrders();
