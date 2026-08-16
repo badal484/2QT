@@ -10,13 +10,15 @@ const useSsl =
     process.env.DATABASE_URL?.includes('supabase') ||
     process.env.DATABASE_URL?.includes('13.239.87.90');
 
+const isPgBouncer = process.env.DATABASE_URL?.includes('pgbouncer=true');
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: process.env.NODE_ENV === 'production' ? parseInt(process.env.DB_POOL_MAX || '5') : 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 15000,
+    max: process.env.NODE_ENV === 'production' ? parseInt(process.env.DB_POOL_MAX || '5') : 10,
+    idleTimeoutMillis: isPgBouncer ? 4000 : 10000,
+    connectionTimeoutMillis: 10000,
     allowExitOnIdle: true,
-    maxUses: 7500, // Staff Optimization: Recycle connections to prevent memory leaks over time
+    maxUses: isPgBouncer ? 100 : 1000, // Recycle PgBouncer connections frequently to prevent terminated socket errors
     ssl: useSsl ? { rejectUnauthorized: false } : undefined,
 });
 

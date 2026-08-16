@@ -53,11 +53,12 @@ export class BroadcastService {
             );
         }
 
-        await Promise.all(jobs);
+        Promise.all(jobs).catch((e) => console.warn('[BroadcastService] Queue enqueue warning:', e?.message));
 
-        // 5. Fire-and-forget inline background dispatch (protected by Redis deduplication)
-        // Guarantees immediate processing & stats update even if worker process is separate
-        this.processCampaignBatchesInline(campaign.id, recipientUserIds, title, body, imageUrl, targetType);
+        // 5. Non-blocking background dispatch (protected by Redis deduplication)
+        setImmediate(() => {
+            this.processCampaignBatchesInline(campaign.id, recipientUserIds, title, body, imageUrl, targetType);
+        });
 
         return { ...campaign, total_recipients: recipientUserIds.length, status: 'PROCESSING' };
     }
