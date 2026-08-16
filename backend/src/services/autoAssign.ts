@@ -185,7 +185,7 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
             FROM orders o
             JOIN zones z ON z.id = o.zone_id
             LEFT JOIN addresses a ON a.id = o.address_id
-            WHERE o.id = $1 AND o.status = 'ready_for_pickup' AND o.rider_id IS NULL
+            WHERE o.id = $1 AND o.status IN ('preparing', 'ready_for_pickup') AND o.rider_id IS NULL
         `, [orderId]);
 
         if (!rows[0]) return; // already assigned or status changed
@@ -236,7 +236,7 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
         const { rowCount } = await query(`
             UPDATE orders
             SET rider_id = $1, auto_assigned = true
-            WHERE id = $2 AND status = 'ready_for_pickup' AND rider_id IS NULL
+            WHERE id = $2 AND status IN ('preparing', 'ready_for_pickup') AND rider_id IS NULL
         `, [riderId, orderId]);
 
         if (!rowCount) return; // race — someone else grabbed it
@@ -249,7 +249,7 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
             const { rowCount: batchRowCount, rows: batchRows } = await query(`
                 UPDATE orders
                 SET rider_id = $1, auto_assigned = true
-                WHERE id = $2 AND status = 'ready_for_pickup' AND rider_id IS NULL
+                WHERE id = $2 AND status IN ('preparing', 'ready_for_pickup') AND rider_id IS NULL
                 RETURNING display_id
             `, [riderId, batchOrderId]);
 
