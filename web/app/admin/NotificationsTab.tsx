@@ -214,7 +214,8 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
       setTitle(""); setMessage(""); setImageUrl("");
       loadCampaigns();
     } catch (err: any) {
-      toast.error(err?.message || "Broadcast failed");
+      const msg = typeof err === 'string' ? err : err?.message || err?.details || "Broadcast failed";
+      toast.error(msg);
     } finally {
       setSending(false);
     }
