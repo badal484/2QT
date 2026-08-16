@@ -68,9 +68,15 @@ export class NotificationHandler {
             const notification = remoteMessage?.notification;
             const data = remoteMessage?.data || {};
 
-            const title = notification?.title || data.title || '2QT Alert';
-            const body = notification?.body || data.body || data.message || '';
+            const title = (notification?.title || data.title || '').trim();
+            const body = (notification?.body || data.body || data.message || '').trim();
             const appType = data.appType || 'buyer';
+
+            // If message has neither title nor body, treat as silent data event and do not display banner
+            if (!title && !body) {
+                console.log('[NotificationHandler] Skipping silent message banner with empty title/body');
+                return;
+            }
 
             const channelId = appType === 'kitchen' ? 'kitchen_orders' : (appType === 'rider' ? 'rider_alerts' : 'order_updates');
 

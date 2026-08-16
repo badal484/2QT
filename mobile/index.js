@@ -21,12 +21,15 @@ try {
             return;
         }
 
-        const notification = remoteMessage?.notification;
-        const data = remoteMessage?.data || {};
-
-        const title = notification?.title || data.title || '2QT Alert';
-        const body = notification?.body || data.body || data.message || '';
+        const title = (notification?.title || data.title || '').trim();
+        const body = (notification?.body || data.body || data.message || '').trim();
         const appType = data.appType || 'buyer';
+
+        // If message has neither title nor body, treat as silent background data event and do not display banner
+        if (!title && !body) {
+            console.log('[FCM Background] Skipping silent message banner with empty title/body');
+            return;
+        }
 
         const channelId = appType === 'kitchen' ? 'kitchen_orders' : (appType === 'rider' ? 'rider_alerts' : 'order_updates');
 
@@ -51,7 +54,7 @@ try {
 
 if (safeNotifee.isAvailable) {
     try {
-        safeNotifee.notifee.onBackgroundEvent(async ({ type, detail }) => {
+        safeNotifee.onBackgroundEvent(async ({ type, detail }: any) => {
             console.log('[Notifee Background Event]', type, detail?.notification?.title);
         });
     } catch (e) {
