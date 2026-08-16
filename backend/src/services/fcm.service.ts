@@ -80,7 +80,7 @@ export async function sendFCM(
     try {
         const skipNotif = dataOnly;
         const channelId = data.android_channel_id || 
-            (data.type === 'broadcast_message' || data.type === 'promo' || data.type === 'offer' ? 'promotions_v4' : 'order_updates_v4');
+            (data.type === 'broadcast_message' || data.type === 'promo' || data.type === 'offer' ? 'promotions_v5' : 'order_updates_v5');
         const tokenPrefix = token ? `${token.slice(0, 15)}...` : 'NULL';
         const img = imageUrl || data.imageUrl || data.image || data.bannerUrl || undefined;
 

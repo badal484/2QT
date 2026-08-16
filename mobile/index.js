@@ -19,19 +19,9 @@ try {
   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     console.log('[PUSH_BACKGROUND] Message received in background/killed state:', remoteMessage);
 
-    // When the FCM payload has a native `notification` block, Android's own FCM SDK
-    // already renders the system-tray notification for us before this handler even
-    // runs — that's true regardless of app state (background or killed). Re-displaying
-    // it here via Notifee would just post a second, duplicate notification for the same
-    // message. Only messages with no `notification` block (pure data-only) need us to
-    // build and display one ourselves.
-    if (remoteMessage?.notification) {
-      return;
-    }
-
     const data = remoteMessage?.data ?? {};
     let title = remoteMessage?.notification?.title || data?.title || '';
-    let body  = remoteMessage?.notification?.body  || data?.body  || '';
+    let body  = remoteMessage?.notification?.body  || data?.body  || data?.message || '';
 
     if (!title && !body && data.type) {
       const TYPE_LABELS = {
