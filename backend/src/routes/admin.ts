@@ -686,14 +686,14 @@ router.post('/orders/complete-all-live', authenticate, requireRole('super_admin'
     try {
         const { rows } = await query(
             `UPDATE orders 
-             SET status = 'delivered', delivered_at = NOW(), updated_at = NOW() 
+             SET status = 'delivered', delivered_at = COALESCE(delivered_at, NOW()) 
              WHERE status NOT IN ('delivered', 'cancelled') 
              RETURNING id, display_id`
         );
         res.json({ success: true, count: rows.length, completedOrders: rows });
     } catch (err: any) {
         console.error('[orders/complete-all-live]', err);
-        res.status(500).json({ error: err.message || 'Failed to complete live orders' });
+        res.status(500).json({ error: err?.message || 'Failed to complete live orders' });
     }
 });
 
