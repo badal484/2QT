@@ -21,7 +21,29 @@ export function playKitchenAlert() {
     // 1. Aggressive 6-second multi-pulse vibration
     Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800, 400, 800]);
 
-    // 2. Play sound via react-native-sound if native module is present
+    // 2. Play high-importance alert sound via Notifee notification channel
+    if (safeNotifee.isAvailable) {
+      safeNotifee.createChannel({
+        id: 'kitchen_order_alerts_v3',
+        name: 'Kitchen Order Alerts',
+        importance: AndroidImportance.HIGH,
+        sound: 'default',
+        vibration: true,
+      }).then((channelId: any) => {
+        safeNotifee.displayNotification({
+          title: '🔔 NEW KITCHEN ORDER!',
+          body: 'A new order ticket has arrived in the kitchen.',
+          android: {
+            channelId: channelId || 'kitchen_order_alerts_v3',
+            importance: AndroidImportance.HIGH,
+            sound: 'default',
+            pressAction: { id: 'default' },
+          },
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+
+    // 3. Play sound file via react-native-sound if native module is present
     if (SoundPkg) {
       const fileName = Platform.OS === 'android' ? 'alert' : 'alert.mp3';
       if (!alertSound) {
