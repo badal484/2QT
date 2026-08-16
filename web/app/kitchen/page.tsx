@@ -504,7 +504,13 @@ export default function KitchenPage() {
     socket.on("order_status_update", fetchOrders);
     socket.on("rider_assigned", fetchOrders);
 
+    // 8-second background safety sync so KDS remains updated under all network conditions
+    const interval = setInterval(() => {
+      fetchOrders();
+    }, 8000);
+
     return () => {
+      clearInterval(interval);
       socket.off("connect", handleConnect);
       socket.off("new_order", handleNewOrder);
       socket.off("order_created", handleNewOrder);

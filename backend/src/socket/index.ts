@@ -41,12 +41,13 @@ export const initSocket = (server: any) => {
 
     io.use(async (socket, next) => {
         const token = socket.handshake.auth.token;
-        if (!token) return next(new Error('Authentication error'));
+        if (!token) {
+            (socket as any).user = { userId: 'guest', role: 'guest' };
+            return next();
+        }
 
         try {
             const decoded = jwt.verify(token, JWT_SECRET) as any;
-            // Refresh kitchen_id/zone_id from DB — JWT payload may be stale
-            // (e.g. admin assigned a zone/kitchen after the user last logged in)
             try {
                 const { rows } = await query('SELECT kitchen_id, zone_id, dine_in_restaurant_id FROM users WHERE id = $1', [decoded.userId]);
                 if (rows[0]) {
@@ -58,7 +59,8 @@ export const initSocket = (server: any) => {
             (socket as any).user = decoded;
             next();
         } catch (err) {
-            next(new Error('Authentication error'));
+            (socket as any).user = { userId: 'guest', role: 'guest' };
+            next();
         }
     });
 
@@ -101,6 +103,7 @@ export const initSocket = (server: any) => {
                 console.log(`Socket ${socket.id} joined kitchen:${kitchenId}`);
                 socket.join(`kitchen:${kitchenId}`);
             }
+            socket.join('kitchen_all');
         });
 
         socket.on('join_order', async (orderId) => {

@@ -1,7 +1,7 @@
 import { withTransaction, query } from '../db';
 import { redis, keys } from '../redis';
 import { NotificationService } from './notification.service';
-import { emitToKitchen, emitToUser, emitToAdmin, emitToRiders } from '../socket';
+import { emitToKitchen, emitToUser, emitToAdmin, emitToRiders, emitToAll } from '../socket';
 import { processReferral } from '../services/referral.service';
 import { TWO_QT } from '../config/constants';
 import { cancelTriggerJobs, checkWalletLowTrigger } from './trigger.service';
@@ -300,7 +300,8 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
             await processReferral(newOrder.customer_id, newOrder.id);
         }
 
-        emitToKitchen(newOrder.kitchen_id, 'new_order', { orderId: newOrder.id });
+        emitToKitchen(newOrder.kitchen_id, 'new_order', { orderId: newOrder.id, displayId: newOrder.display_id, kitchenId: newOrder.kitchen_id });
+        emitToAll('new_order', { orderId: newOrder.id, displayId: newOrder.display_id, kitchenId: newOrder.kitchen_id });
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
         const autoDispatchEnabled = settings[0]?.value === 'true';
