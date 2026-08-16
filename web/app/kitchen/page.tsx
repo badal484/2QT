@@ -490,9 +490,6 @@ export default function KitchenPage() {
     // Re-fetch on reconnect so orders aren't stale after a backend restart or network drop
     socket.on("connect", fetchOrders);
 
-    // 30-second quiet poll as a safety net for any missed socket events
-    const pollId = setInterval(fetchOrders, 30000);
-
     return () => {
       socket.off("new_order", handleNewOrder);
       socket.off("critical_alert", handleCriticalAlert);
@@ -500,7 +497,6 @@ export default function KitchenPage() {
       socket.off("order_updated", fetchOrders);
       socket.off("order_status_update", fetchOrders);
       socket.off("connect", fetchOrders);
-      clearInterval(pollId);
       socket.disconnect();
     };
   }, [fetchOrders]);

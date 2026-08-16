@@ -13,6 +13,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { updateUser } from '../store/slices/authSlice';
 import { getSocket } from '../socket/client';
+import { playKitchenAlert } from '../utils/kitchenAlert';
 import { ChevronRight, Check, X, IndianRupee, Navigation, MapPin, Banknote } from 'lucide-react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { startRiderLocationService, stopRiderLocationService } from '../services/locationService';
@@ -96,7 +97,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     queryKey: ['rider-active-order'],
     queryFn: () => api.get('/riders/orders/active'),
     enabled: isOnline,
-    refetchInterval: isOnline ? 30000 : false,
+    refetchInterval: false,
   });
 
   // No zone = rider is online but zone_id is not yet assigned
@@ -276,9 +277,22 @@ const RiderHomeScreen = ({ navigation }: any) => {
   useEffect(() => {
     let retryInterval: ReturnType<typeof setInterval> | null = null;
 
-    const autoAssignedHandler = (data: { orderId: string; displayId: string; batchDisplayId?: string; optOutWindowMs: number }) => {
+    const autoAssignedHandler = async (data: { orderId: string; displayId: string; batchDisplayId?: string; optOutWindowMs: number }) => {
       if (!isOnlineRef.current) return;
-      showAutoAssign({ orderId: data.orderId, displayId: data.displayId, batchDisplayId: data.batchDisplayId });
+      playKitchenAlert();
+      queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
+      
+      try {
+        const res = await api.get('/riders/orders/active');
+        const foundOrder = res?.orders?.find((o: any) => o.id === data.orderId || o.display_id === data.displayId) || res?.orders?.[0];
+        if (foundOrder) {
+          navigation.navigate('AssignedOrder', { order: foundOrder });
+        } else {
+          navigation.navigate('AssignedOrder', { order: { id: data.orderId, display_id: data.displayId } });
+        }
+      } catch {
+        navigation.navigate('AssignedOrder', { order: { id: data.orderId, display_id: data.displayId } });
+      }
     };
 
     const register = () => {
