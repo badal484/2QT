@@ -295,10 +295,11 @@ router.post('/validate-cart', async (req, res) => {
              // We'll treat category target_id conceptually, but here we assume target_id stores the string if target_type is category.
              // Wait, target_id is UUID. If category is a string, we might need a mapping. 
              // Let's assume for now target_type = 'item' or 'all' or 'kitchen' works perfectly.
+             const itemTargetIds: string[] = Array.isArray(offer.target_ids) ? offer.target_ids : [];
              const isMatch = offer.target_type === 'all' || 
-                             (offer.target_type === 'item' && offer.target_id === db.id) ||
-                             (offer.target_type === 'category' && String(offer.target_id) === String(db.category)) ||
-                             (offer.target_type === 'kitchen' && offer.target_id === db.kitchen_id);
+                             (offer.target_type === 'item' && (itemTargetIds.includes(db.id) || offer.target_id === db.id)) ||
+                             (offer.target_type === 'category' && (itemTargetIds.some(tid => String(tid) === String(db.category)) || String(offer.target_id) === String(db.category))) ||
+                             (offer.target_type === 'kitchen' && (itemTargetIds.includes(db.kitchen_id) || offer.target_id === db.kitchen_id));
              
              if (isMatch) {
                   let discount = 0;
