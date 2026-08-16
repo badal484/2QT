@@ -97,7 +97,7 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.2):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
-  - GTMSessionFetcher/Core (5.3.0)
+  - GTMSessionFetcher/Core (5.3.1)
   - hermes-engine (250829098.0.10):
     - hermes-engine/Pre-built (= 250829098.0.10)
   - hermes-engine/Pre-built (250829098.0.10)
@@ -116,7 +116,7 @@ PODS:
   - lottie-ios (4.6.1)
   - lottie-react-native (7.4.0):
     - hermes-engine
-    - lottie-ios (>= 4.6.0)
+    - lottie-ios
     - RCTRequired
     - RCTTypeSafety
     - React-Core
@@ -191,7 +191,7 @@ PODS:
     - Yoga
   - PromisesObjC (2.4.1)
   - razorpay-core-pod (1.0.7)
-  - razorpay-pod (1.5.6):
+  - razorpay-pod (1.5.7):
     - razorpay-core-pod (= 1.0.7)
   - RCTDeprecation (0.85.2)
   - RCTRequired (0.85.2)
@@ -1718,7 +1718,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-safe-area-context (5.8.1):
+  - react-native-safe-area-context (5.9.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1730,8 +1730,8 @@ PODS:
     - React-graphics
     - React-ImageManager
     - React-jsi
-    - react-native-safe-area-context/common (= 5.8.1)
-    - react-native-safe-area-context/fabric (= 5.8.1)
+    - react-native-safe-area-context/common (= 5.9.0)
+    - react-native-safe-area-context/fabric (= 5.9.0)
     - React-NativeModulesApple
     - React-RCTFabric
     - React-renderercss
@@ -1742,7 +1742,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-safe-area-context/common (5.8.1):
+  - react-native-safe-area-context/common (5.9.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1764,7 +1764,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-safe-area-context/fabric (5.8.1):
+  - react-native-safe-area-context/fabric (5.9.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2534,7 +2534,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RNSentry (8.22.0):
+  - RNSentry (8.23.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -3118,17 +3118,17 @@ SPEC CHECKSUMS:
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleMaps: 0608099d4870cac8754bdba9b6953db543432438
   GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
-  GTMSessionFetcher: 127211aeec0b1e904fc49f4f6f895dcc535b0ecf
+  GTMSessionFetcher: a6d2b2aa203485893d4511ff64642dc811f7c09f
   hermes-engine: 59e4b2f0929346b84337d6fae396c142935dd159
   libwebp: af5937a13536ef73f3784d69cc342b98961acf33
   lottie-ios: 6467ca7035120c5b0e0acee58bb679cf15875686
-  lottie-react-native: c7b7a72ac0e6b6eb40a699db55a978c6cfa14813
+  lottie-react-native: e39322a5d3e98abc3804ef9196d3f6cec59a4c22
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   NitroImage: 2f592086cbdecbbaa1c10dd97e0cdd43b1bb0817
   NitroModules: 452230d9b63c6c3f59dd97eeaa27ec3449271d4a
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   razorpay-core-pod: c7f3ac3d214c1a7fac4e9a59c1de7eac02130573
-  razorpay-pod: e939db88bc67c33a84bcc419505b8546b1081023
+  razorpay-pod: 3c91ef4895d389968a5c56a6f1e9943e44b50fa0
   RCTDeprecation: c7a2768f905d76ca6d2cfefb26e4349eacbdfca3
   RCTRequired: 5e502c3553cfbed090a991c444448da452fb752e
   RCTSwiftUI: 5ce3ccbdc58b78cc4ebbaace01709ec22d58e131
@@ -3172,7 +3172,7 @@ SPEC CHECKSUMS:
   react-native-netinfo: 2f906d5d9a639090ed1c079135d6485a95f749f1
   react-native-otp-verify: b8f402aceafdad77eba70620209c616f242ff0f1
   react-native-razorpay: e6ad1261209cdbac15dd3dab4db2a5f7461fd295
-  react-native-safe-area-context: c4a6d0fbf9c77ee28dab7e4d4c369df7753f20d4
+  react-native-safe-area-context: 30934ff38025480021a6956a3eb8799f18ff835a
   react-native-video: db3a70efc9fa0c00f5499d7798283bf0585cbd37
   react-native-webview: 4b1217071d94a56a6f749e25c751e51a1cec25b6
   React-NativeModulesApple: 993744f42aab769eb02bf5d256b6767c546d0bb5
@@ -3219,7 +3219,7 @@ SPEC CHECKSUMS:
   RNReactNativeHapticFeedback: 16e5f7fd37e2acc5a33ea14f48bfd88ff43776ee
   RNReanimated: 5aa9e73d0f8d3c40d5c9bec396d6a61098db31f0
   RNScreens: de068bbd7d91b820fedac25c597d4b14830de74b
-  RNSentry: abd1c7d1a88175179f5a0367c132e84e06a69b45
+  RNSentry: 67a738ecdc2ddb58371f8ecfa3d6c87a5b87f5db
   RNShare: 7344a3a7d4e5df58c356ad0f79e4a3ef1325c635
   RNSound: 79fb9d0b4a20de49e65e657b563982443c1ed21b
   RNSVG: 0e52210d4d43165e7e2cf9c890a9848b27e513ac
@@ -3230,6 +3230,6 @@ SPEC CHECKSUMS:
   VisionCamera: a917b12fb1a8af28f8265b20e9676d1cb37a1593
   Yoga: 04bb4bfeb02c0000b940c1e6e89e856cd8de5a71
 
-PODFILE CHECKSUM: ff01ff89b06ab94ff64283e9a8f47dabe3552be1
+PODFILE CHECKSUM: b71ddf7fff405f6626097ea76bd046ef60eae2d9
 
 COCOAPODS: 1.16.2
