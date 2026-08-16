@@ -43,6 +43,13 @@ const KitchenLoginScreen = () => {
         accessToken: response.accessToken,
         refreshToken: response.refreshToken
       }));
+
+      try {
+        const { FCMService } = require('../services/fcm.service');
+        FCMService.registerDeviceToken('chef');
+      } catch (e) {
+        console.warn('Failed to register FCM token for kitchen:', e);
+      }
     } catch (err: any) {
       showDialog({ title: 'Access Denied', message: err?.response?.data?.error || 'Invalid PIN code', confirmText: 'Okay', type: 'error' });
       setPin('');

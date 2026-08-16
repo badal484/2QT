@@ -152,10 +152,10 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
 // way /verify-otp and the old /firebase-login independently did before.
 async function completeAuth(
     normalizedPhone: string,
-    opts: { referralCode?: string; name?: string; appRole?: string; lat?: number; lng?: number; platform?: string },
+    opts: { referralCode?: string; name?: string; appRole?: string; lat?: number; lng?: number; platform?: string; fcmToken?: string; deviceId?: string },
     res: Response
 ): Promise<void> {
-    const { referralCode, name, appRole, lat, lng, platform } = opts;
+    const { referralCode, name, appRole, lat, lng, platform, fcmToken, deviceId } = opts;
 
     // Pre-launch mode check — gated on this phone's ALREADY-established role in the DB,
     // never the client-supplied appRole (which anyone could set to bypass the gate otherwise).
@@ -393,6 +393,22 @@ async function completeAuth(
     if (user.kitchen_id) {
         const { rows: kRows } = await query('SELECT name FROM kitchens WHERE id = $1', [user.kitchen_id]);
         if (kRows[0]) kitchenName = kRows[0].name;
+    }
+
+    if (fcmToken && deviceId) {
+        try {
+            const { DeviceTokenService } = require('../modules/notifications/services/device-token.service');
+            await DeviceTokenService.registerToken({
+                userId: user.id,
+                deviceId: String(deviceId),
+                appType: user.role === 'rider' ? 'rider' : (['chef','partner_kitchen'].includes(user.role) ? 'kitchen' : 'buyer'),
+                platform: platform === 'ios' ? 'ios' : 'android',
+                fcmToken: String(fcmToken),
+            });
+            console.log(`[AUTH_FCM_REGISTERED] Auto-registered device token on login for user ${user.id}`);
+        } catch (e: any) {
+            console.warn('[AUTH_FCM_REGISTER_FAIL]', e?.message || e);
+        }
     }
 
     res.json({

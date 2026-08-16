@@ -74,6 +74,12 @@ const OTPScreen = ({ route, navigation }: any) => {
       haptics.success();
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
       connectSocket(data.accessToken);
+      try {
+        const { FCMService } = require('../services/fcm.service');
+        FCMService.registerDeviceToken(data.user?.role);
+      } catch (e) {
+        console.warn('Failed to register FCM token on login success:', e);
+      }
     },
     onError: (err: any) => {
       haptics.error();

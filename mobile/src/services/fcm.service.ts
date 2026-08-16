@@ -28,24 +28,26 @@ export class FCMService {
     static async requestPermission(): Promise<boolean> {
         if (!messagingModule) return false;
         try {
-            if (Platform.OS === 'android' && (Platform.Version as number) >= 33) {
-                const { PermissionsAndroid } = require('react-native');
-                const granted = await PermissionsAndroid.request(
-                    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-                );
-                if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-                    console.warn('[FCMService] POST_NOTIFICATIONS permission denied on Android');
-                    return false;
+            if (Platform.OS === 'android') {
+                const androidApiLevel = typeof Platform.Version === 'string' ? parseInt(Platform.Version, 10) : (Platform.Version || 0);
+                if (androidApiLevel >= 33) {
+                    const { PermissionsAndroid } = require('react-native');
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+                    );
+                    console.log('[FCMService] POST_NOTIFICATIONS permission result:', granted);
+                    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+                        console.warn('[FCMService] POST_NOTIFICATIONS permission denied on Android');
+                        // Still continue to attempt token retrieval
+                    }
                 }
             }
             const authStatus = await messagingModule().requestPermission();
-            const enabled =
-                authStatus === 1 || // AUTHORIZED
-                authStatus === 2;   // PROVISIONAL
-            return enabled;
+            console.log('[FCMService] messaging().requestPermission authStatus:', authStatus);
+            return true;
         } catch (error) {
             console.warn('[FCMService] Permission request failed:', error);
-            return false;
+            return true;
         }
     }
 
