@@ -14,11 +14,13 @@ export class DBStrategy implements NotificationChannelStrategy {
         try {
             const { userId, type, title, body, data = {} } = payload;
             
+            const channel = payload.channels?.includes('push') || payload.type === 'broadcast_message' ? 'push' : 'db';
+
             const { rows } = await query(
                 `INSERT INTO notifications (user_id, type, title, body, data, channel, delivery_status)
                  VALUES ($1, $2, $3, $4, $5, $6, $7)
                  RETURNING id`,
-                [userId, type, title, body, JSON.stringify(data), 'db', 'sent']
+                [userId, type, title, body, JSON.stringify(data), channel, 'sent']
             );
 
             const insertedId = rows[0]?.id;
