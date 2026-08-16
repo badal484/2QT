@@ -5,9 +5,8 @@ export class SocketStrategy implements NotificationChannelStrategy {
     readonly name = 'socket';
 
     canHandle(payload: NotificationPayload): boolean {
-        // Enabled by default unless explicitly excluded
         if (!payload.channels || payload.channels.length === 0) return true;
-        return payload.channels.includes('socket') || payload.channels.includes('push') || payload.channels.includes('in_app');
+        return payload.channels.includes('socket') || payload.channels.includes('in_app');
     }
 
     async send(payload: NotificationPayload): Promise<StrategySendResult> {
