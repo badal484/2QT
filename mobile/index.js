@@ -24,7 +24,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         await notifee.displayNotification({
             title,
             body,
-            data: data as any,
+            data,
             android: {
                 channelId,
                 importance: AndroidImportance.HIGH,
