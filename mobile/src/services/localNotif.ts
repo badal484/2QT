@@ -25,15 +25,18 @@ function loadNotifee() {
 
 function channelForType(type: string): string {
   if (type === 'order_update' || type === 'new_kitchen_order') return 'order_dispatch_v2';
-  if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates_v4';
-  if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account_v4';
-  return 'promotions_v4';
+  if (type.startsWith('order_') || type === 'low_subscription_meals') return 'order_updates_v5';
+  if (type === 'rider_payout' || type === 'kitchen_payout' || type.includes('wallet') || type === 'chat_message') return 'account_v5';
+  return 'promotions_v5';
 }
 
 export async function createNotificationChannels() {
   if (!loadNotifee()) return;
   await _notifee.deleteChannel('order_updates').catch(() => {});
   await _notifee.deleteChannel('promotions').catch(() => {});
+  await _notifee.deleteChannel('order_updates_v4').catch(() => {});
+  await _notifee.deleteChannel('promotions_v4').catch(() => {});
+  await _notifee.deleteChannel('account_v4').catch(() => {});
   const results = await Promise.allSettled([
     // MAX-importance channel for direct rider dispatch & kitchen orders — custom sound + heads-up on lock screen
     _notifee.createChannel({
@@ -47,7 +50,7 @@ export async function createNotificationChannels() {
     }),
     // HIGH-importance heads-up banner channels for order updates, promotions, and account alerts
     _notifee.createChannel({
-      id: 'order_updates_v4',
+      id: 'order_updates_v5',
       name: 'Order Updates',
       importance: _AndroidImportance.HIGH,
       sound: 'default',
@@ -56,7 +59,7 @@ export async function createNotificationChannels() {
       lights: ['#FC4603', 500, 500],
     }),
     _notifee.createChannel({
-      id: 'promotions_v4',
+      id: 'promotions_v5',
       name: 'Promotions & Offers',
       importance: _AndroidImportance.HIGH,
       sound: 'default',
@@ -65,7 +68,7 @@ export async function createNotificationChannels() {
       lights: ['#FC4603', 500, 500],
     }),
     _notifee.createChannel({
-      id: 'account_v4',
+      id: 'account_v5',
       name: 'Account & Wallet Alerts',
       importance: _AndroidImportance.HIGH,
       sound: 'default',
