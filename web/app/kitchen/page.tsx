@@ -341,6 +341,8 @@ export default function KitchenPage() {
       router.push("/login");
     } else if (!["chef", "kitchen_manager", "super_admin", "packer"].includes(user.role)) {
       router.push("/menu");
+    } else if (user.role === "packer") {
+      setView("packer");
     }
   }, [user, authLoading, router]);
 

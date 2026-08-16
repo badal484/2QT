@@ -24,7 +24,7 @@ target 'VeltoMobile' do
   # without needing `use_frameworks!` which breaks C++ pods (lottie, jsi).
   pre_install do |installer|
     installer.pod_targets.each do |pod|
-      if pod.name.start_with?('Firebase') || pod.name.start_with?('Google') || pod.name == 'RecaptchaInterop'
+      if pod.name.start_with?('Firebase') || pod.name.start_with?('Google') || pod.name.start_with?('Sentry') || pod.name == 'RecaptchaInterop'
         def pod.build_type;
           Pod::BuildType.static_framework
         end
