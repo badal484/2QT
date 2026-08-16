@@ -45,7 +45,7 @@ export async function createNotificationChannels() {
       importance: _AndroidImportance.HIGH,
       sound: 'alert', // Plays alert.mp3 from res/raw
       vibration: true,
-      vibrationPattern: [0, 500, 250, 500, 250, 500],
+      vibrationPattern: [0, 500, 250, 500],
       lights: ['#FC4603', 500, 500],
     }),
     // HIGH-importance heads-up banner channels for order updates, promotions, and account alerts
@@ -127,11 +127,11 @@ export async function displayLocalNotification(
         pressAction: { id: 'default' },
         importance: _AndroidImportance.HIGH,
         sound: isDispatch ? 'alert' : 'default',
-        vibrationPattern: [0, 500, 250, 500, 250, 500],
+        vibrationPattern: [0, 500, 250, 500],
         lights: ['#FC4603', 500, 500],
         ...(isDispatch && {
           fullScreenAction: { id: 'default', launchActivity: 'default' },
-          vibrationPattern: [0, 500, 250, 500, 250, 500],
+          vibrationPattern: [0, 500, 250, 500],
         }),
         ...(bannerUrl && !isChat && {
           style: {
