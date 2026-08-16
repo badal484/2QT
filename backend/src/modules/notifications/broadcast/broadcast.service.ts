@@ -63,15 +63,15 @@ export class BroadcastService {
         const params: any[] = [];
 
         if (targetType === 'buyers') {
-            sql += ` AND role IN ('customer', 'buyer')`;
+            sql += ` AND LOWER(role::text) IN ('customer', 'buyer')`;
         } else if (targetType === 'riders') {
-            sql += ` AND role IN ('rider', 'rider_captain')`;
+            sql += ` AND LOWER(role::text) IN ('rider', 'rider_captain')`;
             if (filter.zoneId) {
                 params.push(filter.zoneId);
                 sql += ` AND zone_id = $${params.length}`;
             }
         } else if (targetType === 'kitchens') {
-            sql += ` AND role IN ('chef', 'partner_kitchen', 'kitchen_manager', 'packer')`;
+            sql += ` AND LOWER(role::text) IN ('chef', 'partner_kitchen', 'kitchen_manager', 'packer', 'kitchen')`;
             if (filter.kitchenId) {
                 params.push(filter.kitchenId);
                 sql += ` AND kitchen_id = $${params.length}`;
