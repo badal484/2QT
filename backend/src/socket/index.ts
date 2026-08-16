@@ -96,6 +96,13 @@ export const initSocket = (server: any) => {
             if (user.zoneId) socket.join(`riders:${user.zoneId}`);
         }
 
+        socket.on('join_kitchen', (kitchenId: string) => {
+            if (kitchenId) {
+                console.log(`Socket ${socket.id} joined kitchen:${kitchenId}`);
+                socket.join(`kitchen:${kitchenId}`);
+            }
+        });
+
         socket.on('join_order', async (orderId) => {
             socket.join(`order:${orderId}`);
             // Immediately push last known rider location so buyer doesn't wait for next heartbeat
@@ -173,7 +180,12 @@ export const emitToOrder = (orderId: string, event: string, data: any) => {
 };
 
 export const emitToKitchen = (kitchenId: string, event: string, data: any) => {
-    emitter()?.to(`kitchen:${kitchenId}`).emit(event, data);
+    const e = emitter();
+    if (!e) return;
+    if (kitchenId) {
+        e.to(`kitchen:${kitchenId}`).emit(event, data);
+    }
+    e.to('admin').to('kitchen_all').emit(event, { ...data, kitchenId });
 };
 
 export const emitToAdmin = (event: string, data: any) => {
