@@ -28,6 +28,16 @@ export class FCMService {
     static async requestPermission(): Promise<boolean> {
         if (!messagingModule) return false;
         try {
+            if (Platform.OS === 'android' && (Platform.Version as number) >= 33) {
+                const { PermissionsAndroid } = require('react-native');
+                const granted = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+                );
+                if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+                    console.warn('[FCMService] POST_NOTIFICATIONS permission denied on Android');
+                    return false;
+                }
+            }
             const authStatus = await messagingModule().requestPermission();
             const enabled =
                 authStatus === 1 || // AUTHORIZED
