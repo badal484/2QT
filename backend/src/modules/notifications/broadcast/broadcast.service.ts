@@ -127,7 +127,7 @@ export class BroadcastService {
         const params: any[] = [];
 
         if (targetType === 'buyers') {
-            sql += ` AND LOWER(role::text) IN ('customer', 'buyer')`;
+            sql += ` AND LOWER(role::text) IN ('customer', 'buyer', 'admin', 'super_admin')`;
         } else if (targetType === 'riders') {
             sql += ` AND LOWER(role::text) IN ('rider', 'rider_captain')`;
             if (filter.zoneId) {
