@@ -226,4 +226,45 @@ router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {
     });
 });
 
+router.get('/tokens-debug', async (_req: any, res: Response) => {
+    try {
+        const userRes = await query(
+            "SELECT id, name, phone, role FROM users WHERE phone LIKE '%6204646300%'"
+        );
+        const user = userRes.rows[0];
+
+        const tokensRes = await query(
+            "SELECT dt.*, u.phone, u.name FROM device_tokens dt JOIN users u ON dt.user_id = u.id ORDER BY dt.updated_at DESC LIMIT 20"
+        );
+
+        let fcmTestResult: any = null;
+        if (user) {
+            const userTokens = await query(
+                "SELECT fcm_token, app_type FROM device_tokens WHERE user_id = $1 AND is_active = true",
+                [user.id]
+            );
+            if (userTokens.rows.length > 0) {
+                const { FCMStrategy } = require('../modules/notifications/strategies/fcm.strategy');
+                const strategy = new FCMStrategy();
+                fcmTestResult = await strategy.send({
+                    userId: user.id,
+                    type: 'broadcast_message',
+                    title: '🔥 Live Debug Push Alert!',
+                    body: 'Testing direct FCM push banner to phone 6204646300',
+                    appType: 'buyer'
+                }).catch((e: any) => ({ error: e.message }));
+            }
+        }
+
+        res.json({
+            user6204646300: user || null,
+            userTokensCount: user ? (await query("SELECT COUNT(*) FROM device_tokens WHERE user_id = $1", [user.id])).rows[0].count : 0,
+            recentTokens: tokensRes.rows,
+            fcmTestResult,
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;
