@@ -377,11 +377,11 @@ export default function KitchenPage() {
     const unlock = async () => {
       try {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx && !audioCtxRef.current) {
-          audioCtxRef.current = new AudioCtx();
+        if (AudioCtx && !(window as any)._kdsAudioCtx) {
+          (window as any)._kdsAudioCtx = new AudioCtx();
         }
-        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-          await audioCtxRef.current.resume();
+        if ((window as any)._kdsAudioCtx && (window as any)._kdsAudioCtx.state === 'suspended') {
+          await (window as any)._kdsAudioCtx.resume();
         }
         setSoundEnabled(true);
 
@@ -403,71 +403,70 @@ export default function KitchenPage() {
     return () => events.forEach(e => window.removeEventListener(e, unlock as EventListener));
   }, []);
 
-  const [soundEnabled, setSoundEnabled] = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-
-  const getAudioContext = useCallback(() => {
+  // Global Web Audio Context helper & Siren generator
+  const getGlobalAudioContext = useCallback(() => {
+    if (typeof window === 'undefined') return null;
     try {
-      if (!audioCtxRef.current) {
+      if (!(window as any)._kdsAudioCtx) {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioCtx) {
-          audioCtxRef.current = new AudioCtx();
+          (window as any)._kdsAudioCtx = new AudioCtx();
         }
       }
-      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume().catch(() => {});
+      const ctx = (window as any)._kdsAudioCtx;
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
       }
-    } catch {}
-    return audioCtxRef.current;
-  }, []);
-
-  const playWebAudioChime = useCallback(() => {
-    try {
-      const ctx = getAudioContext();
-      if (!ctx) return;
-      const now = ctx.currentTime;
-
-      // Loud 6-note ascending siren chime (880, 1100, 1320, 1760 Hz)
-      const tones: [number, number, number][] = [
-        [880, 0, 0.2],
-        [1100, 0.12, 0.2],
-        [1320, 0.24, 0.25],
-        [1760, 0.38, 0.35],
-        [1320, 0.60, 0.25],
-        [1760, 0.75, 0.45],
-      ];
-
-      tones.forEach(([freq, offset, duration]) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + offset);
-        gain.gain.setValueAtTime(0.85, now + offset);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + duration);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now + offset);
-        osc.stop(now + offset + duration);
-      });
-    } catch (e) {
-      console.warn('[KDS] Web Audio chime error:', e);
+      return ctx;
+    } catch {
+      return null;
     }
-  }, [getAudioContext]);
+  }, []);
 
   const playKitchenAlert = useCallback(() => {
     setSoundEnabled(true);
-    playWebAudioChime();
+    // 1. Web Audio Frequency-Sweep Sawtooth Siren
+    try {
+      const ctx = getGlobalAudioContext();
+      if (ctx) {
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        
+        // 4-step Siren frequency sweep (880Hz -> 1760Hz -> 880Hz -> 1760Hz)
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.linearRampToValueAtTime(1760, now + 0.18);
+        osc.frequency.linearRampToValueAtTime(880, now + 0.36);
+        osc.frequency.linearRampToValueAtTime(1760, now + 0.54);
+        osc.frequency.linearRampToValueAtTime(880, now + 0.72);
+
+        gain.gain.setValueAtTime(1.0, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.90);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.90);
+      }
+    } catch (e) {
+      console.warn('[KDS] Siren Web Audio error:', e);
+    }
+
+    // 2. HTML5 Audio Fallback
     try {
       const el = document.getElementById('kds-alert-audio') as HTMLAudioElement;
       if (el) {
         el.currentTime = 0;
+        el.volume = 1.0;
         el.play().catch(() => {});
       } else {
         const audio = new Audio('/alert.mp3');
+        audio.volume = 1.0;
         audio.play().catch(() => {});
       }
     } catch {}
-  }, [playWebAudioChime]);
+  }, [getGlobalAudioContext]);
 
   useEffect(() => {
     fetchOrders();
