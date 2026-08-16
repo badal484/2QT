@@ -92,7 +92,15 @@ export interface SendOptions {
 export async function sendNotification(type: NotifType, options: SendOptions): Promise<void> {
     try {
         const { notificationsQueue } = require('../jobs/queues');
-        await (notificationsQueue as any).add(type, { ...options, _queuedOptions: true });
+        // BullMQ's Redis connection is configured with maxRetriesPerRequest: null (required by
+        // BullMQ), which means a struggling/unreachable Redis makes .add() retry indefinitely
+        // instead of failing fast. Bound it explicitly so a Redis outage falls back to direct
+        // delivery within a few seconds instead of hanging this call (and, since callers like
+        // admin.ts's broadcast loop await each batch, potentially the whole batch) forever.
+        await Promise.race([
+            (notificationsQueue as any).add(type, { ...options, _queuedOptions: true }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('QUEUE_ADD_TIMEOUT')), 3000)),
+        ]);
     } catch (e: any) {
         console.warn(`[NOTIF] Queue add failed for type=${type} (delivering directly):`, e.message);
         deliverNotification(type, options).catch(err => console.error('[NOTIF_DIRECT_DELIVERY_ERR]', err.message));
