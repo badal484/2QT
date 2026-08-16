@@ -3,6 +3,13 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const useSsl =
+    process.env.NODE_ENV === 'production' ||
+    process.env.DATABASE_URL?.includes('pgbouncer=true') ||
+    process.env.DATABASE_URL?.includes('sslmode=require') ||
+    process.env.DATABASE_URL?.includes('supabase') ||
+    process.env.DATABASE_URL?.includes('13.239.87.90');
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     max: process.env.NODE_ENV === 'production' ? parseInt(process.env.DB_POOL_MAX || '5') : 20,
@@ -10,7 +17,7 @@ const pool = new Pool({
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: true,
     maxUses: 7500, // Staff Optimization: Recycle connections to prevent memory leaks over time
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined,
 });
 
 pool.on('error', (err) => {
