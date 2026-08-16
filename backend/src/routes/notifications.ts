@@ -256,6 +256,21 @@ router.get('/tokens-debug', async (_req: any, res: Response) => {
             }
         }
 
+        // Cleanup duplicate active device tokens (keep only the newest record per fcm_token + user_id)
+        if (user) {
+            await query(`
+                UPDATE device_tokens 
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE id IN (
+                    SELECT id FROM (
+                        SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id, fcm_token ORDER BY updated_at DESC) as rnum
+                        FROM device_tokens
+                        WHERE is_active = TRUE
+                    ) t WHERE t.rnum > 1
+                )
+            `).catch(() => {});
+        }
+
         const campaignsRes = await query(
             "SELECT id, title, status, sent_count, total_recipients, created_at, completed_at FROM broadcast_campaigns ORDER BY created_at DESC LIMIT 5"
         );

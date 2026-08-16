@@ -10,10 +10,6 @@ const { withNativeWind } = require("nativewind/metro");
  */
 const config = {
   resolver: {
-    // Firebase uses platform-specific files (nativeModule.android.js) which are
-    // overridden by package.json exports map when this flag is true. Disabling
-    // restores Metro's .android.js > .js resolution order.
-    unstable_enablePackageExports: false,
     resolveRequest: (context, moduleName, platform) => {
       if (moduleName.includes('nativewind') && moduleName.includes('transformer')) {
         return {

@@ -29,8 +29,8 @@ const notifWorker = new Worker('2qt:notifications', async (job: Job) => {
 
         for (const userId of userIdsBatch) {
             const dedupeKey = `broadcast_dedup:${campaignId}:${userId}`;
-            const alreadySent = await redis.get(dedupeKey).catch(() => null);
-            if (alreadySent) continue;
+            const acquired = await redis.set(dedupeKey, '1', { EX: 86400, NX: true }).catch(() => null);
+            if (!acquired) continue; // Already claimed by inline/other worker
 
             try {
                 let appType: 'buyer' | 'rider' | 'kitchen' = 'buyer';
@@ -47,7 +47,6 @@ const notifWorker = new Worker('2qt:notifications', async (job: Job) => {
                     imageUrl: imageUrl || undefined,
                 });
 
-                await redis.setEx(dedupeKey, 86400, '1').catch(() => {});
                 sent++;
             } catch (e) {
                 failed++;

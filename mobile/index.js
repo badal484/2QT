@@ -4,12 +4,13 @@ import { enableScreens } from 'react-native-screens';
 import App from './App';
 import { name as appName } from './app.json';
 
+import messaging from '@react-native-firebase/messaging';
+import { safeNotifee, AndroidImportance } from './src/services/notifeeSafe';
+
 enableScreens(false);
 
 // Top-level FCM Background & Killed State Message Handler
 try {
-    const messagingPkg = require('@react-native-firebase/messaging');
-    const messaging = messagingPkg.default || messagingPkg;
     messaging().setBackgroundMessageHandler(async remoteMessage => {
         console.log('[FCM Background] Remote message received:', remoteMessage);
         const notification = remoteMessage?.notification;
@@ -21,15 +22,10 @@ try {
 
         const channelId = appType === 'kitchen' ? 'kitchen_orders' : (appType === 'rider' ? 'rider_alerts' : 'order_updates');
 
-        try {
-            const notifeePackage = require('@notifee/react-native');
-            const notifee = notifeePackage.default || notifeePackage;
-            const AndroidImportance = notifeePackage.AndroidImportance || { HIGH: 4 };
-
-            await notifee.displayNotification({
+        if (safeNotifee.isAvailable) {
+            await safeNotifee.displayNotification({
                 title,
                 body,
-                data: data,
                 android: {
                     channelId,
                     importance: AndroidImportance.HIGH,
@@ -37,13 +33,12 @@ try {
                         id: 'default',
                     },
                 },
+                data,
             });
-        } catch (e) {
-            console.warn('[FCM Background] Display notification error:', e);
         }
     });
 } catch (e) {
-    console.warn('[FCM Background] Messaging module fallback in index.js:', e);
+    console.warn('[FCM Background] Messaging setBackgroundMessageHandler error:', e);
 }
 
 AppRegistry.registerComponent(appName, () => App);

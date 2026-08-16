@@ -22,6 +22,14 @@ export class DeviceTokenService {
         const tokenHash = this.hashToken(fcmToken);
 
         try {
+            // Deactivate any existing tokens with the same fcm_token for other device_ids/users
+            await query(
+                `UPDATE device_tokens 
+                 SET is_active = FALSE, updated_at = NOW() 
+                 WHERE (fcm_token = $1 OR token_hash = $2) AND (user_id != $3 OR device_id != $4)`,
+                [fcmToken, tokenHash, userId, deviceId]
+            ).catch(() => {});
+
             const { rows } = await query(
                 `INSERT INTO device_tokens 
                    (user_id, device_id, app_type, platform, fcm_token, token_hash, is_active, last_used_at, updated_at)
@@ -82,7 +90,7 @@ export class DeviceTokenService {
 
     static async getActiveTokensForUser(userId: string, appType?: AppType): Promise<string[]> {
         try {
-            let sql = `SELECT fcm_token FROM device_tokens WHERE user_id = $1 AND is_active = TRUE`;
+            let sql = `SELECT DISTINCT fcm_token FROM device_tokens WHERE user_id = $1 AND is_active = TRUE`;
             const params: any[] = [userId];
 
             if (appType) {
@@ -102,7 +110,7 @@ export class DeviceTokenService {
         if (!userIds.length) return [];
 
         try {
-            let sql = `SELECT user_id, fcm_token, app_type FROM device_tokens WHERE user_id = ANY($1) AND is_active = TRUE`;
+            let sql = `SELECT DISTINCT user_id, fcm_token, app_type FROM device_tokens WHERE user_id = ANY($1) AND is_active = TRUE`;
             const params: any[] = [userIds];
 
             if (appType) {

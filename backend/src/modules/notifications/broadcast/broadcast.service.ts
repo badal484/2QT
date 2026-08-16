@@ -82,8 +82,8 @@ export class BroadcastService {
 
                 for (const userId of batch) {
                     const dedupeKey = `broadcast_dedup:${campaignId}:${userId}`;
-                    const alreadySent = await redis.get(dedupeKey).catch(() => null);
-                    if (alreadySent) continue;
+                    const acquired = await redis.set(dedupeKey, '1', { EX: 86400, NX: true }).catch(() => null);
+                    if (!acquired) continue; // Already claimed by another worker
 
                     try {
                         let appType: 'buyer' | 'rider' | 'kitchen' = 'buyer';
@@ -100,7 +100,6 @@ export class BroadcastService {
                             imageUrl: imageUrl || undefined,
                         });
 
-                        await redis.setEx(dedupeKey, 86400, '1').catch(() => {});
                         sent++;
                     } catch {
                         failed++;
