@@ -81,6 +81,14 @@ const start = async () => {
         initFileCrons();
         initDirCrons();
 
+        server.on('error', (err: any) => {
+            if (err.code === 'EADDRINUSE') {
+                console.warn(`[WORKER] Health check port ${PORT} already occupied — job processor continuing in secondary mode.`);
+            } else {
+                console.error('[WORKER] Health server error:', err.message);
+            }
+        });
+
         server.listen(PORT as number, '0.0.0.0', () => {
             console.log(`[WORKER] Health server listening on port ${PORT} (0.0.0.0)`);
         });
