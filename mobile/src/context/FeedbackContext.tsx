@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useRef } from 'react';
 import { StyleSheet, View, Text, Modal, Pressable } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tokens } from '../theme/tokens';
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react-native';
 import { haptics } from '../utils/haptics';
@@ -41,6 +42,7 @@ export const useFeedback = () => {
 };
 
 export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const insets = useSafeAreaInsets();
   const [sheetState, setSheetState] = useState<{ visible: boolean; options: DialogOptions | null }>({
     visible: false,
     options: null,
@@ -117,6 +119,8 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
+  const bottomInsetPadding = Math.max(insets.bottom + 24, 32);
+
   return (
     <FeedbackContext.Provider value={{ showDialog, showToast }}>
       {children}
@@ -127,7 +131,7 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
           <Pressable style={StyleSheet.absoluteFill} onPress={handleCancel} />
           
           <Animated.View 
-            style={styles.sheetContainer} 
+            style={[styles.sheetContainer, { paddingBottom: bottomInsetPadding }]} 
             entering={SlideInDown.duration(220)} 
             exiting={SlideOutDown.duration(180)}
           >
