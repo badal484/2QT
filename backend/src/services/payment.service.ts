@@ -197,7 +197,7 @@ export const calculatePricing = async ({
     if (promoCode) {
         const { rows: promos } = await query(
             `SELECT * FROM promo_codes
-             WHERE code = $1
+             WHERE UPPER(TRIM(code)) = UPPER(TRIM($1))
              AND is_active = true
              AND (expires_at IS NULL OR expires_at >= NOW())
              AND (max_uses IS NULL OR times_used < max_uses)
@@ -243,8 +243,8 @@ export const calculatePricing = async ({
         }
 
         promoCodeId = promo.id;
-        if (promo.discount_type === 'percent') {
-            discountPaise = Math.floor((effectiveSubtotal * promo.discount_percent) / 100);
+        if (promo.discount_type === 'percent' || promo.discount_type === 'percentage') {
+            discountPaise = Math.floor((effectiveSubtotal * parseFloat(promo.discount_percent || 0)) / 100);
         } else {
             discountPaise = promo.discount_value_paise || promo.discount_flat_paise || 0;
         }
