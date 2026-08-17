@@ -330,7 +330,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
     </View>
   );
 
-  const p = pricing?.pricing || { totalAmountPaise: 0, subtotalPaise: 0, deliveryFeePaise: 0, cgstPaise: 0, sgstPaise: 0, discountPaise: 0, loyaltyDiscountPaise: 0, walletDeductionPaise: 0, gatewayAmountPaise: 0 };
+  const p = pricing?.pricing ? pricing.pricing : (pricing?.subtotalPaise !== undefined ? pricing : { totalAmountPaise: 0, subtotalPaise: 0, deliveryFeePaise: 0, cgstPaise: 0, sgstPaise: 0, discountPaise: 0, loyaltyDiscountPaise: 0, walletDeductionPaise: 0, gatewayAmountPaise: 0, menuOfferDiscountPaise: 0 });
   const walletBal = pricing?.availableWallet || 0;
   const loyaltyPts = loyaltyData?.points || 0;
 
