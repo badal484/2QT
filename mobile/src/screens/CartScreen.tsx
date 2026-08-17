@@ -233,27 +233,34 @@ const CartScreen = ({ navigation }: any) => {
 
   // React to promo code or pricing calculation errors with user-friendly alerts
   useEffect(() => {
-    if (pricingErrored && pricingError) {
+    if (pricingErrored && pricingError && appliedPromoCode) {
       const msg = (pricingError as any)?.message || "";
+      let title = "";
+      let message = "";
       if (msg.includes("PROMO_INVALID_OR_EXPIRED")) {
-        showDialog({ title: "Invalid Promo Code", message: `The code "${appliedPromoCode}" is invalid or expired.` });
-        setAppliedPromoCode("");
+        title = "Invalid Promo Code";
+        message = `The code "${appliedPromoCode}" is invalid or expired.`;
       } else if (msg.includes("PROMO_MIN_ORDER:")) {
         const minPaise = parseInt(msg.split("PROMO_MIN_ORDER:")[1], 10) || 0;
-        showDialog({ title: "Minimum Order Required", message: `A minimum item total of ₹${(minPaise / 100).toFixed(0)} is required to use "${appliedPromoCode}".` });
-        setAppliedPromoCode("");
+        title = "Minimum Order Required";
+        message = `A minimum item total of ₹${(minPaise / 100).toFixed(0)} is required to use "${appliedPromoCode}".`;
       } else if (msg.includes("PROMO_FIRST_ORDER_ONLY")) {
-        showDialog({ title: "First Order Only", message: `The code "${appliedPromoCode}" is valid on your first completed order only.` });
-        setAppliedPromoCode("");
+        title = "First Order Only";
+        message = `The code "${appliedPromoCode}" is valid on your first completed order only.`;
       } else if (msg.includes("PROMO_NEW_USER_ONLY")) {
-        showDialog({ title: "New Users Only", message: `The code "${appliedPromoCode}" is available for new users only.` });
-        setAppliedPromoCode("");
+        title = "New Users Only";
+        message = `The code "${appliedPromoCode}" is available for new users only.`;
       } else if (msg.includes("PROMO_USAGE_LIMIT_REACHED")) {
-        showDialog({ title: "Usage Limit Reached", message: `You have reached the maximum number of uses for "${appliedPromoCode}".` });
+        title = "Usage Limit Reached";
+        message = `You have reached the maximum number of uses for "${appliedPromoCode}".`;
+      }
+
+      if (title && message) {
         setAppliedPromoCode("");
+        showDialog({ title, message });
       }
     }
-  }, [pricingErrored, pricingError, appliedPromoCode]);
+  }, [pricingErrored, pricingError, appliedPromoCode, showDialog]);
 
   const rawError = (pricingError as any)?.message || "Couldn't calculate";
   let displayError = rawError;
