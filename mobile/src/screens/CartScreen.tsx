@@ -597,12 +597,19 @@ const CartScreen = ({ navigation }: any) => {
             <Text allowFontScaling={false} style={styles.billLabel}>Cart Total</Text>
             <Text allowFontScaling={false} style={styles.billValue}>₹{subtotal}</Text>
           </View>
-          {tax > 0 && (
+          {/* GST Tax Row */}
+          {!hasPricingData && addressId && !pricingErrored ? (
+            <View style={styles.billRow}>
+              <Text allowFontScaling={false} style={styles.billLabel}>GST</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.textTertiary, fontSize: 12 }]}>Calculating...</Text>
+            </View>
+          ) : tax > 0 ? (
             <View style={styles.billRow}>
               <Text allowFontScaling={false} style={styles.billLabel}>GST</Text>
               <Text allowFontScaling={false} style={styles.billValue}>₹{tax.toFixed(2)}</Text>
             </View>
-          )}
+          ) : null}
+
           {addressId && (
             <>
               <View style={styles.billRow}>
@@ -629,7 +636,7 @@ const CartScreen = ({ navigation }: any) => {
                         <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>FREE</Text>
                       </>
                     ) : (
-                      <Text allowFontScaling={false} style={styles.billValue}>₹{deliveryFee}</Text>
+                      <Text allowFontScaling={false} style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
                     )}
                   </View>
                 )}
@@ -700,14 +707,20 @@ const CartScreen = ({ navigation }: any) => {
           {riderTip > 0 && (
             <View style={styles.billRow}>
               <Text allowFontScaling={false} style={styles.billLabel}>Delivery Partner Tip</Text>
-              <Text allowFontScaling={false} style={styles.billValue}>₹{riderTip}</Text>
+              <Text allowFontScaling={false} style={styles.billValue}>₹{riderTip.toFixed(2)}</Text>
             </View>
           )}
 
           <View style={styles.totalSeparator} />
           <View style={[styles.totalRow, { marginBottom: 16 }]}>
             <Text allowFontScaling={false} style={styles.totalLabel}>Total Payable</Text>
-            <Text allowFontScaling={false} style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
+            {!hasPricingData && addressId && !pricingErrored ? (
+              <Text allowFontScaling={false} style={[styles.totalValue, { color: tokens.colors.textTertiary, fontSize: 16, fontFamily: tokens.typography.family.medium }]}>
+                Calculating...
+              </Text>
+            ) : (
+              <Text allowFontScaling={false} style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
+            )}
           </View>
           
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12 }}>
@@ -751,13 +764,26 @@ const CartScreen = ({ navigation }: any) => {
       >
         <View style={styles.footerRow}>
           <View style={{ flex: 1 }}>
-            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.regular, color: tokens.colors.textTertiary, textTransform: 'uppercase' }}>Item Total</Text>
-            <Text allowFontScaling={false} style={{ fontSize: 20, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>₹{grandTotal.toFixed(2)}</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.regular, color: tokens.colors.textTertiary, textTransform: 'uppercase' }}>
+              {!hasPricingData && addressId && !pricingErrored ? 'Total Payable' : 'Item Total'}
+            </Text>
+            {!hasPricingData && addressId && !pricingErrored ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <ActivityIndicator size="small" color={tokens.colors.primary} />
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary }}>
+                  Calculating...
+                </Text>
+              </View>
+            ) : (
+              <Text allowFontScaling={false} style={{ fontSize: 20, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>
+                ₹{grandTotal.toFixed(2)}
+              </Text>
+            )}
           </View>
           
           <PressableScale
-            style={[styles.footerCta, (busy || isOutOfZone || !kitchenOpen || kitchenPaused) && styles.placeOrderBtnDisabled]}
-            disabled={busy || isOutOfZone || !kitchenOpen || kitchenPaused}
+            style={[styles.footerCta, (busy || isOutOfZone || !kitchenOpen || kitchenPaused || (!hasPricingData && addressId && !pricingErrored)) && styles.placeOrderBtnDisabled]}
+            disabled={busy || isOutOfZone || !kitchenOpen || kitchenPaused || (!hasPricingData && addressId && !pricingErrored)}
             accessibilityRole="button"
             accessibilityLabel={addressId ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay') : 'Select Address'}
             onPress={() => {
