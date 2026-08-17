@@ -207,8 +207,8 @@ export const calculatePricing = async ({
         const promo = promos[0];
         if (!promo) throw new Error('PROMO_INVALID_OR_EXPIRED');
 
-        // Check min order requirement
-        if (promo.min_order_paise > 0 && effectiveSubtotal < promo.min_order_paise) {
+        // Check min order requirement (against original cart subtotal)
+        if (promo.min_order_paise > 0 && subtotalPaise < promo.min_order_paise) {
             throw new Error(`PROMO_MIN_ORDER:${promo.min_order_paise}`);
         }
 
