@@ -429,13 +429,12 @@ const CartScreen = ({ navigation }: any) => {
           </Animated.View>
         )}
 
-        {/* Promo Code Card */}
-        {hasActivePromos && (
-          <Animated.View entering={FadeInDown.delay(70).duration(300)} style={styles.card}>
-            <Text allowFontScaling={false} style={styles.cardTitle}>Offers & Coupons</Text>
+        {/* Promo Code Card — always rendered so users can enter promo codes */}
+        <Animated.View entering={FadeInDown.delay(70).duration(300)} style={styles.card}>
+          <Text allowFontScaling={false} style={styles.cardTitle}>Offers & Coupons</Text>
 
-            {/* Quick-apply chips for available promos */}
-            {!appliedPromoCode && activePromos.length > 0 && (
+          {/* Quick-apply chips for available promos */}
+          {!appliedPromoCode && activePromos.length > 0 && (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                 {activePromos.slice(0, 4).map((promo: any) => (
                   <PressableScale
@@ -507,7 +506,6 @@ const CartScreen = ({ navigation }: any) => {
               </PressableScale>
             </View>
           </Animated.View>
-        )}
 
         {/* Delivery Address Card */}
         <Animated.View entering={FadeInDown.delay(90).duration(300)} style={styles.card}>
