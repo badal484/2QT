@@ -14,6 +14,7 @@ import { addItem, setQuantity } from '../store/slices/cartSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { enrichItemsWithOffers } from '../utils/menuOfferUtils';
 
 /** Search result row — subscribes to its own cart quantity so only it re-renders on cart change */
 const SearchResultCard = React.memo(({ item, dispatch, navigation, saveSearch, query }: any) => {
@@ -21,6 +22,8 @@ const SearchResultCard = React.memo(({ item, dispatch, navigation, saveSearch, q
     const ci = state.cart.items.find(i => i.menuItemId === item.id);
     return ci?.quantity ?? 0;
   });
+  const hasOffer = !!item.applied_offer && item.original_price_paise > item.price_paise;
+
   return (
     <PressableScale
       onPress={() => { saveSearch(query); navigation.navigate('ItemDetail', { item }); }}
@@ -32,6 +35,11 @@ const SearchResultCard = React.memo(({ item, dispatch, navigation, saveSearch, q
         {item.photo_url
           ? <NetworkImage uri={item.photo_url} style={styles.itemImage} fallbackText={item.name[0]} />
           : <View style={styles.itemPlaceholder}><ChefHat size={32} color={tokens.colors.primary} /></View>}
+        {hasOffer && !!item.discount_badge && (
+          <View style={styles.imageOfferBadge}>
+            <Text allowFontScaling={false} style={styles.imageOfferBadgeText}>{item.discount_badge}</Text>
+          </View>
+        )}
       </View>
       <View style={styles.itemDetails}>
         <View style={{ flex: 1 }}>
@@ -52,7 +60,14 @@ const SearchResultCard = React.memo(({ item, dispatch, navigation, saveSearch, q
           )}
         </View>
         <View style={styles.itemRightCol}>
-          <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
+          {hasOffer ? (
+            <View style={{ alignItems: 'flex-end', marginBottom: 4 }}>
+              <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
+              <Text allowFontScaling={false} style={styles.strikethroughPrice}>₹{item.original_price_paise / 100}</Text>
+            </View>
+          ) : (
+            <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
+          )}
           {cartQty > 0 ? (
             <View style={styles.quantityControl}>
               <PressableScale hitSlop={8} onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty - 1 }))} accessibilityRole="button" accessibilityLabel="Decrease quantity">
@@ -117,9 +132,15 @@ const SearchScreen = ({ navigation }: any) => {
     enabled: debouncedQuery.trim().length > 0 && !!effectiveZoneId,
   });
 
+  const enrichedResults = useMemo(() => {
+    const rawItems = searchResults?.results ?? [];
+    const offers = searchResults?.offers ?? [];
+    return enrichItemsWithOffers(rawItems, offers);
+  }, [searchResults?.results, searchResults?.offers]);
+
   const filteredResults = useMemo(
-    () => searchResults?.results?.filter((item: any) => vegOnly ? item.is_veg : true) ?? [],
-    [searchResults?.results, vegOnly],
+    () => enrichedResults.filter((item: any) => vegOnly ? item.is_veg : true),
+    [enrichedResults, vegOnly],
   );
 
   const [recentSearches, setRecentSearches] = React.useState<string[]>([]);
@@ -529,6 +550,31 @@ const styles = StyleSheet.create({
     color: tokens.colors.textPrimary,
     fontFamily: tokens.typography.family.extrabold,
     fontSize: 14,
+  },
+  strikethroughPrice: {
+    color: tokens.colors.textTertiary,
+    fontFamily: tokens.typography.family.medium,
+    fontSize: 11,
+    textDecorationLine: 'line-through',
+    marginTop: 1,
+  },
+  imageOfferBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#10B981',
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+  },
+  imageOfferBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontFamily: tokens.typography.family.black,
+    letterSpacing: 0.5,
   },
   quantityControl: {
     flexDirection: 'row',
