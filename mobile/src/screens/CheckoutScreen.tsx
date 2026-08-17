@@ -349,7 +349,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         {/* Bill Summary */}
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.card}>
           <Text allowFontScaling={false} style={styles.sectionTitle}>Order Summary</Text>
-          <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Item Total</Text><Text allowFontScaling={false} style={styles.billValue}>₹{p.subtotalPaise / 100}</Text></View>
+          <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Item Total</Text><Text allowFontScaling={false} style={styles.billValue}>₹{((p.subtotalPaise || 0) / 100).toFixed(2)}</Text></View>
           <View style={styles.billRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text allowFontScaling={false} style={styles.billLabel}>Delivery Fee</Text>
@@ -357,7 +357,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
                 <Text allowFontScaling={false} style={styles.whyThisText}>(Why this?)</Text>
               </PressableScale>
             </View>
-            <Text allowFontScaling={false} style={styles.billValue}>{p.deliveryFeePaise === 0 ? 'FREE' : `₹${p.deliveryFeePaise / 100}`}</Text>
+            <Text allowFontScaling={false} style={styles.billValue}>{p.deliveryFeePaise === 0 ? 'FREE' : `₹${((p.deliveryFeePaise || 0) / 100).toFixed(2)}`}</Text>
           </View>
 
           {showDeliveryFeeInfo && (
@@ -382,20 +382,21 @@ const CheckoutScreen = ({ navigation, route }: any) => {
             <Text allowFontScaling={false} style={[styles.billLabel, { textDecorationLine: 'line-through' }]}>Packaging Fees</Text>
             <Text allowFontScaling={false} style={styles.feeStrikethroughText}>Seriously? Nope</Text>
           </View>
-          <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Taxes</Text><Text allowFontScaling={false} style={styles.billValue}>₹{((p.cgstPaise || 0) + (p.sgstPaise || 0)) / 100}</Text></View>
-          {riderTip > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Rider Tip</Text><Text allowFontScaling={false} style={styles.billValue}>₹{riderTip}</Text></View>}
+          <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Taxes</Text><Text allowFontScaling={false} style={styles.billValue}>₹{(((p.cgstPaise || 0) + (p.sgstPaise || 0)) / 100).toFixed(2)}</Text></View>
+          {riderTip > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billLabel}>Rider Tip</Text><Text allowFontScaling={false} style={styles.billValue}>₹{riderTip.toFixed(2)}</Text></View>}
           
-          {(p.discountPaise > 0 || p.loyaltyDiscountPaise > 0 || p.walletDeductionPaise > 0) && (
+          {(p.menuOfferDiscountPaise > 0 || p.discountPaise > 0 || p.loyaltyDiscountPaise > 0 || p.walletDeductionPaise > 0) && (
             <View style={styles.divider} />
           )}
-          {p.discountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Promo Discount</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{p.discountPaise / 100}</Text></View>}
-          {featureLoyalty && p.loyaltyDiscountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>2QT Points Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{p.loyaltyDiscountPaise / 100}</Text></View>}
-          {p.walletDeductionPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Wallet Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{p.walletDeductionPaise / 100}</Text></View>}
+          {p.menuOfferDiscountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Item Offers</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.menuOfferDiscountPaise / 100).toFixed(2)}</Text></View>}
+          {p.discountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Promo Discount</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.discountPaise / 100).toFixed(2)}</Text></View>}
+          {featureLoyalty && p.loyaltyDiscountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>2QT Points Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.loyaltyDiscountPaise / 100).toFixed(2)}</Text></View>}
+          {p.walletDeductionPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Wallet Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.walletDeductionPaise / 100).toFixed(2)}</Text></View>}
           
           <View style={styles.divider} />
           <View style={styles.billTotalRow}>
             <Text allowFontScaling={false} style={styles.billTotalLabel}>To Pay</Text>
-            <Text allowFontScaling={false} style={styles.billTotalValue}>₹{p.gatewayAmountPaise / 100}</Text>
+            <Text allowFontScaling={false} style={styles.billTotalValue}>₹{((p.gatewayAmountPaise || 0) / 100).toFixed(2)}</Text>
           </View>
         </Animated.View>
 
