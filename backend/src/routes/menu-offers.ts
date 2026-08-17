@@ -28,7 +28,7 @@ router.get('/active', async (req, res) => {
         const { rows } = await query(`
             SELECT id, title, description, target_type, target_id, target_ids,
                    discount_type, discount_percent, discount_flat_paise, max_discount_paise,
-                   audience, zone_id, start_time, end_time
+                   audience, zone_id, start_time, end_time, per_user_limit, max_items_per_order, limit_reset_period
             FROM menu_offers
             WHERE is_active = true
             AND (zone_id IS NULL OR zone_id = $1)
@@ -73,7 +73,8 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
     const {
         title, description, target_type, target_id, target_ids,
         discount_type, discount_percent, discount_flat_paise, max_discount_paise,
-        audience, audience_config, zone_id, start_time, end_time, is_active
+        audience, audience_config, zone_id, start_time, end_time, is_active,
+        per_user_limit, max_items_per_order, limit_reset_period
     } = req.body;
 
     if (!title || !target_type || !discount_type) {
@@ -101,8 +102,9 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
             INSERT INTO menu_offers
                 (title, description, target_type, target_id, target_ids,
                  discount_type, discount_percent, discount_flat_paise, max_discount_paise,
-                 audience, audience_config, zone_id, start_time, end_time, is_active)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                 audience, audience_config, zone_id, start_time, end_time, is_active,
+                 per_user_limit, max_items_per_order, limit_reset_period)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
             RETURNING *
         `, [
             title, description || null, target_type,
@@ -113,6 +115,9 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
             audience_config ? JSON.stringify(audience_config) : '{}',
             zone_id || null, start_time || null, end_time || null,
             is_active ?? true,
+            per_user_limit ? Number(per_user_limit) : null,
+            max_items_per_order ? Number(max_items_per_order) : null,
+            limit_reset_period || 'lifetime'
         ]);
         await clearMenuCache();
         emitToAll('offer_updated', { action: 'create', offerId: rows[0].id });
@@ -128,7 +133,8 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
     const {
         title, description, target_type, target_id, target_ids,
         discount_type, discount_percent, discount_flat_paise, max_discount_paise,
-        audience, audience_config, zone_id, start_time, end_time, is_active
+        audience, audience_config, zone_id, start_time, end_time, is_active,
+        per_user_limit, max_items_per_order, limit_reset_period
     } = req.body;
 
     const resolvedTargetId = target_id !== undefined ? target_id
@@ -154,8 +160,11 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
                 start_time          = COALESCE($13, start_time),
                 end_time            = COALESCE($14, end_time),
                 is_active           = COALESCE($15, is_active),
+                per_user_limit      = COALESCE($16, per_user_limit),
+                max_items_per_order = COALESCE($17, max_items_per_order),
+                limit_reset_period  = COALESCE($18, limit_reset_period),
                 updated_at          = NOW()
-            WHERE id = $16
+            WHERE id = $19
             RETURNING *
         `, [
             title ?? null, description ?? null, target_type ?? null,
@@ -166,7 +175,11 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
             audience ?? null,
             audience_config ? JSON.stringify(audience_config) : null,
             zone_id ?? null, start_time ?? null, end_time ?? null,
-            is_active ?? null, id,
+            is_active ?? null,
+            per_user_limit !== undefined ? (per_user_limit ? Number(per_user_limit) : null) : null,
+            max_items_per_order !== undefined ? (max_items_per_order ? Number(max_items_per_order) : null) : null,
+            limit_reset_period ?? null,
+            id,
         ]);
         if (rows.length === 0) return res.status(404).json({ error: 'Offer not found' });
         await clearMenuCache();

@@ -142,6 +142,20 @@ export const calculatePricing = async ({
                 if (parseInt(spendRows[0]?.total || '0') < minSpend) continue;
             }
 
+            // Per-user limit check on menu_offers
+            if (offer.per_user_limit != null) {
+                const isDaily = offer.limit_reset_period === 'daily';
+                const timeFilter = isDaily ? `AND used_at >= DATE_TRUNC('day', NOW())` : ``;
+                const { rows: useRows } = await query(
+                    `SELECT COUNT(*) as cnt FROM customer_offer_uses
+                     WHERE customer_id = $1 AND offer_id = $2 ${timeFilter}`,
+                    [customerId, offer.id]
+                );
+                if (parseInt(useRows[0]?.cnt || '0') >= offer.per_user_limit) {
+                    continue; // usage limit reached for this customer
+                }
+            }
+
             let discount = 0;
             if (offer.discount_type === 'flat') {
                 discount = offer.discount_flat_paise || 0;
@@ -151,7 +165,16 @@ export const calculatePricing = async ({
             }
             // Cap: discount cannot exceed item price
             discount = Math.min(discount, itemPrice);
-            if (discount > bestOfferDiscount) bestOfferDiscount = discount;
+
+            // Item quantity cap per order
+            const eligibleQty = offer.max_items_per_order
+                ? Math.min(cartItem.quantity, offer.max_items_per_order)
+                : cartItem.quantity;
+            const offerDiscountForLine = discount * eligibleQty;
+
+            if (offerDiscountForLine > (bestOfferDiscount * cartItem.quantity)) {
+                bestOfferDiscount = Math.floor(offerDiscountForLine / cartItem.quantity);
+            }
         }
 
         subtotalPaise += itemPrice * cartItem.quantity;
