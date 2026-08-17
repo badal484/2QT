@@ -128,8 +128,8 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
           
           <Animated.View 
             style={styles.sheetContainer} 
-            entering={SlideInDown.springify().damping(18).stiffness(140)} 
-            exiting={SlideOutDown.duration(200)}
+            entering={SlideInDown.duration(220)} 
+            exiting={SlideOutDown.duration(180)}
           >
             <View style={styles.sheetHandle} />
 
@@ -176,8 +176,8 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
       {toastState.visible && toastState.options && (
         <Animated.View 
           style={styles.toastContainer} 
-          entering={SlideInDown.springify().damping(16).stiffness(130)} 
-          exiting={SlideOutDown.duration(180)}
+          entering={SlideInDown.duration(200)} 
+          exiting={SlideOutDown.duration(160)}
         >
           <PressableScale 
             style={styles.toastPill} 
