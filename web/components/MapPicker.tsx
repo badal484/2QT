@@ -45,7 +45,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
   const [searchQuery, setSearchQuery] = useState("");
   const markerRef = useRef<L.Marker>(null);
 
-  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+  const reverseGeocode = useCallback(async (lat: number, lng: number, notifyParent: boolean = true) => {
     setLoading(true);
     try {
       const data = await api.get(`/menu/geocode/reverse?lat=${lat}&lng=${lng}`);
@@ -54,14 +54,27 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
         const rawAddress = data.address || data.display_name || data.name;
         const area = rawAddress.split(',').slice(0, 2).join(', ');
         
-        onLocationSelect({
-          area,
-          landmark: '',
-          lat,
-          lng
-        });
+        if (notifyParent) {
+          onLocationSelect({
+            area,
+            landmark: '',
+            lat,
+            lng
+          });
+        }
       } else {
-        // Always call onLocationSelect even if reverse geocoding fails, so coordinates are saved
+        if (notifyParent) {
+          onLocationSelect({
+            area: 'Selected Location',
+            landmark: '',
+            lat,
+            lng
+          });
+        }
+      }
+    } catch (err: any) {
+      console.warn("Geocoding error:", err.message);
+      if (notifyParent) {
         onLocationSelect({
           area: 'Selected Location',
           landmark: '',
@@ -69,14 +82,6 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
           lng
         });
       }
-    } catch (err: any) {
-      console.warn("Geocoding error:", err.message);
-      onLocationSelect({
-        area: 'Selected Location',
-        landmark: '',
-        lat,
-        lng
-      });
     } finally {
       setLoading(false);
     }
@@ -87,7 +92,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
   // Falls back to a generic subcontinent center if GPS is denied or unavailable.
   useEffect(() => {
     if (defaultCenter) {
-      reverseGeocode(defaultCenter[0], defaultCenter[1]);
+      reverseGeocode(defaultCenter[0], defaultCenter[1], false);
       return;
     }
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -99,7 +104,7 @@ export default function MapPicker({ onLocationSelect, defaultCenter }: MapPicker
       ({ coords }) => {
         setPosition([coords.latitude, coords.longitude]);
         setGpsLoading(false);
-        reverseGeocode(coords.latitude, coords.longitude);
+        reverseGeocode(coords.latitude, coords.longitude, false);
       },
       () => {
         setPosition([20, 78]);

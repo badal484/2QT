@@ -192,7 +192,7 @@ export function KitchensTab() {
             {field("Address", "address")}
           </div>
 
-          {/* Kitchen Location Picker */}
+          {/* Kitchen Location Picker & Coords */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
@@ -204,7 +204,7 @@ export function KitchensTab() {
                 </span>
               )}
             </div>
-            <div className="h-[400px] rounded-xl overflow-hidden">
+            <div className="h-[360px] rounded-xl overflow-hidden mb-3">
               {/* key forces remount with correct center when switching between edit/create */}
               <MapPicker
                 key={`${editing || "new"}-${mapCenter?.join(",") ?? "gps"}`}
@@ -214,7 +214,31 @@ export function KitchensTab() {
                 }}
               />
             </div>
-            <p className="text-[10px] text-zinc-500 mt-1.5">Click on the map or drag the pin to set the kitchen's exact location.</p>
+            <div className="grid grid-cols-2 gap-4 mb-2">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Latitude</div>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 23.6748"
+                  value={form.lat ?? ""}
+                  onChange={e => setForm({ ...form, lat: e.target.value })}
+                  className="w-full bg-white/[0.02] backdrop-blur-lg border border-white/10 rounded-xl px-4 py-2.5 font-mono text-sm outline-none text-white focus:ring-2 focus:ring-brand-primary/50"
+                />
+              </div>
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Longitude</div>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 85.1234"
+                  value={form.lng ?? ""}
+                  onChange={e => setForm({ ...form, lng: e.target.value })}
+                  className="w-full bg-white/[0.02] backdrop-blur-lg border border-white/10 rounded-xl px-4 py-2.5 font-mono text-sm outline-none text-white focus:ring-2 focus:ring-brand-primary/50"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-500">Click on the map, drag the pin, or enter exact latitude & longitude coordinates above.</p>
           </div>
 
           <div className="flex justify-end">
