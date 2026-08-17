@@ -470,7 +470,9 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
               </View>
             ) : (
               <>
-                <Text allowFontScaling={false} style={s.customiseLabel}>Customise</Text>
+                {Array.isArray(item.customization_groups) && item.customization_groups.length > 0 && (
+                  <Text allowFontScaling={false} style={s.customiseLabel}>Customise</Text>
+                )}
                 {qty > 0 ? (
                   <View style={s.qtyControl}>
                     <PressableScale

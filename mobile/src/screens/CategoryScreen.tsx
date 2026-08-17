@@ -57,7 +57,9 @@ const CategoryGridCard = React.memo(({ item, index, columnWidth, kitchenPaused, 
             ) : (
               <PressableScale style={styles.addBtn} onPress={() => onAdd(item)} accessibilityRole="button" accessibilityLabel={`Add ${item.name} to cart`}>
                 <Text style={styles.addBtnText}>ADD</Text>
-                <View style={styles.customiseBadge}><Text style={styles.customiseText}>Customise</Text></View>
+                {Array.isArray(item.customization_groups) && item.customization_groups.length > 0 && (
+                  <View style={styles.customiseBadge}><Text style={styles.customiseText}>Customise</Text></View>
+                )}
               </PressableScale>
             )}
           </View>
