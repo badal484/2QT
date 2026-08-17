@@ -190,7 +190,7 @@ const DeliveryOTPScreen = ({ route, navigation }: any) => {
     onSuccess: () => {
       startCooldown();
       showDialog({
-        title: 'OTP Resent 📲',
+        title: 'OTP Resent',
         message: 'A fresh delivery OTP has been sent to the customer via push notification and SMS. Please ask the customer for the 6-digit code at the door.',
         confirmText: 'Okay',
         type: 'success',
