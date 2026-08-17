@@ -44,7 +44,9 @@ export const MenuGridCard = React.memo(({ menuItem, kitchenPaused, navigation, d
             ) : (
               <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.homeGridAddBtn} onPress={() => onAddToCartWithCheck(menuItem)} activeOpacity={0.8}>
                 <Text allowFontScaling={false} style={styles.homeGridAddBtnText}>ADD</Text>
-                <View style={styles.homeGridCustomiseBadge}><Text allowFontScaling={false} style={styles.homeGridCustomiseText}>Customise</Text></View>
+                {Array.isArray(menuItem.customization_groups) && menuItem.customization_groups.length > 0 && (
+                  <View style={styles.homeGridCustomiseBadge}><Text allowFontScaling={false} style={styles.homeGridCustomiseText}>Customise</Text></View>
+                )}
               </TouchableOpacity>
             )}
           </View>
