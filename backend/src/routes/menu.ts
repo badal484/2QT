@@ -382,8 +382,25 @@ router.get('/search', async (req, res) => {
             LIMIT 30
         `;
 
-        const { rows } = await query(sql, params);
-        res.json({ results: rows });
+        const [itemsResult, offersResult] = await Promise.all([
+            query(sql, params),
+            zoneId ? query(
+                `SELECT * FROM menu_offers
+                 WHERE is_active = true
+                 AND (zone_id IS NULL OR zone_id = $1)
+                 AND (start_time IS NULL OR start_time <= NOW())
+                 AND (end_time IS NULL OR end_time >= NOW())`,
+                [zoneId]
+            ) : query(
+                `SELECT * FROM menu_offers
+                 WHERE is_active = true
+                 AND zone_id IS NULL
+                 AND (start_time IS NULL OR start_time <= NOW())
+                 AND (end_time IS NULL OR end_time >= NOW())`
+            )
+        ]);
+
+        res.json({ results: itemsResult.rows, offers: offersResult.rows });
     } catch (error) {
         console.error('Search error:', error);
         res.status(500).json({ error: 'SEARCH_FAILED' });
