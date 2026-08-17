@@ -38,7 +38,7 @@ router.get('/active', authenticate, async (req, res) => {
             FROM promo_codes
             WHERE is_active = true
             AND (expires_at IS NULL OR expires_at > NOW())
-            AND (max_uses IS NULL OR COALESCE(times_used, current_uses, 0) < max_uses)
+            AND (max_uses IS NULL OR COALESCE((to_jsonb(promo_codes)->>'times_used')::int, (to_jsonb(promo_codes)->>'current_uses')::int, 0) < max_uses)
             AND (zone_id IS NULL OR zone_id = $1)
             ORDER BY created_at DESC
         `, [zoneId || null]);
