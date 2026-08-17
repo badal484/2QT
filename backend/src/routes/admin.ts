@@ -122,7 +122,7 @@ router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), asyn
             { rows: weeklyRev },
         ] = await Promise.all([
             query("SELECT count(*) FROM orders WHERE status NOT IN ('delivered','cancelled')"),
-            query("SELECT sum(total_amount_paise) FROM orders WHERE payment_status='paid' AND created_at >= CURRENT_DATE"),
+            query("SELECT COALESCE(sum(total_amount_paise), 0) AS sum FROM orders WHERE status != 'cancelled' AND created_at >= CURRENT_DATE"),
             query("SELECT count(*) FROM users WHERE role IN ('rider','rider_captain') AND is_online = true"),
             query('SELECT count(*) FROM ingredients WHERE current_stock_grams <= reorder_threshold_grams'),
             query("SELECT count(*) FROM users WHERE role='customer'"),
@@ -133,7 +133,7 @@ router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), asyn
                 FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day') d
                 LEFT JOIN orders o
                        ON DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = d::date
-                      AND o.payment_status = 'paid'
+                      AND o.status != 'cancelled'
                 GROUP BY d::date
                 ORDER BY d::date ASC
             `),
@@ -1204,15 +1204,20 @@ router.post('/wallet/credit', authenticate, requireRole('super_admin', 'admin'),
 });
 
 router.get('/inventory', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    try {
-        const { rows } = await query('SELECT name, unit, SUM(current_stock_grams) as current_stock_grams, SUM(reorder_threshold_grams) as reorder_threshold_grams FROM ingredients GROUP BY name, unit ORDER BY name');
-        // Map to expected frontend format
-        const formatted = rows.map(r => ({ ...r, id: r.name, current_stock: r.current_stock_grams, reorder_threshold: r.reorder_threshold_grams }));
-        res.json({ ingredients: formatted });
-    } catch {
-        const { rows } = await query('SELECT * FROM ingredients ORDER BY name');
-        res.json({ ingredients: rows });
-    }
+    // Previously this aggregated SUM(current_stock_grams) across all kitchens and used the
+    // ingredient *name* as `id` — since names commonly repeat across kitchens (e.g. "Rice"),
+    // that made the PATCH below (which matched by name) silently overwrite every kitchen's
+    // stock for that name with a single edited value. Return one row per actual ingredient
+    // row, scoped by its real id, with the owning kitchen's name attached for the admin UI
+    // to disambiguate same-named ingredients at different kitchens.
+    const { rows } = await query(
+        `SELECT i.id, i.name, i.unit, i.current_stock_grams AS current_stock, i.reorder_threshold_grams AS reorder_threshold,
+                i.kitchen_id, k.name AS kitchen_name
+         FROM ingredients i
+         JOIN kitchens k ON k.id = i.kitchen_id
+         ORDER BY k.name, i.name`
+    );
+    res.json({ ingredients: rows });
 });
 
 router.post('/inventory', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
@@ -1245,17 +1250,19 @@ router.post('/inventory', authenticate, requireRole('super_admin', 'admin'), asy
 });
 
 router.patch('/inventory/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
-    const idOrName = decodeURIComponent(req.params.id as string);
+    const id = decodeURIComponent(req.params.id as string);
     const current_stock = parseInt(String(req.body.current_stock ?? ''), 10);
     if (isNaN(current_stock)) return res.status(400).json({ error: 'INVALID_STOCK', message: 'current_stock must be a number' });
     try {
-        // Try updating by name first (since GET returns name as id)
-        const { rowCount } = await query('UPDATE ingredients SET current_stock_grams = $1 WHERE name = $2', [current_stock, idOrName]);
-        if (rowCount === 0) {
-            // Fallback to id if it's an actual UUID
-            await query('UPDATE ingredients SET current_stock_grams = $1 WHERE id = $2', [current_stock, idOrName]);
-        }
-        emitToAdmin('inventory_updated', { type: 'update', id: idOrName, current_stock });
+        // Scoped by the ingredient's real id (see GET /inventory above) — this used to match
+        // by name, which silently overwrote every same-named ingredient at every kitchen.
+        const { rows, rowCount } = await query(
+            'UPDATE ingredients SET current_stock_grams = $1 WHERE id = $2 RETURNING kitchen_id',
+            [current_stock, id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'INGREDIENT_NOT_FOUND' });
+        emitToAdmin('inventory_updated', { type: 'update', id, current_stock });
+        emitToKitchen(rows[0].kitchen_id, 'inventory_updated', { type: 'update', id, current_stock });
         res.json({ success: true });
     } catch (e) {
         console.error('PATCH /inventory error:', e);
