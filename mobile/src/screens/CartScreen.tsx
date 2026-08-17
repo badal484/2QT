@@ -13,7 +13,7 @@ import { RootState } from '../store';
 import { api } from '../api/client';
 import { setQuantity, clearCart, setPromoCode as setPromoCodeAction, addItem as addItemAction } from '../store/slices/cartSlice';
 import { getSocket } from '../socket/client';
-import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock, Zap, ArrowLeft, Sparkles } from 'lucide-react-native';
+import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, CheckCircle2, Heart, Clock, Zap, ArrowLeft, Sparkles, AlertCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '../utils/haptics';
 import { PressableScale } from '../components/ui/internal/PressableScale';
@@ -155,6 +155,7 @@ const CartScreen = ({ navigation }: any) => {
 
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
   const [riderTip, setRiderTip] = useState<number>(0);
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [altReceiver, setAltReceiver] = useState(false);
@@ -231,36 +232,33 @@ const CartScreen = ({ navigation }: any) => {
   // the server — otherwise the zero-filled fallback below would render identically to "Free".
   const hasPricingData = !!pricingData?.pricing;
 
-  // React to promo code or pricing calculation errors with user-friendly alerts
+  // Set inline promo error message (unintrusive, Zomato/Swiggy-style)
   useEffect(() => {
     if (pricingErrored && pricingError && appliedPromoCode) {
       const msg = (pricingError as any)?.message || "";
-      let title = "";
-      let message = "";
+      const code = appliedPromoCode;
+      setAppliedPromoCode("");
       if (msg.includes("PROMO_INVALID_OR_EXPIRED")) {
-        title = "Invalid Promo Code";
-        message = `The code "${appliedPromoCode}" is invalid or expired.`;
+        setPromoError(`Code "${code}" is invalid or expired.`);
       } else if (msg.includes("PROMO_MIN_ORDER:")) {
         const minPaise = parseInt(msg.split("PROMO_MIN_ORDER:")[1], 10) || 0;
-        title = "Minimum Order Required";
-        message = `A minimum item total of ₹${(minPaise / 100).toFixed(0)} is required to use "${appliedPromoCode}".`;
+        const diff = (minPaise - fallbackSubtotal) / 100;
+        if (diff > 0) {
+          setPromoError(`Add items worth ₹${diff.toFixed(0)} more to use "${code}".`);
+        } else {
+          setPromoError(`Minimum item total of ₹${(minPaise / 100).toFixed(0)} required for "${code}".`);
+        }
       } else if (msg.includes("PROMO_FIRST_ORDER_ONLY")) {
-        title = "First Order Only";
-        message = `The code "${appliedPromoCode}" is valid on your first completed order only.`;
+        setPromoError(`"${code}" is valid on your first completed order only.`);
       } else if (msg.includes("PROMO_NEW_USER_ONLY")) {
-        title = "New Users Only";
-        message = `The code "${appliedPromoCode}" is available for new users only.`;
+        setPromoError(`"${code}" is valid for new users only.`);
       } else if (msg.includes("PROMO_USAGE_LIMIT_REACHED")) {
-        title = "Usage Limit Reached";
-        message = `You have reached the maximum number of uses for "${appliedPromoCode}".`;
-      }
-
-      if (title && message) {
-        setAppliedPromoCode("");
-        showDialog({ title, message });
+        setPromoError(`Usage limit reached for "${code}".`);
+      } else {
+        setPromoError(`Could not apply code "${code}".`);
       }
     }
-  }, [pricingErrored, pricingError, appliedPromoCode, showDialog]);
+  }, [pricingErrored, pricingError, appliedPromoCode, fallbackSubtotal]);
 
   const rawError = (pricingError as any)?.message || "Couldn't calculate";
   let displayError = rawError;
@@ -481,7 +479,10 @@ const CartScreen = ({ navigation }: any) => {
                   placeholder="Enter promo code"
                   placeholderTextColor={tokens.colors.textTertiary}
                   value={promoCode}
-                  onChangeText={setPromoCode}
+                  onChangeText={(val) => {
+                    setPromoCode(val);
+                    if (promoError) setPromoError('');
+                  }}
                   autoCapitalize="characters"
                   returnKeyType="done"
                 />
@@ -490,6 +491,7 @@ const CartScreen = ({ navigation }: any) => {
                 style={[styles.applyBtn, !promoCode && !appliedPromoCode && styles.applyBtnDisabled]}
                 onPress={() => {
                   haptics.selection();
+                  setPromoError('');
                   if (appliedPromoCode) {
                     setAppliedPromoCode('');
                     setPromoCode('');
@@ -505,6 +507,13 @@ const CartScreen = ({ navigation }: any) => {
                 </Text>
               </PressableScale>
             </View>
+
+            {!!promoError && !appliedPromoCode && (
+              <Animated.View entering={FadeInDown.duration(200)} style={styles.promoErrorRow}>
+                <AlertCircle size={13} color={tokens.colors.danger} />
+                <Text allowFontScaling={false} style={styles.promoErrorText}>{promoError}</Text>
+              </Animated.View>
+            )}
           </Animated.View>
 
         {/* Delivery Address Card */}
@@ -1019,6 +1028,24 @@ const styles = StyleSheet.create({
   promoAppliedText: { fontSize: 15, fontFamily: tokens.typography.family.regular, color: tokens.colors.primary },
   promoSavingText: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2 },
   promoInvalidText: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.danger },
+  promoErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  promoErrorText: {
+    fontSize: 12,
+    fontFamily: tokens.typography.family.medium,
+    color: tokens.colors.danger,
+    flex: 1,
+  },
   applyBtn: {
     height: 46, paddingHorizontal: 20, borderRadius: 14,
     backgroundColor: tokens.colors.primary,
