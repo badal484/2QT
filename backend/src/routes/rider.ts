@@ -424,10 +424,12 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
             const { rows: riderRows } = await query('SELECT name FROM users WHERE id = $1', [riderId]);
             NotificationService.send('order_out_for_delivery', {
                 userId: order.customer_id,
-                displayId: order.display_id,
-                orderId: id,
-                riderName: riderRows[0]?.name ?? 'Your rider',
-                otp: String(order.delivery_otp ?? ''),
+                vars: {
+                    displayId: order.display_id,
+                    orderId: id,
+                    riderName: riderRows[0]?.name ?? 'Your rider',
+                    otp: String(order.delivery_otp ?? ''),
+                },
             }).catch(() => {});
         }
 
@@ -460,25 +462,30 @@ router.post('/resend-otp', authenticate, requireRole('rider', 'rider_captain', '
             await query(`UPDATE orders SET delivery_otp = $1 WHERE id = $2`, [otpCode, orderId]);
         }
 
-        // 1. Emit live socket event directly to customer app
+        // 1. Fetch rider name for personalized push notification
+        const { rows: riderRows } = await query('SELECT name FROM users WHERE id = $1', [riderId]);
+        const riderName = riderRows[0]?.name ?? 'Your rider';
+
+        // 2. Emit live socket event directly to customer app
         emitToUser(order.customer_id, 'delivery_otp_resent', {
             orderId: order.id,
             displayId: order.display_id,
             otp: String(otpCode),
         });
 
-        // 2. Send Push / WhatsApp / SMS notification to customer with structured vars
+        // 3. Send Push / WhatsApp / SMS notification to customer with structured vars
         NotificationService.send('order_out_for_delivery', {
             userId: order.customer_id,
             vars: {
                 displayId: order.display_id,
                 orderId: order.id,
-                riderName: 'Your rider',
+                riderName,
                 otp: String(otpCode),
             },
         }).catch(() => {});
 
-        res.json({ success: true, otp: String(otpCode) });
+        // Never leak customer's secret OTP to rider's HTTP response
+        res.json({ success: true });
     } catch (err) {
         console.error('[resend-otp]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
