@@ -72,23 +72,13 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, []);
 
   const showDialog = useCallback((options: DialogOptions) => {
-    // If the dialog is single-action (no cancelText), route it to a sleek floating toast
-    // so no intrusive full-screen center popup disrupts the user experience!
-    if (!options.cancelText) {
-      const formattedMessage = options.title
-        ? `${options.title} • ${options.message}`
-        : options.message;
-      showToast({ message: formattedMessage, type: options.type });
-      if (options.onConfirm) {
-        options.onConfirm();
-      }
-      return;
-    }
+    if (options.type === 'success') haptics.success();
+    else if (options.type === 'error') haptics.error();
+    else if (options.type === 'warning') haptics.warning();
+    else haptics.impact();
 
-    // For multi-action confirmations (e.g. Cancel Order, Clear Cart), show a sleek Bottom Action Sheet
-    haptics.warning();
     setSheetState({ visible: true, options });
-  }, [showToast]);
+  }, []);
 
   const hideSheet = useCallback(() => {
     setSheetState((prev) => ({ ...prev, visible: false }));
@@ -158,11 +148,13 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
                 <Text allowFontScaling={false} style={styles.sheetMessage}>{sheetState.options.message}</Text>
                 
                 <View style={styles.sheetActions}>
-                  <PressableScale style={styles.cancelBtn} onPress={handleCancel}>
-                    <Text allowFontScaling={false} style={styles.cancelBtnText}>
-                      {sheetState.options.cancelText || 'Cancel'}
-                    </Text>
-                  </PressableScale>
+                  {sheetState.options.cancelText ? (
+                    <PressableScale style={styles.cancelBtn} onPress={handleCancel}>
+                      <Text allowFontScaling={false} style={styles.cancelBtnText}>
+                        {sheetState.options.cancelText}
+                      </Text>
+                    </PressableScale>
+                  ) : null}
                   
                   <PressableScale 
                     style={[
@@ -172,7 +164,7 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
                     onPress={handleConfirm}
                   >
                     <Text allowFontScaling={false} style={styles.confirmBtnText}>
-                      {sheetState.options.confirmText || 'Confirm'}
+                      {sheetState.options.confirmText || 'Okay'}
                     </Text>
                   </PressableScale>
                 </View>
