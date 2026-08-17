@@ -287,31 +287,37 @@ async function sendSMS(phone: string, message: string) {
 
 export class NotificationService {
     static async send(type: NotifType, data: any) {
-        const { userId, phone, displayId, orderId, riderName, otp, minutes, amount, upiId, count, message, title, body, imageUrl, screen, bookingId, ticketId, senderName, timestamp, overrideQuietHours } = data;
+        const mergedVars = { ...(data.vars || {}), ...data };
+        const {
+            userId, phone, displayId, orderId, riderName, otp, minutes, amount,
+            upiId, count, message, title, body, imageUrl, screen, bookingId,
+            ticketId, senderName, timestamp, overrideQuietHours
+        } = mergedVars;
+
         await sendNotification(type, {
-            userId: userId || undefined,
-            phone: phone || undefined,
+            userId: data.userId || userId || undefined,
+            phone: data.phone || phone || undefined,
             vars: {
-                displayId:  String(displayId  ?? ''),
-                orderId:    String(orderId    ?? ''),
-                riderName:  String(riderName  ?? ''),
-                otp:        String(otp         ?? ''),
-                minutes:    String(minutes     ?? ''),
-                amount:     String(amount      ?? ''),
-                upiId:      String(upiId       ?? ''),
-                count:      String(count       ?? ''),
-                message:    String(message     ?? ''),
-                title:      String(title       ?? ''),
-                body:       String(body        ?? ''),
-                screen:     String(screen      ?? ''),
-                bookingId:  String(bookingId   ?? ''),
-                ticketId:   String(ticketId    ?? ''),
-                senderName: String(senderName  ?? ''),
-                timestamp:  String(timestamp   ?? ''),
+                displayId:  String(mergedVars.displayId  ?? ''),
+                orderId:    String(mergedVars.orderId    ?? ''),
+                riderName:  String(mergedVars.riderName  ?? ''),
+                otp:        String(mergedVars.otp        ?? ''),
+                minutes:    String(mergedVars.minutes    ?? ''),
+                amount:     String(mergedVars.amount     ?? ''),
+                upiId:      String(mergedVars.upiId      ?? ''),
+                count:      String(mergedVars.count      ?? ''),
+                message:    String(mergedVars.message    ?? ''),
+                title:      String(mergedVars.title      ?? ''),
+                body:       String(mergedVars.body       ?? ''),
+                screen:     String(mergedVars.screen     ?? ''),
+                bookingId:  String(mergedVars.bookingId  ?? ''),
+                ticketId:   String(mergedVars.ticketId   ?? ''),
+                senderName: String(mergedVars.senderName ?? ''),
+                timestamp:  String(mergedVars.timestamp  ?? ''),
             },
-            dedupeKey: displayId || undefined,
-            imageUrl:  imageUrl  || undefined,
-            overrideQuietHours: !!overrideQuietHours,
+            dedupeKey: mergedVars.displayId || undefined,
+            imageUrl:  mergedVars.imageUrl  || undefined,
+            overrideQuietHours: !!mergedVars.overrideQuietHours,
         });
     }
 }
