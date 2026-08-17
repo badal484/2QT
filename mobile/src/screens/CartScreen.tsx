@@ -231,6 +231,30 @@ const CartScreen = ({ navigation }: any) => {
   // the server — otherwise the zero-filled fallback below would render identically to "Free".
   const hasPricingData = !!pricingData?.pricing;
 
+  // React to promo code or pricing calculation errors with user-friendly alerts
+  useEffect(() => {
+    if (pricingErrored && pricingError) {
+      const msg = (pricingError as any)?.message || "";
+      if (msg.includes("PROMO_INVALID_OR_EXPIRED")) {
+        showDialog({ title: "Invalid Promo Code", message: `The code "${appliedPromoCode}" is invalid or expired.` });
+        setAppliedPromoCode("");
+      } else if (msg.includes("PROMO_MIN_ORDER:")) {
+        const minPaise = parseInt(msg.split("PROMO_MIN_ORDER:")[1], 10) || 0;
+        showDialog({ title: "Minimum Order Required", message: `A minimum item total of ₹${(minPaise / 100).toFixed(0)} is required to use "${appliedPromoCode}".` });
+        setAppliedPromoCode("");
+      } else if (msg.includes("PROMO_FIRST_ORDER_ONLY")) {
+        showDialog({ title: "First Order Only", message: `The code "${appliedPromoCode}" is valid on your first completed order only.` });
+        setAppliedPromoCode("");
+      } else if (msg.includes("PROMO_NEW_USER_ONLY")) {
+        showDialog({ title: "New Users Only", message: `The code "${appliedPromoCode}" is available for new users only.` });
+        setAppliedPromoCode("");
+      } else if (msg.includes("PROMO_USAGE_LIMIT_REACHED")) {
+        showDialog({ title: "Usage Limit Reached", message: `You have reached the maximum number of uses for "${appliedPromoCode}".` });
+        setAppliedPromoCode("");
+      }
+    }
+  }, [pricingErrored, pricingError, appliedPromoCode]);
+
   const rawError = (pricingError as any)?.message || "Couldn't calculate";
   let displayError = rawError;
   if (rawError.includes('CART_ZONE_MISMATCH')) {
