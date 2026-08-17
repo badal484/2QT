@@ -99,7 +99,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
     const {
         code, discount_type, discount_percent, discount_flat_paise,
         min_order_paise, max_discount_paise, expires_at, max_uses,
-        is_active, first_order_only, new_user_only, per_user_limit, description
+        is_active, first_order_only, new_user_only, per_user_limit, description, zone_id
     } = req.body;
     try {
         const { rows } = await query(
@@ -117,15 +117,16 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
                  new_user_only       = COALESCE($11, new_user_only),
                  per_user_limit      = COALESCE($12, per_user_limit),
                  description         = COALESCE($13, description),
+                 zone_id             = $14,
                  updated_at          = NOW()
-             WHERE id = $14
+             WHERE id = $15
              RETURNING *`,
             [
                 code ? code.toUpperCase() : null,
-                discount_type, discount_percent, discount_flat_paise,
-                min_order_paise, max_discount_paise, expires_at, max_uses,
-                is_active, first_order_only, new_user_only, per_user_limit,
-                description, id
+                discount_type ?? null, discount_percent ?? null, discount_flat_paise ?? null,
+                min_order_paise ?? null, max_discount_paise ?? null, expires_at || null, max_uses || null,
+                is_active ?? null, first_order_only ?? null, new_user_only ?? null, per_user_limit || null,
+                description || null, zone_id || null, id
             ]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Promo code not found' });
