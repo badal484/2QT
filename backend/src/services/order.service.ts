@@ -269,15 +269,19 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
 
             // 7.5 Record Menu Offers redemptions if menu offer discount was applied
             if (order.menu_offer_discount_paise > 0) {
-                const { rows: activeOffers } = await client.query(
-                    `SELECT id FROM menu_offers WHERE is_active = true AND (zone_id IS NULL OR zone_id = $1)`,
-                    [order.zone_id]
-                );
-                for (const off of activeOffers) {
-                    await client.query(
-                        `INSERT INTO customer_offer_uses (customer_id, offer_id, order_id) VALUES ($1, $2, $3)`,
-                        [order.customer_id, off.id, order.id]
+                try {
+                    const { rows: activeOffers } = await client.query(
+                        `SELECT id FROM menu_offers WHERE is_active = true AND (zone_id IS NULL OR zone_id = $1)`,
+                        [order.zone_id]
                     );
+                    for (const off of activeOffers) {
+                        await client.query(
+                            `INSERT INTO customer_offer_uses (customer_id, offer_id, order_id) VALUES ($1, $2, $3)`,
+                            [order.customer_id, off.id, order.id]
+                        );
+                    }
+                } catch (e) {
+                    // Safe non-blocking log
                 }
             }
 
