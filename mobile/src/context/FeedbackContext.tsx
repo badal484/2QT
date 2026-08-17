@@ -56,8 +56,9 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
   const showToast = useCallback((options: ToastOptions) => {
     // Haptic response
     if (options.type === 'success') haptics.success();
-    else if (options.type === 'error' || options.type === 'warning') haptics.notification('warning');
-    else haptics.impact('light');
+    else if (options.type === 'error') haptics.error();
+    else if (options.type === 'warning') haptics.warning();
+    else haptics.impact();
 
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     
@@ -83,7 +84,7 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
 
     // For multi-action confirmations (e.g. Cancel Order, Clear Cart), show a sleek Bottom Action Sheet
-    haptics.notification('warning');
+    haptics.warning();
     setSheetState({ visible: true, options });
   }, [showToast]);
 
