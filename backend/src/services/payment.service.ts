@@ -143,16 +143,20 @@ export const calculatePricing = async ({
             }
 
             // Per-user limit check on menu_offers
-            if (offer.per_user_limit != null) {
-                const isDaily = offer.limit_reset_period === 'daily';
-                const timeFilter = isDaily ? `AND used_at >= DATE_TRUNC('day', NOW())` : ``;
-                const { rows: useRows } = await query(
-                    `SELECT COUNT(*) as cnt FROM customer_offer_uses
-                     WHERE customer_id = $1 AND offer_id = $2 ${timeFilter}`,
-                    [customerId, offer.id]
-                );
-                if (parseInt(useRows[0]?.cnt || '0') >= offer.per_user_limit) {
-                    continue; // usage limit reached for this customer
+            if (offer.per_user_limit != null && customerId) {
+                try {
+                    const isDaily = offer.limit_reset_period === 'daily';
+                    const timeFilter = isDaily ? `AND used_at >= DATE_TRUNC('day', NOW())` : ``;
+                    const { rows: useRows } = await query(
+                        `SELECT COUNT(*) as cnt FROM customer_offer_uses
+                         WHERE customer_id = $1 AND offer_id = $2 ${timeFilter}`,
+                        [customerId, offer.id]
+                    );
+                    if (parseInt(useRows[0]?.cnt || '0') >= offer.per_user_limit) {
+                        continue; // usage limit reached for this customer
+                    }
+                } catch (e) {
+                    // Safe fallback if table is being created
                 }
             }
 
