@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Ticket, X, ToggleLeft, ToggleRight, Shield } from "lucide-react";
+import { Plus, Trash2, Ticket, X, ToggleLeft, ToggleRight, Shield, Edit3 } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -47,6 +47,7 @@ export function PromoCodesTab() {
   const [zones, setZones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [editingPromo, setEditingPromo] = useState<any | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
@@ -73,22 +74,57 @@ export function PromoCodesTab() {
 
   useSocketRefresh(["promo_updated"], fetchPromos);
 
-  const handleCreate = async () => {
+  const openCreate = () => {
+    setEditingPromo(null);
+    setForm({ ...EMPTY_FORM });
+    setIsCreating(true);
+  };
+
+  const openEdit = (promo: any) => {
+    setEditingPromo(promo);
+    setForm({
+      code: promo.code || "",
+      discount_type: (promo.discount_type === "percent" || promo.discount_type === "percentage") ? "percentage" : (promo.discount_type || "flat"),
+      discount_percent: promo.discount_percent ?? 10,
+      discount_flat_paise: promo.discount_flat_paise ?? 0,
+      max_discount_paise: promo.max_discount_paise ?? 10000,
+      min_order_paise: promo.min_order_paise ?? 0,
+      is_active: promo.is_active ?? true,
+      first_order_only: promo.first_order_only ?? false,
+      new_user_only: promo.new_user_only ?? false,
+      per_user_limit: promo.per_user_limit ?? "",
+      description: promo.description || "",
+      expires_at: promo.expires_at ? promo.expires_at.slice(0, 16) : "",
+      max_uses: promo.max_uses ?? "",
+      zone_id: promo.zone_id || "",
+    });
+    setIsCreating(true);
+  };
+
+  const handleSave = async () => {
     if (!form.code) return toast.error("Enter a code");
     try {
-      await api.post('/promocodes/admin', {
+      const payload = {
         ...form,
         per_user_limit: form.per_user_limit ? Number(form.per_user_limit) : null,
         max_uses: form.max_uses ? Number(form.max_uses) : null,
         expires_at: form.expires_at || null,
         zone_id: form.zone_id || null,
-      });
-      toast.success("Promo code created — cache busted, live immediately");
+      };
+
+      if (editingPromo) {
+        await api.patch(`/promocodes/admin/${editingPromo.id}`, payload);
+        toast.success("Promo code updated — cache busted, live immediately");
+      } else {
+        await api.post('/promocodes/admin', payload);
+        toast.success("Promo code created — cache busted, live immediately");
+      }
       setIsCreating(false);
+      setEditingPromo(null);
       setForm({ ...EMPTY_FORM });
       fetchPromos();
     } catch (e: any) {
-      toast.error(e.message || "Failed to create");
+      toast.error(e.message || "Failed to save");
     }
   };
 
@@ -126,19 +162,19 @@ export function PromoCodesTab() {
           <p className="text-zinc-400 text-sm font-medium">Disable = removed from app within 30 seconds.</p>
         </div>
         <button
-          onClick={() => setIsCreating(true)}
-          className="bg-orange-500 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-orange-600 transition-all flex items-center gap-2"
+          onClick={openCreate}
+          className="bg-orange-500 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-orange-600 transition-all flex items-center gap-2 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> New Code
         </button>
       </div>
 
-      {/* Create form */}
+      {/* Create / Edit form */}
       {isCreating && (
         <div className="bg-[#11111a] border border-white/[0.08] rounded-2xl p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-white">Create Promo Code</h3>
-            <button onClick={() => setIsCreating(false)} className="text-zinc-500 hover:text-white"><X className="w-5 h-5"/></button>
+            <h3 className="text-lg font-bold text-white">{editingPromo ? `Edit Code: ${editingPromo.code}` : 'Create Promo Code'}</h3>
+            <button onClick={() => { setIsCreating(false); setEditingPromo(null); }} className="text-zinc-500 hover:text-white cursor-pointer"><X className="w-5 h-5"/></button>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -200,16 +236,19 @@ export function PromoCodesTab() {
               <button
                 key={key}
                 onClick={() => f(key, !(form as any)[key])}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${(form as any)[key] ? 'bg-orange-500/20 border-orange-500 text-orange-400' : 'bg-white/[0.04] border-white/10 text-zinc-500'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${(form as any)[key] ? 'bg-orange-500/20 border-orange-500 text-orange-400' : 'bg-white/[0.04] border-white/10 text-zinc-500'}`}
               >
                 <Shield size={12}/> {label}
               </button>
             ))}
           </div>
 
-          <div className="flex justify-end pt-2">
-            <button onClick={handleCreate} className="bg-orange-500 text-white px-8 py-3 rounded-xl text-sm font-bold hover:bg-orange-600">
-              Create Code
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={() => { setIsCreating(false); setEditingPromo(null); }} className="bg-white/[0.05] text-zinc-400 px-6 py-3 rounded-xl text-sm font-bold hover:bg-white/10 transition-all cursor-pointer">
+              Cancel
+            </button>
+            <button onClick={handleSave} className="bg-orange-500 text-white px-8 py-3 rounded-xl text-sm font-bold hover:bg-orange-600 transition-all cursor-pointer">
+              {editingPromo ? 'Save Changes' : 'Create Code'}
             </button>
           </div>
         </div>
@@ -234,7 +273,7 @@ export function PromoCodesTab() {
               </div>
               <button
                 onClick={() => setConfirmId(promo.id)}
-                className="text-zinc-700 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1"
+                className="text-zinc-700 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4"/>
               </button>
@@ -278,19 +317,28 @@ export function PromoCodesTab() {
               )}
             </div>
 
-            {/* ON/OFF toggle */}
-            <button
-              onClick={() => handleToggle(promo.id, promo.is_active)}
-              disabled={toggling === promo.id}
-              className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                promo.is_active
-                  ? 'bg-white/[0.04] text-zinc-400 hover:bg-red-500/10 hover:text-red-400'
-                  : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
-              }`}
-            >
-              {promo.is_active ? <ToggleRight size={14}/> : <ToggleLeft size={14}/>}
-              {toggling === promo.id ? '...' : promo.is_active ? 'Disable' : 'Enable'}
-            </button>
+            {/* Action buttons: EDIT + ON/OFF toggle */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openEdit(promo)}
+                className="flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white/[0.06] text-white hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-white/10"
+              >
+                <Edit3 size={13} /> Edit
+              </button>
+
+              <button
+                onClick={() => handleToggle(promo.id, promo.is_active)}
+                disabled={toggling === promo.id}
+                className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  promo.is_active
+                    ? 'bg-white/[0.04] text-zinc-400 hover:bg-red-500/10 hover:text-red-400'
+                    : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                }`}
+              >
+                {promo.is_active ? <ToggleRight size={14}/> : <ToggleLeft size={14}/>}
+                {toggling === promo.id ? '...' : promo.is_active ? 'Disable' : 'Enable'}
+              </button>
+            </div>
           </div>
         ))}
 
