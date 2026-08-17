@@ -258,12 +258,26 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
                         [order.customer_id, order.promo_code_id, order.id]
                     );
                     const { rows: updatedPromo } = await client.query(
-                        `UPDATE promo_codes SET times_used = times_used + 1 WHERE id = $1 RETURNING times_used, max_uses`,
+                        `UPDATE promo_codes SET times_used = COALESCE(times_used, 0) + 1 WHERE id = $1 RETURNING times_used, max_uses`,
                         [order.promo_code_id]
                     );
-                    if (updatedPromo[0].max_uses !== null && updatedPromo[0].times_used > updatedPromo[0].max_uses) {
+                    if (updatedPromo[0]?.max_uses !== null && updatedPromo[0]?.max_uses !== undefined && updatedPromo[0].times_used > updatedPromo[0].max_uses) {
                         throw new Error('PROMO_MAX_USES_REACHED');
                     }
+                }
+            }
+
+            // 7.5 Record Menu Offers redemptions if menu offer discount was applied
+            if (order.menu_offer_discount_paise > 0) {
+                const { rows: activeOffers } = await client.query(
+                    `SELECT id FROM menu_offers WHERE is_active = true AND (zone_id IS NULL OR zone_id = $1)`,
+                    [order.zone_id]
+                );
+                for (const off of activeOffers) {
+                    await client.query(
+                        `INSERT INTO customer_offer_uses (customer_id, offer_id, order_id) VALUES ($1, $2, $3)`,
+                        [order.customer_id, off.id, order.id]
+                    );
                 }
             }
 

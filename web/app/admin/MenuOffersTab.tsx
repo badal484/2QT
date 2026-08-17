@@ -158,6 +158,7 @@ const EMPTY_FORM = {
   max_discount_paise: "",
   audience: "all", audience_config: {} as any,
   zone_id: "", start_time: "", end_time: "", is_active: true,
+  per_user_limit: "", max_items_per_order: "", limit_reset_period: "lifetime",
 };
 
 const AUDIENCE_OPTIONS = [
@@ -223,7 +224,10 @@ export function MenuOffersTab() {
       zone_id: offer.zone_id ?? "",
       start_time: offer.start_time ? offer.start_time.slice(0, 16) : "",
       end_time: offer.end_time ? offer.end_time.slice(0, 16) : "",
-      is_active: offer.is_active,
+      is_active: offer.is_active ?? true,
+      per_user_limit: offer.per_user_limit ?? "",
+      max_items_per_order: offer.max_items_per_order ?? "",
+      limit_reset_period: offer.limit_reset_period ?? "lifetime",
     });
     setShowModal(true);
   };
@@ -451,6 +455,18 @@ export function MenuOffersTab() {
               </div>
               {f("Start Time (optional)", "start_time", "datetime-local")}
               {f("End Time (optional)", "end_time", "datetime-local")}
+
+              {/* ── Usage Limits & Quantity Caps ── */}
+              <div className="col-span-2 border-t border-white/5 pt-4">
+                <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-3">Per-User Limits & Quantity Caps</div>
+              </div>
+              {f("Per-User Limit (blank = unlimited)", "per_user_limit", "number", "e.g. 1 (once per user)")}
+              {f("Max Items per Order (blank = unlimited)", "max_items_per_order", "number", "e.g. 2 items max")}
+              {sel("Reset Period", "limit_reset_period", [
+                { value: "lifetime", label: "Lifetime (Total Uses)" },
+                { value: "daily", label: "Daily (Resets Midnight)" },
+              ])}
+              <div />
 
               <div className="col-span-2 flex items-center gap-3 pt-2">
                 <label className="flex items-center gap-2 cursor-pointer">
