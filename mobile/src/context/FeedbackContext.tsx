@@ -119,7 +119,7 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const bottomInsetPadding = Math.max(insets.bottom + 24, 32);
+  const bottomPadding = Math.max(insets.bottom + 12, 20);
 
   return (
     <FeedbackContext.Provider value={{ showDialog, showToast }}>
@@ -131,7 +131,13 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
           <Pressable style={StyleSheet.absoluteFill} onPress={handleCancel} />
           
           <Animated.View 
-            style={[styles.sheetContainer, { paddingBottom: bottomInsetPadding }]} 
+            style={[
+              styles.sheetContainer, 
+              { 
+                paddingBottom: bottomPadding + 60,
+                marginBottom: -60 
+              }
+            ]} 
             entering={SlideInDown.duration(220)} 
             exiting={SlideOutDown.duration(180)}
           >
@@ -215,7 +221,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingTop: 12,
     paddingHorizontal: 24,
-    paddingBottom: 36,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.15,
