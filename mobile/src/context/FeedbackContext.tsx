@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, ZoomIn, ZoomOut } from 'react-native-reanimated';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useRef } from 'react';
+import { StyleSheet, View, Text, Modal, Pressable } from 'react-native';
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { tokens } from '../theme/tokens';
-import { CheckCircle2, AlertTriangle, Info, XCircle } from 'lucide-react-native';
+import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react-native';
+import { haptics } from '../utils/haptics';
+import { PressableScale } from '../components/ui/internal/PressableScale';
 
 export type DialogType = 'info' | 'success' | 'warning' | 'error';
 
@@ -39,7 +41,7 @@ export const useFeedback = () => {
 };
 
 export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [dialogState, setDialogState] = useState<{ visible: boolean; options: DialogOptions | null }>({
+  const [sheetState, setSheetState] = useState<{ visible: boolean; options: DialogOptions | null }>({
     visible: false,
     options: null,
   });
@@ -49,40 +51,67 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
     options: null,
   });
 
-  const showDialog = useCallback((options: DialogOptions) => {
-    setDialogState({ visible: true, options });
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((options: ToastOptions) => {
+    // Haptic response
+    if (options.type === 'success') haptics.success();
+    else if (options.type === 'error' || options.type === 'warning') haptics.notification('warning');
+    else haptics.impact('light');
+
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    
+    setToastState({ visible: true, options });
+    
+    toastTimerRef.current = setTimeout(() => {
+      setToastState((prev) => ({ ...prev, visible: false }));
+    }, options.duration || 3200);
   }, []);
 
-  const hideDialog = useCallback(() => {
-    setDialogState((prev) => ({ ...prev, visible: false }));
+  const showDialog = useCallback((options: DialogOptions) => {
+    // If the dialog is single-action (no cancelText), route it to a sleek floating toast
+    // so no intrusive full-screen center popup disrupts the user experience!
+    if (!options.cancelText) {
+      const formattedMessage = options.title
+        ? `${options.title} • ${options.message}`
+        : options.message;
+      showToast({ message: formattedMessage, type: options.type });
+      if (options.onConfirm) {
+        options.onConfirm();
+      }
+      return;
+    }
+
+    // For multi-action confirmations (e.g. Cancel Order, Clear Cart), show a sleek Bottom Action Sheet
+    haptics.notification('warning');
+    setSheetState({ visible: true, options });
+  }, [showToast]);
+
+  const hideSheet = useCallback(() => {
+    setSheetState((prev) => ({ ...prev, visible: false }));
   }, []);
 
   const handleConfirm = useCallback(() => {
-    hideDialog();
-    if (dialogState.options?.onConfirm) {
-      setTimeout(() => dialogState.options?.onConfirm?.(), 300); // Wait for exit animation
+    haptics.selection();
+    hideSheet();
+    if (sheetState.options?.onConfirm) {
+      setTimeout(() => sheetState.options?.onConfirm?.(), 250);
     }
-  }, [dialogState.options, hideDialog]);
+  }, [sheetState.options, hideSheet]);
 
   const handleCancel = useCallback(() => {
-    hideDialog();
-    if (dialogState.options?.onCancel) {
-      setTimeout(() => dialogState.options?.onCancel?.(), 300);
+    haptics.selection();
+    hideSheet();
+    if (sheetState.options?.onCancel) {
+      setTimeout(() => sheetState.options?.onCancel?.(), 250);
     }
-  }, [dialogState.options, hideDialog]);
+  }, [sheetState.options, hideSheet]);
 
-  const showToast = useCallback((options: ToastOptions) => {
-    setToastState({ visible: true, options });
-    setTimeout(() => {
-      setToastState((prev) => ({ ...prev, visible: false }));
-    }, options.duration || 3000);
-  }, []);
-
-  const getIcon = (type?: DialogType, size = 24) => {
+  const getIcon = (type?: DialogType, size = 20) => {
     switch (type) {
-      case 'success': return <CheckCircle2 size={size} color={tokens.colors.success} />;
-      case 'warning': return <AlertTriangle size={size} color={tokens.colors.warning} />;
-      case 'error': return <XCircle size={size} color={tokens.colors.error} />;
+      case 'success': return <CheckCircle2 size={size} color="#10B981" />;
+      case 'warning': return <AlertTriangle size={size} color="#F59E0B" />;
+      case 'error': return <XCircle size={size} color="#EF4444" />;
       default: return <Info size={size} color={tokens.colors.primary} />;
     }
   };
@@ -91,48 +120,76 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
     <FeedbackContext.Provider value={{ showDialog, showToast }}>
       {children}
 
-      {/* Custom Dialog Modal */}
-      <Modal visible={dialogState.visible} transparent animationType="none" statusBarTranslucent>
-        <Animated.View style={styles.dialogOverlay} entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)}>
-          <Animated.View style={styles.dialogContent} entering={ZoomIn.duration(220)} exiting={ZoomOut.duration(180)}>
-            {dialogState.options && (
-              <>
-                <View style={styles.dialogHeader}>
-                  {getIcon(dialogState.options.type, 32)}
-                  <Text style={styles.dialogTitle}>{dialogState.options.title}</Text>
+      {/* Modern Gestural Bottom Sheet for Confirmation Actions (Zomato/Swiggy style) */}
+      <Modal visible={sheetState.visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleCancel}>
+        <Animated.View style={styles.sheetOverlay} entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleCancel} />
+          
+          <Animated.View 
+            style={styles.sheetContainer} 
+            entering={SlideInDown.springify().damping(18).stiffness(140)} 
+            exiting={SlideOutDown.duration(200)}
+          >
+            <View style={styles.sheetHandle} />
+
+            {sheetState.options && (
+              <View style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <View style={[
+                    styles.sheetIconBox,
+                    sheetState.options.destructive && { backgroundColor: '#FEF2F2' }
+                  ]}>
+                    {getIcon(sheetState.options.type, 24)}
+                  </View>
+                  <Text allowFontScaling={false} style={styles.sheetTitle}>{sheetState.options.title}</Text>
                 </View>
-                <Text style={styles.dialogMessage}>{dialogState.options.message}</Text>
+
+                <Text allowFontScaling={false} style={styles.sheetMessage}>{sheetState.options.message}</Text>
                 
-                <View style={styles.dialogActions}>
-                  {dialogState.options.cancelText && (
-                    <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} activeOpacity={0.7}>
-                      <Text style={styles.cancelBtnText}>{dialogState.options.cancelText}</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity 
+                <View style={styles.sheetActions}>
+                  <PressableScale style={styles.cancelBtn} onPress={handleCancel}>
+                    <Text allowFontScaling={false} style={styles.cancelBtnText}>
+                      {sheetState.options.cancelText || 'Cancel'}
+                    </Text>
+                  </PressableScale>
+                  
+                  <PressableScale 
                     style={[
                       styles.confirmBtn, 
-                      dialogState.options.destructive && styles.destructiveBtn
+                      sheetState.options.destructive && styles.destructiveBtn
                     ]} 
-                    onPress={handleConfirm} 
-                    activeOpacity={0.7}
+                    onPress={handleConfirm}
                   >
-                    <Text style={styles.confirmBtnText}>{dialogState.options.confirmText || 'OK'}</Text>
-                  </TouchableOpacity>
+                    <Text allowFontScaling={false} style={styles.confirmBtnText}>
+                      {sheetState.options.confirmText || 'Confirm'}
+                    </Text>
+                  </PressableScale>
                 </View>
-              </>
+              </View>
             )}
           </Animated.View>
         </Animated.View>
       </Modal>
 
-      {/* Global Toast Overlay (can be positioned over everything) */}
+      {/* Modern Floating Pill Toast Notification (Uber/Blinkit style) */}
       {toastState.visible && toastState.options && (
-        <Animated.View style={styles.toastContainer} entering={SlideInDown.duration(250)} exiting={SlideOutDown.duration(200)}>
-          <View style={styles.toastContent}>
-            {getIcon(toastState.options.type, 20)}
-            <Text style={styles.toastText}>{toastState.options.message}</Text>
-          </View>
+        <Animated.View 
+          style={styles.toastContainer} 
+          entering={SlideInDown.springify().damping(16).stiffness(130)} 
+          exiting={SlideOutDown.duration(180)}
+        >
+          <PressableScale 
+            style={styles.toastPill} 
+            onPress={() => setToastState((prev) => ({ ...prev, visible: false }))}
+          >
+            <View style={styles.toastIconBox}>
+              {getIcon(toastState.options.type, 18)}
+            </View>
+            <Text allowFontScaling={false} style={styles.toastText} numberOfLines={2}>
+              {toastState.options.message}
+            </Text>
+            <X size={14} color="#94A3B8" style={{ marginLeft: 4 }} />
+          </PressableScale>
         </Animated.View>
       )}
     </FeedbackContext.Provider>
@@ -140,101 +197,137 @@ export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }
 };
 
 const styles = StyleSheet.create({
-  dialogOverlay: {
+  // Bottom Sheet
+  sheetOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: tokens.spacing.lg,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
   },
-  dialogContent: {
+  sheetContainer: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: tokens.colors.surface,
-    borderRadius: tokens.radii.xl,
-    padding: tokens.spacing.xl,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+    paddingHorizontal: 24,
+    paddingBottom: 36,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 20,
   },
-  dialogHeader: {
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sheetContent: {
     alignItems: 'center',
-    marginBottom: tokens.spacing.md,
   },
-  dialogTitle: {
-    fontSize: tokens.typography.size.h3,
-    fontFamily: tokens.typography.family.bold,
-    color: tokens.colors.textPrimary,
-    marginTop: tokens.spacing.sm,
-    textAlign: 'center',
-  },
-  dialogMessage: {
-    fontSize: tokens.typography.size.body,
-    fontFamily: tokens.typography.family.medium,
-    color: tokens.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: tokens.spacing.xl,
-    lineHeight: 22,
-  },
-  dialogActions: {
+  sheetHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: tokens.spacing.md,
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+    width: '100%',
+  },
+  sheetIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontFamily: tokens.typography.family.bold,
+    color: '#0F172A',
+    flex: 1,
+  },
+  sheetMessage: {
+    fontSize: 14,
+    fontFamily: tokens.typography.family.medium,
+    color: '#475569',
+    lineHeight: 21,
+    marginBottom: 24,
+    alignSelf: 'flex-start',
+  },
+  sheetActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: tokens.spacing.md,
-    borderRadius: tokens.radii.lg,
-    backgroundColor: tokens.colors.background,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtnText: {
-    fontSize: tokens.typography.size.button,
+    fontSize: 14,
     fontFamily: tokens.typography.family.bold,
-    color: tokens.colors.textSecondary,
+    color: '#475569',
   },
   confirmBtn: {
     flex: 1,
-    paddingVertical: tokens.spacing.md,
-    borderRadius: tokens.radii.lg,
+    paddingVertical: 14,
+    borderRadius: 16,
     backgroundColor: tokens.colors.primary,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   destructiveBtn: {
-    backgroundColor: tokens.colors.error,
+    backgroundColor: '#EF4444',
   },
   confirmBtnText: {
-    fontSize: tokens.typography.size.button,
+    fontSize: 14,
     fontFamily: tokens.typography.family.bold,
-    color: tokens.colors.white,
+    color: '#FFFFFF',
   },
+
+  // Floating Toast Pill
   toastContainer: {
     position: 'absolute',
     bottom: 40,
-    left: 20,
-    right: 20,
+    left: 16,
+    right: 16,
     alignItems: 'center',
-    zIndex: 9999,
+    zIndex: 99999,
   },
-  toastContent: {
+  toastPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: tokens.colors.surface,
-    paddingVertical: tokens.spacing.sm,
-    paddingHorizontal: tokens.spacing.lg,
-    borderRadius: tokens.radii.full,
-    gap: tokens.spacing.sm,
+    backgroundColor: '#0F172A',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 30,
+    maxWidth: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    gap: 10,
+  },
+  toastIconBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toastText: {
-    fontSize: tokens.typography.size.caption,
-    fontFamily: tokens.typography.family.bold,
-    color: tokens.colors.textPrimary,
-  }
+    fontSize: 13,
+    fontFamily: tokens.typography.family.medium,
+    color: '#F8FAFC',
+    flexShrink: 1,
+    lineHeight: 18,
+  },
 });
