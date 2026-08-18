@@ -142,44 +142,69 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
     const resolvedTargetIds = Array.isArray(target_ids) && target_ids.length > 0 ? target_ids : null;
     const normalizedDiscountType = discount_type === 'percent' ? 'percentage' : (discount_type ?? null);
 
+    const hasDescription = description !== undefined;
+    const hasTargetId = target_id !== undefined || target_ids !== undefined;
+    const hasTargetIds = target_ids !== undefined;
+    const hasMaxDiscount = max_discount_paise !== undefined;
+    const hasZoneId = zone_id !== undefined;
+    const hasStartTime = start_time !== undefined;
+    const hasEndTime = end_time !== undefined;
+    const hasPerUserLimit = per_user_limit !== undefined;
+    const hasMaxItems = max_items_per_order !== undefined;
+
     try {
         const { rows } = await query(`
             UPDATE menu_offers SET
                 title               = COALESCE($1,  title),
-                description         = COALESCE($2,  description),
+                description         = CASE WHEN $20 THEN $2 ELSE description END,
                 target_type         = COALESCE($3,  target_type),
-                target_id           = COALESCE($4,  target_id),
-                target_ids          = COALESCE($5,  target_ids),
+                target_id           = CASE WHEN $21 THEN $4 ELSE target_id END,
+                target_ids          = CASE WHEN $22 THEN $5 ELSE target_ids END,
                 discount_type       = COALESCE($6,  discount_type),
                 discount_percent    = COALESCE($7,  discount_percent),
                 discount_flat_paise = COALESCE($8,  discount_flat_paise),
-                max_discount_paise  = COALESCE($9,  max_discount_paise),
+                max_discount_paise  = CASE WHEN $23 THEN $9 ELSE max_discount_paise END,
                 audience            = COALESCE($10, audience),
                 audience_config     = COALESCE($11, audience_config),
-                zone_id             = COALESCE($12, zone_id),
-                start_time          = COALESCE($13, start_time),
-                end_time            = COALESCE($14, end_time),
+                zone_id             = CASE WHEN $24 THEN $12 ELSE zone_id END,
+                start_time          = CASE WHEN $25 THEN $13 ELSE start_time END,
+                end_time            = CASE WHEN $26 THEN $14 ELSE end_time END,
                 is_active           = COALESCE($15, is_active),
-                per_user_limit      = COALESCE($16, per_user_limit),
-                max_items_per_order = COALESCE($17, max_items_per_order),
+                per_user_limit      = CASE WHEN $27 THEN $16 ELSE per_user_limit END,
+                max_items_per_order = CASE WHEN $28 THEN $17 ELSE max_items_per_order END,
                 limit_reset_period  = COALESCE($18, limit_reset_period),
                 updated_at          = NOW()
             WHERE id = $19
             RETURNING *
         `, [
-            title ?? null, description ?? null, target_type ?? null,
-            resolvedTargetId ?? null,
+            title ?? null,
+            description || null,
+            target_type ?? null,
+            resolvedTargetId || null,
             resolvedTargetIds,
-            normalizedDiscountType, discount_percent ?? null, discount_flat_paise ?? null,
-            max_discount_paise ?? null,
+            normalizedDiscountType,
+            discount_percent ?? null,
+            discount_flat_paise ?? null,
+            max_discount_paise ? Number(max_discount_paise) : null,
             audience ?? null,
             audience_config ? JSON.stringify(audience_config) : null,
-            zone_id ?? null, start_time ?? null, end_time ?? null,
+            zone_id || null,
+            start_time || null,
+            end_time || null,
             is_active ?? null,
-            per_user_limit !== undefined ? (per_user_limit ? Number(per_user_limit) : null) : null,
-            max_items_per_order !== undefined ? (max_items_per_order ? Number(max_items_per_order) : null) : null,
+            per_user_limit ? Number(per_user_limit) : null,
+            max_items_per_order ? Number(max_items_per_order) : null,
             limit_reset_period ?? null,
             id,
+            hasDescription,
+            hasTargetId,
+            hasTargetIds,
+            hasMaxDiscount,
+            hasZoneId,
+            hasStartTime,
+            hasEndTime,
+            hasPerUserLimit,
+            hasMaxItems,
         ]);
         if (rows.length === 0) return res.status(404).json({ error: 'Offer not found' });
         await clearMenuCache();
