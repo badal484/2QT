@@ -349,9 +349,15 @@ router.get('/:id/tracking', authenticate, async (req: AuthRequest, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
     const order = rows[0];
 
-    // Customers can only track their own orders; kitchen/rider/admin are unrestricted
+    // Customers can only track their own orders; riders/kitchen staff only their own assigned orders; admin is unrestricted
     const role = req.user!.role;
     if (role === 'customer' && order.customer_id !== req.user!.userId) {
+        return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+    if (role === 'rider' && order.rider_id !== req.user!.userId) {
+        return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+    if (['chef', 'kitchen_manager', 'partner_kitchen', 'packer'].includes(role) && order.kitchen_id !== req.user!.kitchenId) {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
 
