@@ -127,8 +127,13 @@ describe('POST /auth/verify-otp', () => {
     expect(res.body.error).toBe('INVALID_OTP');
   });
 
-  it('allows test account bypass with OTP 123456', async () => {
-    // Test accounts hardcoded in auth.ts bypass OTP check → reach completeAuth() DB calls
+  it('allows test account bypass with OTP 123456 in development only', async () => {
+    // Test accounts hardcoded in auth.ts bypass OTP check → reach completeAuth() DB calls.
+    // The bypass is gated behind NODE_ENV === 'development' (it must never be reachable
+    // in production), so it has to be enabled explicitly here since the suite otherwise
+    // runs under NODE_ENV === 'test'.
+    const orig = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
     mockQuery
       .mockResolvedValueOnce({ rows: [] })    // prelaunch check
       .mockResolvedValueOnce({ rows: [] })    // prelaunch config
@@ -138,8 +143,18 @@ describe('POST /auth/verify-otp', () => {
       .mockResolvedValueOnce({ rows: [] });   // kitchen name
 
     const res = await request(app).post('/auth/verify-otp').send({ phone: '919999999999', otp: '123456' });
+    process.env.NODE_ENV = orig;
     // Might succeed or 5xx if remaining DB mocks are incomplete — just check it's not a 400 OTP error
     expect(res.body.error).not.toBe('INVALID_OTP');
+  });
+
+  it('does NOT allow the OTP bypass outside development mode', async () => {
+    // Same request as above, but under the suite's default NODE_ENV ('test') — the
+    // bypass must not be reachable, so this should hit the real invalid-OTP path.
+    mockRedisGet.mockResolvedValueOnce(null);
+    const res = await request(app).post('/auth/verify-otp').send({ phone: '919999999999', otp: '123456' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('INVALID_OTP');
   });
 });
 

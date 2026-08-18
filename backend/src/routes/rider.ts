@@ -408,11 +408,12 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
 
         const { rows } = await query(
             `UPDATE orders SET status = $1, rider_id = COALESCE(rider_id, $4)
-             WHERE id::text = $2 OR display_id = $2 OR display_id = $3 OR display_id = $5
+             WHERE (id::text = $2 OR display_id = $2 OR display_id = $3 OR display_id = $5)
+               AND (rider_id = $4 OR $6 = 'super_admin')
              RETURNING id, display_id, customer_id, kitchen_id, status, delivery_otp`,
-            [status, id, cleanId, riderId, displayWithPrefix]
+            [status, id, cleanId, riderId, displayWithPrefix, req.user!.role]
         );
-        if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND', message: 'Order not found or status cannot be updated.' });
+        if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND', message: 'Order not found, not assigned to you, or status cannot be updated.' });
         const order = rows[0];
 
         emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });

@@ -50,20 +50,16 @@ const RiderHomeScreen = ({ navigation }: any) => {
   const { showDialog } = useFeedback();
   const [isOnline, setIsOnline] = useState(user?.is_online || false);
   const isOnlineRef = useRef(user?.is_online || false);
+  // Default map center until the first GPS fix lands (usually within ~1s —
+  // startTracking() below requests one immediately on mount). The backend does
+  // persist the rider's last known coordinates to users.current_lat/lng, but
+  // nothing currently returns them on login, so there's no live value to seed
+  // this from — falls back to a fixed point rather than reading fields that
+  // don't exist on the client's user object.
   const [currentLocation, setCurrentLocation] = useState({
-    latitude: user?.current_lat ? parseFloat(user.current_lat) : 28.6139,
-    longitude: user?.current_lng ? parseFloat(user.current_lng) : 77.2090
+    latitude: 28.6139,
+    longitude: 77.2090,
   });
-
-  useEffect(() => {
-    if (user?.current_lat && user?.current_lng) {
-      const lat = parseFloat(user.current_lat);
-      const lng = parseFloat(user.current_lng);
-      if (!isNaN(lat) && !isNaN(lng) && currentLocation.latitude === 28.6139) {
-        setCurrentLocation({ latitude: lat, longitude: lng });
-      }
-    }
-  }, [user?.current_lat, user?.current_lng]);
 
   const latestLocationRef = useRef({ latitude: 0, longitude: 0 });
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -280,7 +276,12 @@ const RiderHomeScreen = ({ navigation }: any) => {
 
     const autoAssignedHandler = async (data: { orderId: string; displayId: string; batchDisplayId?: string; optOutWindowMs: number }) => {
       if (!isOnlineRef.current) return;
-      playKitchenAlert();
+      playKitchenAlert({
+        title: '🛵 New Delivery Assigned!',
+        body: 'You have a new order to pick up. Tap to view details.',
+        channelId: 'rider_delivery_alerts_v1',
+        channelName: 'Delivery Alerts',
+      });
       queryClient.invalidateQueries({ queryKey: ['rider-active-order'] });
       
       try {
@@ -357,13 +358,21 @@ const RiderHomeScreen = ({ navigation }: any) => {
         stopRiderLocationService();
       }
 
+      // On Android, the native foreground service started above already reports
+      // location to the backend every ~4s via REST — including while the app is
+      // backgrounded, which this JS watcher can't do. Emitting the same fix again
+      // over the socket here would just double up on network/socket traffic for
+      // no benefit. On iOS there's no equivalent native service, so the socket
+      // emit below is the only way the rider's location reaches the backend.
+      const shouldEmitOverSocket = Platform.OS !== 'android';
+
       // Fast location fix with GPS -> Network fallback
       const getFix = (highAcc: boolean) => {
         Geolocation.getCurrentPosition(
           pos => {
             const { latitude, longitude } = pos.coords;
             setCurrentLocation({ latitude, longitude });
-            if (isOnline) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
+            if (isOnline && shouldEmitOverSocket) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
           },
           () => {
             if (highAcc) getFix(false); // Retry with Network provider if GPS times out
@@ -378,7 +387,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
           pos => {
             const { latitude, longitude } = pos.coords;
             setCurrentLocation({ latitude, longitude });
-            if (isOnline) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
+            if (isOnline && shouldEmitOverSocket) getSocket()?.emit('update_location', { lat: latitude, lng: longitude });
           },
           (err) => {
             console.log('[Geolocation Error]', err);
@@ -394,7 +403,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       setupWatch(true);
 
       interval = setInterval(() => {
-        if (isOnline && latestLocationRef.current.latitude !== 28.6139) {
+        if (isOnline && shouldEmitOverSocket && latestLocationRef.current.latitude !== 28.6139) {
           getSocket()?.emit('update_location', { lat: latestLocationRef.current.latitude, lng: latestLocationRef.current.longitude });
         }
       }, 30000);

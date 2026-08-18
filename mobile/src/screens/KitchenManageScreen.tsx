@@ -9,6 +9,7 @@ import { api } from '../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Power, Package, Timer, RefreshCw } from 'lucide-react-native';
 import { useFeedback } from '../context/FeedbackContext';
+import { getSocket } from '../socket/client';
 
 const G = {
   bg: '#070707', card: '#111111', border: 'rgba(255,255,255,0.07)', faint: 'rgba(255,255,255,0.05)',
@@ -26,7 +27,7 @@ const KitchenManageScreen = () => {
   const [countdownStr, setCountdownStr] = useState('');
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['kitchen-manage'],
+    queryKey: ['kitchen-menu'],
     queryFn: () => api.get('/kitchen/menu'),
   });
 
@@ -47,10 +48,52 @@ const KitchenManageScreen = () => {
     return () => clearInterval(id);
   }, [kitchenPaused, pauseUntil]);
 
+  // Stay in sync with the Board screen (shares the ['kitchen-menu'] cache) and
+  // with any menu/pause change made from another device — the backend already
+  // emits these on pause/resume and on availability toggles, nothing was
+  // listening for them here before. Uses the same connect-retry pattern as
+  // KitchenBoardScreen since this effect can otherwise run before the socket
+  // connection is established and never get a second chance to attach.
+  useEffect(() => {
+    const onMenuUpdate = () => queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] });
+
+    const attach = (socket: ReturnType<typeof getSocket>) => {
+      if (!socket) return;
+      socket.on('menu_updated', onMenuUpdate);
+      socket.on('kitchen_resumed', onMenuUpdate);
+      socket.on('connect', onMenuUpdate);
+    };
+    const detach = (socket: ReturnType<typeof getSocket>) => {
+      if (!socket) return;
+      socket.off('menu_updated', onMenuUpdate);
+      socket.off('kitchen_resumed', onMenuUpdate);
+      socket.off('connect', onMenuUpdate);
+    };
+
+    let attachedSocket: ReturnType<typeof getSocket> = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const tryAttach = () => {
+      if (attachedSocket) return;
+      const s = getSocket();
+      if (s) {
+        attach(s);
+        attachedSocket = s;
+        if (timer) clearInterval(timer);
+      }
+    };
+    tryAttach();
+    if (!attachedSocket) timer = setInterval(tryAttach, 1000);
+
+    return () => {
+      if (timer) clearInterval(timer);
+      detach(attachedSocket);
+    };
+  }, [queryClient]);
+
   const statusMutation = useMutation({
     mutationFn: (payload: any) => api.patch('/kitchen/status', payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['kitchen-manage'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] });
       if (!kitchenPaused) {
         showDialog({ title: 'Kitchen Paused', message: 'New orders will not be accepted.', confirmText: 'Okay', type: 'warning' });
       } else {
@@ -65,7 +108,7 @@ const KitchenManageScreen = () => {
     mutationFn: ({ id, available }: { id: string; available: boolean }) =>
       api.patch(`/kitchen/menu/${id}/availability`, { available }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['kitchen-manage'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] });
     },
   });
 

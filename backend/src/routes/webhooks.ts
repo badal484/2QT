@@ -171,7 +171,7 @@ router.post('/razorpay', async (req, res) => {
             const planId = notes.planId as string;
             try {
                 // Ensure subscription service is called to grant the plan
-                await handleSubscriptionRenewal(customerId, planId);
+                await handleSubscriptionRenewal(customerId, planId, rzpPaymentId);
                 // We should record the gateway payment id for refund purposes
                 // But subscription table schema is handled inside the service.
             } catch (err) {

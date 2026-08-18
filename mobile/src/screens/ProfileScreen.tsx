@@ -240,7 +240,7 @@ const ProfileScreen = ({ navigation }: any) => {
                   {riderStats?.totalDeliveries || 0}
                 </Text>
               </PressableScale>
-              <PressableScale style={styles.statBox} onPress={() => {}} accessibilityRole="button" accessibilityLabel="Rating">
+              <PressableScale style={styles.statBox} onPress={() => navigation.navigate('RiderScorecard')} accessibilityRole="button" accessibilityLabel="Rating">
                 <Star size={20} color={tokens.colors.warning} />
                 <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.statLabel}>Rating</Text>
                 <Text 

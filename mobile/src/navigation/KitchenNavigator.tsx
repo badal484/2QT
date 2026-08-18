@@ -17,8 +17,6 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 const MainKitchenTabs = () => {
-  const user = useSelector((state: RootState) => state.auth.user);
-  const isDineInStaff = user?.role === 'dine_in_staff';
   const insets = useSafeAreaInsets();
 
   const tabOptions = {
@@ -43,53 +41,54 @@ const MainKitchenTabs = () => {
 
   return (
     <Tab.Navigator screenOptions={tabOptions}>
-      {!isDineInStaff && (
-        <Tab.Screen
-          name="Board"
-          component={KitchenBoardScreen}
-          options={{ tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} strokeWidth={2} /> }}
-        />
-      )}
-      {!isDineInStaff && (
-        <Tab.Screen
-          name="Manage"
-          component={KitchenManageScreen}
-          options={{ tabBarIcon: ({ color }) => <Settings size={22} color={color} strokeWidth={2} /> }}
-        />
-      )}
-      {!isDineInStaff && (
-        <Tab.Screen
-          name="Stock"
-          component={StockScreen}
-          options={{ tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} strokeWidth={2} /> }}
-        />
-      )}
-      {!isDineInStaff && (
-        <Tab.Screen
-          name="Ratings"
-          component={FeedbackScreen}
-          options={{ tabBarIcon: ({ color }) => <Star size={22} color={color} strokeWidth={2} /> }}
-        />
-      )}
+      <Tab.Screen
+        name="Board"
+        component={KitchenBoardScreen}
+        options={{ tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} strokeWidth={2} /> }}
+      />
+      <Tab.Screen
+        name="Manage"
+        component={KitchenManageScreen}
+        options={{ tabBarIcon: ({ color }) => <Settings size={22} color={color} strokeWidth={2} /> }}
+      />
+      <Tab.Screen
+        name="Stock"
+        component={StockScreen}
+        options={{ tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} strokeWidth={2} /> }}
+      />
+      <Tab.Screen
+        name="Ratings"
+        component={FeedbackScreen}
+        options={{ tabBarIcon: ({ color }) => <Star size={22} color={color} strokeWidth={2} /> }}
+      />
     </Tab.Navigator>
   );
 };
 
-// Packer gets a standalone fullscreen — no tabs, no distractions
+// Packer and Dine-In staff each get a standalone fullscreen — no tabs, no distractions
 const PackerStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="PackerMain" component={PackerScreen} />
   </Stack.Navigator>
 );
 
+const DineInStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="DineInMain" component={KitchenDineInScreen} />
+  </Stack.Navigator>
+);
+
 const KitchenNavigator = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const isPacker = user?.role === 'packer';
+  const isDineInStaff = user?.role === 'dine_in_staff';
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}>
       {isPacker ? (
         <Stack.Screen name="PackerRoot" component={PackerStack} />
+      ) : isDineInStaff ? (
+        <Stack.Screen name="DineInRoot" component={DineInStack} />
       ) : (
         <>
           <Stack.Screen name="MainKitchen" component={MainKitchenTabs} />

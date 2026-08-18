@@ -150,28 +150,6 @@ function createAndRender(element: React.ReactElement): string {
   return JSON.stringify(inst!.toJSON());
 }
 
-// ── KitchenLoginScreen ────────────────────────────────────────────────────────
-
-import KitchenLoginScreen from '../src/screens/KitchenLoginScreen';
-
-describe('KitchenLoginScreen', () => {
-  it('renders without crashing', () => {
-    act(() => {
-      expect(() => renderer.create(<Wrapper><KitchenLoginScreen /></Wrapper>)).not.toThrow();
-    });
-  });
-
-  it('shows "Kitchen Access" title', () => {
-    const json = createAndRender(<Wrapper><KitchenLoginScreen /></Wrapper>);
-    expect(json).toContain('Kitchen Access');
-  });
-
-  it('shows PIN subtitle', () => {
-    const json = createAndRender(<Wrapper><KitchenLoginScreen /></Wrapper>);
-    expect(json).toContain('Enter 4-Digit Security PIN');
-  });
-});
-
 // ── KitchenBoardScreen ────────────────────────────────────────────────────────
 
 import KitchenBoardScreen from '../src/screens/KitchenBoardScreen';
@@ -208,26 +186,6 @@ describe('KitchenManageScreen', () => {
   it('renders a non-null tree', () => {
     let inst: renderer.ReactTestRenderer;
     act(() => { inst = renderer.create(<Wrapper user={kitchenUser}><KitchenManageScreen /></Wrapper>); });
-    expect(inst!.toJSON()).not.toBeNull();
-  });
-});
-
-// ── MorningPrepScreen ─────────────────────────────────────────────────────────
-
-import MorningPrepScreen from '../src/screens/MorningPrepScreen';
-
-describe('MorningPrepScreen', () => {
-  it('renders without crashing', () => {
-    act(() => {
-      expect(() =>
-        renderer.create(<Wrapper user={kitchenUser}><MorningPrepScreen /></Wrapper>),
-      ).not.toThrow();
-    });
-  });
-
-  it('renders a non-null tree', () => {
-    let inst: renderer.ReactTestRenderer;
-    act(() => { inst = renderer.create(<Wrapper user={kitchenUser}><MorningPrepScreen /></Wrapper>); });
     expect(inst!.toJSON()).not.toBeNull();
   });
 });

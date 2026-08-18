@@ -2,7 +2,7 @@ import { tokens } from '../theme/tokens';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Linking, Modal,
-  ActivityIndicator, Alert, StyleSheet, StatusBar, Platform, AppState,
+  ActivityIndicator, StyleSheet, StatusBar, Platform,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,7 +12,7 @@ import {
   ArrowLeft, Phone, Navigation, Package,
   CreditCard, ChevronRight, Info,
   UserX, X, MapPin, Check,
-  ShieldAlert, RefreshCw, DoorOpen, RotateCcw, Wrench, MessageCircle,
+  ShieldAlert, RefreshCw, DoorOpen, RotateCcw, Wrench, MessageCircle, Flag,
 } from 'lucide-react-native';
 import { getSocket } from '../socket/client';
 import { useFeedback } from '../context/FeedbackContext';
@@ -68,39 +68,24 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
     return () => {
       socket.off('order_status_update', handleStatusUpdate);
       socket.off('order_updated', handleStatusUpdate);
+      socket.emit('leave_order', order.id);
     };
   }, [order.id, queryClient]);
 
-  // Geolocation — share location
+  // Seed a cached location once on mount, purely as a fallback for the SOS
+  // button below if a fresh GPS fix at press-time fails. RiderHomeScreen stays
+  // mounted underneath this screen in the nav stack and already runs the live
+  // location watcher that feeds the map and location-sharing socket emit (and
+  // on Android, the native LocationForegroundService shares location even in
+  // the background) — running a second continuous watcher here only duplicated
+  // GPS wake-ups and socket traffic with no screen-local consumer besides this
+  // one fallback value.
   useEffect(() => {
-    const socket = getSocket();
-    const watchId = Geolocation.watchPosition(
-      pos => {
-        const { latitude: lat, longitude: lng } = pos.coords;
-        currentLocationRef.current = { lat, lng };
-        socket?.emit('update_location', { lat, lng });
-      },
+    Geolocation.getCurrentPosition(
+      pos => { currentLocationRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
       () => {},
-      { enableHighAccuracy: true, distanceFilter: 5, interval: 4000 },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 },
     );
-    return () => Geolocation.clearWatch(watchId);
-  }, []);
-
-  // AppState — re-emit location when foregrounded
-  const appStateRef = useRef(AppState.currentState);
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', nextState => {
-      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-        const socket = getSocket();
-        Geolocation.getCurrentPosition(
-          pos => socket?.emit('update_location', { lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => {},
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 },
-        );
-      }
-      appStateRef.current = nextState;
-    });
-    return () => sub.remove();
   }, []);
 
   // Reset checklist each time the order becomes ready for pickup
@@ -123,7 +108,7 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
   });
 
   const sosMutation = useMutation({
-    mutationFn: async (alertType: 'emergency' | 'safety_hazard' | 'accident') => {
+    mutationFn: async (alertType: 'emergency' | 'share_location' | 'silent') => {
       // Try a fresh GPS fix first; fall back to cached watchPosition value
       let { lat, lng } = currentLocationRef.current;
       try {
@@ -383,6 +368,18 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
           </View>
         )}
 
+        {/* Report an issue with this order (missing items, damaged package, etc.) */}
+        {!isDelivered && (
+          <TouchableOpacity
+            style={s.ghostBtn}
+            onPress={() => navigation.navigate('RiderSupport', { initialCategory: 'order' })}
+            activeOpacity={0.8}
+          >
+            <Flag size={16} color={R.gray} />
+            <Text style={s.ghostBtnText}>Report an Issue with This Order</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Customer not responding */}
         {isOutForDelivery && (
           <TouchableOpacity style={s.warnBtn} onPress={() => setShowUnreachableModal(true)} activeOpacity={0.8}>
@@ -418,11 +415,11 @@ const AssignedOrderScreen = ({ route, navigation }: any) => {
               </TouchableOpacity>
             </View>
             <Text style={s.sheetSub}>Your location will be shared with our safety team instantly.</Text>
-            {[
+            {([
               { type: 'emergency', label: '🚨 Call Emergency (112)', desc: 'Calls police + alerts our ops team with your live location', color: R.red, bg: R.redLight },
               { type: 'share_location', label: '📍 Share Location with Ops', desc: 'Silent alert — ops will call you within 2 minutes', color: R.orange, bg: R.orangeLight },
               { type: 'silent', label: '🤫 Silent Alert', desc: 'No sound, no call — discreet notification to safety team', color: R.blue, bg: R.blueLight },
-            ].map(opt => (
+            ] as const).map(opt => (
               <TouchableOpacity
                 key={opt.type}
                 style={[s.optionRow, { backgroundColor: opt.bg, borderColor: opt.color, borderWidth: 1 }]}
@@ -603,21 +600,6 @@ const s = StyleSheet.create({
   stepLabelActive: { color: R.ink, fontWeight: '700' },
   stepLine: { flex: 1, height: 2, backgroundColor: R.border, marginBottom: 18 },
   stepLineDone: { backgroundColor: R.orange },
-
-  // Kitchen arrival
-  atKitchenBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: R.orangeLight, borderRadius: 14, padding: 14, marginBottom: 12,
-    borderWidth: 1.5, borderColor: '#FFD4A8',
-  },
-  atKitchenText: { fontSize: 15, fontWeight: '800', color: R.orange, flex: 1 },
-  atKitchenHint: { fontSize: 10, color: R.muted, position: 'absolute', bottom: 6, right: 14 },
-  arrivedBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: R.greenLight, borderRadius: 14, padding: 14, marginBottom: 12,
-    borderWidth: 1, borderColor: '#B6EDD8',
-  },
-  arrivedBannerText: { fontSize: 14, fontWeight: '700', color: R.green },
 
   card: {
     backgroundColor: R.white, borderRadius: 16, padding: 16, marginBottom: 12,
