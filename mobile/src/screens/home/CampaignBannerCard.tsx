@@ -165,14 +165,14 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
 
         {/* Footer info: Min order / auto-applied */}
         <View style={styles.footerRow}>
-          <Text allowFontScaling={false} style={styles.footerText}>
-            {minOrderRupees > 0 ? `MIN ORDER ₹${minOrderRupees}` : 'NO MIN ORDER'}
-            {maxDiscountRupees > 0 ? `  •  MAX SAVINGS ₹${maxDiscountRupees}` : ''}
+          <Text allowFontScaling={false} style={styles.footerText} numberOfLines={1}>
+            {minOrderRupees > 0 ? `Min ₹${minOrderRupees}` : 'No Min'}
+            {maxDiscountRupees > 0 ? ` • Max discount ₹${maxDiscountRupees}` : ''}
           </Text>
           <View style={styles.autoAppliedBadge}>
             <Zap size={11} color="#FFF" style={{ marginRight: 3 }} />
             <Text allowFontScaling={false} style={styles.autoAppliedText}>
-              Auto-applied in cart
+              Auto-applied
             </Text>
           </View>
         </View>
@@ -334,10 +334,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: tokens.typography.family.bold,
     letterSpacing: 0.3,
+    flex: 1,
+    marginRight: 8,
   },
   autoAppliedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   autoAppliedText: {
     color: '#FFF',
