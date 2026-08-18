@@ -186,7 +186,7 @@ router.get('/', async (req, res) => {
             [zoneId]
         ),
         query(
-            'SELECT name, opening_time, closing_time, surge_enabled, surge_fee_paise, min_order_for_free_delivery_paise FROM zones WHERE id = $1',
+            'SELECT name, opening_time, closing_time, surge_enabled, surge_fee_paise, free_delivery_above_paise FROM zones WHERE id = $1',
             [zoneId]
         ),
         query(
@@ -258,7 +258,7 @@ router.get('/', async (req, res) => {
         pauseUntil: kitchenPaused ? pauseUntil : null,
         openingTime: zoneResult.rows[0]?.opening_time,
         closingTime: zoneResult.rows[0]?.closing_time,
-        minOrderForFreeDeliveryPaise: zoneResult.rows[0]?.min_order_for_free_delivery_paise ? Number(zoneResult.rows[0].min_order_for_free_delivery_paise) : null,
+        freeDeliveryAbovePaise: zoneResult.rows[0]?.free_delivery_above_paise ? Number(zoneResult.rows[0].free_delivery_above_paise) : null,
     };
 
     // Don't cache paused state — kitchen could resume any second
