@@ -327,6 +327,9 @@ export const calculatePricing = async ({
     // ── 7. Campaign discounts (flash sale / happy hour / winback) ─────────────
     let campaignDiscountPaise = 0;
     let campaignFreeDelivery = false;
+    let appliedCampaignName: string | null = null;
+    let appliedCampaignType: string | null = null;
+    let appliedCampaignPercent: number | null = null;
 
     {
         const istFormatter = new Intl.DateTimeFormat('en-US', {
@@ -344,7 +347,7 @@ export const calculatePricing = async ({
         const todayDay = weekday;
 
         const { rows: campaigns } = await query(
-            `SELECT id, type, discount_type, discount_percent, discount_flat_paise,
+            `SELECT id, name, type, discount_type, discount_percent, discount_flat_paise,
                     max_discount_paise, min_order_paise, winback_days, audience_type
              FROM campaigns
              WHERE is_active = true
@@ -385,7 +388,12 @@ export const calculatePricing = async ({
                 disc = Math.floor((effectiveSubtotal * parseFloat(campaign.discount_percent || '0')) / 100);
                 if (campaign.max_discount_paise) disc = Math.min(disc, campaign.max_discount_paise);
             }
-            if (disc > campaignDiscountPaise) campaignDiscountPaise = disc;
+            if (disc > campaignDiscountPaise) {
+                campaignDiscountPaise = disc;
+                appliedCampaignName = campaign.name || null;
+                appliedCampaignType = campaign.type || null;
+                appliedCampaignPercent = campaign.discount_percent ? parseFloat(campaign.discount_percent) : null;
+            }
         }
     }
 
@@ -490,6 +498,9 @@ export const calculatePricing = async ({
         subtotalPaise,
         menuOfferDiscountPaise,
         campaignDiscountPaise,
+        campaignName: appliedCampaignName,
+        campaignType: appliedCampaignType,
+        campaignDiscountPercent: appliedCampaignPercent,
         subscriptionDiscountPaise,
         discountPaise,
         loyaltyDiscountPaise,

@@ -297,7 +297,7 @@ const CartScreen = ({ navigation }: any) => {
 
   const fallbackSubtotal = useMemo(() => items.reduce((s, i) => s + i.quantity * i.pricePaise, 0), [items]);
   const { data: pricingData, isFetching: pricingFetching, isError: pricingErrored, error: pricingError } = useQuery({
-    queryKey: ['your-order-pricing', items, addressId, appliedPromoCode, effectiveZoneId],
+    queryKey: ['your-order-pricing', items, addressId, appliedPromoCode, riderTip, effectiveZoneId],
     queryFn: () =>
       api.post('/payment/create-order', {
         items, addressId, promoCode: appliedPromoCode, riderTipPaise: riderTip * 100,
@@ -379,6 +379,20 @@ const CartScreen = ({ navigation }: any) => {
   const grandTotal = (p.gatewayAmountPaise || p.totalAmountPaise) / 100;
   const menuOfferDiscount = (p.menuOfferDiscountPaise || 0) / 100;
   const campaignDiscount = (p.campaignDiscountPaise || 0) / 100;
+  const campaignType = p.campaignType;
+  const campaignPercent = p.campaignDiscountPercent;
+  const campaignLabel = useMemo(() => {
+    if (campaignType === 'flash_sale') {
+      return campaignPercent ? `Flash Sale (${campaignPercent}% OFF)` : 'Flash Sale';
+    }
+    if (campaignType === 'happy_hour') {
+      return campaignPercent ? `Happy Hour (${campaignPercent}% OFF)` : 'Happy Hour Discount';
+    }
+    if (campaignType === 'winback') {
+      return campaignPercent ? `Welcome Back (${campaignPercent}% OFF)` : 'Special Reward';
+    }
+    return campaignPercent ? `Special Deal (${campaignPercent}% OFF)` : (p.campaignName || 'Special Deal');
+  }, [campaignType, campaignPercent, p.campaignName]);
   const smallOrderFee = (p.smallOrderFeePaise || 0) / 100;
   const totalSaved = ((p.menuOfferDiscountPaise || 0) + (p.discountPaise || 0) + (p.campaignDiscountPaise || 0)) / 100;
 
@@ -780,7 +794,28 @@ const CartScreen = ({ navigation }: any) => {
             <Text allowFontScaling={false} style={styles.billLabel}>Cart Total</Text>
             <Text allowFontScaling={false} style={styles.billValue}>₹{subtotal}</Text>
           </View>
-          {/* GST Tax Row */}
+
+          {/* 1. Discounts & Offers Section */}
+          {menuOfferDiscount > 0 && (
+            <View style={styles.billRow}>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.success }]}>Item Offers</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>−₹{menuOfferDiscount.toFixed(2)}</Text>
+            </View>
+          )}
+          {p.discountPaise > 0 && (
+            <View style={styles.billRow}>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.success }]}>Promo ({appliedPromoCode})</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>−₹{(p.discountPaise / 100).toFixed(2)}</Text>
+            </View>
+          )}
+          {campaignDiscount > 0 && (
+            <View style={styles.billRow}>
+              <Text allowFontScaling={false} style={[styles.billLabel, { color: '#7C3AED' }]}>{campaignLabel}</Text>
+              <Text allowFontScaling={false} style={[styles.billValue, { color: '#7C3AED' }]}>−₹{campaignDiscount.toFixed(2)}</Text>
+            </View>
+          )}
+
+          {/* 2. Taxes & Fees Section */}
           {!hasPricingData && addressId && !pricingErrored ? (
             <View style={styles.billRow}>
               <Text allowFontScaling={false} style={styles.billLabel}>GST</Text>
@@ -869,24 +904,8 @@ const CartScreen = ({ navigation }: any) => {
             <Text allowFontScaling={false} style={[styles.billLabel, { textDecorationLine: 'line-through', color: tokens.colors.textTertiary }]}>Handling Fee</Text>
             <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success, fontFamily: tokens.typography.family.regular }]}>₹0 <Text style={{ fontFamily: tokens.typography.family.medium, color: tokens.colors.success }}>(On the house)</Text></Text>
           </View>
-          {menuOfferDiscount > 0 && (
-            <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.success }]}>Item Offers</Text>
-              <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>−₹{menuOfferDiscount.toFixed(2)}</Text>
-            </View>
-          )}
-          {p.discountPaise > 0 && (
-            <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={[styles.billLabel, { color: tokens.colors.success }]}>Promo ({appliedPromoCode})</Text>
-              <Text allowFontScaling={false} style={[styles.billValue, { color: tokens.colors.success }]}>−₹{(p.discountPaise / 100).toFixed(2)}</Text>
-            </View>
-          )}
-          {campaignDiscount > 0 && (
-            <View style={styles.billRow}>
-              <Text allowFontScaling={false} style={[styles.billLabel, { color: '#7C3AED' }]}>🎯 Campaign Deal</Text>
-              <Text allowFontScaling={false} style={[styles.billValue, { color: '#7C3AED' }]}>−₹{campaignDiscount.toFixed(2)}</Text>
-            </View>
-          )}
+
+          {/* 3. Rider Tip Section */}
           {riderTip > 0 && (
             <View style={styles.billRow}>
               <Text allowFontScaling={false} style={styles.billLabel}>Delivery Partner Tip</Text>
