@@ -117,7 +117,7 @@ const HomeScreen = ({ navigation }: any) => {
 
   const { data: menuData, isLoading } = useQuery({
     queryKey: ['menu', effectiveZoneId],
-    queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}`),
+    queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}&refresh=true`),
     enabled: !!effectiveZoneId,
     staleTime: 10 * 1000,
     gcTime: 10 * 60 * 1000,

@@ -9,15 +9,15 @@ const VALID_AUDIENCES = ['all','new_users','plus_subscribers','loyal','at_risk',
 
 const clearMenuCache = async () => {
     try {
-        const { redis } = require('../config/redis');
+        const { redis } = require('../redis');
         if (redis) {
-            const keys = await redis.keys('menu:customer:full:*');
+            const keys = await redis.keys('menu:customer:*');
             if (keys && keys.length > 0) {
                 await redis.del(...keys);
             }
         }
     } catch (e) {
-        // non-blocking
+        console.error('Failed to clear menu cache:', e);
     }
 };
 
