@@ -26,6 +26,7 @@ const EMPTY_FORM = {
 };
 
 function discountLabel(promo: any) {
+  if (promo.discount_type === "bogo") return "Buy 1 Get 1 (BOGO)";
   if (promo.discount_type === "free_delivery") return "Free Delivery";
   if (promo.discount_type === "flat") return `₹${((promo.discount_flat_paise || 0) / 100).toFixed(0)} off`;
   return `${promo.discount_percent}% off`;
@@ -186,6 +187,7 @@ export function PromoCodesTab() {
               <select value={form.discount_type} onChange={e => f('discount_type', e.target.value)} className={cls}>
                 <option value="percentage">Percentage %</option>
                 <option value="flat">Flat ₹ amount</option>
+                <option value="bogo">Buy 1 Get 1 (BOGO)</option>
                 <option value="free_delivery">Free Delivery</option>
               </select>
             </Inp>

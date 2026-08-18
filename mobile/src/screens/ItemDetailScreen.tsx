@@ -139,7 +139,12 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
          
          if (isMatch) {
               let discount = 0;
-              if (offer.discount_type === 'flat') {
+              if (offer.discount_type === 'bogo') {
+                  discount = Math.floor(basePrice * 0.5);
+                  if (offer.max_discount_paise && discount > offer.max_discount_paise) {
+                      discount = offer.max_discount_paise;
+                  }
+              } else if (offer.discount_type === 'flat') {
                   discount = offer.discount_flat_paise || 0;
               } else if (offer.discount_type === 'percent' || offer.discount_type === 'percentage') {
                   discount = Math.floor((basePrice * (parseFloat(offer.discount_percent || '0') || 0)) / 100);
@@ -147,7 +152,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                       discount = offer.max_discount_paise;
                   }
               }
-              if (discount > offerDiscountPaise) {
+              if (discount > offerDiscountPaise || (offer.discount_type === 'bogo' && !appliedOffer)) {
                   offerDiscountPaise = discount;
                   appliedOffer = offer;
               }
@@ -191,7 +196,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
         addItem({
           menuItemId: itemToAdd.id,
           name: itemToAdd.name,
-          pricePaise: itemToAdd.price_paise,
+          pricePaise: itemToAdd.original_price_paise || itemToAdd.price_paise,
           quantity: 1,
           photoUrl: itemToAdd.photo_url,
           isVeg: itemToAdd.is_veg,
@@ -319,7 +324,9 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                 </Text>
                 <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
                   <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: tokens.typography.family.extrabold, color: '#15803D' }}>
-                    {enrichedItem.applied_offer.discount_type === 'flat'
+                    {enrichedItem.applied_offer.discount_type === 'bogo'
+                      ? '🎁 BUY 1 GET 1 FREE'
+                      : enrichedItem.applied_offer.discount_type === 'flat'
                       ? `₹${(enrichedItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
                       : `${Math.round(parseFloat(enrichedItem.applied_offer.discount_percent || '0'))}% OFF`}
                   </Text>

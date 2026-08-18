@@ -3,7 +3,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { isKitchenOpen, formatTime12h } from '../utils/kitchenHours';
 import {
   View, Text, ScrollView, TextInput, Image,
-  ActivityIndicator, Alert, StyleSheet, TouchableOpacity,
+  ActivityIndicator, Alert, StyleSheet, TouchableOpacity, Modal,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor, FadeIn, FadeInDown, SlideInDown } from 'react-native-reanimated';
@@ -162,6 +162,7 @@ const CartScreen = ({ navigation }: any) => {
   const [altName, setAltName] = useState('');
   const [altPhone, setAltPhone] = useState('');
   const [showDeliveryFeeInfo, setShowDeliveryFeeInfo] = useState(false);
+  const [showCouponModal, setShowCouponModal] = useState(false);
 
   const { data: activePromosData } = useQuery({
     queryKey: ['active-promos', effectiveZoneId],
@@ -367,6 +368,42 @@ const CartScreen = ({ navigation }: any) => {
           </View>
         </Animated.View>
 
+        {/* Free Delivery Progress Bar Card */}
+        {(() => {
+          const threshold = 199;
+          const currentSubtotal = fallbackSubtotal / 100;
+          const remaining = Math.max(0, threshold - currentSubtotal);
+          const progressPercent = Math.min(100, Math.round((currentSubtotal / threshold) * 100));
+
+          return (
+            <Animated.View entering={FadeInDown.duration(250)} style={styles.delProgressCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                {remaining > 0 ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Zap size={14} color={tokens.colors.primary} />
+                    <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.medium, color: tokens.colors.textPrimary }}>
+                      Add <Text style={{ fontFamily: tokens.typography.family.extrabold, color: tokens.colors.primary }}>₹{remaining.toFixed(0)}</Text> more for <Text style={{ color: tokens.colors.success, fontFamily: tokens.typography.family.extrabold }}>FREE Delivery!</Text> 🚚
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Sparkles size={14} color={tokens.colors.success} />
+                    <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.success }}>
+                      🎉 FREE Delivery Unlocked on this order!
+                    </Text>
+                  </View>
+                )}
+                <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary }}>
+                  {progressPercent}%
+                </Text>
+              </View>
+              <View style={styles.delProgressTrack}>
+                <View style={[styles.delProgressFill, { width: `${progressPercent}%`, backgroundColor: remaining > 0 ? tokens.colors.primary : tokens.colors.success }]} />
+              </View>
+            </Animated.View>
+          );
+        })()}
+
         {/* Cart Items Card */}
         <Animated.View entering={FadeInDown.delay(30).duration(300)} style={styles.card}>
             {items.map((item: any, idx: number) => (
@@ -427,9 +464,22 @@ const CartScreen = ({ navigation }: any) => {
           </Animated.View>
         )}
 
-        {/* Promo Code Card — always rendered so users can enter promo codes */}
+        {/* Promo Code Card */}
         <Animated.View entering={FadeInDown.delay(70).duration(300)} style={styles.card}>
-          <Text allowFontScaling={false} style={styles.cardTitle}>Offers & Coupons</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <Text allowFontScaling={false} style={styles.cardTitle}>Offers & Coupons</Text>
+            {activePromos.length > 0 && (
+              <TouchableOpacity
+                onPress={() => { haptics.selection(); setShowCouponModal(true); }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              >
+                <Tag size={13} color={tokens.colors.primary} />
+                <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.primary }}>
+                  View All ({activePromos.length})
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Quick-apply chips for available promos */}
           {!appliedPromoCode && activePromos.length > 0 && (
@@ -867,6 +917,93 @@ const CartScreen = ({ navigation }: any) => {
           </PressableScale>
         </View>
       </Animated.View>
+
+      {/* Slide-Up Coupon Selector Drawer Modal */}
+      <Modal
+        visible={showCouponModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCouponModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <PressableScale style={styles.modalBackdrop} onPress={() => setShowCouponModal(false)} />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Tag size={18} color={tokens.colors.primary} />
+                <Text allowFontScaling={false} style={styles.modalTitleText}>Offers & Coupons</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowCouponModal(false)} style={styles.modalCloseBtn}>
+                <X size={18} color={tokens.colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              {activePromos.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Text allowFontScaling={false} style={{ fontSize: 14, color: tokens.colors.textSecondary }}>No coupons available right now.</Text>
+                </View>
+              ) : (
+                activePromos.map((promo: any) => {
+                  const isApplied = appliedPromoCode === promo.code;
+                  const minOrder = (promo.min_order_paise || 0) / 100;
+                  const currentSubtotal = fallbackSubtotal / 100;
+                  const isLocked = minOrder > 0 && currentSubtotal < minOrder;
+                  const remainingForUnlock = Math.max(0, minOrder - currentSubtotal);
+
+                  return (
+                    <View key={promo.id} style={[styles.modalCouponCard, isApplied && styles.modalCouponCardApplied, isLocked && styles.modalCouponCardLocked]}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <Text allowFontScaling={false} style={styles.modalCouponCodeText}>{promo.code}</Text>
+                          {isApplied && (
+                            <View style={styles.modalAppliedBadge}>
+                              <CheckCircle2 size={11} color="#15803D" />
+                              <Text allowFontScaling={false} style={styles.modalAppliedBadgeText}>APPLIED</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text allowFontScaling={false} style={styles.modalCouponDescText}>
+                          {promo.discount_type === 'bogo'
+                            ? '🎁 Buy 1 Get 1 Free (BOGO Deal)'
+                            : promo.discount_type === 'percentage'
+                            ? `Get ${promo.discount_percent}% OFF up to ₹${(promo.max_discount_paise || 0) / 100}`
+                            : `Get ₹${(promo.discount_flat_paise || 0) / 100} Flat OFF`}
+                        </Text>
+                        {isLocked && (
+                          <Text allowFontScaling={false} style={styles.modalLockedHintText}>
+                            ⚠️ Add ₹{remainingForUnlock.toFixed(0)} more to unlock
+                          </Text>
+                        )}
+                      </View>
+
+                      <TouchableOpacity
+                        disabled={isLocked && !isApplied}
+                        onPress={() => {
+                          haptics.selection();
+                          if (isApplied) {
+                            setAppliedPromoCode('');
+                            setPromoCode('');
+                          } else {
+                            setAppliedPromoCode(promo.code);
+                            setPromoCode(promo.code);
+                          }
+                          setShowCouponModal(false);
+                        }}
+                        style={[styles.modalApplyBtn, isApplied && styles.modalRemoveBtn, isLocked && styles.modalApplyBtnDisabled]}
+                      >
+                        <Text allowFontScaling={false} style={[styles.modalApplyBtnText, isApplied && styles.modalRemoveBtnText]}>
+                          {isApplied ? 'REMOVE' : isLocked ? 'LOCKED' : 'APPLY'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1216,4 +1353,72 @@ const styles = StyleSheet.create({
   plusBannerText: { flex: 1 },
   plusBannerTitle: { fontSize: 13, fontFamily: tokens.typography.family.medium, color: '#4C1D95', lineHeight: 18 },
   plusBannerSub: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: '#7C3AED', marginTop: 2 },
+
+  // Free Delivery Progress Bar Styles
+  delProgressCard: {
+    backgroundColor: tokens.colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+  },
+  delProgressTrack: {
+    height: 6,
+    backgroundColor: tokens.colors.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  delProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalBackdrop: { flex: 1 },
+  modalContent: {
+    backgroundColor: tokens.colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: tokens.colors.border,
+  },
+  modalTitleText: { fontSize: 18, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textPrimary },
+  modalCloseBtn: { padding: 4, borderRadius: 12, backgroundColor: tokens.colors.background },
+
+  modalCouponCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justify: 'space-between',
+    backgroundColor: tokens.colors.background,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+  },
+  modalCouponCardApplied: { borderColor: '#22C55E', backgroundColor: '#F0FDF4' },
+  modalCouponCardLocked: { opacity: 0.6 },
+  modalCouponCodeText: { fontSize: 15, fontFamily: tokens.typography.family.extrabold, color: tokens.colors.textPrimary, letterSpacing: 0.5 },
+  modalAppliedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  modalAppliedBadgeText: { fontSize: 10, fontFamily: tokens.typography.family.extrabold, color: '#15803D' },
+  modalCouponDescText: { fontSize: 12, fontFamily: tokens.typography.family.medium, color: tokens.colors.textSecondary, marginTop: 2 },
+  modalLockedHintText: { fontSize: 11, fontFamily: tokens.typography.family.medium, color: tokens.colors.warning, marginTop: 4 },
+  modalApplyBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: tokens.colors.primary },
+  modalApplyBtnDisabled: { backgroundColor: tokens.colors.border },
+  modalApplyBtnText: { fontSize: 12, fontFamily: tokens.typography.family.extrabold, color: '#FFF' },
+  modalRemoveBtn: { backgroundColor: '#FEE2E2' },
+  modalRemoveBtnText: { color: '#DC2626' },
 });

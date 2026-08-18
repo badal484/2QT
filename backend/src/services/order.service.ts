@@ -47,8 +47,9 @@ export async function createPendingOrder(data: any) {
                 is_subscription_order, special_instructions,
                 delivery_location_lat, delivery_location_lng,
                 delivery_contact_name, delivery_contact_phone,
-                menu_offer_discount_paise, small_order_fee_paise, rider_tip_paise
-            ) VALUES ('2QT-' || LPAD(nextval('order_display_id_seq')::TEXT, 6, '0'), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+                menu_offer_discount_paise, small_order_fee_paise, rider_tip_paise,
+                applied_menu_offer_ids
+            ) VALUES ('2QT-' || LPAD(nextval('order_display_id_seq')::TEXT, 6, '0'), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
             RETURNING id, display_id
         `, [
             data.customerId, data.kitchenId, data.zoneId, data.addressId,
@@ -67,6 +68,7 @@ export async function createPendingOrder(data: any) {
             data.pricing.menuOfferDiscountPaise || 0,
             data.pricing.smallOrderFeePaise || 0,
             data.pricing.riderTipPaise || 0,
+            data.pricing.appliedMenuOfferIds || [],
         ]);
 
         const newOrder = orderRows[0];
@@ -267,17 +269,16 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
                 }
             }
 
-            // 7.5 Record Menu Offers redemptions if menu offer discount was applied
+            // 7.5 Record Menu Offers redemptions for specifically applied offer IDs
             if (order.menu_offer_discount_paise > 0) {
                 try {
-                    const { rows: activeOffers } = await client.query(
-                        `SELECT id FROM menu_offers WHERE is_active = true AND (zone_id IS NULL OR zone_id = $1)`,
-                        [order.zone_id]
-                    );
-                    for (const off of activeOffers) {
+                    const offerIdsToRecord: string[] = Array.isArray(order.applied_menu_offer_ids) && order.applied_menu_offer_ids.length > 0
+                        ? order.applied_menu_offer_ids
+                        : [];
+                    for (const offId of offerIdsToRecord) {
                         await client.query(
                             `INSERT INTO customer_offer_uses (customer_id, offer_id, order_id) VALUES ($1, $2, $3)`,
-                            [order.customer_id, off.id, order.id]
+                            [order.customer_id, offId, order.id]
                         );
                     }
                 } catch (e) {

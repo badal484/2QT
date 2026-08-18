@@ -58,7 +58,9 @@ export const MenuGridCard = React.memo(({ menuItem, kitchenPaused, navigation, d
         {menuItem.applied_offer && (
           <View style={styles.itemOfferBadge}>
             <Text allowFontScaling={false} style={styles.itemOfferBadgeText}>
-              {menuItem.applied_offer.discount_type === 'flat'
+              {menuItem.applied_offer.discount_type === 'bogo'
+                ? '🎁 BUY 1 GET 1 FREE'
+                : menuItem.applied_offer.discount_type === 'flat'
                 ? `₹${(menuItem.applied_offer.discount_flat_paise || 0) / 100} OFF`
                 : `${Math.round(parseFloat(menuItem.applied_offer.discount_percent || '0'))}% OFF`}
             </Text>

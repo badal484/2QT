@@ -346,7 +346,9 @@ export function MenuOffersTab() {
                   }
                 </div>
                 <div className="text-xs text-zinc-400 font-medium">
-                  {offer.discount_type === "percent" || offer.discount_type === "percentage"
+                  {offer.discount_type === "bogo"
+                    ? "🎁 Buy 1 Get 1 Free (BOGO)"
+                    : offer.discount_type === "percent" || offer.discount_type === "percentage"
                     ? `${offer.discount_percent}% off${offer.max_discount_paise ? ` · max ₹${offer.max_discount_paise / 100}` : ""}`
                     : `₹${(offer.discount_flat_paise / 100).toFixed(0)} flat off`}
                   {offer.end_time && ` · expires ${new Date(offer.end_time).toLocaleDateString()}`}
@@ -442,6 +444,7 @@ export function MenuOffersTab() {
               {sel("Discount Type", "discount_type", [
                 { value: "percentage", label: "Percentage (%)" },
                 { value: "flat", label: "Flat Amount (₹)" },
+                { value: "bogo", label: "Buy 1 Get 1 Free (BOGO)" },
               ])}
               {form.discount_type === "percent" || form.discount_type === "percentage"
                 ? f("Discount Percentage (%)", "discount_percent", "number", "e.g. 50")

@@ -51,6 +51,7 @@ export const calculatePricing = async ({
     // ── 3. Subtotal + per-item offer discount ───────────────────────────────────
     let subtotalPaise = 0;
     let menuOfferDiscountPaise = 0;
+    const appliedOfferIdsSet = new Set<string>();
 
     for (const cartItem of cartItems) {
         const item = itemMap.get(cartItem.menuItemId);
@@ -71,6 +72,7 @@ export const calculatePricing = async ({
 
         // Find best offer discount for this item
         let bestOfferDiscount = 0;
+        let bestOfferId: string | null = null;
         for (const offer of menuOffers) {
             // target_ids (multi-select array) takes priority over single target_id
             const itemTargetIds: string[] = Array.isArray(offer.target_ids) ? offer.target_ids : [];
@@ -160,25 +162,41 @@ export const calculatePricing = async ({
                 }
             }
 
-            let discount = 0;
-            if (offer.discount_type === 'flat') {
-                discount = offer.discount_flat_paise || 0;
+            let offerDiscountForLine = 0;
+            if (offer.discount_type === 'bogo') {
+                const eligibleQty = offer.max_items_per_order
+                    ? Math.min(cartItem.quantity, offer.max_items_per_order)
+                    : cartItem.quantity;
+                const freeCount = Math.floor(eligibleQty / 2);
+                offerDiscountForLine = freeCount * itemPrice;
+                if (offer.max_discount_paise && offerDiscountForLine > offer.max_discount_paise) {
+                    offerDiscountForLine = offer.max_discount_paise;
+                }
             } else {
-                discount = Math.floor((itemPrice * (parseFloat(offer.discount_percent || '0') || 0)) / 100);
-                if (offer.max_discount_paise) discount = Math.min(discount, offer.max_discount_paise);
-            }
-            // Cap: discount cannot exceed item price
-            discount = Math.min(discount, itemPrice);
+                let discount = 0;
+                if (offer.discount_type === 'flat') {
+                    discount = offer.discount_flat_paise || 0;
+                } else {
+                    discount = Math.floor((itemPrice * (parseFloat(offer.discount_percent || '0') || 0)) / 100);
+                    if (offer.max_discount_paise) discount = Math.min(discount, offer.max_discount_paise);
+                }
+                // Cap: discount cannot exceed item price
+                discount = Math.min(discount, itemPrice);
 
-            // Item quantity cap per order
-            const eligibleQty = offer.max_items_per_order
-                ? Math.min(cartItem.quantity, offer.max_items_per_order)
-                : cartItem.quantity;
-            const offerDiscountForLine = discount * eligibleQty;
+                const eligibleQty = offer.max_items_per_order
+                    ? Math.min(cartItem.quantity, offer.max_items_per_order)
+                    : cartItem.quantity;
+                offerDiscountForLine = discount * eligibleQty;
+            }
 
             if (offerDiscountForLine > (bestOfferDiscount * cartItem.quantity)) {
                 bestOfferDiscount = Math.floor(offerDiscountForLine / cartItem.quantity);
+                bestOfferId = offer.id;
             }
+        }
+
+        if (bestOfferId && bestOfferDiscount > 0) {
+            appliedOfferIdsSet.add(bestOfferId);
         }
 
         subtotalPaise += itemPrice * cartItem.quantity;
@@ -450,5 +468,6 @@ export const calculatePricing = async ({
         gatewayAmountPaise,
         promoCodeId,
         riderTipPaise,
+        appliedMenuOfferIds: Array.from(appliedOfferIdsSet),
     };
 };
