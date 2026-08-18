@@ -45,6 +45,15 @@ function BannerForm({
   saveLabel: string;
 }) {
   const inp = "w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary";
+
+  // Local text buffer for the duration field so the user can freely clear/retype/enter
+  // decimals — a fully round-tripped `value={ms/1000}` snaps back to "0" on every
+  // keystroke that isn't yet a valid number (e.g. an empty field or a trailing ".").
+  const [durationText, setDurationText] = useState(String((data.slide_duration_ms ?? 3000) / 1000));
+  useEffect(() => {
+    setDurationText(String((data.slide_duration_ms ?? 3000) / 1000));
+  }, [(data as any).id]);
+
   return (
     <div className="bg-[#11111a] border border-white/[0.05] rounded-3xl p-6 shadow-sm mb-8 space-y-4">
       <div className="flex items-center justify-between mb-4">
@@ -130,8 +139,17 @@ function BannerForm({
             type="number"
             min={1}
             step={0.5}
-            value={data.slide_duration_ms / 1000}
-            onChange={e => onChange({ ...data, slide_duration_ms: Math.round(Number(e.target.value) * 1000) })}
+            value={durationText}
+            onChange={e => {
+              const text = e.target.value;
+              setDurationText(text);
+              const num = parseFloat(text);
+              if (!isNaN(num) && num > 0) onChange({ ...data, slide_duration_ms: Math.round(num * 1000) });
+            }}
+            onBlur={() => {
+              const num = parseFloat(durationText);
+              if (isNaN(num) || num <= 0) setDurationText(String((data.slide_duration_ms ?? 3000) / 1000));
+            }}
             className={inp}
             placeholder="3"
           />
