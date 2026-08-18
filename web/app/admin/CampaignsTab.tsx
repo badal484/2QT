@@ -79,45 +79,74 @@ function discountLabel(c: Campaign) {
   return "—";
 }
 
+const toLocalInputFormat = (dateStr?: string | null) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return "";
+  }
+};
+
+const formatIso = (val: string) => {
+  if (!val) return null;
+  try {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  } catch {
+    return null;
+  }
+};
+
 function EditModal({ campaign, onClose, onSaved }: { campaign: Campaign; onClose: () => void; onSaved: () => void }) {
+  const [zones, setZones] = useState<any[]>([]);
   const [form, setForm] = useState({
     name: campaign.name,
     discount_type: campaign.discount_type,
     discount_percent: campaign.discount_percent,
-    discount_flat_paise: campaign.discount_flat_paise || 0,
-    max_discount_paise: campaign.max_discount_paise || 0,
-    min_order_paise: campaign.min_order_paise || 0,
+    discount_flat_rupees: (campaign.discount_flat_paise || 0) / 100,
+    max_discount_rupees: campaign.max_discount_paise ? campaign.max_discount_paise / 100 : "",
+    min_order_rupees: (campaign.min_order_paise || 0) / 100,
     winback_days: campaign.winback_days || 7,
-    flash_start: campaign.flash_start ? campaign.flash_start.slice(0,16) : "",
-    flash_end: campaign.flash_end ? campaign.flash_end.slice(0,16) : "",
+    flash_start: toLocalInputFormat(campaign.flash_start),
+    flash_end: toLocalInputFormat(campaign.flash_end),
     happy_hour_start: campaign.happy_hour_start || "15:00",
     happy_hour_end: campaign.happy_hour_end || "18:00",
-    // Audience
+    zone_id: (campaign as any).zone_id || "",
     audience_segment: campaign.audience_segment ?? "",
-    // Schedule
-    schedule_start: campaign.schedule_start ? campaign.schedule_start.slice(0,16) : "",
-    schedule_end: campaign.schedule_end ? campaign.schedule_end.slice(0,16) : "",
-    // Notification
+    schedule_start: toLocalInputFormat(campaign.schedule_start),
+    schedule_end: toLocalInputFormat(campaign.schedule_end),
     notif_template_type: campaign.notif_template_type ?? "",
   });
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get("/admin/zones").then(res => setZones(res?.zones ?? [])).catch(() => {});
+  }, []);
 
   const save = async () => {
     setSaving(true);
     try {
       await api.patch(`/campaigns/${campaign.id}`, {
-        ...form,
+        name: form.name,
+        discount_type: form.discount_type,
         discount_percent: Number(form.discount_percent),
-        discount_flat_paise: Number(form.discount_flat_paise),
-        max_discount_paise: Number(form.max_discount_paise) || null,
-        min_order_paise: Number(form.min_order_paise),
+        discount_flat_paise: Math.round(Number(form.discount_flat_rupees || 0) * 100),
+        max_discount_paise: form.max_discount_rupees ? Math.round(Number(form.max_discount_rupees) * 100) : null,
+        min_order_paise: Math.round(Number(form.min_order_rupees || 0) * 100),
         winback_days: Number(form.winback_days),
-        flash_start: form.flash_start || null,
-        flash_end: form.flash_end || null,
+        flash_start: formatIso(form.flash_start),
+        flash_end: formatIso(form.flash_end),
+        happy_hour_start: form.happy_hour_start || null,
+        happy_hour_end: form.happy_hour_end || null,
+        zone_id: form.zone_id || null,
         audience_type: form.audience_segment ? "segment" : "all",
         audience_segment: form.audience_segment || null,
-        schedule_start: form.schedule_start || null,
-        schedule_end: form.schedule_end || null,
+        schedule_start: formatIso(form.schedule_start),
+        schedule_end: formatIso(form.schedule_end),
         notif_template_type: form.notif_template_type || null,
       });
       toast.success("Campaign saved — users see updated offer within 30 seconds");
@@ -142,7 +171,7 @@ function EditModal({ campaign, onClose, onSaved }: { campaign: Campaign; onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="font-black text-lg">Edit — {campaign.name}</h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-zinc-100"><X size={18}/></button>
@@ -164,16 +193,16 @@ function EditModal({ campaign, onClose, onSaved }: { campaign: Campaign; onClose
         </div>
 
         {form.discount_type === "percentage" && f("discount_percent", "Discount %")}
-        {form.discount_type === "flat" && f("discount_flat_paise", "Flat discount (paise)", "number", "e.g. 3000 = ₹30")}
-        {f("max_discount_paise", "Max discount cap (paise, 0 = no cap)", "number", "e.g. 6000 = ₹60")}
-        {f("min_order_paise", "Min order value (paise)", "number", "e.g. 10000 = ₹100")}
+        {form.discount_type === "flat" && f("discount_flat_rupees", "Flat discount (₹)", "number", "e.g. 30 = ₹30")}
+        {f("max_discount_rupees", "Max discount cap (₹, blank = no cap)", "number", "e.g. 60 = ₹60")}
+        {f("min_order_rupees", "Min order value (₹)", "number", "e.g. 100 = ₹100")}
 
         {campaign.type === "winback" && f("winback_days", "Inactive days before trigger")}
         {campaign.type === "flash_sale" && (
-          <>
-            {f("flash_start", "Flash sale start", "datetime-local")}
-            {f("flash_end", "Flash sale end", "datetime-local")}
-          </>
+          <div className="grid grid-cols-2 gap-3">
+            {f("flash_start", "Flash start", "datetime-local")}
+            {f("flash_end", "Flash end", "datetime-local")}
+          </div>
         )}
         {campaign.type === "happy_hour" && (
           <div className="grid grid-cols-2 gap-3">
@@ -181,6 +210,22 @@ function EditModal({ campaign, onClose, onSaved }: { campaign: Campaign; onClose
             {f("happy_hour_end", "End time", "time")}
           </div>
         )}
+
+        <div>
+          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Target Zone</label>
+          <select
+            className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold text-zinc-800 bg-white"
+            value={form.zone_id || ""}
+            onChange={e => setForm(p => ({ ...p, zone_id: e.target.value }))}
+          >
+            <option value="">All Zones (Global)</option>
+            {zones.map((z: any) => (
+              <option key={z.id} value={z.id}>
+                {z.name} — {z.city}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* ── Audience ── */}
         <div className="border-t border-zinc-100 pt-4">
@@ -367,15 +412,15 @@ const EMPTY_CAMPAIGN = {
   name: "",
   type: "flash_sale",
   discount_type: "percentage",
-  discount_percent: "0",
-  discount_flat_paise: "0",
-  max_discount_paise: "",
-  min_order_paise: "0",
+  discount_percent: "20",
+  discount_flat_rupees: "50",
+  max_discount_rupees: "200",
+  min_order_rupees: "100",
   winback_days: "7",
   flash_start: "",
   flash_end: "",
-  happy_hour_start: "",
-  happy_hour_end: "",
+  happy_hour_start: "15:00",
+  happy_hour_end: "18:00",
   happy_hour_days: "mon,tue,wed,thu,fri,sat,sun",
   zone_id: "",
   audience_segment: "",
@@ -398,25 +443,27 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
     setSaving(true);
     try {
       await api.post("/campaigns", {
-        ...form,
-        discount_percent: Number(form.discount_percent),
-        discount_flat_paise: Number(form.discount_flat_paise),
-        max_discount_paise: Number(form.max_discount_paise) || null,
-        min_order_paise: Number(form.min_order_paise),
-        winback_days: Number(form.winback_days),
-        flash_start: form.flash_start || null,
-        flash_end: form.flash_end || null,
+        name: form.name,
+        type: form.type,
+        discount_type: form.discount_type,
+        discount_percent: Number(form.discount_percent || 0),
+        discount_flat_paise: Math.round(Number(form.discount_flat_rupees || 0) * 100),
+        max_discount_paise: form.max_discount_rupees ? Math.round(Number(form.max_discount_rupees) * 100) : null,
+        min_order_paise: Math.round(Number(form.min_order_rupees || 0) * 100),
+        winback_days: Number(form.winback_days || 7),
+        flash_start: formatIso(form.flash_start),
+        flash_end: formatIso(form.flash_end),
         happy_hour_start: form.happy_hour_start || null,
         happy_hour_end: form.happy_hour_end || null,
         happy_hour_days: form.happy_hour_days ? form.happy_hour_days.split(",").map(d => d.trim()) : null,
         zone_id: form.zone_id || null,
         audience_type: form.audience_segment ? "segment" : "all",
         audience_segment: form.audience_segment || null,
-        schedule_start: form.schedule_start || null,
-        schedule_end: form.schedule_end || null,
-        is_active: false,
+        schedule_start: formatIso(form.schedule_start),
+        schedule_end: formatIso(form.schedule_end),
+        is_active: true,
       });
-      toast.success("Campaign created — toggle it on when ready");
+      toast.success("Campaign created & enabled successfully!");
       onCreated();
       onClose();
     } catch { toast.error("Failed to create campaign"); }
@@ -459,26 +506,29 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
           <select className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold"
             value={form.discount_type} onChange={e => set("discount_type", e.target.value)}>
             <option value="percentage">Percentage off subtotal</option>
-            <option value="flat">Flat amount off</option>
+            <option value="flat">Flat amount off (₹)</option>
             <option value="free_delivery">Free delivery</option>
           </select>
         </div>
 
         {form.discount_type === "percentage" && inp("Discount %", "discount_percent", "number", "10")}
-        {form.discount_type === "flat" && inp("Flat discount (paise)", "discount_flat_paise", "number", "2000")}
-        {inp("Max discount (paise, blank = no cap)", "max_discount_paise", "number", "5000")}
-        {inp("Min order (paise)", "min_order_paise", "number", "0")}
+        {form.discount_type === "flat" && inp("Flat discount (₹)", "discount_flat_rupees", "number", "50")}
+        {inp("Max discount cap (₹, blank = no cap)", "max_discount_rupees", "number", "200")}
+        {inp("Min order value (₹)", "min_order_rupees", "number", "100")}
 
-        {form.type === "flash_sale" && <>
-          {inp("Flash start", "flash_start", "datetime-local")}
-          {inp("Flash end", "flash_end", "datetime-local")}
-        </>}
+        {form.type === "flash_sale" && (
+          <div className="grid grid-cols-2 gap-3">
+            {inp("Flash start", "flash_start", "datetime-local")}
+            {inp("Flash end", "flash_end", "datetime-local")}
+          </div>
+        )}
 
-        {form.type === "happy_hour" && <>
-          {inp("Start time", "happy_hour_start", "time")}
-          {inp("End time", "happy_hour_end", "time")}
-          {inp("Days (comma-sep: mon,tue,...)", "happy_hour_days", "text", "mon,tue,wed,thu,fri,sat,sun")}
-        </>}
+        {form.type === "happy_hour" && (
+          <div className="grid grid-cols-2 gap-3">
+            {inp("Start time", "happy_hour_start", "time")}
+            {inp("End time", "happy_hour_end", "time")}
+          </div>
+        )}
 
         {form.type === "winback" && inp("Inactive days threshold", "winback_days", "number", "7")}
 

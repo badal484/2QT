@@ -95,3 +95,11 @@ export const requireRole = (...roles: string[]) => {
     };
 };
 
+export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        return next();
+    }
+    return authenticate(req, res, next);
+};
+

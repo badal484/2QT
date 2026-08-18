@@ -329,10 +329,19 @@ export const calculatePricing = async ({
     let campaignFreeDelivery = false;
 
     {
-        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-        const nowTs = new Date();
-        const todayDay = dayNames[nowTs.getDay()];
-        const timeNow = `${nowTs.getHours().toString().padStart(2, '0')}:${nowTs.getMinutes().toString().padStart(2, '0')}`;
+        const istFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour12: false,
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+        const parts = istFormatter.formatToParts(new Date());
+        const weekday = parts.find(p => p.type === 'weekday')?.value?.toLowerCase()?.slice(0, 3) || 'mon';
+        const hour = parts.find(p => p.type === 'hour')?.value?.padStart(2, '0') || '00';
+        const minute = parts.find(p => p.type === 'minute')?.value?.padStart(2, '0') || '00';
+        const timeNow = `${hour}:${minute}`;
+        const todayDay = weekday;
 
         const { rows: campaigns } = await query(
             `SELECT id, type, discount_type, discount_percent, discount_flat_paise,
@@ -341,11 +350,11 @@ export const calculatePricing = async ({
              WHERE is_active = true
              AND (zone_id IS NULL OR zone_id = $1)
              AND (
-                 (type = 'flash_sale' AND flash_start <= NOW() AND flash_end >= NOW())
+                 (type = 'flash_sale' AND (flash_start IS NULL OR flash_start <= NOW()) AND (flash_end IS NULL OR flash_end >= NOW()))
                  OR (type = 'happy_hour'
-                     AND happy_hour_start::time <= $2::time
-                     AND happy_hour_end::time >= $2::time
-                     AND $3 = ANY(happy_hour_days))
+                     AND (happy_hour_start IS NULL OR happy_hour_start::time <= $2::time)
+                     AND (happy_hour_end IS NULL OR happy_hour_end::time >= $2::time)
+                     AND (happy_hour_days IS NULL OR $3 = ANY(happy_hour_days)))
                  OR (type NOT IN ('flash_sale', 'happy_hour'))
              )`,
             [zoneId, timeNow, todayDay]
