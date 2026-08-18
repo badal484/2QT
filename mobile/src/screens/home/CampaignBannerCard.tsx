@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Zap, Clock, Sparkles, Flame, Gift, ArrowRight } from 'lucide-react-native';
+import { Clock, Sparkles, Flame, Gift, ArrowRight, CheckCircle2 } from 'lucide-react-native';
 import { tokens } from '../../theme/tokens';
 import { BouncingButton } from '../../components/ui/BouncingButton';
 
@@ -47,14 +47,14 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
     switch (campaign.type) {
       case 'flash_sale':
         return {
-          gradient: ['#FF5722', '#F04A0D', '#C2410C', '#991B1B'],
+          gradient: ['#FF5A0A', '#F04A0D', '#B8320C', '#8E2005'],
           badgeBg: 'rgba(0, 0, 0, 0.28)',
-          badgeBorder: '#FFD700',
-          badgeText: '#FFD700',
+          badgeBorder: '#FFB000',
+          badgeText: '#FFB000',
           badgeLabel: 'FLASH SALE',
           icon: Flame,
-          accent: '#FFD700',
-          foodImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&auto=format&fit=crop&q=80',
+          accent: '#FFB000',
+          foodImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=80',
         };
       case 'happy_hour':
         return {
@@ -64,7 +64,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           badgeLabel: 'HAPPY HOUR',
           icon: Clock,
           accent: '#A855F7',
-          foodImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop&q=80',
+          foodImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80',
         };
       case 'welcome':
       case 'winback':
@@ -75,7 +75,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           badgeLabel: 'SPECIAL OFFER',
           icon: Gift,
           accent: '#10B981',
-          foodImage: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop&q=80',
+          foodImage: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80',
         };
       default:
         return {
@@ -85,7 +85,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           badgeLabel: 'LIMITED DEAL',
           icon: Sparkles,
           accent: '#F59E0B',
-          foodImage: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=400&auto=format&fit=crop&q=80',
+          foodImage: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=500&auto=format&fit=crop&q=80',
         };
     }
   };
@@ -100,7 +100,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
       return `FLAT ₹${amt} OFF`;
     }
     const pct = parseFloat(String(campaign.discount_percent || 0));
-    return `${pct}% OFF ON EVERYTHING`;
+    return `${pct}% OFF ON\nEVERYTHING`;
   };
 
   const minOrderRupees = campaign.min_order_paise ? Math.round(campaign.min_order_paise / 100) : 0;
@@ -117,86 +117,87 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
         {/* Glossy top sheen line */}
         <View style={styles.topSheen} pointerEvents="none" />
 
-        {/* Ambient background glow ornaments */}
-        <View style={styles.ambientGlow1} pointerEvents="none" />
-        <View style={styles.ambientGlow2} pointerEvents="none" />
+        {/* Dark depth shadow behind text */}
+        <View style={styles.textBackdropShadow} pointerEvents="none" />
 
-        {/* Top Header Row: Badge & Timer */}
-        <View style={styles.topRow}>
-          <View style={[styles.badge, theme.badgeBorder ? { borderColor: theme.badgeBorder, backgroundColor: theme.badgeBg } : null]}>
-            <Icon size={12} color={theme.accent || '#FFF'} style={{ marginRight: 4 }} />
-            <Text allowFontScaling={false} style={[styles.badgeText, theme.badgeText ? { color: theme.badgeText } : null]}>
-              {theme.badgeLabel}
-            </Text>
-          </View>
+        {/* Radial amber glow behind hero food image */}
+        <View style={styles.foodRadialGlow} pointerEvents="none" />
 
-          {timeLeft ? (
-            <View style={styles.timerBadge}>
-              <Text allowFontScaling={false} style={styles.timerLabel}>ENDS IN </Text>
-              <View style={styles.timeBox}>
-                <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.hours}</Text>
-              </View>
-              <Text allowFontScaling={false} style={styles.timerColon}>:</Text>
-              <View style={styles.timeBox}>
-                <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.minutes}</Text>
-              </View>
-              <Text allowFontScaling={false} style={styles.timerColon}>:</Text>
-              <View style={styles.timeBox}>
-                <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.seconds}</Text>
-              </View>
-            </View>
-          ) : campaign.happy_hour_start ? (
-            <View style={styles.timerBadge}>
-              <Clock size={11} color="#FFF" style={{ marginRight: 4 }} />
-              <Text allowFontScaling={false} style={styles.timerValue}>
-                {campaign.happy_hour_start.slice(0, 5)} – {campaign.happy_hour_end?.slice(0, 5)}
+        {/* Hero Food Photograph (Integrated on Right side, extending towards edges, soft glow edge) */}
+        <View style={styles.heroFoodWrapper} pointerEvents="none">
+          <Image
+            source={{ uri: campaign.image_url || campaign.photo_url || theme.foodImage }}
+            style={styles.heroFoodImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Content Container */}
+        <View style={styles.contentContainer}>
+          {/* Top Bar: Compact Badge + Timer */}
+          <View style={styles.topRow}>
+            <View style={[styles.badge, theme.badgeBorder ? { borderColor: theme.badgeBorder, backgroundColor: theme.badgeBg } : null]}>
+              <Icon size={12} color={theme.accent || '#FFF'} style={{ marginRight: 4 }} />
+              <Text allowFontScaling={false} style={[styles.badgeText, theme.badgeText ? { color: theme.badgeText } : null]}>
+                {theme.badgeLabel}
               </Text>
             </View>
-          ) : null}
-        </View>
 
-        {/* Split Content Row: Left Info vs Right Framed Image */}
-        <View style={styles.splitRow}>
-          {/* Left Column: Headline, Subtitle, CTA */}
-          <View style={styles.leftCol}>
-            <Text allowFontScaling={false} style={styles.headline}>
-              {discountHeadline()}
-            </Text>
-            <Text allowFontScaling={false} style={styles.campaignName} numberOfLines={1}>
-              {campaign.name}
-            </Text>
-
-            <View style={styles.ctaWrapper}>
-              <View style={styles.shopNowPill}>
-                <Text allowFontScaling={false} style={styles.shopNowText}>Order Now</Text>
-                <ArrowRight size={13} color="#B8320C" />
+            {timeLeft ? (
+              <View style={styles.timerBadge}>
+                <Text allowFontScaling={false} style={styles.timerLabel}>ENDS IN </Text>
+                <View style={styles.timeBox}>
+                  <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.hours}</Text>
+                </View>
+                <Text allowFontScaling={false} style={styles.timerColon}>:</Text>
+                <View style={styles.timeBox}>
+                  <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.minutes}</Text>
+                </View>
+                <Text allowFontScaling={false} style={styles.timerColon}>:</Text>
+                <View style={styles.timeBox}>
+                  <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.seconds}</Text>
+                </View>
               </View>
-            </View>
+            ) : campaign.happy_hour_start ? (
+              <View style={styles.timerBadge}>
+                <Clock size={11} color="#FFF" style={{ marginRight: 4 }} />
+                <Text allowFontScaling={false} style={styles.timerValue}>
+                  {campaign.happy_hour_start.slice(0, 5)} – {campaign.happy_hour_end?.slice(0, 5)}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* Right Column: Framed 100% Opaque Food Image Box */}
-          <View style={styles.rightCol}>
-            <View style={styles.foodAuraGlow} pointerEvents="none" />
-            <View style={styles.framedFoodBox}>
-              <Image
-                source={{ uri: campaign.image_url || campaign.photo_url || theme.foodImage }}
-                style={styles.framedFoodImage}
-                resizeMode="cover"
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Footer Row */}
-        <View style={styles.footerRow}>
-          <Text allowFontScaling={false} style={styles.footerText} numberOfLines={1}>
-            {minOrderRupees > 0 ? `Min ₹${minOrderRupees}` : 'No Min'}
-            {maxDiscountRupees > 0 ? ` • Max discount ₹${maxDiscountRupees}` : ''}
+          {/* Headline: 20% OFF ON EVERYTHING */}
+          <Text allowFontScaling={false} style={styles.headline}>
+            {discountHeadline()}
           </Text>
-          <View style={styles.autoAppliedBadge}>
-            <Zap size={11} color="#FFF" style={{ marginRight: 3 }} />
-            <Text allowFontScaling={false} style={styles.autoAppliedText}>
-              Auto-applied
+
+          {/* Subtitle */}
+          <Text allowFontScaling={false} style={styles.campaignName} numberOfLines={1}>
+            {campaign.name}
+          </Text>
+
+          {/* CTA & Auto-applied Row */}
+          <View style={styles.bottomRow}>
+            <View style={styles.shopNowPill}>
+              <Text allowFontScaling={false} style={styles.shopNowText}>Order Now</Text>
+              <ArrowRight size={13} color="#B8320C" />
+            </View>
+
+            <View style={styles.autoAppliedBadge}>
+              <CheckCircle2 size={11} color="#FFB000" style={{ marginRight: 4 }} />
+              <Text allowFontScaling={false} style={styles.autoAppliedText}>
+                Auto-applied
+              </Text>
+            </View>
+          </View>
+
+          {/* Footer Info Row */}
+          <View style={styles.footerRow}>
+            <Text allowFontScaling={false} style={styles.footerText} numberOfLines={1}>
+              {minOrderRupees > 0 ? `Min ₹${minOrderRupees}` : 'No Min'}
+              {maxDiscountRupees > 0 ? `  |  Max discount ₹${maxDiscountRupees}` : ''}
             </Text>
           </View>
         </View>
@@ -209,49 +210,87 @@ const styles = StyleSheet.create({
   outerContainer: {
     marginHorizontal: tokens.spacing.lg,
     marginVertical: tokens.spacing.sm,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     shadowColor: '#B8320C',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 6,
   },
   gradientCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 20,
+    borderRadius: 22,
     position: 'relative',
     overflow: 'hidden',
+    minHeight: 165,
   },
-  ambientGlow1: {
+  topSheen: {
     position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(255, 176, 0, 0.22)',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    zIndex: 3,
   },
-  ambientGlow2: {
+  textBackdropShadow: {
     position: 'absolute',
-    bottom: -50,
-    left: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: '68%',
+    backgroundColor: 'rgba(15, 5, 2, 0.15)',
+    zIndex: 1,
+  },
+  foodRadialGlow: {
+    position: 'absolute',
+    top: -20,
+    right: -25,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: 'rgba(255, 176, 0, 0.25)',
+    zIndex: 1,
+  },
+  heroFoodWrapper: {
+    position: 'absolute',
+    right: -15,
+    top: -10,
+    bottom: -10,
+    width: 155,
+    height: 185,
+    borderRadius: 77.5,
+    overflow: 'hidden',
+    zIndex: 2,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 176, 0, 0.35)',
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  heroFoodImage: {
+    width: '100%',
+    height: '100%',
+  },
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    zIndex: 4,
+    position: 'relative',
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
+    width: '100%',
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -268,12 +307,12 @@ const styles = StyleSheet.create({
   timerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.26)',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   timerLabel: {
     color: 'rgba(255, 232, 222, 0.85)',
@@ -307,119 +346,73 @@ const styles = StyleSheet.create({
     fontFamily: tokens.typography.family.extrabold,
     letterSpacing: 0.5,
   },
-  splitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginVertical: 2,
-  },
-  leftCol: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  topSheen: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  rightCol: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  foodAuraGlow: {
-    position: 'absolute',
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: 'rgba(255, 215, 0, 0.35)',
-    top: -9,
-    left: -9,
-  },
-  framedFoodBox: {
-    width: 92,
-    height: 92,
-    borderRadius: 18,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.55)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
-    backgroundColor: '#000',
-  },
-  framedFoodImage: {
-    width: '100%',
-    height: '100%',
-  },
   headline: {
     color: '#FFFFFF',
-    fontSize: 19,
+    fontSize: 22,
     fontFamily: tokens.typography.family.black,
-    letterSpacing: -0.3,
-    lineHeight: 22,
+    letterSpacing: -0.4,
+    lineHeight: 25,
+    maxWidth: '60%',
   },
   campaignName: {
     color: '#FFE8DE',
     fontSize: 12,
     fontFamily: tokens.typography.family.medium,
-    marginTop: 2,
-    marginBottom: 8,
+    marginTop: 3,
+    marginBottom: 10,
+    maxWidth: '60%',
   },
-  ctaWrapper: {
+  bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+    marginBottom: 6,
   },
   shopNowPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
     gap: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   shopNowText: {
     color: '#B8320C',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: tokens.typography.family.extrabold,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  footerText: {
-    color: '#FFE8DE',
-    fontSize: 10,
-    fontFamily: tokens.typography.family.bold,
-    letterSpacing: 0.3,
-    flex: 1,
-    marginRight: 8,
   },
   autoAppliedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginRight: 10,
   },
   autoAppliedText: {
     color: '#FFE8DE',
     fontSize: 10,
     fontFamily: tokens.typography.family.bold,
     letterSpacing: 0.2,
+  },
+  footerRow: {
+    marginTop: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  footerText: {
+    color: '#FFE8DE',
+    fontSize: 10,
+    fontFamily: tokens.typography.family.bold,
+    letterSpacing: 0.3,
   },
 });
