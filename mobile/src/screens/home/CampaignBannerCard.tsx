@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Zap, Clock, Sparkles, Flame, Gift, ArrowRight } from 'lucide-react-native';
 import { tokens } from '../../theme/tokens';
@@ -47,18 +47,18 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
     switch (campaign.type) {
       case 'flash_sale':
         return {
-          gradient: ['#FF512F', '#DD2476'],
-          badgeBg: '#FFF1F2',
-          badgeText: '#E11D48',
+          gradient: ['#FF1744', '#E11D48', '#BE123C'],
+          badgeBg: 'rgba(255, 255, 255, 0.22)',
+          badgeText: '#FFFFFF',
           badgeLabel: 'FLASH SALE',
           icon: Flame,
           accent: '#FF4D4D',
         };
       case 'happy_hour':
         return {
-          gradient: ['#6B21A8', '#9333EA'],
-          badgeBg: '#F3E8FF',
-          badgeText: '#7E22CE',
+          gradient: ['#7C3AED', '#6D28D9', '#4C1D95'],
+          badgeBg: 'rgba(255, 255, 255, 0.22)',
+          badgeText: '#FFFFFF',
           badgeLabel: 'HAPPY HOUR',
           icon: Clock,
           accent: '#A855F7',
@@ -66,18 +66,18 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
       case 'welcome':
       case 'winback':
         return {
-          gradient: ['#059669', '#10B981'],
-          badgeBg: '#ECFDF5',
-          badgeText: '#047857',
+          gradient: ['#059669', '#047857', '#064E3B'],
+          badgeBg: 'rgba(255, 255, 255, 0.22)',
+          badgeText: '#FFFFFF',
           badgeLabel: 'SPECIAL OFFER',
           icon: Gift,
           accent: '#10B981',
         };
       default:
         return {
-          gradient: ['#D97706', '#F59E0B'],
-          badgeBg: '#FEF3C7',
-          badgeText: '#B45309',
+          gradient: ['#EA580C', '#C2410C', '#9A3412'],
+          badgeBg: 'rgba(255, 255, 255, 0.22)',
+          badgeText: '#FFFFFF',
           badgeLabel: 'LIMITED DEAL',
           icon: Sparkles,
           accent: '#F59E0B',
@@ -102,17 +102,21 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
   const maxDiscountRupees = campaign.max_discount_paise ? Math.round(campaign.max_discount_paise / 100) : 0;
 
   return (
-    <BouncingButton activeOpacity={0.92} onPress={onPress} style={styles.outerContainer}>
+    <BouncingButton activeOpacity={0.94} onPress={onPress} style={styles.outerContainer}>
       <LinearGradient
         colors={theme.gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradientCard}
       >
-        {/* Top bar: Badge + Live Timer or Window */}
+        {/* Ambient background glow ornaments */}
+        <View style={styles.ambientGlow1} pointerEvents="none" />
+        <View style={styles.ambientGlow2} pointerEvents="none" />
+
+        {/* Top bar: Badge + Live Glass Timer */}
         <View style={styles.topRow}>
-          <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
-            <Icon size={13} color="#FFF" style={{ marginRight: 4 }} />
+          <View style={styles.badge}>
+            <Icon size={12} color="#FFF" style={{ marginRight: 4 }} />
             <Text allowFontScaling={false} style={styles.badgeText}>
               {theme.badgeLabel}
             </Text>
@@ -121,12 +125,21 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           {timeLeft ? (
             <View style={styles.timerBadge}>
               <Text allowFontScaling={false} style={styles.timerLabel}>ENDS IN </Text>
-              <Text allowFontScaling={false} style={styles.timerValue}>
-                {timeLeft.hours}h : {timeLeft.minutes}m : {timeLeft.seconds}s
-              </Text>
+              <View style={styles.timeBox}>
+                <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.hours}</Text>
+              </View>
+              <Text allowFontScaling={false} style={styles.timerColon}>:</Text>
+              <View style={styles.timeBox}>
+                <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.minutes}</Text>
+              </View>
+              <Text allowFontScaling={false} style={styles.timerColon}>:</Text>
+              <View style={styles.timeBox}>
+                <Text allowFontScaling={false} style={styles.timeBoxText}>{timeLeft.seconds}</Text>
+              </View>
             </View>
           ) : campaign.happy_hour_start ? (
             <View style={styles.timerBadge}>
+              <Clock size={11} color="#FFF" style={{ marginRight: 4 }} />
               <Text allowFontScaling={false} style={styles.timerValue}>
                 {campaign.happy_hour_start.slice(0, 5)} – {campaign.happy_hour_end?.slice(0, 5)}
               </Text>
@@ -136,7 +149,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
 
         {/* Headline & Campaign Name */}
         <View style={styles.bodyRow}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
             <Text allowFontScaling={false} style={styles.headline}>
               {discountHeadline()}
             </Text>
@@ -146,19 +159,22 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           </View>
           <View style={styles.shopNowPill}>
             <Text allowFontScaling={false} style={styles.shopNowText}>Order Now</Text>
-            <ArrowRight size={13} color="#FFF" />
+            <ArrowRight size={13} color="#0F172A" />
           </View>
         </View>
 
         {/* Footer info: Min order / auto-applied */}
         <View style={styles.footerRow}>
           <Text allowFontScaling={false} style={styles.footerText}>
-            {minOrderRupees > 0 ? `Min order ₹${minOrderRupees}` : 'No minimum order'}
-            {maxDiscountRupees > 0 ? ` · Max discount ₹${maxDiscountRupees}` : ''}
+            {minOrderRupees > 0 ? `MIN ORDER ₹${minOrderRupees}` : 'NO MIN ORDER'}
+            {maxDiscountRupees > 0 ? `  •  MAX SAVINGS ₹${maxDiscountRupees}` : ''}
           </Text>
-          <Text allowFontScaling={false} style={styles.autoAppliedText}>
-            ⚡ Auto-applied in Cart
-          </Text>
+          <View style={styles.autoAppliedBadge}>
+            <Zap size={11} color="#FFF" style={{ marginRight: 3 }} />
+            <Text allowFontScaling={false} style={styles.autoAppliedText}>
+              Auto-applied in cart
+            </Text>
+          </View>
         </View>
       </LinearGradient>
     </BouncingButton>
@@ -171,12 +187,36 @@ const styles = StyleSheet.create({
     marginVertical: tokens.spacing.sm,
     borderRadius: 20,
     overflow: 'hidden',
-    ...tokens.shadows.medium,
+    shadowColor: '#E11D48',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
   gradientCard: {
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 20,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  ambientGlow1: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  ambientGlow2: {
+    position: 'absolute',
+    bottom: -50,
+    left: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(0, 0, 0, 0.12)',
   },
   topRow: {
     flexDirection: 'row',
@@ -187,13 +227,16 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   badgeText: {
     color: '#FFF',
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: tokens.typography.family.black,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
@@ -201,16 +244,38 @@ const styles = StyleSheet.create({
   timerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    paddingHorizontal: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.26)',
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   timerLabel: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 10,
-    fontFamily: tokens.typography.family.bold,
-    letterSpacing: 0.5,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 9,
+    fontFamily: tokens.typography.family.extrabold,
+    letterSpacing: 0.6,
+    marginRight: 4,
+  },
+  timeBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  timeBoxText: {
+    color: '#0F172A',
+    fontSize: 11,
+    fontFamily: tokens.typography.family.black,
+  },
+  timerColon: {
+    color: '#FFF',
+    fontSize: 11,
+    fontFamily: tokens.typography.family.black,
+    marginHorizontal: 2,
   },
   timerValue: {
     color: '#FFF',
@@ -231,24 +296,29 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   campaignName: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.92)',
+    fontSize: 12,
     fontFamily: tokens.typography.family.medium,
     marginTop: 1,
   },
   shopNowPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.24)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
     gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   shopNowText: {
-    color: '#FFF',
+    color: '#0F172A',
     fontSize: 12,
-    fontFamily: tokens.typography.family.bold,
+    fontFamily: tokens.typography.family.extrabold,
   },
   footerRow: {
     flexDirection: 'row',
@@ -257,16 +327,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.18)',
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
   },
   footerText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 11,
-    fontFamily: tokens.typography.family.medium,
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontSize: 10,
+    fontFamily: tokens.typography.family.bold,
+    letterSpacing: 0.3,
+  },
+  autoAppliedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   autoAppliedText: {
     color: '#FFF',
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: tokens.typography.family.bold,
+    letterSpacing: 0.2,
   },
 });
