@@ -208,7 +208,7 @@ const SearchScreen = ({ navigation }: any) => {
           )}
           
           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-            <Text allowFontScaling={false} style={{ fontSize: 9, fontFamily: tokens.typography.family.extrabold, color: vegOnly ? tokens.colors.success : tokens.colors.textSecondary, letterSpacing: 0.5, marginRight: 6 }}>VEG</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 9, fontFamily: tokens.typography.family.extrabold, color: vegOnly ? tokens.colors.success : tokens.colors.primary, letterSpacing: 0.5, marginRight: 6 }}>VEG</Text>
             <View style={{ width: 1, height: 16, backgroundColor: tokens.colors.border, marginRight: 6 }} />
             <CustomVegToggle value={vegOnly} onValueChange={setVegOnly} />
           </View>
