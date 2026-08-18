@@ -368,9 +368,12 @@ const CartScreen = ({ navigation }: any) => {
           </View>
         </Animated.View>
 
-        {/* Free Delivery Progress Bar Card */}
+        {/* Free Delivery Progress Bar Card — only rendered if free delivery threshold is set by admin */}
         {(() => {
-          const threshold = 199;
+          const thresholdPaise = (menuData as any)?.minOrderForFreeDeliveryPaise || (menuData as any)?.zoneConfig?.min_order_for_free_delivery_paise;
+          if (!thresholdPaise || Number(thresholdPaise) <= 0) return null;
+
+          const threshold = Number(thresholdPaise) / 100;
           const currentSubtotal = fallbackSubtotal / 100;
           const remaining = Math.max(0, threshold - currentSubtotal);
           const progressPercent = Math.min(100, Math.round((currentSubtotal / threshold) * 100));
