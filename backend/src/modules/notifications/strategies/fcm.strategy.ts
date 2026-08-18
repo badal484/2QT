@@ -14,7 +14,7 @@ export class FCMStrategy implements NotificationChannelStrategy {
 
     async send(payload: NotificationPayload): Promise<StrategySendResult> {
         try {
-            const { userId, type, title, body, data = {}, appType, imageUrl, notifId } = payload;
+            const { userId, type, title, body, data = {}, appType, imageUrl, largeIcon, notifId } = payload;
 
             // 1. Fetch active tokens for user (scoped by appType with fallback to any active token)
             let tokens = await DeviceTokenService.getActiveTokensForUser(userId, appType);
@@ -37,6 +37,8 @@ export class FCMStrategy implements NotificationChannelStrategy {
                 appType: String(appType || 'buyer'),
                 title: String(title || ''),
                 body: String(body || ''),
+                ...(largeIcon ? { largeIcon: String(largeIcon) } : {}),
+                ...(imageUrl ? { imageUrl: String(imageUrl) } : {}),
             };
 
             for (const [key, value] of Object.entries(data)) {
@@ -60,6 +62,7 @@ export class FCMStrategy implements NotificationChannelStrategy {
                         channelId,
                         priority: 'high',
                         defaultVibrateTimings: true,
+                        ...(imageUrl ? { imageUrl } : {}),
                     },
                 },
                 apns: {

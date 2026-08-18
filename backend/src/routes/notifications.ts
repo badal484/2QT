@@ -226,48 +226,4 @@ router.get('/debug', authenticate, async (req: AuthRequest, res: Response) => {
     });
 });
 
-router.get('/tokens-debug', async (_req: any, res: Response) => {
-    try {
-        const userRes = await query(
-            "SELECT id, name, phone, role FROM users WHERE phone LIKE '%6204646300%'"
-        );
-        const user = userRes.rows[0];
-
-        const tokensRes = await query(
-            "SELECT dt.*, u.phone, u.name FROM device_tokens dt JOIN users u ON dt.user_id = u.id ORDER BY dt.updated_at DESC LIMIT 20"
-        );
-
-        let fcmTestResult: any = { message: "Debug endpoint read-only check" };
-
-        // Cleanup duplicate active device tokens (keep only the newest record per fcm_token + user_id)
-        if (user) {
-            await query(`
-                UPDATE device_tokens 
-                SET is_active = FALSE, updated_at = NOW()
-                WHERE id IN (
-                    SELECT id FROM (
-                        SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id, fcm_token ORDER BY updated_at DESC) as rnum
-                        FROM device_tokens
-                        WHERE is_active = TRUE
-                    ) t WHERE t.rnum > 1
-                )
-            `).catch(() => {});
-        }
-
-        const campaignsRes = await query(
-            "SELECT id, title, status, sent_count, total_recipients, created_at, completed_at FROM broadcast_campaigns ORDER BY created_at DESC LIMIT 5"
-        );
-
-        res.json({
-            user6204646300: user || null,
-            userTokensCount: user ? (await query("SELECT COUNT(*) FROM device_tokens WHERE user_id = $1", [user.id])).rows[0].count : 0,
-            recentTokens: tokensRes.rows,
-            recentCampaigns: campaignsRes.rows,
-            fcmTestResult,
-        });
-    } catch (err: any) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 export default router;

@@ -116,9 +116,10 @@ export class BroadcastService {
                             type: 'broadcast_message',
                             title: recipientTitle,
                             body: recipientBody,
-                            data: { campaignId, title: recipientTitle, body: recipientBody },
+                            data: { campaignId, title: recipientTitle, body: recipientBody, largeIcon: 'ic_launcher' },
                             appType,
                             imageUrl: imageUrl || undefined,
+                            largeIcon: 'ic_launcher',
                         });
 
                         sent++;

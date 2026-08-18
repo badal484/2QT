@@ -90,16 +90,29 @@ export class NotificationHandler {
 
             if (safeNotifee.isAvailable) {
                 try {
+                    const largeIcon = data.largeIcon || notification?.android?.largeIcon || 'ic_launcher';
+                    const imageUrl = data.imageUrl || notification?.android?.imageUrl || notification?.imageUrl;
+
+                    const androidConfig: any = {
+                        channelId,
+                        importance: AndroidImportance.HIGH,
+                        pressAction: {
+                            id: 'default',
+                        },
+                        ...(largeIcon ? { largeIcon } : {}),
+                    };
+
+                    if (imageUrl) {
+                        androidConfig.style = {
+                            type: 0, // AndroidStyle.BIGPICTURE
+                            picture: imageUrl,
+                        };
+                    }
+
                     await safeNotifee.displayNotification({
                         title,
                         body,
-                        android: {
-                            channelId,
-                            importance: AndroidImportance.HIGH,
-                            pressAction: {
-                                id: 'default',
-                            },
-                        },
+                        android: androidConfig,
                         data,
                     });
                 } catch (err) {
@@ -112,7 +125,7 @@ export class NotificationHandler {
         const unsubscribeNotificationOpened = messaging().onNotificationOpenedApp((remoteMessage: any) => {
             console.log('[NotificationHandler] App opened from background notification:', remoteMessage);
             if (remoteMessage?.data) {
-                DeepLinkResolver.handle(navigation, remoteMessage.data);
+                DeepLinkResolver.resolve(remoteMessage.data, navigation);
             }
         });
 
@@ -121,7 +134,7 @@ export class NotificationHandler {
             if (remoteMessage?.data) {
                 console.log('[NotificationHandler] App launched from killed notification:', remoteMessage);
                 setTimeout(() => {
-                    DeepLinkResolver.handle(navigation, remoteMessage.data);
+                    DeepLinkResolver.resolve(remoteMessage.data, navigation);
                 }, 1000);
             }
         });
@@ -130,7 +143,7 @@ export class NotificationHandler {
         const unsubscribeNotifee = safeNotifee.onForegroundEvent(({ type, detail }: any) => {
             if (type === EventType.PRESS && detail?.notification?.data) {
                 console.log('[NotificationHandler] Notifee banner tapped:', detail.notification.data);
-                DeepLinkResolver.handle(navigation, detail.notification.data);
+                DeepLinkResolver.resolve(detail.notification.data, navigation);
             }
         });
 
