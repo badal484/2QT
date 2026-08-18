@@ -206,6 +206,12 @@ const HomeScreen = ({ navigation }: any) => {
   const hasInitializedBanner = useRef(false);
   const [activeBannerDot, setActiveBannerDot] = useState(0);
 
+  // mainBanners is a fresh array reference on every render (built via .filter() above),
+  // so we mirror it into a ref rather than depending on it directly — otherwise the
+  // autoplay effect below would tear down and restart on every unrelated re-render.
+  const mainBannersRef = useRef(mainBanners);
+  mainBannersRef.current = mainBanners;
+
   useEffect(() => {
     if (infiniteBanners.length <= 1) return;
 
@@ -222,8 +228,9 @@ const HomeScreen = ({ navigation }: any) => {
     let timeoutId: ReturnType<typeof setTimeout>;
 
     const advance = () => {
+      const banners = mainBannersRef.current;
       // Admin-configurable per-banner auto-slide duration (falls back to 3000ms)
-      const currentBanner = mainBanners[bannerIndexRef.current % mainBanners.length];
+      const currentBanner = banners[bannerIndexRef.current % banners.length];
       const duration = currentBanner?.slide_duration_ms ?? 3000;
 
       timeoutId = setTimeout(() => {
@@ -244,14 +251,14 @@ const HomeScreen = ({ navigation }: any) => {
             // Suppress out of range errors
           }
         }
-        setActiveBannerDot(bannerIndexRef.current % mainBanners.length);
+        setActiveBannerDot(bannerIndexRef.current % mainBannersRef.current.length);
         advance();
       }, duration);
     };
 
     advance();
     return () => clearTimeout(timeoutId);
-  }, [infiniteBanners.length, mainBanners]);
+  }, [infiniteBanners.length]);
 
   const enrichedItems = useMemo(() => {
     if (!menuData?.items) return [];
