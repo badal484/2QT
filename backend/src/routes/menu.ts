@@ -170,7 +170,7 @@ router.get('/', async (req, res) => {
         ]);
     } catch { /* cache miss — continue to DB */ }
 
-    if (cached) {
+    if (cached && req.query.refresh !== 'true' && req.query.skipCache !== 'true') {
         res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
         return res.json({ ...JSON.parse(cached as string), fromCache: true });
     }
