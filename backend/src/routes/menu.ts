@@ -202,13 +202,21 @@ router.get('/', async (req, res) => {
                     (
                       SELECT ARRAY_AGG(LOWER(c.name))
                       FROM menu_categories c
-                      WHERE c.id = o.target_id OR c.id = ANY(o.target_ids)
+                      WHERE c.id::text = o.target_id::text
+                         OR (o.target_ids IS NOT NULL AND c.id::text = ANY(o.target_ids::text[]))
                     ) AS target_category_names,
                     (
                       SELECT ARRAY_AGG(LOWER(c.slug))
                       FROM menu_categories c
-                      WHERE c.id = o.target_id OR c.id = ANY(o.target_ids)
-                    ) AS target_category_slugs
+                      WHERE c.id::text = o.target_id::text
+                         OR (o.target_ids IS NOT NULL AND c.id::text = ANY(o.target_ids::text[]))
+                    ) AS target_category_slugs,
+                    CASE 
+                      WHEN o.target_type = 'item' THEN (SELECT name FROM menu_items WHERE id::text = o.target_id::text)
+                      WHEN o.target_type = 'category' THEN (SELECT name FROM menu_categories WHERE id::text = o.target_id::text)
+                      WHEN o.target_type = 'kitchen' THEN (SELECT name FROM kitchens WHERE id::text = o.target_id::text)
+                      ELSE NULL
+                    END AS target_name
              FROM menu_offers o
              WHERE o.is_active = true
              AND (o.zone_id IS NULL OR o.zone_id = $1)

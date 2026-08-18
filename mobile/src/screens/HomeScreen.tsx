@@ -244,10 +244,13 @@ const HomeScreen = ({ navigation }: any) => {
         for (const offer of offers) {
              const tIds: string[] = Array.isArray(offer.target_ids) ? offer.target_ids : [];
              const itemCat = String(item.category || '').toLowerCase();
-             const targetCatNames = (offer.target_category_names || [])
-                 .concat(offer.target_category_slugs || [])
+             const targetCatNames = [
+               offer.target_name,
+               ...(offer.target_category_names || []),
+               ...(offer.target_category_slugs || []),
+             ]
                  .filter(Boolean)
-                 .map((c: string) => String(c).toLowerCase());
+                 .map((c: string) => String(c).trim().toLowerCase());
 
              const isMatch = offer.target_type === 'all' ||
                              (offer.target_type === 'item' && (tIds.includes(item.id) || offer.target_id === item.id)) ||
