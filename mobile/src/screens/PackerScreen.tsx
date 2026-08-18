@@ -151,43 +151,14 @@ export const PackerScreen = () => {
   });
 
   useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
     const onUpdate = () => queryClient.invalidateQueries({ queryKey: ['packer-orders'] });
-
-    const attach = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
-      socket.on('order_updated', onUpdate);
-      socket.on('new_order', onUpdate);
-      socket.on('connect', onUpdate);
-    };
-    const detach = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
+    socket.on('order_updated', onUpdate);
+    socket.on('new_order', onUpdate);
+    return () => {
       socket.off('order_updated', onUpdate);
       socket.off('new_order', onUpdate);
-      socket.off('connect', onUpdate);
-    };
-
-    // getSocket() can still be null on first render here — RootNavigator (this
-    // effect's parent) connects the socket in its own effect, which React runs
-    // AFTER this one on mount. Without a retry, a null socket on that first
-    // check meant this screen's real-time updates never attached for its whole
-    // lifetime, silently falling back to the 10s poll only.
-    let attachedSocket: ReturnType<typeof getSocket> = null;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    const tryAttach = () => {
-      if (attachedSocket) return;
-      const s = getSocket();
-      if (s) {
-        attach(s);
-        attachedSocket = s;
-        if (timer) clearInterval(timer);
-      }
-    };
-    tryAttach();
-    if (!attachedSocket) timer = setInterval(tryAttach, 1000);
-
-    return () => {
-      if (timer) clearInterval(timer);
-      detach(attachedSocket);
     };
   }, [queryClient]);
 
@@ -305,16 +276,15 @@ const styles = StyleSheet.create({
   },
   orderId: { color: G.white, fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
   customerName: { color: G.dim, fontSize: 12, fontWeight: '600', marginTop: 2 },
-  cardReady: { borderColor: G.greenBorder, backgroundColor: G.greenBg },
-  badge: {
+  ageChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: G.amberBg, borderWidth: 1, borderColor: G.amberBorder,
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20,
   },
-  badgeText: { color: G.amber, fontSize: 10, fontWeight: '800' },
+  ageText: { color: G.amber, fontSize: 10, fontWeight: '800' },
   // Items
-  itemList: { padding: 16, gap: 10 },
-  checkProgress: { color: G.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 2 },
+  itemsSection: { padding: 16, gap: 10 },
+  itemsLabel: { color: G.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 2 },
   itemRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 10,
     padding: 10, borderRadius: 10,
@@ -333,12 +303,11 @@ const styles = StyleSheet.create({
     margin: 12, marginTop: 4, padding: 14, borderRadius: 12,
     backgroundColor: G.faint, borderWidth: 1, borderColor: G.border,
   },
-  packBtnActive: {
+  packBtnReady: {
     backgroundColor: G.green, borderColor: G.green,
   },
-  packBtnDisabled: { opacity: 0.6 },
   packBtnText: { color: G.muted, fontSize: 13, fontWeight: '900', letterSpacing: 1 },
-  packBtnTextActive: { color: '#000' },
+  packBtnTextReady: { color: '#000' },
 });
 
 export default PackerScreen;

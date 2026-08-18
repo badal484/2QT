@@ -57,11 +57,11 @@ const FAQS = [
       },
       {
         q: 'How do I report an issue with an order?',
-        a: 'Tap "Report an Issue with This Order" on the active order screen — it opens a support ticket pre-filtered to Order Problems. Pick the closest issue type, add a note, and submit. Our team responds within 24 hours; you can track the reply under My Tickets in Support.',
+        a: 'Tap "Report Issue" on the active order screen. You can select from common issues — Missing Items, Wrong Order, Damaged Package, Customer Refused, or Other. Add a note if needed. Our team reviews all reports within 1 hour.',
       },
       {
         q: 'What if the restaurant/kitchen doesn\'t have the order ready?',
-        a: 'Wait at the kitchen for up to 10 minutes. If the order is still not ready, use "Report an Issue with This Order" → Order Problem → Long Kitchen Wait. Do not leave without the order — it affects your completion rate.',
+        a: 'Wait at the kitchen for up to 10 minutes. If the order is still not ready, use Report Issue → "Order Not Ready at Kitchen". Do not leave without the order — it affects your completion rate.',
       },
       {
         q: 'What is COD and how do I handle it?',

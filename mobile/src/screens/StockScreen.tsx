@@ -2,7 +2,7 @@ import { tokens } from '../theme/tokens';
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, TextInput, StyleSheet, RefreshControl,
+  ActivityIndicator, TextInput, Alert, StyleSheet,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
@@ -38,17 +38,10 @@ const StockScreen = () => {
   const isAdmin = user?.role === 'super_admin';
   const endpoint = isAdmin ? '/admin/inventory' : '/kitchen/inventory';
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['inventory', isAdmin],
     queryFn: () => api.get(endpoint),
   });
-
-  const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
 
   const updateMutation = useMutation({
     mutationFn: ({ id, stock }: { id: string; stock: number }) => {
@@ -77,9 +70,7 @@ const StockScreen = () => {
         <View style={styles.cardTop}>
           <View style={styles.cardLeft}>
             <Text style={styles.ingName}>{ing.name}</Text>
-            <Text style={styles.ingUnit}>
-              {ing.unit || 'units'}{isAdmin && ing.kitchen_name ? ` · ${ing.kitchen_name}` : ''}
-            </Text>
+            <Text style={styles.ingUnit}>{ing.unit || 'units'}</Text>
           </View>
           <View style={styles.cardRight}>
             <Text style={[styles.stockNum, { color: low ? G.red : G.white }]}>
@@ -157,12 +148,7 @@ const StockScreen = () => {
           <Text style={styles.emptyText}>Inventory is prime</Text>
         </View>
       ) : (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={G.green} />}
-        >
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
           {lowStock.length > 0 && (
             <View style={styles.section}>

@@ -1,5 +1,5 @@
 import { tokens } from '../theme/tokens';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { playKitchenAlert } from '../utils/kitchenAlert';
 import {
   View, Text, ScrollView, TouchableOpacity,
@@ -56,24 +56,18 @@ function LiveClock() {
   );
 }
 
-// Ticks its own "3m ago" label once a second in isolation, so order cards
-// don't need the whole board to re-render every second just to keep these
-// current — that used to re-run every filter + re-render every card on every
-// tick, which is wasted work on a screen meant to stay open all shift.
-function LiveElapsed({ since, style }: { since: string; style: any }) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return <Text style={style}>{elapsed(since)}</Text>;
-}
-
 const KitchenBoardScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   const { showDialog } = useFeedback();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = React.useCallback(async () => {
@@ -110,10 +104,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/claim`, {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
     onError: (err: any) => {
-      // api/client.ts's fetch wrapper throws a plain Error whose .message is the
-      // backend's `message` (falling back to `error`) field — not an axios-style
-      // err.response object, so the role check has to match on the message text.
-      const msg = err?.message === 'Insufficient permissions'
+      const msg = err.response?.status === 403
           ? 'Your account role cannot claim orders. Ask your kitchen manager.'
           : 'Could not accept this order. It may have been claimed already.';
       showDialog({ title: 'Error', message: msg, confirmText: 'Okay', type: 'error' });
@@ -156,7 +147,6 @@ const KitchenBoardScreen = ({ navigation }: any) => {
     const onOrderUpdate = () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
     const onNewOrder = () => { playKitchenAlert(); onOrderUpdate(); };
     const onDineInUpdate = () => queryClient.invalidateQueries({ queryKey: ['board-dine-in-tickets'] });
-    const onMenuUpdate = () => queryClient.invalidateQueries({ queryKey: ['kitchen-menu'] });
     const onRiderArrived = (data: { orderId: string; riderName?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
       showDialog({ title: 'Rider Arrived', message: `${data.riderName || 'Rider'} is at the kitchen for order pickup.`, confirmText: 'Okay', type: 'info' });
@@ -169,8 +159,6 @@ const KitchenBoardScreen = ({ navigation }: any) => {
       socket.on('table_order', onDineInUpdate);
       socket.on('table_booking_updated', onDineInUpdate);
       socket.on('rider_arrived', onRiderArrived);
-      socket.on('menu_updated', onMenuUpdate);
-      socket.on('kitchen_resumed', onMenuUpdate);
       // Re-fetch on reconnect (handles backend restart + network recovery)
       socket.on('connect', onOrderUpdate);
     };
@@ -182,8 +170,6 @@ const KitchenBoardScreen = ({ navigation }: any) => {
       socket.off('table_order', onDineInUpdate);
       socket.off('table_booking_updated', onDineInUpdate);
       socket.off('rider_arrived', onRiderArrived);
-      socket.off('menu_updated', onMenuUpdate);
-      socket.off('kitchen_resumed', onMenuUpdate);
       socket.off('connect', onOrderUpdate);
     };
 
@@ -214,16 +200,12 @@ const KitchenBoardScreen = ({ navigation }: any) => {
   const allDineInTickets = [...preTickets, ...postTickets];
 
   const paused = menuData?.kitchenPaused;
-  const ordersList = orders?.orders;
-  const { incoming, cooking, packing, ready } = useMemo(() => {
-    const list = ordersList || [];
-    return {
-      incoming: list.filter((o: any) => o.status === 'confirmed'),
-      cooking: list.filter((o: any) => ['preparing', 'at_kitchen'].includes(o.status)),
-      packing: list.filter((o: any) => o.status === 'packing'),
-      ready: list.filter((o: any) => o.status === 'ready_for_pickup'),
-    };
-  }, [ordersList]);
+  const incoming = orders?.orders?.filter((o: any) => o.status === 'confirmed') || [];
+  const cooking = orders?.orders?.filter((o: any) =>
+    ['preparing', 'at_kitchen'].includes(o.status)
+  ) || [];
+  const packing = orders?.orders?.filter((o: any) => o.status === 'packing') || [];
+  const ready = orders?.orders?.filter((o: any) => o.status === 'ready_for_pickup') || [];
 
   return (
     <View style={styles.root}>
@@ -286,11 +268,11 @@ const KitchenBoardScreen = ({ navigation }: any) => {
           </View>
 
           {/* 86 Items */}
-          {menuData?.menu?.length > 0 && (
+          {menuData?.items?.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>86 ITEMS</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-                {menuData.menu.map((item: any) => (
+                {menuData.items.map((item: any) => (
                   <TouchableOpacity
                     key={item.id}
                     style={[styles.chip, !item.available && styles.chipOff]}
@@ -329,7 +311,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
                       <Text style={styles.newCardId}>{order.display_id}</Text>
                       <View style={styles.ageChip}>
                         <Clock size={9} color={G.amber} />
-                        <LiveElapsed since={order.created_at} style={styles.ageText} />
+                        <Text style={styles.ageText}>{elapsed(order.created_at)}</Text>
                       </View>
                     </View>
 
@@ -394,7 +376,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
                       </View>
                       <View style={styles.ageChipDark}>
                         <Clock size={10} color={G.muted} />
-                        <LiveElapsed since={order.created_at} style={styles.ageTextDark} />
+                        <Text style={styles.ageTextDark}>{elapsed(order.created_at)}</Text>
                       </View>
                     </View>
 

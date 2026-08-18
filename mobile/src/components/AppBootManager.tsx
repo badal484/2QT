@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { ENV } from '../config/env';
-import { View, StyleSheet, Platform, PermissionsAndroid, AppState, NativeModules } from 'react-native';
+import { View, StyleSheet, Platform, PermissionsAndroid, AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   setGlobalLocation,
@@ -53,24 +53,11 @@ const getGpsCoords = (): Promise<{ latitude: number; longitude: number } | null>
     );
   });
 
-const { RoleModule } = NativeModules;
-const BUILD_ROLE = RoleModule?.BUILD_ROLE;
 
 export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
   const dispatch = useDispatch();
   const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
   const { addressId: currentAddressId } = useSelector((state: RootState) => state.cart);
-  const authRole = useSelector((state: RootState) => state.auth.user?.role);
-
-  // This whole boot sequence — GPS fix, reverse-geocode, "is this a
-  // deliverable customer zone" check, and the continuous location watcher
-  // below — exists only to resolve a *customer's* delivery address. Riders,
-  // kitchen staff, and admins resolve their own zone via /riders/available-zones
-  // and /riders/zone/check-in inside their own screens, so running this here
-  // for them just adds tens of seconds of GPS/network wait in front of the
-  // splash screen, plus a redundant app-wide GPS watcher, for data nobody reads.
-  const activeRole = BUILD_ROLE || authRole;
-  const isCustomerApp = activeRole === 'customer' || activeRole === 'buyer';
 
   const [isBooted, setIsBooted] = useState(false);
   const hasStartedRef = useRef(false);
@@ -160,17 +147,10 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
       // Enforce minimum splash screen duration to allow premium animations to play
       const minimumSplashTime = new Promise<void>((resolve) => setTimeout(resolve, 3000));
 
+
+
       // Wake Render free-tier backend immediately in background — doesn't block boot
       fetch(`${ENV.API_URL}/menu/zones`).catch(() => {});
-
-      // Rider/Kitchen/Admin apps don't use the customer delivery-zone concept at
-      // all — skip GPS + serviceability entirely and let the splash screen clear
-      // as soon as its minimum duration elapses.
-      if (!isCustomerApp) {
-        await minimumSplashTime;
-        setIsBooted(true);
-        return;
-      }
 
       // Clear stale persisted zone — will be resolved fresh via GPS or address selection
       dispatch(setZone(null));
@@ -227,13 +207,13 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
     };
 
     boot();
-  }, [dispatch, runServiceabilityCheck, runGpsZoneCheck, isCustomerApp]);
+  }, [dispatch, runServiceabilityCheck, runGpsZoneCheck]);
 
-  // ─── Continuous Location Observer (customer delivery-zone tracking only) ──
+  // ─── Continuous Location Observer ────────────────────────────────────────
   const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isBooted || !isCustomerApp) return;
+    if (!isBooted) return;
 
     const startWatching = () => {
       if (watchIdRef.current !== null) return;
@@ -271,7 +251,7 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
       subscription.remove();
       stopWatching();
     };
-  }, [isBooted, isCustomerApp, currentAddressId, dispatch, runServiceabilityCheck]);
+  }, [isBooted, currentAddressId, dispatch, runServiceabilityCheck]);
 
   if (!isBooted) {
     return <SplashScreen />;

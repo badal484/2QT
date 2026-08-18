@@ -9,9 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector, useDispatch } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Clock, Users, ChefHat, Receipt, QrCode, X, LogOut, Plus, Minus, UtensilsCrossed, Zap } from 'lucide-react-native';
-import {
-  Camera, useCameraDevice, useCameraPermission, useObjectOutput, isScannedCode,
-} from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { api } from '../api/client';
@@ -73,7 +71,6 @@ const KitchenDineInScreen = () => {
   const [scannerVisible, setScannerVisible] = useState(false);
   const scanLocked = useRef(false);
   const cameraDevice = useCameraDevice('back');
-  const { hasPermission, requestPermission } = useCameraPermission();
 
   // Staff order state
   const [staffOrderBooking, setStaffOrderBooking] = useState<any>(null);
@@ -163,10 +160,12 @@ const KitchenDineInScreen = () => {
   });
 
   useEffect(() => {
-    if (!hasPermission) requestPermission();
-  }, [hasPermission, requestPermission]);
+    Camera.requestCameraPermission();
+  }, []);
 
   useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
     const onTableOrder = () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-tickets'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
@@ -184,55 +183,23 @@ const KitchenDineInScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-bill'] });
       queryClient.invalidateQueries({ queryKey: ['kitchen-dine-in-today'] });
     };
-
-    const attach = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
-      socket.on('table_order', onTableOrder);
-      socket.on('table_checkin', onTableCheckin);
-      socket.on('table_booking_updated', onBookingUpdated);
-      socket.on('table_checkout', onTableCheckout);
-      socket.on('connect', onBookingUpdated);
-    };
-    const detach = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
+    socket.on('table_order', onTableOrder);
+    socket.on('table_checkin', onTableCheckin);
+    socket.on('table_booking_updated', onBookingUpdated);
+    socket.on('table_checkout', onTableCheckout);
+    return () => {
       socket.off('table_order', onTableOrder);
       socket.off('table_checkin', onTableCheckin);
       socket.off('table_booking_updated', onBookingUpdated);
       socket.off('table_checkout', onTableCheckout);
-      socket.off('connect', onBookingUpdated);
-    };
-
-    // Same retry rationale as KitchenBoardScreen: getSocket() can be null on
-    // this effect's first run since RootNavigator connects the socket in its
-    // own effect, which mounts after this child's. Without retrying, dine-in
-    // staff could silently lose all real-time table/booking updates for the
-    // screen's entire lifetime and fall back to the 30s poll only.
-    let attachedSocket: ReturnType<typeof getSocket> = null;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    const tryAttach = () => {
-      if (attachedSocket) return;
-      const s = getSocket();
-      if (s) {
-        attach(s);
-        attachedSocket = s;
-        if (timer) clearInterval(timer);
-      }
-    };
-    tryAttach();
-    if (!attachedSocket) timer = setInterval(tryAttach, 1000);
-
-    return () => {
-      if (timer) clearInterval(timer);
-      detach(attachedSocket);
     };
   }, [queryClient]);
 
-  const qrObjectOutput = useObjectOutput({
-    types: ['qr'],
-    onObjectsScanned: (objects) => {
+  const codeScanner = useCodeScanner({
+    codeTypes: ['qr'],
+    onCodeScanned: (codes) => {
       if (scanLocked.current) return;
-      const code = objects.find(isScannedCode);
-      const value = code?.value;
+      const value = codes[0]?.value;
       if (!value || !UUID_REGEX.test(value)) return;
       scanLocked.current = true;
       setScannerVisible(false);
@@ -281,23 +248,16 @@ const KitchenDineInScreen = () => {
           </TouchableOpacity>
           <Text style={styles.scannerTitle}>Scan Guest QR Code</Text>
           <Text style={styles.scannerSub}>Point at the customer's booking QR code to check them in</Text>
-          {cameraDevice && hasPermission ? (
+          {cameraDevice ? (
             <Camera
               device={cameraDevice}
               isActive={scannerVisible}
-              outputs={[qrObjectOutput]}
+              codeScanner={codeScanner}
               style={styles.cameraView}
             />
           ) : (
             <View style={[styles.cameraView, styles.cameraFallback]}>
-              <Text style={styles.scannerSub}>
-                {!hasPermission ? 'Camera permission required to scan' : 'Camera not available'}
-              </Text>
-              {!hasPermission && (
-                <TouchableOpacity style={styles.grantPermBtn} onPress={requestPermission}>
-                  <Text style={styles.grantPermBtnText}>Grant Permission</Text>
-                </TouchableOpacity>
-              )}
+              <Text style={styles.scannerSub}>Camera not available</Text>
             </View>
           )}
           <View style={styles.scannerFrame} pointerEvents="none" />
@@ -733,9 +693,7 @@ const styles = StyleSheet.create({
   scannerTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: G.ink, marginBottom: 8 },
   scannerSub: { fontSize: 14, color: G.inkDim, fontFamily: fontFamily.regular, textAlign: 'center', marginBottom: 32 },
   cameraView: { width: '100%', aspectRatio: 1, borderRadius: 20, overflow: 'hidden' },
-  cameraFallback: { backgroundColor: G.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: G.border, gap: 16, paddingHorizontal: 20 },
-  grantPermBtn: { backgroundColor: G.green, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 11 },
-  grantPermBtnText: { fontSize: 14, fontFamily: fontFamily.semibold, color: G.bg },
+  cameraFallback: { backgroundColor: G.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: G.border },
   scannerFrame: { position: 'absolute', top: 180, width: 220, height: 220, borderRadius: 16, borderWidth: 2, borderColor: G.green },
   // Bill — Add Item button
   addItemStaffBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: G.blue + '18', borderRadius: 10, paddingVertical: 11, borderWidth: 1, borderColor: G.blue + '50' },

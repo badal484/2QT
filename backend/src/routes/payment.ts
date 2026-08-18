@@ -344,16 +344,8 @@ router.post('/verify-payment', authenticate, async (req: AuthRequest, res) => {
             await finalizeWalletRecharge(razorpay_payment_id, actualAmountPaise as number, customerId);
             return res.json({ success: true, message: 'Wallet recharged' });
         } else if (type === 'subscription') {
-            // Don't trust the client-supplied planId — a valid signature only proves
-            // *some* genuine payment happened, not which plan it was for. Read the
-            // plan/customer back from the Razorpay order itself, the same way the
-            // wallet branch above already verifies notes.customerId.
-            const rzpOrderInfo = await razorpay.orders.fetch(razorpay_order_id);
-            if (rzpOrderInfo.notes?.customerId !== customerId) {
-                return res.status(403).json({ error: 'UNAUTHORIZED_SUBSCRIPTION_PURCHASE' });
-            }
-            const planId = rzpOrderInfo.notes?.planId as string;
-            const subId = await handleSubscriptionRenewal(customerId, planId, razorpay_payment_id);
+            const { planId } = req.body;
+            const subId = await handleSubscriptionRenewal(customerId, planId);
             return res.json({ success: true, subscriptionId: subId });
         } else {
             const result = await finalizeOrder(razorpay_order_id, 'online');

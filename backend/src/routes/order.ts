@@ -349,15 +349,9 @@ router.get('/:id/tracking', authenticate, async (req: AuthRequest, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
     const order = rows[0];
 
-    // Customers can only track their own orders; riders likewise only orders
-    // assigned to them (this used to be unrestricted, letting any rider pull
-    // another rider's delivery OTP by order-ID enumeration). Kitchen/admin
-    // stay unrestricted for operational visibility.
+    // Customers can only track their own orders; kitchen/rider/admin are unrestricted
     const role = req.user!.role;
     if (role === 'customer' && order.customer_id !== req.user!.userId) {
-        return res.status(403).json({ error: 'FORBIDDEN' });
-    }
-    if ((role === 'rider' || role === 'rider_captain') && order.rider_id !== req.user!.userId) {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
 

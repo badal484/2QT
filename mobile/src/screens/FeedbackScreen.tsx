@@ -1,6 +1,6 @@
 import { tokens } from '../theme/tokens';
-import React, { useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, StyleSheet, RefreshControl } from 'react-native';
+import React from 'react';
+import { View, Text, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -18,17 +18,10 @@ const G = {
 };
 
 const FeedbackScreen = () => {
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['kitchen-feedback'],
     queryFn: () => api.get('/kitchen/feedback'),
   });
-
-  const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
 
   const avg = parseFloat(data?.averageRating || '0');
   const total = data?.feedbacks?.length || 0;
@@ -61,12 +54,7 @@ const FeedbackScreen = () => {
           <ActivityIndicator color={G.amber} size="large" />
         </View>
       ) : (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={G.amber} />}
-        >
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
           {/* Big score */}
           <View style={styles.scoreCard}>
