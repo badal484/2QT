@@ -27,6 +27,7 @@ import { CategoryPreviewSection } from './home/CategoryPreviewSection';
 import { MenuGridCard } from './home/MenuGridCard';
 import { ExploreMenuBanner } from './home/ExploreMenuBanner';
 import { ClosedBottomSheet } from './home/ClosedBottomSheet';
+import { CampaignBannerCard } from './home/CampaignBannerCard';
 import { useFeedback } from '../context/FeedbackContext';
 import { FlashList } from '@shopify/flash-list';
 
@@ -146,6 +147,15 @@ const HomeScreen = ({ navigation }: any) => {
   const mainBanners = banners.filter((b: any) => !b.banner_type || b.banner_type === 'MAIN');
   const miniBanners = banners.filter((b: any) => b.banner_type === 'MINI');
   const stripBanners = banners.filter((b: any) => b.banner_type === 'STRIP');
+
+  const { data: campaignsData } = useQuery({
+    queryKey: ['campaigns', effectiveZoneId],
+    queryFn: () => api.get(`/campaigns/active?zoneId=${effectiveZoneId || ''}`),
+    staleTime: 15 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+  const activeCampaigns = campaignsData?.campaigns || [];
+  const primaryCampaign = activeCampaigns[0];
 
   // ── Admin-configured image categories (zone-specific) ──────────────────
   const { data: menuCategoriesData } = useQuery({
@@ -828,6 +838,19 @@ const HomeScreen = ({ navigation }: any) => {
                 </View>
               </Animated.View>
             )}
+
+            {/* ── Active Campaign Deal Banner (Flash Sale, Happy Hour, Special Deal) ── */}
+            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && primaryCampaign && (
+              <Animated.View entering={FadeInDown.delay(120).duration(400)}>
+                <CampaignBannerCard
+                  campaign={primaryCampaign}
+                  onPress={() => {
+                    flatListRef.current?.scrollToOffset({ offset: 350, animated: true });
+                  }}
+                />
+              </Animated.View>
+            )}
+
             {infiniteBanners.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
               <Animated.View entering={FadeInDown.delay(150).duration(400)} style={{ overflow: 'hidden', marginTop: tokens.spacing.sm }}>
                 <FlatList
