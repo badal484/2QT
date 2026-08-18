@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../db';
-import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { authenticate, optionalAuth, requireRole, AuthRequest } from '../middleware/auth';
 import redis, { keys } from '../redis';
 import { sendNotification, NotifType } from '../services/notification.service';
 import { emitToAll } from '../socket';
@@ -10,7 +10,15 @@ const router = express.Router();
 const CAMPAIGN_TTL = 30;
 
 async function bustCampaignCache() {
-    try { await redis.del(keys.activeCampaigns()); } catch (e) { console.warn('[cache] bustCampaignCache failed:', e); }
+    try { 
+        await redis.del(keys.activeCampaigns()); 
+        const patternKeys = await redis.keys('campaigns:active:*');
+        if (patternKeys && patternKeys.length > 0) {
+            await redis.del(patternKeys);
+        }
+    } catch (e) { 
+        console.warn('[cache] bustCampaignCache failed:', e); 
+    }
 }
 
 // Resolve audience for a campaign and send the configured notification template
@@ -63,30 +71,35 @@ export async function fireCampaignNotification(campaign: any) {
 
 // GET /campaigns/active — returns only active campaigns (cached 30s)
 // Used by mobile app to show banners, happy hour badge, flash sale countdown
-router.get('/active', authenticate, async (req, res) => {
+router.get('/active', optionalAuth, async (req, res) => {
     try {
-        const cached = await redis.get(keys.activeCampaigns());
-        if (cached) return res.json(JSON.parse(cached));
+        const zoneId = req.query.zoneId ? String(req.query.zoneId) : null;
+        const cacheKey = zoneId ? `campaigns:active:${zoneId}` : keys.activeCampaigns();
 
-        const now = new Date();
+        if (req.query.refresh !== 'true') {
+            const cached = await redis.get(cacheKey);
+            if (cached) return res.json(JSON.parse(cached));
+        }
+
         const { rows } = await query(`
             SELECT id, name, type, discount_type, discount_percent, discount_flat_paise,
                    max_discount_paise, min_order_paise, flash_start, flash_end,
-                   happy_hour_start, happy_hour_end, happy_hour_days, config
+                   happy_hour_start, happy_hour_end, happy_hour_days, config, zone_id
             FROM campaigns
             WHERE is_active = true
+            AND ($1::uuid IS NULL OR zone_id IS NULL OR zone_id = $1::uuid)
             AND (
               -- Flash sale: only within its window
-              (type = 'flash_sale' AND flash_start <= NOW() AND flash_end >= NOW())
+              (type = 'flash_sale' AND (flash_start IS NULL OR flash_start <= NOW()) AND (flash_end IS NULL OR flash_end >= NOW()))
               OR
               -- All other types: always active when toggled on
               type != 'flash_sale'
             )
             ORDER BY type, created_at DESC
-        `);
+        `, [zoneId]);
 
         const payload = { campaigns: rows };
-        await redis.setEx(keys.activeCampaigns(), CAMPAIGN_TTL, JSON.stringify(payload));
+        await redis.setEx(cacheKey, CAMPAIGN_TTL, JSON.stringify(payload));
         res.json(payload);
     } catch (err: any) {
         console.error(err);
