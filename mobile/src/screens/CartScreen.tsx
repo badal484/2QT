@@ -71,8 +71,12 @@ const toggleStyles = StyleSheet.create({
   },
 });
 
-const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) => {
+const CartItem = React.memo(({ item, isLast, bogoOffer }: { item: any; isLast: boolean; bogoOffer?: any }) => {
   const dispatch = useDispatch();
+  const isOddBogo = !!bogoOffer && (item.quantity % 2 !== 0);
+  const isEvenBogo = !!bogoOffer && (item.quantity >= 2);
+  const freeItemsCount = isEvenBogo ? Math.floor(item.quantity / 2) : 0;
+
   return (
     <View>
       <View style={styles.itemRow}>
@@ -115,7 +119,7 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
         <View style={styles.qtyRow}>
           <PressableScale
             style={styles.qtyBtn}
-            onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
+            onPress={() => { haptics.selection(); dispatch(setQuantity({ cartItemId: item.cartItemId, menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
             accessibilityRole="button"
             accessibilityLabel="Decrease quantity"
           >
@@ -124,7 +128,7 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
           <Text allowFontScaling={false} style={styles.qtyNum}>{item.quantity}</Text>
           <PressableScale
             style={[styles.qtyBtn, styles.qtyBtnActive]}
-            onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
+            onPress={() => { haptics.selection(); dispatch(setQuantity({ cartItemId: item.cartItemId, menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
             accessibilityRole="button"
             accessibilityLabel="Increase quantity"
           >
@@ -132,6 +136,72 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
           </PressableScale>
         </View>
       </View>
+
+      {/* BOGO Upsell Nudge if quantity is odd */}
+      {isOddBogo && (
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: '#FEF3C7',
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          marginTop: 6,
+          marginBottom: 4,
+          borderWidth: 1,
+          borderColor: '#FDE68A',
+        }}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.extrabold, color: '#B45309' }}>
+              🎁 BUY 1 GET 1 FREE
+            </Text>
+            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.medium, color: '#92400E' }}>
+              Add 1 more to get 1 FREE!
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => {
+              haptics.selection();
+              dispatch(setQuantity({ cartItemId: item.cartItemId, menuItemId: item.menuItemId, quantity: item.quantity + 1 }));
+            }}
+            style={{
+              backgroundColor: '#D97706',
+              borderRadius: 8,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+            }}
+            activeOpacity={0.8}
+          >
+            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.extrabold, color: '#FFF' }}>
+              + Add Free
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* BOGO Unlocked Banner if 2+ items */}
+      {isEvenBogo && (
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: '#ECFDF5',
+          borderRadius: 8,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          marginTop: 6,
+          marginBottom: 4,
+          borderWidth: 1,
+          borderColor: '#A7F3D0',
+        }}>
+          <Sparkles size={13} color="#059669" />
+          <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.extrabold, color: '#047857' }}>
+            🎉 {freeItemsCount} × FREE Item Unlocked (BOGO)!
+          </Text>
+        </View>
+      )}
+
       {!isLast && <View style={styles.cardDivider} />}
     </View>
   );
@@ -141,7 +211,8 @@ const CartItem = React.memo(({ item, isLast }: { item: any; isLast: boolean }) =
 CartItem.displayName = 'CartItem';
 const CartItemMemoized = React.memo(CartItem, (prevProps, nextProps) => {
   return prevProps.item.quantity === nextProps.item.quantity &&
-         prevProps.isLast === nextProps.isLast;
+         prevProps.isLast === nextProps.isLast &&
+         prevProps.bogoOffer?.id === nextProps.bogoOffer?.id;
 });
 
 const CartScreen = ({ navigation }: any) => {
@@ -207,6 +278,22 @@ const CartScreen = ({ navigation }: any) => {
       .filter((i: any) => i.available && i.kitchen_id === kitchenId && !items.some(ci => ci.menuItemId === i.id))
       .slice(0, 6);
   }, [menuData?.items, items]);
+
+  const offers: any[] = menuData?.offers || [];
+  const getBogoOfferForItem = useCallback((cartItem: any) => {
+    const itemInMenu = menuData?.items?.find((i: any) => i.id === cartItem.menuItemId);
+    if (!itemInMenu) return null;
+    const itemCat = String(itemInMenu.category || '').toLowerCase();
+    return offers.find((o: any) => {
+      if (o.discount_type !== 'bogo') return false;
+      const tIds: string[] = Array.isArray(o.target_ids) ? o.target_ids : [];
+      const targetCatNames = [o.target_name, ...(o.target_category_names || []), ...(o.target_category_slugs || [])]
+        .filter(Boolean).map((c: string) => String(c).trim().toLowerCase());
+      return o.target_type === 'all' ||
+             (o.target_type === 'item' && (tIds.includes(itemInMenu.id) || o.target_id === itemInMenu.id)) ||
+             (o.target_type === 'category' && (targetCatNames.includes(itemCat) || tIds.some((t: string) => String(t).toLowerCase() === itemCat) || String(o.target_id).toLowerCase() === itemCat));
+    });
+  }, [offers, menuData?.items]);
 
   const fallbackSubtotal = useMemo(() => items.reduce((s, i) => s + i.quantity * i.pricePaise, 0), [items]);
   const { data: pricingData, isFetching: pricingFetching, isError: pricingErrored, error: pricingError } = useQuery({
@@ -410,7 +497,12 @@ const CartScreen = ({ navigation }: any) => {
         {/* Cart Items Card */}
         <Animated.View entering={FadeInDown.delay(30).duration(300)} style={styles.card}>
             {items.map((item: any, idx: number) => (
-              <CartItemMemoized key={`${item.menuItemId}-${JSON.stringify(item.customizations)}`} item={item} isLast={idx === items.length - 1} />
+              <CartItemMemoized
+                key={`${item.menuItemId}-${JSON.stringify(item.customizations)}`}
+                item={item}
+                isLast={idx === items.length - 1}
+                bogoOffer={getBogoOfferForItem(item)}
+              />
             ))}
         </Animated.View>
 
