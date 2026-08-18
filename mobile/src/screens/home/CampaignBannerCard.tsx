@@ -47,13 +47,13 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
     switch (campaign.type) {
       case 'flash_sale':
         return {
-          gradient: ['#0B0F19', '#1E1B4B', '#2E1045'],
-          badgeBg: 'rgba(249, 115, 22, 0.25)',
-          badgeBorder: 'rgba(249, 115, 22, 0.55)',
-          badgeText: '#FFEDD5',
+          gradient: ['#F04A0D', '#C83B0E', '#B8320C'],
+          badgeBg: 'rgba(0, 0, 0, 0.22)',
+          badgeBorder: '#FFB000',
+          badgeText: '#FFB000',
           badgeLabel: 'FLASH SALE',
           icon: Flame,
-          accent: '#F97316',
+          accent: '#FFB000',
           foodImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&auto=format&fit=crop&q=80',
         };
       case 'happy_hour':
@@ -173,7 +173,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           </View>
           <View style={styles.shopNowPill}>
             <Text allowFontScaling={false} style={styles.shopNowText}>Order Now</Text>
-            <ArrowRight size={13} color="#0F172A" />
+            <ArrowRight size={13} color="#B8320C" />
           </View>
         </View>
 
@@ -218,10 +218,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -40,
     right: -40,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255, 176, 0, 0.22)',
   },
   ambientGlow2: {
     position: 'absolute',
@@ -230,19 +230,19 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(0, 0, 0, 0.12)',
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
   },
   foodCutoutContainer: {
     position: 'absolute',
-    right: -10,
+    right: -15,
     bottom: -15,
-    width: 135,
-    height: 135,
-    borderRadius: 67.5,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     overflow: 'hidden',
-    opacity: 0.35,
+    opacity: 0.55,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: 'rgba(255, 176, 0, 0.45)',
     transform: [{ rotate: '12deg' }],
   },
   foodCutoutImage: {
@@ -258,15 +258,15 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#FFB000',
   },
   badgeText: {
-    color: '#FFF',
+    color: '#FFB000',
     fontSize: 10,
     fontFamily: tokens.typography.family.black,
     letterSpacing: 0.8,
@@ -280,10 +280,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   timerLabel: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 232, 222, 0.85)',
     fontSize: 9,
     fontFamily: tokens.typography.family.extrabold,
     letterSpacing: 0.6,
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timeBoxText: {
-    color: '#0F172A',
+    color: '#B8320C',
     fontSize: 11,
     fontFamily: tokens.typography.family.black,
   },
@@ -321,13 +321,13 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   headline: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontSize: 20,
     fontFamily: tokens.typography.family.black,
     letterSpacing: -0.3,
   },
   campaignName: {
-    color: 'rgba(255, 255, 255, 0.92)',
+    color: '#FFE8DE',
     fontSize: 12,
     fontFamily: tokens.typography.family.medium,
     marginTop: 1,
@@ -342,12 +342,12 @@ const styles = StyleSheet.create({
     gap: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.18,
     shadowRadius: 4,
     elevation: 3,
   },
   shopNowText: {
-    color: '#0F172A',
+    color: '#B8320C',
     fontSize: 12,
     fontFamily: tokens.typography.family.extrabold,
   },
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.2)',
   },
   footerText: {
-    color: 'rgba(255, 255, 255, 0.88)',
+    color: '#FFE8DE',
     fontSize: 10,
     fontFamily: tokens.typography.family.bold,
     letterSpacing: 0.3,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   autoAppliedText: {
-    color: '#FFF',
+    color: '#FFE8DE',
     fontSize: 10,
     fontFamily: tokens.typography.family.bold,
     letterSpacing: 0.2,
