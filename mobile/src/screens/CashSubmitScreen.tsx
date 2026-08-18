@@ -135,7 +135,9 @@ const CashSubmitScreen = ({ navigation }: any) => {
     } catch (e: any) {
       // error.code === 0 means user cancelled — don't show error for that
       if (e?.code !== 0) {
-        showDialog({ title: 'Payment Failed', message: e?.response?.data?.error || e?.description || 'Payment could not be completed. Try again.', confirmText: 'Okay', type: 'error' });
+        let msg = e?.response?.data?.error || e?.description || 'Payment could not be completed. Try again.';
+        if (msg === 'undefined' || !msg) msg = 'Payment could not be completed. Try again.';
+        showDialog({ title: 'Payment Failed', message: msg, confirmText: 'Okay', type: 'error' });
       }
     } finally {
       setRzpLoading(false);

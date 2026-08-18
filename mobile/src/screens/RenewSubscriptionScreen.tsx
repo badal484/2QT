@@ -56,7 +56,8 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
             queryClient.invalidateQueries({ queryKey: ['my-subscriptions'] });
             navigation.navigate('ProfileMain');
         } catch (error: any) {
-            showDialog({ title: 'Payment Failed', message: error.description || 'Transaction cancelled', confirmText: 'Okay', type: 'error' });
+            const msg = error.description && error.description !== 'undefined' ? error.description : 'Transaction cancelled';
+            showDialog({ title: 'Payment Failed', message: msg, confirmText: 'Okay', type: 'error' });
         }
     },
     onError: (err: any) => {
