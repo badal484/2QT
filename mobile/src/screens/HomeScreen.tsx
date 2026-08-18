@@ -713,7 +713,7 @@ const HomeScreen = ({ navigation }: any) => {
               <Text allowFontScaling={false} style={{
                 fontSize: 9,
                 fontFamily: tokens.typography.family.extrabold,
-                color: isVegOnly ? tokens.colors.success : tokens.colors.textSecondary,
+                color: isVegOnly ? tokens.colors.success : tokens.colors.primary,
                 letterSpacing: 0.5,
                 marginLeft: 4,
                 flexShrink: 0

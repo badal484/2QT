@@ -21,15 +21,15 @@ export const CustomVegToggle: React.FC<CustomVegToggleProps> = ({ value, onValue
 
   const animatedTrackStyle = useAnimatedStyle(() => {
     return {
-      backgroundColor: progress.value > 0.5 ? tokens.colors.successTint : '#E2E8F0',
-      borderColor: progress.value > 0.5 ? tokens.colors.successTint : '#CBD5E1',
+      backgroundColor: progress.value > 0.5 ? tokens.colors.successTint : tokens.colors.primaryTint,
+      borderColor: progress.value > 0.5 ? '#A7F3D0' : '#FFD8CC',
     };
   });
 
   const animatedThumbStyle = useAnimatedStyle(() => {
     return {
       transform: [{ translateX: progress.value * 14 }],
-      backgroundColor: progress.value > 0.5 ? tokens.colors.success : tokens.colors.surface,
+      backgroundColor: progress.value > 0.5 ? tokens.colors.success : tokens.colors.primary,
     };
   });
 
