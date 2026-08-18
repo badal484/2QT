@@ -386,7 +386,12 @@ const EMPTY_CAMPAIGN = {
 function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({ ...EMPTY_CAMPAIGN });
   const [saving, setSaving] = useState(false);
+  const [zones, setZones] = useState<any[]>([]);
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    api.get("/admin/zones").then(res => setZones(res?.zones ?? [])).catch(() => {});
+  }, []);
 
   const save = async () => {
     if (!form.name.trim()) { toast.error("Name is required"); return; }
@@ -477,7 +482,21 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
 
         {form.type === "winback" && inp("Inactive days threshold", "winback_days", "number", "7")}
 
-        {inp("Zone ID (blank = all zones)", "zone_id", "text")}
+        <div>
+          <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Target Zone</label>
+          <select
+            className="mt-1 w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-semibold text-zinc-800 bg-white"
+            value={form.zone_id || ""}
+            onChange={e => set("zone_id", e.target.value)}
+          >
+            <option value="">All Zones (Global)</option>
+            {zones.map((z: any) => (
+              <option key={z.id} value={z.id}>
+                {z.name} — {z.city}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div>
           <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Audience</label>
