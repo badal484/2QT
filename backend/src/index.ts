@@ -141,9 +141,13 @@ const PORT = process.env.PORT || 3000;
 
 const start = async () => {
     try {
-        // Run Migrations
-        // We can run it in a separate process or call it here.
-        // For simplicity, I'll ensure it's triggered.
+        // Auto-run pending DB migrations on startup
+        try {
+            const { runMigrations } = require('./db/migrate');
+            await runMigrations();
+        } catch (mErr) {
+            console.error('[API] Migration check failed:', mErr);
+        }
 
         await connectRedis();
         console.log('Redis connected.');

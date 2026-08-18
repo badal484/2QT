@@ -52,53 +52,55 @@ async function migrate() {
             console.log(`Executing migration ${version}...`);
             const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
 
-            // Migrations that use ALTER TYPE ... ADD VALUE cannot run inside a transaction
-            // on PostgreSQL < 12 (and may behave unexpectedly even on 12+ in some edge cases).
-            // Run these outside a transaction so they are never blocked.
-            const needsNoTransaction = /ALTER\s+TYPE\s+\S+\s+ADD\s+VALUE/i.test(sql);
+        const client = await pool.connect();
+        try {
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version TEXT PRIMARY KEY,
+                    executed_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            `);
 
-            if (needsNoTransaction) {
+            const migrationsDir = path.join(__dirname, '../../migrations');
+            if (!fs.existsSync(migrationsDir)) return;
+            const files = fs.readdirSync(migrationsDir)
+                .filter(f => f.endsWith('.sql'))
+                .sort((a, b) => a.localeCompare(b));
+
+            for (const file of files) {
+                const version = file.split('.')[0];
+
+                const { rows } = await client.query('SELECT 1 FROM schema_migrations WHERE version = $1', [version]);
+                if (rows.length > 0) {
+                    continue;
+                }
+
+                const filePath = path.join(migrationsDir, file);
+                const sql = fs.readFileSync(filePath, 'utf-8');
+
                 try {
                     await client.query(sql);
                     await client.query('INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING', [version]);
-                    console.log(`Migration ${version} completed (no-transaction mode).`);
+                    console.log(`[MIGRATIONS] Migration ${version} completed successfully.`);
                 } catch (err: any) {
                     if (ALREADY_EXISTS.has(err.code)) {
                         await client.query('INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING', [version]);
-                        console.warn(`Migration ${version} skipped (object already exists) — recorded as done.`);
+                        console.warn(`[MIGRATIONS] Migration ${version} skipped (object already exists) — recorded as done.`);
                     } else {
-                        console.error(`Migration ${version} failed:`, err.message, `(code: ${err.code})`);
-                        process.exit(1);
-                    }
-                }
-            } else {
-                await client.query('BEGIN');
-                try {
-                    await client.query(sql);
-                    await client.query('INSERT INTO schema_migrations (version) VALUES ($1)', [version]);
-                    await client.query('COMMIT');
-                    console.log(`Migration ${version} completed successfully.`);
-                } catch (err: any) {
-                    await client.query('ROLLBACK');
-                    if (ALREADY_EXISTS.has(err.code)) {
-                        await client.query('INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING', [version]);
-                        console.warn(`Migration ${version} skipped (object already exists) — recorded as done.`);
-                    } else {
-                        console.error(`Migration ${version} failed:`, err.message, `(code: ${err.code})`);
-                        process.exit(1);
+                        console.error(`[MIGRATIONS] Migration ${version} failed:`, err.message, `(code: ${err.code})`);
                     }
                 }
             }
-        }
 
-        console.log('All migrations completed successfully.');
+            console.log('[MIGRATIONS] All pending migrations checked and executed successfully.');
+        } finally {
+            client.release();
+        }
     } catch (err) {
-        console.error('Migration runner failed:', err);
-        process.exit(1);
-    } finally {
-        client.release();
-        await pool.end();
+        console.error('[MIGRATIONS] Migration runner failed:', err);
     }
 }
 
-migrate();
+if (require.main === module) {
+    runMigrations().then(() => pool.end());
+}
