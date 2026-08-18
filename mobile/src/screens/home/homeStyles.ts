@@ -483,6 +483,9 @@ export const styles = StyleSheet.create({
   bannerTagText: { color: tokens.colors.textInverse, fontSize: 10, fontFamily: tokens.typography.family.extrabold, textTransform: 'uppercase' },
   bannerTitle: { color: tokens.colors.textInverse, fontSize: 24, fontFamily: tokens.typography.family.black, width: '80%' },
   bannerSubtitle: { color: tokens.colors.textInverse, fontSize: 14, fontFamily: tokens.typography.family.medium, marginTop: 4, opacity: 0.9 },
+  bannerDotsContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: tokens.spacing.sm },
+  bannerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: tokens.colors.surfaceMuted },
+  bannerDotActive: { width: 16, backgroundColor: tokens.colors.primary },
 
   requestServiceContainer: { width: '100%', paddingHorizontal: tokens.spacing.sm },
   reqInfoCard: { alignItems: 'center', paddingVertical: tokens.spacing.xxl },

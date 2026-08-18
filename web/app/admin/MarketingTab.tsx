@@ -12,7 +12,7 @@ import { SkeletonList } from "../components/ui/Skeleton";
 const EMPTY_BANNER = {
   title: "", subtitle: "", tag_text: "", image_url: "",
   action_type: "NONE", action_payload: "", display_order: 0,
-  is_active: true, banner_type: "MAIN",
+  is_active: true, banner_type: "MAIN", slide_duration_ms: 3000,
 };
 
 function sizeHint(type: string) {
@@ -123,6 +123,18 @@ function BannerForm({
         <div>
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Display Order</label>
           <input type="number" value={data.display_order} onChange={e => onChange({ ...data, display_order: Number(e.target.value) })} className={inp} placeholder="0" />
+        </div>
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Auto-Slide Duration (seconds)</label>
+          <input
+            type="number"
+            min={1}
+            step={0.5}
+            value={data.slide_duration_ms / 1000}
+            onChange={e => onChange({ ...data, slide_duration_ms: Math.round(Number(e.target.value) * 1000) })}
+            className={inp}
+            placeholder="3"
+          />
         </div>
       </div>
       <div className="pt-4 flex justify-end">
@@ -288,7 +300,7 @@ export function MarketingTab() {
                   {banner.is_active ? 'Active' : 'Paused'}
                 </button>
                 <button
-                  onClick={() => { setEditingBanner({ ...banner }); setIsCreating(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => { setEditingBanner({ ...banner, slide_duration_ms: banner.slide_duration_ms ?? 3000 }); setIsCreating(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="bg-zinc-800/90 text-white w-6 h-6 flex items-center justify-center rounded-full hover:bg-zinc-700 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <Edit className="w-3 h-3" />
@@ -306,7 +318,7 @@ export function MarketingTab() {
               <p className="text-sm text-zinc-400 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
               <div className="flex items-center justify-between border-t border-white/10 pt-4">
                 <div className="text-xs font-bold uppercase text-zinc-500">
-                  {banner.banner_type === 'MINI' ? 'Type: MINI' : banner.banner_type === 'STRIP' ? 'Type: STRIP' : 'Type: MAIN'} | Order: {banner.display_order}
+                  {banner.banner_type === 'MINI' ? 'Type: MINI' : banner.banner_type === 'STRIP' ? 'Type: STRIP' : 'Type: MAIN'} | Order: {banner.display_order} | {((banner.slide_duration_ms ?? 3000) / 1000).toFixed(1)}s
                 </div>
                 <div className="text-xs font-bold bg-white/5 px-2 py-1 rounded text-zinc-400">
                   {banner.action_type} {banner.action_payload && `(${banner.action_payload})`}

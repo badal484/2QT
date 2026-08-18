@@ -317,11 +317,12 @@ export default function MenuPage() {
 
   useEffect(() => {
     if (banners.length <= 1) return;
-    const interval = setInterval(() => {
+    const duration = banners[currentBannerIndex]?.slide_duration_ms ?? 5000;
+    const timeout = setTimeout(() => {
       setCurrentBannerIndex(prev => (prev + 1) % banners.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [banners.length]);
+    }, duration);
+    return () => clearTimeout(timeout);
+  }, [banners, currentBannerIndex]);
 
   useEffect(() => {
     if (!isCartOpen || !user) return;
