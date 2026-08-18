@@ -47,12 +47,13 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
     switch (campaign.type) {
       case 'flash_sale':
         return {
-          gradient: ['#FF1744', '#E11D48', '#BE123C'],
-          badgeBg: 'rgba(255, 255, 255, 0.22)',
-          badgeText: '#FFFFFF',
+          gradient: ['#0B0F19', '#1E1B4B', '#2E1045'],
+          badgeBg: 'rgba(249, 115, 22, 0.25)',
+          badgeBorder: 'rgba(249, 115, 22, 0.55)',
+          badgeText: '#FFEDD5',
           badgeLabel: 'FLASH SALE',
           icon: Flame,
-          accent: '#FF4D4D',
+          accent: '#F97316',
           foodImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&auto=format&fit=crop&q=80',
         };
       case 'happy_hour':
@@ -128,9 +129,9 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
 
         {/* Top bar: Badge + Live Glass Timer */}
         <View style={styles.topRow}>
-          <View style={styles.badge}>
-            <Icon size={12} color="#FFF" style={{ marginRight: 4 }} />
-            <Text allowFontScaling={false} style={styles.badgeText}>
+          <View style={[styles.badge, theme.badgeBorder ? { borderColor: theme.badgeBorder, backgroundColor: theme.badgeBg } : null]}>
+            <Icon size={12} color={theme.accent || '#FFF'} style={{ marginRight: 4 }} />
+            <Text allowFontScaling={false} style={[styles.badgeText, theme.badgeText ? { color: theme.badgeText } : null]}>
               {theme.badgeLabel}
             </Text>
           </View>
