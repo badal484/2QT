@@ -608,7 +608,7 @@ const CartScreen = ({ navigation }: any) => {
                     <Tag size={11} color={tokens.colors.success} />
                     <Text allowFontScaling={false} style={styles.promoChipCode}>{promo.code}</Text>
                     <Text allowFontScaling={false} style={styles.promoChipDesc} numberOfLines={1}>
-                      {promo.discount_type === 'percentage'
+                      {(promo.discount_type === 'percentage' || promo.discount_type === 'percent')
                         ? `${promo.discount_percent}% off`
                         : `₹${(promo.discount_flat_paise || 0) / 100} off`}
                       {promo.min_order_paise ? ` on ₹${promo.min_order_paise / 100}+` : ''}
@@ -1079,8 +1079,8 @@ const CartScreen = ({ navigation }: any) => {
                         </View>
                         <Text allowFontScaling={false} style={styles.modalCouponDescText}>
                           {promo.discount_type === 'bogo'
-                            ? '🎁 Buy 1 Get 1 Free (BOGO Deal)'
-                            : promo.discount_type === 'percentage'
+                            ? 'Buy 1 Get 1 Free (BOGO Deal)'
+                            : (promo.discount_type === 'percentage' || promo.discount_type === 'percent')
                             ? `Get ${promo.discount_percent}% OFF up to ₹${(promo.max_discount_paise || 0) / 100}`
                             : `Get ₹${(promo.discount_flat_paise || 0) / 100} Flat OFF`}
                         </Text>

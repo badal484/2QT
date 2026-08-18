@@ -438,9 +438,9 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text allowFontScaling={false} style={s.promoTitle} numberOfLines={1}>
-                      {promo.discount_type === 'percentage'
-                        ? `${promo.discount_percent}% upto ₹${promo.max_discount_paise / 100} Off`
-                        : `₹${promo.discount_flat_paise / 100} Off`}
+                      {(promo.discount_type === 'percentage' || promo.discount_type === 'percent')
+                        ? `${promo.discount_percent}% upto ₹${(promo.max_discount_paise || 0) / 100} Off`
+                        : `₹${(promo.discount_flat_paise || 0) / 100} Off`}
                     </Text>
                     <Text allowFontScaling={false} style={s.promoSub}>
                       USE {promo.code}
