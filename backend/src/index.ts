@@ -2,6 +2,7 @@ import './instrument'; // Sentry must be first — before any other import
 import 'express-async-errors';
 import express from 'express';
 import http from 'http';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -42,6 +43,7 @@ const server = http.createServer(app);
 // Middleware
 app.use(compression({ level: 6, threshold: 1024 })); // gzip responses > 1KB
 app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use('/public', express.static(path.join(__dirname, '../public')));
 // CSP removal must come AFTER helmet so it overrides what helmet just set
 app.use('/admin/queues', (_req, res, next) => {
     res.removeHeader('Content-Security-Policy');

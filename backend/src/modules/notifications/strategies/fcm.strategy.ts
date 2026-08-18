@@ -29,6 +29,8 @@ export class FCMStrategy implements NotificationChannelStrategy {
             // 2. Select channel sound & priority based on appType & target urgency
             const sound = this.getSoundForApp(appType, type);
             const channelId = this.getChannelIdForApp(appType);
+            const defaultLogoUrl = process.env.PUBLIC_LOGO_URL || 'https://twoqt-3kjw.onrender.com/public/logo-2qt-circle.png';
+            const resolvedLargeIcon = largeIcon || defaultLogoUrl;
 
             // Convert data object to key-value strings required by FCM SDK (always include title & body)
             const stringifiedData: Record<string, string> = {
@@ -37,7 +39,7 @@ export class FCMStrategy implements NotificationChannelStrategy {
                 appType: String(appType || 'buyer'),
                 title: String(title || ''),
                 body: String(body || ''),
-                ...(largeIcon ? { largeIcon: String(largeIcon) } : {}),
+                largeIcon: String(resolvedLargeIcon),
                 ...(imageUrl ? { imageUrl: String(imageUrl) } : {}),
             };
 

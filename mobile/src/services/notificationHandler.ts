@@ -90,7 +90,8 @@ export class NotificationHandler {
 
             if (safeNotifee.isAvailable) {
                 try {
-                    const largeIcon = data.largeIcon || notification?.android?.largeIcon || 'ic_launcher';
+                    const defaultLogoUrl = 'https://twoqt-3kjw.onrender.com/public/logo-2qt-circle.png';
+                    const largeIcon = data.largeIcon || notification?.android?.largeIcon || defaultLogoUrl;
                     const imageUrl = data.imageUrl || notification?.android?.imageUrl || notification?.imageUrl;
 
                     const androidConfig: any = {
