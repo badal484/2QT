@@ -83,8 +83,8 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
     if (!['all', 'kitchen', 'category', 'item'].includes(target_type)) {
         return res.status(400).json({ error: 'target_type must be all | kitchen | category | item' });
     }
-    if (!['flat', 'percent', 'percentage'].includes(discount_type)) {
-        return res.status(400).json({ error: 'discount_type must be flat | percent' });
+    if (!['flat', 'percent', 'percentage', 'bogo'].includes(discount_type)) {
+        return res.status(400).json({ error: 'discount_type must be flat | percent | bogo' });
     }
     if (audience && !VALID_AUDIENCES.includes(audience)) {
         return res.status(400).json({ error: `audience must be one of: ${VALID_AUDIENCES.join(', ')}` });

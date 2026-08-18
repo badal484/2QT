@@ -253,7 +253,12 @@ const HomeScreen = ({ navigation }: any) => {
              
              if (isMatch) {
                   let discount = 0;
-                  if (offer.discount_type === 'flat') {
+                  if (offer.discount_type === 'bogo') {
+                      discount = Math.floor(basePrice * 0.5);
+                      if (offer.max_discount_paise && discount > offer.max_discount_paise) {
+                          discount = offer.max_discount_paise;
+                      }
+                  } else if (offer.discount_type === 'flat') {
                       discount = offer.discount_flat_paise || 0;
                   } else if (offer.discount_type === 'percent' || offer.discount_type === 'percentage') {
                       discount = Math.floor((basePrice * (parseFloat(offer.discount_percent || '0') || 0)) / 100);
@@ -261,7 +266,7 @@ const HomeScreen = ({ navigation }: any) => {
                           discount = offer.max_discount_paise;
                       }
                   }
-                  if (discount > offerDiscountPaise) {
+                  if (discount > offerDiscountPaise || (offer.discount_type === 'bogo' && !appliedOffer)) {
                       offerDiscountPaise = discount;
                       appliedOffer = offer;
                   }
@@ -361,7 +366,7 @@ const HomeScreen = ({ navigation }: any) => {
             addItem({
               menuItemId: item.id,
               name: item.name,
-              pricePaise: item.price_paise + customExtraPaise,
+              pricePaise: (item.original_price_paise || item.price_paise) + customExtraPaise,
               quantity: 1,
               photoUrl: item.photo_url,
               isVeg: item.is_veg,
@@ -378,7 +383,7 @@ const HomeScreen = ({ navigation }: any) => {
         addItem({
           menuItemId: item.id,
           name: item.name,
-          pricePaise: item.price_paise + customExtraPaise,
+          pricePaise: (item.original_price_paise || item.price_paise) + customExtraPaise,
           quantity: 1,
           photoUrl: item.photo_url,
           isVeg: item.is_veg,
