@@ -198,11 +198,22 @@ router.get('/', async (req, res) => {
             [zoneId]
         ),
         query(
-            `SELECT * FROM menu_offers
-             WHERE is_active = true
-             AND (zone_id IS NULL OR zone_id = $1)
-             AND (start_time IS NULL OR start_time <= NOW())
-             AND (end_time IS NULL OR end_time >= NOW())`,
+            `SELECT o.*,
+                    (
+                      SELECT ARRAY_AGG(LOWER(c.name))
+                      FROM menu_categories c
+                      WHERE c.id = o.target_id OR c.id = ANY(o.target_ids)
+                    ) AS target_category_names,
+                    (
+                      SELECT ARRAY_AGG(LOWER(c.slug))
+                      FROM menu_categories c
+                      WHERE c.id = o.target_id OR c.id = ANY(o.target_ids)
+                    ) AS target_category_slugs
+             FROM menu_offers o
+             WHERE o.is_active = true
+             AND (o.zone_id IS NULL OR o.zone_id = $1)
+             AND (o.start_time IS NULL OR o.start_time <= NOW())
+             AND (o.end_time IS NULL OR o.end_time >= NOW())`,
             [zoneId]
         )
     ]);

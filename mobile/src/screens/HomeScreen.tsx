@@ -243,11 +243,18 @@ const HomeScreen = ({ navigation }: any) => {
         
         for (const offer of offers) {
              const tIds: string[] = Array.isArray(offer.target_ids) ? offer.target_ids : [];
+             const itemCat = String(item.category || '').toLowerCase();
+             const targetCatNames = (offer.target_category_names || [])
+                 .concat(offer.target_category_slugs || [])
+                 .filter(Boolean)
+                 .map((c: string) => String(c).toLowerCase());
+
              const isMatch = offer.target_type === 'all' ||
                              (offer.target_type === 'item' && (tIds.includes(item.id) || offer.target_id === item.id)) ||
                              (offer.target_type === 'category' && (
-                                 tIds.some((t: string) => String(t) === String(item.category)) ||
-                                 String(offer.target_id) === String(item.category)
+                                 targetCatNames.includes(itemCat) ||
+                                 tIds.some((t: string) => String(t).toLowerCase() === itemCat) ||
+                                 String(offer.target_id).toLowerCase() === itemCat
                              )) ||
                              (offer.target_type === 'kitchen' && (tIds.includes(item.kitchen_id) || offer.target_id === item.kitchen_id));
              

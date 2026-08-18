@@ -40,11 +40,22 @@ export const calculatePricing = async ({
 
     // ── 2. Fetch active menu offers for this zone ───────────────────────────────
     const { rows: menuOffers } = await query(
-        `SELECT * FROM menu_offers
-         WHERE is_active = true
-         AND (zone_id IS NULL OR zone_id = $1)
-         AND (start_time IS NULL OR start_time <= NOW())
-         AND (end_time IS NULL OR end_time >= NOW())`,
+        `SELECT o.*,
+                (
+                  SELECT ARRAY_AGG(LOWER(c.name))
+                  FROM menu_categories c
+                  WHERE c.id = o.target_id OR c.id = ANY(o.target_ids)
+                ) AS target_category_names,
+                (
+                  SELECT ARRAY_AGG(LOWER(c.slug))
+                  FROM menu_categories c
+                  WHERE c.id = o.target_id OR c.id = ANY(o.target_ids)
+                ) AS target_category_slugs
+         FROM menu_offers o
+         WHERE o.is_active = true
+         AND (o.zone_id IS NULL OR o.zone_id = $1)
+         AND (o.start_time IS NULL OR o.start_time <= NOW())
+         AND (o.end_time IS NULL OR o.end_time >= NOW())`,
         [zoneId]
     );
 
@@ -76,14 +87,21 @@ export const calculatePricing = async ({
         for (const offer of menuOffers) {
             // target_ids (multi-select array) takes priority over single target_id
             const itemTargetIds: string[] = Array.isArray(offer.target_ids) ? offer.target_ids : [];
+            const itemCat = String(item.category || '').toLowerCase();
+            const targetCatNames = (offer.target_category_names || [])
+                .concat(offer.target_category_slugs || [])
+                .filter(Boolean)
+                .map((c: string) => String(c).toLowerCase());
+
             const matches =
                 offer.target_type === 'all' ||
                 (offer.target_type === 'item' && (
                     itemTargetIds.includes(item.id) || offer.target_id === item.id
                 )) ||
                 (offer.target_type === 'category' && (
-                    itemTargetIds.some(tid => String(tid) === String(item.category)) ||
-                    String(offer.target_id) === String(item.category)
+                    targetCatNames.includes(itemCat) ||
+                    itemTargetIds.some(tid => String(tid).toLowerCase() === itemCat) ||
+                    String(offer.target_id).toLowerCase() === itemCat
                 )) ||
                 (offer.target_type === 'kitchen' && (
                     itemTargetIds.includes(item.kitchen_id) || offer.target_id === item.kitchen_id
