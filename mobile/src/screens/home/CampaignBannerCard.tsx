@@ -47,13 +47,13 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
     switch (campaign.type) {
       case 'flash_sale':
         return {
-          gradient: ['#F04A0D', '#C83B0E', '#B8320C'],
-          badgeBg: 'rgba(0, 0, 0, 0.22)',
-          badgeBorder: '#FFB000',
-          badgeText: '#FFB000',
+          gradient: ['#FF5722', '#F04A0D', '#C2410C', '#991B1B'],
+          badgeBg: 'rgba(0, 0, 0, 0.28)',
+          badgeBorder: '#FFD700',
+          badgeText: '#FFD700',
           badgeLabel: 'FLASH SALE',
           icon: Flame,
-          accent: '#FFB000',
+          accent: '#FFD700',
           foodImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&auto=format&fit=crop&q=80',
         };
       case 'happy_hour':
@@ -114,20 +114,14 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
         end={{ x: 1, y: 1 }}
         style={styles.gradientCard}
       >
+        {/* Glossy top sheen line */}
+        <View style={styles.topSheen} pointerEvents="none" />
+
         {/* Ambient background glow ornaments */}
         <View style={styles.ambientGlow1} pointerEvents="none" />
         <View style={styles.ambientGlow2} pointerEvents="none" />
 
-        {/* Floating Gourmet Food Cutout Accent */}
-        <View pointerEvents="none" style={styles.foodCutoutContainer}>
-          <Image
-            source={{ uri: campaign.image_url || campaign.photo_url || theme.foodImage }}
-            style={styles.foodCutoutImage}
-            resizeMode="cover"
-          />
-        </View>
-
-        {/* Top bar: Badge + Live Glass Timer */}
+        {/* Top Header Row: Badge & Timer */}
         <View style={styles.topRow}>
           <View style={[styles.badge, theme.badgeBorder ? { borderColor: theme.badgeBorder, backgroundColor: theme.badgeBg } : null]}>
             <Icon size={12} color={theme.accent || '#FFF'} style={{ marginRight: 4 }} />
@@ -161,23 +155,39 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           ) : null}
         </View>
 
-        {/* Headline & Campaign Name */}
-        <View style={styles.bodyRow}>
-          <View style={{ flex: 1, paddingRight: 8 }}>
+        {/* Split Content Row: Left Info vs Right Framed Image */}
+        <View style={styles.splitRow}>
+          {/* Left Column: Headline, Subtitle, CTA */}
+          <View style={styles.leftCol}>
             <Text allowFontScaling={false} style={styles.headline}>
               {discountHeadline()}
             </Text>
             <Text allowFontScaling={false} style={styles.campaignName} numberOfLines={1}>
               {campaign.name}
             </Text>
+
+            <View style={styles.ctaWrapper}>
+              <View style={styles.shopNowPill}>
+                <Text allowFontScaling={false} style={styles.shopNowText}>Order Now</Text>
+                <ArrowRight size={13} color="#B8320C" />
+              </View>
+            </View>
           </View>
-          <View style={styles.shopNowPill}>
-            <Text allowFontScaling={false} style={styles.shopNowText}>Order Now</Text>
-            <ArrowRight size={13} color="#B8320C" />
+
+          {/* Right Column: Framed 100% Opaque Food Image Box */}
+          <View style={styles.rightCol}>
+            <View style={styles.foodAuraGlow} pointerEvents="none" />
+            <View style={styles.framedFoodBox}>
+              <Image
+                source={{ uri: campaign.image_url || campaign.photo_url || theme.foodImage }}
+                style={styles.framedFoodImage}
+                resizeMode="cover"
+              />
+            </View>
           </View>
         </View>
 
-        {/* Footer info: Min order / auto-applied */}
+        {/* Footer Row */}
         <View style={styles.footerRow}>
           <Text allowFontScaling={false} style={styles.footerText} numberOfLines={1}>
             {minOrderRupees > 0 ? `Min ₹${minOrderRupees}` : 'No Min'}
@@ -201,7 +211,7 @@ const styles = StyleSheet.create({
     marginVertical: tokens.spacing.sm,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#E11D48',
+    shadowColor: '#B8320C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -232,28 +242,11 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     backgroundColor: 'rgba(0, 0, 0, 0.18)',
   },
-  foodCutoutContainer: {
-    position: 'absolute',
-    right: -15,
-    bottom: -15,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    overflow: 'hidden',
-    opacity: 0.55,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 176, 0, 0.45)',
-    transform: [{ rotate: '12deg' }],
-  },
-  foodCutoutImage: {
-    width: '100%',
-    height: '100%',
-  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   badge: {
     flexDirection: 'row',
@@ -314,31 +307,81 @@ const styles = StyleSheet.create({
     fontFamily: tokens.typography.family.extrabold,
     letterSpacing: 0.5,
   },
-  bodyRow: {
+  splitRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 4,
+    marginVertical: 2,
+  },
+  leftCol: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  topSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  rightCol: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  foodAuraGlow: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255, 215, 0, 0.35)',
+    top: -9,
+    left: -9,
+  },
+  framedFoodBox: {
+    width: 92,
+    height: 92,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+    backgroundColor: '#000',
+  },
+  framedFoodImage: {
+    width: '100%',
+    height: '100%',
   },
   headline: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 19,
     fontFamily: tokens.typography.family.black,
     letterSpacing: -0.3,
+    lineHeight: 22,
   },
   campaignName: {
     color: '#FFE8DE',
     fontSize: 12,
     fontFamily: tokens.typography.family.medium,
-    marginTop: 1,
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  ctaWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   shopNowPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     gap: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -348,14 +391,14 @@ const styles = StyleSheet.create({
   },
   shopNowText: {
     color: '#B8320C',
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: tokens.typography.family.extrabold,
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.2)',
