@@ -65,7 +65,9 @@ export const CatPreviewCard = React.memo(({ mi, kitchenPaused, navigation, dispa
         {mi.applied_offer && (
           <View style={styles.itemOfferTag}>
             <Text allowFontScaling={false} style={styles.itemOfferTagText}>
-              {mi.applied_offer.discount_type === 'flat'
+              {mi.applied_offer.discount_type === 'bogo'
+                ? '🎁 BUY 1 GET 1 FREE'
+                : mi.applied_offer.discount_type === 'flat'
                 ? `₹${(mi.applied_offer.discount_flat_paise || 0) / 100} OFF`
                 : `${Math.round(parseFloat(mi.applied_offer.discount_percent || '0'))}% OFF`}
             </Text>

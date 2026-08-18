@@ -150,21 +150,22 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
          if (isMatch) {
               let discount = 0;
               if (offer.discount_type === 'bogo') {
-                  discount = Math.floor(basePrice * 0.5);
-                  if (offer.max_discount_paise && discount > offer.max_discount_paise) {
-                      discount = offer.max_discount_paise;
-                  }
+                  appliedOffer = offer;
               } else if (offer.discount_type === 'flat') {
                   discount = offer.discount_flat_paise || 0;
+                  if (discount > offerDiscountPaise) {
+                      offerDiscountPaise = discount;
+                      appliedOffer = offer;
+                  }
               } else if (offer.discount_type === 'percent' || offer.discount_type === 'percentage') {
                   discount = Math.floor((basePrice * (parseFloat(offer.discount_percent || '0') || 0)) / 100);
                   if (offer.max_discount_paise && discount > offer.max_discount_paise) {
                       discount = offer.max_discount_paise;
                   }
-              }
-              if (discount > offerDiscountPaise || (offer.discount_type === 'bogo' && !appliedOffer)) {
-                  offerDiscountPaise = discount;
-                  appliedOffer = offer;
+                  if (discount > offerDiscountPaise) {
+                      offerDiscountPaise = discount;
+                      appliedOffer = offer;
+                  }
               }
          }
     }
