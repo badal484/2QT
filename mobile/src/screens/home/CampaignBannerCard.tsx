@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Zap, Clock, Sparkles, Flame, Gift, ArrowRight } from 'lucide-react-native';
 import { tokens } from '../../theme/tokens';
@@ -53,6 +53,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           badgeLabel: 'FLASH SALE',
           icon: Flame,
           accent: '#FF4D4D',
+          foodImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&auto=format&fit=crop&q=80',
         };
       case 'happy_hour':
         return {
@@ -62,6 +63,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           badgeLabel: 'HAPPY HOUR',
           icon: Clock,
           accent: '#A855F7',
+          foodImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop&q=80',
         };
       case 'welcome':
       case 'winback':
@@ -72,6 +74,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           badgeLabel: 'SPECIAL OFFER',
           icon: Gift,
           accent: '#10B981',
+          foodImage: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop&q=80',
         };
       default:
         return {
@@ -81,6 +84,7 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           badgeLabel: 'LIMITED DEAL',
           icon: Sparkles,
           accent: '#F59E0B',
+          foodImage: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=400&auto=format&fit=crop&q=80',
         };
     }
   };
@@ -112,6 +116,15 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
         {/* Ambient background glow ornaments */}
         <View style={styles.ambientGlow1} pointerEvents="none" />
         <View style={styles.ambientGlow2} pointerEvents="none" />
+
+        {/* Floating Gourmet Food Cutout Accent */}
+        <View pointerEvents="none" style={styles.foodCutoutContainer}>
+          <Image
+            source={{ uri: campaign.image_url || campaign.photo_url || theme.foodImage }}
+            style={styles.foodCutoutImage}
+            resizeMode="cover"
+          />
+        </View>
 
         {/* Top bar: Badge + Live Glass Timer */}
         <View style={styles.topRow}>
@@ -217,6 +230,23 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     backgroundColor: 'rgba(0, 0, 0, 0.12)',
+  },
+  foodCutoutContainer: {
+    position: 'absolute',
+    right: -10,
+    bottom: -15,
+    width: 135,
+    height: 135,
+    borderRadius: 67.5,
+    overflow: 'hidden',
+    opacity: 0.35,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    transform: [{ rotate: '12deg' }],
+  },
+  foodCutoutImage: {
+    width: '100%',
+    height: '100%',
   },
   topRow: {
     flexDirection: 'row',
