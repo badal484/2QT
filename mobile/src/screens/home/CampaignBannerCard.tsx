@@ -114,6 +114,13 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
         end={{ x: 1, y: 1 }}
         style={styles.gradientCard}
       >
+        {/* Gourmet food backdrop texture overlay (20% opacity for subtle food vibe without washing out text) */}
+        <Image
+          source={{ uri: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1000&auto=format&fit=crop&q=80' }}
+          style={[StyleSheet.absoluteFillObject, { opacity: 0.20 }]}
+          resizeMode="cover"
+        />
+
         {/* Glossy top sheen line */}
         <View style={styles.topSheen} pointerEvents="none" />
 
