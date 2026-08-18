@@ -252,6 +252,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
               } else if (error?.description) msg = error.description;
               else if (error?.message) msg = error.message;
             } catch (e) { msg = error?.description || error?.message || 'Transaction cancelled'; }
+            if (msg === 'undefined' || !msg) msg = 'Transaction cancelled';
             showDialog({ title: 'Payment Failed', message: msg });
           });
       } else {
