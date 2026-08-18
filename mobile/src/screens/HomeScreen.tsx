@@ -194,10 +194,11 @@ const HomeScreen = ({ navigation }: any) => {
   // Start at the middle copy so user can scroll both directions
   const bannerIndexRef = useRef(mainBanners.length > 1 ? mainBanners.length : 0);
   const hasInitializedBanner = useRef(false);
+  const [activeBannerDot, setActiveBannerDot] = useState(0);
 
   useEffect(() => {
     if (infiniteBanners.length <= 1) return;
-    
+
     // Jump to the middle instantly on mount
     if (!hasInitializedBanner.current) {
       setTimeout(() => {
@@ -208,28 +209,39 @@ const HomeScreen = ({ navigation }: any) => {
       }, 100);
     }
 
-    const interval = setInterval(() => {
-      if (!bannerListRef.current || infiniteBanners.length === 0) return;
-      
-      // If we somehow go out of bounds, silently reset to the middle
-      if (bannerIndexRef.current >= infiniteBanners.length - 1) {
-        bannerIndexRef.current = Math.floor(infiniteBanners.length / 2);
-        try { bannerListRef.current.scrollToIndex({ index: bannerIndexRef.current, animated: false }); } catch(e) {}
-        return;
-      }
+    let timeoutId: ReturnType<typeof setTimeout>;
 
-      bannerIndexRef.current += 1;
-      try {
-        bannerListRef.current.scrollToIndex({
-          index: bannerIndexRef.current,
-          animated: true,
-        });
-      } catch (e) {
-        // Suppress out of range errors
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [infiniteBanners.length]);
+    const advance = () => {
+      // Admin-configurable per-banner auto-slide duration (falls back to 3000ms)
+      const currentBanner = mainBanners[bannerIndexRef.current % mainBanners.length];
+      const duration = currentBanner?.slide_duration_ms ?? 3000;
+
+      timeoutId = setTimeout(() => {
+        if (!bannerListRef.current || infiniteBanners.length === 0) return;
+
+        // If we somehow go out of bounds, silently reset to the middle
+        if (bannerIndexRef.current >= infiniteBanners.length - 1) {
+          bannerIndexRef.current = Math.floor(infiniteBanners.length / 2);
+          try { bannerListRef.current.scrollToIndex({ index: bannerIndexRef.current, animated: false }); } catch(e) {}
+        } else {
+          bannerIndexRef.current += 1;
+          try {
+            bannerListRef.current.scrollToIndex({
+              index: bannerIndexRef.current,
+              animated: true,
+            });
+          } catch (e) {
+            // Suppress out of range errors
+          }
+        }
+        setActiveBannerDot(bannerIndexRef.current % mainBanners.length);
+        advance();
+      }, duration);
+    };
+
+    advance();
+    return () => clearTimeout(timeoutId);
+  }, [infiniteBanners.length, mainBanners]);
 
   const enrichedItems = useMemo(() => {
     if (!menuData?.items) return [];
@@ -835,6 +847,7 @@ const HomeScreen = ({ navigation }: any) => {
                   onMomentumScrollEnd={(ev) => {
                     const newIndex = Math.round(ev.nativeEvent.contentOffset.x / SCREEN_WIDTH);
                     bannerIndexRef.current = newIndex;
+                    setActiveBannerDot(newIndex % mainBanners.length);
                   }}
                   getItemLayout={(_, index) => ({
                     length: SCREEN_WIDTH,
@@ -861,6 +874,19 @@ const HomeScreen = ({ navigation }: any) => {
                     </View>
                   )}
                 />
+                {mainBanners.length > 1 && (
+                  <View style={styles.bannerDotsContainer}>
+                    {mainBanners.map((_: any, idx: number) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.bannerDot,
+                          idx === activeBannerDot && styles.bannerDotActive,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                )}
               </Animated.View>
             )}
 
