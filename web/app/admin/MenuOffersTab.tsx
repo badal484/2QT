@@ -202,6 +202,20 @@ export function MenuOffersTab() {
     setShowModal(true);
   };
 
+const toLocalInputFormat = (isoStr?: string) => {
+  if (!isoStr) return "";
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const formatIso = (val?: string) => {
+  if (!val) return null;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+};
+
   const openEdit = (offer: any) => {
     setEditing(offer);
     // Rebuild selected targets from target_ids or target_id
@@ -222,8 +236,8 @@ export function MenuOffersTab() {
       audience: offer.audience ?? "all",
       audience_config: offer.audience_config ?? {},
       zone_id: offer.zone_id ?? "",
-      start_time: offer.start_time ? offer.start_time.slice(0, 16) : "",
-      end_time: offer.end_time ? offer.end_time.slice(0, 16) : "",
+      start_time: toLocalInputFormat(offer.start_time),
+      end_time: toLocalInputFormat(offer.end_time),
       is_active: offer.is_active ?? true,
       per_user_limit: offer.per_user_limit ?? "",
       max_items_per_order: offer.max_items_per_order ?? "",
@@ -248,8 +262,8 @@ export function MenuOffersTab() {
         discount_flat_paise: form.discount_flat_paise ? Math.round(parseFloat(form.discount_flat_paise) * 100) : 0,
         max_discount_paise: form.max_discount_paise ? Math.round(parseFloat(form.max_discount_paise) * 100) : null,
         zone_id: form.zone_id || null,
-        start_time: form.start_time || null,
-        end_time: form.end_time || null,
+        start_time: formatIso(form.start_time),
+        end_time: formatIso(form.end_time),
         audience_config: form.audience_config || {},
       };
       if (editing) {

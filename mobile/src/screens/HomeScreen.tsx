@@ -119,7 +119,7 @@ const HomeScreen = ({ navigation }: any) => {
     queryKey: ['menu', effectiveZoneId],
     queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}`),
     enabled: !!effectiveZoneId,
-    staleTime: 3 * 60 * 1000,
+    staleTime: 10 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
