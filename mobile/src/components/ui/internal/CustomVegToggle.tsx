@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TouchableWithoutFeedback } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { tokens } from '../../../theme/tokens';
 import { haptics } from '../../../utils/haptics';
 
@@ -10,13 +10,14 @@ interface CustomVegToggleProps {
 }
 
 export const CustomVegToggle: React.FC<CustomVegToggleProps> = ({ value, onValueChange }) => {
-  // Use local state so UI updates instantly without waiting for parent
   const [localValue, setLocalValue] = useState(value);
   const progress = useSharedValue(value ? 1 : 0);
 
   useEffect(() => {
-    setLocalValue(value);
-    progress.value = withSpring(value ? 1 : 0, { damping: 15, stiffness: 200, mass: 0.5 });
+    if (value !== localValue) {
+      setLocalValue(value);
+      progress.value = withTiming(value ? 1 : 0, { duration: 120 });
+    }
   }, [value]);
 
   const animatedTrackStyle = useAnimatedStyle(() => {
@@ -34,14 +35,11 @@ export const CustomVegToggle: React.FC<CustomVegToggleProps> = ({ value, onValue
   });
 
   const handlePress = () => {
+    haptics.selection();
     const newValue = !localValue;
     setLocalValue(newValue);
-    progress.value = withSpring(newValue ? 1 : 0, { damping: 15, stiffness: 200, mass: 0.5 });
-    
-    // Defer the expensive parent update so animation starts instantly
-    setTimeout(() => {
-      onValueChange(newValue);
-    }, 50);
+    progress.value = withTiming(newValue ? 1 : 0, { duration: 120 });
+    onValueChange(newValue);
   };
 
   return (
