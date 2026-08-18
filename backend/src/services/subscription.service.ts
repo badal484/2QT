@@ -1,5 +1,4 @@
 import { query, withTransaction } from '../db';
-import { redis, keys } from '../redis';
 
 export const resetDailyCredits = async () => {
     console.log('[SUBSCRIPTION] Resetting daily credits...');
@@ -19,17 +18,8 @@ export const resetDailyCredits = async () => {
     });
 };
 
-// gatewayPaymentId is required so this can be deduplicated against the Razorpay
-// payment it's actually granting a subscription for — this function used to have
-// no idempotency guard at all, and is reachable from both the payment webhook and
-// the client's own /verify-payment call for the same payment, so either a webhook
-// retry or a repeated client call would previously grant a brand-new subscription
-// each time. Mirrors the same Redis-dedup pattern already used in finalizeWalletRecharge.
-export const handleSubscriptionRenewal = async (customerId: string, planId: string, gatewayPaymentId: string) => {
-    const processed = await redis.get(keys.processedWebhook(gatewayPaymentId)).catch(() => null);
-    if (processed) return processed; // already granted for this payment — return the existing subscription id
-
-    const subId = await withTransaction(async (client) => {
+export const handleSubscriptionRenewal = async (customerId: string, planId: string) => {
+    return await withTransaction(async (client) => {
         // 1. Get current active subscription
         const { rows: currentSubs } = await client.query(
             "SELECT * FROM subscriptions WHERE customer_id = $1 AND is_active = true",
@@ -74,9 +64,6 @@ export const handleSubscriptionRenewal = async (customerId: string, planId: stri
 
         return newSub[0].id;
     });
-
-    await redis.set(keys.processedWebhook(gatewayPaymentId), subId, { EX: 90000 }).catch(e => console.error('Redis set failed', e.message));
-    return subId;
 };
 
 export const consumeCredit = async (subscriptionId: string) => {

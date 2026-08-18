@@ -72,72 +72,41 @@ const RootNavigator = () => {
     checkSystemStatus();
   }, []);
 
-  const isAuthenticated = !!accessToken;
-
-  // The backend issues 2h access tokens that get silently refreshed by the API
-  // client on any 401. accessToken's *value* therefore changes every ~2h even
-  // though the session itself hasn't ended. Keep the latest value in a ref so
-  // the socket-connect effect below can read it without depending on it —
-  // depending on it directly used to tear down and recreate the Socket object
-  // on every refresh, silently orphaning every listener bound to the old one
-  // (GlobalSocketListener, RiderHomeScreen's order feed, AssignedOrderScreen's
-  // status feed) since none of them ever re-attach to the new instance.
-  const accessTokenRef = React.useRef(accessToken);
-  React.useEffect(() => { accessTokenRef.current = accessToken; }, [accessToken]);
-
-  // Socket connection — connects once per login session, not once per token refresh.
+  // Socket connection & Push Notification setup
   React.useEffect(() => {
-    if (!isAuthenticated) {
-      disconnectSocket();
-      return;
-    }
+    if (accessToken) {
+      console.log('--- INITIALIZING SOCKET & PUSH NOTIFICATION CONNECTION ---');
+      connectSocket(accessToken);
 
-    console.log('--- INITIALIZING SOCKET CONNECTION ---');
-    connectSocket(accessTokenRef.current!);
-    const socket = getSocket();
+      const socket = getSocket();
+      if (socket) {
+        socket.on('user_updated', (data) => {
+          console.log('--- SYSTEMATIC USER UPDATE RECEIVED ---', data);
+          dispatch(updateUser(data));
+        });
+      }
 
-    const handleUserUpdated = (data: any) => {
-      console.log('--- SYSTEMATIC USER UPDATE RECEIVED ---', data);
-      dispatch(updateUser(data));
-    };
-    socket?.on('user_updated', handleUserUpdated);
+      // FCM & Notification Handlers
+      const { FCMService } = require('../services/fcm.service');
+      const { NotificationHandler } = require('../services/notificationHandler');
 
-    return () => {
-      // Remove only our own handler — a bare .off('user_updated') here would
-      // also strip GlobalSocketListener's handler for the same event.
-      socket?.off('user_updated', handleUserUpdated);
-      disconnectSocket();
-    };
-  }, [isAuthenticated, dispatch]);
+      FCMService.registerDeviceToken(user?.role);
+      const unsubscribeRefresh = FCMService.setupTokenRefreshListener(user?.role);
+      const unsubscribeNotif = NotificationHandler.setupListeners(navigationRef.current);
 
-  // Keep the live socket's auth payload current on token refresh, without
-  // tearing down the connection — only used if socket.io ever needs to
-  // reconnect (e.g. after a network drop), so it authenticates with a fresh token.
-  React.useEffect(() => {
-    if (!isAuthenticated) return;
-    const socket = getSocket();
-    if (socket) socket.auth = { token: accessToken };
-  }, [accessToken, isAuthenticated]);
-
-  // Push notification registration — keyed on login state, not on token value,
-  // so it doesn't re-run (and re-register the device token) on every refresh.
-  React.useEffect(() => {
-    const { FCMService } = require('../services/fcm.service');
-    if (!isAuthenticated) {
+      return () => {
+        if (unsubscribeRefresh) unsubscribeRefresh();
+        if (unsubscribeNotif) unsubscribeNotif();
+        const sock = getSocket();
+        if (sock) sock.off('user_updated');
+        disconnectSocket();
+      };
+    } else {
+      const { FCMService } = require('../services/fcm.service');
       FCMService.deactivateDeviceToken(user?.role);
-      return;
+      disconnectSocket();
     }
-
-    const { NotificationHandler } = require('../services/notificationHandler');
-    FCMService.registerDeviceToken(user?.role);
-    const unsubscribeRefresh = FCMService.setupTokenRefreshListener(user?.role);
-    const unsubscribeNotif = NotificationHandler.setupListeners(navigationRef.current);
-
-    return () => {
-      if (unsubscribeRefresh) unsubscribeRefresh();
-      if (unsubscribeNotif) unsubscribeNotif();
-    };
-  }, [isAuthenticated, user?.role]);
+  }, [accessToken, user?.role, dispatch]);
 
   if (isMaintenance) return <MaintenanceScreen />;
   if (forceUpdateRequired) return <ForceUpdateScreen />;

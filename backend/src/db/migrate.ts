@@ -25,24 +25,6 @@ const ALREADY_EXISTS = new Set([
              // a follow-up migration adds the value first, then recreates the function.
 ]);
 
-// Strips `-- ...` line comments, then splits on `;` into standalone statements.
-// Needed for CONCURRENTLY mode: Postgres batches multiple ;-separated statements sent in a
-// single simple-query message into one implicit transaction, which CREATE INDEX CONCURRENTLY
-// cannot run inside — each statement must be sent as its own client.query() call.
-function splitStatements(sql: string): string[] {
-    const withoutComments = sql
-        .split('\n')
-        .map(line => {
-            const idx = line.indexOf('--');
-            return idx >= 0 ? line.slice(0, idx) : line;
-        })
-        .join('\n');
-    return withoutComments
-        .split(';')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
-}
-
 async function migrate() {
     const client = await pool.connect();
     try {
@@ -70,36 +52,12 @@ async function migrate() {
             console.log(`Executing migration ${version}...`);
             const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
 
-            // CREATE INDEX CONCURRENTLY cannot run inside a transaction block at all. Run each
-            // statement in the file individually, outside a transaction, so the index build
-            // doesn't take a table-locking exclusive lock during deploy.
-            const needsConcurrentIndexMode = /CREATE\s+INDEX\s+CONCURRENTLY/i.test(sql);
-
             // Migrations that use ALTER TYPE ... ADD VALUE cannot run inside a transaction
             // on PostgreSQL < 12 (and may behave unexpectedly even on 12+ in some edge cases).
             // Run these outside a transaction so they are never blocked.
             const needsNoTransaction = /ALTER\s+TYPE\s+\S+\s+ADD\s+VALUE/i.test(sql);
 
-            if (needsConcurrentIndexMode) {
-                try {
-                    for (const statement of splitStatements(sql)) {
-                        try {
-                            await client.query(statement);
-                        } catch (err: any) {
-                            if (ALREADY_EXISTS.has(err.code)) {
-                                console.warn(`Statement in migration ${version} skipped (already exists): ${statement.slice(0, 80)}...`);
-                            } else {
-                                throw err;
-                            }
-                        }
-                    }
-                    await client.query('INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING', [version]);
-                    console.log(`Migration ${version} completed (concurrent-index mode).`);
-                } catch (err: any) {
-                    console.error(`Migration ${version} failed:`, err.message, `(code: ${err.code})`);
-                    process.exit(1);
-                }
-            } else if (needsNoTransaction) {
+            if (needsNoTransaction) {
                 try {
                     await client.query(sql);
                     await client.query('INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING', [version]);

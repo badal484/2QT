@@ -9,7 +9,6 @@ export interface NotificationPayload {
     userPhone?: string;
     notifId?: string;
     imageUrl?: string;
-    largeIcon?: string;
 }
 
 export interface StrategySendResult {

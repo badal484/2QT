@@ -545,8 +545,8 @@ const OrderPicker = ({
 };
 
 // ── New Ticket form ──────────────────────────────────────────────────────────
-const NewTicketTab = ({ onSuccess, initialCategory }: { onSuccess: () => void; initialCategory?: string }) => {
-  const [categoryKey, setCategoryKey] = useState(initialCategory || 'earnings');
+const NewTicketTab = ({ onSuccess }: { onSuccess: () => void }) => {
+  const [categoryKey, setCategoryKey] = useState('earnings');
   const [subType, setSubType] = useState<string>('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -881,7 +881,6 @@ const RiderSupportScreen = ({ route, navigation }: any) => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const ticketId = route?.params?.ticketId;
-  const initialCategory = route?.params?.initialCategory as string | undefined;
   const [tab, setTab] = useState<'new' | 'mine' | 'complaints'>(ticketId ? 'mine' : 'new');
 
   return (
@@ -937,7 +936,6 @@ const RiderSupportScreen = ({ route, navigation }: any) => {
 
       {tab === 'new' && (
         <NewTicketTab
-          initialCategory={initialCategory}
           onSuccess={() => {
             setTab('mine');
             queryClient.invalidateQueries({ queryKey: ['rider-support-tickets'] });

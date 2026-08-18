@@ -160,31 +160,21 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const loadCampaigns = useCallback(async (isManual = false) => {
-    if (isManual) setRefreshing(true);
+  const loadCampaigns = useCallback(async () => {
     try {
       const res: any = await api.get("/admin/broadcast");
-      if (res?.success) {
+      if (res.success) {
         setCampaigns(res.campaigns || []);
-        if (isManual) toast.success("Refreshed broadcast campaigns");
-      } else if (isManual) {
-        toast.error("Failed to load campaigns");
       }
-    } catch (err: any) {
-      if (isManual) {
-        const msg = typeof err === "string" ? err : err?.message || "Failed to refresh campaigns";
-        toast.error(msg);
-      }
-    } finally {
-      if (isManual) setRefreshing(false);
+    } catch {
+      // Ignore fallback
     }
   }, []);
 
   useEffect(() => {
     loadCampaigns();
-    const timer = setInterval(() => loadCampaigns(false), 5000);
+    const timer = setInterval(loadCampaigns, 5000);
     return () => clearInterval(timer);
   }, [loadCampaigns]);
 
@@ -304,13 +294,8 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-white flex items-center justify-between">
           <span>Recent Broadcast Campaigns</span>
-          <button
-            onClick={() => loadCampaigns(true)}
-            disabled={refreshing}
-            className="text-xs text-zinc-400 hover:text-white flex items-center gap-1 transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin text-orange-400" : ""}`} />
-            {refreshing ? "Refreshing..." : "Refresh"}
+          <button onClick={loadCampaigns} className="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+            <RefreshCw className="w-3 h-3" /> Refresh
           </button>
         </h3>
         {campaigns.length === 0 ? (

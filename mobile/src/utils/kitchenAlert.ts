@@ -16,23 +16,7 @@ try {
   console.warn('[KitchenAlert] Safe load react-native-sound warning:', e);
 }
 
-export interface OrderAlertOptions {
-  title?: string;
-  body?: string;
-  channelId?: string;
-  channelName?: string;
-}
-
-// Shared by the Kitchen app's "new order ticket" alert (default copy below) and
-// the Rider app's "delivery assigned" alert (RiderHomeScreen passes its own
-// title/body/channel) — pass options rather than duplicating this whole
-// vibration+sound+notification sequence per role.
-export function playKitchenAlert(opts?: OrderAlertOptions) {
-  const title = opts?.title || '🔔 NEW KITCHEN ORDER!';
-  const body = opts?.body || 'A new order ticket has arrived in the kitchen.';
-  const channelId = opts?.channelId || 'kitchen_order_alerts_v3';
-  const channelName = opts?.channelName || 'Kitchen Order Alerts';
-
+export function playKitchenAlert() {
   try {
     // 1. Aggressive 6-second multi-pulse vibration
     Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800, 400, 800]);
@@ -40,17 +24,17 @@ export function playKitchenAlert(opts?: OrderAlertOptions) {
     // 2. Play high-importance alert sound via Notifee notification channel
     if (safeNotifee.isAvailable) {
       safeNotifee.createChannel({
-        id: channelId,
-        name: channelName,
+        id: 'kitchen_order_alerts_v3',
+        name: 'Kitchen Order Alerts',
         importance: AndroidImportance.HIGH,
         sound: 'default',
         vibration: true,
-      }).then((createdChannelId: any) => {
+      }).then((channelId: any) => {
         safeNotifee.displayNotification({
-          title,
-          body,
+          title: '🔔 NEW KITCHEN ORDER!',
+          body: 'A new order ticket has arrived in the kitchen.',
           android: {
-            channelId: createdChannelId || channelId,
+            channelId: channelId || 'kitchen_order_alerts_v3',
             importance: AndroidImportance.HIGH,
             sound: 'default',
             pressAction: { id: 'default' },

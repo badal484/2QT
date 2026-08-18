@@ -21,12 +21,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
 router.post('/renew', authenticate, async (req: AuthRequest, res) => {
     const { planId } = req.body;
     try {
-        // NOTE: this route has no payment verification at all — flagged separately,
-        // out of scope for this change. gatewayPaymentId here is a synthetic,
-        // always-unique value only to satisfy handleSubscriptionRenewal's new
-        // required idempotency key; it preserves this route's exact prior
-        // behavior (no dedup) rather than changing it.
-        const subId = await handleSubscriptionRenewal(req.user!.userId, planId, `manual:${req.user!.userId}:${Date.now()}`);
+        const subId = await handleSubscriptionRenewal(req.user!.userId, planId);
         res.json({ success: true, subscriptionId: subId });
     } catch (err: any) {
         res.status(400).json({ error: 'RENEWAL_FAILED', message: err.message });
