@@ -330,9 +330,11 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
             </Text>
             {enrichedItem.applied_offer && (
               <>
-                <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary, textDecorationLine: 'line-through' }}>
-                  ₹{enrichedItem.original_price_paise / 100}
-                </Text>
+                {enrichedItem.original_price_paise > enrichedItem.price_paise && (
+                  <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: tokens.typography.family.medium, color: tokens.colors.textTertiary, textDecorationLine: 'line-through' }}>
+                    ₹{enrichedItem.original_price_paise / 100}
+                  </Text>
+                )}
                 <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
                   <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: tokens.typography.family.extrabold, color: '#15803D' }}>
                     {enrichedItem.applied_offer.discount_type === 'bogo'
