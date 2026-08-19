@@ -320,7 +320,6 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
         }
 
         emitToKitchen(newOrder.kitchen_id, 'new_order', { orderId: newOrder.id, displayId: newOrder.display_id, kitchenId: newOrder.kitchen_id });
-        emitToAll('new_order', { orderId: newOrder.id, displayId: newOrder.display_id, kitchenId: newOrder.kitchen_id });
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
         const autoDispatchEnabled = settings[0]?.value === 'true';

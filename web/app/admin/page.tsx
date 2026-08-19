@@ -448,10 +448,26 @@ function OrdersTab() {
                         toast.error("Invoice failed");
                       }
                     }}
-                    className="w-9 h-9 rounded-xl bg-white/[0.02] backdrop-blur-lg border border-white/10 flex items-center justify-center text-zinc-400 hover:text-swish-green hover:border-swish-green/30 transition-all"
+                    className="w-9 h-9 rounded-xl bg-white/[0.02] backdrop-blur-lg border border-white/10 flex items-center justify-center text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
                     title="Download Invoice"
                   >
                     <Download className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        toast.loading("Regenerating invoice...", { id: `reg-${order.id}` });
+                        const data = await api.post(`/admin/orders/${order.id}/regenerate-invoice`);
+                        toast.success("Invoice regenerated!", { id: `reg-${order.id}` });
+                        if (data.invoiceUrl) window.open(data.invoiceUrl, "_blank");
+                      } catch {
+                        toast.error("Regeneration failed", { id: `reg-${order.id}` });
+                      }
+                    }}
+                    className="w-9 h-9 rounded-xl bg-white/[0.02] backdrop-blur-lg border border-white/10 flex items-center justify-center text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
+                    title="Regenerate & Preview PDF"
+                  >
+                    <RefreshCw className="w-4 h-4" />
                   </button>
                   <button 
                     disabled={cancelling === order.id}
@@ -1698,6 +1714,54 @@ function SettingsTab() {
                     <button onClick={() => { setEditingKey(key); setEditVal(s.value); }} className="px-4 py-2 rounded-xl bg-white/[0.04] text-xs font-black uppercase tracking-widest hover:bg-zinc-700/80 text-white">Edit</button>
                   )}
                 </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Invoice Customization Section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-emerald-400 mb-0.5">Invoice & Billing Customizer</p>
+            <p className="text-xs text-zinc-500">Customize header, company details, GSTIN, and footer for all customer PDF invoices.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            { key: "invoice_company_name", label: "Company Name", placeholder: "e.g. 2QT FOOD PALACE PRIVATE LIMITED" },
+            { key: "invoice_subtitle", label: "Invoice Subtitle / Tagline", placeholder: "e.g. Fulfilled by Central Kitchen" },
+            { key: "invoice_company_address", label: "Header Address", placeholder: "e.g. Kundanahalli Central, Bengaluru" },
+            { key: "invoice_gstin", label: "GSTIN Number", placeholder: "e.g. 29ABCDE1234F1Z5" },
+            { key: "invoice_fssai", label: "FSSAI License No.", placeholder: "e.g. 11223344556677" },
+            { key: "invoice_support_phone", label: "Support Phone", placeholder: "e.g. +91-8800000000" },
+            { key: "invoice_support_email", label: "Support Email", placeholder: "e.g. support@2qt.app" },
+            { key: "invoice_primary_color", label: "Theme Accent Color (Hex)", placeholder: "e.g. #10B981" },
+            { key: "invoice_footer_text", label: "Footer Thank You Note", placeholder: "e.g. Thank you for choosing 2QT! We hope you enjoyed your meal.", fullWidth: true },
+          ].map(field => {
+            const val = settings[field.key]?.value ?? "";
+            return (
+              <div key={field.key} className={`p-4 bg-white/[0.03] border border-white/10 rounded-2xl ${field.fullWidth ? 'md:col-span-2' : ''}`}>
+                <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">{field.label}</p>
+                {editingKey === field.key ? (
+                  <div className="flex gap-2">
+                    <input
+                      autoFocus
+                      value={editVal}
+                      onChange={e => setEditVal(e.target.value)}
+                      placeholder={field.placeholder}
+                      className="flex-1 bg-white/[0.04] border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-emerald-500"
+                    />
+                    <button disabled={saving} onClick={() => patch(field.key, editVal)} className="px-3 py-2 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400">Save</button>
+                    <button onClick={() => setEditingKey(null)} className="px-3 py-2 rounded-xl bg-white/10 text-xs font-bold text-zinc-400">Cancel</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-sm text-white truncate">{val || <span className="text-zinc-600 font-normal italic">Default: {field.placeholder}</span>}</p>
+                    <button onClick={() => { setEditingKey(field.key); setEditVal(val); }} className="px-3 py-1.5 rounded-xl bg-white/[0.04] text-xs font-black uppercase tracking-widest hover:bg-white/10 text-white ml-2">Edit</button>
+                  </div>
+                )}
               </div>
             );
           })}

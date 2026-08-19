@@ -119,11 +119,18 @@ router.post('/razorpay', async (req, res) => {
         if (notes.type === 'cash_submission') {
             const submissionId = notes.submissionId as string;
             try {
+                // Atomic claim: the UPDATE's own row lock makes this safe against concurrent
+                // redelivery of the same webhook — only one delivery can ever see a returned row.
                 const { rows: [submission] } = await query(
-                    'SELECT id, rider_id, total_amount_paise, order_count, status FROM cash_submissions WHERE id = $1',
-                    [submissionId]
+                    `UPDATE cash_submissions
+                     SET status = 'confirmed', confirmed_at = NOW(),
+                         utr_number = COALESCE(utr_number, $2)
+                     WHERE id = $1 AND status != 'confirmed'
+                     RETURNING id, rider_id, total_amount_paise, order_count`,
+                    [submissionId, rzpPaymentId]
                 );
-                if (submission && submission.status !== 'confirmed') {
+
+                if (submission) {
                     const { rows: subOrders } = await query(
                         'SELECT order_id FROM cash_submission_orders WHERE submission_id = $1',
                         [submissionId]
@@ -139,11 +146,6 @@ router.post('/razorpay', async (req, res) => {
                             [...orderIds, rzpPaymentId]
                         );
                     }
-                    await query(
-                        `UPDATE cash_submissions SET status = 'confirmed', confirmed_at = NOW(),
-                         utr_number = COALESCE(utr_number, $2) WHERE id = $1`,
-                        [submissionId, rzpPaymentId]
-                    );
                     emitToUser(submission.rider_id, 'cash_confirmed', { submissionId, totalPaise: submission.total_amount_paise });
                     emitToAdmin('cash_submitted', { submissionId, riderId: submission.rider_id, method: 'razorpay_link', totalPaise: submission.total_amount_paise, orderCount: submission.order_count, autoConfirmed: true });
                 }
@@ -214,12 +216,17 @@ router.post('/razorpay', async (req, res) => {
         if (referenceId.startsWith('cs:')) {
             const submissionId = referenceId.slice(3); // strip "cs:" prefix
             try {
+                // Atomic claim: the UPDATE's own row lock makes this safe against concurrent
+                // redelivery of the same webhook — only one delivery can ever see a returned row.
                 const { rows: [submission] } = await query(
-                    `SELECT id, rider_id, total_amount_paise, order_count, status
-                     FROM cash_submissions WHERE id = $1 FOR UPDATE`,
-                    [submissionId]
+                    `UPDATE cash_submissions
+                     SET status = 'confirmed', confirmed_at = NOW(),
+                         utr_number = COALESCE(utr_number, $2)
+                     WHERE id = $1 AND status = 'pending'
+                     RETURNING id, rider_id, total_amount_paise, order_count`,
+                    [submissionId, rzpPaymentId || null]
                 );
-                if (!submission || submission.status !== 'pending') return res.json({ status: 'already_processed' });
+                if (!submission) return res.json({ status: 'already_processed' });
 
                 const { rows: subOrders } = await query(
                     'SELECT order_id, amount_paise FROM cash_submission_orders WHERE submission_id = $1',
@@ -239,14 +246,6 @@ router.post('/razorpay', async (req, res) => {
                         rzpPaymentId ? [...orderIds, rzpPaymentId] : orderIds
                     );
                 }
-
-                await query(
-                    `UPDATE cash_submissions
-                     SET status = 'confirmed', confirmed_at = NOW(),
-                         utr_number = COALESCE(utr_number, $2)
-                     WHERE id = $1`,
-                    [submissionId, rzpPaymentId || null]
-                );
 
                 emitToUser(submission.rider_id, 'cash_confirmed', {
                     submissionId,

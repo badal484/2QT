@@ -10,6 +10,7 @@ import AuthNavigator from './AuthNavigator';
 import CustomerNavigator from './CustomerNavigator';
 import RiderNavigator from './RiderNavigator';
 import KitchenNavigator from './KitchenNavigator';
+import PackerNavigator from './PackerNavigator';
 import AdminNavigator from './AdminNavigator';
 import PartnerNavigator from './PartnerNavigator';
 import ForceUpdateScreen from '../screens/ForceUpdateScreen';
@@ -138,7 +139,9 @@ const RootNavigator = () => {
         <CustomerNavigator />
       ) : (activeRole === 'rider' || activeRole === 'rider_captain') ? (
         <RiderNavigator />
-      ) : (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff', 'packer'].includes(activeRole)) ? (
+      ) : (activeRole === 'packer') ? (
+        <PackerNavigator />
+      ) : (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff'].includes(activeRole)) ? (
         <KitchenNavigator />
       ) : (activeRole === 'partner') ? (
         <PartnerNavigator />

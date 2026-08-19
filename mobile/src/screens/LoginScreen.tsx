@@ -1,9 +1,10 @@
 import { tokens } from '../theme/tokens';
 import React, { useEffect, useState } from 'react';
-import { Alert, NativeModules, StyleSheet, Text, View, StatusBar, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { Alert, NativeModules, StyleSheet, Text, View, StatusBar, KeyboardAvoidingView, Platform, Dimensions, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import Animated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
-import { Bike, ChefHat, ShieldCheck, Flame } from 'lucide-react-native';
+import { Bike, ChefHat, ShieldCheck, Flame, Package } from 'lucide-react-native';
 import { OTPWidget } from '@msg91comm/sendotp-react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
@@ -20,6 +21,7 @@ const BRANDING: Record<string, { name: string; sub: string; color: string; Icon:
   customer: { name: '2QT', sub: 'Cooked Fresh, Daily', color: '#FF4500', Icon: ChefHat }, // Matching the exact orange from the mockup
   rider: { name: '2QT CAPTAIN', sub: 'Rider Portal', color: tokens.colors.textPrimary, Icon: Bike },
   kitchen: { name: '2QT PARTNER', sub: 'Kitchen Command', color: '#0E7490', Icon: Flame },
+  packer: { name: '2QT PACKER', sub: 'Packing Station', color: '#F59E0B', Icon: Package },
   admin: { name: '2QT ADMIN', sub: 'Operations Deck', color: tokens.colors.danger, Icon: ShieldCheck },
 };
 
@@ -28,6 +30,7 @@ const LoginScreen = ({ navigation }: any) => {
   const [referralCode, setReferralCode] = useState('');
   const [devRole, setDevRole] = useState(BUILD_ROLE);
   const { showDialog } = useFeedback();
+  const insets = useSafeAreaInsets();
 
   const globalLocation = useSelector((state: RootState) => state.app.globalLocation);
 
@@ -42,8 +45,6 @@ const LoginScreen = ({ navigation }: any) => {
       if (response?.type !== 'success') {
         throw new Error(response?.message || 'Could not send OTP');
       }
-      // reqId location isn't fully pinned down by MSG91's docs beyond "the response" -- check
-      // every field name that's shown up across their other endpoints before giving up.
       const reqId = response.message || response.reqId || response.request_id;
       if (!reqId) throw new Error('No request ID returned');
       return reqId as string;
@@ -80,15 +81,25 @@ const LoginScreen = ({ navigation }: any) => {
     <KeyboardAvoidingView 
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
     >
       <StatusBar barStyle="dark-content" backgroundColor={styles.container.backgroundColor} />
       
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: Math.max(insets.top + 16, 44),
+            paddingBottom: Math.max(insets.bottom + 16, 24),
+          }
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         
         <Animated.View entering={ZoomIn.duration(500)} style={styles.logoWrapper}>
           <View style={[styles.logoCard, { backgroundColor: branding.color }]}>
-            <Icon color={tokens.colors.textInverse} size={48} strokeWidth={2} />
+            <Icon color={tokens.colors.textInverse} size={42} strokeWidth={2} />
           </View>
         </Animated.View>
 
@@ -146,7 +157,7 @@ const LoginScreen = ({ navigation }: any) => {
         {__DEV__ && !RoleModule?.BUILD_ROLE && (
           <View style={styles.devRoleContainer}>
             <View style={styles.devRoleRow}>
-              {['customer', 'rider', 'kitchen', 'admin'].map((r) => (
+              {['customer', 'rider', 'kitchen', 'packer', 'admin'].map((r) => (
                 <PressableScale
                   key={r}
                   onPress={() => setDevRole(r)}
@@ -158,7 +169,7 @@ const LoginScreen = ({ navigation }: any) => {
             </View>
           </View>
         )}
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -168,24 +179,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: tokens.colors.background,
   },
-  content: {
-    flex: 1,
-    padding: tokens.spacing.xxl,
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: tokens.spacing.xxl,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
   },
   logoWrapper: {
-    marginBottom: tokens.spacing.xxl,
+    marginBottom: tokens.spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoCard: {
-    width: 100,
-    height: 100,
+    width: 88,
+    height: 88,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 34,
+    borderRadius: 28,
     borderCurve: 'continuous',
   },
   headerWrapper: {

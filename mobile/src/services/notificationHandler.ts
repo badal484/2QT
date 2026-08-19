@@ -1,3 +1,4 @@
+import './firebaseInit';
 import { DeepLinkResolver } from './deepLinkResolver';
 import messaging from '@react-native-firebase/messaging';
 import { safeNotifee, AndroidImportance, EventType } from './notifeeSafe';

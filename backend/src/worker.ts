@@ -12,6 +12,8 @@
 // hosted Socket.IO server — see initSocketEmitter() below.
 
 import './instrument'; // Sentry must be first — before any other import
+import { loadWorkerEnv } from './config/env';
+loadWorkerEnv(); // Fail fast if a required env var is missing/invalid — before any other module loads
 import * as Sentry from '@sentry/node';
 Sentry.setTag('service', 'worker');
 
@@ -30,12 +32,15 @@ import { initCrons as initFileCrons, stopCrons as stopFileCrons } from './crons'
 import { initCrons as initDirCrons, stopCrons as stopDirCrons } from './crons/index';
 import { closeWorkers } from './jobs/worker';
 import { closeQueueConnections } from './jobs/queues';
+import { shutdownAuditLogger } from './utils/logger';
 
 process.on('uncaughtException', (err) => {
     console.error('[WORKER] UNCAUGHT EXCEPTION! 💥', err.name, err.message, err.stack);
+    process.exit(1);
 });
 process.on('unhandledRejection', (err: any) => {
     console.error('[WORKER] UNHANDLED REJECTION! 💥', err?.name, err?.message);
+    process.exit(1);
 });
 
 // Cloud Run requires every Service (as opposed to a Job) to listen on $PORT and answer
@@ -105,6 +110,10 @@ const start = async () => {
                     // 2. Let in-flight BullMQ jobs finish, then stop pulling new ones.
                     await closeWorkers();
                     await closeQueueConnections();
+
+                    // Flush any audit log entries still sitting in the batch queue —
+                    // refund/payout side effects processed here can enqueue audit events too.
+                    await shutdownAuditLogger();
 
                     // 3. Close the shared Redis clients (cache, pub/sub for the socket
                     //    emitter) last, since the steps above may still use them.

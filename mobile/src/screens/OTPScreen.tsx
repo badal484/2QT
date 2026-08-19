@@ -71,6 +71,46 @@ const OTPScreen = ({ route, navigation }: any) => {
       return api.post('/auth/verify-widget-token', { accessToken, referralCode, appRole: devRole, lat, lng, platform: 'app' });
     },
     onSuccess: (data) => {
+      const userRole = data.user?.role;
+      const { NativeModules } = require('react-native');
+      const buildRole = NativeModules.RoleModule?.BUILD_ROLE || devRole;
+
+      if (buildRole === 'packer' && userRole !== 'packer') {
+        haptics.error();
+        showDialog({
+          title: 'Access Denied',
+          message: `Phone number +${phone} is not registered as a Packer. Please log in with a registered Packer account.`,
+          confirmText: 'Okay',
+          type: 'error',
+        });
+        setOtp('');
+        return;
+      }
+
+      if (buildRole === 'rider' && !['rider', 'rider_captain'].includes(userRole)) {
+        haptics.error();
+        showDialog({
+          title: 'Access Denied',
+          message: `Phone number +${phone} is not registered as a Rider.`,
+          confirmText: 'Okay',
+          type: 'error',
+        });
+        setOtp('');
+        return;
+      }
+
+      if (buildRole === 'kitchen' && !['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff'].includes(userRole)) {
+        haptics.error();
+        showDialog({
+          title: 'Access Denied',
+          message: `Phone number +${phone} is not registered as Kitchen Staff.`,
+          confirmText: 'Okay',
+          type: 'error',
+        });
+        setOtp('');
+        return;
+      }
+
       haptics.success();
       dispatch(setAuth({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken }));
       connectSocket(data.accessToken);

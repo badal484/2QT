@@ -24,7 +24,28 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
         [orderId]
     );
 
-    // 2. Create PDF
+    // 2. Fetch Admin Settings
+    const { rows: settingsRows } = await query(`
+        SELECT key, value FROM app_settings 
+        WHERE key LIKE 'invoice_%' OR key IN ('company_name', 'gstin', 'fssai_license', 'support_phone', 'support_email')
+    `);
+    const settingsMap: Record<string, string> = {};
+    settingsRows.forEach(r => {
+        const val = typeof r.value === 'string' ? r.value.replace(/^"|"$/g, '') : r.value;
+        settingsMap[r.key] = val;
+    });
+
+    const primaryColor = settingsMap['invoice_primary_color'] || '#10B981';
+    const companyName = settingsMap['invoice_company_name'] || settingsMap['company_name'] || '2QT';
+    const kitchenInfo = settingsMap['invoice_subtitle'] || (order.kitchen_name ? `Fulfilled by ${order.kitchen_name}` : 'Premium Food Delivery');
+    const addressInfo = settingsMap['invoice_company_address'] || order.kitchen_address || 'Kundanahalli Central, Bengaluru';
+    const gstin = settingsMap['invoice_gstin'] || settingsMap['gstin'] || '';
+    const fssai = settingsMap['invoice_fssai'] || settingsMap['fssai_license'] || '';
+    const supportPhone = settingsMap['invoice_support_phone'] || settingsMap['support_phone'] || '+91-8800000000';
+    const supportEmail = settingsMap['invoice_support_email'] || settingsMap['support_email'] || 'support@2qt.app';
+    const footerMsg = settingsMap['invoice_footer_text'] || 'Thank you for choosing 2QT! We hope you enjoyed your meal.';
+
+    // 3. Create PDF
     const doc = new PDFDocument({ margin: 0, size: 'A4' });
     const fileName = `INV-${order.invoice_number || order.display_id}.pdf`;
     const publicDir = path.join(__dirname, '../../public/invoices');
@@ -38,8 +59,6 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
     const stream = fs.createWriteStream(filePath);
     doc.pipe(stream);
 
-    // Constants for design
-    const primaryColor = '#10B981'; // 2QT Green
     const textColor = '#374151';
     const lightGray = '#F3F4F6';
     const borderGray = '#E5E7EB';
@@ -49,19 +68,24 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
     
     // Brand & Logo Area
     doc.fillColor('#FFFFFF')
-       .fontSize(36).font('Helvetica-Bold')
-       .text('2QT', 50, 35)
-       .fontSize(11).font('Helvetica')
-       .text(order.kitchen_name ? `Fulfilled by ${order.kitchen_name}` : 'Premium Food Delivery', 50, 75)
-       .text(order.kitchen_address || 'Kundanahalli Central, Bengaluru', 50, 90);
+       .fontSize(32).font('Helvetica-Bold')
+       .text(companyName, 50, 25)
+       .fontSize(10).font('Helvetica')
+       .text(kitchenInfo, 50, 65)
+       .text(addressInfo, 50, 80);
+
+    if (gstin || fssai) {
+        const taxDetails = [gstin ? `GSTIN: ${gstin}` : '', fssai ? `FSSAI: ${fssai}` : ''].filter(Boolean).join(' | ');
+        doc.fontSize(9).text(taxDetails, 50, 95);
+    }
 
     // Invoice Title Area
-    doc.fontSize(32).font('Helvetica-Bold')
-       .text('INVOICE', 0, 35, { align: 'right', width: 545 })
+    doc.fontSize(30).font('Helvetica-Bold')
+       .text('INVOICE', 0, 25, { align: 'right', width: 545 })
        .fontSize(10).font('Helvetica-Bold')
-       .text(`INV #${order.invoice_number || order.display_id}`, 0, 75, { align: 'right', width: 545 })
+       .text(`INV #${order.invoice_number || order.display_id}`, 0, 65, { align: 'right', width: 545 })
        .font('Helvetica')
-       .text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 0, 90, { align: 'right', width: 545 });
+       .text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 0, 80, { align: 'right', width: 545 });
 
     // Reset layout for content
     doc.x = 50;
@@ -145,8 +169,8 @@ export const generateInvoicePDF = async (orderId: string): Promise<string> => {
     // Footer
     doc.rect(0, 780, 595, 62).fill(lightGray);
     doc.fillColor('#6B7280').fontSize(10).font('Helvetica-Oblique');
-    doc.text('Thank you for choosing 2QT! We hope you enjoyed your meal.', 0, 795, { align: 'center', width: 595 });
-    doc.text('Need help? Contact support@2qt.app or call +91-8800000000', 0, 810, { align: 'center', width: 595 });
+    doc.text(footerMsg, 0, 795, { align: 'center', width: 595 });
+    doc.text(`Need help? Contact ${supportEmail} or call ${supportPhone}`, 0, 810, { align: 'center', width: 595 });
 
     doc.end();
 

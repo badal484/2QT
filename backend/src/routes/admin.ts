@@ -1731,10 +1731,26 @@ router.get('/settings', authenticate, requireRole('super_admin', 'admin'), async
 router.patch('/settings/:key', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { key } = req.params;
     const { value } = req.body;
-    await query('UPDATE app_settings SET value = $1 WHERE key = $2', [value, key]);
+    await query(`
+        INSERT INTO app_settings (key, value)
+        VALUES ($1, $2)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    `, [key, value]);
     redis.del(`2qt:setting:${key}`).catch(() => {}); // bust cached value immediately
     emitToAll('settings_updated', { key, value });
     res.json({ success: true });
+});
+
+router.post('/orders/:id/regenerate-invoice', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    try {
+        const { generateInvoicePDF } = require('../services/invoice.service');
+        const invoiceUrl = await generateInvoicePDF(id);
+        await query('UPDATE orders SET invoice_url = $1 WHERE id = $2', [invoiceUrl, id]);
+        res.json({ success: true, invoiceUrl });
+    } catch (err: any) {
+        res.status(500).json({ error: 'FAILED_TO_REGENERATE_INVOICE', message: err.message });
+    }
 });
 
 // ─── System Jobs ─────────────────────────────────────────────────────────────

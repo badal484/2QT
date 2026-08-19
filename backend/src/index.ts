@@ -1,4 +1,6 @@
 import './instrument'; // Sentry must be first — before any other import
+import { loadApiEnv } from './config/env';
+loadApiEnv(); // Fail fast if a required env var is missing/invalid — before any other module loads
 import 'express-async-errors';
 import express from 'express';
 import http from 'http';
@@ -13,9 +15,11 @@ import { ExpressAdapter } from '@bull-board/express';
 import { connectRedis, redis, redisPub, redisSub } from './redis';
 import { initSocket, io } from './socket';
 import { errorHandler } from './middleware/errorHandler';
+import { requestLogger } from './middleware/requestLogger';
 import { generalLimiter } from './middleware/rateLimiter';
 import apiRouter from './routes';
 import { notificationsQueue, invoicesQueue, emailsQueue, closeQueueConnections } from './jobs/queues';
+import { shutdownAuditLogger } from './utils/logger';
 
 // This process is the API only — it does NOT start BullMQ workers or node-cron.
 // Those live exclusively in src/worker.ts (the singleton `2qt-worker` Cloud Run
@@ -28,16 +32,24 @@ dotenv.config();
 process.on('uncaughtException', (err) => {
     console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
     console.error(err.name, err.message, err.stack);
+    process.exit(1);
 });
 
 process.on('unhandledRejection', (err: any) => {
     console.error('UNHANDLED REJECTION! 💥 Shutting down...');
     console.error(err.name, err.message);
+    process.exit(1);
 });
 
 
 const app = express();
+app.set('trust proxy', 1); // Render sits in front as a reverse proxy — trust its X-Forwarded-For for req.ip
 const server = http.createServer(app);
+
+// Opens the request-scoped AsyncLocalStorage context as early as possible so every
+// downstream middleware/handler — including CORS rejections and rate-limit blocks —
+// gets a trace ID and shows up correlated in logs.
+app.use(requestLogger);
 
 // Middleware
 app.use(compression({ level: 6, threshold: 1024 })); // gzip responses > 1KB
@@ -54,8 +66,9 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 
 app.use(cors({
     origin: (origin, callback) => {
+        // No Origin header — mobile apps, server-to-server calls, curl, health checks.
         if (!origin) return callback(null, true);
-        if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
         // Allow all Cloudflare Workers, Vercel preview deployments, 2QT domains and tunnel tools
@@ -70,7 +83,9 @@ app.use(cors({
         ) {
             return callback(null, true);
         }
-        callback(null, true); // Ensure production API continuity across all frontend domains
+        const err: any = new Error('Not allowed by CORS');
+        err.status = 403;
+        callback(err);
     },
     credentials: true,
 }));
@@ -181,6 +196,10 @@ const start = async () => {
                     // Stop accepting new Socket.IO connections and notify existing
                     // clients before the process exits, rather than dropping them silently.
                     io?.close();
+                    // Flush any audit log entries still sitting in the batch queue before
+                    // the DB pool/process goes away — otherwise the last <2s of audit
+                    // events (admin actions, refunds, etc.) would be silently lost.
+                    await shutdownAuditLogger();
                     await closeQueueConnections();
                     await Promise.allSettled([redis.quit(), redisPub.quit(), redisSub.quit()]);
                 } catch (err) {

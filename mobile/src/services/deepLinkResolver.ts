@@ -16,7 +16,7 @@ export class DeepLinkResolver {
         }
 
         try {
-            let data = payload;
+            let data = payload || {};
             if (typeof payload === 'string') {
                 try { data = JSON.parse(payload); } catch {}
             }
@@ -61,5 +61,10 @@ export class DeepLinkResolver {
         } catch (error) {
             console.error('[DeepLinkResolver] Failed resolving deep link:', error);
         }
+    }
+
+    // Alias overload for backward/forward call signature compatibility
+    static handle(navigation: any, payload: DeepLinkPayload) {
+        return DeepLinkResolver.resolve(payload, navigation);
     }
 }

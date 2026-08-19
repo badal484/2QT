@@ -22,16 +22,25 @@ import { useFeedback } from '../context/FeedbackContext';
 
 
 
-const PremiumBag = () => (
-  <View style={{ width: 180, height: 240, alignItems: 'center', justifyContent: 'center' }}>
-    {/* White 2QT bag with transparent background */}
-    <Image 
-      source={require('../../assets/images/white_bag_2qt_clean_transparent.png')} 
-      style={{ width: '100%', height: '100%' }} 
-      resizeMode="contain" 
-    />
-  </View>
-);
+const BAG_IMG_CDN = { uri: 'https://ik.imagekit.io/edncabmhc/assets/2qt_bag_clean_cC5HBiqG6.png' };
+const BAG_IMG_LOCAL = require('../../assets/images/white_bag_2qt_clean_transparent.png');
+
+const PremiumBag = () => {
+  const [imgSrc, setImgSrc] = useState<any>(BAG_IMG_CDN);
+
+  return (
+    <View style={{ width: 180, height: 240, alignItems: 'center', justifyContent: 'center' }}>
+      {/* White 2QT bag with transparent background */}
+      <Image 
+        source={imgSrc} 
+        style={{ width: 180, height: 240 }} 
+        resizeMode="contain"
+        fadeDuration={0}
+        onError={() => setImgSrc(BAG_IMG_LOCAL)}
+      />
+    </View>
+  );
+};
 
 const RelatedItemCard = React.memo(({ ri, onAdd, dispatch }: any) => {
   const nav = useNavigation<any>();

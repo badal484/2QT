@@ -5,6 +5,7 @@ import { NotificationService, NotifType, deliverNotification } from '../services
 import { generateInvoicePDF } from '../services/invoice.service';
 import { query } from '../db';
 import { getCleanRedisUrl, isRedisTls } from '../redis/parseRedisUrl';
+import { runWithTraceId } from '../utils/asyncContext';
 
 const redisUrl = getCleanRedisUrl();
 const connection = new IORedis(redisUrl, {
@@ -12,9 +13,17 @@ const connection = new IORedis(redisUrl, {
     tls: isRedisTls(redisUrl) ? { rejectUnauthorized: false } : undefined,
 });
 
+// Restores the traceId that jobs/queues.ts's withTracing() serialized into the job
+// payload, so logs made while processing this job carry the same traceId as the
+// request that originally enqueued it. Jobs enqueued outside a request (e.g. from a
+// cron) simply have no traceId — the handler still runs, just without one.
+function withTraceContext<T>(handler: (job: Job) => Promise<T>): (job: Job) => Promise<T> {
+    return (job: Job) => runWithTraceId(job.data?.traceId, () => handler(job));
+}
+
 // ─── Notifications worker ─────────────────────────────────────────────────────
 
-const notifWorker = new Worker('2qt:notifications', async (job: Job) => {
+const notifWorker = new Worker('2qt:notifications', withTraceContext(async (job: Job) => {
     const type = job.name as NotifType;
     const data = job.data;
 
@@ -151,26 +160,26 @@ const notifWorker = new Worker('2qt:notifications', async (job: Job) => {
     } else {
         await NotificationService.send(type, data);
     }
-}, {
+}), {
     connection,
     concurrency: 10,
 });
 
 // ─── Invoices worker ──────────────────────────────────────────────────────────
 
-const invoiceWorker = new Worker('2qt:invoices', async (job: Job) => {
+const invoiceWorker = new Worker('2qt:invoices', withTraceContext(async (job: Job) => {
     const { orderId } = job.data;
     const invoiceUrl = await generateInvoicePDF(orderId);
     await query('UPDATE orders SET invoice_url = $1 WHERE id = $2', [invoiceUrl, orderId]);
     console.log(`[WORKER] Invoice generated: ${invoiceUrl}`);
-}, { connection, concurrency: 3 });
+}), { connection, concurrency: 3 });
 
 // ─── Email worker (placeholder) ───────────────────────────────────────────────
 
-const emailWorker = new Worker('2qt:emails', async (job: Job) => {
+const emailWorker = new Worker('2qt:emails', withTraceContext(async (job: Job) => {
     const { orderId, email } = job.data;
     console.log(`[EMAIL] Would send GST invoice for ${orderId} to ${email}`);
-}, { connection });
+}), { connection });
 
 // ─── Lifecycle logging ────────────────────────────────────────────────────────
 // Identifies queue, job id/type, and outcome — never logs job payloads (may contain

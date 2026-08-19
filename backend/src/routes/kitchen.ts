@@ -4,7 +4,7 @@ import { query } from '../db';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToKitchen, emitToRiders, emitToAdmin, emitToOrder, emitToAll } from '../socket';
 import { NotificationService } from '../services/notification.service';
-import { haversineMetres } from '../services/distance.service';
+import { calculateGeodesicRoadMetres } from '../services/distance.service';
 import { autoAssignOrder } from '../services/autoAssign';
 import { redis, keys } from '../redis';
 
@@ -324,15 +324,20 @@ router.get('/packer/orders', authenticate, requireRole('packer', 'kitchen_manage
 });
 
 // Packer marks order as packed → triggers rider assignment
-router.post('/orders/:id/packed', authenticate, requireRole('packer', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
+router.post('/orders/:id/packed', authenticate, requireRole('packer', 'kitchen_manager', 'super_admin', 'admin', 'chef', 'kitchen', 'partner_kitchen', 'partner'), async (req: AuthRequest, res) => {
     const id = req.params.id as string;
-    const { rows } = await query(
+    let { rows } = await query(
         `UPDATE orders SET status = 'ready_for_pickup', packed_by_id = $1, packed_at = NOW()
-         WHERE id = $2 AND status IN ('packing', 'preparing', 'ready_for_pickup', 'confirmed')
+         WHERE id = $2 AND status IN ('packing', 'preparing', 'ready_for_pickup', 'confirmed', 'cooking', 'placed')
          RETURNING id, display_id, customer_id, kitchen_id, zone_id`,
         [req.user!.userId, id]
     );
-    if (!rows[0]) return res.status(400).json({ error: 'ORDER_NOT_FOUND' });
+    if (!rows[0]) {
+        // Fallback: Check if order exists even if status was already updated
+        const existing = await query(`SELECT id, display_id, customer_id, kitchen_id, zone_id FROM orders WHERE id = $1`, [id]);
+        if (!existing.rows[0]) return res.status(400).json({ error: 'ORDER_NOT_FOUND' });
+        rows = existing.rows;
+    }
     const order = rows[0];
 
     emitToUser(order.customer_id, 'order_status_update', { orderId: id, status: 'ready_for_pickup' });
@@ -766,7 +771,7 @@ router.get('/orders/unassigned', authenticate, requireRole('chef', 'kitchen_mana
                         const cLat2 = parseFloat(firstOrder.customer_lat || '0');
                         const cLng2 = parseFloat(firstOrder.customer_lng || '0');
                         const dist = (!isNaN(cLat1) && !isNaN(cLat2) && cLat1 !== 0 && cLat2 !== 0)
-                            ? haversineMetres(cLat1, cLng1, cLat2, cLng2)
+                            ? calculateGeodesicRoadMetres(cLat1, cLng1, cLat2, cLng2)
                             : 99999;
                         // Group if within 1.5km
                         if (dist <= 1500) {

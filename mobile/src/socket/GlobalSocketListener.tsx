@@ -22,7 +22,6 @@ export const GlobalSocketListener: React.FC = () => {
 
       const handleNewOrder = () => {
         console.log("🔔 [GlobalSocketListener] -> handleNewOrder TRIGGERED!");
-        playKitchenAlert();
         handleOrderUpdate();
       };
 
