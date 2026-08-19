@@ -1,4 +1,6 @@
 import rateLimit from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+import { redis } from '../redis';
 
 const createLimiter = (windowMs: number, max: number, message: string) => {
     if (process.env.NODE_ENV === 'development') {
@@ -10,7 +12,9 @@ const createLimiter = (windowMs: number, max: number, message: string) => {
         message: { error: 'TOO_MANY_REQUESTS', message },
         standardHeaders: true,
         legacyHeaders: false,
-        validate: { default: false },
+        store: new RedisStore({
+            sendCommand: (...args: string[]) => redis.sendCommand(args),
+        }),
     });
 };
 

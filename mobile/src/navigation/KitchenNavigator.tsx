@@ -8,9 +8,7 @@ import StockScreen from '../screens/StockScreen';
 import KitchenManageScreen from '../screens/KitchenManageScreen';
 import FeedbackScreen from '../screens/FeedbackScreen';
 import ShiftHandoverScreen from '../screens/ShiftHandoverScreen';
-import KitchenDineInScreen from '../screens/KitchenDineInScreen';
-import PackerScreen from '../screens/PackerScreen';
-import { ClipboardList, BarChart3, Star, UtensilsCrossed, Settings } from 'lucide-react-native';
+import { ClipboardList, BarChart3, Star, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const Tab = createBottomTabNavigator();
@@ -75,27 +73,11 @@ const MainKitchenTabs = () => {
   );
 };
 
-// Packer gets a standalone fullscreen — no tabs, no distractions
-const PackerStack = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="PackerMain" component={PackerScreen} />
-  </Stack.Navigator>
-);
-
 const KitchenNavigator = () => {
-  const user = useSelector((state: RootState) => state.auth.user);
-  const isPacker = user?.role === 'packer';
-
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 200 }}>
-      {isPacker ? (
-        <Stack.Screen name="PackerRoot" component={PackerStack} />
-      ) : (
-        <>
-          <Stack.Screen name="MainKitchen" component={MainKitchenTabs} />
-          <Stack.Screen name="ShiftHandover" component={ShiftHandoverScreen} />
-        </>
-      )}
+      <Stack.Screen name="MainKitchen" component={MainKitchenTabs} />
+      <Stack.Screen name="ShiftHandover" component={ShiftHandoverScreen} />
     </Stack.Navigator>
   );
 };

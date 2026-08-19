@@ -3,6 +3,7 @@ import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import GoogleMaps
+import FirebaseCore
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -15,6 +16,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // Configure Firebase iOS SDK before any React Native modules launch
+    FirebaseApp.configure()
+
     // Must be called before React Native starts — required for PROVIDER_GOOGLE on iOS
     GMSServices.provideAPIKey("AIzaSyCwvUrO91u81DGsCr4YoJZWzrIC9Pr5kaA")
 

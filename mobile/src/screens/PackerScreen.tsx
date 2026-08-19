@@ -13,6 +13,7 @@ import { Package, CheckSquare, Square, LogOut, Clock, CheckCircle2 } from 'lucid
 import { api } from '../api/client';
 import { getSocket } from '../socket/client';
 import { useFeedback } from '../context/FeedbackContext';
+import { haptics } from '../utils/haptics';
 
 const G = {
   bg: '#070707',
@@ -71,22 +72,22 @@ const OrderPackCard = ({ order, onPacked }: { order: Order; onPacked: () => void
   const elapsedMins = Math.max(0, Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000));
 
   return (
-    <View style={[styles.card, isAllChecked ? styles.cardReady : null]}>
+    <View style={[styles.card, isAllChecked ? { borderColor: G.greenBorder } : null]}>
       {/* Header */}
       <View style={styles.cardHeader}>
         <View>
           <Text style={styles.orderId}>#{order.display_id}</Text>
           <Text style={styles.customerName}>{order.customer_name}</Text>
         </View>
-        <View style={styles.badge}>
+        <View style={styles.ageChip}>
           <Clock size={12} color={G.amber} />
-          <Text style={styles.badgeText}>{elapsedMins}m</Text>
+          <Text style={styles.ageText}>{elapsedMins}m</Text>
         </View>
       </View>
 
       {/* Checklist */}
-      <View style={styles.itemList}>
-        <Text style={styles.checkProgress}>
+      <View style={styles.itemsSection}>
+        <Text style={styles.itemsLabel}>
           {checkedCount}/{totalItems} ITEMS CHECKED
         </Text>
 
@@ -118,10 +119,10 @@ const OrderPackCard = ({ order, onPacked }: { order: Order; onPacked: () => void
         activeOpacity={0.8}
         disabled={!isAllChecked}
         onPress={onPacked}
-        style={[styles.packBtn, isAllChecked ? styles.packBtnActive : styles.packBtnDisabled]}
+        style={[styles.packBtn, isAllChecked ? styles.packBtnReady : null]}
       >
         <CheckCircle2 size={18} color={isAllChecked ? G.bg : G.muted} />
-        <Text style={[styles.packBtnText, isAllChecked ? styles.packBtnTextActive : null]}>
+        <Text style={[styles.packBtnText, isAllChecked ? styles.packBtnTextReady : null]}>
           MARK PACKED
         </Text>
       </TouchableOpacity>
@@ -144,7 +145,7 @@ export const PackerScreen = () => {
   const packMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/packed`, {}),
     onSuccess: () => {
-      showDialog({ title: 'Success', message: 'Order packed successfully', confirmText: 'Okay', type: 'success' });
+      haptics.success();
       queryClient.invalidateQueries({ queryKey: ['packer-orders'] });
     },
     onError: () => showDialog({ title: 'Error', message: 'Could not mark order as packed. Please try again.', confirmText: 'Okay', type: 'error' }),

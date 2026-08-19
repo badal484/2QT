@@ -20,13 +20,14 @@ import { startRiderLocationService, stopRiderLocationService } from '../services
 import { Card } from '../components/ui/Card';
 import { useFeedback } from '../context/FeedbackContext';
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+function calculateRoadDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
   const a = Math.sin(dLat / 2) ** 2
     + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const straightDist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return straightDist * 1.3;
 }
 
 const S = {
@@ -159,7 +160,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
       // Skip until we have a real GPS fix (default is 0,0)
       if (lat === 0 && lng === 0) return;
       const inRange = zones.some(z =>
-        haversineKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng))
+        calculateRoadDistanceKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng))
         <= parseFloat(z.radius_km) + 1,
       );
       if (inRange) {
@@ -177,7 +178,7 @@ const RiderHomeScreen = ({ navigation }: any) => {
     if (!zones.length) return null;
     const { latitude: lat, longitude: lng } = currentLocation;
     return zones.reduce((best: any, z: any) => {
-      const dist = haversineKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng));
+      const dist = calculateRoadDistanceKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng));
       return !best || dist < best.dist ? { ...z, dist } : best;
     }, null as any);
   })();

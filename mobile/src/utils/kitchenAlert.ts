@@ -4,21 +4,27 @@ import { safeNotifee, AndroidImportance } from '../services/notifeeSafe';
 let SoundPkg: any = null;
 let alertSound: any = null;
 
-try {
-  if (NativeModules.RNSound || NativeModules.SoundManager || NativeModules.Sound) {
-    const pkg = require('react-native-sound');
-    SoundPkg = pkg?.default || pkg;
-    if (SoundPkg && typeof SoundPkg.setCategory === 'function') {
-      SoundPkg.setCategory('Playback', true);
+function getSoundPkg() {
+  if (SoundPkg) return SoundPkg;
+  // ONLY attempt to load react-native-sound if RNSound native module is explicitly linked
+  if (NativeModules.RNSound) {
+    try {
+      const pkg = require('react-native-sound');
+      SoundPkg = pkg?.default || pkg;
+      if (SoundPkg && typeof SoundPkg.setCategory === 'function') {
+        SoundPkg.setCategory('Playback', true);
+      }
+    } catch (e) {
+      console.warn('[KitchenAlert] Safe load react-native-sound notice:', e);
+      SoundPkg = null;
     }
   }
-} catch (e) {
-  console.warn('[KitchenAlert] Safe load react-native-sound warning:', e);
+  return SoundPkg;
 }
 
 export function playKitchenAlert() {
   try {
-    // 1. Aggressive 6-second multi-pulse vibration
+    // 1. Aggressive 6-second multi-pulse vibration (works on all devices natively)
     Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800, 400, 800]);
 
     // 2. Play high-importance alert sound via Notifee notification channel
@@ -44,10 +50,11 @@ export function playKitchenAlert() {
     }
 
     // 3. Play sound file via react-native-sound if native module is present
-    if (SoundPkg) {
+    const soundClass = getSoundPkg();
+    if (soundClass) {
       const fileName = Platform.OS === 'android' ? 'alert' : 'alert.mp3';
       if (!alertSound) {
-        alertSound = new SoundPkg(fileName, SoundPkg.MAIN_BUNDLE, (error: any) => {
+        alertSound = new soundClass(fileName, soundClass.MAIN_BUNDLE, (error: any) => {
           if (error) {
             console.warn('[KitchenAlert] Sound load error:', error);
             alertSound = null;

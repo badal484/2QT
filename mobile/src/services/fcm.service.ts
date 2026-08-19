@@ -1,3 +1,4 @@
+import './firebaseInit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, NativeModules } from 'react-native';
 import { api } from '../api/client';

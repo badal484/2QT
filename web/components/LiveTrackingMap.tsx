@@ -21,13 +21,14 @@ function injectStyles() {
 
 // ─── Geometry ─────────────────────────────────────────────────────────────────
 
-function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+function getRoadDistanceMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
   const a = Math.sin(dLat / 2) ** 2
     + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const straightDist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return straightDist * 1.3;
 }
 
 function calcBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -50,7 +51,7 @@ function closestPointIndex(route: [number, number][], lat: number, lng: number):
 function remainingMeters(route: [number, number][], fromIdx: number): number {
   let total = 0;
   for (let i = fromIdx; i < route.length - 1; i++)
-    total += haversineMeters(route[i][0], route[i][1], route[i + 1][0], route[i + 1][1]);
+    total += getRoadDistanceMetres(route[i][0], route[i][1], route[i + 1][0], route[i + 1][1]);
   return total;
 }
 
@@ -126,7 +127,7 @@ function MapCamera({
 
   useEffect(() => {
     const prev = prevRef.current;
-    if (prev && haversineMeters(prev[0], prev[1], rLat, rLng) < 80) return;
+    if (prev && getRoadDistanceMetres(prev[0], prev[1], rLat, rLng) < 80) return;
     prevRef.current = [rLat, rLng];
     map.fitBounds(L.latLngBounds([rLat, rLng], [cLat, cLng]), {
       padding: [72, 72],
@@ -157,7 +158,7 @@ function RiderMarker({
   cbRef.current = onPositionChange;
 
   useEffect(() => {
-    const d = haversineMeters(prev.current.lat, prev.current.lng, targetLat, targetLng);
+    const d = getRoadDistanceMetres(prev.current.lat, prev.current.lng, targetLat, targetLng);
     if (d > 5) {
       const newBear = calcBearing(prev.current.lat, prev.current.lng, targetLat, targetLng);
       if (Math.abs(newBear - bear.current) > 5) {
@@ -246,7 +247,7 @@ export default function LiveTrackingMap({
     if (!fromLat || !fromLng) { setLoadingRoute(false); return; }
 
     const last = lastFetchPos.current;
-    if (last && haversineMeters(last[0], last[1], fromLat, fromLng) < 100) return;
+    if (last && getRoadDistanceMetres(last[0], last[1], fromLat, fromLng) < 100) return;
     lastFetchPos.current = [fromLat, fromLng];
     prevIdxRef.current = -1;
     if (!firstDone.current) setLoadingRoute(true);
@@ -292,7 +293,7 @@ export default function LiveTrackingMap({
     </div>
   );
 
-  if (kitchenLat && kitchenLng && haversineMeters(kitchenLat, kitchenLng, customerLat, customerLng) > 500_000) return (
+  if (kitchenLat && kitchenLng && getRoadDistanceMetres(kitchenLat, kitchenLng, customerLat, customerLng) > 500_000) return (
     <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center gap-1 text-center px-6">
       <p className="text-sm font-bold text-zinc-700">Rider is on the way</p>
       <p className="text-xs text-zinc-400">Map updating…</p>

@@ -8,6 +8,8 @@
     "android:buyer:release": "react-native run-android --mode buyerRelease --appId com.veltomobile.buyer",
     "android:rider": "react-native run-android --mode riderDebug --appId com.veltomobile.rider --active-arch-only",
     "android:kitchen": "react-native run-android --mode kitchenDebug --appId com.veltomobile.kitchen --active-arch-only",
+    "android:packer": "react-native run-android --mode packerDebug --appId com.veltomobile.packer --active-arch-only",
+    "android:packer:release": "react-native run-android --mode packerRelease --appId com.veltomobile.packer",
     "android:admin": "react-native run-android --mode adminDebug --appId com.veltomobile.admin --active-arch-only",
     "ios": "react-native run-ios",
     "lint": "eslint .",

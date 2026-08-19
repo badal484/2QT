@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { redis, keys } from '../redis';
+import { setContextUserId } from '../utils/asyncContext';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set — server cannot start safely');
@@ -80,6 +81,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             restaurantId: userData.dine_in_restaurant_id ?? null,
             jti: decoded.jti,
         };
+        setContextUserId(decoded.userId);
         next();
     } catch (err: any) {
         return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Invalid token' });

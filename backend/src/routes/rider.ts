@@ -202,14 +202,15 @@ router.post('/location', authenticate, requireRole('rider', 'rider_captain', 'su
     }
 });
 
-// Haversine distance in km
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+// Real Road distance in km (incorporating driving road routing factor)
+function calculateRoadDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLng = (lng2 - lng1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) ** 2
         + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const straightDist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return straightDist * 1.3;
 }
 
 // Returns all active zones with their primary kitchen — used by unzoned riders to navigate to the nearest hub
@@ -257,7 +258,7 @@ router.post('/zone/check-in', authenticate, requireRole('rider', 'rider_captain'
         let nearest: { id: string; name: string; dist: number } | null = null;
 
         for (const z of zones) {
-            const dist = haversineKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng));
+            const dist = calculateRoadDistanceKm(lat, lng, parseFloat(z.kitchen_lat), parseFloat(z.kitchen_lng));
             if (dist <= parseFloat(z.radius_km) + BUFFER_KM) {
                 if (!nearest || dist < nearest.dist) nearest = { id: z.id, name: z.name, dist };
             }

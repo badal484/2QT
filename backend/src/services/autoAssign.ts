@@ -4,13 +4,14 @@ import { emitToUser, emitToRiders, emitToAdmin, emitToKitchen } from '../socket'
 import { getAppSettingInt } from '../utils/appSettings';
 import { NotificationService } from './notification.service';
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+function calculateRoadDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLng = (lng2 - lng1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) ** 2
         + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const straightDist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return straightDist * 1.3;
 }
 
 // Max distance between a busy rider's current delivery and a new order's delivery.
@@ -99,7 +100,7 @@ async function findBestRider(
                     const dlat = parseFloat(activeRows[0].dlat);
                     const dlng = parseFloat(activeRows[0].dlng);
                     if (!isNaN(dlat) && !isNaN(dlng)) {
-                        const distBetweenDeliveries = haversineKm(dlat, dlng, newDeliveryLat, newDeliveryLng);
+                        const distBetweenDeliveries = calculateRoadDistanceKm(dlat, dlng, newDeliveryLat, newDeliveryLng);
                         if (distBetweenDeliveries > MAX_SECOND_ORDER_DIST_KM) {
                             console.log(`[AUTO-ASSIGN] Skipping busy rider ${rider.id} — new delivery ${distBetweenDeliveries.toFixed(1)}km from current delivery (limit ${MAX_SECOND_ORDER_DIST_KM}km)`);
                             continue;
@@ -127,7 +128,7 @@ async function findBestRider(
             }
 
             const distKm = (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) && !isNaN(kitchenLat) && !isNaN(kitchenLng))
-                ? haversineKm(kitchenLat, kitchenLng, lat, lng)
+                ? calculateRoadDistanceKm(kitchenLat, kitchenLng, lat, lng)
                 : 0;
 
             candidates.push({ id: rider.id, activeOrders, distKm });
@@ -189,7 +190,7 @@ async function detectBatch(
         LIMIT 10
     `, [kitchenId, anchorOrderId, zoneId]);
 
-    const directA = haversineKm(kitchenLat, kitchenLng, anchorDeliveryLat, anchorDeliveryLng);
+    const directA = calculateRoadDistanceKm(kitchenLat, kitchenLng, anchorDeliveryLat, anchorDeliveryLng);
 
     for (const row of rows) {
         const dlat = parseFloat(row.dlat);
@@ -197,12 +198,12 @@ async function detectBatch(
         if (isNaN(dlat) || isNaN(dlng)) continue;
 
         // Filter 1: delivery points must be close
-        const betweenDeliveries = haversineKm(anchorDeliveryLat, anchorDeliveryLng, dlat, dlng);
+        const betweenDeliveries = calculateRoadDistanceKm(anchorDeliveryLat, anchorDeliveryLng, dlat, dlng);
         if (betweenDeliveries > MAX_DELIVERY_DIST_KM) continue;
 
         // Filter 2: detour check — reject if one delivery is a backtrack from the other.
         // Compare best batch route against the longer of the two individual routes.
-        const directB   = haversineKm(kitchenLat, kitchenLng, dlat, dlng);
+        const directB   = calculateRoadDistanceKm(kitchenLat, kitchenLng, dlat, dlng);
         const routeAB   = directA + betweenDeliveries; // K→A→B
         const routeBA   = directB + betweenDeliveries; // K→B→A
         const maxDirect = Math.max(directA, directB);

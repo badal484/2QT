@@ -5,7 +5,7 @@ import { query, withTransaction } from './db';
 import { NotificationService } from './services/notification.service';
 import { emitToUser, emitToAdmin } from './socket';
 import { redis, keys } from './redis';
-import { haversineMetres } from './services/distance.service';
+import { calculateGeodesicRoadMetres } from './services/distance.service';
 import { generateKitchenPayout } from './services/kitchen-payout.service';
 
 // NOTE: this is a SEPARATE module from src/crons/index.ts (same base name, one is a
@@ -556,7 +556,7 @@ export const initCrons = () => {
                         for (const batch of batches) {
                             if (batch.orders.length < maxBatchSize) {
                                 const firstOrder = batch.orders[0];
-                                const dist = haversineMetres(
+                                const dist = calculateGeodesicRoadMetres(
                                     parseFloat(order.customer_lat), parseFloat(order.customer_lng),
                                     parseFloat(firstOrder.customer_lat), parseFloat(firstOrder.customer_lng)
                                 );
@@ -598,7 +598,7 @@ export const initCrons = () => {
 
                         try {
                             const loc = JSON.parse(locStr);
-                            const distFromKitchen = haversineMetres(kLat, kLng, loc.lat, loc.lng);
+                            const distFromKitchen = calculateGeodesicRoadMetres(kLat, kLng, loc.lat, loc.lng);
                             
                             // Base score is negative distance (closer = higher score)
                             let score = -distFromKitchen;
