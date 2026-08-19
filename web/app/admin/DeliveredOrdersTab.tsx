@@ -120,15 +120,33 @@ export function DeliveredOrdersTab() {
                   <span className="font-black text-white text-sm">#{order.display_id}</span>
                   <span className="text-zinc-500 text-xs">·</span>
                   <span className="text-zinc-300 text-sm">{order.customer_name}</span>
-                  <span
-                    className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                      order.pod_photo_url
-                        ? "bg-emerald-500/10 text-emerald-400"
-                        : "bg-zinc-800 text-zinc-500"
-                    }`}
-                  >
-                    {order.pod_photo_url ? "POD ✓" : "No photo"}
-                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          toast.loading("Fetching invoice...", { id: `inv-${order.id}` });
+                          const data = await api.get(`/orders/${order.id}/invoice`);
+                          toast.dismiss(`inv-${order.id}`);
+                          if (data.invoiceUrl) window.open(data.invoiceUrl, "_blank");
+                        } catch {
+                          toast.error("Invoice fetch failed");
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-1"
+                      title="View PDF Invoice"
+                    >
+                      PDF Invoice
+                    </button>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                        order.pod_photo_url
+                          ? "bg-emerald-500/10 text-emerald-400"
+                          : "bg-zinc-800 text-zinc-500"
+                      }`}
+                    >
+                      {order.pod_photo_url ? "POD ✓" : "No photo"}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-zinc-500">
                   <span className="flex items-center gap-1">
