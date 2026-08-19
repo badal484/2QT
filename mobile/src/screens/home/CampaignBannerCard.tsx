@@ -48,44 +48,47 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
       case 'flash_sale':
         return {
           gradient: ['#FF5A0A', '#F04A0D', '#B8320C', '#8E2005'],
-          badgeBg: 'rgba(0, 0, 0, 0.28)',
+          badgeBg: 'rgba(0, 0, 0, 0.25)',
           badgeBorder: '#FFB000',
           badgeText: '#FFB000',
           badgeLabel: 'FLASH SALE',
           icon: Flame,
           accent: '#FFB000',
-          foodImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=500&auto=format&fit=crop&q=80',
+          foodImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=1000&auto=format&fit=crop&q=80',
         };
       case 'happy_hour':
         return {
-          gradient: ['#7C3AED', '#6D28D9', '#4C1D95'],
-          badgeBg: 'rgba(255, 255, 255, 0.22)',
+          gradient: ['#6D28D9', '#5B21B6', '#4C1D95', '#3B0764'],
+          badgeBg: 'rgba(0, 0, 0, 0.25)',
+          badgeBorder: '#A855F7',
           badgeText: '#FFFFFF',
           badgeLabel: 'HAPPY HOUR',
           icon: Clock,
           accent: '#A855F7',
-          foodImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80',
+          foodImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=1000&auto=format&fit=crop&q=80',
         };
       case 'welcome':
       case 'winback':
         return {
-          gradient: ['#059669', '#047857', '#064E3B'],
-          badgeBg: 'rgba(255, 255, 255, 0.22)',
+          gradient: ['#059669', '#047857', '#064E3B', '#022C22'],
+          badgeBg: 'rgba(0, 0, 0, 0.25)',
+          badgeBorder: '#10B981',
           badgeText: '#FFFFFF',
           badgeLabel: 'SPECIAL OFFER',
           icon: Gift,
           accent: '#10B981',
-          foodImage: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80',
+          foodImage: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=1000&auto=format&fit=crop&q=80',
         };
       default:
         return {
-          gradient: ['#EA580C', '#C2410C', '#9A3412'],
-          badgeBg: 'rgba(255, 255, 255, 0.22)',
+          gradient: ['#EA580C', '#C2410C', '#9A3412', '#7C2D12'],
+          badgeBg: 'rgba(0, 0, 0, 0.25)',
+          badgeBorder: '#F59E0B',
           badgeText: '#FFFFFF',
           badgeLabel: 'LIMITED DEAL',
           icon: Sparkles,
           accent: '#F59E0B',
-          foodImage: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=500&auto=format&fit=crop&q=80',
+          foodImage: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=1000&auto=format&fit=crop&q=80',
         };
     }
   };
@@ -114,23 +117,20 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
         end={{ x: 1, y: 1 }}
         style={styles.gradientCard}
       >
-        {/* Gourmet food backdrop texture overlay (20% opacity for subtle food vibe without washing out text) */}
+        {/* Subtle background gourmet food texture overlay */}
         <Image
           source={{ uri: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1000&auto=format&fit=crop&q=80' }}
-          style={[StyleSheet.absoluteFillObject, { opacity: 0.20 }]}
+          style={[StyleSheet.absoluteFillObject, { opacity: 0.18 }]}
           resizeMode="cover"
         />
 
-        {/* Glossy top sheen line */}
+        {/* Top glossy sheen */}
         <View style={styles.topSheen} pointerEvents="none" />
 
-        {/* Dark depth shadow behind text */}
-        <View style={styles.textBackdropShadow} pointerEvents="none" />
-
-        {/* Radial amber glow behind hero food image */}
+        {/* Ambient radial lighting glow behind food */}
         <View style={styles.foodRadialGlow} pointerEvents="none" />
 
-        {/* Hero Food Photograph (Integrated on Right side, extending towards edges, soft glow edge) */}
+        {/* Hero Food Dish Photograph (Right side 42% integrated with soft ambient glow) */}
         <View style={styles.heroFoodWrapper} pointerEvents="none">
           <Image
             source={{ uri: campaign.image_url || campaign.photo_url || theme.foodImage }}
@@ -139,9 +139,9 @@ export const CampaignBannerCard: React.FC<CampaignBannerCardProps> = ({ campaign
           />
         </View>
 
-        {/* Content Container */}
+        {/* Left Column Content Container */}
         <View style={styles.contentContainer}>
-          {/* Top Bar: Compact Badge + Timer */}
+          {/* Top Row: Badge + Countdown Timer */}
           <View style={styles.topRow}>
             <View style={[styles.badge, theme.badgeBorder ? { borderColor: theme.badgeBorder, backgroundColor: theme.badgeBg } : null]}>
               <Icon size={12} color={theme.accent || '#FFF'} style={{ marginRight: 4 }} />
@@ -240,52 +240,42 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
     zIndex: 3,
   },
-  textBackdropShadow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    width: '68%',
-    backgroundColor: 'rgba(15, 5, 2, 0.15)',
-    zIndex: 1,
-  },
   foodRadialGlow: {
     position: 'absolute',
-    top: -20,
-    right: -25,
-    width: 190,
-    height: 190,
-    borderRadius: 95,
+    right: -10,
+    top: -10,
+    bottom: -10,
+    width: 170,
+    borderRadius: 85,
     backgroundColor: 'rgba(255, 176, 0, 0.25)',
     zIndex: 1,
   },
   heroFoodWrapper: {
     position: 'absolute',
-    right: -15,
-    top: -10,
-    bottom: -10,
-    width: 155,
-    height: 185,
-    borderRadius: 77.5,
+    right: 8,
+    top: 10,
+    bottom: 10,
+    width: 145,
+    borderRadius: 18,
     overflow: 'hidden',
     zIndex: 2,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 176, 0, 0.35)',
     shadowColor: '#000',
-    shadowOffset: { width: -2, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 5,
   },
   heroFoodImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 18,
   },
   contentContainer: {
     paddingHorizontal: 16,
     paddingVertical: 14,
     zIndex: 4,
     position: 'relative',
+    maxWidth: '62%',
   },
   topRow: {
     flexDirection: 'row',
@@ -297,7 +287,7 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -314,7 +304,7 @@ const styles = StyleSheet.create({
   timerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -355,11 +345,10 @@ const styles = StyleSheet.create({
   },
   headline: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 21,
     fontFamily: tokens.typography.family.black,
     letterSpacing: -0.4,
-    lineHeight: 25,
-    maxWidth: '60%',
+    lineHeight: 24,
   },
   campaignName: {
     color: '#FFE8DE',
@@ -367,20 +356,19 @@ const styles = StyleSheet.create({
     fontFamily: tokens.typography.family.medium,
     marginTop: 3,
     marginBottom: 10,
-    maxWidth: '60%',
   },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginTop: 2,
     marginBottom: 6,
+    gap: 8,
   },
   shopNowPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
+    paddingHorizontal: 13,
     paddingVertical: 7,
     borderRadius: 18,
     gap: 4,
@@ -400,9 +388,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 10,
-    marginRight: 10,
   },
   autoAppliedText: {
     color: '#FFE8DE',
@@ -414,7 +401,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.18)',
+    borderTopColor: 'rgba(255, 255, 255, 0.22)',
   },
   footerText: {
     color: '#FFE8DE',
