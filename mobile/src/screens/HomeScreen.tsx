@@ -134,7 +134,7 @@ const HomeScreen = ({ navigation }: any) => {
       return Array.isArray(orders) && orders.length > 0 ? 5000 : false;
     },
   });
-  const activeOrders = activeOrdersData?.activeOrders?.filter((o: any) => !['cancelled_by_restaurant', 'refunded', 'pending_payment', 'payment_failed'].includes(o.status)) || [];
+  const activeOrders = activeOrdersData?.activeOrders?.filter((o: any) => !['cancelled', 'cancelled_by_restaurant', 'refunded', 'payment_failed'].includes(o.status)) || [];
   const primaryActiveOrder = activeOrders[0];
 
   const { data: bannersData } = useQuery({
@@ -1247,6 +1247,7 @@ const HomeScreen = ({ navigation }: any) => {
             <View style={styles.activeOrderTextContainer}>
               <Text allowFontScaling={false} style={styles.activeOrderTitle}>
                 {activeOrders.length > 1 ? `${activeOrders.length} Active Orders` :
+                 primaryActiveOrder.status === 'pending_payment' ? 'Payment Pending' :
                  primaryActiveOrder.status === 'placed' ? 'Order Placed' :
                  primaryActiveOrder.status === 'accepted' ? 'Preparing food' :
                  primaryActiveOrder.status === 'preparing' ? 'Preparing food' :
@@ -1254,7 +1255,8 @@ const HomeScreen = ({ navigation }: any) => {
                  primaryActiveOrder.status === 'out_for_delivery' ? 'Arriving soon' : 'Active Order'}
               </Text>
               <Text allowFontScaling={false} style={styles.activeOrderSubtitle}>
-                {activeOrders.length > 1 ? 'View all orders' : 'View live tracking'}
+                {activeOrders.length > 1 ? 'View all orders' :
+                 primaryActiveOrder.status === 'pending_payment' ? 'Tap to complete payment' : 'View live tracking'}
               </Text>
             </View>
             <View style={styles.activeOrderArrow}>
