@@ -439,36 +439,42 @@ function OrdersTab() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={async () => {
-                      try {
-                        const data = await api.get(`/orders/${order.id}/invoice`);
-                        if (data.invoiceUrl) window.open(data.invoiceUrl, "_blank");
-                      } catch {
-                        toast.error("Invoice failed");
-                      }
-                    }}
-                    className="w-9 h-9 rounded-xl bg-white/[0.02] backdrop-blur-lg border border-white/10 flex items-center justify-center text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
-                    title="Download Invoice"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        toast.loading("Regenerating invoice...", { id: `reg-${order.id}` });
-                        const data = await api.post(`/admin/orders/${order.id}/regenerate-invoice`);
-                        toast.success("Invoice regenerated!", { id: `reg-${order.id}` });
-                        if (data.invoiceUrl) window.open(data.invoiceUrl, "_blank");
-                      } catch {
-                        toast.error("Regeneration failed", { id: `reg-${order.id}` });
-                      }
-                    }}
-                    className="w-9 h-9 rounded-xl bg-white/[0.02] backdrop-blur-lg border border-white/10 flex items-center justify-center text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
-                    title="Regenerate & Preview PDF"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5 bg-white/[0.04] p-1 rounded-2xl border border-white/10">
+                    <button
+                      onClick={async () => {
+                        try {
+                          toast.loading("Fetching invoice...", { id: `inv-${order.id}` });
+                          const data = await api.get(`/orders/${order.id}/invoice`);
+                          toast.dismiss(`inv-${order.id}`);
+                          if (data.invoiceUrl) window.open(data.invoiceUrl, "_blank");
+                        } catch {
+                          toast.error("Invoice fetch failed", { id: `inv-${order.id}` });
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black font-black text-xs transition-all flex items-center gap-1.5"
+                      title="View Customer Invoice PDF"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>PDF</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          toast.loading("Regenerating invoice PDF...", { id: `reg-${order.id}` });
+                          const data = await api.post(`/admin/orders/${order.id}/regenerate-invoice`);
+                          toast.success("Invoice PDF updated!", { id: `reg-${order.id}` });
+                          if (data.invoiceUrl) window.open(data.invoiceUrl, "_blank");
+                        } catch {
+                          toast.error("Regeneration failed", { id: `reg-${order.id}` });
+                        }
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 font-bold text-xs transition-all flex items-center gap-1"
+                      title="Re-apply Admin Settings & Regenerate PDF"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Regen</span>
+                    </button>
+                  </div>
                   <button 
                     disabled={cancelling === order.id}
                     onClick={() => forceStatus(order.id, order.status)}
