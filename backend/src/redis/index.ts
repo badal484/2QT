@@ -37,11 +37,13 @@ const withTimeout = <T>(promise: Promise<T>, ms = 200): Promise<T> => {
 const originalGet = redis.get.bind(redis);
 redis.get = (async (...args: any[]) => {
     const key = args[0];
-    try { 
-        const res = await withTimeout((originalGet as any)(...args)); 
-        if (res !== null) return res;
-    } catch (e: any) { 
-        console.error('[Redis Safe GET]', e.message); 
+    if (redis.isOpen) {
+        try { 
+            const res = await withTimeout((originalGet as any)(...args)).catch(() => null); 
+            if (res !== null) return res;
+        } catch (e: any) { 
+            console.error('[Redis Safe GET]', e.message); 
+        }
     }
     // Check fallback
     const cached = fallbackCache.get(key);
@@ -68,30 +70,37 @@ redis.set = (async (...args: any[]) => {
     // Optimistically set in local fallback cache
     fallbackCache.set(key, { value: String(value), expiresAt: ttl ? Date.now() + ttl : 0 });
     
-    try { 
-        return await withTimeout((originalSet as any)(...args)); 
-    } catch (e: any) { 
-        console.error('[Redis Safe SET]', e.message); 
-        // If Redis failed, but we successfully set it locally (or it was an NX lock we acquired locally), return 'OK' instead of null.
-        // Returning null for an NX lock means 'failed to acquire lock', which blocks the order completely.
-        return 'OK'; 
+    if (redis.isOpen) {
+        try { 
+            return await withTimeout((originalSet as any)(...args)).catch(() => 'OK'); 
+        } catch (e: any) { 
+            console.error('[Redis Safe SET]', e.message); 
+            return 'OK'; 
+        }
     }
+    return 'OK';
 }) as any;
 
 const originalDel = redis.del.bind(redis);
 redis.del = (async (...args: any[]) => {
     const key = args[0];
     fallbackCache.delete(key);
-    try { return await withTimeout((originalDel as any)(...args)); } 
-    catch (e: any) { console.error('[Redis Safe DEL]', e.message); return null; }
+    if (redis.isOpen) {
+        try { return await withTimeout((originalDel as any)(...args)).catch(() => null); } 
+        catch (e: any) { console.error('[Redis Safe DEL]', e.message); return null; }
+    }
+    return null;
 }) as any;
 
 const originalSetEx = redis.setEx.bind(redis);
 redis.setEx = (async (...args: any[]) => {
     const [key, seconds, value] = args;
     fallbackCache.set(key, { value: String(value), expiresAt: Date.now() + (Number(seconds) * 1000) });
-    try { return await withTimeout((originalSetEx as any)(...args)); } 
-    catch (e: any) { console.error('[Redis Safe SETEX]', e.message); return null; }
+    if (redis.isOpen) {
+        try { return await withTimeout((originalSetEx as any)(...args)).catch(() => null); } 
+        catch (e: any) { console.error('[Redis Safe SETEX]', e.message); return null; }
+    }
+    return null;
 }) as any;
 // -------------------------------------------------------------
 
