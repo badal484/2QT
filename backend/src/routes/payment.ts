@@ -161,7 +161,7 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             return res.json({ pricing, availableWallet });
         }
 
-        const dbOrder = await createPendingOrder({
+        const pendingOrderPayload = {
             customerId,
             kitchenId,
             zoneId,
@@ -175,21 +175,19 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             scheduledAt,
             deliveryContactName: deliveryContactName?.trim() || null,
             deliveryContactPhone: deliveryContactPhone?.trim() || null,
-        });
+            riderTipPaise,
+        };
 
-        // 1.5 Deduct loyalty points immediately if used (Wallet is deducted at finalization, but points are simpler to lock here or we can just pass it to pending)
-        if (pricing.loyaltyDiscountPaise > 0) {
-            const pointsRedeemed = Math.round(pricing.loyaltyDiscountPaise / 100);
-            await query(`
-                INSERT INTO loyalty_transactions (customer_id, points, type, order_id)
-                VALUES ($1, $2, 'redeem', $3)
-            `, [customerId, pointsRedeemed, dbOrder.id]);
-        }
-
-        // 2. Handle COD
-        // finalizeOrder confirms the order and deducts inventory/wallet, but sets payment_status='paid'.
-        // We immediately override to 'cod_pending' because cash hasn't been collected yet.
+        // 2. Handle COD (creates confirmed DB order immediately)
         if (paymentMethod === 'cod') {
+            const dbOrder = await createPendingOrder(pendingOrderPayload);
+            if (pricing.loyaltyDiscountPaise > 0) {
+                const pointsRedeemed = Math.round(pricing.loyaltyDiscountPaise / 100);
+                await query(`
+                    INSERT INTO loyalty_transactions (customer_id, points, type, order_id)
+                    VALUES ($1, $2, 'redeem', $3)
+                `, [customerId, pointsRedeemed, dbOrder.id]).catch(() => {});
+            }
             const codResult = await finalizeOrder(`COD_${dbOrder.id.slice(0, 8)}`, 'cod', dbOrder.id);
             if (codResult?.status === 'already_processed') {
                 return res.status(409).json({ error: 'ORDER_ALREADY_PLACED' });
@@ -206,8 +204,16 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
             });
         }
 
-        // 2.5 Handle Fully Wallet/Loyalty Paid Order
+        // 2.5 Handle Fully Wallet/Loyalty Paid Order (creates confirmed DB order immediately)
         if (pricing.gatewayAmountPaise <= 0) {
+            const dbOrder = await createPendingOrder(pendingOrderPayload);
+            if (pricing.loyaltyDiscountPaise > 0) {
+                const pointsRedeemed = Math.round(pricing.loyaltyDiscountPaise / 100);
+                await query(`
+                    INSERT INTO loyalty_transactions (customer_id, points, type, order_id)
+                    VALUES ($1, $2, 'redeem', $3)
+                `, [customerId, pointsRedeemed, dbOrder.id]).catch(() => {});
+            }
             const finalResult = await finalizeOrder(`WALLET_${dbOrder.id.slice(0, 8)}`, 'wallet', dbOrder.id);
             if (finalResult?.status === 'already_processed') {
                 return res.status(409).json({ error: 'ORDER_ALREADY_PLACED' });
@@ -221,32 +227,23 @@ router.post('/create-order', authenticate, paymentLimiter, async (req: AuthReque
         }
 
         // 3. Handle Online (Razorpay)
+        // DO NOT create DB row yet — save cart payload in Redis pending session!
+        const tempReceipt = `2QT_RZP_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
         const rzpOrder = await razorpay.orders.create({
             amount: pricing.gatewayAmountPaise,
             currency: "INR",
-            receipt: dbOrder.display_id,
+            receipt: tempReceipt,
             notes: {
-                orderId: dbOrder.id,
-                customerId
+                customerId,
+                tempReceipt
             }
         });
 
-        // Update order with gateway ID
-        await query('UPDATE orders SET gateway_order_id = $1 WHERE id = $2', [rzpOrder.id, dbOrder.id]);
-
-        // Keep redis for legacy/fallback but DB is primary now
-        await redis.set(keys.pendingOrder(rzpOrder.id), JSON.stringify({
-            customerId,
-            kitchenId,
-            zoneId,
-            items,
-            addressId,
-            pricing,
-            promoCode
-        }), { EX: 3600 }).catch(e => console.error('Redis pendingOrder set failed:', e.message));
+        // Store pending cart session in Redis (30 min auto-expiry)
+        await redis.set(keys.pendingOrder(rzpOrder.id), JSON.stringify(pendingOrderPayload), { EX: 1800 })
+            .catch(e => console.error('Redis pendingOrder set failed:', e.message));
 
         res.json({
-            orderId: dbOrder.id,
             razorpayOrderId: rzpOrder.id,
             amount: rzpOrder.amount,
             keyId: process.env.RAZORPAY_KEY_ID,
@@ -348,16 +345,22 @@ router.post('/verify-payment', authenticate, async (req: AuthRequest, res) => {
             const subId = await handleSubscriptionRenewal(customerId, planId);
             return res.json({ success: true, subscriptionId: subId });
         } else {
-            const result = await finalizeOrder(razorpay_order_id, 'online');
+            const result: any = await finalizeOrder(razorpay_order_id, 'online');
             // Save Razorpay payment ID so the refund service can reverse it later.
-            // The webhook does the same, but verify-payment fires first on mobile.
-            if (razorpay_payment_id) {
+            if (razorpay_payment_id && (result?.id || result?.orderId)) {
+                const targetId = result.id || result.orderId;
                 await query(
-                    'UPDATE orders SET gateway_payment_id = $1 WHERE gateway_order_id = $2 AND gateway_payment_id IS NULL',
-                    [razorpay_payment_id, razorpay_order_id]
+                    'UPDATE orders SET gateway_payment_id = $1 WHERE id = $2 AND gateway_payment_id IS NULL',
+                    [razorpay_payment_id, targetId]
                 ).catch(() => {});
             }
-            return res.json(result);
+            return res.json({
+                success: true,
+                orderId: result?.id || result?.orderId,
+                displayId: result?.display_id || result?.displayId,
+                status: 'confirmed',
+                ...result
+            });
         }
     } catch (err: any) {
         res.status(500).json({ error: 'VERIFICATION_FAILED', message: err.message });
