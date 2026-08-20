@@ -43,6 +43,7 @@ process.on('unhandledRejection', (err: any) => {
         msg.includes('Redis Timeout') ||
         msg.includes('max requests limit exceeded') ||
         msg.includes('max_requests_limit') ||
+        msg.includes('unexpected reply') ||
         msg.includes('ReplyError') ||
         err?.name === 'ReplyError'
     ) {
