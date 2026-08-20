@@ -40,8 +40,16 @@ process.on('uncaughtException', (err) => {
 });
 process.on('unhandledRejection', (err: any) => {
     const msg = err?.message || String(err);
-    if (msg.includes('The client is closed') || msg.includes('Redis Client Error') || msg.includes('Redis Timeout')) {
-        console.warn('[WORKER] [REDIS WARNING] Ignored transient Redis error:', msg);
+    if (
+        msg.includes('The client is closed') ||
+        msg.includes('Redis Client Error') ||
+        msg.includes('Redis Timeout') ||
+        msg.includes('max requests limit exceeded') ||
+        msg.includes('max_requests_limit') ||
+        msg.includes('ReplyError') ||
+        err?.name === 'ReplyError'
+    ) {
+        console.warn('[WORKER] [REDIS WARNING] Ignored Redis error (operating on in-memory fallback):', msg);
         return;
     }
     console.error('[WORKER] UNHANDLED REJECTION! 💥', err?.name, err?.message);
