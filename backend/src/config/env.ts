@@ -30,7 +30,7 @@ const sharedSchema = z.object({
                 "ENABLE_EMBEDDED_WORKER must be explicitly set to 'true' or 'false' — " +
                 'an unset value on a scaled-out API instance causes duplicate cron/job execution',
         }),
-    }),
+    }).default('true'),
     SENTRY_DSN: z.string().optional(),
     GOOGLE_MAPS_KEY: z.string().optional(),
     GOOGLE_MAPS_API_KEY: z.string().optional(),
