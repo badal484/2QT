@@ -29,7 +29,6 @@ import {
   ShoppingBag,
   ClipboardCheck,
   Volume2,
-  VolumeX,
   Coffee,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -366,57 +365,49 @@ export default function KitchenPage() {
     }
   }, []);
 
-  const unlockAudio = useCallback(async () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx && !(window as any)._kdsAudioCtx) {
-        (window as any)._kdsAudioCtx = new AudioCtx();
-      }
-      const ctx = (window as any)._kdsAudioCtx;
-      if (ctx && ctx.state === 'suspended') {
-        await ctx.resume();
-      }
-      let audioEl = document.getElementById('kds-alert-audio') as HTMLAudioElement;
-      if (!audioEl) {
-        audioEl = document.createElement('audio');
-        audioEl.id = 'kds-alert-audio';
-        audioEl.src = '/alert.mp3';
-        audioEl.preload = 'auto';
-        document.body.appendChild(audioEl);
-      }
-      try {
-        audioEl.currentTime = 0;
-        const p = audioEl.play();
-        if (p !== undefined) {
-          await p;
-          audioEl.pause();
-          audioEl.currentTime = 0;
-        }
-      } catch {}
-      setSoundEnabled(true);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  // Unlock audio on ANY user gesture (click, touch, keydown, pointerdown)
+  // Unlock audio on first user gesture to bypass browser autoplay policies
   useEffect(() => {
-    const handleGesture = () => {
-      unlockAudio();
-    };
-    window.addEventListener('click', handleGesture);
-    window.addEventListener('touchstart', handleGesture);
-    window.addEventListener('keydown', handleGesture);
-    window.addEventListener('pointerdown', handleGesture);
-    return () => {
-      window.removeEventListener('click', handleGesture);
-      window.removeEventListener('touchstart', handleGesture);
-      window.removeEventListener('keydown', handleGesture);
-      window.removeEventListener('pointerdown', handleGesture);
-    };
-  }, [unlockAudio]);
+    // Create a global audio element if it doesn't exist
+    let audioEl = document.getElementById('kds-alert-audio') as HTMLAudioElement;
+    if (!audioEl) {
+      audioEl = document.createElement('audio');
+      audioEl.id = 'kds-alert-audio';
+      audioEl.src = '/alert.mp3';
+      audioEl.preload = 'auto';
+      document.body.appendChild(audioEl);
+    }
 
+    const unlock = async () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx && !(window as any)._kdsAudioCtx) {
+          (window as any)._kdsAudioCtx = new AudioCtx();
+        }
+        if ((window as any)._kdsAudioCtx && (window as any)._kdsAudioCtx.state === 'suspended') {
+          await (window as any)._kdsAudioCtx.resume();
+        }
+        setSoundEnabled(true);
+
+        const el = document.getElementById('kds-alert-audio') as HTMLAudioElement;
+        if (el) {
+          const playPromise = el.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              el.pause();
+              el.currentTime = 0;
+            }).catch(() => {});
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('click', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
   const getGlobalAudioContext = useCallback(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -433,7 +424,7 @@ export default function KitchenPage() {
   }, []);
 
   const playKitchenAlert = useCallback(async () => {
-    await unlockAudio();
+    setSoundEnabled(true);
     // 1. Web Audio Frequency-Sweep Sawtooth Siren (await resume if suspended)
     try {
       const ctx = getGlobalAudioContext();
@@ -446,20 +437,20 @@ export default function KitchenPage() {
         const gain = ctx.createGain();
         osc.type = 'sawtooth';
         
-        // Loud 4-step Siren frequency sweep (880Hz -> 1760Hz -> 1174Hz -> 1760Hz)
+        // 4-step Siren frequency sweep (880Hz -> 1760Hz -> 880Hz -> 1760Hz)
         osc.frequency.setValueAtTime(880, now);
         osc.frequency.linearRampToValueAtTime(1760, now + 0.20);
-        osc.frequency.linearRampToValueAtTime(1174, now + 0.40);
+        osc.frequency.linearRampToValueAtTime(880, now + 0.40);
         osc.frequency.linearRampToValueAtTime(1760, now + 0.60);
         osc.frequency.linearRampToValueAtTime(880, now + 0.80);
 
         gain.gain.setValueAtTime(1.0, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 1.2);
+        osc.stop(now + 1.0);
       }
     } catch (e) {
       console.warn('[KDS] Siren Web Audio error:', e);
@@ -478,7 +469,7 @@ export default function KitchenPage() {
         audio.play().catch(() => {});
       }
     } catch {}
-  }, [getGlobalAudioContext, unlockAudio]);
+  }, [getGlobalAudioContext]);
 
   useEffect(() => {
     fetchOrders();
@@ -538,21 +529,9 @@ export default function KitchenPage() {
       socket.off("order_updated", fetchOrders);
       socket.off("order_status_update", fetchOrders);
       socket.off("rider_assigned", fetchOrders);
+      socket.disconnect();
     };
   }, [fetchOrders]);
-
-  // Repeat alert siren every 5 seconds while new unacknowledged orders exist in KDS
-  useEffect(() => {
-    const hasUnacceptedOrders = orders.some(o => o.status === "confirmed");
-    if (!hasUnacceptedOrders) return;
-
-    playKitchenAlert();
-    const interval = setInterval(() => {
-      playKitchenAlert();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [orders, playKitchenAlert]);
 
   const updateStatus = async (orderId: string, status: string) => {
     setUpdatingId(orderId);
@@ -847,26 +826,10 @@ export default function KitchenPage() {
               <ClipboardCheck className="w-4 h-4 text-orange-400" />
               <span className="text-xs font-black uppercase tracking-widest text-orange-400">Prep</span>
             </button>
-            {/* Sound Control / Test Button */}
-            <button
-              onClick={async () => {
-                await unlockAudio();
-                playKitchenAlert();
-                toast.success("Sound test played! Kitchen alert siren is active.");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
-                soundEnabled
-                  ? "bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20"
-                  : "bg-red-500/20 border-red-500/50 text-red-400 animate-pulse hover:bg-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.4)]"
-              }`}
-              title="Click to enable or test kitchen alert siren"
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4 text-green-400" /> : <VolumeX className="w-4 h-4 text-red-400" />}
-              <span className="text-xs font-black uppercase tracking-widest">
-                {soundEnabled ? "Sound ON (Test)" : "Enable Sound"}
-              </span>
+            <button onClick={() => setShowHandover(true)} className="hidden sm:flex px-3 py-1.5 rounded-xl bg-violet-500/10 border border-violet-500/20 items-center justify-center hover:bg-violet-500/20 transition-all gap-2">
+              <Timer className="w-4 h-4 text-violet-400" />
+              <span className="text-xs font-black uppercase tracking-widest text-violet-400">Handover</span>
             </button>
-
             <button onClick={() => { logout(); router.push("/"); }} className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center hover:bg-red-500/20 transition-all">
               <LogOut className="w-4 h-4 text-red-500" />
             </button>
