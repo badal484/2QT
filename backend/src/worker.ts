@@ -39,6 +39,11 @@ process.on('uncaughtException', (err) => {
     process.exit(1);
 });
 process.on('unhandledRejection', (err: any) => {
+    const msg = err?.message || String(err);
+    if (msg.includes('The client is closed') || msg.includes('Redis Client Error') || msg.includes('Redis Timeout')) {
+        console.warn('[WORKER] [REDIS WARNING] Ignored transient Redis error:', msg);
+        return;
+    }
     console.error('[WORKER] UNHANDLED REJECTION! 💥', err?.name, err?.message);
     process.exit(1);
 });
