@@ -13,7 +13,15 @@ const createLimiter = (windowMs: number, max: number, message: string) => {
         standardHeaders: true,
         legacyHeaders: false,
         store: new RedisStore({
-            sendCommand: (...args: string[]) => redis.sendCommand(args),
+            sendCommand: (async (...args: string[]) => {
+                if (!redis.isOpen) return 0;
+                try {
+                    return await redis.sendCommand(args);
+                } catch (e: any) {
+                    console.error('[RateLimiter Safe sendCommand]', e.message);
+                    return 0;
+                }
+            }) as any,
         }),
     });
 };
