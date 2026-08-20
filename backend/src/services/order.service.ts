@@ -14,79 +14,80 @@ const getDeliveryOtpForOrder = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+export async function createPendingOrderWithClient(client: any, data: any) {
+    // Guard: reject orders for suspended or inactive partner kitchens
+    const { rows: kvRows } = await client.query(
+        'SELECT is_active, is_partner, partner_status, is_paused FROM kitchens WHERE id = $1',
+        [data.kitchenId]
+    );
+    const kv = kvRows[0];
+    if (!kv || !kv.is_active || kv.is_paused) {
+        const err: any = new Error('KITCHEN_INACTIVE'); err.code = 'KITCHEN_INACTIVE'; throw err;
+    }
+    if (kv.is_partner && kv.partner_status === 'suspended') {
+        const err: any = new Error('KITCHEN_SUSPENDED'); err.code = 'KITCHEN_SUSPENDED'; throw err;
+    }
+
+    // Snapshot delivery coordinates from the address at placement time so
+    // a later address update or migration never corrupts an in-flight order.
+    const { rows: addrRows } = await client.query(
+        'SELECT lat, lng FROM addresses WHERE id = $1', [data.addressId]
+    );
+    const deliveryLat = addrRows[0]?.lat ?? null;
+    const deliveryLng = addrRows[0]?.lng ?? null;
+
+    const { rows: orderRows } = await client.query(`
+        INSERT INTO orders (
+            display_id, customer_id, kitchen_id, zone_id, address_id, status,
+            subtotal_paise, delivery_fee_paise, discount_paise,
+            loyalty_discount_paise, wallet_deduction_paise, surge_paise,
+            cgst_paise, sgst_paise, total_amount_paise, gateway_amount_paise,
+            payment_method, payment_status, promo_code_id,
+            is_subscription_order, special_instructions,
+            delivery_location_lat, delivery_location_lng,
+            delivery_contact_name, delivery_contact_phone,
+            menu_offer_discount_paise, small_order_fee_paise, rider_tip_paise,
+            applied_menu_offer_ids
+        ) VALUES ('2QT-' || LPAD(nextval('order_display_id_seq')::TEXT, 6, '0'), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        RETURNING id, display_id
+    `, [
+        data.customerId, data.kitchenId, data.zoneId, data.addressId,
+        data.pricing.subtotalPaise, data.pricing.deliveryFeePaise,
+        data.pricing.discountPaise, data.pricing.loyaltyDiscountPaise,
+        data.pricing.walletDeductionPaise, data.pricing.surgePaise,
+        data.pricing.cgstPaise, data.pricing.sgstPaise,
+        data.pricing.totalAmountPaise, data.pricing.gatewayAmountPaise,
+        data.paymentMethod || 'online',
+        data.pricing.promoCodeId ?? null,
+        data.isSubscriptionOrder || false,
+        data.instructions || null,
+        deliveryLat, deliveryLng,
+        data.deliveryContactName || null,
+        data.deliveryContactPhone || null,
+        data.pricing.menuOfferDiscountPaise || 0,
+        data.pricing.smallOrderFeePaise || 0,
+        data.pricing.riderTipPaise || 0,
+        data.pricing.appliedMenuOfferIds || [],
+    ]);
+
+    const newOrder = orderRows[0];
+
+    for (const item of data.items) {
+        const customizations = item.customizations ? JSON.stringify(item.customizations) : '[]';
+        const specialInstructions = item.instructions || null;
+        
+        await client.query(`
+            INSERT INTO order_items (order_id, menu_item_id, menu_item_name, quantity, price_paise, station, customizations, special_instructions)
+            SELECT $1, id, name, $2, COALESCE($4, price_paise), station, $5::jsonb, $6 FROM menu_items WHERE id = $3
+        `, [newOrder.id, item.quantity, item.menuItemId, item.pricePaise || null, customizations, specialInstructions]);
+    }
+
+    return newOrder;
+}
+
 export async function createPendingOrder(data: any) {
     return await withTransaction(async (client) => {
-        // Guard: reject orders for suspended or inactive partner kitchens
-        const { rows: kvRows } = await client.query(
-            'SELECT is_active, is_partner, partner_status, is_paused FROM kitchens WHERE id = $1',
-            [data.kitchenId]
-        );
-        const kv = kvRows[0];
-        if (!kv || !kv.is_active || kv.is_paused) {
-            const err: any = new Error('KITCHEN_INACTIVE'); err.code = 'KITCHEN_INACTIVE'; throw err;
-        }
-        if (kv.is_partner && kv.partner_status === 'suspended') {
-            const err: any = new Error('KITCHEN_SUSPENDED'); err.code = 'KITCHEN_SUSPENDED'; throw err;
-        }
-
-        // Snapshot delivery coordinates from the address at placement time so
-        // a later address update or migration never corrupts an in-flight order.
-        const { rows: addrRows } = await client.query(
-            'SELECT lat, lng FROM addresses WHERE id = $1', [data.addressId]
-        );
-        const deliveryLat = addrRows[0]?.lat ?? null;
-        const deliveryLng = addrRows[0]?.lng ?? null;
-
-        const { rows: orderRows } = await client.query(`
-            INSERT INTO orders (
-                display_id, customer_id, kitchen_id, zone_id, address_id, status,
-                subtotal_paise, delivery_fee_paise, discount_paise,
-                loyalty_discount_paise, wallet_deduction_paise, surge_paise,
-                cgst_paise, sgst_paise, total_amount_paise, gateway_amount_paise,
-                payment_method, payment_status, promo_code_id,
-                is_subscription_order, special_instructions,
-                delivery_location_lat, delivery_location_lng,
-                delivery_contact_name, delivery_contact_phone,
-                menu_offer_discount_paise, small_order_fee_paise, rider_tip_paise,
-                applied_menu_offer_ids
-            ) VALUES ('2QT-' || LPAD(nextval('order_display_id_seq')::TEXT, 6, '0'), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-            RETURNING id, display_id
-        `, [
-            data.customerId, data.kitchenId, data.zoneId, data.addressId,
-            data.pricing.subtotalPaise, data.pricing.deliveryFeePaise,
-            data.pricing.discountPaise, data.pricing.loyaltyDiscountPaise,
-            data.pricing.walletDeductionPaise, data.pricing.surgePaise,
-            data.pricing.cgstPaise, data.pricing.sgstPaise,
-            data.pricing.totalAmountPaise, data.pricing.gatewayAmountPaise,
-            data.paymentMethod || 'online',
-            data.pricing.promoCodeId ?? null,
-            data.isSubscriptionOrder || false,
-            data.instructions || null,
-            deliveryLat, deliveryLng,
-            data.deliveryContactName || null,
-            data.deliveryContactPhone || null,
-            data.pricing.menuOfferDiscountPaise || 0,
-            data.pricing.smallOrderFeePaise || 0,
-            data.pricing.riderTipPaise || 0,
-            data.pricing.appliedMenuOfferIds || [],
-        ]);
-
-        const newOrder = orderRows[0];
-
-        for (const item of data.items) {
-            const customizations = item.customizations ? JSON.stringify(item.customizations) : '[]';
-            const specialInstructions = item.instructions || null;
-            
-            // If the item has add-ons that cost money, the frontend will pass the calculated price.
-            // For now, we trust the item.price_paise passed from checkout or calculate it if missing.
-            // To be secure, we should re-verify customization prices, but for this step we store the selections.
-            await client.query(`
-                INSERT INTO order_items (order_id, menu_item_id, menu_item_name, quantity, price_paise, station, customizations, special_instructions)
-                SELECT $1, id, name, $2, COALESCE($4, price_paise), station, $5::jsonb, $6 FROM menu_items WHERE id = $3
-            `, [newOrder.id, item.quantity, item.menuItemId, item.pricePaise || null, customizations, specialInstructions]);
-        }
-
-        return newOrder;
+        return await createPendingOrderWithClient(client, data);
     });
 }
 
@@ -95,6 +96,8 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
     if (processed) return { status: 'already_processed' };
 
     try {
+        const pendingRedisStr = await redis.get(keys.pendingOrder(gatewayOrderId)).catch(() => null);
+
         const result = await withTransaction(async (client) => {
             // 1. Find the order
             let order;
@@ -106,8 +109,18 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
                 order = rows[0];
             }
 
+            // If order doesn't exist in DB yet (post-payment creation mode), create it now from Redis pending session!
+            if (!order && pendingRedisStr) {
+                const pendingData = JSON.parse(pendingRedisStr);
+                pendingData.paymentMethod = paymentMethod || pendingData.paymentMethod || 'online';
+                const created = await createPendingOrderWithClient(client, pendingData);
+                await client.query('UPDATE orders SET gateway_order_id = $1 WHERE id = $2', [gatewayOrderId, created.id]);
+                const { rows: reFetched } = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [created.id]);
+                order = reFetched[0];
+            }
+
             if (!order) throw new Error('ORDER_NOT_FOUND');
-            if (order.status !== 'pending_payment') return { status: 'already_finalized', orderId: order.id };
+            if (order.status !== 'pending_payment') return { status: 'already_finalized', orderId: order.id, displayId: order.display_id };
 
             // 2. Re-verify wallet if used
             let walletRows: { balance_paise: number }[] = [];
