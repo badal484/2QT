@@ -8,6 +8,7 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { emitToUser, emitToAdmin, emitToKitchen, emitToAll, emitToRiders } from '../socket';
 import { createPendingRefund } from '../services/refund.service';
 import { NotificationService, sendNotification } from '../services/notification.service';
+import { payoutMonthlySalaryForRider } from '../services/rider-payout.service';
 import { logSystemEvent } from '../utils/logger';
 import ImageKit from '@imagekit/nodejs';
 import multer from 'multer';
@@ -554,7 +555,7 @@ router.patch('/sos-alerts/:id/resolve', authenticate, requireRole('super_admin',
 
 router.get('/riders', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows: riders } = await query(`
-        SELECT u.id, u.name, u.phone, u.is_online, u.is_verified,
+        SELECT u.id, u.name, u.phone, u.is_online, u.is_verified, u.payment_model,
                (
                    SELECT json_agg(json_build_object(
                        'id', o.id,
@@ -769,7 +770,8 @@ router.get('/riders/:id', authenticate, requireRole('super_admin', 'admin'), asy
         const [profileRes, earningsRes, ordersRes, docsRes, payoutsRes] = await Promise.all([
             query(`SELECT u.id, u.name, u.phone, u.is_verified, u.is_online, u.is_active,
                           u.is_suspended, u.suspension_reason, u.suspended_at, u.created_at,
-                          u.payment_model, u.monthly_salary_paise, u.fuel_allowance_per_km_paise
+                          u.payment_model, u.monthly_salary_paise, u.fuel_allowance_per_km_paise,
+                          COALESCE(u.pending_deductions_paise, 0) AS pending_deductions_paise
                    FROM users u WHERE u.id = $1 AND u.role IN ('rider', 'rider_captain')`, [id]),
             query(`SELECT date, deliveries_count, total_paise, base_earnings_paise, bonus_earnings_paise, cash_collected_paise
                    FROM rider_daily_earnings WHERE rider_id = $1 ORDER BY date DESC LIMIT 30`, [id]),
@@ -818,10 +820,70 @@ router.patch('/riders/:id/contract', authenticate, requireRole('super_admin', 'a
         );
         
         if (!rows.length) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
-        
+
+        const salaryPaise = monthly_salary_paise || 0;
+        const fuelPaise = fuel_allowance_per_km_paise || 0;
+        emitToUser(id, 'user_updated', {
+            payment_model,
+            monthly_salary_paise: salaryPaise,
+            fuel_allowance_per_km_paise: fuelPaise,
+        });
+        const body = payment_model === 'salary'
+            ? `You're now on a fixed monthly salary of ₹${(salaryPaise / 100).toFixed(0)} + ₹${(fuelPaise / 100).toFixed(1)}/km fuel allowance.`
+            : `You're now on per-order (gig) pay — you earn per delivery instead of a fixed salary.`;
+        NotificationService.send('rider_contract_changed', {
+            userId: id,
+            title: 'Your Pay Model Changed',
+            body,
+        }).catch(e => console.error('[admin/riders/contract/notify]', e.message));
+
         res.json({ success: true });
     } catch (err) {
         console.error('[admin/riders/contract]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
+router.post('/riders/:id/pay-salary-now', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const id = req.params.id as string;
+    try {
+        const { rows } = await query(`
+            SELECT u.id, u.name, u.phone, u.upi_id,
+                   u.razorpay_contact_id, u.razorpay_fund_account_id,
+                   COALESCE(u.pending_deductions_paise, 0) AS pending_deductions,
+                   u.monthly_salary_paise, u.payment_model
+            FROM users u
+            WHERE u.id = $1 AND u.role IN ('rider', 'rider_captain')
+        `, [id]);
+        if (!rows.length) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
+        const rider = rows[0];
+
+        if (rider.payment_model !== 'salary') {
+            return res.status(400).json({ error: 'NOT_SALARIED' });
+        }
+        if (!rider.monthly_salary_paise || parseInt(rider.monthly_salary_paise, 10) <= 0) {
+            return res.status(400).json({ error: 'NO_SALARY_SET' });
+        }
+
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const { rows: existing } = await query(
+            `SELECT id FROM weekly_payouts WHERE rider_id = $1 AND week_start = $2`,
+            [id, today]
+        );
+        if (existing.length) return res.status(409).json({ error: 'ALREADY_PAID_TODAY' });
+
+        const result = await payoutMonthlySalaryForRider(rider, today.substring(0, 7));
+
+        const actorRows = await query('SELECT name FROM users WHERE id = $1', [req.user!.userId]);
+        ActivityLogService.log({
+            userId: req.user!.userId, userName: actorRows.rows[0]?.name || 'Admin', userRole: req.user!.role,
+            actionType: 'MANUAL_SALARY_PAYOUT', entityType: 'RIDER_PAYOUT', entityId: id,
+            details: { riderId: id, result },
+        });
+
+        res.json({ success: true, result });
+    } catch (err) {
+        console.error('[admin/riders/pay-salary-now]', err);
         res.status(500).json({ error: 'SERVER_ERROR' });
     }
 });

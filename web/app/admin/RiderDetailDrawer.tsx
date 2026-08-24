@@ -21,6 +21,7 @@ interface RiderDetail {
     payment_model: 'per_order' | 'salary';
     monthly_salary_paise: number | null;
     fuel_allowance_per_km_paise: number | null;
+    pending_deductions_paise: number;
   };
   stats: { totalEarningsPaise: number; totalDeliveries: number; totalPaidPaise: number };
   earnings: Array<{ date: string; deliveries_count: string; total_paise: string; base_earnings_paise: string; bonus_earnings_paise: string }>;
@@ -117,6 +118,20 @@ export function RiderDetailDrawer({ riderId, onClose }: { riderId: string; onClo
       qc.invalidateQueries({ queryKey: ["rider-detail", riderId] });
     },
     onError: () => toast.error("Failed to update contract."),
+  });
+
+  const paySalaryMutation = useMutation({
+    mutationFn: () => api.post(`/admin/riders/${riderId}/pay-salary-now`, {}),
+    onSuccess: (res: any) => {
+      const status = res?.result?.status;
+      toast.success(status === "absorbed" ? "Salary fully absorbed by deductions." : `Salary payout ${status === "paid" ? "sent" : "queued"}.`);
+      qc.invalidateQueries({ queryKey: ["rider-detail", riderId] });
+    },
+    onError: (err: any) => {
+      const code = err?.response?.data?.error;
+      if (code === "ALREADY_PAID_TODAY") toast.error("This rider already has a payout for today.");
+      else toast.error("Failed to trigger salary payout.");
+    },
   });
 
   const r = data?.rider;
@@ -377,6 +392,19 @@ export function RiderDetailDrawer({ riderId, onClose }: { riderId: string; onClo
                               <span className="text-xs text-zinc-500">Fuel Allowance</span>
                               <span className="text-sm text-white font-bold">₹{((r?.fuel_allowance_per_km_paise || 0) / 100).toFixed(1)} / km</span>
                             </div>
+                            {(r?.pending_deductions_paise || 0) > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-zinc-500">Pending Deductions</span>
+                                <span className="text-sm text-red-400 font-bold">-₹{((r?.pending_deductions_paise || 0) / 100).toFixed(0)}</span>
+                              </div>
+                            )}
+                            <button
+                              onClick={() => paySalaryMutation.mutate()}
+                              disabled={paySalaryMutation.isPending}
+                              className="w-full mt-1 px-3 py-2 rounded-xl bg-blue-500/20 border border-blue-500/30 text-xs font-bold text-blue-400 hover:bg-blue-500/30 disabled:opacity-50"
+                            >
+                              {paySalaryMutation.isPending ? "Processing..." : "Pay Salary Now"}
+                            </button>
                           </>
                         )}
                       </div>

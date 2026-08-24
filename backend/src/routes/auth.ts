@@ -279,7 +279,7 @@ async function completeAuth(
     roleUpdate += zoneUpdateKeys;
 
     const { rows } = await query(
-        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true, role = CASE WHEN users.role IN ('super_admin', 'admin', 'rider', 'rider_captain', 'chef', 'kitchen_manager', 'packer', 'partner_kitchen', 'dine_in_staff') THEN users.role ELSE 'customer' END${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete, email, photo_url, prelaunch_reward_credited`,
+        `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true, role = CASE WHEN users.role IN ('super_admin', 'admin', 'rider', 'rider_captain', 'chef', 'kitchen_manager', 'packer', 'partner_kitchen', 'dine_in_staff') THEN users.role ELSE 'customer' END${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete, email, photo_url, prelaunch_reward_credited, payment_model, monthly_salary_paise, fuel_allowance_per_km_paise`,
         [normalizedPhone, name || '2QT User', insertRole, insertVerified]
     );
 
@@ -422,7 +422,10 @@ async function completeAuth(
             zoneId: user.zone_id ?? null,
             termsAccepted: !!user.terms_accepted_at,
             onboarding_complete: user.onboarding_complete,
-            is_verified: user.is_verified
+            is_verified: user.is_verified,
+            payment_model: user.payment_model,
+            monthly_salary_paise: user.monthly_salary_paise,
+            fuel_allowance_per_km_paise: user.fuel_allowance_per_km_paise
         },
         accessToken,
         refreshToken

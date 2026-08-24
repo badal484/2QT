@@ -2,6 +2,7 @@ import React from 'react';
 import { NativeModules } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import * as Sentry from '@sentry/react-native';
 import { getSocket, connectSocket, disconnectSocket } from '../socket/client';
 import { RootState } from '../store';
 import { updateUser } from '../store/slices/authSlice';
@@ -48,6 +49,7 @@ const RootNavigator = () => {
   const dispatch = useDispatch();
   const [forceUpdateRequired, setForceUpdateRequired] = React.useState(false);
   const [isMaintenance, setIsMaintenance] = React.useState(false);
+  const routeNameRef = React.useRef<string | undefined>(undefined);
 
   // One-time setup: system status
   React.useEffect(() => {
@@ -61,17 +63,19 @@ const RootNavigator = () => {
           setIsMaintenance(true);
         }
         if (status.featureLoyalty !== undefined) {
-          dispatch(setFeatures({
-            loyalty: status.featureLoyalty,
-            referrals: status.featureReferrals
-          }));
+          dispatch(
+            setFeatures({
+              loyalty: status.featureLoyalty,
+              referrals: status.featureReferrals,
+            })
+          );
         }
       } catch (err) {
         console.warn('--- SYSTEM CHECK FAILED --- (Server might be offline)', err);
       }
     };
     checkSystemStatus();
-  }, []);
+  }, [dispatch]);
 
   // Socket connection & Push Notification setup
   React.useEffect(() => {
@@ -115,10 +119,26 @@ const RootNavigator = () => {
   const activeRole = BUILD_ROLE || user?.role;
 
   return (
-    <NavigationContainer 
-      ref={navigationRef} 
-      linking={linking as any} 
-      onReady={flushPendingNav}
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linking as any}
+      onReady={() => {
+        flushPendingNav();
+        routeNameRef.current = navigationRef.current?.getCurrentRoute()?.name;
+      }}
+      onStateChange={() => {
+        const previousRouteName = routeNameRef.current;
+        const currentRouteName = navigationRef.current?.getCurrentRoute()?.name;
+
+        if (previousRouteName !== currentRouteName && currentRouteName) {
+          Sentry.addBreadcrumb({
+            category: 'navigation',
+            message: `Navigated to ${currentRouteName}`,
+            level: 'info',
+          });
+        }
+        routeNameRef.current = currentRouteName;
+      }}
       theme={{
         ...DefaultTheme,
         dark: false,
@@ -135,15 +155,15 @@ const RootNavigator = () => {
     >
       {!user ? (
         <AuthNavigator />
-      ) : (activeRole === 'customer' || activeRole === 'buyer') ? (
+      ) : activeRole === 'customer' || activeRole === 'buyer' ? (
         <CustomerNavigator />
-      ) : (activeRole === 'rider' || activeRole === 'rider_captain') ? (
+      ) : activeRole === 'rider' || activeRole === 'rider_captain' ? (
         <RiderNavigator />
-      ) : (activeRole === 'packer') ? (
+      ) : activeRole === 'packer' ? (
         <PackerNavigator />
-      ) : (['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff'].includes(activeRole)) ? (
+      ) : ['chef', 'kitchen_manager', 'partner_kitchen', 'kitchen', 'dine_in_staff'].includes(activeRole) ? (
         <KitchenNavigator />
-      ) : (activeRole === 'partner') ? (
+      ) : activeRole === 'partner' ? (
         <PartnerNavigator />
       ) : (
         <AdminNavigator />

@@ -699,9 +699,11 @@ router.get('/stats', authenticate, requireRole('rider', 'rider_captain', 'super_
     const tier = totalDel >= 1000 ? 'platinum' : totalDel >= 500 ? 'gold' : totalDel >= 100 ? 'silver' : 'bronze';
     const nextTierAt = totalDel >= 1000 ? null : totalDel >= 500 ? 1000 : totalDel >= 100 ? 500 : 100;
 
-    // Streak from users table
+    // Streak + contract fields from users table
     const { rows: streakRow } = await query(
-        'SELECT current_streak_days, longest_streak_days FROM users WHERE id = $1',
+        `SELECT current_streak_days, longest_streak_days,
+                payment_model, monthly_salary_paise, fuel_allowance_per_km_paise
+         FROM users WHERE id = $1`,
         [riderId]
     );
 
@@ -716,6 +718,9 @@ router.get('/stats', authenticate, requireRole('rider', 'rider_captain', 'super_
         nextTierAt,
         currentStreak: streakRow[0]?.current_streak_days ?? 0,
         longestStreak: streakRow[0]?.longest_streak_days ?? 0,
+        payment_model: streakRow[0]?.payment_model,
+        monthly_salary_paise: streakRow[0]?.monthly_salary_paise,
+        fuel_allowance_per_km_paise: streakRow[0]?.fuel_allowance_per_km_paise,
     });
     } catch (err) {
         console.error('[stats]', err);
@@ -782,6 +787,7 @@ router.get('/payouts', authenticate, requireRole('rider', 'rider_captain', 'supe
             payoutMethod: profile.payout_method || 'upi',
             todayDeliveries: parseInt(today.deliveries_count),
             todayEarningsPaise: parseInt(today.total_paise),
+            pendingDeductionsPaise: deductions,
         });
     } catch (err) {
         console.error('[payouts]', err);
@@ -1102,8 +1108,8 @@ router.post('/payouts/request', authenticate, requireRole('rider', 'rider_captai
 
             await client.query(`
                 INSERT INTO weekly_payouts
-                  (rider_id, week_start, week_end, gross_earnings_paise, net_amount_paise, status, upi_id, payout_method)
-                VALUES ($1, CURRENT_DATE, CURRENT_DATE, $2, $2, 'pending', $3,
+                  (rider_id, week_start, week_end, gross_earnings_paise, net_amount_paise, status, payout_type, upi_id, payout_method)
+                VALUES ($1, CURRENT_DATE, CURRENT_DATE, $2, $2, 'pending', 'withdrawal_request', $3,
                         COALESCE((SELECT payout_method FROM users WHERE id = $1), 'upi'))
             `, [riderId, amountPaise, upiId || null]);
         });

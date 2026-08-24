@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Edit, X, Zap, Upload, ImageIcon } from "lucide-react";
+import { Plus, Trash2, Edit, X, Zap, Upload, ImageIcon, Video, Film } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -10,7 +10,8 @@ import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { SkeletonList } from "../components/ui/Skeleton";
 
 const EMPTY_BANNER = {
-  title: "", subtitle: "", tag_text: "", image_url: "",
+  title: "", subtitle: "", tag_text: "", image_url: "", video_url: "",
+  media_type: "IMAGE" as "IMAGE" | "VIDEO",
   action_type: "NONE", action_payload: "", display_order: 0,
   is_active: true, banner_type: "MAIN", slide_duration_ms: 3000,
 };
@@ -26,8 +27,12 @@ function BannerForm({
   onChange,
   onImageUpload,
   onImageRemove,
-  uploading,
-  fileInputRef,
+  uploadingImage,
+  imageInputRef,
+  onVideoUpload,
+  onVideoRemove,
+  uploadingVideo,
+  videoInputRef,
   title,
   onClose,
   onSave,
@@ -37,8 +42,12 @@ function BannerForm({
   onChange: (d: typeof EMPTY_BANNER) => void;
   onImageUpload: (f: File) => void;
   onImageRemove: () => void;
-  uploading: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  uploadingImage: boolean;
+  imageInputRef: React.RefObject<HTMLInputElement | null>;
+  onVideoUpload: (f: File) => void;
+  onVideoRemove: () => void;
+  uploadingVideo: boolean;
+  videoInputRef: React.RefObject<HTMLInputElement | null>;
   title: string;
   onClose: () => void;
   onSave: () => void;
@@ -46,9 +55,7 @@ function BannerForm({
 }) {
   const inp = "w-full bg-white/[0.03] text-white border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-primary";
 
-  // Local text buffer for the duration field so the user can freely clear/retype/enter
-  // decimals — a fully round-tripped `value={ms/1000}` snaps back to "0" on every
-  // keystroke that isn't yet a valid number (e.g. an empty field or a trailing ".").
+  // Local text buffer for the duration field
   const [durationText, setDurationText] = useState(String((data.slide_duration_ms ?? 3000) / 1000));
   useEffect(() => {
     setDurationText(String((data.slide_duration_ms ?? 3000) / 1000));
@@ -60,6 +67,36 @@ function BannerForm({
         <h3 className="text-lg font-bold text-white">{title}</h3>
         <button onClick={onClose} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
       </div>
+
+      {/* Media Type Toggle */}
+      <div className="mb-4">
+        <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2 block">Banner Media Type</label>
+        <div className="inline-flex p-1 bg-white/[0.04] border border-white/10 rounded-2xl gap-1">
+          <button
+            type="button"
+            onClick={() => onChange({ ...data, media_type: "IMAGE" })}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all ${
+              data.media_type === "IMAGE"
+                ? "bg-brand-primary text-white shadow-md"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" /> Static Image
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ ...data, media_type: "VIDEO" })}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all ${
+              data.media_type === "VIDEO"
+                ? "bg-brand-primary text-white shadow-md"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Film className="w-4 h-4" /> Looping Video
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Title</label>
@@ -73,42 +110,118 @@ function BannerForm({
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Tag Pill Text</label>
           <input value={data.tag_text} onChange={e => onChange({ ...data, tag_text: e.target.value })} className={inp} placeholder="30 MIN" />
         </div>
-        <div>
-          <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Banner Image</label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) onImageUpload(f); e.target.value = ""; }}
-          />
-          {data.image_url ? (
-            <div className="relative w-full h-28 rounded-xl overflow-hidden border border-white/10 group">
-              <Image src={data.image_url} alt="Preview" fill className="object-cover" />
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                <button type="button" onClick={() => fileInputRef.current?.click()}
-                  className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                  <Upload className="w-3 h-3" /> Replace
-                </button>
-                <button type="button" onClick={onImageRemove}
-                  className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                  <X className="w-3 h-3" /> Remove
-                </button>
+
+        {/* Video Upload Section if VIDEO */}
+        {data.media_type === "VIDEO" ? (
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 flex items-center justify-between">
+              <span>Banner Video (MP4 / WebM)</span>
+              <span className="text-brand-primary font-semibold lowercase">autoplay & loop</span>
+            </label>
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) onVideoUpload(f); e.target.value = ""; }}
+            />
+            {data.video_url ? (
+              <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10 group bg-black">
+                <video src={data.video_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                  <button type="button" onClick={() => videoInputRef.current?.click()}
+                    className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                    <Upload className="w-3 h-3" /> Replace Video
+                  </button>
+                  <button type="button" onClick={onVideoRemove}
+                    className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                    <X className="w-3 h-3" /> Remove
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
-              className="w-full h-28 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-brand-primary/50 hover:bg-brand-primary/5 transition-all disabled:opacity-50">
-              {uploading
-                ? <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
-                : <><ImageIcon className="w-6 h-6 text-zinc-500" /><span className="text-xs font-semibold text-zinc-500">Click to upload image</span></>
-              }
-            </button>
-          )}
-          <p className="mt-1.5 text-xs text-zinc-500">
-            Recommended: <span className="font-semibold text-zinc-400">{sizeHint(data.banner_type)}</span> · JPEG or WebP
-          </p>
-        </div>
+            ) : (
+              <button type="button" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo}
+                className="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-brand-primary/50 hover:bg-brand-primary/5 transition-all disabled:opacity-50">
+                {uploadingVideo
+                  ? <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+                  : <><Video className="w-6 h-6 text-zinc-500" /><span className="text-xs font-semibold text-zinc-500">Click to upload MP4/WebM video</span></>
+                }
+              </button>
+            )}
+            <p className="mt-1.5 text-xs text-zinc-500">
+              Recommended: <span className="font-semibold text-zinc-400">1200 × 520 px</span> · Under 30MB
+            </p>
+          </div>
+        ) : (
+          /* Image Upload Section if IMAGE */
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Banner Image</label>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) onImageUpload(f); e.target.value = ""; }}
+            />
+            {data.image_url ? (
+              <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10 group">
+                <Image src={data.image_url} alt="Preview" fill className="object-cover" />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                  <button type="button" onClick={() => imageInputRef.current?.click()}
+                    className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                    <Upload className="w-3 h-3" /> Replace
+                  </button>
+                  <button type="button" onClick={onImageRemove}
+                    className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                    <X className="w-3 h-3" /> Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}
+                className="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-brand-primary/50 hover:bg-brand-primary/5 transition-all disabled:opacity-50">
+                {uploadingImage
+                  ? <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+                  : <><ImageIcon className="w-6 h-6 text-zinc-500" /><span className="text-xs font-semibold text-zinc-500">Click to upload image</span></>
+                }
+              </button>
+            )}
+            <p className="mt-1.5 text-xs text-zinc-500">
+              Recommended: <span className="font-semibold text-zinc-400">{sizeHint(data.banner_type)}</span> · JPEG or WebP
+            </p>
+          </div>
+        )}
+
+        {/* Poster Image upload if VIDEO */}
+        {data.media_type === "VIDEO" && (
+          <div className="col-span-2 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1 flex items-center justify-between">
+              <span>Thumbnail / Poster Image <span className="text-zinc-500 font-normal lowercase">(optional — shown while video loads)</span></span>
+            </label>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) onImageUpload(f); e.target.value = ""; }}
+            />
+            {data.image_url ? (
+              <div className="relative w-48 h-20 rounded-lg overflow-hidden border border-white/10 group mt-2">
+                <Image src={data.image_url} alt="Poster preview" fill className="object-cover" />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button type="button" onClick={() => imageInputRef.current?.click()} className="bg-white text-black text-[10px] font-bold px-2 py-1 rounded">Replace</button>
+                  <button type="button" onClick={onImageRemove} className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded">Remove</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}
+                className="mt-2 px-4 py-2 border border-dashed border-white/10 rounded-xl text-xs text-zinc-400 hover:text-white hover:border-brand-primary flex items-center gap-2">
+                <ImageIcon className="w-3.5 h-3.5" /> Upload Fallback Thumbnail Image
+              </button>
+            )}
+          </div>
+        )}
+
         <div>
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Action Type</label>
           <select value={data.action_type} onChange={e => onChange({ ...data, action_type: e.target.value })} className={inp}>
@@ -169,12 +282,16 @@ export function MarketingTab() {
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [newBanner, setNewBanner] = useState<typeof EMPTY_BANNER>({ ...EMPTY_BANNER });
-  const [createUploading, setCreateUploading] = useState(false);
-  const createFileRef = useRef<HTMLInputElement>(null);
+  const [createImageUploading, setCreateImageUploading] = useState(false);
+  const [createVideoUploading, setCreateVideoUploading] = useState(false);
+  const createImageFileRef = useRef<HTMLInputElement>(null);
+  const createVideoFileRef = useRef<HTMLInputElement>(null);
 
   const [editingBanner, setEditingBanner] = useState<(typeof EMPTY_BANNER & { id: string }) | null>(null);
-  const [editUploading, setEditUploading] = useState(false);
-  const editFileRef = useRef<HTMLInputElement>(null);
+  const [editImageUploading, setEditImageUploading] = useState(false);
+  const [editVideoUploading, setEditVideoUploading] = useState(false);
+  const editImageFileRef = useRef<HTMLInputElement>(null);
+  const editVideoFileRef = useRef<HTMLInputElement>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
 
@@ -194,7 +311,7 @@ export function MarketingTab() {
 
   useSocketRefresh(["promo_updated", "campaign_updated", "banner_updated"], fetchBanners);
 
-  const makeUploader = (
+  const makeImageUploader = (
     setter: (fn: (b: any) => any) => void,
     setUploading: (v: boolean) => void
   ) => async (file: File) => {
@@ -210,8 +327,32 @@ export function MarketingTab() {
     }
   };
 
+  const makeVideoUploader = (
+    setter: (fn: (b: any) => any) => void,
+    setUploading: (v: boolean) => void
+  ) => async (file: File) => {
+    setUploading(true);
+    try {
+      const res = await api.uploadVideo(file);
+      setter(b => ({ ...b, video_url: res.url, media_type: "VIDEO" }));
+      toast.success("Video uploaded successfully");
+    } catch (e: any) {
+      toast.error(e.message || "Video upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleCreate = async () => {
     try {
+      if (newBanner.media_type === "VIDEO" && !newBanner.video_url) {
+        toast.error("Please upload a video file for this video banner");
+        return;
+      }
+      if (newBanner.media_type === "IMAGE" && !newBanner.image_url) {
+        toast.error("Please upload a banner image");
+        return;
+      }
       await api.post('/banners/admin', newBanner);
       toast.success("Banner created!");
       setIsCreating(false);
@@ -238,10 +379,9 @@ export function MarketingTab() {
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     try {
       await api.patch(`/banners/admin/${id}`, { is_active: !currentStatus });
-      toast.success("Status updated");
       fetchBanners();
     } catch (e: any) {
-      toast.error(e.message || "Failed to update");
+      toast.error(e.message || "Failed to toggle status");
     }
   };
 
@@ -262,7 +402,7 @@ export function MarketingTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Promotional Banners</h2>
-          <p className="text-zinc-400 font-medium">Manage the auto-playing marketing carousel on the customer menu page.</p>
+          <p className="text-zinc-400 font-medium">Manage images and dynamic autoplay video banners for the customer menu and mobile app.</p>
         </div>
         <button
           onClick={() => { setIsCreating(true); setEditingBanner(null); }}
@@ -276,10 +416,14 @@ export function MarketingTab() {
         <BannerForm
           data={newBanner}
           onChange={setNewBanner}
-          onImageUpload={makeUploader(setNewBanner as any, setCreateUploading)}
+          onImageUpload={makeImageUploader(setNewBanner as any, setCreateImageUploading)}
           onImageRemove={() => setNewBanner(b => ({ ...b, image_url: "" }))}
-          uploading={createUploading}
-          fileInputRef={createFileRef}
+          uploadingImage={createImageUploading}
+          imageInputRef={createImageFileRef}
+          onVideoUpload={makeVideoUploader(setNewBanner as any, setCreateVideoUploading)}
+          onVideoRemove={() => setNewBanner(b => ({ ...b, video_url: "" }))}
+          uploadingVideo={createVideoUploading}
+          videoInputRef={createVideoFileRef}
           title="Create New Banner"
           onClose={() => setIsCreating(false)}
           onSave={handleCreate}
@@ -291,10 +435,14 @@ export function MarketingTab() {
         <BannerForm
           data={editingBanner}
           onChange={d => setEditingBanner(eb => eb ? { ...d, id: eb.id } : null)}
-          onImageUpload={makeUploader(setEditingBanner as any, setEditUploading)}
+          onImageUpload={makeImageUploader(setEditingBanner as any, setEditImageUploading)}
           onImageRemove={() => setEditingBanner(eb => eb ? { ...eb, image_url: "" } : null)}
-          uploading={editUploading}
-          fileInputRef={editFileRef}
+          uploadingImage={editImageUploading}
+          imageInputRef={editImageFileRef}
+          onVideoUpload={makeVideoUploader(setEditingBanner as any, setEditVideoUploading)}
+          onVideoRemove={() => setEditingBanner(eb => eb ? { ...eb, video_url: "" } : null)}
+          uploadingVideo={editVideoUploading}
+          videoInputRef={editVideoFileRef}
           title={`Edit Banner — ${editingBanner.title}`}
           onClose={() => setEditingBanner(null)}
           onSave={handleUpdate}
@@ -303,48 +451,76 @@ export function MarketingTab() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {banners.map(banner => (
-          <div key={banner.id} className={`bg-[#11111a] border ${banner.is_active ? 'border-brand-primary/30 shadow-lg' : 'border-white/[0.05] opacity-60'} rounded-3xl overflow-hidden transition-all group`}>
-            <div className="relative h-32 bg-black">
-              <Image src={banner.image_url} alt={banner.title} fill className="object-cover opacity-60" />
-              <div className="absolute top-4 left-4 inline-flex items-center gap-1 bg-brand-primary text-[10px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow">
-                <Zap className="w-3 h-3" /> {banner.tag_text}
+        {banners.map(banner => {
+          const isVideo = banner.media_type === "VIDEO" && banner.video_url;
+          return (
+            <div key={banner.id} className={`bg-[#11111a] border ${banner.is_active ? 'border-brand-primary/30 shadow-lg' : 'border-white/[0.05] opacity-60'} rounded-3xl overflow-hidden transition-all group`}>
+              <div className="relative h-36 bg-black overflow-hidden">
+                {isVideo ? (
+                  <video
+                    src={banner.video_url}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    poster={banner.image_url}
+                    className="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity"
+                  />
+                ) : banner.image_url ? (
+                  <Image src={banner.image_url} alt={banner.title} fill className="object-cover opacity-60 group-hover:opacity-80 transition-opacity" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-600">No Media</div>
+                )}
+                
+                <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                  {banner.tag_text && (
+                    <div className="inline-flex items-center gap-1 bg-brand-primary text-[10px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow">
+                      <Zap className="w-3 h-3" /> {banner.tag_text}
+                    </div>
+                  )}
+                  {isVideo && (
+                    <div className="inline-flex items-center gap-1 bg-purple-600/90 text-[10px] font-black uppercase tracking-wider text-white px-2 py-0.5 rounded shadow backdrop-blur">
+                      <Film className="w-3 h-3" /> VIDEO
+                    </div>
+                  )}
+                </div>
+
+                <div className="absolute top-3 right-3 flex gap-2 z-10">
+                  <button
+                    onClick={() => handleToggleActive(banner.id, banner.is_active)}
+                    className="bg-white/90 backdrop-blur text-xs font-bold px-3 py-1 rounded-full shadow-sm hover:scale-105"
+                  >
+                    {banner.is_active ? 'Active' : 'Paused'}
+                  </button>
+                  <button
+                    onClick={() => { setEditingBanner({ ...banner, media_type: banner.media_type || (banner.video_url ? 'VIDEO' : 'IMAGE'), slide_duration_ms: banner.slide_duration_ms ?? 3000 }); setIsCreating(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className="bg-zinc-800/90 text-white w-6 h-6 flex items-center justify-center rounded-full hover:bg-zinc-700 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Edit className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => setConfirmDialog({ isOpen: true, id: banner.id })}
+                    className="bg-red-500/90 text-white w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
-              <div className="absolute top-4 right-4 flex gap-2">
-                <button
-                  onClick={() => handleToggleActive(banner.id, banner.is_active)}
-                  className="bg-white/90 backdrop-blur text-xs font-bold px-3 py-1 rounded-full shadow-sm hover:scale-105"
-                >
-                  {banner.is_active ? 'Active' : 'Paused'}
-                </button>
-                <button
-                  onClick={() => { setEditingBanner({ ...banner, slide_duration_ms: banner.slide_duration_ms ?? 3000 }); setIsCreating(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  className="bg-zinc-800/90 text-white w-6 h-6 flex items-center justify-center rounded-full hover:bg-zinc-700 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Edit className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() => setConfirmDialog({ isOpen: true, id: banner.id })}
-                  className="bg-red-500/90 text-white w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+              <div className="p-5">
+                <h3 className="font-bold text-lg leading-tight text-white mb-1">{banner.title}</h3>
+                <p className="text-sm text-zinc-400 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
+                <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                  <div className="text-xs font-bold uppercase text-zinc-500">
+                    {banner.banner_type === 'MINI' ? 'Type: MINI' : banner.banner_type === 'STRIP' ? 'Type: STRIP' : 'Type: MAIN'} | Order: {banner.display_order} | {((banner.slide_duration_ms ?? 3000) / 1000).toFixed(1)}s
+                  </div>
+                  <div className="text-xs font-bold bg-white/5 px-2 py-1 rounded text-zinc-400">
+                    {banner.action_type} {banner.action_payload && `(${banner.action_payload})`}
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="p-5">
-              <h3 className="font-bold text-lg leading-tight text-white mb-1">{banner.title}</h3>
-              <p className="text-sm text-zinc-400 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
-              <div className="flex items-center justify-between border-t border-white/10 pt-4">
-                <div className="text-xs font-bold uppercase text-zinc-500">
-                  {banner.banner_type === 'MINI' ? 'Type: MINI' : banner.banner_type === 'STRIP' ? 'Type: STRIP' : 'Type: MAIN'} | Order: {banner.display_order} | {((banner.slide_duration_ms ?? 3000) / 1000).toFixed(1)}s
-                </div>
-                <div className="text-xs font-bold bg-white/5 px-2 py-1 rounded text-zinc-400">
-                  {banner.action_type} {banner.action_payload && `(${banner.action_payload})`}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {banners.length === 0 && (
           <div className="col-span-full py-20 text-center text-zinc-500 font-medium">No banners found. Create one above.</div>
         )}

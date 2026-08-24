@@ -17,8 +17,8 @@ import { MapPin, ShoppingCart, X, ChefHat, Tag, Star, Wallet, UserRound, Phone, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '../utils/haptics';
 import { PressableScale } from '../components/ui/internal/PressableScale';
-import RazorpayCheckout from 'react-native-razorpay';
 import { useFeedback } from '../context/FeedbackContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 const ACCENT = tokens.colors.primary;
 const BG = tokens.colors.background;
@@ -117,23 +117,27 @@ const CartItem = React.memo(({ item, isLast, bogoOffer }: { item: any; isLast: b
           <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.pricePaise / 100}</Text>
         </View>
         <View style={styles.qtyRow}>
-          <PressableScale
+          <TouchableOpacity
             style={styles.qtyBtn}
+            activeOpacity={0.6}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
             onPress={() => { haptics.selection(); dispatch(setQuantity({ cartItemId: item.cartItemId, menuItemId: item.menuItemId, quantity: item.quantity - 1 })); }}
             accessibilityRole="button"
             accessibilityLabel="Decrease quantity"
           >
             <Text allowFontScaling={false} style={styles.qtyBtnText}>−</Text>
-          </PressableScale>
+          </TouchableOpacity>
           <Text allowFontScaling={false} style={styles.qtyNum}>{item.quantity}</Text>
-          <PressableScale
+          <TouchableOpacity
             style={[styles.qtyBtn, styles.qtyBtnActive]}
+            activeOpacity={0.6}
+            hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
             onPress={() => { haptics.selection(); dispatch(setQuantity({ cartItemId: item.cartItemId, menuItemId: item.menuItemId, quantity: item.quantity + 1 })); }}
             accessibilityRole="button"
             accessibilityLabel="Increase quantity"
           >
             <Text allowFontScaling={false} style={[styles.qtyBtnText, styles.qtyBtnActiveText]}>+</Text>
-          </PressableScale>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -218,7 +222,8 @@ const CartItemMemoized = React.memo(CartItem, (prevProps, nextProps) => {
 const CartScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
-  const { showDialog } = useFeedback();
+  const { showDialog, showToast } = useFeedback();
+  const { isOnline } = useNetworkStatus();
   
   const { items, addressId, zoneId } = useSelector((state: RootState) => state.cart);
   const activeZoneId = useSelector((state: any) => state.app.activeZoneId);
@@ -987,11 +992,16 @@ const CartScreen = ({ navigation }: any) => {
             style={[styles.footerCta, (busy || isOutOfZone || !kitchenOpen || kitchenPaused || (!hasPricingData && addressId && !pricingErrored)) && styles.placeOrderBtnDisabled]}
             disabled={busy || isOutOfZone || !kitchenOpen || kitchenPaused || (!hasPricingData && addressId && !pricingErrored)}
             accessibilityRole="button"
-            accessibilityLabel={addressId ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay') : 'Select Address'}
+            accessibilityLabel={addressId ? (isOutOfZone ? 'Out of Zone' : (!isOnline ? 'Waiting for connection' : 'Proceed to Pay')) : 'Select Address'}
             onPress={() => {
               haptics.selection();
               if (!addressId) {
                 handleAddressNavigation();
+                return;
+              }
+              if (!isOnline) {
+                haptics.warning();
+                showToast({ message: 'Your cart is saved. Please connect to the internet to proceed.', type: 'info' });
                 return;
               }
               if (altReceiver) {
@@ -1024,7 +1034,7 @@ const CartScreen = ({ navigation }: any) => {
                   : !kitchenOpen
                     ? `Opens at ${openLabel}`
                     : addressId
-                      ? (isOutOfZone ? 'Out of Zone' : 'Proceed to Pay')
+                      ? (isOutOfZone ? 'Out of Zone' : (!isOnline ? 'Waiting for connection...' : 'Proceed to Pay'))
                       : 'Select Address'}
               </Text>
             )}

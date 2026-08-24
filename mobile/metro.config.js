@@ -8,20 +8,27 @@ const { withNativeWind } = require("nativewind/metro");
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
+const defaultConfig = getDefaultConfig(__dirname);
+
 const config = {
+  projectRoot: __dirname,
+  watchFolders: [__dirname],
   resolver: {
-    resolveRequest: (context, moduleName, platform) => {
-      if (moduleName.includes('nativewind') && moduleName.includes('transformer')) {
-        return {
-          filePath: require.resolve('react-native-css-interop/dist/metro/transformer'),
-          type: 'sourceFile',
-        };
-      }
-      return context.resolveRequest(context, moduleName, platform);
-    },
+    blockList: [
+      /.*\/android\/build\/.*/,
+      /.*\/android\/app\/build\/.*/,
+      /.*\/ios\/build\/.*/,
+      /.*\/ios\/Pods\/.*/,
+      /.*\/\.git\/.*/,
+      /.*\/\.gradle\/.*/,
+      /.*\/\.cxx\/.*/,
+    ],
   },
 };
 
 module.exports = withSentryConfig(
-  withNativeWind(mergeConfig(getDefaultConfig(__dirname), config), { input: "./src/global.css" })
+  withNativeWind(mergeConfig(defaultConfig, config), {
+    input: "./src/global.css",
+    forceWriteFileSystem: true,
+  })
 );

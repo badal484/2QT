@@ -7,14 +7,21 @@ import { name as appName } from './app.json';
 
 import messaging from '@react-native-firebase/messaging';
 import { safeNotifee, AndroidImportance } from './src/services/notifeeSafe';
+import { NotificationHandler } from './src/services/notificationHandler';
 
 enableScreens(false);
+
+// Pre-initialize Android Notification Channels for killed-state push delivery (Xiaomi/Vivo/Samsung)
+NotificationHandler.initChannels();
 
 // Top-level FCM Background & Killed State Message Handler
 try {
     messaging().setBackgroundMessageHandler(async remoteMessage => {
         console.log('[FCM Background] Remote message received:', remoteMessage);
         
+        // Ensure channels are ready
+        await NotificationHandler.initChannels();
+
         // If Android OS native FCM SDK already displayed the notification banner (notification object exists),
         // suppress duplicate JS Notifee display call to prevent double banners on system tray.
         if (remoteMessage?.notification) {

@@ -9,7 +9,7 @@ export type NotifType =
     | 'rider_payout' | 'kitchen_payout' | 'low_subscription_meals'
     | 'rider_verified' | 'cash_submitted' | 'broadcast_message' | 'chat_message'
     | 'low_stock_alert' | 'rider_guarantee_payout' | 'renewal_reminder' | 'generic_sms'
-    | 'rider_at_door';
+    | 'rider_at_door' | 'rider_contract_changed';
 
 const PROMO_TYPES   = new Set(['broadcast_message', 'winback', 'birthday', 'flash_sale', 'renewal_reminder']);
 const PAYOUT_TYPES  = new Set(['rider_payout', 'kitchen_payout', 'rider_guarantee_payout']);
@@ -36,6 +36,7 @@ const FALLBACK_TEMPLATES: Record<string, { title_template: string; body_template
     rider_at_door:          { title_template: 'Your rider is at the door!', body_template: 'Your rider is waiting outside. Please come to the door — order #{{displayId}} is here!', channels: ['push', 'whatsapp'] },
     low_stock_alert:        { title_template: 'Low Stock Alert', body_template: '{{itemName}} is running low — only {{remaining}} left. Restock soon.', channels: ['push'] },
     rider_guarantee_payout: { title_template: 'Earnings Top-Up Added', body_template: '₹{{amount}} guarantee top-up has been added to your earnings for today.', channels: ['push'] },
+    rider_contract_changed: { title_template: '{{title}}', body_template: '{{body}}', channels: ['push', 'whatsapp'] },
 };
 
 // ─── Template cache ───────────────────────────────────────────────────────────

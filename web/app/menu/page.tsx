@@ -872,13 +872,25 @@ export default function MenuPage() {
                     // Add APPLY_COUPON logic here if needed
                  }}
                >
-                 <Image 
-                   src={banners[currentBannerIndex].image_url}
-                   alt={banners[currentBannerIndex].title}
-                   fill
-                   priority
-                   className="object-cover opacity-60"
-                 />
+                  {banners[currentBannerIndex].media_type === "VIDEO" && banners[currentBannerIndex].video_url ? (
+                    <video
+                      src={banners[currentBannerIndex].video_url}
+                      poster={banners[currentBannerIndex].image_url || undefined}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover opacity-60"
+                    />
+                  ) : banners[currentBannerIndex].image_url ? (
+                    <Image 
+                      src={banners[currentBannerIndex].image_url}
+                      alt={banners[currentBannerIndex].title}
+                      fill
+                      priority
+                      className="object-cover opacity-60"
+                    />
+                  ) : null}
                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
                  <div className="absolute inset-0 p-5 md:p-6 z-10 flex flex-col justify-center max-w-[70%]">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-brand-primary text-[9px] font-black uppercase tracking-widest text-white mb-2 w-fit shadow-md">

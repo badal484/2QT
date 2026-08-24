@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackActions } from '@react-navigation/native';
 import {
   View, Text, ScrollView, StyleSheet,
-  StatusBar, useWindowDimensions, Image, Share
+  StatusBar, useWindowDimensions, Image, Share, TouchableOpacity
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
@@ -46,55 +46,89 @@ const RelatedItemCard = React.memo(({ ri, onAdd, dispatch }: any) => {
   const nav = useNavigation<any>();
   const riCart = useSelector((state: RootState) => state.cart.items.find(ci => ci.menuItemId === ri.id));
   const riVeg = ri.is_egg ? tokens.colors.warning : ri.is_veg ? tokens.colors.success : tokens.colors.danger;
+
+  const handleOpenDetail = () => {
+    nav.dispatch(StackActions.push('ItemDetailPush', { item: ri }));
+  };
+
   return (
-    <PressableScale
-      style={s.relatedCard}
-      onPress={() => nav.dispatch(StackActions.push('ItemDetailPush', { item: ri }))}
-      accessibilityRole="button"
-      accessibilityLabel={`View ${ri.name}`}
-    >
-      <View style={s.relatedImgBox}>
-        {ri.photo_url ? (
-          <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
-        ) : (
-          <View style={[s.relatedImg, s.heroPlaceholder]}>
-            <Text allowFontScaling={false} style={{ fontSize: 24 }}>🍽️</Text>
-          </View>
-        )}
-        {ri.is_bestseller && (
-          <View style={s.relatedBadge}>
-            <Text allowFontScaling={false} style={s.relatedBadgeText}>★ Bestseller</Text>
-          </View>
-        )}
-      </View>
+    <View style={s.relatedCard}>
+      <PressableScale
+        onPress={handleOpenDetail}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${ri.name}`}
+      >
+        <View style={s.relatedImgBox}>
+          {ri.photo_url ? (
+            <NetworkImage uri={ri.photo_url} style={s.relatedImg} />
+          ) : (
+            <View style={[s.relatedImg, s.heroPlaceholder]}>
+              <Text allowFontScaling={false} style={{ fontSize: 24 }}>🍽️</Text>
+            </View>
+          )}
+          {ri.is_bestseller && (
+            <View style={s.relatedBadge}>
+              <Text allowFontScaling={false} style={s.relatedBadgeText}>★ Bestseller</Text>
+            </View>
+          )}
+        </View>
+      </PressableScale>
+
       {ri.available && !riCart ? (
-        <PressableScale style={s.relatedAddBtn} onPress={() => { haptics.selection(); onAdd(ri); }} accessibilityRole="button" accessibilityLabel="Add to cart">
+        <TouchableOpacity
+          style={s.relatedAddBtn}
+          activeOpacity={0.7}
+          onPress={() => { haptics.selection(); onAdd(ri); }}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${ri.name} to cart`}
+        >
           <Text allowFontScaling={false} style={s.relatedAddText}>ADD</Text>
-        </PressableScale>
+        </TouchableOpacity>
       ) : ri.available && riCart ? (
         <View style={s.relatedQtyBox}>
-          <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }} accessibilityRole="button" accessibilityLabel="Decrease quantity">
+          <TouchableOpacity
+            activeOpacity={0.6}
+            style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 8 }}
+            onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity - 1 })); }}
+            accessibilityRole="button"
+            accessibilityLabel="Decrease quantity"
+          >
             <Text allowFontScaling={false} style={s.relatedQtyBtn}>−</Text>
-          </PressableScale>
+          </TouchableOpacity>
           <Text allowFontScaling={false} style={s.relatedQtyVal}>{riCart.quantity}</Text>
-          <PressableScale hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }} accessibilityRole="button" accessibilityLabel="Increase quantity">
+          <TouchableOpacity
+            activeOpacity={0.6}
+            style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
+            onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: ri.id, quantity: riCart.quantity + 1 })); }}
+            accessibilityRole="button"
+            accessibilityLabel="Increase quantity"
+          >
             <Text allowFontScaling={false} style={s.relatedQtyBtn}>+</Text>
-          </PressableScale>
+          </TouchableOpacity>
         </View>
       ) : null}
-      <View style={s.relatedMeta}>
-        <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
-          <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
-        </View>
-        {ri.tags?.[0] && (
-          <View style={[s.servePill, { paddingHorizontal: 6, paddingVertical: 2 }]}>
-            <Text allowFontScaling={false} style={[s.servePillText, { fontSize: 9 }]}>{ri.tags[0]}</Text>
+
+      <PressableScale
+        onPress={handleOpenDetail}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${ri.name}`}
+      >
+        <View style={s.relatedMeta}>
+          <View style={[s.vegBox, { borderColor: riVeg, width: 14, height: 14, borderRadius: 2 }]}>
+            <View style={[s.vegDot, { backgroundColor: riVeg, width: 6, height: 6, borderRadius: 3 }]} />
           </View>
-        )}
-      </View>
-      <Text allowFontScaling={false} style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
-      <Text allowFontScaling={false} style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
-    </PressableScale>
+          {ri.tags?.[0] && (
+            <View style={[s.servePill, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+              <Text allowFontScaling={false} style={[s.servePillText, { fontSize: 9 }]}>{ri.tags[0]}</Text>
+            </View>
+          )}
+        </View>
+        <Text allowFontScaling={false} style={s.relatedName} numberOfLines={2}>{ri.name}</Text>
+        <Text allowFontScaling={false} style={s.relatedPrice}>₹{ri.price_paise / 100}</Text>
+      </PressableScale>
+    </View>
   );
 });
 
@@ -504,33 +538,38 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                 )}
                 {qty > 0 ? (
                   <View style={s.qtyControl}>
-                    <PressableScale
-                      hitSlop={{ top: 8, bottom: 8, left: 10, right: 6 }}
+                    <TouchableOpacity
+                      activeOpacity={0.6}
+                      style={{ paddingHorizontal: 12, paddingVertical: 4 }}
+                      hitSlop={{ top: 12, bottom: 12, left: 14, right: 8 }}
                       onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.id, quantity: qty - 1 })); }}
                       accessibilityRole="button"
                       accessibilityLabel="Decrease quantity"
                     >
                       <Text allowFontScaling={false} style={s.qtyCtrlBtn}>−</Text>
-                    </PressableScale>
+                    </TouchableOpacity>
                     <Text allowFontScaling={false} style={s.qtyCtrlVal}>{qty}</Text>
-                    <PressableScale
-                      hitSlop={{ top: 8, bottom: 8, left: 6, right: 10 }}
+                    <TouchableOpacity
+                      activeOpacity={0.6}
+                      style={{ paddingHorizontal: 12, paddingVertical: 4 }}
+                      hitSlop={{ top: 12, bottom: 12, left: 8, right: 14 }}
                       onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.id, quantity: qty + 1 })); }}
                       accessibilityRole="button"
                       accessibilityLabel="Increase quantity"
                     >
                       <Text allowFontScaling={false} style={s.qtyCtrlBtn}>+</Text>
-                    </PressableScale>
+                    </TouchableOpacity>
                   </View>
                 ) : (
-                  <PressableScale
+                  <TouchableOpacity
                     style={s.addBtn}
+                    activeOpacity={0.7}
                     onPress={() => { haptics.selection(); handleAddWithCheck(enrichedItem); }}
                     accessibilityRole="button"
                     accessibilityLabel="Add to cart"
                   >
                     <Text allowFontScaling={false} style={s.addBtnText}>Add</Text>
-                  </PressableScale>
+                  </TouchableOpacity>
                 )}
               </>
             )}

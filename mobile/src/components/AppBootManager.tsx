@@ -16,6 +16,7 @@ import SplashScreen from '../screens/SplashScreen';
 import { api } from '../api/client';
 import { reverseGeocode } from '../utils/geocode';
 import Geolocation from '@react-native-community/geolocation';
+import { useQueryClient } from '@tanstack/react-query';
 
 const requestLocationPermission = async (): Promise<boolean> => {
   if (Platform.OS === 'android') {
@@ -138,22 +139,24 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
     }
   }, [dispatch, runServiceabilityCheck]);
 
+  const queryClient = useQueryClient();
+  const activeZoneId = useSelector((state: RootState) => state.app.activeZoneId);
+  const activeZoneIdRef = useRef(activeZoneId);
+  useEffect(() => {
+    activeZoneIdRef.current = activeZoneId;
+  }, [activeZoneId]);
+
   // ─── Main boot sequence ───────────────────────────────────────────────────
   useEffect(() => {
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
 
     const boot = async () => {
-      // Enforce minimum splash screen duration to allow premium animations to play
-      const minimumSplashTime = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+      // Smooth splash screen animation duration
+      const minimumSplashTime = new Promise<void>((resolve) => setTimeout(resolve, 600));
 
-
-
-      // Wake Render free-tier backend immediately in background — doesn't block boot
+      // Wake backend immediately in background
       fetch(`${ENV.API_URL}/menu/zones`).catch(() => {});
-
-      // Clear stale persisted zone — will be resolved fresh via GPS or address selection
-      dispatch(setZone(null));
 
       // Sanitize corrupted Redux-Persist state (object stored instead of string)
       if (currentAddressIdRef.current !== null && typeof currentAddressIdRef.current === 'object') {
@@ -161,17 +164,59 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
         currentAddressIdRef.current = null;
       }
 
-      if (currentAddressIdRef.current || globalLocation) {
-        // Fast boot path: we still wait for minimum splash duration
+      // Ensure activeZoneId is never null on boot by resolving available active zones
+      let zoneToPrefetch = activeZoneIdRef.current;
+      if (!zoneToPrefetch) {
+        try {
+          const zonesRes = await api.get('/menu/zones');
+          if (zonesRes.zones && zonesRes.zones.length > 0) {
+            zoneToPrefetch = zonesRes.zones[0].id;
+            dispatch(setServiceable({
+              zoneId: zonesRes.zones[0].id,
+              zoneName: zonesRes.zones[0].name,
+            }));
+          }
+        } catch (_) {}
+      }
+      zoneToPrefetch = zoneToPrefetch || 'zone_velto_main';
 
-        // Zone was cleared above — need to re-resolve it.
-        // Signal HomeScreen to show skeleton while GPS resolves.
-        dispatch(setServiceabilityChecking());
+      // Prefetch home data during splash screen so HomeScreen mounts with 100% complete data
+      const prefetchPromise = Promise.all([
+        queryClient.prefetchQuery({
+          queryKey: ['banners'],
+          queryFn: () => api.get('/banners'),
+          staleTime: 10 * 60 * 1000,
+        }),
+        queryClient.prefetchQuery({
+          queryKey: ['campaigns', zoneToPrefetch],
+          queryFn: () => api.get(`/campaigns/active?zoneId=${zoneToPrefetch}`),
+          staleTime: 5 * 60 * 1000,
+        }),
+        queryClient.prefetchQuery({
+          queryKey: ['menu-categories', zoneToPrefetch],
+          queryFn: () => api.get(`/categories?zoneId=${zoneToPrefetch}`),
+          staleTime: 5 * 60 * 1000,
+        }),
+        queryClient.prefetchQuery({
+          queryKey: ['menu', zoneToPrefetch],
+          queryFn: () => api.get(`/menu?zoneId=${zoneToPrefetch}`),
+          staleTime: 5 * 60 * 1000,
+        }),
+      ]).catch(() => {});
 
+      const prefetchWithTimeout = Promise.race([
+        prefetchPromise,
+        new Promise<void>((resolve) => setTimeout(resolve, 900)),
+      ]);
+
+      // Fast Optimistic Boot: wait for prefetch/splash
+      if (zoneToPrefetch || globalLocation || currentAddressIdRef.current) {
+        await Promise.all([minimumSplashTime, prefetchWithTimeout]);
+        setIsBooted(true);
+
+        // Run GPS / Zone revalidation silently in the background
         if (globalLocation) {
-          // Have cached coords — fast zone check with existing address text
-          await runServiceabilityCheck(globalLocation, globalLocation.addressText);
-          // Refresh stale address text in background (e.g. 'Current Location' placeholder)
+          runServiceabilityCheck(globalLocation, globalLocation.addressText);
           const isStale =
             !globalLocation.addressText ||
             globalLocation.addressText === 'Current Location' ||
@@ -182,32 +227,28 @@ export const AppBootManager = ({ children }: { children: React.ReactNode }) => {
             });
           }
         } else {
-          // Have saved addressId but no GPS coords — run GPS silently.
-          // isSilent=true so GPS denial doesn't override 'checking' with an error screen
-          // when the user has a real saved address.
-          const gpsOk = await runGpsZoneCheck(/* isSilent= */ true);
-          // If GPS failed entirely (denied, timed out, no signal), we'd be stuck on
-          // 'checking' forever. Surface a retry option instead.
-          if (!gpsOk) dispatch(setNetworkError());
+          runGpsZoneCheck(/* isSilent= */ true);
         }
-        await minimumSplashTime;
-        setIsBooted(true);
         return;
       }
 
-      // Full boot: no cached address or location — wait for GPS before showing app
+      // First-time install: no cached zone — wait for initial GPS check before dismissing splash
       dispatch(setServiceabilityChecking());
 
+      const gpsCheckWithTimeout = Promise.race([
+        runGpsZoneCheck(/* isSilent= */ false),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2500)),
+      ]);
+
       try {
-        await runGpsZoneCheck(/* isSilent= */ false);
+        await Promise.all([gpsCheckWithTimeout, minimumSplashTime, prefetchWithTimeout]);
       } finally {
-        await minimumSplashTime;
         setIsBooted(true);
       }
     };
 
     boot();
-  }, [dispatch, runServiceabilityCheck, runGpsZoneCheck]);
+  }, [dispatch, runServiceabilityCheck, runGpsZoneCheck, globalLocation, queryClient]);
 
   // ─── Continuous Location Observer ────────────────────────────────────────
   const watchIdRef = useRef<number | null>(null);

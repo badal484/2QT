@@ -14,14 +14,14 @@ interface SkeletonProps {
 export const Skeleton: React.FC<SkeletonProps> = ({
   width = '100%', height = 16, borderRadius = tokens.radii.sm, style,
 }) => {
-  const opacity = useSharedValue(0.35);
+  const opacity = useSharedValue(0.5);
   useEffect(() => {
-    opacity.value = withRepeat(withTiming(0.75, { duration: 900 }), -1, true);
+    opacity.value = withRepeat(withTiming(1, { duration: 800 }), -1, true);
   }, [opacity]);
   const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
     <Animated.View
-      style={[{ width, height, borderRadius, backgroundColor: tokens.colors.background }, animStyle, style]}
+      style={[{ width, height, borderRadius, backgroundColor: '#E2E8F0' }, animStyle, style]}
     />
   );
 };
@@ -131,6 +131,52 @@ export const SkeletonDashboard: React.FC = () => (
   </View>
 );
 
+// ── HomeScreen Full Skeleton ───────────────────────────────────────────────
+export const SkeletonHomeScreen: React.FC = () => (
+  <View style={s.homeSkeletonContainer}>
+    {/* Category Strip Skeleton */}
+    <View style={s.homeCatStrip}>
+      {[1, 2, 3, 4, 5, 6].map(i => (
+        <View key={i} style={s.homeCatItem}>
+          <Skeleton width={56} height={56} borderRadius={28} />
+          <Skeleton width={44} height={10} style={{ marginTop: 6 }} />
+        </View>
+      ))}
+    </View>
+
+    {/* Hero Banner Skeleton */}
+    <View style={s.homeBannerWrap}>
+      <Skeleton width="100%" height={140} borderRadius={16} />
+    </View>
+
+    {/* Highlights Section Header Skeleton */}
+    <View style={s.homeSectionHeader}>
+      <Skeleton width={120} height={18} borderRadius={tokens.radii.sm} />
+    </View>
+
+    {/* Highlights Horizontal Strip Skeleton */}
+    <View style={s.homeHighlightsStrip}>
+      {[1, 2, 3].map(i => (
+        <View key={i} style={s.homeHighlightCard}>
+          <Skeleton width={136} height={110} borderRadius={16} />
+          <View style={{ marginTop: 8, paddingHorizontal: 4 }}>
+            <Skeleton width="70%" height={12} style={{ marginBottom: 4 }} />
+            <Skeleton width="40%" height={12} />
+          </View>
+        </View>
+      ))}
+    </View>
+
+    {/* Food Menu Items Skeleton */}
+    <View style={{ marginTop: 24, paddingHorizontal: tokens.spacing.lg }}>
+      <Skeleton width={140} height={18} style={{ marginBottom: 16 }} />
+      <SkeletonRow />
+      <SkeletonRow />
+      <SkeletonRow />
+    </View>
+  </View>
+);
+
 const baseCardStyle = {
   backgroundColor: tokens.colors.surface,
   borderRadius: tokens.radii.lg,
@@ -204,4 +250,13 @@ const s = StyleSheet.create({
   dashStatRow: { flexDirection: 'row', gap: tokens.spacing.sm, marginBottom: tokens.spacing.xs },
   dashStat: { flex: 1 },
   dashDivider: { opacity: 0.4, marginVertical: tokens.spacing.xs },
+
+  // SkeletonHomeScreen
+  homeSkeletonContainer: { paddingVertical: 12 },
+  homeCatStrip: { flexDirection: 'row', paddingHorizontal: tokens.spacing.lg, gap: 14, marginBottom: 18 },
+  homeCatItem: { alignItems: 'center' },
+  homeBannerWrap: { paddingHorizontal: tokens.spacing.lg, marginBottom: 20 },
+  homeSectionHeader: { paddingHorizontal: tokens.spacing.lg, marginBottom: 12 },
+  homeHighlightsStrip: { flexDirection: 'row', paddingHorizontal: tokens.spacing.lg, gap: 14 },
+  homeHighlightCard: { width: 136 },
 });

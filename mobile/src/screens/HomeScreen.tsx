@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { BouncingButton } from '../components/ui/BouncingButton';
@@ -16,8 +16,9 @@ import { MapPin, Search, PackageOpen, ChefHat, ChevronDown, ShoppingBag, User, B
 import Animated, { FadeInDown, FadeOutDown, useSharedValue, useAnimatedStyle, interpolate, useAnimatedScrollHandler, withRepeat, withTiming } from 'react-native-reanimated';
 import { isKitchenOpen } from '../utils/kitchenHours';
 import { NetworkImage } from '../components/NetworkImage';
+import { BannerMedia } from '../components/BannerMedia';
 import { CustomizationBottomSheet } from '../components/ui/CustomizationBottomSheet';
-import { EmptyState, SkeletonRow, ActiveOrdersBottomSheet } from '../components/ui';
+import { EmptyState, SkeletonRow, SkeletonHomeScreen, ActiveOrdersBottomSheet } from '../components/ui';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics } from '../utils/haptics';
@@ -37,6 +38,7 @@ const HomeScreen = ({ navigation }: any) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const { user } = useSelector((state: RootState) => state.auth);
   const { items: cartItems, zoneId, addressId } = useSelector((state: RootState) => state.cart);
+  const isFocused = useIsFocused();
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const { globalLocation: location, serviceabilityStatus, activeZoneId } = useSelector((state: RootState) => state.app);
@@ -46,12 +48,6 @@ const HomeScreen = ({ navigation }: any) => {
   // Stable ref so handleAddToCart doesn't need cartItems in its dep array
   const cartItemsRef = useRef(cartItems);
 
-  useFocusEffect(
-    useCallback(() => {
-      queryClient.invalidateQueries({ queryKey: ['menu'] });
-      queryClient.invalidateQueries({ queryKey: ['zones'] });
-    }, [queryClient])
-  );
   cartItemsRef.current = cartItems;
 
   const [isVegOnly, setIsVegOnly] = useState(false);
@@ -87,9 +83,17 @@ const HomeScreen = ({ navigation }: any) => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     haptics.selection();
-    await queryClient.refetchQueries();
-    setRefreshing(false);
-  }, [queryClient]);
+    try {
+      if (!effectiveZoneId && location) {
+        await retryZoneCheck();
+      }
+      await queryClient.refetchQueries();
+    } catch {
+      // Ignored - React Query handles error states
+    } finally {
+      setRefreshing(false);
+    }
+  }, [queryClient, effectiveZoneId, location, retryZoneCheck]);
 
   // Serviceability derived flags — trigger even with an address if effectiveZoneId is still null
   // Also treat 'serviceable' with no zone as checking — happens when persist is stale/corrupt
@@ -118,10 +122,10 @@ const HomeScreen = ({ navigation }: any) => {
 
   const { data: menuData, isLoading } = useQuery({
     queryKey: ['menu', effectiveZoneId],
-    queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}&refresh=true`),
+    queryFn: () => api.get(`/menu?zoneId=${effectiveZoneId}`),
     enabled: !!effectiveZoneId,
-    staleTime: 10 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 3 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: activeOrdersData } = useQuery({
@@ -151,8 +155,8 @@ const HomeScreen = ({ navigation }: any) => {
   const { data: campaignsData } = useQuery({
     queryKey: ['campaigns', effectiveZoneId],
     queryFn: () => api.get(`/campaigns/active?zoneId=${effectiveZoneId || ''}`),
-    staleTime: 15 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
   const activeCampaigns = campaignsData?.campaigns || [];
   const primaryCampaign = activeCampaigns[0];
@@ -742,7 +746,7 @@ const HomeScreen = ({ navigation }: any) => {
         ref={flatListRef}
         style={{ flex: 1, minHeight: 2 }}
         data={
-          isServiceabilityChecking || unserviceableLocation || showNoLocation || showNetworkError
+          unserviceableLocation || showNoLocation || showNetworkError
             ? []
             : listData
         }
@@ -782,7 +786,7 @@ const HomeScreen = ({ navigation }: any) => {
           <View>
             
             {/* ── Category Strip ── */}
-            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && adminCategories.length > 0 && (
+            {!unserviceableLocation && !showNoLocation && !showNetworkError && adminCategories.length > 0 && (
               <View style={styles.categoryStrip}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryStripScroll}>
                   {/* Admin categories */}
@@ -814,7 +818,7 @@ const HomeScreen = ({ navigation }: any) => {
             )}
 
             {/* ── Mini Banners (Quick Filters) ── */}
-            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && miniBanners.length > 0 && (
+            {!unserviceableLocation && !showNoLocation && !showNetworkError && miniBanners.length > 0 && (
               <View style={styles.miniBannersContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.miniBannersScroll}>
                   {miniBanners.map((banner: any) => (
@@ -828,7 +832,14 @@ const HomeScreen = ({ navigation }: any) => {
                       accessibilityRole="button"
                       accessibilityLabel={`Filter by ${banner.title}`}
                     >
-                      <NetworkImage uri={banner.image_url} style={styles.miniBannerImage} />
+                      <BannerMedia
+                        imageUrl={banner.image_url}
+                        videoUrl={banner.video_url}
+                        mediaType={banner.media_type}
+                        isActive={isFocused}
+                        style={styles.miniBannerImage}
+                        borderRadius={20}
+                      />
                       <View style={styles.miniBannerOverlay}>
                         <Text allowFontScaling={false} style={styles.miniBannerTitle}>{banner.title}</Text>
                         {banner.subtitle && <Text allowFontScaling={false} style={styles.miniBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
@@ -850,7 +861,7 @@ const HomeScreen = ({ navigation }: any) => {
             )}
 
             {/* ── Active Campaign Deal Banner (Flash Sale, Happy Hour, Special Deal) ── */}
-            {!isLoading && !unserviceableLocation && !showNoLocation && !showNetworkError && primaryCampaign && (
+            {!unserviceableLocation && !showNoLocation && !showNetworkError && primaryCampaign && (
               <Animated.View entering={FadeInDown.delay(120).duration(400)}>
                 <CampaignBannerCard
                   campaign={primaryCampaign}
@@ -861,7 +872,7 @@ const HomeScreen = ({ navigation }: any) => {
               </Animated.View>
             )}
 
-            {infiniteBanners.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && !isServiceabilityChecking && (
+            {infiniteBanners.length > 0 && !unserviceableLocation && !showNoLocation && !showNetworkError && (
               <Animated.View entering={FadeInDown.delay(150).duration(400)} style={{ overflow: 'hidden', marginTop: tokens.spacing.sm }}>
                 <FlatList
                   ref={bannerListRef}
@@ -887,25 +898,35 @@ const HomeScreen = ({ navigation }: any) => {
                     offset: SCREEN_WIDTH * index,
                     index,
                   })}
-                  renderItem={({ item: b }: any) => (
-                    <View style={{ width: SCREEN_WIDTH, paddingHorizontal: tokens.spacing.lg }}>
-                      <BouncingButton
-                        activeOpacity={0.9}
-                        onPress={() => {
-                          if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
-                        }}
-                        style={[styles.bannerContainer, { height: 130 }]}
-                        accessibilityRole="button"
-                        accessibilityLabel={b.title}
-                      >
-                        <NetworkImage uri={b.image_url} style={[styles.bannerImage, { borderRadius: 16 }]} />
-                        <View style={[styles.bannerOverlay, { borderRadius: 16 }]}>
-                          <Text allowFontScaling={false} style={styles.bannerTitle} numberOfLines={2}>{b.title}</Text>
-                          {b.subtitle && <Text allowFontScaling={false} style={styles.bannerSubtitle} numberOfLines={2}>{b.subtitle}</Text>}
-                        </View>
-                      </BouncingButton>
-                    </View>
-                  )}
+                  renderItem={({ item: b, index }: any) => {
+                    const isSlideActive = isFocused && ((index % (mainBanners.length || 1)) === activeBannerDot);
+                    return (
+                      <View style={{ width: SCREEN_WIDTH, paddingHorizontal: tokens.spacing.lg }}>
+                        <BouncingButton
+                          activeOpacity={0.9}
+                          onPress={() => {
+                            if (b.action_type === 'FILTER_CATEGORY') setSelectedCategory(b.action_payload);
+                          }}
+                          style={[styles.bannerContainer, { height: 130 }]}
+                          accessibilityRole="button"
+                          accessibilityLabel={b.title}
+                        >
+                          <BannerMedia
+                            imageUrl={b.image_url}
+                            videoUrl={b.video_url}
+                            mediaType={b.media_type}
+                            isActive={isSlideActive}
+                            style={[styles.bannerImage, { borderRadius: 16 }]}
+                            borderRadius={16}
+                          />
+                          <View style={[styles.bannerOverlay, { borderRadius: 16 }]}>
+                            <Text allowFontScaling={false} style={styles.bannerTitle} numberOfLines={2}>{b.title}</Text>
+                            {b.subtitle && <Text allowFontScaling={false} style={styles.bannerSubtitle} numberOfLines={2}>{b.subtitle}</Text>}
+                          </View>
+                        </BouncingButton>
+                      </View>
+                    );
+                  }}
                 />
                 {mainBanners.length > 1 && (
                   <View style={styles.bannerDotsContainer}>
@@ -937,7 +958,14 @@ const HomeScreen = ({ navigation }: any) => {
                     accessibilityRole="button"
                     accessibilityLabel={banner.title}
                   >
-                    <NetworkImage uri={banner.image_url} style={styles.stripBannerImage} />
+                    <BannerMedia
+                      imageUrl={banner.image_url}
+                      videoUrl={banner.video_url}
+                      mediaType={banner.media_type}
+                      isActive={isFocused}
+                      style={styles.stripBannerImage}
+                      borderRadius={20}
+                    />
                     <View style={styles.stripBannerOverlay}>
                       <Text allowFontScaling={false} style={styles.stripBannerTitle}>{banner.title}</Text>
                       {banner.subtitle && <Text allowFontScaling={false} style={styles.stripBannerSubtitle} numberOfLines={1}>{banner.subtitle}</Text>}
@@ -1009,10 +1037,8 @@ const HomeScreen = ({ navigation }: any) => {
           </View>
         }
         ListEmptyComponent={
-          isServiceabilityChecking || (isLoading && !!effectiveZoneId) ? (
-            <View style={[styles.skeletonList, styles.itemPadding]}>
-              <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
-            </View>
+          isServiceabilityChecking || (isLoading && !(menuData as any)?.items) ? (
+            <SkeletonHomeScreen />
           ) : showNoLocation ? (
             /* ── No GPS permission ── */
             <Animated.View entering={FadeInDown.duration(400)} style={styles.unserviceableWrap}>

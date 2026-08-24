@@ -16,33 +16,66 @@ export const MenuGridCard = React.memo(({ menuItem, kitchenPaused, navigation, d
   });
   const vegColor = menuItem.is_egg ? tokens.colors.warning : (menuItem.is_veg ? tokens.colors.success : tokens.colors.danger);
   const unavailable = !menuItem.available || kitchenPaused;
+  const handleOpenDetail = () => {
+    if (menuItem.available) navigation.navigate('ItemDetail', { item: menuItem });
+  };
+
   return (
-    <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.homeGridCard} activeOpacity={0.92}
-      onPress={() => { if (menuItem.available) navigation.navigate('ItemDetail', { item: menuItem }); }}>
+    <View style={styles.homeGridCard}>
       <View style={styles.homeGridImageContainer}>
-        {menuItem.photo_url
-          ? <NetworkImage uri={menuItem.photo_url} style={styles.homeGridImage} />
-          : <View style={[styles.homeGridImage, styles.homeGridImagePlaceholder]}><ChefHat size={28} color={tokens.colors.textTertiary} /></View>}
-        <View style={[styles.homeGridVegBadge, { borderColor: vegColor }]}>
-          <View style={[styles.homeGridVegDot, { backgroundColor: vegColor }]} />
-        </View>
-        {menuItem.is_bestseller && <View style={styles.homeGridBestsellerBadge}><Text allowFontScaling={false} style={styles.homeGridBestsellerText}>★ Bestseller</Text></View>}
-        {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text allowFontScaling={false} style={styles.homeGridNewText}>+ New</Text></View>}
-        {unavailable && <View style={styles.homeGridSoldOut}><Text allowFontScaling={false} style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
+        <TouchableOpacity
+          style={{ width: '100%', height: '100%' }}
+          activeOpacity={0.92}
+          onPress={handleOpenDetail}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${menuItem.name}`}
+        >
+          {menuItem.photo_url
+            ? <NetworkImage uri={menuItem.photo_url} style={styles.homeGridImage} />
+            : <View style={[styles.homeGridImage, styles.homeGridImagePlaceholder]}><ChefHat size={28} color={tokens.colors.textTertiary} /></View>}
+          <View style={[styles.homeGridVegBadge, { borderColor: vegColor }]}>
+            <View style={[styles.homeGridVegDot, { backgroundColor: vegColor }]} />
+          </View>
+          {menuItem.is_bestseller && <View style={styles.homeGridBestsellerBadge}><Text allowFontScaling={false} style={styles.homeGridBestsellerText}>★ Bestseller</Text></View>}
+          {!menuItem.is_bestseller && menuItem.is_new && <View style={styles.homeGridNewBadge}><Text allowFontScaling={false} style={styles.homeGridNewText}>+ New</Text></View>}
+          {unavailable && <View style={styles.homeGridSoldOut}><Text allowFontScaling={false} style={styles.homeGridSoldOutText}>Sold Out</Text></View>}
+        </TouchableOpacity>
+
         {!unavailable && (
           <View style={styles.homeGridAddFloat}>
             {cartQty > 0 ? (
               <View style={styles.homeGridQtyControl}>
-                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartQty - 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} activeOpacity={0.7}>
+                <TouchableOpacity
+                  onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartQty - 1 })); }}
+                  style={styles.homeGridQtyBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease quantity"
+                >
                   <Text allowFontScaling={false} style={styles.homeGridQtyBtnText}>−</Text>
                 </TouchableOpacity>
                 <Text allowFontScaling={false} style={styles.homeGridQtyValue}>{cartQty}</Text>
-                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartQty + 1 })); }} style={styles.homeGridQtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} activeOpacity={0.7}>
+                <TouchableOpacity
+                  onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: menuItem.id, quantity: cartQty + 1 })); }}
+                  style={styles.homeGridQtyBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Increase quantity"
+                >
                   <Text allowFontScaling={false} style={styles.homeGridQtyBtnText}>+</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.homeGridAddBtn} onPress={() => onAddToCartWithCheck(menuItem)} activeOpacity={0.8}>
+              <TouchableOpacity
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.homeGridAddBtn}
+                onPress={() => onAddToCartWithCheck(menuItem)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${menuItem.name} to cart`}
+              >
                 <Text allowFontScaling={false} style={styles.homeGridAddBtnText}>ADD</Text>
                 {Array.isArray(menuItem.customization_groups) && menuItem.customization_groups.length > 0 && (
                   <View style={styles.homeGridCustomiseBadge}><Text allowFontScaling={false} style={styles.homeGridCustomiseText}>Customise</Text></View>
@@ -52,7 +85,13 @@ export const MenuGridCard = React.memo(({ menuItem, kitchenPaused, navigation, d
           </View>
         )}
       </View>
-      <View style={styles.homeGridInfo}>
+      <TouchableOpacity
+        style={styles.homeGridInfo}
+        activeOpacity={0.92}
+        onPress={handleOpenDetail}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${menuItem.name}`}
+      >
         <Text allowFontScaling={false} style={styles.homeGridName} numberOfLines={2}>{menuItem.name}</Text>
         {menuItem.description ? <Text allowFontScaling={false} style={styles.homeGridDesc} numberOfLines={2}>{menuItem.description}</Text> : null}
         {menuItem.applied_offer && (
@@ -79,7 +118,7 @@ export const MenuGridCard = React.memo(({ menuItem, kitchenPaused, navigation, d
             ))}
           </View>
         )}
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 });

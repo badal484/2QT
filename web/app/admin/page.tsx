@@ -809,9 +809,19 @@ function CustomersTab() {
 
 // ─── Fleet Tab ───────────────────────────────────────────────────────────────
 
+function PayModelBadge({ paymentModel }: { paymentModel?: string }) {
+  const isSalary = paymentModel === 'salary';
+  return (
+    <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest ${isSalary ? 'bg-blue-500/10 text-blue-400' : 'bg-swish-green/10 text-swish-green'}`}>
+      {isSalary ? 'Salary' : 'Gig'}
+    </span>
+  );
+}
+
 function FleetTab({ onOpenRider }: { onOpenRider?: (id: string) => void }) {
   const [riders, setRiders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [payModelFilter, setPayModelFilter] = useState<'all' | 'salary' | 'per_order'>('all');
 
   const load = async () => {
     try {
@@ -837,7 +847,8 @@ function FleetTab({ onOpenRider }: { onOpenRider?: (id: string) => void }) {
   };
 
   const pendingRiders = riders.filter(r => !r.is_verified);
-  const verifiedRiders = riders.filter(r => r.is_verified);
+  const payModelFiltered = riders.filter(r => payModelFilter === 'all' || r.payment_model === payModelFilter);
+  const verifiedRiders = payModelFiltered.filter(r => r.is_verified);
   const onlineRiders = verifiedRiders.filter(r => r.is_online);
   const offlineRiders = verifiedRiders.filter(r => !r.is_online);
 
@@ -848,13 +859,26 @@ function FleetTab({ onOpenRider }: { onOpenRider?: (id: string) => void }) {
           <h2 className="text-4xl font-black tracking-tighter text-white mb-2">Fleet Command</h2>
           <p className="text-zinc-400 text-sm font-medium">Real-time rider tracking and performance metrics.</p>
         </div>
-        <div className="flex items-center gap-4 bg-white/[0.03] backdrop-blur-2xl px-5 py-3 rounded-2xl border border-white/10 shadow-2xl shadow-black/40">
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Online Fleet</span>
-            <span className="text-xl font-black text-white">{onlineRiders.length} <span className="text-zinc-400">/ {verifiedRiders.length}</span></span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-white/[0.03] backdrop-blur-2xl p-1 rounded-xl border border-white/10">
+            {(['all', 'per_order', 'salary'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setPayModelFilter(f)}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${payModelFilter === f ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >
+                {f === 'all' ? 'All' : f === 'per_order' ? 'Gig' : 'Salary'}
+              </button>
+            ))}
           </div>
-          <div className="w-12 h-12 rounded-full bg-swish-green/20 flex items-center justify-center text-swish-green">
-            <Bike className="w-6 h-6" />
+          <div className="flex items-center gap-4 bg-white/[0.03] backdrop-blur-2xl px-5 py-3 rounded-2xl border border-white/10 shadow-2xl shadow-black/40">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Online Fleet</span>
+              <span className="text-xl font-black text-white">{onlineRiders.length} <span className="text-zinc-400">/ {verifiedRiders.length}</span></span>
+            </div>
+            <div className="w-12 h-12 rounded-full bg-swish-green/20 flex items-center justify-center text-swish-green">
+              <Bike className="w-6 h-6" />
+            </div>
           </div>
         </div>
       </div>
@@ -922,7 +946,7 @@ function FleetTab({ onOpenRider }: { onOpenRider?: (id: string) => void }) {
                         {r.name?.[0]}
                       </div>
                       <div>
-                        <h3 className="font-bold text-white">{r.name}</h3>
+                        <h3 className="font-bold text-white flex items-center gap-1.5">{r.name} <PayModelBadge paymentModel={r.payment_model} /></h3>
                         <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{r.phone}</div>
                       </div>
                     </div>
@@ -973,7 +997,7 @@ function FleetTab({ onOpenRider }: { onOpenRider?: (id: string) => void }) {
                     {r.name?.[0]}
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-zinc-400">{r.name}</h3>
+                    <h3 className="font-bold text-sm text-zinc-400 flex items-center gap-1.5">{r.name} <PayModelBadge paymentModel={r.payment_model} /></h3>
                     <div className="text-[9px] font-black text-zinc-300 uppercase tracking-widest">{r.phone}</div>
                   </div>
                 </div>

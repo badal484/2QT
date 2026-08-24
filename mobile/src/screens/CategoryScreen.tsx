@@ -2,7 +2,7 @@ import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
-  TextInput, ActivityIndicator, useWindowDimensions
+  TextInput, ActivityIndicator, useWindowDimensions, TouchableOpacity
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
@@ -25,47 +25,81 @@ const CategoryGridCard = React.memo(({ item, index, columnWidth, kitchenPaused, 
   const vegColor = item.is_egg ? tokens.colors.warning : (item.is_veg ? tokens.colors.success : tokens.colors.danger);
   const unavailable = !item.available || kitchenPaused;
   const isEven = index % 2 === 0;
+
+  const handleOpenDetail = () => {
+    if (item.available) navigation.navigate('ItemDetail', { item });
+  };
+
   return (
-    <PressableScale
+    <View
       style={[styles.gridCard, { width: columnWidth, marginLeft: isEven ? 0 : tokens.spacing.md }]}
-      onPress={() => { if (item.available) navigation.navigate('ItemDetail', { item }); }}
-      accessibilityRole="button"
-      accessibilityLabel={`View ${item.name}`}
     >
       <View style={styles.gridCardImageContainer}>
-        {item.photo_url
-          ? <NetworkImage uri={item.photo_url} style={styles.gridCardImage} />
-          : <View style={[styles.gridCardImage, styles.cardImagePlaceholder]}><ChefHat size={32} color={tokens.colors.textTertiary} /></View>}
-        <View style={[styles.vegBadgeFloat, { borderColor: vegColor }]}>
-          <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
-        </View>
-        {item.is_bestseller && <View style={styles.bestsellerOverlay}><Text style={styles.bestsellerOverlayText}>★ Bestseller</Text></View>}
-        {!item.is_bestseller && item.is_new && <View style={styles.newOverlay}><Text style={styles.newOverlayText}>+ New</Text></View>}
-        {unavailable && <View style={styles.soldOutOverlay}><Text style={styles.soldOutText}>Sold Out</Text></View>}
+        <PressableScale
+          onPress={handleOpenDetail}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${item.name}`}
+        >
+          {item.photo_url
+            ? <NetworkImage uri={item.photo_url} style={styles.gridCardImage} />
+            : <View style={[styles.gridCardImage, styles.cardImagePlaceholder]}><ChefHat size={32} color={tokens.colors.textTertiary} /></View>}
+          <View style={[styles.vegBadgeFloat, { borderColor: vegColor }]}>
+            <View style={[styles.vegDot, { backgroundColor: vegColor }]} />
+          </View>
+          {item.is_bestseller && <View style={styles.bestsellerOverlay}><Text style={styles.bestsellerOverlayText}>★ Bestseller</Text></View>}
+          {!item.is_bestseller && item.is_new && <View style={styles.newOverlay}><Text style={styles.newOverlayText}>+ New</Text></View>}
+          {unavailable && <View style={styles.soldOutOverlay}><Text style={styles.soldOutText}>Sold Out</Text></View>}
+        </PressableScale>
+
         {!unavailable && (
           <View style={styles.gridAddBtnFloat}>
             {cartQty > 0 ? (
               <View style={styles.qtyControl}>
-                <PressableScale onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty - 1 })); }} style={styles.qtyBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} accessibilityRole="button" accessibilityLabel="Decrease quantity">
+                <TouchableOpacity
+                  activeOpacity={0.6}
+                  onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty - 1 })); }}
+                  style={styles.qtyBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease quantity"
+                >
                   <Text style={styles.qtyBtnText}>−</Text>
-                </PressableScale>
+                </TouchableOpacity>
                 <Text style={styles.qtyValue}>{cartQty}</Text>
-                <PressableScale onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty + 1 })); }} style={styles.qtyBtn} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} accessibilityRole="button" accessibilityLabel="Increase quantity">
+                <TouchableOpacity
+                  activeOpacity={0.6}
+                  onPress={() => { haptics.selection(); dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty + 1 })); }}
+                  style={styles.qtyBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Increase quantity"
+                >
                   <Text style={styles.qtyBtnText}>+</Text>
-                </PressableScale>
+                </TouchableOpacity>
               </View>
             ) : (
-              <PressableScale style={styles.addBtn} onPress={() => onAdd(item)} accessibilityRole="button" accessibilityLabel={`Add ${item.name} to cart`}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.addBtn}
+                onPress={() => onAdd(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${item.name} to cart`}
+              >
                 <Text style={styles.addBtnText}>ADD</Text>
                 {Array.isArray(item.customization_groups) && item.customization_groups.length > 0 && (
                   <View style={styles.customiseBadge}><Text style={styles.customiseText}>Customise</Text></View>
                 )}
-              </PressableScale>
+              </TouchableOpacity>
             )}
           </View>
         )}
       </View>
-      <View style={styles.gridCardInfo}>
+      <PressableScale
+        onPress={handleOpenDetail}
+        style={styles.gridCardInfo}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${item.name}`}
+      >
         <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
         {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
         <Text style={styles.cardPrice}>₹{item.price_paise / 100}</Text>
@@ -76,8 +110,8 @@ const CategoryGridCard = React.memo(({ item, index, columnWidth, kitchenPaused, 
             ))}
           </View>
         )}
-      </View>
-    </PressableScale>
+      </PressableScale>
+    </View>
   );
 });
 

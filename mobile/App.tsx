@@ -13,6 +13,10 @@ import SplashScreen from './src/screens/SplashScreen';
 import { GlobalSocketListener } from './src/socket/GlobalSocketListener';
 import { Toast } from './src/components/ui/Toast';
 import { useAppStateFocusManager } from './src/hooks/useAppStateFocusManager';
+import { networkManager } from './src/services/networkManager';
+
+// Initialize 3-tier connectivity sentinel & TanStack Query onlineManager
+networkManager.initialize();
 
 Sentry.init({
   dsn: 'https://b5d670f640f89928714224c3d20458f3@o4511873871642624.ingest.us.sentry.io/4511873899167744',

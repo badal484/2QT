@@ -3,21 +3,16 @@
 # in /usr/local/Cellar/android-sdk/24.3.3/tools/proguard/proguard-rules.txt
 # You can edit the include path and order by changing the proguardFiles
 # directive in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
 
-# ─── React Native ──────────────────────────────────────────────────────────────
-# Keep React Native core classes
+# ─── React Native Core & Hermes ───────────────────────────────────────────────
 -keep class com.facebook.react.** { *; }
 -keep class com.facebook.hermes.** { *; }
 -keep class com.facebook.jni.** { *; }
+-keep class com.facebook.react.turbomodule.** { *; }
 -dontwarn com.facebook.react.**
 -dontwarn com.facebook.hermes.**
 
-# ─── 2QT Native Modules ────────────────────────────────────────────────────────
-# These classes are referenced by name from the JavaScript bridge.
-# R8 must NOT rename or remove them.
+# ─── 2QT Native Modules & Services ───────────────────────────────────────────
 -keep class com.veltomobile.LocationForegroundService { *; }
 -keep class com.veltomobile.LocationServiceModule { *; }
 -keep class com.veltomobile.LocationServicePackage { *; }
@@ -25,6 +20,29 @@
 -keep class com.veltomobile.RolePackage { *; }
 -keep class com.veltomobile.MainActivity { *; }
 -keep class com.veltomobile.MainApplication { *; }
+
+# ─── NitroModules & Fast Turbo Native Bindings ───────────────────────────────
+-keep class com.margelo.nitro.** { *; }
+-keep class com.margelo.nitro.image.** { *; }
+-keep class com.mrousavy.camera.** { *; }
+-dontwarn com.margelo.nitro.**
+-dontwarn com.mrousavy.camera.**
+
+# ─── React Native Reanimated ──────────────────────────────────────────────────
+-keep class com.swmansion.reanimated.** { *; }
+-dontwarn com.swmansion.reanimated.**
+
+# ─── Sentry Error Monitoring ──────────────────────────────────────────────────
+-keep class io.sentry.** { *; }
+-dontwarn io.sentry.**
+
+# ─── Notifee & Local Notifications ────────────────────────────────────────────
+-keep class app.notifee.** { *; }
+-dontwarn app.notifee.**
+
+# ─── Razorpay Checkout ────────────────────────────────────────────────────────
+-keep class com.razorpay.** { *; }
+-dontwarn com.razorpay.**
 
 # ─── Firebase & Play Services ──────────────────────────────────────────────────
 -keep class com.google.firebase.** { *; }
@@ -40,21 +58,19 @@
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
 
-# ─── Kotlin ───────────────────────────────────────────────────────────────────
+# ─── Kotlin Reflection & Coroutines ───────────────────────────────────────────
 -keep class kotlin.** { *; }
 -keep class kotlin.Metadata { *; }
 -dontwarn kotlin.**
 -keepclassmembers class **$WhenMappings { <fields>; }
 -keepclassmembers class kotlin.Lazy { *; }
 
-# ─── Android Standard ─────────────────────────────────────────────────────────
+# ─── Android Standard & Native Attributes ─────────────────────────────────────
 -keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
+-keepattributes InnerClasses,EnclosingMethod
+-keepattributes Signature
 -keep public class * extends android.app.Activity
 -keep public class * extends android.app.Service
 -keep public class * extends android.content.BroadcastReceiver
 -keep public class * extends android.content.ContentProvider
-
-# ─── Hermes JS Engine ─────────────────────────────────────────────────────────
--keep class com.facebook.hermes.unicode.** { *; }
--keep class com.facebook.jni.** { *; }
