@@ -5,9 +5,8 @@ import { api } from "../lib/api";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
-import { LayoutGrid, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, Upload, X, AlertCircle, CheckCircle2, MapPin } from "lucide-react";
+import { LayoutGrid, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, Upload, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
-import { useAdminZone } from "./AdminZoneContext";
 
 interface Category {
   id: string;
@@ -254,7 +253,6 @@ const CategoryModal = ({
 
 // ── Main Tab ───────────────────────────────────────────────────────────────────
 export const CategoriesTab = () => {
-  const { selectedZoneId: globalZoneId, setSelectedZoneId: setGlobalZoneId } = useAdminZone();
   const [zones, setZones] = useState<Zone[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState("");
@@ -264,13 +262,7 @@ export const CategoriesTab = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const effectiveZoneId = selectedZoneId || (globalZoneId !== "ALL" ? globalZoneId : "") || zones[0]?.id || "";
-
-  useEffect(() => {
-    if (globalZoneId && globalZoneId !== "ALL") {
-      setSelectedZoneId(globalZoneId);
-    }
-  }, [globalZoneId]);
+  const effectiveZoneId = selectedZoneId || zones[0]?.id || "";
 
   useEffect(() => {
     api.get("/admin/zones").then((res) => {
@@ -279,11 +271,9 @@ export const CategoriesTab = () => {
       const seen = new Set<string>();
       const unique = raw.filter(z => { if (seen.has(z.id)) return false; seen.add(z.id); return true; });
       setZones(unique);
-      if (!selectedZoneId && unique.length > 0) {
-        setSelectedZoneId(globalZoneId && globalZoneId !== "ALL" ? globalZoneId : unique[0].id);
-      }
+      if (unique.length > 0) setSelectedZoneId(unique[0].id);
     }).catch(() => {});
-  }, [globalZoneId, selectedZoneId]);
+  }, []);
 
   const loadCategories = useCallback(() => {
     if (!effectiveZoneId) return;
@@ -372,10 +362,7 @@ export const CategoriesTab = () => {
           {zones.map((z) => (
             <button
               key={z.id}
-              onClick={() => {
-                setSelectedZoneId(z.id);
-                setGlobalZoneId(z.id);
-              }}
+              onClick={() => setSelectedZoneId(z.id)}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${effectiveZoneId === z.id ? "bg-orange-500 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
             >
               {z.name}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3, Users, ShoppingBag, TrendingUp, LayoutDashboard,
@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star, Rocket,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare, ShieldCheck, ShieldAlert, Trophy, Layers, Globe
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare, ShieldCheck, ShieldAlert, Trophy, Layers
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -18,7 +18,6 @@ import { socket } from "../lib/socket";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
-import { AdminZoneProvider, useAdminZone } from "./AdminZoneContext";
 import dynamic from "next/dynamic";
 
 const MarketingTab = dynamic(() => import("./MarketingTab").then(m => ({ default: m.MarketingTab })), { ssr: false });
@@ -94,8 +93,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 
 // ─── Overview ────────────────────────────────────────────────────────────────
 
-function OverviewTab({ onNavigateTab }: { onNavigateTab?: (tab: string) => void }) {
-  const { selectedZoneId, selectedZone } = useAdminZone();
+function OverviewTab() {
   const [stats, setStats] = useState<any>(null);
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,11 +124,6 @@ function OverviewTab({ onNavigateTab }: { onNavigateTab?: (tab: string) => void 
     };
   }, [load]);
 
-  const zoneFilteredOrders = useMemo(() => {
-    if (selectedZoneId === "ALL") return liveOrders;
-    return liveOrders.filter(o => o.zone_id === selectedZoneId || o.zoneId === selectedZoneId);
-  }, [liveOrders, selectedZoneId]);
-
   const rev = (stats?.todayRevenuePaise ?? 0) / 100;
   const weeklyRaw: number[] = stats?.weeklyRevenue?.map((d: any) => d.revenuePaise) ?? [];
   const weeklyLabels: string[] = stats?.weeklyRevenue?.map((d: any) => d.label) ?? [];
@@ -143,12 +136,11 @@ function OverviewTab({ onNavigateTab }: { onNavigateTab?: (tab: string) => void 
 
   const statCards = stats ? [
     {
-      label: selectedZoneId === "ALL" ? "Active Orders" : `${selectedZone?.name || 'Zone'} Orders`,
-      value: selectedZoneId === "ALL" ? stats.activeOrders : zoneFilteredOrders.length,
+      label: "Active Orders", value: stats.activeOrders,
       trend: "live", up: true, icon: ShoppingBag,
       iconColor: "text-brand-primary", iconBg: "bg-brand-primary/10",
       trendColor: "text-emerald-400", sparkColor: "#10b981",
-      sparkData: Array(10).fill(selectedZoneId === "ALL" ? stats.activeOrders : zoneFilteredOrders.length),
+      sparkData: Array(10).fill(stats.activeOrders),
     },
     {
       label: "Customers", value: (stats.totalCustomers ?? 0).toLocaleString("en-IN"),
@@ -174,56 +166,14 @@ function OverviewTab({ onNavigateTab }: { onNavigateTab?: (tab: string) => void 
   ] : [];
 
   const columns = useMemo(() => [
-    { id: "confirmed", title: "Confirmed", count: zoneFilteredOrders.filter(o => o.status === "confirmed").length, color: "emerald", border: "border-t-emerald-500", dot: "bg-emerald-500", orders: zoneFilteredOrders.filter(o => o.status === "confirmed") },
-    { id: "preparing", title: "Preparing", count: zoneFilteredOrders.filter(o => o.status === "preparing").length, color: "blue", border: "border-t-blue-500", dot: "bg-blue-500", orders: zoneFilteredOrders.filter(o => o.status === "preparing") },
-    { id: "ready_for_pickup", title: "Ready", count: zoneFilteredOrders.filter(o => o.status === "ready_for_pickup").length, color: "purple", border: "border-t-purple-500", dot: "bg-purple-500", orders: zoneFilteredOrders.filter(o => o.status === "ready_for_pickup") },
-    { id: "out_for_delivery", title: "Delivering", count: zoneFilteredOrders.filter(o => o.status === "out_for_delivery").length, color: "orange", border: "border-t-brand-primary", dot: "bg-brand-primary", orders: zoneFilteredOrders.filter(o => o.status === "out_for_delivery") },
-  ], [zoneFilteredOrders]);
+    { id: "confirmed", title: "Confirmed", count: liveOrders.filter(o => o.status === "confirmed").length, color: "emerald", border: "border-t-emerald-500", dot: "bg-emerald-500", orders: liveOrders.filter(o => o.status === "confirmed") },
+    { id: "preparing", title: "Preparing", count: liveOrders.filter(o => o.status === "preparing").length, color: "blue", border: "border-t-blue-500", dot: "bg-blue-500", orders: liveOrders.filter(o => o.status === "preparing") },
+    { id: "ready_for_pickup", title: "Ready", count: liveOrders.filter(o => o.status === "ready_for_pickup").length, color: "purple", border: "border-t-purple-500", dot: "bg-purple-500", orders: liveOrders.filter(o => o.status === "ready_for_pickup") },
+    { id: "out_for_delivery", title: "Delivering", count: liveOrders.filter(o => o.status === "out_for_delivery").length, color: "orange", border: "border-t-brand-primary", dot: "bg-brand-primary", orders: liveOrders.filter(o => o.status === "out_for_delivery") },
+  ], [liveOrders]);
 
   return (
     <div className="space-y-6">
-      {/* ── Zone Command Header Banner ── */}
-      {selectedZone && (
-        <div className="bg-gradient-to-r from-brand-primary/15 via-[#161622] to-[#11111a] border border-brand-primary/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-primary/20 flex items-center justify-center border border-brand-primary/40">
-              <MapPin className="w-5 h-5 text-brand-primary" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-lg text-white">{selectedZone.name}</h3>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
-                  ACTIVE ZONE
-                </span>
-              </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                {zoneFilteredOrders.length} live order{zoneFilteredOrders.length === 1 ? '' : 's'} in progress · Delivery radius {selectedZone.delivery_radius_km || 10} km
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onNavigateTab?.("Menu")}
-              className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs font-bold text-white transition-all flex items-center gap-1.5"
-            >
-              <Utensils className="w-3.5 h-3.5 text-orange-400" /> Zone Menu
-            </button>
-            <button
-              onClick={() => onNavigateTab?.("Kitchens")}
-              className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs font-bold text-white transition-all flex items-center gap-1.5"
-            >
-              <Store className="w-3.5 h-3.5 text-blue-400" /> Kitchens
-            </button>
-            <button
-              onClick={() => onNavigateTab?.("Delivery Pricing")}
-              className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs font-bold text-white transition-all flex items-center gap-1.5"
-            >
-              <Receipt className="w-3.5 h-3.5 text-emerald-400" /> Pricing Slabs
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── Top Dashboard Grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -2153,177 +2103,7 @@ const TABS = [
   { name: "Settings",        icon: Settings,         component: SettingsTab },
 ];
 
-// ─── 5-Hub Grouped Navigation Structure ─────────────────────────────────────────
-const SIDEBAR_HUBS = [
-  {
-    section: "Live Operations",
-    icon: ShoppingBag,
-    items: ["Overview", "Orders", "Dispatch", "Scheduled", "Deliveries", "Analytics"],
-  },
-  {
-    section: "Food & Kitchens",
-    icon: Utensils,
-    items: ["Menu", "Categories", "Kitchens", "Restaurants", "Partners", "Inventory"],
-  },
-  {
-    section: "Riders & Fleet",
-    icon: Bike,
-    items: ["Fleet", "Applications", "Rider Docs", "Rider Issues", "SOS Alerts", "Rider Payouts"],
-  },
-  {
-    section: "Marketing & Growth",
-    icon: Rocket,
-    items: ["Campaigns", "Promo Codes", "Menu Offers", "Broadcast", "Marketing", "Pre-Launch"],
-  },
-  {
-    section: "Customers & Support",
-    icon: Users,
-    items: ["Customers", "Support", "Complaints", "Ratings"],
-  },
-  {
-    section: "Zone & Platform Config",
-    icon: Settings,
-    items: ["Zones", "Delivery Pricing", "Order Capacity", "Kitchen Health", "Missions", "Notifications", "Activity Log", "Team", "Systems", "Settings"],
-  },
-];
-
-// ─── Master Zone Selector (Top Bar Component) ───────────────────────────────────
-function ZoneMasterSwitcher({ onNavigateToZones }: { onNavigateToZones: () => void }) {
-  const { zones, selectedZoneId, selectedZone, setSelectedZoneId, loadingZones } = useAdminZone();
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(prev => !prev)}
-        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-sm ${
-          selectedZoneId === "ALL"
-            ? "bg-white/[0.04] border-white/10 hover:border-white/20 text-zinc-300 hover:text-white hover:bg-white/[0.08]"
-            : "bg-brand-primary/10 border-brand-primary/40 text-brand-primary hover:bg-brand-primary/20"
-        }`}
-      >
-        {selectedZoneId === "ALL" ? (
-          <>
-            <Globe className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="font-bold">All Operating Zones</span>
-          </>
-        ) : (
-          <>
-            <MapPin className="w-3.5 h-3.5 text-brand-primary" />
-            <span className="max-w-[140px] truncate font-extrabold">{selectedZone?.name || "Active Zone"}</span>
-            <span className="px-1.5 py-0.5 rounded-md bg-brand-primary/20 text-[9px] font-black uppercase tracking-wider">
-              ZONE
-            </span>
-          </>
-        )}
-        <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {/* Dropdown Menu */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.96 }}
-            transition={{ duration: 0.12 }}
-            className="absolute left-0 mt-2 w-72 rounded-2xl bg-[#0e0e18] border border-white/10 shadow-2xl p-2 z-50 backdrop-blur-xl"
-          >
-            <div className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center justify-between border-b border-white/[0.06] mb-1">
-              <span>Delivery Territory</span>
-              <span className="text-zinc-400">{zones.length} Zones registered</span>
-            </div>
-
-            <div className="max-h-60 overflow-y-auto space-y-1 py-1 scrollbar-hide">
-              {/* All Zones Option */}
-              <button
-                onClick={() => {
-                  setSelectedZoneId("ALL");
-                  setIsOpen(false);
-                  toast.info("Switched to Global View (All Zones)");
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                  selectedZoneId === "ALL"
-                    ? "bg-white/10 text-white font-black border border-white/10"
-                    : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Globe className="w-4 h-4 text-emerald-400" />
-                  <div className="text-left">
-                    <div className="text-white">All Zones (Global View)</div>
-                    <div className="text-[10px] text-zinc-500 font-normal">Aggregated across all locations</div>
-                  </div>
-                </div>
-                {selectedZoneId === "ALL" && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
-              </button>
-
-              <div className="h-px bg-white/[0.06] my-1" />
-
-              {/* Individual Zones */}
-              {zones.map((zone) => {
-                const isSelected = selectedZoneId === zone.id;
-                return (
-                  <button
-                    key={zone.id}
-                    onClick={() => {
-                      setSelectedZoneId(zone.id);
-                      setIsOpen(false);
-                      toast.success(`Active Zone: ${zone.name}`);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      isSelected
-                        ? "bg-brand-primary/15 text-brand-primary font-black border border-brand-primary/30"
-                        : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 text-left">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${zone.active !== false ? "bg-emerald-400" : "bg-zinc-600"}`} />
-                      <div>
-                        <div className="text-white font-bold truncate max-w-[170px]">{zone.name}</div>
-                        <div className="text-[10px] text-zinc-500 font-normal">
-                          {zone.delivery_radius_km ? `${zone.delivery_radius_km} km radius` : "Active Territory"}
-                        </div>
-                      </div>
-                    </div>
-                    {isSelected && <CheckCircle2 className="w-4 h-4 text-brand-primary shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Manage Zones Quick Link */}
-            <div className="pt-2 mt-1 border-t border-white/[0.06]">
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  onNavigateToZones();
-                }}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all"
-              >
-                <Plus className="w-3.5 h-3.5 text-brand-primary" />
-                <span>Manage Geofences & Slabs</span>
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function AdminPageInner() {
+export default function AdminPage() {
   const { user, loading, logout } = useAuth()!;
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("Overview");
@@ -2423,51 +2203,48 @@ function AdminPageInner() {
   return (
     <div className="h-screen w-full overflow-hidden bg-[#07070e] flex font-sans selection:bg-brand-primary/30 relative">
       {/* ── Sidebar ── */}
-      <aside className="w-[245px] bg-[#0a0a14] border-r border-white/[0.05] flex flex-col sticky top-0 h-screen z-20 shrink-0">
+      <aside className="w-[240px] bg-[#0a0a14] border-r border-white/[0.05] flex flex-col sticky top-0 h-screen z-20 shrink-0">
         {/* Logo */}
-        <div className="px-5 pt-6 pb-5">
+        <div className="px-5 pt-6 pb-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center shadow-lg shadow-brand-primary/20">
+            <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center">
               <Package className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <div className="text-lg font-black tracking-tight text-white leading-none">
-                2QT<span className="text-brand-primary">.</span>
-              </div>
-              <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">Command Center</div>
+            <div className="text-lg font-black tracking-tight text-white leading-none">
+              2QT<span className="text-brand-primary">.</span>
             </div>
           </div>
         </div>
 
         <div className="flex-1 px-3 overflow-y-auto pb-4 scrollbar-hide">
-          {SIDEBAR_HUBS.map(group => {
+          {[
+            { section: "Core",           items: ["Overview", "Analytics"] },
+            { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Deliveries", "Fleet", "Applications", "Rider Docs", "Rider Issues", "SOS Alerts"] },
+            { section: "Restaurants",    items: ["Restaurants", "Kitchens", "Partners", "Menu", "Categories", "Inventory"] },
+            { section: "Growth",         items: ["Broadcast", "Campaigns", "Promo Codes", "Menu Offers", "Marketing", "Pre-Launch"] },
+            { section: "Customers",      items: ["Customers", "Support", "Complaints"] },
+            { section: "Platform",       items: ["Zones", "Order Capacity", "Missions", "Delivery Pricing", "Kitchen Health", "Rider Payouts", "Notifications", "Activity Log", "Team", "Systems", "Settings"] },
+          ].map(group => {
             const visibleItems = sidebarSearch
               ? group.items.filter(n => n.toLowerCase().includes(sidebarSearch.toLowerCase()))
               : group.items;
             if (sidebarSearch && visibleItems.length === 0) return null;
             const isCollapsed = collapsedSections.has(group.section) && !sidebarSearch;
-            const GroupIcon = group.icon;
-
             return (
-              <div key={group.section} className="mt-4 first:mt-0">
+              <div key={group.section} className="mt-5 first:mt-0">
                 <button
                   onClick={() => setCollapsedSections(prev => {
                     const next = new Set(prev);
                     next.has(group.section) ? next.delete(group.section) : next.add(group.section);
                     return next;
                   })}
-                  className="w-full flex items-center justify-between px-3 py-1 mb-1 group rounded-lg hover:bg-white/[0.02] transition-colors"
+                  className="w-full flex items-center justify-between px-3 mb-1 group"
                 >
-                  <div className="flex items-center gap-2">
-                    <GroupIcon className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
-                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest group-hover:text-zinc-200 transition-colors">
-                      {group.section}
-                    </span>
-                  </div>
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest group-hover:text-zinc-400 transition-colors">{group.section}</span>
                   <ChevronRight className={`w-3 h-3 text-zinc-600 transition-transform duration-150 ${isCollapsed ? "" : "rotate-90"}`} />
                 </button>
                 {!isCollapsed && (
-                  <div className="space-y-0.5 pl-1">
+                  <div className="space-y-0.5">
                     {visibleItems.map(name => {
                       const tab = TABS.find(t => t.name === name);
                       if (!tab) return null;
@@ -2476,14 +2253,12 @@ function AdminPageInner() {
                         <button
                           key={name}
                           onClick={() => { setActiveTab(name); setSidebarSearch(""); }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all group ${
-                            isActive
-                              ? "bg-brand-primary text-white font-bold shadow-lg shadow-brand-primary/20"
-                              : "text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04]"
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
+                            isActive ? "bg-white/[0.08] text-white" : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]"
                           }`}
                         >
-                          <tab.icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-white" : "text-zinc-500 group-hover:text-zinc-300"}`} />
-                          <span className="flex-1 text-left truncate">{name}</span>
+                          <tab.icon className={`w-4 h-4 shrink-0 ${isActive ? "text-brand-primary" : "text-zinc-500 group-hover:text-zinc-400"}`} />
+                          <span className="flex-1 text-left">{name}</span>
                         </button>
                       );
                     })}
@@ -2496,23 +2271,22 @@ function AdminPageInner() {
           <div className="mt-5 pt-4 border-t border-white/[0.05] px-3">
             <button
               onClick={() => toast.info("Keyboard shortcuts modal coming soon!")}
-              className="w-full flex items-center justify-between py-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="w-full flex items-center justify-between py-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
             >
-              <span className="flex items-center gap-2"><Command className="w-3.5 h-3.5" /> Shortcuts</span>
+              <span className="flex items-center gap-2"><Command className="w-4 h-4" /> Shortcuts</span>
               <span className="text-[10px] bg-white/[0.05] px-1.5 py-0.5 rounded font-mono">⌘K</span>
             </button>
           </div>
         </div>
 
         {/* User Card */}
-        <div className="p-3.5 m-3 bg-[#11111a] border border-white/[0.05] rounded-2xl flex items-center justify-between group cursor-pointer hover:border-white/[0.1] transition-colors" onClick={() => { logout(); router.push("/"); }}>
-          <div className="flex items-center gap-2.5">
+        <div className="p-4 m-4 bg-[#11111a] border border-white/[0.05] rounded-2xl flex items-center justify-between group cursor-pointer hover:border-white/[0.1] transition-colors" onClick={() => { logout(); router.push("/"); }}>
+          <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center font-bold text-white text-xs">
               {user?.name?.[0] ?? "A"}
             </div>
             <div>
-              <div className="font-semibold text-xs text-white">{user?.name?.split(' ')[0] || 'Admin'}</div>
-              <div className="text-[10px] text-zinc-500 capitalize">{user?.role || 'Super Admin'}</div>
+              <div className="font-semibold text-sm text-white">{user?.name?.split(' ')[0] || 'Admin'}</div>
             </div>
           </div>
           <LogOut className="w-4 h-4 text-zinc-600 group-hover:text-red-400 transition-colors" />
@@ -2522,50 +2296,43 @@ function AdminPageInner() {
       {/* ── Main Content Area ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto scrollbar-hide">
         
-        {/* Top Header Bar with Zone Master Switcher */}
-        <header className="h-16 px-8 border-b border-white/[0.05] flex items-center justify-between bg-[#07070e]/80 backdrop-blur-md sticky top-0 z-10 shrink-0 gap-4">
-          
-          <div className="flex items-center gap-4 flex-1 max-w-xl">
-            {/* Master Zone Selector */}
-            <ZoneMasterSwitcher onNavigateToZones={() => setActiveTab("Zones")} />
-
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={sidebarSearch}
-                onChange={(e) => setSidebarSearch(e.target.value)}
-                placeholder="Search tabs, menu, fleet..."
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && sidebarSearch.trim()) {
-                    const match = TABS.find(t => t.name.toLowerCase().includes(sidebarSearch.toLowerCase()));
-                    if (match) { setActiveTab(match.name); setSidebarSearch(""); }
-                    else toast.info("No matching tab found");
-                  }
-                  if (e.key === 'Escape') setSidebarSearch("");
-                }}
-                className="w-full bg-[#11111a] border border-white/[0.05] rounded-xl pl-9 pr-10 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
-              />
-              {sidebarSearch ? (
-                <button onClick={() => setSidebarSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
-                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] bg-white/[0.05] rounded font-mono text-zinc-500 border border-white/[0.05]">⌘K</kbd>
-                </div>
-              )}
-            </div>
+        {/* Top Header Bar */}
+        <header className="h-16 px-8 border-b border-white/[0.05] flex items-center justify-between bg-[#07070e]/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
+          <div className="flex items-center w-full max-w-md relative">
+            <Search className="w-4 h-4 text-zinc-500 absolute left-3" />
+            <input
+              type="text"
+              value={sidebarSearch}
+              onChange={(e) => setSidebarSearch(e.target.value)}
+              placeholder="Search tabs..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && sidebarSearch.trim()) {
+                  const match = TABS.find(t => t.name.toLowerCase().includes(sidebarSearch.toLowerCase()));
+                  if (match) { setActiveTab(match.name); setSidebarSearch(""); }
+                  else toast.info("No matching tab found");
+                }
+                if (e.key === 'Escape') setSidebarSearch("");
+              }}
+              className="w-full bg-[#11111a] border border-white/[0.05] rounded-lg pl-10 pr-12 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white/20 transition-colors"
+            />
+            {sidebarSearch ? (
+              <button onClick={() => setSidebarSearch("")} className="absolute right-3 text-zinc-500 hover:text-white transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <div className="absolute right-3 flex gap-1">
+                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-white/[0.05] rounded font-mono text-zinc-500 border border-white/[0.05]">⌘</kbd>
+                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-white/[0.05] rounded font-mono text-zinc-500 border border-white/[0.05]">K</kbd>
+              </div>
+            )}
           </div>
-
           <div className="flex items-center gap-4">
             <button 
               onClick={() => toast.info("No new notifications")}
-              className="relative w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+              className="relative w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
             >
               <Bell className="w-4 h-4" />
-              <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border border-[#07070e]" />
+              <span className="absolute top-1 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-[#07070e]" />
             </button>
             <div className="w-px h-6 bg-white/[0.1]" />
             <div 
@@ -2573,12 +2340,11 @@ function AdminPageInner() {
                 toast.success("Logging out...");
                 setTimeout(() => { logout(); router.push("/"); }, 1000);
               }}
-              className="flex items-center gap-2.5 cursor-pointer hover:bg-white/[0.05] p-1.5 pr-3 rounded-xl transition-colors"
+              className="flex items-center gap-2 cursor-pointer hover:bg-white/[0.05] p-1 pr-2 rounded-full transition-colors"
             >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-xs">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-xs">
                 {user?.name?.[0] ?? "A"}
               </div>
-              <span className="text-xs font-semibold text-zinc-300 hidden md:inline">{user?.name?.split(' ')[0] || 'Admin'}</span>
               <ChevronDown className="w-3 h-3 text-zinc-500" />
             </div>
           </div>
@@ -2594,15 +2360,11 @@ function AdminPageInner() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             >
-              {activeTab === "Overview" ? (
-                <OverviewTab onNavigateTab={(tab) => setActiveTab(tab)} />
-              ) : activeTab === "Rider Docs" ? (
-                <RiderDocumentsTab onOpenRider={id => setOpenRiderId(id)} />
-              ) : activeTab === "Fleet" ? (
-                <FleetTab onOpenRider={id => setOpenRiderId(id)} />
-              ) : (
-                <ActiveComponent />
-              )}
+              {activeTab === "Rider Docs"
+                ? <RiderDocumentsTab onOpenRider={id => setOpenRiderId(id)} />
+                : activeTab === "Fleet"
+                ? <FleetTab onOpenRider={id => setOpenRiderId(id)} />
+                : <ActiveComponent />}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -2615,13 +2377,5 @@ function AdminPageInner() {
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-export default function AdminPage() {
-  return (
-    <AdminZoneProvider>
-      <AdminPageInner />
-    </AdminZoneProvider>
   );
 }
