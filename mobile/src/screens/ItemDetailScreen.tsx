@@ -371,7 +371,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
         bounces={false}
       >
         {/* ── Hero Media (Video + Multi-Photo Gallery) ── */}
-        <Animated.View entering={FadeIn.duration(tokens.motion.duration.normal)} style={[s.heroBox, { width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }]}>
+        <Animated.View entering={FadeIn.duration(tokens.motion.duration.normal)} style={[s.heroBox, { width: SCREEN_W, height: Math.round(SCREEN_W * (9 / 16)) }]}>
           {mediaList.length === 0 ? (
             <View style={[s.heroImg, s.heroPlaceholder]}>
               <Text allowFontScaling={false} style={s.heroEmoji}>🍽️</Text>
@@ -379,7 +379,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
           ) : mediaList.length === 1 && mediaList[0].type === 'IMAGE' ? (
             <NetworkImage uri={mediaList[0].url} style={s.heroImg} />
           ) : (
-            <View style={{ width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }}>
+            <View style={{ width: SCREEN_W, height: Math.round(SCREEN_W * (9 / 16)) }}>
               <FlatList
                 data={mediaList}
                 horizontal
@@ -391,14 +391,14 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
                   setActiveMediaIdx(newIdx);
                 }}
                 renderItem={({ item: media, index }) => (
-                  <View style={{ width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }}>
+                  <View style={{ width: SCREEN_W, height: Math.round(SCREEN_W * (9 / 16)) }}>
                     {media.type === 'VIDEO' ? (
                       <BannerMedia
                         videoUrl={media.url}
                         imageUrl={media.poster}
                         mediaType="VIDEO"
                         isActive={isScreenFocused && activeMediaIdx === index}
-                        style={{ width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }}
+                        style={{ width: SCREEN_W, height: Math.round(SCREEN_W * (9 / 16)) }}
                         borderRadius={0}
                       />
                     ) : (

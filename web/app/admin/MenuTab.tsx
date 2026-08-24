@@ -474,7 +474,7 @@ export function MenuTab() {
                           <>
                             <Camera className="w-8 h-8 text-zinc-500 mb-2" />
                             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Click to upload primary photo</span>
-                            <span className="text-[9px] text-zinc-500 mt-1">Best: <strong>1200 × 900 px (4:3)</strong> or <strong>1080 × 1080 px (1:1)</strong> · Max 10MB</span>
+                            <span className="text-[9px] text-zinc-500 mt-1">Best: <strong>16:9 Landscape (1920 × 1080 px)</strong> · Max 10MB</span>
                           </>
                         )}
                         <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
@@ -642,7 +642,7 @@ export function MenuTab() {
                         <>
                           <Camera className="w-5 h-5 text-emerald-400/70 mb-1" />
                           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">Add More Photos (Multi-select)</span>
-                          <span className="text-[9px] text-zinc-500 mt-0.5">Best: <strong>1200 × 900 px (4:3)</strong> · Multiple files supported</span>
+                          <span className="text-[9px] text-zinc-500 mt-0.5">Best: <strong>16:9 Landscape (1920 × 1080 px)</strong> · Multiple files supported</span>
                         </>
                       )}
                       <input
