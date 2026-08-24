@@ -16,46 +16,80 @@ export const CatPreviewCard = React.memo(({ mi, kitchenPaused, navigation, dispa
   });
   const vegColor = mi.is_egg ? tokens.colors.warning : (mi.is_veg ? tokens.colors.success : tokens.colors.danger);
   const unavailable = !mi.available || kitchenPaused;
+  const handleOpenDetail = () => {
+    navigation.navigate('ItemDetail', { item: mi });
+  };
+
   return (
-    <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      style={styles.catPreviewCard}
-      activeOpacity={0.92}
-      onPress={() => navigation.navigate('ItemDetail', { item: mi })}
-    >
+    <View style={styles.catPreviewCard}>
       <View style={styles.catPreviewImgBox}>
-        {mi.photo_url
-          ? <NetworkImage uri={mi.photo_url} style={styles.catPreviewImg} />
-          : <View style={[styles.catPreviewImg, styles.catPreviewImgPlaceholder]}><ChefHat size={30} color={tokens.colors.textTertiary} /></View>}
-        <View style={styles.catPreviewCatPill}>
-          <Text allowFontScaling={false} style={styles.catPreviewCatText} numberOfLines={1}>{mi.category}</Text>
-        </View>
-        {mi.is_bestseller && (
-          <View style={styles.catPreviewBestBadge}><Text allowFontScaling={false} style={styles.catPreviewBestText}>★ Bestseller</Text></View>
-        )}
-        {unavailable && (
-          <View style={styles.catPreviewSoldOut}><Text allowFontScaling={false} style={styles.catPreviewSoldOutText}>Sold Out</Text></View>
-        )}
+        <TouchableOpacity
+          style={{ width: '100%', height: '100%' }}
+          activeOpacity={0.92}
+          onPress={handleOpenDetail}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${mi.name}`}
+        >
+          {mi.photo_url
+            ? <NetworkImage uri={mi.photo_url} style={styles.catPreviewImg} />
+            : <View style={[styles.catPreviewImg, styles.catPreviewImgPlaceholder]}><ChefHat size={30} color={tokens.colors.textTertiary} /></View>}
+          <View style={styles.catPreviewCatPill}>
+            <Text allowFontScaling={false} style={styles.catPreviewCatText} numberOfLines={1}>{mi.category}</Text>
+          </View>
+          {mi.is_bestseller && (
+            <View style={styles.catPreviewBestBadge}><Text allowFontScaling={false} style={styles.catPreviewBestText}>★ Bestseller</Text></View>
+          )}
+          {unavailable && (
+            <View style={styles.catPreviewSoldOut}><Text allowFontScaling={false} style={styles.catPreviewSoldOutText}>Sold Out</Text></View>
+          )}
+        </TouchableOpacity>
+
         {!unavailable && (
           <View style={styles.catPreviewAddFloat}>
             {cartQty > 0 ? (
               <View style={styles.catPreviewQty}>
-                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartQty - 1 })); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }} activeOpacity={0.7}>
+                <TouchableOpacity
+                  onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartQty - 1 })); }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease quantity"
+                >
                   <Text allowFontScaling={false} style={styles.catPreviewQtyBtn}>−</Text>
                 </TouchableOpacity>
                 <Text allowFontScaling={false} style={styles.catPreviewQtyVal}>{cartQty}</Text>
-                <TouchableOpacity onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartQty + 1 })); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }} activeOpacity={0.7}>
+                <TouchableOpacity
+                  onPress={() => { triggerHaptic(); dispatch(setQuantity({ menuItemId: mi.id, quantity: cartQty + 1 })); }}
+                  hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Increase quantity"
+                >
                   <Text allowFontScaling={false} style={styles.catPreviewQtyBtn}>+</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.catPreviewAddBtn} onPress={() => onAddToCartWithCheck(mi)} activeOpacity={0.8}>
+              <TouchableOpacity
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.catPreviewAddBtn}
+                onPress={() => onAddToCartWithCheck(mi)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${mi.name} to cart`}
+              >
                 <Text allowFontScaling={false} style={styles.catPreviewAddText}>ADD</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
       </View>
-      <View style={styles.catPreviewInfo}>
+      <TouchableOpacity
+        style={styles.catPreviewInfo}
+        activeOpacity={0.92}
+        onPress={handleOpenDetail}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${mi.name}`}
+      >
         <View style={styles.catPreviewNameRow}>
           <View style={[styles.catPreviewVegBadge, { borderColor: vegColor }]}>
             <View style={[styles.catPreviewVegDot, { backgroundColor: vegColor }]} />
@@ -79,7 +113,7 @@ export const CatPreviewCard = React.memo(({ mi, kitchenPaused, navigation, dispa
             <Text allowFontScaling={false} style={styles.catPreviewStrikePrice}>₹{mi.original_price_paise / 100}</Text>
           )}
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 });

@@ -291,7 +291,16 @@ export function RiderPayoutsTab() {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-black text-white">{p.rider_name}</div>
+                  <div className="font-black text-white flex items-center gap-2">
+                    {p.rider_name}
+                    <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${
+                      p.payout_type === "salary_monthly" ? "bg-blue-500/10 text-blue-400"
+                      : p.payout_type === "withdrawal_request" ? "bg-amber-500/10 text-amber-400"
+                      : "bg-emerald-500/10 text-emerald-400"
+                    }`}>
+                      {p.payout_type === "salary_monthly" ? "Salary" : p.payout_type === "withdrawal_request" ? "Withdrawal" : "Gig"}
+                    </span>
+                  </div>
                   <div className="text-xs text-white/30">{p.rider_phone}</div>
                   <div className="text-xs text-white/30 mt-1">
                     {new Date(p.week_start).toLocaleDateString("en-IN")} → {new Date(p.week_end).toLocaleDateString("en-IN")}

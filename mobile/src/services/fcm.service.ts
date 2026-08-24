@@ -86,7 +86,7 @@ export class FCMService {
                 } catch (err: any) {
                     attempts++;
                     console.warn(`[FCMService] Device token registration attempt ${attempts} failed:`, err?.message || err);
-                    if (attempts < 3) await new Promise(r => setTimeout(r, 1500));
+                    if (attempts < 3) await new Promise<void>((res) => setTimeout(res, 1500));
                 }
             }
 

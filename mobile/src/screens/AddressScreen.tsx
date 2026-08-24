@@ -25,6 +25,7 @@ import { haptics } from '../utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useFeedback } from '../context/FeedbackContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 const AddressIcon = ({ label, serviceable }: { label: string; serviceable: boolean }) => {
   const color = serviceable ? tokens.colors.primary : tokens.colors.textTertiary;
@@ -38,7 +39,8 @@ const AddressScreen = ({ navigation, route }: any) => {
   const returnToCart = route?.params?.returnToCart;
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
-  const { showDialog } = useFeedback();
+  const { showDialog, showToast } = useFeedback();
+  const { isOnline } = useNetworkStatus();
   const insets = useSafeAreaInsets();
 
   const [searchVisible, setSearchVisible] = useState(false);
@@ -90,7 +92,11 @@ const AddressScreen = ({ navigation, route }: any) => {
   };
 
   const selectAddress = async (addr: any) => {
-    // Haptic now fires from ListItem's own `haptic="selection"` prop, not here.
+    if (!isOnline) {
+      haptics.warning();
+      showToast({ message: 'Connect to internet to verify delivery to this address.', type: 'info' });
+      return;
+    }
     setSelectingId(addr.id);
     const addrLocation = { latitude: addr.lat, longitude: addr.lng, addressText: addr.address_text };
     try {
@@ -122,6 +128,12 @@ const AddressScreen = ({ navigation, route }: any) => {
 
   const handleUseCurrentLocation = async () => {
     haptics.selection(); // a real, deliberate choice — not a plain nav tap
+
+    if (!isOnline) {
+      haptics.warning();
+      showToast({ message: 'Connect to internet to locate your address.', type: 'info' });
+      return;
+    }
 
     if (isFromCheckout) {
       // Redirect to map pin picker to enforce a real address entry for checkout

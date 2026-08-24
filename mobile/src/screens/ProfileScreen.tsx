@@ -28,7 +28,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFeedback } from '../context/FeedbackContext';
 import { RootState } from '../store';
-import { logout } from '../store/slices/authSlice';
+import { logout, updateUser } from '../store/slices/authSlice';
 import { disconnectSocket } from '../socket/client';
 import { api } from '../api/client';
 import { haptics } from '../utils/haptics';
@@ -89,6 +89,25 @@ const ProfileScreen = ({ navigation }: any) => {
     queryFn: () => api.get('/riders/stats'),
     enabled: isRider
   });
+
+  const { data: riderPayouts } = useQuery({
+    queryKey: ['rider-payouts-history'],
+    queryFn: () => api.get('/riders/payouts'),
+    enabled: isRider
+  });
+
+  // Keeps payment_model/salary/fuel-allowance fresh in redux even if a live
+  // socket push (fired when an admin edits the contract) was missed — every
+  // ProfileScreen focus refetches rider-stats, which carries these fields.
+  React.useEffect(() => {
+    if (isRider && riderStats?.payment_model) {
+      dispatch(updateUser({
+        payment_model: riderStats.payment_model,
+        monthly_salary_paise: riderStats.monthly_salary_paise,
+        fuel_allowance_per_km_paise: riderStats.fuel_allowance_per_km_paise,
+      }));
+    }
+  }, [isRider, riderStats?.payment_model, riderStats?.monthly_salary_paise, riderStats?.fuel_allowance_per_km_paise, dispatch]);
 
   useFocusEffect(
     useCallback(() => {
@@ -292,6 +311,17 @@ const ProfileScreen = ({ navigation }: any) => {
           <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.groupLabel}>{isRider ? 'Fleet Management' : 'Activity'}</Text>
           {isRider ? (
             <>
+              <MinimalListItem
+                icon={<CreditCard size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />}
+                title="Employment"
+                value={user?.payment_model === 'salary' ? 'Salaried' : 'Gig (Per Order)'}
+                subtitle={
+                  user?.payment_model === 'salary'
+                    ? `₹${((user?.monthly_salary_paise || 0) / 100).toFixed(0)}/mo + ₹${((user?.fuel_allowance_per_km_paise || 0) / 100).toFixed(1)}/km fuel${(riderPayouts?.pendingDeductionsPaise || 0) > 0 ? ` · -₹${((riderPayouts?.pendingDeductionsPaise || 0) / 100).toFixed(0)} pending deduction` : ''}`
+                    : 'You earn per delivery'
+                }
+                onPress={() => navigation.navigate('Payouts')}
+              />
               <MinimalListItem icon={<ShieldCheck size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Documents" onPress={() => navigation.navigate('RiderDocuments')} />
               <MinimalListItem icon={<Star size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Daily Missions" onPress={() => navigation.navigate('RiderMissions')} />
               <MinimalListItem icon={<BarChart2 size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Weekly Scorecard" subtitle="Your performance this week" onPress={() => navigation.navigate('RiderScorecard')} />

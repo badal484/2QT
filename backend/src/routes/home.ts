@@ -14,7 +14,7 @@ router.get('/feed', async (req, res) => {
         const [{ rows: banners }, { rows: collections }] = await Promise.all([
             // 1. Banners — uses partial index idx_banners_active_order
             query(
-                'SELECT id, image_url, destination_screen, destination_params, banner_type FROM promotional_banners WHERE is_active = true ORDER BY display_order ASC'
+                'SELECT id, image_url, video_url, media_type, destination_screen, destination_params, banner_type FROM promotional_banners WHERE is_active = true ORDER BY display_order ASC'
             ),
             // 2. Collections with items — single aggregated query, no N+1
             query(

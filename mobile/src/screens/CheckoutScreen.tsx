@@ -13,6 +13,7 @@ import { haptics } from '../utils/haptics';
 import { PressableScale } from '../components/ui/internal/PressableScale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFeedback } from '../context/FeedbackContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 const PulseLoader = () => {
   const scale = useSharedValue(0.8);
@@ -70,7 +71,8 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   const { featureLoyalty } = useSelector((state: RootState) => state.app);
   const appState = useRef(AppState.currentState);
   const insets = useSafeAreaInsets();
-  const { showDialog } = useFeedback();
+  const { showDialog, showToast } = useFeedback();
+  const { isOnline } = useNetworkStatus();
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
@@ -263,6 +265,11 @@ const CheckoutScreen = ({ navigation, route }: any) => {
   });
 
   const handlePlaceOrder = () => {
+    if (!isOnline) {
+      haptics.warning();
+      showToast({ message: 'Your cart is saved. Please connect to the internet to place your order.', type: 'info' });
+      return;
+    }
     haptics.impact(); // the one weighty confirmation on this screen — placing/paying for the order
     placeOrderMutation.mutate({
       items: cart.items,
@@ -468,11 +475,19 @@ const CheckoutScreen = ({ navigation, route }: any) => {
         </View>
         
         <PressableScale
-          style={styles.fabBtn}
-          disabled={placeOrderMutation.isPending || isFetching}
+          style={[styles.fabBtn, !isOnline && { backgroundColor: '#27272A' }]}
+          disabled={!isOnline || placeOrderMutation.isPending || isFetching}
           onPress={handlePlaceOrder}
           accessibilityRole="button"
-          accessibilityLabel={p.gatewayAmountPaise <= 0 ? 'Place Order' : (paymentSubMethod === 'cod' ? 'Place Order via Cash on Delivery' : 'Pay Now')}
+          accessibilityLabel={
+            !isOnline
+              ? 'Waiting for connection to place order'
+              : p.gatewayAmountPaise <= 0
+              ? 'Place Order'
+              : paymentSubMethod === 'cod'
+              ? 'Place Order via Cash on Delivery'
+              : 'Pay Now'
+          }
         >
           <View style={styles.fabBtnContent}>
             <View>
@@ -480,7 +495,14 @@ const CheckoutScreen = ({ navigation, route }: any) => {
               <Text allowFontScaling={false} style={styles.fabTotalValue}>₹{p.gatewayAmountPaise / 100}</Text>
             </View>
             <View style={styles.fabActionRow}>
-              {placeOrderMutation.isPending || isFetching ? (
+              {!isOnline ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#F59E0B', marginRight: 6 }} />
+                  <Text allowFontScaling={false} style={[styles.fabActionText, { fontSize: 13, color: '#E4E4E7' }]}>
+                    Waiting for connection...
+                  </Text>
+                </View>
+              ) : placeOrderMutation.isPending || isFetching ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <>

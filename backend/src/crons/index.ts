@@ -8,6 +8,7 @@ import {
     ensureKitchenFundAccount, ensureRiderFundAccount,
     firePayout, isAutoPayConfigured,
 } from '../services/razorpay-payout.service';
+import { payoutMonthlySalaryForRider } from '../services/rider-payout.service';
 import { processDueTriggerJobs, runDailyTriggers } from '../services/trigger.service';
 import { fireCampaignNotification } from '../routes/campaigns';
 
@@ -339,55 +340,11 @@ export const initCrons = () => {
 
         for (const rider of salariedRiders) {
             try {
-                const salaryPaise = parseInt(rider.monthly_salary_paise);
-                const deductions = parseInt(rider.pending_deductions);
-                const complaintDeduction = Math.min(deductions, salaryPaise);
-                const netPaise = Math.max(0, salaryPaise - complaintDeduction);
-
-                if (netPaise <= 0) {
+                const result = await payoutMonthlySalaryForRider(rider, today.substring(0, 7));
+                if (result.status === 'absorbed') {
                     console.log(`[CRON] Salaried Rider ${rider.name}: fully absorbed by deductions`);
-                    await query(
-                        `UPDATE users SET pending_deductions_paise = pending_deductions_paise - $1 WHERE id = $2`,
-                        [complaintDeduction, rider.id]
-                    );
-                    continue;
-                }
-
-                const mode = (isAutoPayConfigured() && rider.upi_id) ? 'auto' : 'manual';
-                const { rows: pr } = await query(`
-                    INSERT INTO weekly_payouts
-                      (rider_id, week_start, week_end, net_amount_paise,
-                       status, payout_mode, complaint_deduction_paise, upi_id)
-                    VALUES ($1, $2, $2, $3, 'processing', $4, $5, $6)
-                    RETURNING id
-                `, [rider.id, today, netPaise, mode, complaintDeduction, rider.upi_id || null]);
-                const payoutRowId = pr[0].id;
-
-                if (mode === 'auto') {
-                    const fundAccountId = await ensureRiderFundAccount(rider);
-                    const result = await firePayout(
-                        fundAccountId,
-                        netPaise,
-                        `2QT Salary ${today.substring(0,7)}`,
-                        `2QT-S-${rider.id.slice(0, 8)}-${today}`
-                    );
-                    await query(`
-                        UPDATE weekly_payouts
-                        SET status = 'paid', paid_at = NOW(),
-                            razorpay_payout_id = $1, utr_number = $2
-                        WHERE id = $3
-                    `, [result.payoutId, result.utr, payoutRowId]);
-                    console.log(`[CRON] Salaried Rider ${rider.name}: ₹${netPaise / 100} paid (${result.payoutId})`);
                 } else {
-                    await query(`UPDATE weekly_payouts SET status = 'pending' WHERE id = $1`, [payoutRowId]);
-                    console.log(`[CRON] Salaried Rider ${rider.name}: ₹${netPaise / 100} pending (no UPI stored)`);
-                }
-
-                if (complaintDeduction > 0) {
-                    await query(
-                        `UPDATE users SET pending_deductions_paise = pending_deductions_paise - $1 WHERE id = $2`,
-                        [complaintDeduction, rider.id]
-                    );
+                    console.log(`[CRON] Salaried Rider ${rider.name}: ₹${result.netPaise / 100} ${result.status}`);
                 }
             } catch (err: any) {
                 console.error(`[CRON_ERROR] Salaried rider payout failed for ${rider.name}:`, err.message);
@@ -446,8 +403,8 @@ export const initCrons = () => {
                 const { rows: pr } = await query(`
                     INSERT INTO weekly_payouts
                       (rider_id, week_start, week_end, net_amount_paise,
-                       status, payout_mode, complaint_deduction_paise, upi_id)
-                    VALUES ($1, $2, $2, $3, 'processing', $4, $5, $6)
+                       status, payout_mode, payout_type, complaint_deduction_paise, upi_id)
+                    VALUES ($1, $2, $2, $3, 'processing', $4, 'gig_daily', $5, $6)
                     RETURNING id
                 `, [rider.id, today, netPaise, mode, complaintDeduction, rider.upi_id || null]);
                 const payoutRowId = pr[0].id;

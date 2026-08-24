@@ -13,6 +13,8 @@ import {
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFeedback } from '../context/FeedbackContext';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 
 const R = {
   orange: '#FC4603', orangeLight: '#FFF0E8',
@@ -28,6 +30,8 @@ type PayoutTab = 'bank' | 'upi';
 const PayoutsScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
   const { showDialog } = useFeedback();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const isSalaried = user?.payment_model === 'salary';
   const [activeTab, setActiveTab] = useState<PayoutTab>('bank');
   const [editing, setEditing] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -59,7 +63,7 @@ const PayoutsScreen = ({ navigation }: any) => {
     onSuccess: () => {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
-      showDialog({ title: 'Bank Account Saved', message: 'Earnings will be transferred to your bank every Monday at 10 AM.', confirmText: 'Okay', type: 'success' });
+      showDialog({ title: 'Bank Account Saved', message: isSalaried ? 'Your fixed salary is transferred to your bank on the 1st of every month. Fuel allowance is paid out daily.' : 'Earnings will be transferred to your bank daily.', confirmText: 'Okay', type: 'success' });
     },
     onError: (err: any) => showDialog({ title: 'Error', message: err.response?.data?.error || err.message || 'Could not save bank account', confirmText: 'Okay', type: 'error' }),
   });
@@ -110,7 +114,7 @@ const PayoutsScreen = ({ navigation }: any) => {
     onSuccess: () => {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ['rider-payouts-history'] });
-      showDialog({ title: 'UPI Saved', message: 'Earnings will be transferred to your UPI every Monday at 10 AM.', confirmText: 'Okay', type: 'success' });
+      showDialog({ title: 'UPI Saved', message: isSalaried ? 'Your fixed salary is transferred to your UPI on the 1st of every month. Fuel allowance is paid out daily.' : 'Earnings will be transferred to your UPI daily.', confirmText: 'Okay', type: 'success' });
     },
     onError: (err: any) => showDialog({ title: 'Error', message: err.response?.data?.error || err.message || 'Could not save UPI', confirmText: 'Okay', type: 'error' }),
   });
@@ -216,8 +220,13 @@ const PayoutsScreen = ({ navigation }: any) => {
 
           {/* Balance card */}
           <View style={[styles.card, { paddingVertical: 24 }]}>
-            <Text style={styles.balLabel}>Available to Withdraw</Text>
+            <Text style={styles.balLabel}>{isSalaried ? 'Fuel Allowance Available' : 'Available to Withdraw'}</Text>
             <Text style={styles.balAmount}>₹{(withdrawablePaise / 100).toFixed(0)}</Text>
+            {isSalaried && (
+              <Text style={{ color: R.muted, fontSize: 11, textAlign: 'center', marginTop: 4, paddingHorizontal: 12 }}>
+                Your fixed monthly salary is paid separately on the 1st and isn't part of this balance.
+              </Text>
+            )}
 
             {inFlightPaise > 0 && (
               <View style={[styles.inFlightBanner]}>
@@ -299,7 +308,9 @@ const PayoutsScreen = ({ navigation }: any) => {
                 </View>
               )}
               <Text style={styles.scheduleText}>
-                {autoPayActive ? 'Next payout Monday, 10 AM' : 'Set a payout method below'}
+                {autoPayActive
+                  ? (isSalaried ? 'Salary paid on the 1st · fuel allowance paid daily' : 'Next payout tonight, 11:45 PM')
+                  : 'Set a payout method below'}
               </Text>
             </View>
           </View>
@@ -479,7 +490,7 @@ const PayoutsScreen = ({ navigation }: any) => {
             <View style={styles.emptyCard}>
               <Banknote size={32} color={R.border} />
               <Text style={styles.emptyText}>No payouts yet</Text>
-              <Text style={styles.emptyHint}>First payout runs Monday 10 AM</Text>
+              <Text style={styles.emptyHint}>{isSalaried ? 'Salary payout runs on the 1st of each month' : 'First payout runs tonight at 11:45 PM'}</Text>
             </View>
           ) : (
             <View style={styles.historyList}>

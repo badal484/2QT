@@ -10,7 +10,7 @@ import appReducer from './slices/appSlice';
 const persistConfig = {
   key: 'root',
   storage: reduxStorage,
-  whitelist: ['auth', 'cart'], // Never persist app state — zone must always be freshly detected on launch
+  whitelist: ['auth', 'cart', 'app'], // Persist app state so returning users boot instantly with cached zone
 };
 
 const rootReducer = combineReducers({
@@ -26,9 +26,8 @@ export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
-      },
+      immutableCheck: false,
+      serializableCheck: false,
     }),
 });
 

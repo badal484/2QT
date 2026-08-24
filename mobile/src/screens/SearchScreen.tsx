@@ -3,7 +3,7 @@ import { ArrowLeft, ChefHat, Flame, Search, SearchX, Utensils, X } from 'lucide-
 import React, { useState, useEffect, useMemo } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
 import { CustomVegToggle } from '../components/ui/internal/CustomVegToggle';
-import { View, Text, TextInput, FlatList, ActivityIndicator, StyleSheet, Platform, InteractionManager } from 'react-native';
+import { View, Text, TextInput, FlatList, ActivityIndicator, StyleSheet, Platform, InteractionManager, TouchableOpacity } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { NetworkImage } from '../components/NetworkImage';
 import { useQuery } from '@tanstack/react-query';
@@ -15,83 +15,105 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { enrichItemsWithOffers } from '../utils/menuOfferUtils';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 /** Search result row — subscribes to its own cart quantity so only it re-renders on cart change */
 const SearchResultCard = React.memo(({ item, dispatch, navigation, saveSearch, query }: any) => {
   const cartQty = useSelector((state: RootState) => {
-    const ci = state.cart.items.find(i => i.menuItemId === item.id);
+    const ci = state.cart.items.find(ci => ci.menuItemId === item.id);
     return ci?.quantity ?? 0;
   });
   const hasOffer = !!item.applied_offer && item.original_price_paise > item.price_paise;
 
+  const handleOpenDetail = () => {
+    saveSearch(query);
+    navigation.navigate('ItemDetail', { item });
+  };
+
   return (
-    <PressableScale
-      onPress={() => { saveSearch(query); navigation.navigate('ItemDetail', { item }); }}
-      style={styles.itemCard}
-      accessibilityRole="button"
-      accessibilityLabel={`View details for ${item.name}`}
-    >
-      <View style={styles.itemImageWrapper}>
-        {item.photo_url
-          ? <NetworkImage uri={item.photo_url} style={styles.itemImage} fallbackText={item.name[0]} />
-          : <View style={styles.itemPlaceholder}><ChefHat size={32} color={tokens.colors.primary} /></View>}
-        {hasOffer && !!item.discount_badge && (
-          <View style={styles.imageOfferBadge}>
-            <Text allowFontScaling={false} style={styles.imageOfferBadgeText}>{item.discount_badge}</Text>
+    <View style={styles.itemCard}>
+      <PressableScale
+        onPress={handleOpenDetail}
+        style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}
+        accessibilityRole="button"
+        accessibilityLabel={`View details for ${item.name}`}
+      >
+        <View style={styles.itemImageWrapper}>
+          {item.photo_url
+            ? <NetworkImage uri={item.photo_url} style={styles.itemImage} fallbackText={item.name[0]} />
+            : <View style={styles.itemPlaceholder}><ChefHat size={32} color={tokens.colors.primary} /></View>}
+          {hasOffer && !!item.discount_badge && (
+            <View style={styles.imageOfferBadge}>
+              <Text allowFontScaling={false} style={styles.imageOfferBadgeText}>{item.discount_badge}</Text>
+            </View>
+          )}
+        </View>
+        <View style={[styles.itemDetails, { flex: 1 }]}>
+          <View style={{ flex: 1 }}>
+            <View style={styles.itemNameRow}>
+              <View style={[styles.vegIndicator, { borderColor: item.is_veg ? tokens.colors.success : tokens.colors.danger }]}>
+                <View style={[styles.vegDot, { backgroundColor: item.is_veg ? tokens.colors.success : tokens.colors.danger }]} />
+              </View>
+              <Text allowFontScaling={false} style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+            </View>
+            {!!item.description && (
+              <Text allowFontScaling={false} style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
+            )}
+            {item.is_bestseller && (
+              <View style={styles.tagRow}>
+                <Flame size={12} color={tokens.colors.primary} fill={tokens.colors.primary} />
+                <Text allowFontScaling={false} style={styles.tagBestsellerText}>Bestseller</Text>
+              </View>
+            )}
           </View>
+        </View>
+      </PressableScale>
+
+      <View style={styles.itemRightCol}>
+        {hasOffer ? (
+          <View style={{ alignItems: 'flex-end', marginBottom: 4 }}>
+            <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
+            <Text allowFontScaling={false} style={styles.strikethroughPrice}>₹{item.original_price_paise / 100}</Text>
+          </View>
+        ) : (
+          <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
+        )}
+        {cartQty > 0 ? (
+          <View style={styles.quantityControl}>
+            <TouchableOpacity
+              activeOpacity={0.6}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
+              onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty - 1 }))}
+              accessibilityRole="button"
+              accessibilityLabel="Decrease quantity"
+            >
+              <Text allowFontScaling={false} style={styles.quantityBtnText}>−</Text>
+            </TouchableOpacity>
+            <Text allowFontScaling={false} style={styles.quantityValueText}>{cartQty}</Text>
+            <TouchableOpacity
+              activeOpacity={0.6}
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+              onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty + 1 }))}
+              accessibilityRole="button"
+              accessibilityLabel="Increase quantity"
+            >
+              <Text allowFontScaling={false} style={styles.quantityBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.addButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => dispatch(addItem({ menuItemId: item.id, name: item.name, pricePaise: item.price_paise, quantity: 1, photoUrl: item.photo_url, isVeg: item.is_veg, kitchenId: item.kitchen_id }))}
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${item.name} to cart`}
+          >
+            <Text allowFontScaling={false} style={styles.addButtonText}>Add</Text>
+          </TouchableOpacity>
         )}
       </View>
-      <View style={styles.itemDetails}>
-        <View style={{ flex: 1 }}>
-          <View style={styles.itemNameRow}>
-            <View style={[styles.vegIndicator, { borderColor: item.is_veg ? tokens.colors.success : tokens.colors.danger }]}>
-              <View style={[styles.vegDot, { backgroundColor: item.is_veg ? tokens.colors.success : tokens.colors.danger }]} />
-            </View>
-            <Text allowFontScaling={false} style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-          </View>
-          {!!item.description && (
-            <Text allowFontScaling={false} style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
-          )}
-          {item.is_bestseller && (
-            <View style={styles.tagRow}>
-              <Flame size={12} color={tokens.colors.primary} fill={tokens.colors.primary} />
-              <Text allowFontScaling={false} style={styles.tagBestsellerText}>Bestseller</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.itemRightCol}>
-          {hasOffer ? (
-            <View style={{ alignItems: 'flex-end', marginBottom: 4 }}>
-              <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
-              <Text allowFontScaling={false} style={styles.strikethroughPrice}>₹{item.original_price_paise / 100}</Text>
-            </View>
-          ) : (
-            <Text allowFontScaling={false} style={styles.itemPrice}>₹{item.price_paise / 100}</Text>
-          )}
-          {cartQty > 0 ? (
-            <View style={styles.quantityControl}>
-              <PressableScale hitSlop={8} onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty - 1 }))} accessibilityRole="button" accessibilityLabel="Decrease quantity">
-                <Text allowFontScaling={false} style={styles.quantityBtnText}>−</Text>
-              </PressableScale>
-              <Text allowFontScaling={false} style={styles.quantityValueText}>{cartQty}</Text>
-              <PressableScale hitSlop={8} onPress={() => dispatch(setQuantity({ menuItemId: item.id, quantity: cartQty + 1 }))} accessibilityRole="button" accessibilityLabel="Increase quantity">
-                <Text allowFontScaling={false} style={styles.quantityBtnText}>+</Text>
-              </PressableScale>
-            </View>
-          ) : (
-            <PressableScale
-              style={styles.addButton}
-              hitSlop={8}
-              onPress={() => dispatch(addItem({ menuItemId: item.id, name: item.name, pricePaise: item.price_paise, quantity: 1, photoUrl: item.photo_url, isVeg: item.is_veg, kitchenId: item.kitchen_id }))}
-              accessibilityRole="button"
-              accessibilityLabel={`Add ${item.name} to cart`}
-            >
-              <Text allowFontScaling={false} style={styles.addButtonText}>Add</Text>
-            </PressableScale>
-          )}
-        </View>
-      </View>
-    </PressableScale>
+    </View>
   );
 });
 
@@ -103,7 +125,8 @@ const SearchScreen = ({ navigation }: any) => {
   const [searchFocused, setSearchFocused] = useState(false);
   const { zoneId, items: cartItems } = useSelector((state: RootState) => state.cart);
   const { user } = useSelector((state: RootState) => state.auth);
-  const location = useSelector((state: RootState) => (state as any).location); // Using any cast in case location type isn't globally typed on RootState yet
+  const location = useSelector((state: RootState) => (state as any).location);
+  const { isOnline } = useNetworkStatus();
   const totalCartQty = useMemo(() => cartItems.reduce((sum, i) => sum + i.quantity, 0), [cartItems]);
   const cartTotal = useMemo(() => cartItems.reduce((sum, i) => sum + (i.pricePaise / 100) * i.quantity, 0), [cartItems]);
   const dispatch = useDispatch();
@@ -214,10 +237,18 @@ const SearchScreen = ({ navigation }: any) => {
           </View>
         </PressableScale>
 
-        <View style={[styles.filterRow, { justifyContent: 'flex-end', marginTop: 8 }]}>
-            {!isLoading && query.trim().length > 0 && (
-              <Text allowFontScaling={false} style={styles.resultCount}>{filteredResults.length} item{filteredResults.length === 1 ? '' : 's'} found</Text>
-            )}
+        <View style={[styles.filterRow, { justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }]}>
+          {!isOnline ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#F59E0B', marginRight: 5 }} />
+              <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: tokens.typography.family.medium, color: '#F59E0B' }}>
+                Searching saved dishes (Offline)
+              </Text>
+            </View>
+          ) : <View />}
+          {!isLoading && query.trim().length > 0 && (
+            <Text allowFontScaling={false} style={styles.resultCount}>{filteredResults.length} item{filteredResults.length === 1 ? '' : 's'} found</Text>
+          )}
         </View>
       </View>
 

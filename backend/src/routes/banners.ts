@@ -34,14 +34,14 @@ router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (r
 
 // CREATE new banner (admin)
 router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
-    const { title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type, slide_duration_ms } = req.body;
+    const { title, subtitle, tag_text, image_url, video_url, media_type, action_type, action_payload, is_active, display_order, banner_type, slide_duration_ms } = req.body;
     try {
         const { rows } = await query(
             `INSERT INTO promotional_banners
-            (title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type, slide_duration_ms)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            (title, subtitle, tag_text, image_url, video_url, media_type, action_type, action_payload, is_active, display_order, banner_type, slide_duration_ms)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *`,
-            [title, subtitle, tag_text, image_url, action_type || 'NONE', action_payload || '', is_active ?? true, display_order ?? 0, banner_type || 'MAIN', slide_duration_ms ?? 3000]
+            [title, subtitle, tag_text, image_url, video_url || null, media_type || 'IMAGE', action_type || 'NONE', action_payload || '', is_active ?? true, display_order ?? 0, banner_type || 'MAIN', slide_duration_ms ?? 3000]
         );
         emitToAll('banner_updated', { action: 'create', bannerId: rows[0].id });
         res.status(201).json({ banner: rows[0] });
@@ -54,7 +54,7 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
 // UPDATE banner (admin)
 router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
     const { id } = req.params;
-    const { title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type, slide_duration_ms } = req.body;
+    const { title, subtitle, tag_text, image_url, video_url, media_type, action_type, action_payload, is_active, display_order, banner_type, slide_duration_ms } = req.body;
     try {
         const { rows } = await query(
             `UPDATE promotional_banners
@@ -62,16 +62,18 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
                  subtitle = COALESCE($2, subtitle),
                  tag_text = COALESCE($3, tag_text),
                  image_url = COALESCE($4, image_url),
-                 action_type = COALESCE($5, action_type),
-                 action_payload = COALESCE($6, action_payload),
-                 is_active = COALESCE($7, is_active),
-                 display_order = COALESCE($8, display_order),
-                 banner_type = COALESCE($9, banner_type),
-                 slide_duration_ms = COALESCE($10, slide_duration_ms),
+                 video_url = COALESCE($5, video_url),
+                 media_type = COALESCE($6, media_type),
+                 action_type = COALESCE($7, action_type),
+                 action_payload = COALESCE($8, action_payload),
+                 is_active = COALESCE($9, is_active),
+                 display_order = COALESCE($10, display_order),
+                 banner_type = COALESCE($11, banner_type),
+                 slide_duration_ms = COALESCE($12, slide_duration_ms),
                  updated_at = NOW()
-             WHERE id = $11
+             WHERE id = $13
              RETURNING *`,
-            [title, subtitle, tag_text, image_url, action_type, action_payload, is_active, display_order, banner_type, slide_duration_ms, id]
+            [title, subtitle, tag_text, image_url, video_url, media_type, action_type, action_payload, is_active, display_order, banner_type, slide_duration_ms, id]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Banner not found' });
         emitToAll('banner_updated', { action: 'update', bannerId: id });
