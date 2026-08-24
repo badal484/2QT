@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
-import { DollarSign, Bike, MapPin, Plus, Trash2, ChevronRight, Calculator, Zap } from "lucide-react";
+import { DollarSign, Bike, MapPin, Plus, Trash2, ChevronRight, Calculator, Zap, Globe } from "lucide-react";
+import { useAdminZone } from "./AdminZoneContext";
 
 export function DeliveryPricingTab() {
+  const { selectedZoneId, selectedZone: globalActiveZone } = useAdminZone();
   const [zones, setZones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
@@ -16,6 +18,12 @@ export function DeliveryPricingTab() {
   // Tiers state per zone
   const [tiers, setTiers] = useState<Record<string, any[]>>({});
   const [tierForm, setTierForm] = useState<Record<string, { from: string; to: string; fee: string }>>({});
+
+  const visibleZones = useMemo(() => {
+    if (selectedZoneId === "ALL") return zones;
+    const filtered = zones.filter(z => z.id === selectedZoneId);
+    return filtered.length > 0 ? filtered : zones;
+  }, [zones, selectedZoneId]);
 
   // Live fee calculator
   const [calcCart, setCalcCart] = useState("200");
@@ -172,8 +180,19 @@ export function DeliveryPricingTab() {
     <div>
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-black tracking-tighter text-white mb-2">Delivery Pricing</h2>
-          <p className="text-zinc-400 text-sm font-medium">Flat / per-km fees, surge, minimum order, small order fee, and delivery fee tiers per zone.</p>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-4xl font-black tracking-tighter text-white">Delivery Pricing</h2>
+            {selectedZoneId !== "ALL" && globalActiveZone && (
+              <span className="px-2.5 py-1 rounded-full bg-brand-primary/20 text-brand-primary border border-brand-primary/30 text-xs font-black uppercase">
+                📍 {globalActiveZone.name}
+              </span>
+            )}
+          </div>
+          <p className="text-zinc-400 text-sm font-medium">
+            {selectedZoneId === "ALL"
+              ? "Flat / per-km fees, surge, minimum order, small order fee, and delivery fee tiers across all zones."
+              : `Configuring delivery fee slabs, surge rates, and minimum order rules for ${globalActiveZone?.name || 'this zone'}.`}
+          </p>
         </div>
       </div>
 
@@ -181,7 +200,7 @@ export function DeliveryPricingTab() {
         <div className="space-y-4">{[1, 2].map(i => <div key={i} className="h-32 bg-white/[0.04] rounded-2xl animate-pulse" />)}</div>
       ) : (
         <div className="space-y-6">
-          {zones.map(zone => {
+          {visibleZones.map(zone => {
             const zoneTiers = tiers[zone.id] ?? [];
             const tf = tierForm[zone.id] || { from: "", to: "", fee: "" };
             const isEditing = editing === zone.id;

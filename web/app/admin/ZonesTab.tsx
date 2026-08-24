@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, MapPin } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
 import dynamic from "next/dynamic";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { useAdminZone } from "./AdminZoneContext";
 
 const MapPolygonPicker = dynamic(() => import("../../components/MapPolygonPicker"), { ssr: false });
 
@@ -19,6 +20,7 @@ const EMPTY_ZONE = {
 };
 
 export function ZonesTab() {
+  const { reloadZones } = useAdminZone();
   const [zones, setZones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export function ZonesTab() {
       setShowAdd(false);
       setAddForm({ ...EMPTY_ZONE });
       load();
+      reloadZones();
       toast.success("Zone created!");
     } catch (err: any) {
       toast.error(err.message || "Failed to create zone");
@@ -100,6 +103,7 @@ export function ZonesTab() {
       });
       setEditing(null);
       load();
+      reloadZones();
       toast.success("Zone saved!");
     } catch (err: any) {
       toast.error(err.message || "Failed to save zone");
@@ -113,6 +117,7 @@ export function ZonesTab() {
       await api.delete(`/admin/zones/${id}`);
       toast.success("Zone deleted");
       load();
+      reloadZones();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete zone");
     }
