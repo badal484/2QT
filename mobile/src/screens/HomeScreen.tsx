@@ -144,8 +144,8 @@ const HomeScreen = ({ navigation }: any) => {
   const { data: bannersData } = useQuery({
     queryKey: ['banners'],
     queryFn: () => api.get('/banners'),
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 30 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
   const banners = bannersData?.banners || [];
   const mainBanners = banners.filter((b: any) => !b.banner_type || b.banner_type === 'MAIN');
@@ -216,53 +216,49 @@ const HomeScreen = ({ navigation }: any) => {
   const mainBannersRef = useRef(mainBanners);
   mainBannersRef.current = mainBanners;
 
+  // Jump to the middle instantly on mount
   useEffect(() => {
-    if (infiniteBanners.length <= 1) return;
-
-    // Jump to the middle instantly on mount
-    if (!hasInitializedBanner.current) {
-      setTimeout(() => {
+    if (infiniteBanners.length > 1 && !hasInitializedBanner.current) {
+      const timer = setTimeout(() => {
         try {
           bannerListRef.current?.scrollToIndex({ index: bannerIndexRef.current, animated: false });
           hasInitializedBanner.current = true;
         } catch (e) {}
       }, 100);
+      return () => clearTimeout(timer);
     }
-
-    let timeoutId: ReturnType<typeof setTimeout>;
-
-    const advance = () => {
-      const banners = mainBannersRef.current;
-      // Admin-configurable per-banner auto-slide duration (falls back to 3000ms)
-      const currentBanner = banners[bannerIndexRef.current % banners.length];
-      const duration = currentBanner?.slide_duration_ms ?? 3000;
-
-      timeoutId = setTimeout(() => {
-        if (!bannerListRef.current || infiniteBanners.length === 0) return;
-
-        // If we somehow go out of bounds, silently reset to the middle
-        if (bannerIndexRef.current >= infiniteBanners.length - 1) {
-          bannerIndexRef.current = Math.floor(infiniteBanners.length / 2);
-          try { bannerListRef.current.scrollToIndex({ index: bannerIndexRef.current, animated: false }); } catch(e) {}
-        } else {
-          bannerIndexRef.current += 1;
-          try {
-            bannerListRef.current.scrollToIndex({
-              index: bannerIndexRef.current,
-              animated: true,
-            });
-          } catch (e) {
-            // Suppress out of range errors
-          }
-        }
-        setActiveBannerDot(bannerIndexRef.current % mainBannersRef.current.length);
-        advance();
-      }, duration);
-    };
-
-    advance();
-    return () => clearTimeout(timeoutId);
   }, [infiniteBanners.length]);
+
+  // Per-banner auto-slide timer respecting exact configured duration
+  useEffect(() => {
+    if (mainBanners.length <= 1) return;
+
+    const currentBanner = mainBanners[activeBannerDot % mainBanners.length];
+    const duration = (currentBanner?.slide_duration_ms && currentBanner.slide_duration_ms >= 1000)
+      ? currentBanner.slide_duration_ms
+      : 3000;
+
+    const timer = setTimeout(() => {
+      if (!bannerListRef.current || infiniteBanners.length === 0) return;
+
+      let nextIndex = bannerIndexRef.current + 1;
+      if (nextIndex >= infiniteBanners.length) {
+        nextIndex = Math.floor(infiniteBanners.length / 2);
+        try {
+          bannerListRef.current.scrollToIndex({ index: nextIndex, animated: false });
+        } catch {}
+      } else {
+        try {
+          bannerListRef.current.scrollToIndex({ index: nextIndex, animated: true });
+        } catch {}
+      }
+
+      bannerIndexRef.current = nextIndex;
+      setActiveBannerDot(nextIndex % mainBanners.length);
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [activeBannerDot, mainBanners, infiniteBanners.length]);
 
   const enrichedItems = useMemo(() => {
     if (!menuData?.items) return [];
