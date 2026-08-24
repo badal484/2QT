@@ -22,10 +22,27 @@ buildscript {
 
 apply plugin: "com.facebook.react.rootproject"
 
-
+ext {
+    media3Version = "1.4.1"
+    RNVideo_media3Version = "1.4.1"
+}
 
 allprojects {
     configurations.all {
         exclude group: "com.google.android.play", module: "core-common"
+        resolutionStrategy {
+            force "androidx.media3:media3-exoplayer:1.4.1"
+            force "androidx.media3:media3-common:1.4.1"
+            force "androidx.media3:media3-ui:1.4.1"
+            force "androidx.media3:media3-session:1.4.1"
+            force "androidx.media3:media3-datasource:1.4.1"
+            force "androidx.media3:media3-extractor:1.4.1"
+            force "androidx.media3:media3-database:1.4.1"
+            force "androidx.media3:media3-decoder:1.4.1"
+            force "androidx.media3:media3-exoplayer-smoothstreaming:1.4.1"
+            force "androidx.media3:media3-exoplayer-dash:1.4.1"
+            force "androidx.media3:media3-exoplayer-hls:1.4.1"
+            force "androidx.media3:media3-exoplayer-rtsp:1.4.1"
+        }
     }
 }
