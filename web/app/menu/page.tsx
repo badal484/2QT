@@ -37,6 +37,8 @@ interface MenuItem {
   category: string;
   available: boolean;
   photo_url?: string;
+  images?: string[];
+  video_url?: string;
   is_veg?: boolean;
   zone_id?: string;
 }
@@ -107,6 +109,7 @@ export default function MenuPage() {
   const [serviceable, setServiceable] = useState<boolean | null>(null);
   const [payMethod, setPayMethod] = useState<"online" | "cod">("online");
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [selectedMediaIdx, setSelectedMediaIdx] = useState(0);
   const [customizationItem, setCustomizationItem] = useState<MenuItem | null>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [useLoyalty, setUseLoyalty] = useState(false);
@@ -1474,20 +1477,77 @@ export default function MenuPage() {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed bottom-0 md:bottom-auto md:top-1/2 left-0 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:max-w-2xl z-[210] bg-white md:rounded-[32px] rounded-t-[32px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="relative w-full aspect-video bg-black/5">
-                <Image
-                  src={getDishImage(selectedItem.name, selectedItem.category, selectedItem.photo_url)}
-                  alt={selectedItem.name}
-                  fill
-                  className="object-cover"
-                />
-                <button 
-                  onClick={() => setSelectedItem(null)} 
-                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center shadow-lg hover:bg-white transition-colors"
-                >
-                  <X className="w-5 h-5 text-brand-dark" />
-                </button>
-              </div>
+              {(() => {
+                const list: Array<{ type: 'VIDEO' | 'IMAGE'; url: string }> = [];
+                if (selectedItem.video_url) {
+                  list.push({ type: 'VIDEO', url: selectedItem.video_url });
+                }
+                const cover = getDishImage(selectedItem.name, selectedItem.category, selectedItem.photo_url);
+                if (cover) {
+                  list.push({ type: 'IMAGE', url: cover });
+                }
+                if (Array.isArray(selectedItem.images)) {
+                  selectedItem.images.forEach(img => {
+                    if (img && img !== cover) {
+                      list.push({ type: 'IMAGE', url: img });
+                    }
+                  });
+                }
+                const currentMedia = list[selectedMediaIdx] || list[0] || { type: 'IMAGE', url: cover };
+
+                return (
+                  <div className="relative w-full aspect-video bg-black">
+                    {currentMedia.type === 'VIDEO' ? (
+                      <video
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        controls
+                        src={currentMedia.url}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Image
+                        src={currentMedia.url}
+                        alt={selectedItem.name}
+                        fill
+                        className="object-cover"
+                      />
+                    )}
+
+                    <button 
+                      onClick={() => setSelectedItem(null)} 
+                      className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center shadow-lg hover:bg-white transition-colors z-20"
+                    >
+                      <X className="w-5 h-5 text-brand-dark" />
+                    </button>
+
+                    {/* Media Thumbnails Strip */}
+                    {list.length > 1 && (
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 overflow-x-auto p-1.5 rounded-2xl bg-black/60 backdrop-blur-md z-20">
+                        {list.map((media, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedMediaIdx(idx)}
+                            className={`relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
+                              selectedMediaIdx === idx ? 'border-brand-primary ring-2 ring-brand-primary/40 scale-105' : 'border-white/30 opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            {media.type === 'VIDEO' ? (
+                              <div className="w-full h-full bg-purple-900 flex items-center justify-center text-white text-xs font-bold">
+                                ▶
+                              </div>
+                            ) : (
+                              <img src={media.url} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               
               <div className="p-6 md:p-8 overflow-y-auto">
                 <div className="flex justify-between items-start gap-4 mb-4">

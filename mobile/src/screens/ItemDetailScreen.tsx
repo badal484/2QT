@@ -1,10 +1,9 @@
 import { tokens } from '../theme/tokens';
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { useNavigation } from '@react-navigation/native';
-import { StackActions } from '@react-navigation/native';
+import { useNavigation, useIsFocused, StackActions } from '@react-navigation/native';
 import {
   View, Text, ScrollView, StyleSheet,
-  StatusBar, useWindowDimensions, Image, Share, TouchableOpacity
+  StatusBar, useWindowDimensions, Image, Share, TouchableOpacity, FlatList
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
@@ -12,6 +11,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Share2 } from 'lucide-react-native';
 import { NetworkImage } from '../components/NetworkImage';
+import { BannerMedia } from '../components/BannerMedia';
 import { CustomizationBottomSheet } from '../components/ui/CustomizationBottomSheet';
 import { RootState, store } from '../store';
 import { addItem, setQuantity, clearCart } from '../store/slices/cartSlice';
@@ -314,6 +314,41 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
   }, [qty, priceScale]);
   const pricePulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: priceScale.value }] }));
 
+  const isScreenFocused = useIsFocused();
+  const [activeMediaIdx, setActiveMediaIdx] = useState(0);
+
+  const mediaList = useMemo(() => {
+    const list: Array<{ type: 'VIDEO' | 'IMAGE'; url: string; poster?: string }> = [];
+    const video = enrichedItem.video_url || item.video_url;
+    const cover = enrichedItem.photo_url || item.photo_url;
+    const additionalImages = enrichedItem.images || item.images;
+
+    if (video) {
+      list.push({
+        type: 'VIDEO',
+        url: video,
+        poster: cover || undefined,
+      });
+    }
+    if (cover) {
+      list.push({
+        type: 'IMAGE',
+        url: cover,
+      });
+    }
+    if (Array.isArray(additionalImages)) {
+      additionalImages.forEach((imgUrl: string) => {
+        if (imgUrl && imgUrl !== cover) {
+          list.push({
+            type: 'IMAGE',
+            url: imgUrl,
+          });
+        }
+      });
+    }
+    return list;
+  }, [enrichedItem.video_url, enrichedItem.photo_url, enrichedItem.images, item.video_url, item.photo_url, item.images]);
+
   return (
     <View style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
@@ -335,13 +370,70 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
         contentContainerStyle={{ paddingBottom: 160 + insets.bottom }}
         bounces={false}
       >
-        {/* ── Hero image ── */}
+        {/* ── Hero Media (Video + Multi-Photo Gallery) ── */}
         <Animated.View entering={FadeIn.duration(tokens.motion.duration.normal)} style={[s.heroBox, { width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }]}>
-          {item.photo_url ? (
-            <NetworkImage uri={item.photo_url} style={s.heroImg} />
-          ) : (
+          {mediaList.length === 0 ? (
             <View style={[s.heroImg, s.heroPlaceholder]}>
               <Text allowFontScaling={false} style={s.heroEmoji}>🍽️</Text>
+            </View>
+          ) : mediaList.length === 1 && mediaList[0].type === 'IMAGE' ? (
+            <NetworkImage uri={mediaList[0].url} style={s.heroImg} />
+          ) : (
+            <View style={{ width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }}>
+              <FlatList
+                data={mediaList}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(_, idx) => String(idx)}
+                onMomentumScrollEnd={(ev) => {
+                  const newIdx = Math.round(ev.nativeEvent.contentOffset.x / SCREEN_W);
+                  setActiveMediaIdx(newIdx);
+                }}
+                renderItem={({ item: media, index }) => (
+                  <View style={{ width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }}>
+                    {media.type === 'VIDEO' ? (
+                      <BannerMedia
+                        videoUrl={media.url}
+                        imageUrl={media.poster}
+                        mediaType="VIDEO"
+                        isActive={isScreenFocused && activeMediaIdx === index}
+                        style={{ width: SCREEN_W, height: Math.round(SCREEN_W * 0.82) }}
+                        borderRadius={0}
+                      />
+                    ) : (
+                      <NetworkImage uri={media.url} style={s.heroImg} />
+                    )}
+                  </View>
+                )}
+              />
+
+              {/* Gallery Counter Pill */}
+              {mediaList.length > 1 && (
+                <View style={s.mediaCounterPill}>
+                  {mediaList[activeMediaIdx]?.type === 'VIDEO' && (
+                    <Text allowFontScaling={false} style={s.videoBadgeText}>▶ </Text>
+                  )}
+                  <Text allowFontScaling={false} style={s.mediaCounterText}>
+                    {activeMediaIdx + 1} / {mediaList.length}
+                  </Text>
+                </View>
+              )}
+
+              {/* Dots indicator */}
+              {mediaList.length > 1 && (
+                <View style={s.mediaDotsRow}>
+                  {mediaList.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        s.mediaDot,
+                        i === activeMediaIdx && s.mediaDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
           )}
         </Animated.View>
@@ -982,6 +1074,50 @@ const s = StyleSheet.create({
     fontFamily: tokens.typography.family.bold,
     color: '#9E9E9E',
     letterSpacing: 0.3,
+  },
+  mediaCounterPill: {
+    position: 'absolute',
+    bottom: 36,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  videoBadgeText: {
+    fontSize: 11,
+    color: '#C084FC',
+    fontFamily: tokens.typography.family.extrabold,
+  },
+  mediaCounterText: {
+    fontSize: 11,
+    fontFamily: tokens.typography.family.bold,
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
+  mediaDotsRow: {
+    position: 'absolute',
+    bottom: 38,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    zIndex: 10,
+  },
+  mediaDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+  },
+  mediaDotActive: {
+    width: 18,
+    backgroundColor: '#FFF',
   },
 });
 

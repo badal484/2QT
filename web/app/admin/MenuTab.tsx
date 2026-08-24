@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Utensils, Plus, CheckCircle2, Camera, Edit3, XCircle, ImagePlus } from "lucide-react";
+import { Search, Utensils, Plus, CheckCircle2, Camera, Edit3, XCircle, ImagePlus, Video, Film, Trash2, Star, Sparkles, UploadCloud } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -24,6 +24,10 @@ export function MenuTab() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingOptionImage, setUploadingOptionImage] = useState<{gIdx: number, oIdx: number} | null>(null);
   const [imageUrl, setImageUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
   const [modalZoneId, setModalZoneId] = useState<string>("");
   const [modalCategories, setModalCategories] = useState<string[]>([]);
@@ -33,6 +37,8 @@ export function MenuTab() {
   useEffect(() => {
     if (showAddModal) {
       setImageUrl(editingItem?.photo_url || "");
+      setVideoUrl(editingItem?.video_url || "");
+      setGalleryImages(Array.isArray(editingItem?.images) ? editingItem.images : []);
       const zoneId = editingItem?.zone_id || (selectedZone !== "All" ? selectedZone : zones[0]?.id || "");
       setModalZoneId(zoneId);
       setCustomizationGroups(editingItem?.customization_groups || []);
@@ -126,6 +132,16 @@ export function MenuTab() {
         >
           {/* Photo */}
           <div className="relative aspect-[4/3] bg-zinc-900">
+            {item.video_url && (
+              <div className="absolute top-3 right-3 z-10 px-2 py-0.5 rounded-full bg-purple-600/90 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-lg backdrop-blur-sm">
+                <Video className="w-2.5 h-2.5" /> Video
+              </div>
+            )}
+            {Array.isArray(item.images) && item.images.length > 0 && (
+              <div className="absolute top-3 left-3 z-10 px-2 py-0.5 rounded-full bg-black/70 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-lg backdrop-blur-sm border border-white/10">
+                +{item.images.length} photos
+              </div>
+            )}
             {item.photo_url ? (
               <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
             ) : (
@@ -404,6 +420,8 @@ export function MenuTab() {
                       price_paise: Math.round(parseFloat(formData.get("price") as string) * 100),
                       station: formData.get("station"),
                       photo_url: imageUrl,
+                      images: galleryImages,
+                      video_url: videoUrl || null,
                       is_veg: formData.get("dietary_type") === "veg",
                       is_egg: formData.get("dietary_type") === "egg",
                       is_bestseller: formData.get("is_bestseller") === "on",
@@ -434,7 +452,7 @@ export function MenuTab() {
                   {/* Image upload */}
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-3 block">
-                      Dish Photo <span className="text-red-400">*</span>
+                      Primary Cover Photo <span className="text-red-400">*</span>
                     </label>
                     {imageUrl ? (
                       <div className="relative w-full h-48 rounded-2xl overflow-hidden border border-white/10 group">
@@ -455,7 +473,7 @@ export function MenuTab() {
                         ) : (
                           <>
                             <Camera className="w-8 h-8 text-zinc-500 mb-2" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Click to upload photo</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Click to upload primary photo</span>
                             <span className="text-[9px] text-zinc-600 mt-1">JPG, PNG, WEBP · Max 10MB</span>
                           </>
                         )}
@@ -463,14 +481,8 @@ export function MenuTab() {
                           if (!e.target.files?.[0]) return;
                           setUploadingImage(true);
                           try {
-                            const fData = new FormData();
-                            fData.append("image", e.target.files[0]);
-                            const res = await api.request("/admin/menu/upload", {
-                              method: "POST",
-                              body: fData,
-                            });
-                            const data = res;
-                            if (data.url) setImageUrl(data.url);
+                            const res = await api.uploadImage(e.target.files[0]);
+                            if (res?.url) setImageUrl(res.url);
                             else throw new Error("No URL returned from server");
                           } catch (err: any) {
                             console.error("Image upload error:", err);
@@ -481,6 +493,186 @@ export function MenuTab() {
                         }} />
                       </label>
                     )}
+                  </div>
+
+                  {/* Dish Video Clip (Autoplay & Looping) */}
+                  <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Video className="w-4 h-4 text-purple-400" />
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-300">
+                          Dish Video Clip <span className="text-zinc-500 font-normal">(Optional · Autoplays in dish view)</span>
+                        </label>
+                      </div>
+                      {videoUrl && (
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                          VIDEO ACTIVE
+                        </span>
+                      )}
+                    </div>
+
+                    {videoUrl ? (
+                      <div className="relative w-full h-48 rounded-xl overflow-hidden border border-white/10 group bg-black/60">
+                        <video autoPlay loop muted playsInline src={videoUrl} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
+                          <label className="px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white font-bold text-[11px] cursor-pointer transition-all">
+                            Replace Video
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="video/mp4,video/webm,video/quicktime"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setUploadingVideo(true);
+                                try {
+                                  const res = await api.uploadVideo(file);
+                                  if (res?.url) setVideoUrl(res.url);
+                                  toast.success("Video uploaded!");
+                                } catch (err: any) {
+                                  toast.error(`Video upload error: ${err.message || 'Failed'}`);
+                                } finally {
+                                  setUploadingVideo(false);
+                                }
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setVideoUrl("")}
+                            className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-[11px] transition-all flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className={`w-full h-28 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${uploadingVideo ? "border-purple-500/50 bg-purple-500/5" : "border-white/10 hover:border-purple-400/40 hover:bg-purple-500/5 bg-white/[0.01]"}`}>
+                        {uploadingVideo ? (
+                          <>
+                            <div className="w-6 h-6 rounded-full border-2 border-purple-400 border-t-transparent animate-spin mb-2" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Uploading Video…</span>
+                          </>
+                        ) : (
+                          <>
+                            <Film className="w-6 h-6 text-purple-400/70 mb-1.5" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">Click to upload food video</span>
+                            <span className="text-[9px] text-zinc-500 mt-0.5">MP4, WebM, MOV · Max 100MB</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="video/mp4,video/webm,video/quicktime"
+                          disabled={uploadingVideo}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingVideo(true);
+                            try {
+                              const res = await api.uploadVideo(file);
+                              if (res?.url) {
+                                setVideoUrl(res.url);
+                                toast.success("Food video uploaded!");
+                              }
+                            } catch (err: any) {
+                              toast.error(`Video upload error: ${err.message || 'Failed'}`);
+                            } finally {
+                              setUploadingVideo(false);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Additional Gallery Photos */}
+                  <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <ImagePlus className="w-4 h-4 text-emerald-400" />
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-300">
+                          Additional Gallery Photos <span className="text-zinc-500 font-normal">({galleryImages.length} uploaded)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Gallery Thumbnails Grid */}
+                    {galleryImages.length > 0 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-3">
+                        {galleryImages.map((img, idx) => (
+                          <div key={idx} className="relative group rounded-xl overflow-hidden border border-white/10 aspect-square bg-black/40">
+                            <img src={img} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-1.5 p-1">
+                              <button
+                                type="button"
+                                title="Set as primary cover"
+                                onClick={() => {
+                                  const oldCover = imageUrl;
+                                  setImageUrl(img);
+                                  setGalleryImages(prev => prev.map((item, i) => i === idx ? oldCover : item).filter(Boolean));
+                                  toast.success("Set as primary cover image");
+                                }}
+                                className="px-2 py-1 rounded bg-amber-500/80 hover:bg-amber-500 text-white font-bold text-[9px] uppercase tracking-wider flex items-center gap-1"
+                              >
+                                <Star className="w-3 h-3" /> Make Cover
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete image"
+                                onClick={() => setGalleryImages(prev => prev.filter((_, i) => i !== idx))}
+                                className="px-2 py-1 rounded bg-red-500/80 hover:bg-red-500 text-white font-bold text-[9px] uppercase tracking-wider flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3" /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Upload More Photos Dropzone */}
+                    <label className={`w-full h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${uploadingGallery ? "border-emerald-500/50 bg-emerald-500/5" : "border-white/10 hover:border-emerald-400/40 hover:bg-emerald-500/5 bg-white/[0.01]"}`}>
+                      {uploadingGallery ? (
+                        <>
+                          <div className="w-6 h-6 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin mb-2" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Uploading photos…</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-5 h-5 text-emerald-400/70 mb-1" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">Add More Photos (Multi-select)</span>
+                          <span className="text-[9px] text-zinc-500 mt-0.5">JPG, PNG, WEBP · Multiple files supported</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        accept="image/*"
+                        disabled={uploadingGallery}
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length === 0) return;
+                          setUploadingGallery(true);
+                          try {
+                            const newUrls: string[] = [];
+                            for (const file of files) {
+                              const res = await api.uploadImage(file);
+                              if (res?.url) newUrls.push(res.url);
+                            }
+                            if (newUrls.length > 0) {
+                              setGalleryImages(prev => [...prev, ...newUrls]);
+                              toast.success(`Added ${newUrls.length} photo${newUrls.length > 1 ? 's' : ''}`);
+                            }
+                          } catch (err: any) {
+                            toast.error(`Gallery upload error: ${err.message || 'Failed'}`);
+                          } finally {
+                            setUploadingGallery(false);
+                          }
+                        }}
+                      />
+                    </label>
                   </div>
 
                   {/* Zone Selector */}
