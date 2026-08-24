@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Plus, X, Trash2, MapPin, Globe } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, X, Trash2, MapPin } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
 import dynamic from "next/dynamic";
 import { api } from "../lib/api";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
-import { useAdminZone } from "./AdminZoneContext";
 
 const MapPicker = dynamic(() => import("../../components/MapPicker"), {
   ssr: false,
@@ -20,7 +19,6 @@ const MapPicker = dynamic(() => import("../../components/MapPicker"), {
 });
 
 export function KitchensTab() {
-  const { selectedZoneId, selectedZone: globalActiveZone } = useAdminZone();
   const [kitchens, setKitchens] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,36 +138,15 @@ export function KitchensTab() {
       ? [Number(fallbackLat), Number(fallbackLng)]
       : undefined;
 
-  const visibleKitchens = useMemo(() => {
-    if (selectedZoneId === "ALL") return kitchens;
-    return kitchens.filter(k => {
-      if (k.zones && k.zones.some((z: any) => z.id === selectedZoneId)) return true;
-      if (k.zone_ids && k.zone_ids.includes(selectedZoneId)) return true;
-      if (k.zone_id === selectedZoneId) return true;
-      return false;
-    });
-  }, [kitchens, selectedZoneId]);
-
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-4xl font-black tracking-tighter text-white">Kitchens</h2>
-            {selectedZoneId !== "ALL" && globalActiveZone && (
-              <span className="px-2.5 py-1 rounded-full bg-brand-primary/20 text-brand-primary border border-brand-primary/30 text-xs font-black uppercase">
-                📍 {globalActiveZone.name}
-              </span>
-            )}
-          </div>
-          <p className="text-zinc-400 text-sm font-medium">
-            {selectedZoneId === "ALL" 
-              ? "Manage all physical kitchen locations across all zones." 
-              : `Showing kitchens serving ${globalActiveZone?.name || 'this zone'}.`}
-          </p>
+          <h2 className="text-4xl font-black tracking-tighter text-white mb-2">Kitchens</h2>
+          <p className="text-zinc-400 text-sm font-medium">Manage physical kitchen locations and chefs.</p>
         </div>
         {!adding && !editing && (
-          <button onClick={() => { setForm({ zone_ids: selectedZoneId !== "ALL" ? [selectedZoneId] : [] }); setAdding(true); }}
+          <button onClick={() => { setForm({}); setAdding(true); }}
             className="bg-brand-primary text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-dark flex items-center gap-2 shadow-lg shadow-brand-primary/30">
             <Plus className="w-4 h-4" /> New Kitchen
           </button>
@@ -203,7 +180,7 @@ export function KitchensTab() {
                         }}
                         className="w-4 h-4 rounded accent-brand-primary"
                       />
-                      <span className="text-xs font-bold">{z.name}</span>
+                      <span className="text-sm font-bold truncate">{z.name}</span>
                     </label>
                   );
                 })}
@@ -211,15 +188,15 @@ export function KitchensTab() {
             </div>
             {field("Kitchen Name", "name")}
             {field("FSSAI License", "fssai_license")}
-            {field("Contact Phone", "phone")}
-            {field("Full Address", "address")}
+            {field("GSTIN", "gstin")}
+            {field("Address", "address")}
           </div>
 
           {/* Kitchen Location Picker & Coords */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
-                <MapPin className="w-3 h-3" /> Kitchen Location Pin (Drag to Position)
+                <MapPin className="w-3 h-3" /> Kitchen Location
               </div>
               {form.lat && form.lng && (
                 <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded-lg border border-white/10">
@@ -273,16 +250,7 @@ export function KitchensTab() {
         </div>
       ) : (
         <div className="space-y-4">
-          {visibleKitchens.length === 0 && (
-            <div className="p-12 text-center bg-white/[0.02] rounded-2xl border border-white/5">
-              <MapPin className="w-8 h-8 text-zinc-600 mx-auto mb-3" />
-              <div className="text-sm font-bold text-zinc-300">No kitchens found for this zone</div>
-              <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
-                No active kitchen is currently assigned to this zone. Click &quot;New Kitchen&quot; to assign one.
-              </p>
-            </div>
-          )}
-          {visibleKitchens.map(k => (
+          {kitchens.map(k => (
             <div key={k.id} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
               <div className="flex items-center justify-between p-5 border-b border-white/5">
                 <div className="flex items-center gap-3">

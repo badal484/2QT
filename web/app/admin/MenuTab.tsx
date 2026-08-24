@@ -2,16 +2,14 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Utensils, Plus, CheckCircle2, Camera, Edit3, XCircle, ImagePlus, Video, Film, Trash2, Star, Sparkles, UploadCloud, MapPin } from "lucide-react";
+import { Search, Utensils, Plus, CheckCircle2, Camera, Edit3, XCircle, ImagePlus, Video, Film, Trash2, Star, Sparkles, UploadCloud } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { SkeletonList } from "../components/ui/Skeleton";
-import { useAdminZone } from "./AdminZoneContext";
 
 export function MenuTab() {
-  const { selectedZoneId, setSelectedZoneId } = useAdminZone();
   const [items, setItems] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
   const [selectedZone, setSelectedZone] = useState<string>("All");
@@ -21,15 +19,6 @@ export function MenuTab() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  // Synchronize with global zone selection
-  useEffect(() => {
-    if (selectedZoneId === "ALL") {
-      setSelectedZone("All");
-    } else if (selectedZoneId) {
-      setSelectedZone(selectedZoneId);
-    }
-  }, [selectedZoneId]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -318,15 +307,11 @@ export function MenuTab() {
           {/* Zone Selector */}
           <select 
             value={selectedZone} 
-            onChange={(e) => {
-              const val = e.target.value;
-              setSelectedZone(val);
-              setSelectedZoneId(val === "All" ? "ALL" : val);
-            }}
+            onChange={(e) => setSelectedZone(e.target.value)}
             className="px-4 py-2.5 rounded-xl bg-white/[0.03] backdrop-blur-2xl border border-white/10 text-sm font-bold text-white focus:outline-none focus:ring-2 ring-swish-green/20 appearance-none min-w-[160px]"
           >
-            <option value="All" className="bg-zinc-900">🌐 All Zones</option>
-            {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">📍 {z.name}</option>)}
+            <option value="All" className="bg-zinc-900">All Zones</option>
+            {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">{z.name}</option>)}
           </select>
 
           <div className="relative">
