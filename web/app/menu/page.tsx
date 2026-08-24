@@ -18,6 +18,7 @@ import { NotificationBell } from "../../components/NotificationBell";
 import { useHaptics } from "../../hooks/useHaptics";
 import { Toaster, toast } from "sonner";
 import { CustomizationModal } from "../components/CustomizationModal";
+import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const MapPicker = dynamic(() => import('../../components/MapPicker'), { 
   ssr: false, 
@@ -315,11 +316,21 @@ export default function MenuPage() {
     }
   }, []);
 
+  useSocketRefresh(["banner_updated", "promo_updated"], () => {
+    api.get("/banners").then(res => {
+      if (res?.banners) setBanners(res.banners);
+    }).catch(() => {});
+  });
+
   useEffect(() => {
-    if (banners.length <= 1) return;
-    const duration = banners[currentBannerIndex]?.slide_duration_ms ?? 5000;
+    const activeBanners = banners.filter((b: any) => !b.banner_type || b.banner_type === 'MAIN');
+    if (activeBanners.length <= 1) return;
+    const currentBanner = activeBanners[currentBannerIndex % activeBanners.length];
+    const duration = (currentBanner?.slide_duration_ms && currentBanner.slide_duration_ms >= 1000)
+      ? currentBanner.slide_duration_ms
+      : 3000;
     const timeout = setTimeout(() => {
-      setCurrentBannerIndex(prev => (prev + 1) % banners.length);
+      setCurrentBannerIndex(prev => (prev + 1) % activeBanners.length);
     }, duration);
     return () => clearTimeout(timeout);
   }, [banners, currentBannerIndex]);
