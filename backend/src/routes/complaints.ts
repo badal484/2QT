@@ -86,8 +86,29 @@ router.get('/mine', authenticate, async (req: AuthRequest, res) => {
 
 // GET /complaints/admin — all complaints for admin review
 router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
-    const { status } = req.query;
+    const { status, zoneId, kitchenId } = req.query;
     try {
+        const conditions: string[] = [];
+        const params: any[] = [];
+        let p = 1;
+
+        if (status) {
+            conditions.push(`c.status = $${p}`);
+            params.push(status);
+            p++;
+        }
+        if (kitchenId) {
+            conditions.push(`o.kitchen_id = $${p}`);
+            params.push(kitchenId);
+            p++;
+        } else if (zoneId) {
+            conditions.push(`o.kitchen_id IN (SELECT id FROM kitchens WHERE zone_id = $${p})`);
+            params.push(zoneId);
+            p++;
+        }
+
+        const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
         const { rows } = await query(
             `SELECT c.*,
                     o.display_id, o.total_amount_paise, o.payment_method,
@@ -98,9 +119,9 @@ router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (r
              JOIN orders o ON o.id = c.order_id
              JOIN users cu ON cu.id = c.customer_id
              LEFT JOIN users r ON r.id = c.rider_id
-             WHERE ($1::text IS NULL OR c.status = $1)
+             ${where}
              ORDER BY c.created_at DESC`,
-            [status || null]
+            params
         );
         res.json({ complaints: rows });
     } catch (err: any) {
