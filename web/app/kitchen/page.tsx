@@ -348,8 +348,66 @@ export default function KitchenPage() {
   }, [user, authLoading, router]);
 
 
-  const lastWebAlertTimeRef = useRef<number>(0);
+  const fetchOrders = useCallback(async () => {
+    try {
+      const data = await api.get("/kitchen/orders");
+      setOrders(data.orders || []);
+      if (data.kitchen_name) {
+        setKitchenName(data.kitchen_name);
+      } else if (data.orders && data.orders.length > 0 && data.orders[0].kitchen_name) {
+        setKitchenName(data.orders[0].kitchen_name);
+      }
+      setError(null);
+    } catch {
+      setError("Could not reach kitchen server.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  // Unlock audio on first user gesture to bypass browser autoplay policies
+  useEffect(() => {
+    // Create a global audio element if it doesn't exist
+    let audioEl = document.getElementById('kds-alert-audio') as HTMLAudioElement;
+    if (!audioEl) {
+      audioEl = document.createElement('audio');
+      audioEl.id = 'kds-alert-audio';
+      audioEl.src = '/alert.mp3';
+      audioEl.preload = 'auto';
+      document.body.appendChild(audioEl);
+    }
+
+    const unlock = async () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx && !(window as any)._kdsAudioCtx) {
+          (window as any)._kdsAudioCtx = new AudioCtx();
+        }
+        if ((window as any)._kdsAudioCtx && (window as any)._kdsAudioCtx.state === 'suspended') {
+          await (window as any)._kdsAudioCtx.resume();
+        }
+        setSoundEnabled(true);
+
+        const el = document.getElementById('kds-alert-audio') as HTMLAudioElement;
+        if (el) {
+          const playPromise = el.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              el.pause();
+              el.currentTime = 0;
+            }).catch(() => {});
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('click', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
   const getGlobalAudioContext = useCallback(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -366,10 +424,6 @@ export default function KitchenPage() {
   }, []);
 
   const playKitchenAlert = useCallback(async () => {
-    const nowTs = Date.now();
-    if (nowTs - lastWebAlertTimeRef.current < 3000) return;
-    lastWebAlertTimeRef.current = nowTs;
-
     setSoundEnabled(true);
     // 1. Web Audio Frequency-Sweep Sawtooth Siren (await resume if suspended)
     try {
@@ -416,81 +470,6 @@ export default function KitchenPage() {
       }
     } catch {}
   }, [getGlobalAudioContext]);
-
-  const prevConfirmedRef = useRef<number>(-1);
-
-  const fetchOrders = useCallback(async () => {
-    try {
-      const data = await api.get("/kitchen/orders");
-      const fetchedOrders: Order[] = data.orders || [];
-      const confirmedCount = fetchedOrders.filter(o => o.status === "confirmed").length;
-
-      if (prevConfirmedRef.current !== -1 && confirmedCount > prevConfirmedRef.current) {
-        playKitchenAlert();
-      }
-      prevConfirmedRef.current = confirmedCount;
-
-      setOrders(fetchedOrders);
-      if (data.kitchen_name) {
-        setKitchenName(data.kitchen_name);
-      } else if (fetchedOrders.length > 0 && fetchedOrders[0].kitchen_name) {
-        setKitchenName(fetchedOrders[0].kitchen_name);
-      }
-      setError(null);
-    } catch {
-      setError("Could not reach kitchen server.");
-    } finally {
-      setLoading(false);
-    }
-  }, [playKitchenAlert]);
-
-  // Unlock audio on first user gesture to bypass browser autoplay policies
-  useEffect(() => {
-    // Create a global audio element if it doesn't exist
-    let audioEl = document.getElementById('kds-alert-audio') as HTMLAudioElement;
-    if (!audioEl) {
-      audioEl = document.createElement('audio');
-      audioEl.id = 'kds-alert-audio';
-      audioEl.src = '/alert.mp3';
-      audioEl.preload = 'auto';
-      document.body.appendChild(audioEl);
-    }
-
-    const unlock = async () => {
-      try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx && !(window as any)._kdsAudioCtx) {
-          (window as any)._kdsAudioCtx = new AudioCtx();
-        }
-        if ((window as any)._kdsAudioCtx && (window as any)._kdsAudioCtx.state === 'suspended') {
-          await (window as any)._kdsAudioCtx.resume();
-        }
-        setSoundEnabled(true);
-
-        const el = document.getElementById('kds-alert-audio') as HTMLAudioElement;
-        if (el) {
-          const playPromise = el.play();
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              el.pause();
-              el.currentTime = 0;
-            }).catch(() => {});
-          }
-        }
-      } catch (e) {}
-    };
-
-    window.addEventListener('click', unlock, { once: true });
-    window.addEventListener('touchstart', unlock, { once: true });
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    return () => {
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('touchstart', unlock);
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-    };
-  }, []);
 
   useEffect(() => {
     fetchOrders();
@@ -916,27 +895,6 @@ export default function KitchenPage() {
           )}
         </div>
       </header>
-
-      {/* ── Audio activation banner (shown until browser audio is unlocked by user interaction) ── */}
-      {!soundEnabled && (
-        <div
-          onClick={() => {
-            playKitchenAlert();
-            toast.success("Sound Alerts Active 🔔", { description: "Kitchen sound tested and enabled for all incoming orders." });
-          }}
-          className="bg-amber-500/20 border-b border-amber-500/30 text-amber-300 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4 cursor-pointer hover:bg-amber-500/30 transition-all shrink-0 z-40"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Volume2 className="w-5 h-5 text-amber-400 shrink-0 animate-bounce" />
-            <p className="text-xs sm:text-sm font-bold truncate">
-              Audio alerts waiting for browser activation. Tap or click anywhere on screen to enable live order sound alerts!
-            </p>
-          </div>
-          <button className="shrink-0 bg-amber-400 text-black text-xs font-black uppercase tracking-widest px-3 py-1 rounded-md shadow-md">
-            Enable Audio 🔔
-          </button>
-        </div>
-      )}
 
       {/* ── Layer 2: Persistent banner (shows on every tab except Dispatch) ── */}
       {needsManualAssignment && view !== "dispatch" && (

@@ -1,6 +1,6 @@
 import { tokens } from '../theme/tokens';
 import React, { useEffect, useState } from 'react';
-import { playKitchenAlert, stopKitchenAlert } from '../utils/kitchenAlert';
+import { playKitchenAlert } from '../utils/kitchenAlert';
 import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, StatusBar, StyleSheet, Alert, RefreshControl
@@ -102,10 +102,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
 
   const claimMutation = useMutation({
     mutationFn: (orderId: string) => api.post(`/kitchen/orders/${orderId}/claim`, {}),
-    onSuccess: () => {
-      stopKitchenAlert();
-      queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kitchen-orders'] }),
     onError: (err: any) => {
       const msg = err.response?.status === 403
           ? 'Your account role cannot claim orders. Ask your kitchen manager.'
@@ -155,22 +152,15 @@ const KitchenBoardScreen = ({ navigation }: any) => {
       showDialog({ title: 'Rider Arrived', message: `${data.riderName || 'Rider'} is at the kitchen for order pickup.`, confirmText: 'Okay', type: 'info' });
     };
 
-    const handleConnect = () => {
-      const s = getSocket();
-      if (s) s.emit('join_kitchen', user?.kitchenId || 'kitchen_all');
-      onOrderUpdate();
-    };
-
     const attach = (socket: ReturnType<typeof getSocket>) => {
       if (!socket) return;
-      socket.emit('join_kitchen', user?.kitchenId || 'kitchen_all');
       socket.on('new_order', onNewOrder);
       socket.on('order_updated', onOrderUpdate);
       socket.on('table_order', onDineInUpdate);
       socket.on('table_booking_updated', onDineInUpdate);
       socket.on('rider_arrived', onRiderArrived);
-      // Re-fetch and rejoin room on reconnect (handles backend restart + network recovery)
-      socket.on('connect', handleConnect);
+      // Re-fetch on reconnect (handles backend restart + network recovery)
+      socket.on('connect', onOrderUpdate);
     };
 
     const detach = (socket: ReturnType<typeof getSocket>) => {
@@ -180,7 +170,7 @@ const KitchenBoardScreen = ({ navigation }: any) => {
       socket.off('table_order', onDineInUpdate);
       socket.off('table_booking_updated', onDineInUpdate);
       socket.off('rider_arrived', onRiderArrived);
-      socket.off('connect', handleConnect);
+      socket.off('connect', onOrderUpdate);
     };
 
     let attachedSocket: ReturnType<typeof getSocket> = null;
