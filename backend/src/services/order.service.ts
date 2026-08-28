@@ -334,22 +334,6 @@ export async function finalizeOrder(gatewayOrderId: string, paymentMethod: strin
 
         emitToKitchen(newOrder.kitchen_id, 'new_order', { orderId: newOrder.id, displayId: newOrder.display_id, kitchenId: newOrder.kitchen_id });
 
-        // Notify kitchen staff via FCM push notification so devices ring even in background
-        if (newOrder.kitchen_id) {
-            query("SELECT id FROM users WHERE kitchen_id = $1 AND role IN ('chef', 'kitchen_manager', 'packer', 'super_admin')", [newOrder.kitchen_id])
-                .then(({ rows: staffRows }) => {
-                    staffRows.forEach(staff => {
-                        NotificationService.send('kitchen_new_order', {
-                            userId: staff.id,
-                            orderId: newOrder.id,
-                            displayId: newOrder.display_id,
-                            kitchenId: newOrder.kitchen_id,
-                        }).catch(() => {});
-                    });
-                })
-                .catch(() => {});
-        }
-
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'auto_dispatch_enabled'");
         const autoDispatchEnabled = settings[0]?.value === 'true';
         if (!autoDispatchEnabled) {

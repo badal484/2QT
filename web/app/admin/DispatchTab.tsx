@@ -32,10 +32,7 @@ function rupees(paise: number) {
   return "₹" + (paise / 100).toFixed(0);
 }
 
-import { useAdminScope } from "./AdminScopeContext";
-
 export function DispatchTab() {
-  const { selectedZoneId, selectedKitchenId } = useAdminScope();
   const [orders, setOrders] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -54,9 +51,6 @@ export function DispatchTab() {
       if (search) params.set("search", search);
       if (status) params.set("status", status);
       if (date) params.set("date", date);
-      if (selectedKitchenId) params.set("kitchenId", selectedKitchenId);
-      else if (selectedZoneId) params.set("zoneId", selectedZoneId);
-
       const d = await api.get(`/admin/orders/dispatch?${params}`);
       setOrders(d.orders ?? []);
       setTotal(d.total ?? 0);
@@ -64,9 +58,9 @@ export function DispatchTab() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, date, page, selectedZoneId, selectedKitchenId]);
+  }, [search, status, date, page]);
 
-  useEffect(() => { load(1); }, [selectedZoneId, selectedKitchenId]);
+  useEffect(() => { load(1); }, []);
   useEffect(() => {
     api.get("/admin/users?role=rider").then((d: any) => setActiveRiders(d.users ?? [])).catch(() => {});
   }, []);

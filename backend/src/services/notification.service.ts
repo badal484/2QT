@@ -9,7 +9,7 @@ export type NotifType =
     | 'rider_payout' | 'kitchen_payout' | 'low_subscription_meals'
     | 'rider_verified' | 'cash_submitted' | 'broadcast_message' | 'chat_message'
     | 'low_stock_alert' | 'rider_guarantee_payout' | 'renewal_reminder' | 'generic_sms'
-    | 'rider_at_door' | 'rider_contract_changed' | 'kitchen_new_order';
+    | 'rider_at_door' | 'rider_contract_changed';
 
 const PROMO_TYPES   = new Set(['broadcast_message', 'winback', 'birthday', 'flash_sale', 'renewal_reminder']);
 const PAYOUT_TYPES  = new Set(['rider_payout', 'kitchen_payout', 'rider_guarantee_payout']);
@@ -19,7 +19,6 @@ const TEMPLATE_CACHE_TTL = 300; // 5 min
 
 const FALLBACK_TEMPLATES: Record<string, { title_template: string; body_template: string; channels: string[] }> = {
     order_confirmed:        { title_template: 'Order Confirmed! 🎉', body_template: 'Your order #{{displayId}} is confirmed — ~{{minutes}} mins.', channels: ['push', 'whatsapp'] },
-    kitchen_new_order:      { title_template: '🔔 NEW ORDER RECEIVED!', body_template: 'New Order #{{displayId}} placed! Tap to accept and start preparation.', channels: ['push'] },
     order_preparing:        { title_template: 'Chefs are cooking! 👨‍🍳', body_template: 'Your meal is being freshly prepared right now.', channels: ['push'] },
     order_packing:          { title_template: 'Packing your order! 📦', body_template: 'Your food is cooked and being packed right now.', channels: ['push'] },
     order_ready:            { title_template: 'Order Ready! 🛵', body_template: 'Your order is packed and a rider is on the way.', channels: ['push', 'whatsapp'] },

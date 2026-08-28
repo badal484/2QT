@@ -9,10 +9,7 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { SkeletonList } from "../components/ui/Skeleton";
 
-import { useAdminScope } from "./AdminScopeContext";
-
 export function MenuTab() {
-  const { getScopeQueryParams, selectedZoneId, selectedKitchenId } = useAdminScope();
   const [items, setItems] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
   const [selectedZone, setSelectedZone] = useState<string>("All");
@@ -62,9 +59,8 @@ export function MenuTab() {
 
   const load = async () => {
     try {
-      const scopeParams = getScopeQueryParams();
       const [menuRes, zonesRes] = await Promise.all([
-        api.get(`/admin/menu${scopeParams}`),
+        api.get("/admin/menu"),
         api.get("/admin/zones")
       ]);
       setItems(menuRes.items ?? []);
@@ -74,7 +70,7 @@ export function MenuTab() {
     }
   };
 
-  useEffect(() => { load(); }, [selectedZoneId, selectedKitchenId]);
+  useEffect(() => { load(); }, []);
 
   useSocketRefresh(["menu_updated"], load);
 
