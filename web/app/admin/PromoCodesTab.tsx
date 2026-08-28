@@ -22,9 +22,7 @@ const EMPTY_FORM = {
   description: "",
   expires_at: "",
   max_uses: "" as string | number,
-  target_scope: "all" as "all" | "zone" | "kitchen",
   zone_id: "" as string,
-  kitchen_id: "" as string,
 };
 
 function discountLabel(promo: any) {
@@ -48,7 +46,6 @@ const cls = "w-full bg-white/[0.03] text-white border border-white/10 rounded-xl
 export function PromoCodesTab() {
   const [promos, setPromos] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
-  const [kitchens, setKitchens] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [editingPromo, setEditingPromo] = useState<any | null>(null);
@@ -61,14 +58,12 @@ export function PromoCodesTab() {
   const fetchPromos = async () => {
     try {
       setLoading(true);
-      const [promoRes, zoneRes, kitchenRes] = await Promise.all([
+      const [promoRes, zoneRes] = await Promise.all([
         api.get('/promocodes/admin'),
         api.get('/admin/zones'),
-        api.get('/admin/kitchens').catch(() => ({ kitchens: [] })),
       ]);
       setPromos(promoRes.promoCodes || []);
       setZones(zoneRes.zones || []);
-      setKitchens(kitchenRes.kitchens || []);
     } catch (e: any) {
       toast.error(e.message || "Failed to load promo codes");
     } finally {
@@ -88,7 +83,6 @@ export function PromoCodesTab() {
 
   const openEdit = (promo: any) => {
     setEditingPromo(promo);
-    const target_scope = promo.kitchen_id ? "kitchen" : (promo.zone_id ? "zone" : "all");
     setForm({
       code: promo.code || "",
       discount_type: (promo.discount_type === "percent" || promo.discount_type === "percentage") ? "percentage" : (promo.discount_type || "flat"),
@@ -103,9 +97,7 @@ export function PromoCodesTab() {
       description: promo.description || "",
       expires_at: promo.expires_at ? promo.expires_at.slice(0, 16) : "",
       max_uses: promo.max_uses ?? "",
-      target_scope,
       zone_id: promo.zone_id || "",
-      kitchen_id: promo.kitchen_id || "",
     });
     setIsCreating(true);
   };
@@ -118,8 +110,7 @@ export function PromoCodesTab() {
         per_user_limit: form.per_user_limit ? Number(form.per_user_limit) : null,
         max_uses: form.max_uses ? Number(form.max_uses) : null,
         expires_at: form.expires_at || null,
-        zone_id: form.target_scope === "zone" ? (form.zone_id || null) : null,
-        kitchen_id: form.target_scope === "kitchen" ? (form.kitchen_id || null) : null,
+        zone_id: form.zone_id || null,
       };
 
       if (editingPromo) {
@@ -230,49 +221,12 @@ export function PromoCodesTab() {
             <Inp label="Description (shown to customer)">
               <input value={form.description} onChange={e => f('description', e.target.value)} className={cls} placeholder="Get 30% off this Diwali!"/>
             </Inp>
-            <div className="col-span-1 md:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2 block">Target Operational Scope</label>
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                {[
-                  { id: "all", label: "🌐 All Platform (Global)" },
-                  { id: "zone", label: "📍 Specific Zone" },
-                  { id: "kitchen", label: "🍳 Specific Kitchen" }
-                ].map(opt => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => f('target_scope', opt.id)}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      form.target_scope === opt.id
-                        ? "bg-orange-500/20 border-orange-500 text-orange-400"
-                        : "bg-white/[0.03] border-white/10 text-zinc-400 hover:border-white/20"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-
-              {form.target_scope === "zone" && (
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Select Zone</label>
-                  <select value={form.zone_id} onChange={e => f('zone_id', e.target.value)} className={cls} required>
-                    <option value="" disabled>Choose delivery zone…</option>
-                    {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">{z.name} — {z.city}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {form.target_scope === "kitchen" && (
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1 block">Select Restaurant Kitchen</label>
-                  <select value={form.kitchen_id} onChange={e => f('kitchen_id', e.target.value)} className={cls} required>
-                    <option value="" disabled>Choose kitchen/restaurant…</option>
-                    {kitchens.map(k => <option key={k.id} value={k.id} className="bg-zinc-900">🍳 {k.name}</option>)}
-                  </select>
-                </div>
-              )}
-            </div>
+            <Inp label="Zone (blank = all zones)">
+              <select value={form.zone_id} onChange={e => f('zone_id', e.target.value)} className={cls}>
+                <option value="">All Zones</option>
+                {zones.map(z => <option key={z.id} value={z.id}>{z.name} — {z.city}</option>)}
+              </select>
+            </Inp>
           </div>
 
           {/* Targeting toggles */}
@@ -356,18 +310,12 @@ export function PromoCodesTab() {
               {promo.new_user_only && (
                 <span className="bg-purple-500/10 text-purple-400 text-[10px] font-bold px-2 py-0.5 rounded-full">New users</span>
               )}
-              {promo.kitchen_id ? (
-                <span className="bg-amber-500/15 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
-                  🍳 {promo.kitchen_name || kitchens.find(k => k.id === promo.kitchen_id)?.name || 'Kitchen'}
-                </span>
-              ) : promo.zone_id ? (
-                <span className="bg-emerald-500/15 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
-                  📍 {promo.zone_name || zones.find(z => z.id === promo.zone_id)?.name || 'Zone'}
+              {promo.zone_id ? (
+                <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  {zones.find(z => z.id === promo.zone_id)?.name ?? 'Zone'}
                 </span>
               ) : (
-                <span className="bg-white/[0.06] text-zinc-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  🌐 All Platform
-                </span>
+                <span className="bg-white/[0.04] text-zinc-500 text-[10px] font-bold px-2 py-0.5 rounded-full">All zones</span>
               )}
             </div>
 
