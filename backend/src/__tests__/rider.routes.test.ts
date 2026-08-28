@@ -7,6 +7,7 @@ import express from 'express';
 import request from 'supertest';
 import { query } from '../db';
 import { redis } from '../redis';
+import { authenticate } from '../middleware/auth';
 
 jest.mock('razorpay', () =>
   jest.fn().mockImplementation(() => ({
@@ -59,11 +60,21 @@ app.use(express.json());
 app.use('/rider', riderRouter);
 
 const mockQuery = query as jest.Mock;
+const mockAuthenticate = authenticate as jest.Mock;
+const defaultAuthenticate = mockAuthenticate.getMockImplementation();
+
+function actingAs(user: { userId: string; role: string; kitchenId: string | null; zoneId: string | null; restaurantId: string | null }) {
+  mockAuthenticate.mockImplementationOnce((req: any, _res: any, next: any) => {
+    req.user = { ...user, jti: 'jti-test' };
+    next();
+  });
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
   (redis.get as jest.Mock).mockResolvedValue(null);
   (redis.set as jest.Mock).mockResolvedValue('OK');
+  if (defaultAuthenticate) mockAuthenticate.mockImplementation(defaultAuthenticate);
 });
 
 // ── GET /rider/documents ──────────────────────────────────────────────────────
@@ -159,5 +170,52 @@ describe('GET /rider/application-status', () => {
     const res = await request(app).get('/rider/application-status');
     expect(res.status).toBe(200);
     expect(res.body.application.status).toBe('approved');
+  });
+});
+
+// ── PATCH /rider/orders/:id/status ────────────────────────────────────────────
+// Security fix (Phase 2, Critical #2): previously had no ownership check and silently
+// self-assigned any unassigned order via COALESCE(rider_id, riderId) — any rider could alter
+// the status of any order platform-wide.
+
+describe('PATCH /rider/orders/:id/status', () => {
+  it('returns 404 when the order is not assigned to the calling rider', async () => {
+    actingAs({ userId: 'rider-1', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // UPDATE ... AND rider_id = $4 matches nothing
+
+    const res = await request(app).patch('/rider/orders/ord-1/status').send({ status: 'out_for_delivery' });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('ORDER_NOT_FOUND');
+
+    // Confirm the query is now scoped by rider_id, not just the order id/display_id
+    const call = mockQuery.mock.calls[0];
+    expect(call[0]).toContain('rider_id = $4');
+    expect(call[1]).toEqual(['out_for_delivery', 'ord-1', 'ord-1', 'rider-1', '2QT-ord-1', false]);
+  });
+
+  it('updates status when the order is assigned to the calling rider', async () => {
+    actingAs({ userId: 'rider-1', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: 'ord-2', display_id: '2QT-100002', customer_id: 'cust-1', kitchen_id: 'kitchen-1', status: 'out_for_delivery', delivery_otp: '123456' }],
+      })
+      .mockResolvedValueOnce({ rows: [{ name: 'Rider One' }] }); // rider name lookup for the out_for_delivery notification
+
+    const res = await request(app).patch('/rider/orders/ord-2/status').send({ status: 'out_for_delivery' });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('allows super_admin to update any order\'s status unscoped', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-3', display_id: '2QT-100003', customer_id: 'cust-1', kitchen_id: 'kitchen-1', status: 'preparing', delivery_otp: '654321' }],
+    });
+
+    const res = await request(app).patch('/rider/orders/ord-3/status').send({ status: 'preparing' });
+    expect(res.status).toBe(200);
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[1]).toEqual(['preparing', 'ord-3', 'ord-3', 'admin-1', '2QT-ord-3', true]);
   });
 });

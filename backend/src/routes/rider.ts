@@ -407,13 +407,22 @@ router.patch('/orders/:id/status', authenticate, requireRole('rider', 'rider_cap
         const cleanId = String(id).replace(/^#/, '').trim();
         const displayWithPrefix = cleanId.startsWith('2QT-') ? cleanId : `2QT-${cleanId}`;
 
+        // Security audit finding, Phase 2 CRITICAL #2: previously had no ownership check at
+        // all and silently self-assigned (COALESCE(rider_id, riderId)) any unassigned order,
+        // letting any authenticated rider alter the status of any order platform-wide by
+        // guessing/enumerating its (sequential, non-secret) display ID. Proper claiming already
+        // has its own endpoint (POST /orders/:id/claim, with busy/verification checks) — this
+        // endpoint now only updates an order already assigned to the calling rider, matching the
+        // "$3 = 'super_admin'" unrestricted-admin pattern already used by /resend-otp above.
+        const isAdmin = req.user!.role === 'super_admin';
         const { rows } = await query(
-            `UPDATE orders SET status = $1, rider_id = COALESCE(rider_id, $4)
-             WHERE id::text = $2 OR display_id = $2 OR display_id = $3 OR display_id = $5
+            `UPDATE orders SET status = $1
+             WHERE (id::text = $2 OR display_id = $2 OR display_id = $3 OR display_id = $5)
+               AND ($6::boolean OR rider_id = $4)
              RETURNING id, display_id, customer_id, kitchen_id, status, delivery_otp`,
-            [status, id, cleanId, riderId, displayWithPrefix]
+            [status, id, cleanId, riderId, displayWithPrefix, isAdmin]
         );
-        if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND', message: 'Order not found or status cannot be updated.' });
+        if (rows.length === 0) return res.status(404).json({ error: 'ORDER_NOT_FOUND', message: 'Order not found or not assigned to you.' });
         const order = rows[0];
 
         emitToUser(order.customer_id, 'order_status_update', { orderId: id, status });

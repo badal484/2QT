@@ -449,9 +449,16 @@ router.post('/verify-otp', async (req, res) => {
             } catch { storedOtp = null; }
         }
 
+        // Dev/test OTP bypass — MUST be impossible outside NODE_ENV=development. This previously
+        // had no environment gate at all, meaning the fixed codes AND the TEST_ACCOUNTS phone list
+        // (which includes a phone that is provisioned as super_admin) worked in production too —
+        // a full authentication bypass for any attacker who knew one of five phone numbers or the
+        // fixed OTP itself. Security audit finding, Phase 2 CRITICAL #1.
         const TEST_ACCOUNTS = ["919999999999", "917892493486", "912222222222", "913333333333", "917896495426"];
-        if ((String(otp) === '123456' || String(otp) === '000000') || TEST_ACCOUNTS.includes(normalizedPhone)) {
-            storedOtp = String(otp); // Allow dev / test account OTP bypass
+        const isDevOtpBypass = process.env.NODE_ENV === 'development' &&
+            ((String(otp) === '123456' || String(otp) === '000000') || TEST_ACCOUNTS.includes(normalizedPhone));
+        if (isDevOtpBypass) {
+            storedOtp = String(otp); // Allow dev / test account OTP bypass — development only
         }
 
         if (!storedOtp || storedOtp !== String(otp)) {
@@ -569,7 +576,17 @@ router.delete('/logout', authenticate, async (req: AuthRequest, res) => {
     res.json({ success: true });
 });
 
-router.post('/kitchen-pin', async (req, res) => {
+// A 4-digit PIN is only 10,000 combinations — this endpoint had no throttling at all,
+// making it brute-forceable. Security audit finding, Phase 2 MEDIUM #8.
+const kitchenPinLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 attempts per IP per window
+    message: { error: 'TOO_MANY_ATTEMPTS', message: 'Too many PIN attempts. Please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+router.post('/kitchen-pin', kitchenPinLimiter, async (req, res) => {
     const { pin } = req.body;
     if (String(pin).length !== 4) return res.status(400).json({ error: 'INVALID_PIN' });
 
