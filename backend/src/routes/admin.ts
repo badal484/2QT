@@ -39,6 +39,7 @@ const CustomizationGroupSchema = z.object({
 const MenuItemSchema = z.object({
     name: z.string().min(1).max(120),
     zone_id: z.string().uuid(),
+    kitchen_id: z.string().uuid().optional().nullable(),
     description: z.string().max(500).optional(),
     price_paise: z.number().int().positive(),
     cost_price_paise: z.number().int().positive().optional(),
@@ -303,9 +304,10 @@ router.delete('/scheduled-orders/:id', authenticate, requireRole('super_admin', 
 
 router.get('/menu', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { rows } = await query(`
-        SELECT m.*, z.name as zone_name
+        SELECT m.*, z.name as zone_name, k.name as kitchen_name
         FROM menu_items m
         JOIN zones z ON m.zone_id = z.id
+        LEFT JOIN kitchens k ON m.kitchen_id = k.id
         ORDER BY m.category, m.name
     `);
     res.json({ items: rows });
@@ -1070,16 +1072,22 @@ router.post('/payouts/:id/approve', authenticate, requireRole('super_admin', 'ad
 
 router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema), async (req: AuthRequest, res) => {
     try {
-        const { name, zone_id, description, price_paise, category, station, photo_url, images, video_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups } = req.body;
+        const { name, zone_id, kitchen_id: custom_kitchen_id, description, price_paise, category, station, photo_url, images, video_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups } = req.body;
 
         const cost_price_paise = req.body.cost_price_paise ?? Math.floor(price_paise * 0.7);
 
-        // Fetch kitchen_id associated with the zone
-        const { rows: kitchenRows } = await query('SELECT kitchen_id FROM kitchen_zones WHERE zone_id = $1 LIMIT 1', [zone_id]);
-        if (kitchenRows.length === 0) {
+        let kitchen_id = custom_kitchen_id;
+        if (!kitchen_id) {
+            const { rows: kitchenRows } = await query('SELECT kitchen_id FROM kitchen_zones WHERE zone_id = $1 LIMIT 1', [zone_id]);
+            kitchen_id = kitchenRows[0]?.kitchen_id;
+        }
+        if (!kitchen_id) {
+            const { rows: firstKitchen } = await query('SELECT id FROM kitchens LIMIT 1');
+            kitchen_id = firstKitchen[0]?.id;
+        }
+        if (!kitchen_id) {
             return res.status(400).json({ error: 'No kitchen is assigned to this zone.' });
         }
-        const kitchen_id = kitchenRows[0].kitchen_id;
 
         const { rows } = await query(
             'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, images, video_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17::TEXT[], $18::jsonb) RETURNING *',
@@ -1143,10 +1151,10 @@ router.delete('/menu/:id', authenticate, requireRole('super_admin', 'admin'), as
 router.put('/menu/:id', authenticate, requireRole('super_admin', 'admin'), validate(MenuItemSchema.partial()), async (req: AuthRequest, res) => {
     try {
         const { id } = req.params;
-        const { zone_id, name, description, price_paise, category, station, photo_url, images, video_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups } = req.body;
+        const { zone_id, kitchen_id: custom_kitchen_id, name, description, price_paise, category, station, photo_url, images, video_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups } = req.body;
 
-        let kitchen_id = undefined;
-        if (zone_id) {
+        let kitchen_id = custom_kitchen_id;
+        if (!kitchen_id && zone_id) {
             const { rows: kitchenRows } = await query('SELECT kitchen_id FROM kitchen_zones WHERE zone_id = $1 LIMIT 1', [zone_id]);
             if (kitchenRows.length > 0) {
                 kitchen_id = kitchenRows[0].kitchen_id;

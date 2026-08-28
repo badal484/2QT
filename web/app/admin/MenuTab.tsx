@@ -12,7 +12,9 @@ import { SkeletonList } from "../components/ui/Skeleton";
 export function MenuTab() {
   const [items, setItems] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
+  const [kitchens, setKitchens] = useState<any[]>([]);
   const [selectedZone, setSelectedZone] = useState<string>("All");
+  const [selectedKitchen, setSelectedKitchen] = useState<string>("All");
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -30,6 +32,7 @@ export function MenuTab() {
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
   const [modalZoneId, setModalZoneId] = useState<string>("");
+  const [modalKitchenId, setModalKitchenId] = useState<string>("");
   const [modalCategories, setModalCategories] = useState<string[]>([]);
   const [customizationGroups, setCustomizationGroups] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -41,6 +44,7 @@ export function MenuTab() {
       setGalleryImages(Array.isArray(editingItem?.images) ? editingItem.images : []);
       const zoneId = editingItem?.zone_id || (selectedZone !== "All" ? selectedZone : zones[0]?.id || "");
       setModalZoneId(zoneId);
+      setModalKitchenId(editingItem?.kitchen_id || (selectedKitchen !== "All" ? selectedKitchen : ""));
       setCustomizationGroups(editingItem?.customization_groups || []);
     }
   }, [showAddModal, editingItem]);
@@ -59,12 +63,14 @@ export function MenuTab() {
 
   const load = async () => {
     try {
-      const [menuRes, zonesRes] = await Promise.all([
+      const [menuRes, zonesRes, kitchensRes] = await Promise.all([
         api.get("/admin/menu"),
-        api.get("/admin/zones")
+        api.get("/admin/zones"),
+        api.get("/admin/kitchens").catch(() => ({ kitchens: [] }))
       ]);
       setItems(menuRes.items ?? []);
       setZones(zonesRes.zones ?? []);
+      setKitchens(kitchensRes.kitchens ?? []);
     } finally {
       setLoading(false);
     }
@@ -112,11 +118,21 @@ export function MenuTab() {
       i.category.toLowerCase().includes(search.toLowerCase());
     const matchCat = activeCategory === "All" || i.category === activeCategory;
     const matchZone = selectedZone === "All" || i.zone_id === selectedZone;
-    return matchSearch && matchCat && matchZone;
-  }), [items, search, activeCategory, selectedZone]);
+    const matchKitchen = selectedKitchen === "All" || i.kitchen_id === selectedKitchen;
+    return matchSearch && matchCat && matchZone && matchKitchen;
+  }), [items, search, activeCategory, selectedZone, selectedKitchen]);
 
   const liveCount = filtered.filter(i => i.available).length;
   const offCount = filtered.filter(i => !i.available).length;
+
+  const availableKitchens = useMemo(() => {
+    if (selectedZone === "All") return kitchens;
+    return kitchens.filter(k => {
+      if (k.zone_id === selectedZone) return true;
+      if (Array.isArray(k.zones)) return k.zones.some((z: any) => z.id === selectedZone);
+      return false;
+    });
+  }, [kitchens, selectedZone]);
 
   const renderGrid = useMemo(() => (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
@@ -173,9 +189,11 @@ export function MenuTab() {
             <h3 className="font-black text-sm text-white line-clamp-1 mb-0.5">{item.name}</h3>
             <div className="flex items-center justify-between mb-3">
               <span className="text-swish-green font-black text-sm">₹{(item.price_paise / 100).toLocaleString("en-IN")}</span>
-              <div className="flex items-center gap-1.5 ml-2">
-                {selectedZone === "All" && (
-                  <span className="text-[8px] font-black uppercase tracking-widest text-brand-primary truncate">{item.zone_name}</span>
+              <div className="flex flex-col items-end gap-0.5 ml-2">
+                {item.kitchen_name && (
+                  <span className="text-[8px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded truncate max-w-[120px]">
+                    🍳 {item.kitchen_name}
+                  </span>
                 )}
                 <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 truncate">{item.category}</span>
               </div>
@@ -303,15 +321,28 @@ export function MenuTab() {
             {filtered.length} total
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Zone Selector */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Zone Filter Pill */}
           <select 
             value={selectedZone} 
-            onChange={(e) => setSelectedZone(e.target.value)}
-            className="px-4 py-2.5 rounded-xl bg-white/[0.03] backdrop-blur-2xl border border-white/10 text-sm font-bold text-white focus:outline-none focus:ring-2 ring-swish-green/20 appearance-none min-w-[160px]"
+            onChange={(e) => {
+              setSelectedZone(e.target.value);
+              setSelectedKitchen("All");
+            }}
+            className="px-4 py-2.5 rounded-xl bg-white/[0.03] backdrop-blur-2xl border border-white/10 text-sm font-bold text-white focus:outline-none focus:ring-2 ring-swish-green/20 appearance-none min-w-[150px] cursor-pointer"
           >
-            <option value="All" className="bg-zinc-900">All Zones</option>
-            {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">{z.name}</option>)}
+            <option value="All" className="bg-zinc-900">📍 All Zones</option>
+            {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">📍 {z.name}</option>)}
+          </select>
+
+          {/* Kitchen Filter Pill */}
+          <select 
+            value={selectedKitchen} 
+            onChange={(e) => setSelectedKitchen(e.target.value)}
+            className="px-4 py-2.5 rounded-xl bg-white/[0.03] backdrop-blur-2xl border border-white/10 text-sm font-bold text-white focus:outline-none focus:ring-2 ring-amber-500/20 appearance-none min-w-[160px] cursor-pointer"
+          >
+            <option value="All" className="bg-zinc-900">🍳 All Kitchens</option>
+            {availableKitchens.map(k => <option key={k.id} value={k.id} className="bg-zinc-900">🍳 {k.name}</option>)}
           </select>
 
           <div className="relative">
@@ -411,22 +442,22 @@ export function MenuTab() {
                       return;
                     }
                     const formData = new FormData(e.currentTarget);
-                    const rawTags = (formData.get("tags") as string || "").split(",").map(t => t.trim()).filter(Boolean);
                     const data = {
-                      name: formData.get("name"),
-                      zone_id: formData.get("zone_id"),
-                      description: formData.get("description"),
-                      category: formData.get("category"),
-                      price_paise: Math.round(parseFloat(formData.get("price") as string) * 100),
-                      station: formData.get("station"),
+                      name: formData.get("name") as string,
+                      zone_id: formData.get("zone_id") as string,
+                      kitchen_id: modalKitchenId || undefined,
+                      description: formData.get("description") as string,
+                      price_paise: Math.round(Number(formData.get("price")) * 100),
+                      category: formData.get("category") as string,
+                      station: formData.get("station") as string,
                       photo_url: imageUrl,
-                      images: galleryImages,
                       video_url: videoUrl || null,
+                      images: galleryImages,
                       is_veg: formData.get("dietary_type") === "veg",
                       is_egg: formData.get("dietary_type") === "egg",
                       is_bestseller: formData.get("is_bestseller") === "on",
                       is_new: formData.get("is_new") === "on",
-                      tags: rawTags,
+                      tags: (formData.get("tags") as string)?.split(",").map(t => t.trim()).filter(Boolean) || [],
                       customization_groups: customizationGroups,
                       available: true
                     };
@@ -675,19 +706,39 @@ export function MenuTab() {
                     </label>
                   </div>
 
-                  {/* Zone Selector */}
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Menu Zone</label>
-                    <select
-                      name="zone_id"
-                      value={modalZoneId}
-                      onChange={(e) => setModalZoneId(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none"
-                    >
-                      <option value="" disabled className="bg-zinc-900">Select Delivery Zone…</option>
-                      {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">{z.name}</option>)}
-                    </select>
+                  {/* Zone & Kitchen Selection Grid */}
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Menu Zone</label>
+                      <select
+                        name="zone_id"
+                        value={modalZoneId}
+                        onChange={(e) => {
+                          setModalZoneId(e.target.value);
+                          setModalKitchenId("");
+                        }}
+                        required
+                        className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-swish-green/20 text-white appearance-none"
+                      >
+                        <option value="" disabled className="bg-zinc-900">Select Delivery Zone…</option>
+                        {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">{z.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-2 block">Restaurant Kitchen</label>
+                      <select
+                        name="kitchen_id"
+                        value={modalKitchenId}
+                        onChange={(e) => setModalKitchenId(e.target.value)}
+                        className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/10 font-bold text-sm focus:outline-none focus:ring-2 ring-amber-500/20 text-white appearance-none"
+                      >
+                        <option value="" className="bg-zinc-900">Default Zone Kitchen</option>
+                        {kitchens
+                          .filter(k => !modalZoneId || k.zone_id === modalZoneId || (Array.isArray(k.zones) && k.zones.some((z: any) => z.id === modalZoneId)))
+                          .map(k => <option key={k.id} value={k.id} className="bg-zinc-900">🍳 {k.name}</option>)}
+                      </select>
+                    </div>
                   </div>
 
                   {/* Name + Category */}
