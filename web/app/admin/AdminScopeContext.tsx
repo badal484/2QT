@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { api } from '../lib/api';
 
 export interface KitchenItem {
     id: string;
@@ -53,21 +52,33 @@ export const AdminScopeProvider: React.FC<{ children: ReactNode }> = ({ children
     useEffect(() => {
         const fetchHierarchy = async () => {
             try {
-                const data = await api.get('/admin/hierarchy');
-                setZones(data.zones || []);
-                setAllKitchens(data.kitchens || []);
+                const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+                const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+                
+                const res = await fetch(`${API_URL}/api/admin/hierarchy`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-                // Check URL params or LocalStorage for initial values
-                const urlZone = searchParams?.get('zoneId');
-                const urlKitchen = searchParams?.get('kitchenId');
-                const localZone = typeof window !== 'undefined' ? localStorage.getItem('admin_selected_zone') : null;
-                const localKitchen = typeof window !== 'undefined' ? localStorage.getItem('admin_selected_kitchen') : null;
+                if (res.ok) {
+                    const data = await res.json();
+                    setZones(data.zones || []);
+                    setAllKitchens(data.kitchens || []);
 
-                const initZone = urlZone || localZone || null;
-                const initKitchen = urlKitchen || localKitchen || null;
+                    // Check URL params or LocalStorage for initial values
+                    const urlZone = searchParams?.get('zoneId');
+                    const urlKitchen = searchParams?.get('kitchenId');
+                    const localZone = typeof window !== 'undefined' ? localStorage.getItem('admin_selected_zone') : null;
+                    const localKitchen = typeof window !== 'undefined' ? localStorage.getItem('admin_selected_kitchen') : null;
 
-                if (initZone) setSelectedZoneIdState(initZone);
-                if (initKitchen) setSelectedKitchenIdState(initKitchen);
+                    const initZone = urlZone || localZone || null;
+                    const initKitchen = urlKitchen || localKitchen || null;
+
+                    if (initZone) setSelectedZoneIdState(initZone);
+                    if (initKitchen) setSelectedKitchenIdState(initKitchen);
+                }
             } catch (err) {
                 console.error('Failed to load admin zone hierarchy:', err);
             } finally {
