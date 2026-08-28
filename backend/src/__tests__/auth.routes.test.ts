@@ -127,19 +127,57 @@ describe('POST /auth/verify-otp', () => {
     expect(res.body.error).toBe('INVALID_OTP');
   });
 
-  it('allows test account bypass with OTP 123456', async () => {
-    // Test accounts hardcoded in auth.ts bypass OTP check → reach completeAuth() DB calls
-    mockQuery
-      .mockResolvedValueOnce({ rows: [] })    // prelaunch check
-      .mockResolvedValueOnce({ rows: [] })    // prelaunch config
-      .mockResolvedValueOnce({ rows: [{ id: 'u-1', phone: '919999999999', name: 'Test', role: 'customer', kitchen_id: null, zone_id: null, terms_accepted_at: null, is_verified: true, onboarding_complete: true, email: null, photo_url: null, prelaunch_reward_credited: false }] }) // upsert user
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })  // wallet upsert
-      .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // referral check
-      .mockResolvedValueOnce({ rows: [] });   // kitchen name
+  // Security fix (Phase 2, Critical #1): the fixed test OTP (123456/000000) and the
+  // TEST_ACCOUNTS phone-list bypass previously worked in ANY environment, including
+  // production — a full authentication bypass for anyone who knew one of five phone numbers
+  // (one of which is provisioned as super_admin) or the fixed code itself. It must now be
+  // impossible outside NODE_ENV=development.
+  it('rejects the fixed test OTP (123456) outside development mode', async () => {
+    const orig = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      mockRedisGet.mockResolvedValueOnce(null);
+      const res = await request(app).post('/auth/verify-otp').send({ phone: '919999999999', otp: '123456' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('INVALID_OTP');
+    } finally {
+      process.env.NODE_ENV = orig;
+    }
+  });
 
-    const res = await request(app).post('/auth/verify-otp').send({ phone: '919999999999', otp: '123456' });
-    // Might succeed or 5xx if remaining DB mocks are incomplete — just check it's not a 400 OTP error
-    expect(res.body.error).not.toBe('INVALID_OTP');
+  it('rejects a TEST_ACCOUNTS phone number with an arbitrary OTP outside development mode', async () => {
+    const orig = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      mockRedisGet.mockResolvedValueOnce(null);
+      const res = await request(app).post('/auth/verify-otp').send({ phone: '917892493486', otp: '111111' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('INVALID_OTP');
+    } finally {
+      process.env.NODE_ENV = orig;
+    }
+  });
+
+  it('allows the fixed test OTP (123456) only in development mode', async () => {
+    const orig = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      // Test accounts hardcoded in auth.ts bypass OTP check → reach completeAuth() DB calls
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })    // prelaunch check
+        .mockResolvedValueOnce({ rows: [] })    // prelaunch config
+        .mockResolvedValueOnce({ rows: [{ id: 'u-1', phone: '919999999999', name: 'Test', role: 'customer', kitchen_id: null, zone_id: null, terms_accepted_at: null, is_verified: true, onboarding_complete: true, email: null, photo_url: null, prelaunch_reward_credited: false }] }) // upsert user
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })  // wallet upsert
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // referral check
+        .mockResolvedValueOnce({ rows: [] });   // kitchen name
+      mockRedisGet.mockResolvedValueOnce(null);
+
+      const res = await request(app).post('/auth/verify-otp').send({ phone: '919999999999', otp: '123456' });
+      // Might succeed or 5xx if remaining DB mocks are incomplete — just check it's not a 400 OTP error
+      expect(res.body.error).not.toBe('INVALID_OTP');
+    } finally {
+      process.env.NODE_ENV = orig;
+    }
   });
 });
 
@@ -186,6 +224,20 @@ describe('POST /auth/kitchen-pin', () => {
     const res = await request(app).post('/auth/kitchen-pin').send({ pin: '1234' });
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('INVALID_PIN');
+  });
+
+  // Security fix (Phase 2, Medium #8): a 4-digit PIN is only 10,000 combinations and had no
+  // throttling at all. Send well past the configured limit (10/15min) and confirm the limiter
+  // engages — order-independent since earlier tests in this file already consume part of the
+  // window from the same test-client IP.
+  it('rate-limits repeated PIN attempts', async () => {
+    mockQuery.mockResolvedValue({ rows: [] }); // no kitchens, every attempt is a plain miss
+
+    const responses = [];
+    for (let i = 0; i < 15; i++) {
+      responses.push(await request(app).post('/auth/kitchen-pin').send({ pin: '9999' }));
+    }
+    expect(responses.some((r) => r.status === 429)).toBe(true);
   });
 });
 

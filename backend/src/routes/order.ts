@@ -9,6 +9,24 @@ import { processWalletRefund, processBankRefund } from '../services/refund.servi
 
 const router = Router();
 
+// Security audit finding, Phase 2 HIGH #6: GET /:id, GET /:id/invoice, and POST /:id/cancel
+// previously only checked ownership for role==='customer', leaving any rider/kitchen-staff/
+// support/finance account able to view or cancel an arbitrary order by ID. This mirrors the
+// ownership rule already enforced correctly by GET /:id/tracking below — customers see only
+// their own orders, riders only their own assigned deliveries, kitchen staff only their own
+// kitchen's orders; every other role (admin/finance/support/etc.) is platform-wide by design.
+function isAuthorizedForOrder(
+    user: { role: string; userId: string; kitchenId: string | null },
+    order: { customer_id: string; rider_id: string | null; kitchen_id: string }
+): boolean {
+    if (user.role === 'customer') return order.customer_id === user.userId;
+    if (user.role === 'rider') return order.rider_id === user.userId;
+    if (['chef', 'kitchen_manager', 'partner_kitchen', 'packer'].includes(user.role)) {
+        return order.kitchen_id === user.kitchenId;
+    }
+    return true;
+}
+
 router.get('/mine', authenticate, async (req: AuthRequest, res) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
     const offset = parseInt(req.query.offset as string) || 0;
@@ -110,7 +128,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
     const order = rows[0];
     if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
 
-    if (req.user!.role === 'customer' && order.customer_id !== req.user!.userId) {
+    if (!isAuthorizedForOrder(req.user!, order)) {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
 
@@ -129,11 +147,11 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
 router.get('/:id/invoice', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
     try {
-        const { rows } = await query('SELECT customer_id FROM orders WHERE id = $1', [id]);
+        const { rows } = await query('SELECT customer_id, rider_id, kitchen_id FROM orders WHERE id = $1', [id]);
         if (rows.length === 0) return res.status(404).json({ error: 'NOT_FOUND' });
-        
+
         // Authorization check
-        if (req.user!.role === 'customer' && rows[0].customer_id !== req.user!.userId) {
+        if (!isAuthorizedForOrder(req.user!, rows[0])) {
             return res.status(403).json({ error: 'FORBIDDEN' });
         }
 
@@ -156,7 +174,7 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
     const order = rows[0];
 
     if (!order) return res.status(404).json({ error: 'NOT_FOUND' });
-    if (req.user!.role === 'customer' && order.customer_id !== req.user!.userId) {
+    if (!isAuthorizedForOrder(req.user!, order)) {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
     if (!['pending_payment', 'confirmed'].includes(order.status)) {

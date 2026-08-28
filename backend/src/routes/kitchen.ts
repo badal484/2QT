@@ -10,12 +10,27 @@ import { redis, keys } from '../redis';
 
 const router = Router();
 
+// Only platform admins may legitimately need to inspect an arbitrary kitchen (e.g. from the
+// admin dashboard); every other role must be pinned to the kitchen the DB actually assigned them.
+const PLATFORM_ADMIN_ROLES = ['super_admin', 'admin'];
+
+// Security audit finding, Phase 2 CRITICAL #3: this previously accepted a client-supplied
+// ?kitchen_id= query param or x-kitchen-id header for EVERY caller, letting any authenticated
+// kitchen-role account (chef/kitchen_manager/packer/partner_kitchen) act as any other kitchen —
+// read/modify its menu, orders, inventory, batches, earnings, and analytics. The override (and
+// the "pick any kitchen" fallback) is now restricted to platform-admin roles; kitchen-scoped
+// staff always resolve to their own req.user.kitchenId, server-derived at auth time.
 async function getKitchenId(req: AuthRequest, res: any): Promise<string | null> {
-    const override = (req.query.kitchen_id || req.headers['x-kitchen-id']) as string;
-    if (override) return override;
+    const isPlatformAdmin = PLATFORM_ADMIN_ROLES.includes(req.user!.role);
+    if (isPlatformAdmin) {
+        const override = (req.query.kitchen_id || req.headers['x-kitchen-id']) as string;
+        if (override) return override;
+    }
     if (req.user!.kitchenId) return req.user!.kitchenId;
-    const { rows } = await query('SELECT id FROM kitchens LIMIT 1');
-    if (rows.length > 0) return rows[0].id;
+    if (isPlatformAdmin) {
+        const { rows } = await query('SELECT id FROM kitchens LIMIT 1');
+        if (rows.length > 0) return rows[0].id;
+    }
     res.status(400).json({ error: 'KITCHEN_NOT_ASSIGNED' });
     return null;
 }
@@ -50,28 +65,6 @@ async function autoResumeIfExpired(kitchenId: string): Promise<void> {
         }
     }
 }
-
-router.get('/debug-dispatch', async (_req, res) => {
-    try {
-        const { rows: orderRows } = await query(`
-            SELECT o.id, o.display_id, o.status, o.rider_id, o.kitchen_id, o.created_at,
-                   u.name as customer_name, r.name as rider_name, r.is_online as rider_is_online
-            FROM orders o
-            LEFT JOIN users u ON o.customer_id = u.id
-            LEFT JOIN users r ON o.rider_id = r.id
-            ORDER BY o.created_at DESC LIMIT 10
-        `);
-        const { rows: riderRows } = await query(`
-            SELECT id, name, phone, role, is_online
-            FROM users
-            WHERE role IN ('rider', 'rider_captain', 'super_admin', 'admin')
-            ORDER BY is_online DESC, name ASC
-        `);
-        res.json({ orders: orderRows, riders: riderRows });
-    } catch (err: any) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 router.get('/menu', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const kitchenId = await getKitchenId(req, res);
@@ -127,11 +120,27 @@ router.patch('/status', authenticate, requireRole('chef', 'kitchen_manager', 'su
 router.patch('/menu/:itemId/availability', authenticate, requireRole('chef', 'kitchen_manager', 'super_admin'), async (req: AuthRequest, res) => {
     const { itemId } = req.params;
     const { available } = req.body;
-    
-    const { rows } = await query(
-        'UPDATE menu_items SET available = $1 WHERE id = $2 RETURNING zone_id',
-        [available, itemId]
-    );
+
+    // Security audit finding, Phase 2 HIGH #5: previously updated any menu item by raw ID with
+    // no ownership check at all. Menu items are shared per-zone (every kitchen in a zone serves
+    // the same menu — see GET /menu above), so the correct boundary is the caller's own zone,
+    // not an arbitrary item anywhere on the platform.
+    let rows;
+    if (req.user!.role === 'super_admin') {
+        ({ rows } = await query(
+            'UPDATE menu_items SET available = $1 WHERE id = $2 RETURNING zone_id',
+            [available, itemId]
+        ));
+    } else {
+        const kitchenId = await getKitchenId(req, res);
+        if (!kitchenId) return;
+        const zoneId = await getZoneId(kitchenId);
+        if (!zoneId) return res.status(400).json({ error: 'KITCHEN_NOT_IN_ZONE' });
+        ({ rows } = await query(
+            'UPDATE menu_items SET available = $1 WHERE id = $2 AND zone_id = $3 RETURNING zone_id',
+            [available, itemId, zoneId]
+        ));
+    }
 
     if (rows.length === 0) return res.status(404).json({ error: 'NOT_FOUND' });
 
@@ -213,11 +222,18 @@ router.post('/orders/:id/claim', authenticate, requireRole('chef', 'kitchen_mana
     const id = req.params.id as string;
     const chefId = req.user!.userId;
 
+    // Security audit finding, Phase 2 HIGH #5: previously had no kitchen ownership check at
+    // all, so kitchen staff from any kitchen could claim any other kitchen's order by ID.
+    const isPlatformAdmin = PLATFORM_ADMIN_ROLES.includes(req.user!.role);
+    const callerKitchenId = isPlatformAdmin ? null : await getKitchenId(req, res);
+    if (!isPlatformAdmin && !callerKitchenId) return;
+
     const { rowCount, rows } = await query(
         `UPDATE orders SET status = 'preparing', claimed_by_chef_id = $1, claimed_at = NOW()
          WHERE id = $2 AND status = 'confirmed' AND claimed_by_chef_id IS NULL
+           AND ($3::uuid IS NULL OR kitchen_id = $3)
          RETURNING kitchen_id, customer_id, display_id`,
-        [chefId, id]
+        [chefId, id, callerKitchenId]
     );
 
     if (rowCount === 0) return res.status(400).json({ error: 'ORDER_ALREADY_CLAIMED' });
@@ -326,15 +342,27 @@ router.get('/packer/orders', authenticate, requireRole('packer', 'kitchen_manage
 // Packer marks order as packed → triggers rider assignment
 router.post('/orders/:id/packed', authenticate, requireRole('packer', 'kitchen_manager', 'super_admin', 'admin', 'chef', 'kitchen', 'partner_kitchen', 'partner'), async (req: AuthRequest, res) => {
     const id = req.params.id as string;
+
+    // Security audit finding, Phase 2 HIGH #5: previously updated by raw order ID with no
+    // kitchen ownership check — any kitchen-role account could mark any other kitchen's order
+    // as packed/ready-for-pickup.
+    const isPlatformAdmin = PLATFORM_ADMIN_ROLES.includes(req.user!.role);
+    const callerKitchenId = isPlatformAdmin ? null : await getKitchenId(req, res);
+    if (!isPlatformAdmin && !callerKitchenId) return;
+
     let { rows } = await query(
         `UPDATE orders SET status = 'ready_for_pickup', packed_by_id = $1, packed_at = NOW()
          WHERE id = $2 AND status IN ('packing', 'preparing', 'ready_for_pickup', 'confirmed', 'cooking', 'placed')
+           AND ($3::uuid IS NULL OR kitchen_id = $3)
          RETURNING id, display_id, customer_id, kitchen_id, zone_id`,
-        [req.user!.userId, id]
+        [req.user!.userId, id, callerKitchenId]
     );
     if (!rows[0]) {
-        // Fallback: Check if order exists even if status was already updated
-        const existing = await query(`SELECT id, display_id, customer_id, kitchen_id, zone_id FROM orders WHERE id = $1`, [id]);
+        // Fallback: Check if order exists (and is owned by this kitchen) even if status was already updated
+        const existing = await query(
+            `SELECT id, display_id, customer_id, kitchen_id, zone_id FROM orders WHERE id = $1 AND ($2::uuid IS NULL OR kitchen_id = $2)`,
+            [id, callerKitchenId]
+        );
         if (!existing.rows[0]) return res.status(400).json({ error: 'ORDER_NOT_FOUND' });
         rows = existing.rows;
     }
@@ -411,7 +439,19 @@ router.post('/batches', authenticate, requireRole('chef', 'super_admin'), async 
 
 router.post('/batches/:id/complete', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    await query('UPDATE production_batches SET status = \'completed\', completed_at = NOW() WHERE id = $1', [id]);
+    // Security audit finding, Phase 2 HIGH #5: previously updated any batch by raw ID with no
+    // kitchen ownership check.
+    if (req.user!.role === 'super_admin') {
+        await query('UPDATE production_batches SET status = \'completed\', completed_at = NOW() WHERE id = $1', [id]);
+    } else {
+        const kitchenId = await getKitchenId(req, res);
+        if (!kitchenId) return;
+        const { rowCount } = await query(
+            'UPDATE production_batches SET status = \'completed\', completed_at = NOW() WHERE id = $1 AND kitchen_id = $2',
+            [id, kitchenId]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'NOT_FOUND' });
+    }
     res.json({ success: true });
 });
 
@@ -424,7 +464,19 @@ router.get('/prep-list', authenticate, requireRole('chef', 'super_admin'), async
 
 router.post('/prep-list/:id/toggle', authenticate, requireRole('chef', 'super_admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    await query('UPDATE prep_tasks SET completed = NOT completed, completed_at = CASE WHEN NOT completed THEN NOW() ELSE NULL END WHERE id = $1', [id]);
+    // Security audit finding, Phase 2 HIGH #5: previously updated any prep task by raw ID with
+    // no kitchen ownership check.
+    if (req.user!.role === 'super_admin') {
+        await query('UPDATE prep_tasks SET completed = NOT completed, completed_at = CASE WHEN NOT completed THEN NOW() ELSE NULL END WHERE id = $1', [id]);
+    } else {
+        const kitchenId = await getKitchenId(req, res);
+        if (!kitchenId) return;
+        const { rowCount } = await query(
+            'UPDATE prep_tasks SET completed = NOT completed, completed_at = CASE WHEN NOT completed THEN NOW() ELSE NULL END WHERE id = $1 AND kitchen_id = $2',
+            [id, kitchenId]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'NOT_FOUND' });
+    }
     res.json({ success: true });
 });
 
@@ -537,11 +589,18 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
 
 // ─── Dispatch: live rider list with GPS + order status ───────────────────────
 router.get('/riders/live', authenticate, requireRole('chef', 'kitchen_manager', 'admin', 'super_admin', 'packer'), async (req: AuthRequest, res) => {
+    const isPlatformAdmin = PLATFORM_ADMIN_ROLES.includes(req.user!.role);
     const kitchenId = await getKitchenId(req, res);
     if (!kitchenId) return;
 
     try {
-        // Show all online riders + ANY rider assigned active undelivered orders (even if offline)
+        const zoneId = isPlatformAdmin ? null : await getZoneId(kitchenId);
+
+        // Security audit finding, Phase 2 HIGH #7: previously returned every online rider on the
+        // whole platform — with phone number and live GPS — to any kitchen, regardless of zone.
+        // Riders are pooled per zone (see services/autoAssign.ts), so a kitchen's dispatch view
+        // is now limited to riders in its own zone, plus any rider currently mid-delivery on one
+        // of THIS kitchen's own orders (who may have since left the zone).
         const { rows: riders } = await query(`
             SELECT u.id, u.name, u.phone, u.is_online,
                    k.lat AS kitchen_lat, k.lng AS kitchen_lng,
@@ -558,13 +617,18 @@ router.get('/riders/live', authenticate, requireRole('chef', 'kitchen_manager', 
                    ), '[]'::json) as active_orders
             FROM users u
             LEFT JOIN kitchens k ON k.id = $1
-            WHERE u.is_online = true
-               OR u.id IN (
-                   SELECT DISTINCT o.rider_id FROM orders o 
-                   WHERE o.rider_id IS NOT NULL AND o.status NOT IN ('delivered', 'cancelled')
-               )
+            WHERE (u.is_online = true
+                   OR u.id IN (
+                       SELECT DISTINCT o.rider_id FROM orders o
+                       WHERE o.rider_id IS NOT NULL AND o.status NOT IN ('delivered', 'cancelled')
+                         AND ($2::boolean OR o.kitchen_id = $1)
+                   ))
+              AND ($2::boolean OR u.zone_id = $3 OR u.id IN (
+                       SELECT DISTINCT o.rider_id FROM orders o
+                       WHERE o.rider_id IS NOT NULL AND o.kitchen_id = $1 AND o.status NOT IN ('delivered', 'cancelled')
+                  ))
             ORDER BY u.name
-        `, [kitchenId]);
+        `, [kitchenId, isPlatformAdmin, zoneId]);
 
         // Attach location: Redis live GPS -> Kitchen location fallback -> Default Ranchi location
         const ridersWithLocation = await Promise.all(
@@ -730,6 +794,13 @@ router.post('/orders/:id/force-reassign', authenticate, requireRole('kitchen_man
 
 // ─── Dispatch: get unassigned ready orders for dispatch panel ─────────────────
 router.get('/orders/unassigned', authenticate, requireRole('chef', 'kitchen_manager', 'admin', 'super_admin', 'packer'), async (req: AuthRequest, res) => {
+    // Security audit finding, Phase 2 HIGH #7: previously returned every unassigned order on the
+    // whole platform — including customer name, phone, and delivery GPS — to any kitchen-role
+    // account regardless of which kitchen it belongs to.
+    const isPlatformAdmin = PLATFORM_ADMIN_ROLES.includes(req.user!.role);
+    const kitchenId = isPlatformAdmin ? null : await getKitchenId(req, res);
+    if (!isPlatformAdmin && !kitchenId) return;
+
     try {
         const { rows } = await query(`
             SELECT o.id, o.display_id, o.status, o.created_at, o.rider_id,
@@ -751,9 +822,10 @@ router.get('/orders/unassigned', authenticate, requireRole('chef', 'kitchen_mana
             LEFT JOIN order_items oi ON oi.order_id = o.id
             WHERE o.status IN ('confirmed', 'preparing', 'packing', 'ready_for_pickup')
               AND o.rider_id IS NULL
+              AND ($1::boolean OR o.kitchen_id = $2)
             GROUP BY o.id, u.id, r.id, a.id, k.id
             ORDER BY o.created_at ASC
-        `);
+        `, [isPlatformAdmin, kitchenId]);
 
         const { rows: settings } = await query("SELECT value FROM app_settings WHERE key = 'max_batch_size'");
         const maxBatchSize = settings.length > 0 ? parseInt(settings[0].value, 10) || 1 : 1;

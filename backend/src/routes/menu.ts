@@ -476,13 +476,27 @@ router.get('/zones/check', async (req, res) => {
     }
 });
 
-router.patch('/items/:id/toggle', authenticate, requireRole('chef', 'super_admin'), async (req, res) => {
+router.patch('/items/:id/toggle', authenticate, requireRole('chef', 'super_admin'), async (req: any, res) => {
     const { id } = req.params;
-    
-    const { rows } = await query(
-        'UPDATE menu_items SET available = NOT available, sold_out_reason = CASE WHEN available = false THEN \'manual\' ELSE NULL END WHERE id = $1 RETURNING *',
-        [id]
-    );
+
+    // Security audit finding, Phase 2 HIGH #5: previously toggled any menu item by raw ID with
+    // no ownership check. Menu items are shared per-zone (every kitchen in a zone serves the
+    // same menu), so a chef is scoped to items in their own zone; super_admin is unrestricted.
+    let rows;
+    if (req.user.role === 'super_admin') {
+        ({ rows } = await query(
+            'UPDATE menu_items SET available = NOT available, sold_out_reason = CASE WHEN available = false THEN \'manual\' ELSE NULL END WHERE id = $1 RETURNING *',
+            [id]
+        ));
+    } else {
+        const { rows: kRows } = await query('SELECT zone_id FROM kitchens WHERE id = $1', [req.user.kitchenId]);
+        const zoneId = kRows[0]?.zone_id;
+        if (!zoneId) return res.status(400).json({ error: 'KITCHEN_NOT_ASSIGNED' });
+        ({ rows } = await query(
+            'UPDATE menu_items SET available = NOT available, sold_out_reason = CASE WHEN available = false THEN \'manual\' ELSE NULL END WHERE id = $1 AND zone_id = $2 RETURNING *',
+            [id, zoneId]
+        ));
+    }
 
     if (rows.length === 0) return res.status(404).json({ error: 'NOT_FOUND' });
 
