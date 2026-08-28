@@ -686,12 +686,27 @@ router.patch('/orders/:id/status', authenticate, requireRole('super_admin', 'adm
 });
 
 router.post('/orders/complete-all-live', authenticate, requireRole('super_admin', 'admin', 'manager', 'kitchen_manager', 'partner_kitchen', 'chef'), async (req: AuthRequest, res) => {
+    // Security fix (Phase 2.1, Critical): previously updated EVERY non-terminal order on the
+    // whole platform with no ownership check. The only actual UI caller is the admin panel's
+    // confirm-gated "Complete All Live Orders" button (web/app/admin/page.tsx), reachable only
+    // by super_admin/admin — but the backend route was reachable directly by any
+    // chef/kitchen_manager/partner_kitchen account too, with full platform-wide power. Those
+    // roles are now restricted to their own kitchen's orders; the intentional platform-wide
+    // behavior for super_admin/admin is unchanged.
+    const isPlatformAdmin = ['super_admin', 'admin'].includes(req.user!.role);
+    const kitchenId = isPlatformAdmin ? null : req.user!.kitchenId;
+    if (!isPlatformAdmin && !kitchenId) {
+        return res.status(400).json({ error: 'KITCHEN_NOT_ASSIGNED' });
+    }
+
     try {
         const { rows } = await query(
-            `UPDATE orders 
-             SET status = 'delivered', delivered_at = COALESCE(delivered_at, NOW()) 
-             WHERE status NOT IN ('delivered', 'cancelled') 
-             RETURNING id, display_id`
+            `UPDATE orders
+             SET status = 'delivered', delivered_at = COALESCE(delivered_at, NOW())
+             WHERE status NOT IN ('delivered', 'cancelled')
+               AND ($1::uuid IS NULL OR kitchen_id = $1)
+             RETURNING id, display_id`,
+            [kitchenId]
         );
         res.json({ success: true, count: rows.length, completedOrders: rows });
     } catch (err: any) {

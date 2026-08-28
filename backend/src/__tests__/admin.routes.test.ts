@@ -6,6 +6,7 @@
 import express from 'express';
 import request from 'supertest';
 import { query } from '../db';
+import { authenticate } from '../middleware/auth';
 
 jest.mock('@imagekit/nodejs', () =>
   jest.fn().mockImplementation(() => ({
@@ -46,13 +47,23 @@ app.use(express.json());
 app.use('/admin', adminRouter);
 
 const mockQuery = query as jest.Mock;
+const mockAuthenticate = authenticate as jest.Mock;
+const defaultAuthenticate = mockAuthenticate.getMockImplementation();
 
 function parallelQueryMocks(results: any[]) {
   results.forEach(r => mockQuery.mockResolvedValueOnce(r));
 }
 
+function actingAs(user: { userId: string; role: string; kitchenId: string | null; zoneId: string | null; restaurantId: string | null }) {
+  mockAuthenticate.mockImplementationOnce((req: any, _res: any, next: any) => {
+    req.user = { ...user, jti: 'jti-test' };
+    next();
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  if (defaultAuthenticate) mockAuthenticate.mockImplementation(defaultAuthenticate);
 });
 
 // ── GET /admin/activity-logs ──────────────────────────────────────────────────
@@ -233,5 +244,85 @@ describe('Admin Zod validation — kitchens', () => {
     const res = await request(app).post('/admin/kitchens').send(body);
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('VALIDATION_ERROR');
+  });
+});
+
+// ── POST /admin/orders/complete-all-live ──────────────────────────────────────
+// Security fix (Phase 2.1, Critical): previously updated EVERY non-terminal order on the whole
+// platform with no ownership check — reachable directly by chef/kitchen_manager/partner_kitchen
+// accounts even though the only UI caller (the admin panel button) is admin-only.
+
+describe('POST /admin/orders/complete-all-live', () => {
+  it("scopes completion to a chef's own kitchen — no other kitchen's orders are touched", async () => {
+    actingAs({ userId: 'chef-1', role: 'chef', kitchenId: 'kitchen-A', zoneId: 'zone-A', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'ord-1', display_id: '2QT-100001' }] });
+
+    const res = await request(app).post('/admin/orders/complete-all-live');
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(1);
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[0]).toContain('kitchen_id = $1');
+    expect(call[0]).toContain("NOT IN ('delivered', 'cancelled')"); // already-delivered/cancelled orders stay untouched
+    expect(call[1]).toEqual(['kitchen-A']);
+  });
+
+  it('does not let a kitchen_manager complete platform-wide orders — only their own kitchen', async () => {
+    actingAs({ userId: 'km-1', role: 'kitchen_manager', kitchenId: 'kitchen-B', zoneId: 'zone-B', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // no eligible orders for kitchen-B
+
+    const res = await request(app).post('/admin/orders/complete-all-live');
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(0);
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[1]).toEqual(['kitchen-B']);
+  });
+
+  it('ignores a client-supplied kitchen scope override attempt for a non-admin role', async () => {
+    // requireRole already gates on role, but this proves the handler itself derives scope
+    // from req.user, not from anything the client can send in the body.
+    actingAs({ userId: 'chef-1', role: 'chef', kitchenId: 'kitchen-A', zoneId: 'zone-A', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/orders/complete-all-live').send({ kitchenId: 'kitchen-Z', restaurantId: 'restaurant-Z', zoneId: 'zone-Z' });
+    expect(res.status).toBe(200);
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[1]).toEqual(['kitchen-A']); // server-derived kitchen used, body ignored
+  });
+
+  it('returns 400 when a kitchen-role account has no kitchen assigned', async () => {
+    actingAs({ userId: 'partner-1', role: 'partner_kitchen', kitchenId: null, zoneId: null, restaurantId: null });
+
+    const res = await request(app).post('/admin/orders/complete-all-live');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('KITCHEN_NOT_ASSIGNED');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('retains platform-wide completion for super_admin', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-1', display_id: '2QT-100001' }, { id: 'ord-2', display_id: '2QT-100002' }],
+    });
+
+    const res = await request(app).post('/admin/orders/complete-all-live');
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(2);
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[1]).toEqual([null]); // no kitchen filter — platform-wide, as intended
+  });
+
+  it('retains platform-wide completion for admin', async () => {
+    actingAs({ userId: 'admin-2', role: 'admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/orders/complete-all-live');
+    expect(res.status).toBe(200);
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[1]).toEqual([null]);
   });
 });
