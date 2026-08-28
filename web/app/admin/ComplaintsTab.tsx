@@ -175,23 +175,18 @@ function ComplaintCard({ c, onAction }: { c: any; onAction: () => void }) {
 }
 
 export function ComplaintsTab() {
-  const { selectedZoneId, selectedKitchenId } = useAdminScope();
-  const [statusFilter, setStatusFilter] = useState("open");
+  const [statusFilter, setStatusFilter] = useState<string>("open");
   const [complaints, setComplaints] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({ status: statusFilter });
-      if (selectedKitchenId) params.set("kitchenId", selectedKitchenId);
-      else if (selectedZoneId) params.set("zoneId", selectedZoneId);
-
-      const data = await api.get(`/complaints/admin?${params.toString()}`);
+      const data = await api.get(`/complaints/admin?status=${statusFilter}`);
       setComplaints(data?.complaints ?? []);
     } catch {}
     setIsLoading(false);
-  }, [statusFilter, selectedZoneId, selectedKitchenId]);
+  }, [statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
