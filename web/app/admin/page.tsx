@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3, Users, ShoppingBag, TrendingUp, LayoutDashboard,
@@ -91,9 +91,13 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
+import { AdminScopeProvider, useAdminScope } from "./AdminScopeContext";
+import { AdminScopeHeader } from "./AdminScopeHeader";
+
 // ─── Overview ────────────────────────────────────────────────────────────────
 
 function OverviewTab() {
+  const { getScopeQueryParams, selectedZoneId, selectedKitchenId } = useAdminScope();
   const [stats, setStats] = useState<any>(null);
   const [liveOrders, setLiveOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,16 +105,17 @@ function OverviewTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const scopeParams = getScopeQueryParams();
       const [s, o] = await Promise.all([
-        api.get("/admin/dashboard"),
-        api.get("/admin/orders/live"),
+        api.get(`/admin/dashboard${scopeParams}`),
+        api.get(`/admin/orders/live${scopeParams}`),
       ]);
       setStats(s);
       setLiveOrders(o.orders ?? []);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getScopeQueryParams]);
 
   useEffect(() => { 
     load(); 
@@ -122,7 +127,7 @@ function OverviewTab() {
       socket.off("order_status_update", load);
       socket.off("order_cancelled", load);
     };
-  }, [load]);
+  }, [load, selectedZoneId, selectedKitchenId]);
 
   const rev = (stats?.todayRevenuePaise ?? 0) / 100;
   const weeklyRaw: number[] = stats?.weeklyRevenue?.map((d: any) => d.revenuePaise) ?? [];
@@ -2103,7 +2108,7 @@ const TABS = [
   { name: "Settings",        icon: Settings,         component: SettingsTab },
 ];
 
-export default function AdminPage() {
+function AdminDashboard() {
   const { user, loading, logout } = useAuth()!;
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("Overview");
@@ -2350,6 +2355,9 @@ export default function AdminPage() {
           </div>
         </header>
 
+        {/* Hierarchical Operational Scope Header Bar */}
+        <AdminScopeHeader />
+
         {/* Dynamic Tab Content */}
         <main className="flex-1 p-8 overflow-y-auto">
           <AnimatePresence mode="wait">
@@ -2377,5 +2385,15 @@ export default function AdminPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div className="h-screen w-full bg-[#07070e] text-white flex items-center justify-center font-sans">Loading Admin Panel...</div>}>
+      <AdminScopeProvider>
+        <AdminDashboard />
+      </AdminScopeProvider>
+    </Suspense>
   );
 }

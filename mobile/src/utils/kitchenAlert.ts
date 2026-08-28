@@ -22,7 +22,28 @@ function getSoundPkg() {
   return SoundPkg;
 }
 
+let lastPlayTime = 0;
+
+export function stopKitchenAlert() {
+  try {
+    Vibration.cancel();
+    if (alertSound) {
+      alertSound.stop(() => {
+        alertSound?.setCurrentTime(0);
+      });
+    }
+  } catch (e) {
+    console.warn('[KitchenAlert] Failed to stop kitchen alert sound:', e);
+  }
+}
+
 export function playKitchenAlert() {
+  const now = Date.now();
+  if (now - lastPlayTime < 3000) {
+    return; // Ignore duplicate calls within 3 seconds
+  }
+  lastPlayTime = now;
+
   try {
     // 1. Aggressive 6-second multi-pulse vibration (works on all devices natively)
     Vibration.vibrate([0, 800, 400, 800, 400, 800, 400, 800, 400, 800]);
@@ -33,7 +54,7 @@ export function playKitchenAlert() {
         id: 'kitchen_order_alerts_v3',
         name: 'Kitchen Order Alerts',
         importance: AndroidImportance.HIGH,
-        sound: 'default',
+        sound: 'kitchen_alarm',
         vibration: true,
       }).then((channelId: any) => {
         safeNotifee.displayNotification({
@@ -42,7 +63,7 @@ export function playKitchenAlert() {
           android: {
             channelId: channelId || 'kitchen_order_alerts_v3',
             importance: AndroidImportance.HIGH,
-            sound: 'default',
+            sound: 'kitchen_alarm',
             pressAction: { id: 'default' },
           },
         }).catch(() => {});
@@ -52,12 +73,22 @@ export function playKitchenAlert() {
     // 3. Play sound file via react-native-sound if native module is present
     const soundClass = getSoundPkg();
     if (soundClass) {
-      const fileName = Platform.OS === 'android' ? 'alert' : 'alert.mp3';
+      const fileName = Platform.OS === 'android' ? 'kitchen_alarm' : 'kitchen_alarm.mp3';
       if (!alertSound) {
         alertSound = new soundClass(fileName, soundClass.MAIN_BUNDLE, (error: any) => {
           if (error) {
-            console.warn('[KitchenAlert] Sound load error:', error);
-            alertSound = null;
+            console.warn('[KitchenAlert] Primary sound load notice:', error);
+            // Fallback to 'alert' / 'alert.mp3'
+            const fallbackName = Platform.OS === 'android' ? 'alert' : 'alert.mp3';
+            alertSound = new soundClass(fallbackName, soundClass.MAIN_BUNDLE, (err2: any) => {
+              if (err2) {
+                console.warn('[KitchenAlert] Fallback sound load error:', err2);
+                alertSound = null;
+                return;
+              }
+              alertSound?.setVolume(1.0);
+              alertSound?.play();
+            });
             return;
           }
           alertSound?.setVolume(1.0);
