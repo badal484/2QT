@@ -15,7 +15,13 @@ async function bustPromoCache() {
 // GET all promo codes (admin only)
 router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (_req, res) => {
     try {
-        const { rows } = await query('SELECT * FROM promo_codes ORDER BY created_at DESC');
+        const { rows } = await query(`
+            SELECT p.*, z.name as zone_name, k.name as kitchen_name
+            FROM promo_codes p
+            LEFT JOIN zones z ON p.zone_id = z.id
+            LEFT JOIN kitchens k ON p.kitchen_id = k.id
+            ORDER BY p.created_at DESC
+        `);
         res.json({ promoCodes: rows });
     } catch (err: any) {
         console.error(err);
@@ -23,25 +29,27 @@ router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (_
     }
 });
 
-// GET active promo codes (customer-facing) — Redis cached 30s per zone
+// GET active promo codes (customer-facing) — Redis cached 30s per zone/kitchen
 router.get('/active', authenticate, async (req, res) => {
     try {
         const zoneId = req.query.zoneId as string | undefined;
-        const cacheKey = zoneId ? `${keys.activePromos()}:${zoneId}` : keys.activePromos();
+        const kitchenId = req.query.kitchenId as string | undefined;
+        const cacheKey = `${keys.activePromos()}:${zoneId || 'all'}:${kitchenId || 'all'}`;
         const cached = await redis.get(cacheKey);
         if (cached) return res.json(JSON.parse(cached));
 
         const { rows } = await query(`
             SELECT id, code, discount_type, discount_percent, discount_flat_paise,
                    max_discount_paise, min_order_paise, expires_at, description,
-                   first_order_only, new_user_only, per_user_limit
+                   first_order_only, new_user_only, per_user_limit, zone_id, kitchen_id
             FROM promo_codes
             WHERE is_active = true
             AND (expires_at IS NULL OR expires_at > NOW())
             AND (max_uses IS NULL OR COALESCE((to_jsonb(promo_codes)->>'times_used')::int, (to_jsonb(promo_codes)->>'current_uses')::int, 0) < max_uses)
             AND (zone_id IS NULL OR zone_id = $1)
+            AND (kitchen_id IS NULL OR kitchen_id = $2)
             ORDER BY created_at DESC
-        `, [zoneId || null]);
+        `, [zoneId || null, kitchenId || null]);
         const payload = { promoCodes: rows };
         await redis.setEx(cacheKey, PROMO_TTL, JSON.stringify(payload));
         res.json(payload);
@@ -56,15 +64,16 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
     const {
         code, discount_type, discount_percent, discount_flat_paise,
         min_order_paise, max_discount_paise, expires_at, max_uses,
-        is_active, first_order_only, new_user_only, per_user_limit, description
+        is_active, first_order_only, new_user_only, per_user_limit, description,
+        zone_id, kitchen_id
     } = req.body;
     try {
         const { rows } = await query(
             `INSERT INTO promo_codes
             (code, discount_type, discount_percent, discount_flat_paise, min_order_paise,
              max_discount_paise, expires_at, max_uses, is_active, first_order_only,
-             new_user_only, per_user_limit, description)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+             new_user_only, per_user_limit, description, zone_id, kitchen_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
             RETURNING *`,
             [
                 code.toUpperCase(),
@@ -79,7 +88,9 @@ router.post('/admin', authenticate, requireRole('super_admin', 'admin'), async (
                 first_order_only ?? false,
                 new_user_only ?? false,
                 per_user_limit || null,
-                description || null
+                description || null,
+                zone_id || null,
+                kitchen_id || null
             ]
         );
         await bustPromoCache();
@@ -99,7 +110,7 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
     const {
         code, discount_type, discount_percent, discount_flat_paise,
         min_order_paise, max_discount_paise, expires_at, max_uses,
-        is_active, first_order_only, new_user_only, per_user_limit, description, zone_id
+        is_active, first_order_only, new_user_only, per_user_limit, description, zone_id, kitchen_id
     } = req.body;
     try {
         const { rows } = await query(
@@ -118,15 +129,16 @@ router.patch('/admin/:id', authenticate, requireRole('super_admin', 'admin'), as
                  per_user_limit      = COALESCE($12, per_user_limit),
                  description         = COALESCE($13, description),
                  zone_id             = $14,
+                 kitchen_id          = $15,
                  updated_at          = NOW()
-             WHERE id = $15
+             WHERE id = $16
              RETURNING *`,
             [
                 code ? code.toUpperCase() : null,
                 discount_type ?? null, discount_percent ?? null, discount_flat_paise ?? null,
                 min_order_paise ?? null, max_discount_paise ?? null, expires_at || null, max_uses || null,
                 is_active ?? null, first_order_only ?? null, new_user_only ?? null, per_user_limit || null,
-                description || null, zone_id || null, id
+                description || null, zone_id || null, kitchen_id || null, id
             ]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Promo code not found' });

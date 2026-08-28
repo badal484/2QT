@@ -73,6 +73,16 @@ function ComplaintCard({ c, onAction }: { c: any; onAction: () => void }) {
                 <Banknote size={10}/> Cash COD
               </span>
             )}
+            {c.kitchen_name && (
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 flex items-center gap-1">
+                🍳 {c.kitchen_name}
+              </span>
+            )}
+            {c.zone_name && (
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center gap-1">
+                📍 {c.zone_name}
+              </span>
+            )}
           </div>
           <p className="text-xs text-zinc-500 mt-1">
             {c.customer_name} · {c.customer_phone} · ₹{(c.total_amount_paise / 100).toFixed(0)}
@@ -176,17 +186,31 @@ function ComplaintCard({ c, onAction }: { c: any; onAction: () => void }) {
 
 export function ComplaintsTab() {
   const [statusFilter, setStatusFilter] = useState<string>("open");
+  const [zones, setZones] = useState<any[]>([]);
+  const [kitchens, setKitchens] = useState<any[]>([]);
+  const [selectedZone, setSelectedZone] = useState<string>("All");
+  const [selectedKitchen, setSelectedKitchen] = useState<string>("All");
   const [complaints, setComplaints] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    api.get("/admin/zones").then((d: any) => setZones(d.zones ?? [])).catch(() => {});
+    api.get("/admin/kitchens").then((d: any) => setKitchens(d.kitchens ?? [])).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await api.get(`/complaints/admin?status=${statusFilter}`);
+      const params = new URLSearchParams();
+      if (statusFilter) params.set("status", statusFilter);
+      if (selectedKitchen !== "All") params.set("kitchenId", selectedKitchen);
+      else if (selectedZone !== "All") params.set("zoneId", selectedZone);
+
+      const data = await api.get(`/complaints/admin?${params}`);
       setComplaints(data?.complaints ?? []);
     } catch {}
     setIsLoading(false);
-  }, [statusFilter]);
+  }, [statusFilter, selectedZone, selectedKitchen]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -196,12 +220,39 @@ export function ComplaintsTab() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-black">Customer Complaints</h2>
-        <p className="text-sm text-zinc-500 mt-1">
-          Raised within 24h of delivery. Approve refund → credited to wallet instantly.
-          Cash COD refunds auto-deducted from rider's next payout.
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-white">Customer Complaints</h2>
+          <p className="text-sm text-zinc-400 mt-1">
+            Raised within 24h of delivery. Filter by restaurant kitchen or delivery zone.
+          </p>
+        </div>
+
+        {/* Filter Pills */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={selectedZone}
+            onChange={e => {
+              setSelectedZone(e.target.value);
+              setSelectedKitchen("All");
+            }}
+            className="px-3 py-2 bg-white/[0.04] border border-white/10 rounded-xl text-sm font-bold text-zinc-300 focus:outline-none cursor-pointer"
+          >
+            <option value="All" className="bg-zinc-900">📍 All Zones</option>
+            {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">📍 {z.name}</option>)}
+          </select>
+
+          <select
+            value={selectedKitchen}
+            onChange={e => setSelectedKitchen(e.target.value)}
+            className="px-3 py-2 bg-white/[0.04] border border-white/10 rounded-xl text-sm font-bold text-zinc-300 focus:outline-none cursor-pointer"
+          >
+            <option value="All" className="bg-zinc-900">🍳 All Kitchens</option>
+            {kitchens
+              .filter(k => selectedZone === "All" || k.zone_id === selectedZone || (Array.isArray(k.zones) && k.zones.some((z: any) => z.id === selectedZone)))
+              .map(k => <option key={k.id} value={k.id} className="bg-zinc-900">🍳 {k.name}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Filter tabs */}
@@ -211,7 +262,7 @@ export function ComplaintsTab() {
             key={s}
             onClick={() => setStatusFilter(s)}
             className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all ${
-              statusFilter === s ? "bg-black text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+              statusFilter === s ? "bg-white text-black font-black" : "bg-white/[0.04] text-zinc-400 hover:bg-white/10"
             }`}
           >
             {s} {s === "open" && openCount > 0 && <span className="ml-1 bg-red-500 text-white rounded-full px-1.5 py-0.5 text-[10px]">{openCount}</span>}

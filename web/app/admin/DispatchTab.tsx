@@ -40,6 +40,10 @@ export function DispatchTab() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [date, setDate] = useState("");
+  const [zones, setZones] = useState<any[]>([]);
+  const [kitchens, setKitchens] = useState<any[]>([]);
+  const [selectedZone, setSelectedZone] = useState<string>("All");
+  const [selectedKitchen, setSelectedKitchen] = useState<string>("All");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [alerting, setAlerting] = useState<string | null>(null);
   const [activeRiders, setActiveRiders] = useState<any[]>([]);
@@ -51,6 +55,9 @@ export function DispatchTab() {
       if (search) params.set("search", search);
       if (status) params.set("status", status);
       if (date) params.set("date", date);
+      if (selectedKitchen !== "All") params.set("kitchenId", selectedKitchen);
+      else if (selectedZone !== "All") params.set("zoneId", selectedZone);
+
       const d = await api.get(`/admin/orders/dispatch?${params}`);
       setOrders(d.orders ?? []);
       setTotal(d.total ?? 0);
@@ -58,11 +65,13 @@ export function DispatchTab() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, date, page]);
+  }, [search, status, date, page, selectedZone, selectedKitchen]);
 
-  useEffect(() => { load(1); }, []);
+  useEffect(() => { load(1); }, [selectedZone, selectedKitchen]);
   useEffect(() => {
     api.get("/admin/users?role=rider").then((d: any) => setActiveRiders(d.users ?? [])).catch(() => {});
+    api.get("/admin/zones").then((d: any) => setZones(d.zones ?? [])).catch(() => {});
+    api.get("/admin/kitchens").then((d: any) => setKitchens(d.kitchens ?? [])).catch(() => {});
   }, []);
 
   useSocketRefresh(["new_order", "order_status_update"], () => load(page));
@@ -131,6 +140,31 @@ export function DispatchTab() {
           </button>
         </form>
 
+        {/* Zone Filter */}
+        <select
+          value={selectedZone}
+          onChange={e => {
+            setSelectedZone(e.target.value);
+            setSelectedKitchen("All");
+          }}
+          className="px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl text-sm text-zinc-300 focus:outline-none cursor-pointer"
+        >
+          <option value="All">📍 All Zones</option>
+          {zones.map(z => <option key={z.id} value={z.id} className="bg-zinc-900">📍 {z.name}</option>)}
+        </select>
+
+        {/* Kitchen Filter */}
+        <select
+          value={selectedKitchen}
+          onChange={e => setSelectedKitchen(e.target.value)}
+          className="px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl text-sm text-zinc-300 focus:outline-none cursor-pointer"
+        >
+          <option value="All">🍳 All Kitchens</option>
+          {kitchens
+            .filter(k => selectedZone === "All" || k.zone_id === selectedZone || (Array.isArray(k.zones) && k.zones.some((z: any) => z.id === selectedZone)))
+            .map(k => <option key={k.id} value={k.id} className="bg-zinc-900">🍳 {k.name}</option>)}
+        </select>
+
         <select
           value={status}
           onChange={e => { setStatus(e.target.value); }}
@@ -139,7 +173,8 @@ export function DispatchTab() {
           <option value="">All statuses</option>
           <option value="confirmed">Confirmed</option>
           <option value="preparing">Preparing</option>
-          <option value="out_for_delivery">Out for Delivery</option>
+          <option value="ready_for_pickup">Ready for pickup</option>
+          <option value="out_for_delivery">Out for delivery</option>
           <option value="delivered">Delivered</option>
           <option value="cancelled">Cancelled</option>
         </select>
