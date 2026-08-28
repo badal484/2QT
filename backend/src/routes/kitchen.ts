@@ -204,12 +204,24 @@ router.get('/orders', authenticate, requireRole('chef', 'kitchen_manager', 'supe
 });
 
 router.post('/orders/complete-all-live', authenticate, requireRole('chef', 'kitchen_manager', 'partner_kitchen', 'manager', 'admin', 'super_admin'), async (req: AuthRequest, res) => {
+    // Security fix (Phase 2.1, Critical): previously updated EVERY non-terminal order on the
+    // whole platform with no ownership check at all — any chef/kitchen_manager/partner_kitchen
+    // account could mark every kitchen's live orders as delivered in one call. Kitchen-scoped
+    // roles are now restricted to their own kitchen's orders; platform admins keep the existing
+    // unrestricted behavior (mirroring the intentionally-global /admin/orders/complete-all-live
+    // tool behind the admin panel's confirm-gated "Complete All Live Orders" button).
+    const isPlatformAdmin = PLATFORM_ADMIN_ROLES.includes(req.user!.role);
+    const callerKitchenId = isPlatformAdmin ? null : await getKitchenId(req, res);
+    if (!isPlatformAdmin && !callerKitchenId) return;
+
     try {
         const { rows } = await query(
-            `UPDATE orders 
-             SET status = 'delivered', delivered_at = NOW(), updated_at = NOW() 
-             WHERE status NOT IN ('delivered', 'cancelled') 
-             RETURNING id, display_id`
+            `UPDATE orders
+             SET status = 'delivered', delivered_at = NOW(), updated_at = NOW()
+             WHERE status NOT IN ('delivered', 'cancelled')
+               AND ($1::uuid IS NULL OR kitchen_id = $1)
+             RETURNING id, display_id`,
+            [callerKitchenId]
         );
         res.json({ success: true, count: rows.length, completedOrders: rows });
     } catch (err: any) {
