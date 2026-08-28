@@ -52,24 +52,30 @@ export async function payoutMonthlySalaryForRider(rider: SalariedRider, periodLa
 
     let result: SalaryPayoutResult;
     if (mode === 'auto') {
-        const fundAccountId = await ensureRiderFundAccount({
-            id: rider.id, name: rider.name, phone: rider.phone, upi_id: rider.upi_id!,
-            razorpay_contact_id: rider.razorpay_contact_id || undefined,
-            razorpay_fund_account_id: rider.razorpay_fund_account_id || undefined,
-        });
-        const payout = await firePayout(
-            fundAccountId,
-            netPaise,
-            `2QT Salary ${periodLabel}`,
-            `2QT-S-${rider.id.slice(0, 8)}-${today}`
-        );
-        await query(`
-            UPDATE weekly_payouts
-            SET status = 'paid', paid_at = NOW(),
-                razorpay_payout_id = $1, utr_number = $2
-            WHERE id = $3
-        `, [payout.payoutId, payout.utr, payoutRowId]);
-        result = { status: 'paid', netPaise, payoutRowId };
+        try {
+            const fundAccountId = await ensureRiderFundAccount({
+                id: rider.id, name: rider.name, phone: rider.phone, upi_id: rider.upi_id!,
+                razorpay_contact_id: rider.razorpay_contact_id || undefined,
+                razorpay_fund_account_id: rider.razorpay_fund_account_id || undefined,
+            });
+            const payout = await firePayout(
+                fundAccountId,
+                netPaise,
+                `2QT Salary ${periodLabel}`,
+                `2QT-S-${rider.id.slice(0, 8)}-${today}`
+            );
+            await query(`
+                UPDATE weekly_payouts
+                SET status = 'paid', paid_at = NOW(),
+                    razorpay_payout_id = $1, utr_number = $2
+                WHERE id = $3
+            `, [payout.payoutId, payout.utr, payoutRowId]);
+            result = { status: 'paid', netPaise, payoutRowId };
+        } catch (err: any) {
+            console.error('[rider-payout.service] Auto-payout failed:', err.message);
+            await query(`UPDATE weekly_payouts SET status = 'failed', notes = $1 WHERE id = $2`, [err.message, payoutRowId]);
+            throw new Error(`AUTO_PAYOUT_FAILED: ${err.message}`);
+        }
     } else {
         await query(`UPDATE weekly_payouts SET status = 'pending' WHERE id = $1`, [payoutRowId]);
         result = { status: 'pending', netPaise, payoutRowId };

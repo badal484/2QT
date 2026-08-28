@@ -114,8 +114,52 @@ router.get('/activity-logs', authenticate, requireRole('super_admin', 'admin'), 
     }
 });
 
+router.get('/hierarchy', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    try {
+        const { rows: zones } = await query(
+            `SELECT id, name, is_active, city, kitchen_lat, kitchen_lng, radius_km FROM zones ORDER BY name ASC`
+        );
+        const { rows: kitchens } = await query(
+            `SELECT id, zone_id, name, address, is_paused, lat, lng FROM kitchens ORDER BY name ASC`
+        );
+
+        const hierarchy = zones.map(zone => ({
+            ...zone,
+            kitchens: kitchens.filter(k => k.zone_id === zone.id)
+        }));
+
+        res.json({ zones: hierarchy, kitchens });
+    } catch (err: any) {
+        console.error('Hierarchy Fetch Error:', err);
+        res.status(500).json({ error: 'Failed to fetch zone hierarchy' });
+    }
+});
+
 router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
+        const zoneId = (req.query.zoneId as string || '').trim();
+        const kitchenId = (req.query.kitchenId as string || '').trim();
+
+        let orderFilter = '';
+        const orderParams: any[] = [];
+        if (kitchenId) {
+            orderParams.push(kitchenId);
+            orderFilter = ` AND o.kitchen_id = $${orderParams.length}`;
+        } else if (zoneId) {
+            orderParams.push(zoneId);
+            orderFilter = ` AND o.kitchen_id IN (SELECT id FROM kitchens WHERE zone_id = $${orderParams.length})`;
+        }
+
+        const activeOrderQuery = `SELECT count(*) FROM orders o WHERE o.status NOT IN ('delivered','cancelled')${orderFilter}`;
+        const revenueQuery = `SELECT COALESCE(sum(o.total_amount_paise), 0) AS sum FROM orders o WHERE o.status != 'cancelled' AND o.created_at >= CURRENT_DATE${orderFilter}`;
+        
+        let riderQuery = "SELECT count(*) FROM users WHERE role IN ('rider','rider_captain') AND is_online = true";
+        const riderParams: any[] = [];
+        if (zoneId) {
+            riderParams.push(zoneId);
+            riderQuery += ` AND zone_id = $1`;
+        }
+
         const [
             { rows: activeOrders },
             { rows: revenue },
@@ -124,9 +168,9 @@ router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), asyn
             { rows: customers },
             { rows: weeklyRev },
         ] = await Promise.all([
-            query("SELECT count(*) FROM orders WHERE status NOT IN ('delivered','cancelled')"),
-            query("SELECT COALESCE(sum(total_amount_paise), 0) AS sum FROM orders WHERE status != 'cancelled' AND created_at >= CURRENT_DATE"),
-            query("SELECT count(*) FROM users WHERE role IN ('rider','rider_captain') AND is_online = true"),
+            query(activeOrderQuery, orderParams),
+            query(revenueQuery, orderParams),
+            query(riderQuery, riderParams),
             query('SELECT count(*) FROM ingredients WHERE current_stock_grams <= reorder_threshold_grams'),
             query("SELECT count(*) FROM users WHERE role='customer'"),
             query(`
@@ -136,10 +180,10 @@ router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), asyn
                 FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day') d
                 LEFT JOIN orders o
                        ON DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = d::date
-                      AND o.status != 'cancelled'
+                      AND o.status != 'cancelled' ${orderFilter}
                 GROUP BY d::date
                 ORDER BY d::date ASC
-            `),
+            `, orderParams),
         ]);
 
         res.json({
@@ -160,13 +204,29 @@ router.get('/dashboard', authenticate, requireRole('super_admin', 'admin'), asyn
 });
 
 router.get('/feedback', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const zoneId = (req.query.zoneId as string || '').trim();
+    const kitchenId = (req.query.kitchenId as string || '').trim();
+
+    let whereClause = '';
+    const params: any[] = [];
+    if (kitchenId) {
+        params.push(kitchenId);
+        whereClause = ` WHERE o.kitchen_id = $${params.length}`;
+    } else if (zoneId) {
+        params.push(zoneId);
+        whereClause = ` WHERE o.kitchen_id IN (SELECT id FROM kitchens WHERE zone_id = $${params.length})`;
+    }
+
     const { rows: avg } = await query(`
         SELECT
-            AVG(rating)::numeric(3,1)          as avg_food,
-            AVG(delivery_rating)::numeric(3,1) as avg_delivery,
-            COUNT(*)                           as total
-        FROM order_feedback
-    `);
+            AVG(f.rating)::numeric(3,1)          as avg_food,
+            AVG(f.delivery_rating)::numeric(3,1) as avg_delivery,
+            COUNT(*)                             as total
+        FROM order_feedback f
+        JOIN orders o ON f.order_id = o.id
+        ${whereClause}
+    `, params);
+
     const { rows: recent } = await query(`
         SELECT f.rating, f.delivery_rating, f.comment, f.created_at,
                o.display_id as order_display_id,
@@ -177,14 +237,15 @@ router.get('/feedback', authenticate, requireRole('super_admin', 'admin'), async
         JOIN orders  o ON f.order_id   = o.id
         JOIN kitchens k ON o.kitchen_id = k.id
         JOIN users   u ON f.customer_id = u.id
+        ${whereClause}
         ORDER BY f.created_at DESC
         LIMIT 100
-    `);
+    `, params);
     res.json({
         feedbacks: recent,
-        averageRating:         parseFloat(avg[0].avg_food     || '0').toFixed(1),
-        averageDeliveryRating: parseFloat(avg[0].avg_delivery || '0').toFixed(1),
-        totalCount:            parseInt(avg[0].total),
+        averageRating:         parseFloat(avg[0]?.avg_food     || '0').toFixed(1),
+        averageDeliveryRating: parseFloat(avg[0]?.avg_delivery || '0').toFixed(1),
+        totalCount:            parseInt(avg[0]?.total || '0'),
     });
 });
 
@@ -201,14 +262,29 @@ router.get('/stats/growth', authenticate, requireRole('super_admin', 'admin'), a
 });
 
 router.get('/orders/live', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const zoneId = (req.query.zoneId as string || '').trim();
+    const kitchenId = (req.query.kitchenId as string || '').trim();
+
+    const conditions: string[] = ["o.status NOT IN ('delivered', 'cancelled')"];
+    const params: any[] = [];
+    if (kitchenId) {
+        params.push(kitchenId);
+        conditions.push(`o.kitchen_id = $${params.length}`);
+    } else if (zoneId) {
+        params.push(zoneId);
+        conditions.push(`o.kitchen_id IN (SELECT id FROM kitchens WHERE zone_id = $${params.length})`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const { rows } = await query(`
         SELECT o.*, u.name as customer_name, r.name as rider_name
         FROM orders o
         JOIN users u ON o.customer_id = u.id
         LEFT JOIN users r ON o.rider_id = r.id
-        WHERE o.status NOT IN ('delivered', 'cancelled')
+        ${where}
         ORDER BY o.created_at DESC
-    `);
+    `, params);
     
     for (const order of rows) {
         const { rows: items } = await query('SELECT * FROM order_items WHERE order_id = $1', [order.id]);
@@ -227,6 +303,8 @@ router.get('/orders/dispatch', authenticate, requireRole('super_admin', 'admin')
     const status = (req.query.status as string || '').trim();
     const riderId = (req.query.riderId as string || '').trim();
     const date = (req.query.date as string || '').trim(); // YYYY-MM-DD
+    const zoneId = (req.query.zoneId as string || '').trim();
+    const kitchenId = (req.query.kitchenId as string || '').trim();
 
     const conditions: string[] = [];
     const params: any[] = [];
@@ -239,6 +317,11 @@ router.get('/orders/dispatch', authenticate, requireRole('super_admin', 'admin')
     if (status) { conditions.push(`o.status = $${p}`); params.push(status); p++; }
     if (riderId) { conditions.push(`o.rider_id = $${p}`); params.push(riderId); p++; }
     if (date) { conditions.push(`o.created_at::date = $${p}`); params.push(date); p++; }
+    if (kitchenId) {
+        conditions.push(`o.kitchen_id = $${p}`); params.push(kitchenId); p++;
+    } else if (zoneId) {
+        conditions.push(`o.kitchen_id IN (SELECT id FROM kitchens WHERE zone_id = $${p})`); params.push(zoneId); p++;
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -302,12 +385,26 @@ router.delete('/scheduled-orders/:id', authenticate, requireRole('super_admin', 
 });
 
 router.get('/menu', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const zoneId = (req.query.zoneId as string || '').trim();
+    const kitchenId = (req.query.kitchenId as string || '').trim();
+
+    let whereClause = '';
+    const params: any[] = [];
+    if (kitchenId) {
+        params.push(kitchenId);
+        whereClause = ` WHERE m.zone_id IN (SELECT zone_id FROM kitchens WHERE id = $${params.length})`;
+    } else if (zoneId) {
+        params.push(zoneId);
+        whereClause = ` WHERE m.zone_id = $${params.length}`;
+    }
+
     const { rows } = await query(`
         SELECT m.*, z.name as zone_name
         FROM menu_items m
         JOIN zones z ON m.zone_id = z.id
+        ${whereClause}
         ORDER BY m.category, m.name
-    `);
+    `, params);
     res.json({ items: rows });
 });
 
@@ -855,9 +952,9 @@ router.post('/riders/:id/pay-salary-now', authenticate, requireRole('super_admin
                    COALESCE(u.pending_deductions_paise, 0) AS pending_deductions,
                    u.monthly_salary_paise, u.payment_model
             FROM users u
-            WHERE u.id = $1 AND u.role IN ('rider', 'rider_captain')
+            WHERE u.id = $1 AND u.role IN ('rider', 'rider_captain') AND u.is_active = TRUE
         `, [id]);
-        if (!rows.length) return res.status(404).json({ error: 'RIDER_NOT_FOUND' });
+        if (!rows.length) return res.status(404).json({ error: 'RIDER_NOT_FOUND_OR_INACTIVE' });
         const rider = rows[0];
 
         if (rider.payment_model !== 'salary') {
@@ -869,10 +966,13 @@ router.post('/riders/:id/pay-salary-now', authenticate, requireRole('super_admin
 
         const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
         const { rows: existing } = await query(
-            `SELECT id FROM weekly_payouts WHERE rider_id = $1 AND week_start = $2`,
-            [id, today]
+            `SELECT id FROM weekly_payouts 
+             WHERE rider_id = $1 
+               AND payout_type = 'salary_monthly' 
+               AND date_trunc('month', week_start::date) = date_trunc('month', CURRENT_DATE)`,
+            [id]
         );
-        if (existing.length) return res.status(409).json({ error: 'ALREADY_PAID_TODAY' });
+        if (existing.length) return res.status(409).json({ error: 'SALARY_ALREADY_PAID_THIS_MONTH' });
 
         const result = await payoutMonthlySalaryForRider(rider, today.substring(0, 7));
 

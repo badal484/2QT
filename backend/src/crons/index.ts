@@ -321,41 +321,7 @@ export const initCrons = () => {
         console.log('[CRON] Daily kitchen payouts done');
     });
 
-    // ── Monthly Salaried Rider Payout on the 1st of every month at 9:00 AM ──
-    cron.schedule('0 9 1 * *', async () => {
-        console.log('[CRON] Running monthly salaried rider payouts...');
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-
-        const { rows: salariedRiders } = await query(`
-            SELECT u.id, u.name, u.phone, u.upi_id,
-                   u.razorpay_contact_id, u.razorpay_fund_account_id,
-                   COALESCE(u.pending_deductions_paise, 0) AS pending_deductions,
-                   u.monthly_salary_paise
-            FROM users u
-            WHERE u.role = 'rider'
-              AND u.is_active = TRUE
-              AND u.payment_model = 'salary'
-              AND COALESCE(u.monthly_salary_paise, 0) > 0
-        `);
-
-        for (const rider of salariedRiders) {
-            try {
-                const result = await payoutMonthlySalaryForRider(rider, today.substring(0, 7));
-                if (result.status === 'absorbed') {
-                    console.log(`[CRON] Salaried Rider ${rider.name}: fully absorbed by deductions`);
-                } else {
-                    console.log(`[CRON] Salaried Rider ${rider.name}: ₹${result.netPaise / 100} ${result.status}`);
-                }
-            } catch (err: any) {
-                console.error(`[CRON_ERROR] Salaried rider payout failed for ${rider.name}:`, err.message);
-                await query(
-                    `UPDATE weekly_payouts SET status = 'failed' WHERE rider_id = $1 AND week_start = $2`,
-                    [rider.id, today]
-                ).catch(() => {});
-            }
-        }
-        console.log('[CRON] Monthly salaried rider payouts done');
-    });
+    // Note: Monthly salaried rider payouts are 100% manual via Admin Dashboard (/riders/:id/pay-salary-now)
 
     // ── Daily rider auto-payout at 11:45 PM (after 11:30 PM guarantee top-up) ─
     cron.schedule('45 23 * * *', async () => {
