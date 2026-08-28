@@ -86,27 +86,21 @@ router.get('/mine', authenticate, async (req: AuthRequest, res) => {
 
 // GET /complaints/admin — all complaints for admin review
 router.get('/admin', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
-    const { status, zoneId, kitchenId } = req.query;
+    const { status } = req.query;
     try {
         const { rows } = await query(
             `SELECT c.*,
                     o.display_id, o.total_amount_paise, o.payment_method,
-                    o.cod_cash_collected, o.zone_id, o.kitchen_id,
+                    o.cod_cash_collected,
                     cu.name as customer_name, cu.phone as customer_phone,
-                    r.name as rider_name,
-                    z.name as zone_name,
-                    k.name as kitchen_name
+                    r.name as rider_name
              FROM order_complaints c
              JOIN orders o ON o.id = c.order_id
              JOIN users cu ON cu.id = c.customer_id
              LEFT JOIN users r ON r.id = c.rider_id
-             LEFT JOIN zones z ON o.zone_id = z.id
-             LEFT JOIN kitchens k ON o.kitchen_id = k.id
              WHERE ($1::text IS NULL OR c.status = $1)
-               AND ($2::uuid IS NULL OR o.zone_id = $2)
-               AND ($3::uuid IS NULL OR o.kitchen_id = $3)
              ORDER BY c.created_at DESC`,
-            [status || null, zoneId || null, kitchenId || null]
+            [status || null]
         );
         res.json({ complaints: rows });
     } catch (err: any) {
