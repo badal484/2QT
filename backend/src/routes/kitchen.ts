@@ -364,7 +364,7 @@ router.post('/orders/:id/packed', authenticate, requireRole('packer', 'kitchen_m
 
     let { rows } = await query(
         `UPDATE orders SET status = 'ready_for_pickup', packed_by_id = $1, packed_at = NOW()
-         WHERE id = $2 AND status IN ('packing', 'preparing', 'ready_for_pickup', 'confirmed', 'cooking', 'placed')
+         WHERE id = $2 AND status IN ('packing', 'preparing', 'ready_for_pickup', 'confirmed')
            AND ($3::uuid IS NULL OR kitchen_id = $3)
          RETURNING id, display_id, customer_id, kitchen_id, zone_id`,
         [req.user!.userId, id, callerKitchenId]
