@@ -24,7 +24,7 @@ router.use(authenticate, requireActiveRestaurantMembership);
 router.get('/me', async (req: AuthRequest, res) => {
     const restaurantId = getTenantRestaurantId(req)!; // non-null: guaranteed by the gate above
     const { rows } = await query(
-        `SELECT id, name, slug, status, settings, created_at, updated_at FROM restaurants WHERE id = $1`,
+        `SELECT id, name, slug, status, settings, delivery_model, created_at, updated_at FROM restaurants WHERE id = $1`,
         [restaurantId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -70,6 +70,62 @@ router.get('/staff', async (req: AuthRequest, res) => {
         [restaurantId]
     );
     res.json({ staff: rows });
+});
+
+// Self-serve rider onboarding for 'dedicated_fleet' tenants (see migration 152 and
+// services/autoAssign.ts). Not gated on delivery_model here — a 'platform_fleet' tenant adding a
+// rider this way just creates a rider the dispatch engine never selects for them (findBestRider
+// only looks at restaurant_id for dedicated_fleet orders), so it's a harmless no-op rather than
+// something worth a hard 403 for.
+router.post('/staff/riders', async (req: AuthRequest, res) => {
+    const restaurantId = getTenantRestaurantId(req)!;
+    const { phone: rawPhone, name } = req.body;
+    let phone = (rawPhone || '').replace(/\D/g, '');
+    if (phone.length === 10) phone = '91' + phone;
+    if (!phone || phone.length !== 12) return res.status(400).json({ error: 'INVALID_PHONE', message: 'Enter a valid 10-digit mobile number.' });
+    try {
+        const { rows: existing } = await query('SELECT id, restaurant_id FROM users WHERE phone = $1', [phone]);
+        if (existing.length > 0) {
+            if (existing[0].restaurant_id && existing[0].restaurant_id !== restaurantId) {
+                return res.status(409).json({ error: 'PHONE_IN_USE', message: 'This phone number already belongs to a different restaurant.' });
+            }
+            await query(`UPDATE users SET role = 'rider', restaurant_id = $1, is_active = true, is_verified = true WHERE id = $2`, [restaurantId, existing[0].id]);
+            await query(
+                `INSERT INTO restaurant_users (restaurant_id, user_id, role, status) VALUES ($1, $2, 'rider', 'active')
+                 ON CONFLICT (restaurant_id, user_id) DO UPDATE SET role = 'rider', status = 'active'`,
+                [restaurantId, existing[0].id]
+            );
+            return res.json({ success: true, message: 'Existing user added as your rider' });
+        }
+        const { rows: created } = await query(
+            `INSERT INTO users (name, phone, role, restaurant_id, is_active, is_verified, onboarding_complete)
+             VALUES ($1, $2, 'rider', $3, true, true, true) RETURNING id`,
+            [name || 'Rider', phone, restaurantId]
+        );
+        await query(
+            `INSERT INTO restaurant_users (restaurant_id, user_id, role, status) VALUES ($1, $2, 'rider', 'active')`,
+            [restaurantId, created[0].id]
+        );
+        res.json({ success: true, message: 'New rider account created' });
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to add rider', details: err.message });
+    }
+});
+
+router.delete('/staff/:staffId', async (req: AuthRequest, res) => {
+    const restaurantId = getTenantRestaurantId(req)!;
+    const { staffId } = req.params;
+    try {
+        const { rowCount } = await query(
+            `UPDATE users SET restaurant_id = NULL, kitchen_id = NULL, role = 'customer' WHERE id = $1 AND restaurant_id = $2`,
+            [staffId, restaurantId]
+        );
+        if (!rowCount) return res.status(404).json({ error: 'NOT_FOUND' });
+        await query(`UPDATE restaurant_users SET status = 'inactive' WHERE user_id = $1 AND restaurant_id = $2`, [staffId, restaurantId]);
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(500).json({ error: 'Failed to remove staff', details: err.message });
+    }
 });
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

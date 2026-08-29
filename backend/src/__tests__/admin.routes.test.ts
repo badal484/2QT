@@ -812,12 +812,13 @@ describe('GET /admin/tenant-restaurants/:id', () => {
     expect(res.body.error).toBe('NOT_FOUND');
   });
 
-  it("scopes every sub-query to the selected :id, and never includes rider data", async () => {
+  it("scopes every sub-query to the selected :id, and includes only that restaurant's own dedicated-fleet riders", async () => {
     parallelQueryMocks([
-      { rows: [{ id: 'restaurant-A', name: 'Royal Spice', slug: 'royal-spice', status: 'active', settings: {} }] },
+      { rows: [{ id: 'restaurant-A', name: 'Royal Spice', slug: 'royal-spice', status: 'active', settings: {}, delivery_model: 'dedicated_fleet' }] },
       { rows: [{ id: 'outlet-1', name: 'Main', zone_id: 'zone-1', kitchen_id: 'kitchen-A', status: 'active' }] },
       { rows: [{ id: 'kitchen-A', name: 'Kitchen A', address: 'Addr', is_active: true, is_paused: false }] },
       { rows: [{ id: 'chef-1', name: 'Chef One', phone: '919876543210', membership_role: 'chef', membership_status: 'active' }] },
+      { rows: [{ id: 'rider-1', name: 'Rider One', phone: '919876500000', is_online: true, is_active: true, is_verified: true }] },
       { rows: [{ total: 5, active: 2 }] },
       { rows: [{ id: 'ord-1', display_id: '2QT-100001', status: 'preparing', kitchen_id: 'kitchen-A', total_amount_paise: 20000, created_at: new Date() }] },
       { rows: [{ count: 3 }] },
@@ -830,14 +831,15 @@ describe('GET /admin/tenant-restaurants/:id', () => {
     expect(res.body.outlets).toHaveLength(1);
     expect(res.body.kitchens).toHaveLength(1);
     expect(res.body.staff).toHaveLength(1);
+    expect(res.body.riders).toHaveLength(1);
+    expect(res.body.riders[0].id).toBe('rider-1');
     expect(res.body.orders.total).toBe(5);
     expect(res.body.orders.recent).toHaveLength(1);
     expect(res.body.menu.itemCount).toBe(3);
     expect(res.body.subscriptions).toHaveLength(1);
     expect(res.body.subscriptions[0].status).toBe('active');
-    expect(res.body).not.toHaveProperty('riders'); // riders stay platform-owned — never surfaced here
 
-    // Every one of the 8 queries must be parameterized by the same selected id
+    // Every one of the 9 queries must be parameterized by the same selected id
     for (const call of mockQuery.mock.calls) {
       expect(call[1]).toEqual(['restaurant-A']);
     }
@@ -845,7 +847,8 @@ describe('GET /admin/tenant-restaurants/:id', () => {
 
   it("selecting a different restaurant id queries only that restaurant's data — no cross-tenant bleed", async () => {
     parallelQueryMocks([
-      { rows: [{ id: 'restaurant-B', name: 'Spice Villa', slug: 'spice-villa', status: 'active', settings: {} }] },
+      { rows: [{ id: 'restaurant-B', name: 'Spice Villa', slug: 'spice-villa', status: 'active', settings: {}, delivery_model: 'platform_fleet' }] },
+      { rows: [] },
       { rows: [] },
       { rows: [] },
       { rows: [] },

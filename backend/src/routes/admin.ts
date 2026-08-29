@@ -2726,7 +2726,7 @@ router.delete('/restaurants/:id/staff/:userId', authenticate, requireRole('super
 
 router.get('/tenant-restaurants', authenticate, requireRole('super_admin', 'admin'), async (_req: AuthRequest, res) => {
     const { rows } = await query(`
-        SELECT r.id, r.name, r.slug, r.status, r.created_at,
+        SELECT r.id, r.name, r.slug, r.status, r.delivery_model, r.created_at,
                COUNT(DISTINCT o.id)::int AS outlet_count,
                COUNT(DISTINCT k.id)::int AS kitchen_count,
                rs.status AS subscription_status, rs.billing_period_end AS subscription_period_end
@@ -2743,14 +2743,23 @@ router.get('/tenant-restaurants', authenticate, requireRole('super_admin', 'admi
 router.get('/tenant-restaurants/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     try {
-        const [restaurantRes, outletsRes, kitchensRes, staffRes, orderStatsRes, recentOrdersRes, menuRes, subscriptionsRes] = await Promise.all([
-            query('SELECT id, name, slug, status, settings, created_at, updated_at FROM restaurants WHERE id = $1', [id]),
+        const [restaurantRes, outletsRes, kitchensRes, staffRes, ridersRes, orderStatsRes, recentOrdersRes, menuRes, subscriptionsRes] = await Promise.all([
+            query('SELECT id, name, slug, status, settings, delivery_model, created_at, updated_at FROM restaurants WHERE id = $1', [id]),
             query('SELECT id, name, zone_id, kitchen_id, status FROM outlets WHERE restaurant_id = $1 ORDER BY created_at', [id]),
             query('SELECT id, name, address, is_active, is_paused FROM kitchens WHERE restaurant_id = $1 ORDER BY name', [id]),
             query(
                 `SELECT u.id, u.name, u.phone, ru.role AS membership_role, ru.status AS membership_status
                  FROM restaurant_users ru JOIN users u ON u.id = ru.user_id
-                 WHERE ru.restaurant_id = $1 ORDER BY ru.role, u.name`,
+                 WHERE ru.restaurant_id = $1 AND ru.role != 'rider' ORDER BY ru.role, u.name`,
+                [id]
+            ),
+            // Riders are platform-owned/zone-pooled by default (Phase 6 conclusion) and excluded
+            // from ownership displays everywhere else — except here, for a 'dedicated_fleet'
+            // tenant, where users.restaurant_id on a rider means exactly what it looks like: this
+            // tenant's own delivery staff, isolated from the shared pool (see autoAssign.ts).
+            query(
+                `SELECT id, name, phone, is_online, is_active, is_verified
+                 FROM users WHERE restaurant_id = $1 AND role = 'rider' ORDER BY name`,
                 [id]
             ),
             query(
@@ -2784,14 +2793,35 @@ router.get('/tenant-restaurants/:id', authenticate, requireRole('super_admin', '
             outlets: outletsRes.rows,
             kitchens: kitchensRes.rows,
             staff: staffRes.rows,
+            riders: ridersRes.rows,
             orders: { ...orderStatsRes.rows[0], recent: recentOrdersRes.rows },
             menu: { itemCount: menuRes.rows[0]?.count ?? 0 },
-            // Riders are intentionally NOT included here — they remain platform-owned and
-            // zone-pooled (Phase 6 conclusion), not restaurant-owned. Showing rider data on this
-            // page would misleadingly imply ownership that doesn't exist; platform-wide rider
-            // management stays on the existing /admin/riders endpoints.
             subscriptions: subscriptionsRes.rows,
         });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── Phase 9: per-tenant delivery model ───────────────────────────────────────────────────────
+// See migration 152. Every restaurant defaults to 'platform_fleet' (the shared rider pool this
+// platform has always used) — this endpoint is the explicit, admin-controlled way to promote a
+// SaaS tenant to 'dedicated_fleet' once they have their own riders, or demote them back.
+// Deliberately not inferred from how the restaurant was created (see migration 152's comment).
+const DeliveryModelSchema = z.object({
+    delivery_model: z.enum(['platform_fleet', 'dedicated_fleet']),
+});
+
+router.patch('/tenant-restaurants/:id/delivery-model', authenticate, requireRole('super_admin', 'admin'), validate(DeliveryModelSchema), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { delivery_model } = req.body;
+    try {
+        const { rows } = await query(
+            `UPDATE restaurants SET delivery_model = $1 WHERE id = $2 RETURNING id, delivery_model`,
+            [delivery_model, id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        res.json({ success: true, restaurant: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

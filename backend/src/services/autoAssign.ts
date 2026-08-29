@@ -18,6 +18,8 @@ function calculateRoadDistanceKm(lat1: number, lng1: number, lat2: number, lng2:
 // If exceeded, the rider is skipped — they're heading in a different direction.
 const MAX_SECOND_ORDER_DIST_KM = 5.0;
 
+type FleetScope = { deliveryModel: 'platform_fleet' | 'dedicated_fleet'; restaurantId: string | null };
+
 async function findBestRider(
     zoneId: string | null,
     kitchenLat: number,
@@ -25,37 +27,63 @@ async function findBestRider(
     isCodOrder = false,
     newDeliveryLat: number | null = null,
     newDeliveryLng: number | null = null,
+    fleet: FleetScope = { deliveryModel: 'platform_fleet', restaurantId: null },
 ): Promise<string | null> {
-    // 1. Try matching riders in the specific zone first
-    let { rows: riders } = await query(`
-        SELECT u.id, u.current_lat, u.current_lng,
-               COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) AS active_orders
-        FROM users u
-        LEFT JOIN orders o ON o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
-        WHERE u.zone_id = $1
-          AND u.is_online = true
-          AND u.is_verified = true
-          AND u.role IN ('rider', 'rider_captain')
-        GROUP BY u.id
-        HAVING COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) < 2
-        ORDER BY COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) ASC
-    `, [zoneId || null]);
+    let riders: any[];
 
-    // Fallback: If no online riders in zone, search ALL online verified riders
-    if (riders.length === 0) {
-        const { rows: fallbackRiders } = await query(`
+    if (fleet.deliveryModel === 'dedicated_fleet' && fleet.restaurantId) {
+        // Isolated SaaS tenant: only their own riders (users.restaurant_id), never the shared
+        // platform pool and never another tenant's riders. No zone/platform-wide fallback tier —
+        // a dedicated fleet has no wider pool to fall back into. If none are available,
+        // autoAssignOrder's no-rider branch alerts the tenant to assign manually, and deliberately
+        // does NOT broadcast to the shared pool (that would defeat the isolation entirely).
+        const { rows } = await query(`
             SELECT u.id, u.current_lat, u.current_lng,
                    COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) AS active_orders
             FROM users u
             LEFT JOIN orders o ON o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
-            WHERE u.is_online = true
+            WHERE u.restaurant_id = $1
+              AND u.is_online = true
               AND u.is_verified = true
               AND u.role IN ('rider', 'rider_captain')
             GROUP BY u.id
             HAVING COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) < 2
             ORDER BY COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) ASC
-        `);
-        riders = fallbackRiders;
+        `, [fleet.restaurantId]);
+        riders = rows;
+    } else {
+        // 1. Try matching riders in the specific zone first
+        let { rows } = await query(`
+            SELECT u.id, u.current_lat, u.current_lng,
+                   COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) AS active_orders
+            FROM users u
+            LEFT JOIN orders o ON o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
+            WHERE u.zone_id = $1
+              AND u.is_online = true
+              AND u.is_verified = true
+              AND u.role IN ('rider', 'rider_captain')
+            GROUP BY u.id
+            HAVING COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) < 2
+            ORDER BY COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) ASC
+        `, [zoneId || null]);
+
+        // Fallback: If no online riders in zone, search ALL online verified riders
+        if (rows.length === 0) {
+            const { rows: fallbackRiders } = await query(`
+                SELECT u.id, u.current_lat, u.current_lng,
+                       COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) AS active_orders
+                FROM users u
+                LEFT JOIN orders o ON o.rider_id = u.id AND o.status NOT IN ('delivered', 'cancelled')
+                WHERE u.is_online = true
+                  AND u.is_verified = true
+                  AND u.role IN ('rider', 'rider_captain')
+                GROUP BY u.id
+                HAVING COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) < 2
+                ORDER BY COUNT(o.id) FILTER (WHERE o.status NOT IN ('delivered', 'cancelled')) ASC
+            `);
+            rows = fallbackRiders;
+        }
+        riders = rows;
     }
 
     if (riders.length === 0) return null;
@@ -219,13 +247,15 @@ async function detectBatch(
 export async function autoAssignOrder(orderId: string, attempt = 1): Promise<void> {
     try {
         const { rows } = await query(`
-            SELECT o.id, o.display_id, o.zone_id, o.kitchen_id, o.payment_method,
+            SELECT o.id, o.display_id, o.zone_id, o.kitchen_id, o.payment_method, o.restaurant_id,
                    COALESCE(o.delivery_location_lat, a.lat)  AS delivery_lat,
                    COALESCE(o.delivery_location_lng, a.lng)  AS delivery_lng,
-                   z.kitchen_lat, z.kitchen_lng
+                   z.kitchen_lat, z.kitchen_lng,
+                   COALESCE(r.delivery_model, 'platform_fleet') AS delivery_model
             FROM orders o
             JOIN zones z ON z.id = o.zone_id
             LEFT JOIN addresses a ON a.id = o.address_id
+            LEFT JOIN restaurants r ON r.id = o.restaurant_id
             WHERE o.id = $1 AND o.status IN ('preparing', 'ready_for_pickup') AND o.rider_id IS NULL
         `, [orderId]);
 
@@ -236,8 +266,9 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
         const kitchenLng = parseFloat(order.kitchen_lng);
         const deliveryLat = order.delivery_lat ? parseFloat(order.delivery_lat) : null;
         const deliveryLng = order.delivery_lng ? parseFloat(order.delivery_lng) : null;
+        const fleet: FleetScope = { deliveryModel: order.delivery_model, restaurantId: order.restaurant_id };
 
-        const riderId = await findBestRider(order.zone_id, kitchenLat, kitchenLng, order.payment_method === 'cod', deliveryLat, deliveryLng);
+        const riderId = await findBestRider(order.zone_id, kitchenLat, kitchenLng, order.payment_method === 'cod', deliveryLat, deliveryLng, fleet);
 
         if (!riderId) {
             console.log(`[AUTO-ASSIGN] No eligible riders for ${order.display_id} (attempt ${attempt}) — alerting admin`);
@@ -251,8 +282,11 @@ export async function autoAssignOrder(orderId: string, attempt = 1): Promise<voi
             emitToAdmin('order_needs_manual_assignment', payload);
             // Also emit to kitchen room so kitchen_manager web page receives it
             if (order.kitchen_id) emitToKitchen(order.kitchen_id, 'order_needs_manual_assignment', payload);
-            if (attempt >= 2) {
-                // Absolute last resort — broadcast to all online riders in zone
+            if (attempt >= 2 && fleet.deliveryModel !== 'dedicated_fleet') {
+                // Absolute last resort — broadcast to all online riders in zone. Never for a
+                // dedicated_fleet tenant: that would leak the order onto riders outside their own
+                // fleet, defeating the isolation. Their only recourse is the manual-assignment
+                // alert above.
                 console.log(`[AUTO-ASSIGN] Last resort broadcast for ${order.display_id}`);
                 emitToRiders('order_needs_rider', {
                     orderId,

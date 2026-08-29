@@ -11,9 +11,14 @@
 // Mostly read-only: this view exists so a platform admin can inspect a restaurant tenant's
 // profile, outlets, kitchens, staff, and order/menu summary — it does not duplicate or replace
 // any existing management action (kitchen creation/staff assignment stay usable from the
-// Kitchens tab too, order operations stay on Dispatch/Orders). Riders are intentionally never
-// shown here — they remain platform-owned and zone-pooled (Phase 6), not restaurant-owned, and
-// showing them on a restaurant's page would misleadingly imply an ownership that doesn't exist.
+// Kitchens tab too, order operations stay on Dispatch/Orders).
+//
+// Phase 9: every restaurant has a Delivery Model. 'platform_fleet' (the default, and every
+// restaurant that predates this phase) rides the platform's own shared, zone-pooled riders —
+// riders stay hidden here for that model, same reasoning as before. 'dedicated_fleet' is an
+// explicit admin promotion for a SaaS tenant that runs its own isolated riders (see migration
+// 152 and services/autoAssign.ts) — only then do this tenant's own riders (users.restaurant_id)
+// appear below, since only then does that ownership actually exist.
 //
 // The one write action this tab does own is onboarding (Phase 10's NewRestaurantWizard) — it
 // exists here, not on Kitchens, because creating a kitchen has always silently created a tenant
@@ -21,7 +26,7 @@
 // flow where the tenant actually lives makes that relationship visible instead of hidden.
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Store, Users, ClipboardList, UtensilsCrossed, Building2, CreditCard, Plus } from "lucide-react";
+import { X, Store, Users, ClipboardList, UtensilsCrossed, Building2, CreditCard, Plus, Bike } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -152,6 +157,45 @@ function SubscriptionSection({ restaurantId, subscriptions, onChanged }: { resta
   );
 }
 
+// Phase 9: the explicit admin control that promotes/demotes a tenant between the shared
+// platform fleet and its own dedicated riders. Deliberately a confirm-gated toggle, not a plain
+// dropdown — flipping this changes which riders can pick up this tenant's orders immediately.
+function DeliveryModelToggle({ restaurantId, deliveryModel, onChanged }: { restaurantId: string; deliveryModel: string; onChanged: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const isDedicated = deliveryModel === "dedicated_fleet";
+
+  const toggle = async () => {
+    const next = isDedicated ? "platform_fleet" : "dedicated_fleet";
+    const confirmMsg = isDedicated
+      ? "Switch back to the shared platform fleet? This tenant's own riders will no longer be eligible for their orders — the platform's shared riders will be used instead."
+      : "Give this tenant its own dedicated fleet? Their orders will only be offered to their own riders, never the shared platform pool. Make sure they have riders added first.";
+    if (!confirm(confirmMsg)) return;
+    setSaving(true);
+    try {
+      await api.patch(`/admin/tenant-restaurants/${restaurantId}/delivery-model`, { delivery_model: next });
+      toast.success(next === "dedicated_fleet" ? "Switched to dedicated fleet" : "Switched to shared platform fleet");
+      onChanged();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update delivery model");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={saving}
+      className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase transition-colors disabled:opacity-50 ${
+        isDedicated ? "text-sky-400 bg-sky-500/10 hover:bg-sky-500/20" : "text-zinc-400 bg-white/5 hover:bg-white/10"
+      }`}
+      title="Click to switch delivery model"
+    >
+      {saving ? "…" : isDedicated ? "Dedicated Fleet" : "Platform Fleet"}
+    </button>
+  );
+}
+
 function DetailPanel({ restaurantId, onClose }: { restaurantId: string; onClose: () => void }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -181,6 +225,7 @@ function DetailPanel({ restaurantId, onClose }: { restaurantId: string; onClose:
             <div className="flex items-center gap-3">
               <h3 className="text-xl font-bold text-white">{data.restaurant.name}</h3>
               <StatusPill status={data.restaurant.status} />
+              <DeliveryModelToggle restaurantId={restaurantId} deliveryModel={data.restaurant.delivery_model} onChanged={load} />
             </div>
             <div className="text-xs font-mono text-zinc-500 mt-1">{data.restaurant.slug}</div>
           </div>
@@ -276,11 +321,39 @@ function DetailPanel({ restaurantId, onClose }: { restaurantId: string; onClose:
             </div>
           </div>
 
-          <SubscriptionSection restaurantId={restaurantId} subscriptions={data.subscriptions ?? []} onChanged={load} />
+          {data.restaurant.delivery_model === "dedicated_fleet" ? (
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-2 flex items-center gap-1.5">
+                <Bike className="w-3 h-3" /> Dedicated Riders ({data.riders?.length ?? 0})
+              </div>
+              <div className="space-y-1.5">
+                {!data.riders || data.riders.length === 0 ? (
+                  <div className="text-xs text-zinc-500">No riders added yet — the tenant adds their own from their restaurant dashboard's Staff section.</div>
+                ) : (
+                  data.riders.map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between bg-[#11111a] border border-white/10 rounded-lg px-3 py-2">
+                      <div>
+                        <span className="text-sm text-white">{r.name}</span>
+                        <span className="text-xs text-zinc-500 font-mono ml-2">{r.phone}</span>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${r.is_online ? "text-emerald-400 bg-emerald-500/10" : "text-zinc-400 bg-white/5"}`}>
+                        {r.is_online ? "Online" : "Offline"}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-2">
+                Orders from this tenant are only offered to these riders — never the shared platform pool.
+              </div>
+            </div>
+          ) : (
+            <div className="text-[10px] text-zinc-500 border-t border-white/[0.06] pt-3">
+              This tenant uses the platform's shared, zone-pooled riders — same as every kitchen on 2QT. Switch to Dedicated Fleet above to give them their own isolated riders instead.
+            </div>
+          )}
 
-          <div className="text-[10px] text-zinc-500 border-t border-white/[0.06] pt-3">
-            Riders are platform-owned and zone-pooled — not restaurant-owned — so they intentionally do not appear on this page. See the Fleet tab for platform-wide rider management.
-          </div>
+          <SubscriptionSection restaurantId={restaurantId} subscriptions={data.subscriptions ?? []} onChanged={load} />
         </div>
       )}
     </div>
