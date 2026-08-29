@@ -320,6 +320,43 @@ describe('GET /restaurant/stats', () => {
   });
 });
 
+describe('GET /restaurant/sales — no commission math, restaurant keeps 100% of order revenue', () => {
+  it('computes sales as total_amount_paise minus delivery_fee_paise, scoped to restaurant_id', async () => {
+    actingAsChefOfA();
+    mockActiveMembership();
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ sales: '5000', orders: 2 }] })   // today
+      .mockResolvedValueOnce({ rows: [{ sales: '15000', orders: 5 }] })  // thisWeek
+      .mockResolvedValueOnce({ rows: [{ sales: '40000', orders: 12 }] }) // thisMonth
+      .mockResolvedValueOnce({ rows: [{ sales: '100000', orders: 30 }] }) // allTime
+      .mockResolvedValueOnce({ rows: [] }); // trend (empty — padded client-side to 7 days)
+
+    const res = await request(app).get('/restaurant/sales');
+
+    expect(res.status).toBe(200);
+    expect(res.body.today.sales).toBe('5000');
+    expect(res.body.allTime.orders).toBe(30);
+    expect(res.body.trend).toHaveLength(7); // always padded to a full week, even with no rows
+
+    const calls = mockQuery.mock.calls.slice(1); // skip the membership check
+    for (const call of calls) {
+      expect(call[0]).toContain("FROM orders WHERE restaurant_id = $1 AND status = 'delivered'");
+      expect(call[0]).toContain('total_amount_paise - delivery_fee_paise');
+      expect(call[0]).not.toContain('commission'); // the defining difference from kitchen.ts's /my-earnings
+      expect(call[1][0]).toBe('restaurant-A');
+    }
+  });
+
+  it('returns 403 for a restaurant role with no active membership, never computing sales', async () => {
+    actingAsChefOfA();
+    mockNoMembership();
+
+    const res = await request(app).get('/restaurant/sales');
+    expect(res.status).toBe(403);
+    expect(mockQuery).toHaveBeenCalledTimes(1); // only the membership check ran
+  });
+});
+
 // ── Restaurant B isolation, end to end ────────────────────────────────────────
 
 describe('Cross-tenant isolation — Restaurant B staff can never see Restaurant A data', () => {

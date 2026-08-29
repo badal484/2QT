@@ -153,4 +153,58 @@ router.get('/stats', async (req: AuthRequest, res) => {
     });
 });
 
+// ─── Sales ──────────────────────────────────────────────────────────────────
+// Unlike kitchen.ts's /my-earnings (the commission-based Partners program), a SaaS restaurant
+// keeps 100% of its order revenue — 2QT's revenue here is the subscription fee (Phase 8), not a
+// per-order cut — so there is no commission line to compute or subtract. "Sales" is simply
+// total_amount_paise minus delivery_fee_paise (the delivery fee is never the restaurant's money
+// regardless of billing model — see kitchen.ts's identical convention).
+router.get('/sales', async (req: AuthRequest, res) => {
+    const restaurantId = getTenantRestaurantId(req)!;
+    const now = new Date();
+    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0, 0, 0, 0);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const periodQuery = (sinceParam: number) => `
+        SELECT COALESCE(SUM(total_amount_paise - delivery_fee_paise), 0)::bigint AS sales,
+               COUNT(*)::int AS orders
+        FROM orders WHERE restaurant_id = $1 AND status = 'delivered' AND updated_at >= $${sinceParam}`;
+
+    const [today, thisWeek, thisMonth, allTime, trend] = await Promise.all([
+        query(periodQuery(2), [restaurantId, todayStart]),
+        query(periodQuery(2), [restaurantId, weekStart]),
+        query(periodQuery(2), [restaurantId, monthStart]),
+        query(
+            `SELECT COALESCE(SUM(total_amount_paise - delivery_fee_paise), 0)::bigint AS sales, COUNT(*)::int AS orders
+             FROM orders WHERE restaurant_id = $1 AND status = 'delivered'`,
+            [restaurantId]
+        ),
+        query(
+            `SELECT DATE(updated_at AT TIME ZONE 'Asia/Kolkata') AS date,
+                    COALESCE(SUM(total_amount_paise - delivery_fee_paise), 0)::bigint AS sales
+             FROM orders WHERE restaurant_id = $1 AND status = 'delivered' AND updated_at >= NOW() - INTERVAL '7 days'
+             GROUP BY DATE(updated_at AT TIME ZONE 'Asia/Kolkata') ORDER BY date ASC`,
+            [restaurantId]
+        ),
+    ]);
+
+    const trendByDate = new Map(trend.rows.map((r: any) => [new Date(r.date).toISOString().split('T')[0], parseInt(r.sales)]));
+    const trendData = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(todayStart);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        trendData.push({ date: dateStr, sales: trendByDate.get(dateStr) ?? 0 });
+    }
+
+    res.json({
+        today: today.rows[0],
+        thisWeek: thisWeek.rows[0],
+        thisMonth: thisMonth.rows[0],
+        allTime: allTime.rows[0],
+        trend: trendData,
+    });
+});
+
 export default router;
