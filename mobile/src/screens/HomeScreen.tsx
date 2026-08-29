@@ -142,8 +142,8 @@ const HomeScreen = ({ navigation }: any) => {
   const primaryActiveOrder = activeOrders[0];
 
   const { data: bannersData } = useQuery({
-    queryKey: ['banners'],
-    queryFn: () => api.get('/banners'),
+    queryKey: ['banners', effectiveZoneId],
+    queryFn: () => api.get(`/banners?zoneId=${effectiveZoneId || ''}`),
     staleTime: 30 * 1000,
     gcTime: 15 * 60 * 1000,
   });

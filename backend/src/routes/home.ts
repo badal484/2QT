@@ -12,9 +12,12 @@ router.get('/feed', async (req, res) => {
         
         // Run banners + collections in parallel — 2x faster on every home-feed load
         const [{ rows: banners }, { rows: collections }] = await Promise.all([
-            // 1. Banners — uses partial index idx_banners_active_order
+            // 1. Banners — filtered by zoneId (global banners + zone-specific banners)
             query(
-                'SELECT id, image_url, video_url, media_type, destination_screen, destination_params, banner_type FROM promotional_banners WHERE is_active = true ORDER BY display_order ASC'
+                zoneId
+                    ? 'SELECT id, image_url, video_url, media_type, destination_screen, destination_params, banner_type FROM promotional_banners WHERE is_active = true AND (zone_id IS NULL OR zone_id = $1) ORDER BY display_order ASC'
+                    : 'SELECT id, image_url, video_url, media_type, destination_screen, destination_params, banner_type FROM promotional_banners WHERE is_active = true ORDER BY display_order ASC',
+                zoneId ? [zoneId] : []
             ),
             // 2. Collections with items — single aggregated query, no N+1
             query(

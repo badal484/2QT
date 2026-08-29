@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Edit, X, Zap, Upload, ImageIcon, Video, Film } from "lucide-react";
+import { Plus, Trash2, Edit, X, Zap, Upload, ImageIcon, Video, Film, MapPin, Globe } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -14,6 +14,7 @@ const EMPTY_BANNER = {
   media_type: "IMAGE" as "IMAGE" | "VIDEO",
   action_type: "NONE", action_payload: "", display_order: 0,
   is_active: true, banner_type: "MAIN", slide_duration_ms: 3000,
+  zone_id: null as string | null,
 };
 
 function sizeHint(type: string) {
@@ -25,6 +26,7 @@ function sizeHint(type: string) {
 function BannerForm({
   data,
   onChange,
+  zones,
   onImageUpload,
   onImageRemove,
   uploadingImage,
@@ -40,6 +42,7 @@ function BannerForm({
 }: {
   data: typeof EMPTY_BANNER;
   onChange: (d: typeof EMPTY_BANNER) => void;
+  zones: Array<{ id: string; name: string }>;
   onImageUpload: (f: File) => void;
   onImageRemove: () => void;
   uploadingImage: boolean;
@@ -97,7 +100,7 @@ function BannerForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Title</label>
           <input value={data.title} onChange={e => onChange({ ...data, title: e.target.value })} className={inp} placeholder="Gourmet Meals" />
@@ -106,6 +109,25 @@ function BannerForm({
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Subtitle</label>
           <input value={data.subtitle} onChange={e => onChange({ ...data, subtitle: e.target.value })} className={inp} placeholder="Crafted for you" />
         </div>
+
+        {/* Target Zone Selection */}
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 flex items-center justify-between">
+            <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-emerald-400" /> Target Delivery Zone</span>
+            <span className="text-zinc-500 text-[10px] lowercase">hybrid scope</span>
+          </label>
+          <select
+            value={data.zone_id || ""}
+            onChange={e => onChange({ ...data, zone_id: e.target.value || null })}
+            className={inp}
+          >
+            <option value="" className="text-black bg-zinc-900 text-white">🌐 All Zones (Global)</option>
+            {zones.map(z => (
+              <option key={z.id} value={z.id} className="text-black bg-zinc-900 text-white">📍 {z.name}</option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Tag Pill Text</label>
           <input value={data.tag_text} onChange={e => onChange({ ...data, tag_text: e.target.value })} className={inp} placeholder="30 MIN" />
@@ -113,7 +135,7 @@ function BannerForm({
 
         {/* Video Upload Section if VIDEO */}
         {data.media_type === "VIDEO" ? (
-          <div>
+          <div className="col-span-1 md:col-span-2">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 flex items-center justify-between">
               <span>Banner Video (MP4 / WebM)</span>
               <span className="text-brand-primary font-semibold lowercase">autoplay & loop</span>
@@ -126,7 +148,7 @@ function BannerForm({
               onChange={e => { const f = e.target.files?.[0]; if (f) onVideoUpload(f); e.target.value = ""; }}
             />
             {data.video_url ? (
-              <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10 group bg-black">
+              <div className="relative w-full h-36 rounded-xl overflow-hidden border border-white/10 group bg-black">
                 <video src={data.video_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                   <button type="button" onClick={() => videoInputRef.current?.click()}
@@ -141,7 +163,7 @@ function BannerForm({
               </div>
             ) : (
               <button type="button" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo}
-                className="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-brand-primary/50 hover:bg-brand-primary/5 transition-all disabled:opacity-50">
+                className="w-full h-36 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-brand-primary/50 hover:bg-brand-primary/5 transition-all disabled:opacity-50">
                 {uploadingVideo
                   ? <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
                   : <><Video className="w-6 h-6 text-zinc-500" /><span className="text-xs font-semibold text-zinc-500">Click to upload MP4/WebM video</span></>
@@ -154,7 +176,7 @@ function BannerForm({
           </div>
         ) : (
           /* Image Upload Section if IMAGE */
-          <div>
+          <div className="col-span-1 md:col-span-2">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Banner Image</label>
             <input
               ref={imageInputRef}
@@ -164,7 +186,7 @@ function BannerForm({
               onChange={e => { const f = e.target.files?.[0]; if (f) onImageUpload(f); e.target.value = ""; }}
             />
             {data.image_url ? (
-              <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10 group">
+              <div className="relative w-full h-36 rounded-xl overflow-hidden border border-white/10 group">
                 <Image src={data.image_url} alt="Preview" fill className="object-cover" />
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                   <button type="button" onClick={() => imageInputRef.current?.click()}
@@ -179,7 +201,7 @@ function BannerForm({
               </div>
             ) : (
               <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}
-                className="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-brand-primary/50 hover:bg-brand-primary/5 transition-all disabled:opacity-50">
+                className="w-full h-36 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-brand-primary/50 hover:bg-brand-primary/5 transition-all disabled:opacity-50">
                 {uploadingImage
                   ? <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
                   : <><ImageIcon className="w-6 h-6 text-zinc-500" /><span className="text-xs font-semibold text-zinc-500">Click to upload image</span></>
@@ -194,7 +216,7 @@ function BannerForm({
 
         {/* Poster Image upload if VIDEO */}
         {data.media_type === "VIDEO" && (
-          <div className="col-span-2 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+          <div className="col-span-1 md:col-span-2 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1 flex items-center justify-between">
               <span>Thumbnail / Poster Image <span className="text-zinc-500 font-normal lowercase">(optional — shown while video loads)</span></span>
             </label>
@@ -225,17 +247,17 @@ function BannerForm({
         <div>
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Action Type</label>
           <select value={data.action_type} onChange={e => onChange({ ...data, action_type: e.target.value })} className={inp}>
-            <option value="NONE" className="text-black">No Action</option>
-            <option value="APPLY_COUPON" className="text-black">Apply Coupon</option>
-            <option value="FILTER_CATEGORY" className="text-black">Filter Category</option>
+            <option value="NONE" className="text-black bg-zinc-900 text-white">No Action</option>
+            <option value="APPLY_COUPON" className="text-black bg-zinc-900 text-white">Apply Coupon</option>
+            <option value="FILTER_CATEGORY" className="text-black bg-zinc-900 text-white">Filter Category</option>
           </select>
         </div>
         <div>
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Banner Type</label>
           <select value={data.banner_type} onChange={e => onChange({ ...data, banner_type: e.target.value })} className={inp}>
-            <option value="MAIN" className="text-black">Main Banner (Large)</option>
-            <option value="MINI" className="text-black">Mini Banner (Quick Filter)</option>
-            <option value="STRIP" className="text-black">Strip Banner (Wide & Short)</option>
+            <option value="MAIN" className="text-black bg-zinc-900 text-white">Main Banner (Large)</option>
+            <option value="MINI" className="text-black bg-zinc-900 text-white">Mini Banner (Quick Filter)</option>
+            <option value="STRIP" className="text-black bg-zinc-900 text-white">Strip Banner (Wide & Short)</option>
           </select>
         </div>
         <div>
@@ -246,7 +268,7 @@ function BannerForm({
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Display Order</label>
           <input type="number" value={data.display_order} onChange={e => onChange({ ...data, display_order: Number(e.target.value) })} className={inp} placeholder="0" />
         </div>
-        <div>
+        <div className="col-span-1 md:col-span-2">
           <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 block">Auto-Slide Duration (seconds)</label>
           <input
             type="number"
@@ -269,7 +291,7 @@ function BannerForm({
         </div>
       </div>
       <div className="pt-4 flex justify-end">
-        <button onClick={onSave} className="bg-brand-primary text-white px-8 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-primary-dark">
+        <button onClick={onSave} className="bg-brand-primary text-white px-8 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-primary-dark transition-all">
           {saveLabel}
         </button>
       </div>
@@ -279,6 +301,8 @@ function BannerForm({
 
 export function MarketingTab() {
   const [banners, setBanners] = useState<any[]>([]);
+  const [zones, setZones] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [newBanner, setNewBanner] = useState<typeof EMPTY_BANNER>({ ...EMPTY_BANNER });
@@ -295,6 +319,15 @@ export function MarketingTab() {
 
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
 
+  const fetchZones = async () => {
+    try {
+      const res = await api.get('/admin/zones');
+      setZones(res.zones || []);
+    } catch (e) {
+      console.error("Failed to load zones", e);
+    }
+  };
+
   const fetchBanners = async () => {
     try {
       setLoading(true);
@@ -307,7 +340,10 @@ export function MarketingTab() {
     }
   };
 
-  useEffect(() => { fetchBanners(); }, []);
+  useEffect(() => {
+    fetchZones();
+    fetchBanners();
+  }, []);
 
   useSocketRefresh(["promo_updated", "campaign_updated", "banner_updated"], fetchBanners);
 
@@ -395,27 +431,80 @@ export function MarketingTab() {
     }
   };
 
+  // Filter banners based on selected zone filter
+  const filteredBanners = banners.filter(b => {
+    if (selectedZoneFilter === "ALL") return true;
+    if (selectedZoneFilter === "GLOBAL") return !b.zone_id;
+    return b.zone_id === selectedZoneFilter;
+  });
+
   if (loading) return <SkeletonList rows={6} />;
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Promotional Banners</h2>
-          <p className="text-zinc-400 font-medium">Manage images and dynamic autoplay video banners for the customer menu and mobile app.</p>
+          <p className="text-zinc-400 font-medium">Manage global & zone-specific image/video banners for the customer menu and mobile app.</p>
         </div>
         <button
           onClick={() => { setIsCreating(true); setEditingBanner(null); }}
-          className="bg-brand-primary text-white px-6 py-3 rounded-2xl text-sm font-semibold hover:bg-brand-primary-dark transition-all shadow-lg flex items-center gap-2"
+          className="bg-brand-primary text-white px-6 py-3 rounded-2xl text-sm font-semibold hover:bg-brand-primary-dark transition-all shadow-lg flex items-center gap-2 self-start md:self-auto"
         >
           <Plus className="w-4 h-4" /> New Banner
         </button>
+      </div>
+
+      {/* Zone Filter Navigation Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-white/[0.06]">
+        <button
+          onClick={() => setSelectedZoneFilter("ALL")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            selectedZoneFilter === "ALL"
+              ? "bg-brand-primary text-white shadow-md"
+              : "bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]"
+          }`}
+        >
+          <span>All Banners</span>
+          <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full">{banners.length}</span>
+        </button>
+        <button
+          onClick={() => setSelectedZoneFilter("GLOBAL")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            selectedZoneFilter === "GLOBAL"
+              ? "bg-blue-600 text-white shadow-md"
+              : "bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]"
+          }`}
+        >
+          <Globe className="w-3.5 h-3.5" />
+          <span>Global Only</span>
+          <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full">{banners.filter(b => !b.zone_id).length}</span>
+        </button>
+        {zones.map(z => {
+          const count = banners.filter(b => b.zone_id === z.id).length;
+          return (
+            <button
+              key={z.id}
+              onClick={() => setSelectedZoneFilter(z.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                selectedZoneFilter === z.id
+                  ? "bg-emerald-600 text-white shadow-md"
+                  : "bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]"
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>{z.name}</span>
+              <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded-full">{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {isCreating && (
         <BannerForm
           data={newBanner}
           onChange={setNewBanner}
+          zones={zones}
           onImageUpload={makeImageUploader(setNewBanner as any, setCreateImageUploading)}
           onImageRemove={() => setNewBanner(b => ({ ...b, image_url: "" }))}
           uploadingImage={createImageUploading}
@@ -435,6 +524,7 @@ export function MarketingTab() {
         <BannerForm
           data={editingBanner}
           onChange={d => setEditingBanner(eb => eb ? { ...d, id: eb.id } : null)}
+          zones={zones}
           onImageUpload={makeImageUploader(setEditingBanner as any, setEditImageUploading)}
           onImageRemove={() => setEditingBanner(eb => eb ? { ...eb, image_url: "" } : null)}
           uploadingImage={editImageUploading}
@@ -451,10 +541,11 @@ export function MarketingTab() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {banners.map(banner => {
+        {filteredBanners.map(banner => {
           const isVideo = banner.media_type === "VIDEO" && banner.video_url;
+          const zoneName = banner.zone_name || zones.find(z => z.id === banner.zone_id)?.name;
           return (
-            <div key={banner.id} className={`bg-[#11111a] border ${banner.is_active ? 'border-brand-primary/30 shadow-lg' : 'border-white/[0.05] opacity-60'} rounded-3xl overflow-hidden transition-all group`}>
+            <div key={banner.id} className={`bg-[#11111a] border ${banner.is_active ? 'border-brand-primary/30 shadow-lg' : 'border-white/[0.05] opacity-60'} rounded-3xl overflow-hidden transition-all group flex flex-col`}>
               <div className="relative h-36 bg-black overflow-hidden">
                 {isVideo ? (
                   <video
@@ -472,7 +563,7 @@ export function MarketingTab() {
                   <div className="w-full h-full flex items-center justify-center text-zinc-600">No Media</div>
                 )}
                 
-                <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 max-w-[70%]">
                   {banner.tag_text && (
                     <div className="inline-flex items-center gap-1 bg-brand-primary text-[10px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow">
                       <Zap className="w-3 h-3" /> {banner.tag_text}
@@ -481,6 +572,15 @@ export function MarketingTab() {
                   {isVideo && (
                     <div className="inline-flex items-center gap-1 bg-purple-600/90 text-[10px] font-black uppercase tracking-wider text-white px-2 py-0.5 rounded shadow backdrop-blur">
                       <Film className="w-3 h-3" /> VIDEO
+                    </div>
+                  )}
+                  {banner.zone_id ? (
+                    <div className="inline-flex items-center gap-1 bg-emerald-600/90 text-[10px] font-black uppercase tracking-wider text-white px-2 py-0.5 rounded shadow backdrop-blur">
+                      <MapPin className="w-3 h-3" /> {zoneName || "Zone"}
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1 bg-blue-600/80 text-[10px] font-black uppercase tracking-wider text-white px-2 py-0.5 rounded shadow backdrop-blur">
+                      <Globe className="w-3 h-3" /> ALL ZONES
                     </div>
                   )}
                 </div>
@@ -493,7 +593,16 @@ export function MarketingTab() {
                     {banner.is_active ? 'Active' : 'Paused'}
                   </button>
                   <button
-                    onClick={() => { setEditingBanner({ ...banner, media_type: banner.media_type || (banner.video_url ? 'VIDEO' : 'IMAGE'), slide_duration_ms: banner.slide_duration_ms ?? 3000 }); setIsCreating(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => {
+                      setEditingBanner({
+                        ...banner,
+                        media_type: banner.media_type || (banner.video_url ? 'VIDEO' : 'IMAGE'),
+                        slide_duration_ms: banner.slide_duration_ms ?? 3000,
+                        zone_id: banner.zone_id || null,
+                      });
+                      setIsCreating(false);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                     className="bg-zinc-800/90 text-white w-6 h-6 flex items-center justify-center rounded-full hover:bg-zinc-700 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Edit className="w-3 h-3" />
@@ -506,9 +615,11 @@ export function MarketingTab() {
                   </button>
                 </div>
               </div>
-              <div className="p-5">
-                <h3 className="font-bold text-lg leading-tight text-white mb-1">{banner.title}</h3>
-                <p className="text-sm text-zinc-400 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
+              <div className="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-lg leading-tight text-white mb-1">{banner.title}</h3>
+                  <p className="text-sm text-zinc-400 font-medium line-clamp-1 mb-4">{banner.subtitle}</p>
+                </div>
                 <div className="flex items-center justify-between border-t border-white/10 pt-4">
                   <div className="text-xs font-bold uppercase text-zinc-500">
                     {banner.banner_type === 'MINI' ? 'Type: MINI' : banner.banner_type === 'STRIP' ? 'Type: STRIP' : 'Type: MAIN'} | Order: {banner.display_order} | {((banner.slide_duration_ms ?? 3000) / 1000).toFixed(1)}s
@@ -521,8 +632,10 @@ export function MarketingTab() {
             </div>
           );
         })}
-        {banners.length === 0 && (
-          <div className="col-span-full py-20 text-center text-zinc-500 font-medium">No banners found. Create one above.</div>
+        {filteredBanners.length === 0 && (
+          <div className="col-span-full py-20 text-center text-zinc-500 font-medium">
+            No banners found for {selectedZoneFilter === "ALL" ? "all zones" : selectedZoneFilter === "GLOBAL" ? "global scope" : "this zone"}. Create one above.
+          </div>
         )}
       </div>
 
