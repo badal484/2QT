@@ -360,3 +360,27 @@ describe('GET /kitchen/orders/unassigned', () => {
     expect(call[1]).toEqual([true, null]);
   });
 });
+
+// is_partner distinguishes the commission-based Partners program from a SaaS-onboarded kitchen
+// that merely happens to also use the partner_kitchen staff role — kitchen-portal (the frontend)
+// uses this field to decide whether to show the commission dashboard at all.
+describe('GET /kitchen/my-earnings — includes is_partner so the frontend can tell SaaS kitchens apart', () => {
+  it("returns the kitchen's is_partner flag alongside the earnings figures", async () => {
+    actingAs({ userId: 'partner-1', role: 'partner_kitchen', kitchenId: 'kitchen-A', zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'kitchen-A', name: 'iiii', commission_rate: '0.20', upi_id: null, partner_status: 'none', is_partner: false }] })
+      .mockResolvedValueOnce({ rows: [{ net: 0, commission: 0, gross: 0, orders: 0 }] })
+      .mockResolvedValueOnce({ rows: [{ net: 0, commission: 0, gross: 0, orders: 0 }] })
+      .mockResolvedValueOnce({ rows: [{ net: 0, commission: 0, gross: 0, orders: 0 }] })
+      .mockResolvedValueOnce({ rows: [{ net: 0, commission: 0, gross: 0, orders: 0 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).get('/kitchen/my-earnings');
+
+    expect(res.status).toBe(200);
+    expect(res.body.kitchen.is_partner).toBe(false);
+    expect(mockQuery.mock.calls[0][0]).toContain('is_partner');
+  });
+});

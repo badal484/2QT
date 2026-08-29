@@ -545,7 +545,7 @@ router.get('/my-earnings', authenticate, requireRole('partner_kitchen', 'super_a
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
         const [kitchen, todayRows, weekRows, monthRows, allRows, payoutRows, recentOrders, trendRows] = await Promise.all([
-            query('SELECT id, name, commission_rate, upi_id, partner_status FROM kitchens WHERE id = $1', [kitchenId]),
+            query('SELECT id, name, commission_rate, upi_id, partner_status, is_partner FROM kitchens WHERE id = $1', [kitchenId]),
             query(`SELECT COALESCE(SUM(kitchen_payout_paise),0) net, COALESCE(SUM(commission_paise),0) commission,
                           COALESCE(SUM(total_amount_paise - delivery_fee_paise),0) gross, COUNT(*) orders
                    FROM orders WHERE kitchen_id=$1 AND status='delivered' AND updated_at >= $2`, [kitchenId, todayStart]),

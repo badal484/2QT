@@ -106,19 +106,31 @@ function PayoutRow({ payout }: { payout: any }) {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 function Dashboard({ onLogout }: { user: any; onLogout: () => void }) {
+  const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
   const [activeSection, setActiveSection] = useState<"earnings" | "orders" | "payouts">("earnings");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get("/kitchen/my-earnings");
+      // This portal is the commission-based Partners program's earnings view. A partner_kitchen
+      // staff member from the SaaS onboarding wizard shares the same role name but their kitchen
+      // never enrolled in that program (is_partner defaults false) — the 20% commission shown
+      // here would never actually be applied to their orders (see order.service.ts's gating),
+      // so showing it at all is misleading. Send them to the real SaaS tenant view instead.
+      if (res.kitchen && !res.kitchen.is_partner) {
+        setRedirecting(true);
+        router.replace("/restaurant-dashboard");
+        return; // never render commission UI for this account
+      }
       setData(res);
     } catch (err: any) {
       toast.error(err.message || "Failed to load earnings");
     } finally { setLoading(false); }
-  }, []);
+  }, [router]);
 
   // Silent refresh — used by socket events and the 5-second poll so no spinner flicker
   const silentRefresh = useCallback(async () => {
@@ -197,7 +209,7 @@ function Dashboard({ onLogout }: { user: any; onLogout: () => void }) {
           ))}
         </div>
 
-        {loading ? (
+        {loading || redirecting ? (
           <div className="grid grid-cols-2 gap-4">
             {[1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-white/[0.03] rounded-2xl animate-pulse" />)}
           </div>
