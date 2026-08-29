@@ -117,19 +117,19 @@ function SalesTab() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 text-xs text-white/40 leading-relaxed">
-        Sales are the full order amount minus the delivery fee — unlike a commission-based kitchen, your restaurant keeps 100% of this. 2QT's revenue is your subscription, not a per-order cut.
-      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatTile label="Today" value={fmt(data?.today?.sales)} accent />
         <StatTile label="This Week" value={fmt(data?.thisWeek?.sales)} />
         <StatTile label="This Month" value={fmt(data?.thisMonth?.sales)} />
         <StatTile label="All Time" value={fmt(data?.allTime?.sales)} />
       </div>
-      {data?.trend && (
+      {data?.trend && data.trend.length > 0 && (
         <SectionCard title="7-Day Sales" meta={`${data.allTime?.orders ?? 0} orders all time`}>
-          <div className="h-56 w-full p-4">
-            <ResponsiveContainer width="100%" height="100%">
+          {/* key forces a clean remount once real data is known, instead of ResponsiveContainer
+              trying to reuse a measurement it may have taken before this card had settled into
+              its final layout size (the same class of bug fixed for the Kitchen-step map). */}
+          <div key={JSON.stringify(data.trend)} className="h-56 w-full min-w-[280px] p-4">
+            <ResponsiveContainer width="100%" height="100%" minHeight={224} debounce={1}>
               <LineChart data={data.trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="date" stroke="rgba(255,255,255,0.2)" fontSize={10}
