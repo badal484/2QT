@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, X, Trash2, MapPin } from "lucide-react";
+import { Plus, X, Trash2, MapPin, Pencil } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
 import dynamic from "next/dynamic";
 import { api } from "../lib/api";
@@ -117,6 +117,25 @@ export function KitchensTab() {
 
   const removeStaff = (staffId: string) => {
     setConfirmDialog({ isOpen: true, action: 'remove_chef', id: staffId });
+  };
+
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [editStaffForm, setEditStaffForm] = useState({ name: "", phone: "" });
+
+  const startEditStaff = (s: any) => {
+    setEditingStaffId(s.id);
+    setEditStaffForm({ name: s.name, phone: (s.phone || "").replace(/^91/, "") });
+  };
+
+  const saveEditStaff = async () => {
+    try {
+      await api.patch(`/admin/kitchens/${staffKitchenId}/staff/${editingStaffId}`, editStaffForm);
+      toast.success("Staff details updated");
+      setEditingStaffId(null);
+      loadStaff(staffKitchenId!);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update staff");
+    }
   };
 
   const field = (label: string, key: string) => (
@@ -299,17 +318,35 @@ export function KitchensTab() {
 
                   <div className="space-y-2 mb-4">
                     {staffList.length === 0 ? <div className="text-xs text-zinc-500">No staff assigned yet.</div> : staffList.map(s => (
-                      <div key={s.id} className="flex justify-between items-center bg-white/[0.02] border border-white/5 p-3 rounded-xl">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${s.is_online ? 'bg-green-500' : 'bg-zinc-600'}`}/>
-                          <span className="text-sm font-bold text-white">{s.name}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${s.role === 'packer' ? 'bg-amber-500/20 text-amber-400' : 'bg-brand-primary/20 text-brand-primary'}`}>
-                            {s.role === 'packer' ? 'Packer' : 'Chef'}
-                          </span>
-                          <span className="text-xs text-zinc-500">{s.phone}</span>
+                      editingStaffId === s.id ? (
+                        <div key={s.id} className="bg-white/[0.03] border border-brand-primary/30 p-3 rounded-xl space-y-2">
+                          <div className="flex gap-2">
+                            <input type="text" value={editStaffForm.name} onChange={e => setEditStaffForm({ ...editStaffForm, name: e.target.value })}
+                              className="flex-1 bg-white/[0.05] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white" placeholder="Name" />
+                            <input type="tel" value={editStaffForm.phone} onChange={e => setEditStaffForm({ ...editStaffForm, phone: e.target.value })}
+                              className="flex-1 bg-white/[0.05] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white" placeholder="10-digit mobile number" />
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={() => setEditingStaffId(null)} className="text-xs font-bold text-zinc-400 hover:text-white px-2 py-1">Cancel</button>
+                            <button onClick={saveEditStaff} className="text-xs font-bold text-black bg-brand-primary rounded-lg px-3 py-1">Save</button>
+                          </div>
                         </div>
-                        <button onClick={() => removeStaff(s.id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 className="w-4 h-4"/></button>
-                      </div>
+                      ) : (
+                        <div key={s.id} className="flex justify-between items-center bg-white/[0.02] border border-white/5 p-3 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${s.is_online ? 'bg-green-500' : 'bg-zinc-600'}`}/>
+                            <span className="text-sm font-bold text-white">{s.name}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${s.role === 'packer' ? 'bg-amber-500/20 text-amber-400' : 'bg-brand-primary/20 text-brand-primary'}`}>
+                              {s.role === 'packer' ? 'Packer' : 'Chef'}
+                            </span>
+                            <span className="text-xs text-zinc-500">{s.phone}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => startEditStaff(s)} className="text-zinc-400 hover:text-white p-1"><Pencil className="w-3.5 h-3.5"/></button>
+                            <button onClick={() => removeStaff(s.id)} className="text-red-400 hover:text-red-300 p-1"><Trash2 className="w-4 h-4"/></button>
+                          </div>
+                        </div>
+                      )
                     ))}
                   </div>
 

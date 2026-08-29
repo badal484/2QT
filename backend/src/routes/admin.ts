@@ -1890,6 +1890,30 @@ router.post('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'adm
     }
 });
 
+router.patch('/kitchens/:id/staff/:staffId', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { staffId } = req.params;
+    const { name, phone: rawPhone } = req.body;
+    try {
+        let phone: string | null = null;
+        if (rawPhone !== undefined && rawPhone !== null) {
+            phone = String(rawPhone).replace(/\D/g, '');
+            if (phone.length === 10) phone = '91' + phone;
+            if (phone.length !== 12) return res.status(400).json({ error: 'INVALID_PHONE', message: 'Enter a valid 10-digit mobile number.' });
+        }
+        const { rows } = await query(
+            `UPDATE users SET name = COALESCE($1, name), phone = COALESCE($2, phone) WHERE id = $3
+             RETURNING id, name, phone`,
+            [name?.trim() || null, phone, staffId]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+        emitToAll('kitchen_updated', { action: 'staff_update', kitchenId: req.params.id });
+        res.json({ success: true, staff: rows[0] });
+    } catch (err: any) {
+        if (err.code === '23505') return res.status(409).json({ error: 'PHONE_IN_USE', message: 'This phone number is already registered to another account.' });
+        res.status(500).json({ error: 'Failed to update staff', details: err.message });
+    }
+});
+
 router.delete('/kitchens/:id/staff/:staffId', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { staffId } = req.params;
     try {
