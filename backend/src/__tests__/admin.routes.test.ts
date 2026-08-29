@@ -451,6 +451,25 @@ describe('POST /admin/kitchens — Phase 4 tenant sync', () => {
   });
 });
 
+describe('GET /admin/kitchens/:id/staff — lists every restaurant-dashboard role, not just chef/packer', () => {
+  it('queries using the full RESTAURANT_DASHBOARD_ROLES set, including kitchen_manager and partner_kitchen', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'staff-1', name: 'Badal', phone: '916204646300', role: 'partner_kitchen', is_online: false }],
+    });
+
+    const res = await request(app).get('/admin/kitchens/kitchen-A/staff');
+
+    expect(res.status).toBe(200);
+    expect(res.body.staff).toHaveLength(1);
+    expect(res.body.staff[0].role).toBe('partner_kitchen');
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[0]).toContain('role::text = ANY($2)');
+    expect(call[1][1]).toEqual(expect.arrayContaining(['chef', 'kitchen_manager', 'packer', 'partner_kitchen']));
+  });
+});
+
 describe('POST /admin/kitchens/:id/staff — Phase 4 tenant sync', () => {
   it("syncs an existing user's restaurant_id and restaurant_users membership", async () => {
     actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });

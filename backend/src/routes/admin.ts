@@ -1854,8 +1854,8 @@ router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin')
 router.get('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { rows } = await query(
-        `SELECT id, name, phone, role, is_online FROM users WHERE kitchen_id = $1 AND role::text IN ('chef', 'packer', 'kitchen_manager') ORDER BY role, name`,
-        [id]
+        `SELECT id, name, phone, role, is_online FROM users WHERE kitchen_id = $1 AND role::text = ANY($2) ORDER BY role, name`,
+        [id, RESTAURANT_DASHBOARD_ROLES]
     );
     res.json({ staff: rows });
 });
@@ -1877,9 +1877,10 @@ router.post('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'adm
             emitToAll('kitchen_updated', { action: 'staff_add', kitchenId: id });
             res.json({ success: true, message: `Existing user set as ${role}` });
         } else {
+            const DEFAULT_STAFF_NAME: Record<string, string> = { chef: 'Chef', packer: 'Packer', kitchen_manager: 'Kitchen Manager', partner_kitchen: 'Partner' };
             const { rows: created } = await query(
                 `INSERT INTO users (name, phone, role, kitchen_id, is_active, onboarding_complete) VALUES ($1, $2, $3, $4, true, true) RETURNING id`,
-                [name || (role === 'packer' ? 'Packer' : 'Chef'), phone, role, id]
+                [name || DEFAULT_STAFF_NAME[role], phone, role, id]
             );
             await syncTenantMembership(query, created[0].id, id as string, role);
             emitToAll('kitchen_updated', { action: 'staff_add', kitchenId: id });
