@@ -161,10 +161,19 @@ class ApiClient {
 
   // Auth
   async sendOtp(phone: string) {
-    return await this.request('/auth/send-otp', {
+    const data = await this.request('/auth/send-otp', {
       method: 'POST',
       body: JSON.stringify({ phone }),
     });
+    // The backend can respond HTTP 200 with sent: false — MSG91 rejected the request (bad
+    // key, no balance, invalid number) but the HTTP call itself succeeded, so nothing throws
+    // on its own. Every caller was treating this identically to a real success and telling the
+    // user "OTP sent" regardless. devOtp presence means dev-mode bypass is active, in which
+    // case a real SMS was never attempted, so it isn't a delivery failure either.
+    if (data?.sent === false && !data?.devOtp) {
+      throw new Error('Could not send the OTP right now. Please try again in a moment.');
+    }
+    return data;
   }
 
   async verifyOtp(phone: string, otp: string, referralCode?: string, name?: string, appRole?: string) {
