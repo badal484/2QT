@@ -16,8 +16,13 @@ const getDeliveryOtpForOrder = () => {
 
 export async function createPendingOrderWithClient(client: any, data: any) {
     // Guard: reject orders for suspended or inactive partner kitchens
+    // restaurant_id is included here (Phase 4) so every newly-created order carries its
+    // kitchen's tenant, server-derived, from the moment it's placed — without this, orders
+    // created after the Phase 3 migration would have a permanently NULL restaurant_id, making
+    // the additive tenant check in routes/order.ts's isAuthorizedForOrder() inert for all future
+    // orders. No extra round-trip: piggybacks on the kitchen-status check already made here.
     const { rows: kvRows } = await client.query(
-        'SELECT is_active, is_partner, partner_status, is_paused FROM kitchens WHERE id = $1',
+        'SELECT is_active, is_partner, partner_status, is_paused, restaurant_id FROM kitchens WHERE id = $1',
         [data.kitchenId]
     );
     const kv = kvRows[0];
@@ -47,8 +52,8 @@ export async function createPendingOrderWithClient(client: any, data: any) {
             delivery_location_lat, delivery_location_lng,
             delivery_contact_name, delivery_contact_phone,
             menu_offer_discount_paise, small_order_fee_paise, rider_tip_paise,
-            applied_menu_offer_ids
-        ) VALUES ('2QT-' || LPAD(nextval('order_display_id_seq')::TEXT, 6, '0'), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+            applied_menu_offer_ids, restaurant_id
+        ) VALUES ('2QT-' || LPAD(nextval('order_display_id_seq')::TEXT, 6, '0'), $1, $2, $3, $4, 'pending_payment', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
         RETURNING id, display_id
     `, [
         data.customerId, data.kitchenId, data.zoneId, data.addressId,
@@ -68,6 +73,7 @@ export async function createPendingOrderWithClient(client: any, data: any) {
         data.pricing.smallOrderFeePaise || 0,
         data.pricing.riderTipPaise || 0,
         data.pricing.appliedMenuOfferIds || [],
+        kv.restaurant_id ?? null,
     ]);
 
     const newOrder = orderRows[0];

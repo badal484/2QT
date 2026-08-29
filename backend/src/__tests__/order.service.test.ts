@@ -257,6 +257,50 @@ describe('createPendingOrder', () => {
     const itemInsert = clientMock.query.mock.calls.find((c: any[]) => c[0]?.includes('order_items'));
     expect(itemInsert).toBeDefined();
   });
+
+  // Phase 4: orders.restaurant_id must be set at creation time (server-derived from the
+  // kitchen), otherwise every order placed after Phase 3 would have a permanently NULL
+  // restaurant_id and the additive tenant check in routes/order.ts would never engage.
+  it("sets restaurant_id on the new order from the kitchen's restaurant_id", async () => {
+    const orderRecord = { id: ORDER_ID, display_id: '2QT-000001' };
+    clientMock.query
+      .mockResolvedValueOnce({ rows: [{ is_active: true, is_partner: false, partner_status: null, is_paused: false, restaurant_id: 'restaurant-1' }] })
+      .mockResolvedValueOnce({ rows: [{ lat: 12.9, lng: 77.6 }] })
+      .mockResolvedValueOnce({ rows: [orderRecord] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await createPendingOrder({
+      customerId: CUSTOMER_ID, kitchenId: KITCHEN_ID, zoneId: 'zone-1', addressId: 'address-1',
+      items: [{ menuItemId: 'item-1', quantity: 1, pricePaise: 10000 }],
+      pricing: { subtotalPaise: 10000, deliveryFeePaise: 2500, discountPaise: 0, loyaltyDiscountPaise: 0, walletDeductionPaise: 0, surgePaise: 0, cgstPaise: 250, sgstPaise: 250, totalAmountPaise: 13000, gatewayAmountPaise: 13000, promoCodeId: null, menuOfferDiscountPaise: 0, smallOrderFeePaise: 0, riderTipPaise: 0 },
+      paymentMethod: 'online',
+    });
+
+    const insertOrderCall = clientMock.query.mock.calls.find((c: any[]) => c[0]?.includes('INSERT INTO orders'));
+    expect(insertOrderCall[0]).toContain('restaurant_id');
+    expect(insertOrderCall[1][insertOrderCall[1].length - 1]).toBe('restaurant-1');
+  });
+
+  it('sets restaurant_id to null (never throws) when the kitchen has no restaurant_id yet', async () => {
+    const orderRecord = { id: ORDER_ID, display_id: '2QT-000001' };
+    clientMock.query
+      .mockResolvedValueOnce({ rows: [{ is_active: true, is_partner: false, partner_status: null, is_paused: false, restaurant_id: null }] })
+      .mockResolvedValueOnce({ rows: [{ lat: 12.9, lng: 77.6 }] })
+      .mockResolvedValueOnce({ rows: [orderRecord] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await createPendingOrder({
+      customerId: CUSTOMER_ID, kitchenId: KITCHEN_ID, zoneId: 'zone-1', addressId: 'address-1',
+      items: [{ menuItemId: 'item-1', quantity: 1, pricePaise: 10000 }],
+      pricing: { subtotalPaise: 10000, deliveryFeePaise: 2500, discountPaise: 0, loyaltyDiscountPaise: 0, walletDeductionPaise: 0, surgePaise: 0, cgstPaise: 250, sgstPaise: 250, totalAmountPaise: 13000, gatewayAmountPaise: 13000, promoCodeId: null, menuOfferDiscountPaise: 0, smallOrderFeePaise: 0, riderTipPaise: 0 },
+      paymentMethod: 'online',
+    });
+
+    expect(result).toEqual(orderRecord);
+    const insertOrderCall = clientMock.query.mock.calls.find((c: any[]) => c[0]?.includes('INSERT INTO orders'));
+    // restaurant_id is appended as the last param in the INSERT
+    expect(insertOrderCall[1][insertOrderCall[1].length - 1]).toBeNull();
+  });
 });
 
 describe('finalizeWalletRecharge', () => {

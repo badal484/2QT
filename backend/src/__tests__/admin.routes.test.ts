@@ -5,7 +5,7 @@
 
 import express from 'express';
 import request from 'supertest';
-import { query } from '../db';
+import { query, withTransaction } from '../db';
 import { authenticate } from '../middleware/auth';
 
 jest.mock('@imagekit/nodejs', () =>
@@ -47,6 +47,7 @@ app.use(express.json());
 app.use('/admin', adminRouter);
 
 const mockQuery = query as jest.Mock;
+const mockWithTransaction = withTransaction as jest.Mock;
 const mockAuthenticate = authenticate as jest.Mock;
 const defaultAuthenticate = mockAuthenticate.getMockImplementation();
 
@@ -324,5 +325,176 @@ describe('POST /admin/orders/complete-all-live', () => {
 
     const call = mockQuery.mock.calls[0];
     expect(call[1]).toEqual([null]);
+  });
+});
+
+// ── Phase 4: kitchen/staff lifecycle keeps restaurant tenancy in sync ─────────────────────────
+// utils/tenant.ts's syncTenantMembership/deactivateTenantMembership, wired into the admin flows
+// that create/assign/remove kitchens and staff — without this, anything created after migration
+// 148 would silently drift out of the Phase 3 tenant model.
+
+describe('POST /admin/kitchens — Phase 4 tenant sync', () => {
+  it('creates a matching restaurant + outlet and links the new kitchen to it', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+
+    const clientCalls: any[] = [];
+    const clientMock = {
+      query: jest.fn(async (text: string, params?: any[]) => {
+        clientCalls.push([text, params]);
+        if (text.includes('INSERT INTO kitchens')) return { rows: [{ id: 'kitchen-new' }] };
+        if (text.includes('INSERT INTO kitchen_zones')) return { rows: [] };
+        if (text.includes('INSERT INTO restaurants')) return { rows: [{ id: 'restaurant-new' }] };
+        if (text.includes('UPDATE kitchens SET restaurant_id')) return { rows: [] };
+        if (text.includes('INSERT INTO outlets')) return { rows: [] };
+        return { rows: [] };
+      }),
+    };
+    mockWithTransaction.mockImplementationOnce(async (cb: any) => cb(clientMock));
+    // Post-transaction SELECT that builds the response payload
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'kitchen-new', name: 'New Kitchen', zones: [] }] });
+
+    const res = await request(app).post('/admin/kitchens').send({
+      name: 'New Kitchen',
+      zone_ids: ['00000000-0000-0000-0000-000000000001'],
+    });
+
+    expect(res.status).toBe(201);
+
+    const restaurantInsert = clientCalls.find(([text]) => text.includes('INSERT INTO restaurants'));
+    expect(restaurantInsert).toBeDefined();
+    expect(restaurantInsert[1][0]).toBe('New Kitchen'); // restaurant name mirrors kitchen name
+    expect(restaurantInsert[1][1]).toContain('new-kitchen'); // slugified
+
+    const kitchenLink = clientCalls.find(([text]) => text.includes('UPDATE kitchens SET restaurant_id'));
+    expect(kitchenLink[1]).toEqual(['restaurant-new', 'kitchen-new']);
+
+    const outletInsert = clientCalls.find(([text]) => text.includes('INSERT INTO outlets'));
+    expect(outletInsert[1]).toEqual(['restaurant-new', 'New Kitchen', '00000000-0000-0000-0000-000000000001', 'kitchen-new']);
+  });
+});
+
+describe('POST /admin/kitchens/:id/staff — Phase 4 tenant sync', () => {
+  it("syncs an existing user's restaurant_id and restaurant_users membership", async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'existing-user-1' }] }) // SELECT id FROM users WHERE phone
+      .mockResolvedValueOnce({ rows: [] })                          // UPDATE users role/kitchen_id
+      .mockResolvedValueOnce({ rows: [{ restaurant_id: 'restaurant-A' }] }) // syncTenantMembership: kitchen lookup
+      .mockResolvedValueOnce({ rows: [] })                          // syncTenantMembership: UPDATE users.restaurant_id
+      .mockResolvedValueOnce({ rows: [] });                         // syncTenantMembership: UPSERT restaurant_users
+
+    const res = await request(app).post('/admin/kitchens/kitchen-A/staff').send({ phone: '9876543210', role: 'chef' });
+    expect(res.status).toBe(200);
+
+    const kitchenLookup = mockQuery.mock.calls[2];
+    expect(kitchenLookup[0]).toContain('SELECT restaurant_id FROM kitchens');
+    expect(kitchenLookup[1]).toEqual(['kitchen-A']);
+    const membershipUpsert = mockQuery.mock.calls[4];
+    expect(membershipUpsert[0]).toContain('INSERT INTO restaurant_users');
+    expect(membershipUpsert[1]).toEqual(['restaurant-A', 'existing-user-1', 'chef']);
+  });
+
+  it('syncs a newly-created staff account the same way', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })                          // SELECT id FROM users WHERE phone → none
+      .mockResolvedValueOnce({ rows: [{ id: 'new-user-1' }] })       // INSERT INTO users ... RETURNING id
+      .mockResolvedValueOnce({ rows: [{ restaurant_id: 'restaurant-A' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/kitchens/kitchen-A/staff').send({ phone: '9876543211', name: 'New Chef', role: 'chef' });
+    expect(res.status).toBe(200);
+
+    const membershipUpsert = mockQuery.mock.calls[4];
+    expect(membershipUpsert[1]).toEqual(['restaurant-A', 'new-user-1', 'chef']);
+  });
+
+  it('does not fail the request when the kitchen has no restaurant_id yet', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'existing-user-1' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ restaurant_id: null }] }); // kitchen lookup — no restaurant_id
+
+    const res = await request(app).post('/admin/kitchens/kitchen-A/staff').send({ phone: '9876543210', role: 'chef' });
+    expect(res.status).toBe(200);
+    expect(mockQuery).toHaveBeenCalledTimes(3); // sync stops after the lookup — no crash, no extra writes
+  });
+});
+
+describe('DELETE /admin/kitchens/:id/staff/:staffId — Phase 4 tenant sync', () => {
+  it("nulls the removed staff member's restaurant_id and deactivates their membership", async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE users role/kitchen_id
+      .mockResolvedValueOnce({ rows: [] }) // deactivateTenantMembership: UPDATE users.restaurant_id
+      .mockResolvedValueOnce({ rows: [] }); // deactivateTenantMembership: UPDATE restaurant_users
+
+    const res = await request(app).delete('/admin/kitchens/kitchen-A/staff/staff-1');
+    expect(res.status).toBe(200);
+
+    expect(mockQuery.mock.calls[1]).toEqual(['UPDATE users SET restaurant_id = NULL WHERE id = $1', ['staff-1']]);
+    expect(mockQuery.mock.calls[2][0]).toContain("SET status = 'inactive'");
+    expect(mockQuery.mock.calls[2][1]).toEqual(['staff-1']);
+  });
+});
+
+describe('DELETE /admin/kitchens/:id — Phase 4 tenant sync', () => {
+  it('deactivates restaurant_users membership for every demoted staff member', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'chef-1' }, { id: 'manager-1' }] }) // demote UPDATE ... RETURNING id
+      .mockResolvedValueOnce({ rows: [] }) // deactivate restaurant_users for both
+      .mockResolvedValueOnce({ rows: [] }) // DELETE kitchen_zones
+      .mockResolvedValueOnce({ rows: [] }); // DELETE kitchens
+
+    const res = await request(app).delete('/admin/kitchens/kitchen-A');
+    expect(res.status).toBe(200);
+
+    const deactivateCall = mockQuery.mock.calls[1];
+    expect(deactivateCall[0]).toContain("SET status = 'inactive'");
+    expect(deactivateCall[1]).toEqual([['chef-1', 'manager-1']]);
+  });
+
+  it('does not attempt a membership update when no staff were assigned to the kitchen', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] }) // demote UPDATE ... RETURNING id → no rows
+      .mockResolvedValueOnce({ rows: [] }) // DELETE kitchen_zones
+      .mockResolvedValueOnce({ rows: [] }); // DELETE kitchens
+
+    const res = await request(app).delete('/admin/kitchens/kitchen-A');
+    expect(res.status).toBe(200);
+    expect(mockQuery).toHaveBeenCalledTimes(3); // no restaurant_users UPDATE attempted
+  });
+});
+
+describe('POST /admin/team/users — Phase 4 tenant sync', () => {
+  it('syncs tenant membership when creating a chef with a kitchenId', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'user-1', name: 'Chef', phone: '919876543210', role: 'chef', kitchen_id: 'kitchen-A', created_at: new Date() }] })
+      .mockResolvedValueOnce({ rows: [{ restaurant_id: 'restaurant-A' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/team/users').send({ phone: '9876543210', name: 'Chef', role: 'chef', kitchenId: 'kitchen-A' });
+    expect(res.status).toBe(200);
+
+    const membershipUpsert = mockQuery.mock.calls[3];
+    expect(membershipUpsert[0]).toContain('INSERT INTO restaurant_users');
+    expect(membershipUpsert[1]).toEqual(['restaurant-A', 'user-1', 'chef']);
+  });
+
+  it('never syncs tenant membership for a rider, even if a kitchenId is somehow supplied', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'rider-1', name: 'Rider', phone: '919876543211', role: 'rider', kitchen_id: 'kitchen-A', created_at: new Date() }],
+    });
+
+    const res = await request(app).post('/admin/team/users').send({ phone: '9876543211', name: 'Rider', role: 'rider', kitchenId: 'kitchen-A' });
+    expect(res.status).toBe(200);
+    expect(mockQuery).toHaveBeenCalledTimes(1); // only the INSERT — no tenant sync for riders (Phase 8, not now)
   });
 });

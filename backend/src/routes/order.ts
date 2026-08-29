@@ -15,14 +15,27 @@ const router = Router();
 // ownership rule already enforced correctly by GET /:id/tracking below — customers see only
 // their own orders, riders only their own assigned deliveries, kitchen staff only their own
 // kitchen's orders; every other role (admin/finance/support/etc.) is platform-wide by design.
+//
+// Phase 4 addition: once both the caller's tenant (req.user.tenantRestaurantId) and the order's
+// restaurant_id are populated, they must agree — an additional isolation layer on top of the
+// existing kitchen_id check, not a replacement for it (per the approved Phase 4 plan, "restaurant
+// scope + kitchen/zone scope"). This is deliberately a soft check: if either side is still null
+// (any order/staff pair that predates the Phase 3 tenant model, or hasn't been synced by the
+// Phase 4 admin-flow hooks in utils/tenant.ts yet), the existing kitchen_id-only rule alone
+// decides access, exactly as it did before this phase — so this never introduces a new failure
+// mode for data that hasn't been migrated into the tenant model.
 function isAuthorizedForOrder(
-    user: { role: string; userId: string; kitchenId: string | null },
-    order: { customer_id: string; rider_id: string | null; kitchen_id: string }
+    user: { role: string; userId: string; kitchenId: string | null; tenantRestaurantId?: string | null },
+    order: { customer_id: string; rider_id: string | null; kitchen_id: string; restaurant_id?: string | null }
 ): boolean {
     if (user.role === 'customer') return order.customer_id === user.userId;
     if (user.role === 'rider') return order.rider_id === user.userId;
     if (['chef', 'kitchen_manager', 'partner_kitchen', 'packer'].includes(user.role)) {
-        return order.kitchen_id === user.kitchenId;
+        if (order.kitchen_id !== user.kitchenId) return false;
+        if (user.tenantRestaurantId && order.restaurant_id && user.tenantRestaurantId !== order.restaurant_id) {
+            return false;
+        }
+        return true;
     }
     return true;
 }
@@ -147,7 +160,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
 router.get('/:id/invoice', authenticate, async (req: AuthRequest, res) => {
     const { id } = req.params;
     try {
-        const { rows } = await query('SELECT customer_id, rider_id, kitchen_id FROM orders WHERE id = $1', [id]);
+        const { rows } = await query('SELECT customer_id, rider_id, kitchen_id, restaurant_id FROM orders WHERE id = $1', [id]);
         if (rows.length === 0) return res.status(404).json({ error: 'NOT_FOUND' });
 
         // Authorization check
