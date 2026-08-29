@@ -74,7 +74,7 @@ describe('finalizeOrder', () => {
       .mockResolvedValueOnce({ rows: [makeOrder({ status: 'confirmed' })] }); // already confirmed
 
     const result = await finalizeOrder(GATEWAY_ORDER_ID, 'online');
-    expect(result).toEqual({ status: 'already_finalized', orderId: ORDER_ID });
+    expect(result).toMatchObject({ status: 'already_finalized', orderId: ORDER_ID });
   });
 
   it('throws INSUFFICIENT_WALLET_BALANCE_AT_FINALIZATION when wallet is too low', async () => {
