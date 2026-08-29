@@ -8,9 +8,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
-import { api } from "../lib/api";
 import { toast } from "sonner";
-import { OtpBoxInput } from "../components/ui/OtpBoxInput";
 import dynamic from "next/dynamic";
 
 const OverviewTab = dynamic(() => import("./OverviewTab").then(m => ({ default: m.OverviewTab })), { ssr: false });
@@ -35,171 +33,40 @@ const TABS = [
 
 const SECTIONS = ["Main", "Payouts", "Reports"];
 
-// ─── Login ────────────────────────────────────────────────────────────────────
-// Uses the same phone+OTP system as the rest of the app.
-// Finance users are created by admin via the Team tab (phone number only, no password).
-
-function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh: string) => void }) {
-  const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [devOtp, setDevOtp] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const sendOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10) return toast.error("Enter a valid phone number");
-    setLoading(true);
-    try {
-      const data = await api.sendOtp(digits);
-      if (data?.devOtp) { setOtp(data.devOtp); setDevOtp(data.devOtp); }
-      setStep("otp");
-      toast.success("OTP sent");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send OTP");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otp.length < 4) return toast.error("Enter the OTP");
-    setLoading(true);
-    try {
-      const digits = phone.replace(/\D/g, "");
-      const res = await api.verifyOtp(digits, otp, undefined);
-      if (!res.user || !["finance", "super_admin"].includes(res.user.role)) {
-        toast.error("Access denied. Finance team credentials required.");
-        return;
-      }
-      onLogin(res.user, res.accessToken, res.refreshToken);
-      toast.success(`Welcome, ${res.user.name}`);
-    } catch (err: any) {
-      toast.error(err.message || "Invalid OTP");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#07070e] flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm"
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
-            <IndianRupee className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <div className="text-xl font-black text-white leading-none">
-              2QT<span className="text-emerald-400">.</span>
-            </div>
-            <div className="text-xs text-white/30 font-semibold mt-0.5">Finance Portal</div>
-          </div>
-        </div>
-
-        <div className="bg-[#0d0d1a] border border-white/[0.07] rounded-2xl p-6 space-y-5">
-          <div>
-            <h1 className="text-2xl font-black text-white">{step === "phone" ? "Sign in" : "Verify OTP"}</h1>
-            <p className="text-white/30 text-sm mt-1">
-              {step === "phone" ? "Finance team access only" : `Code sent to ${phone}`}
-            </p>
-          </div>
-
-          <AnimatePresence mode="wait">
-          {step === "phone" ? (
-            <motion.form key="phone" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={sendOTP} className="space-y-4">
-              <div>
-                <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Phone Number</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  placeholder="9876543210"
-                  autoComplete="tel"
-                  className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 placeholder:text-white/20"
-                />
-              </div>
-              <button type="submit" disabled={loading || phone.replace(/\D/g,"").length < 10}
-                className="w-full py-3.5 rounded-xl bg-emerald-500 text-white font-black text-sm hover:bg-emerald-400 transition-colors disabled:opacity-40">
-                {loading ? "Sending..." : "Send OTP"}
-              </button>
-            </motion.form>
-          ) : (
-            <motion.form key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={verifyOTP} className="space-y-5">
-              {devOtp && (
-                <div className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                  <p className="text-xs text-white/40 uppercase tracking-widest font-bold mb-1">SMS not configured — your OTP</p>
-                  <p className="text-2xl font-black tracking-[0.5em] text-emerald-400">{devOtp}</p>
-                </div>
-              )}
-              <div>
-                <label className="text-xs text-white/40 font-semibold uppercase tracking-wider block mb-3">OTP Code</label>
-                <OtpBoxInput
-                  value={otp}
-                  onChange={setOtp}
-                  onComplete={val => { setOtp(val); }}
-                  accentColor="border-emerald-500"
-                />
-              </div>
-              <button type="submit" disabled={loading || otp.replace(/\s/g,"").length < 4}
-                className="w-full py-3.5 rounded-xl bg-emerald-500 text-white font-black text-sm hover:bg-emerald-400 transition-colors disabled:opacity-40">
-                {loading ? "Verifying..." : "Verify & Sign In"}
-              </button>
-              <button type="button" onClick={() => { setStep("phone"); setOtp(""); }} className="w-full text-xs text-white/30 hover:text-white/60 transition-colors">
-                ← Change number
-              </button>
-            </motion.form>
-          )}
-          </AnimatePresence>
-        </div>
-
-        <p className="text-center text-xs text-white/20 mt-6">
-          2QT Finance Portal · Restricted Access
-        </p>
-      </motion.div>
-    </div>
-  );
-}
-
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function FinancePage() {
-  const { user, loading, login, logout } = useAuth()!;
+  const { user, loading, logout } = useAuth()!;
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("Overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const handleLocalLogin = (userData: any, token: string, refresh: string) => {
-    try {
-      localStorage.setItem("2qt_token", token);
-      localStorage.setItem("2qt_refresh_token", refresh);
-    } catch {}
-    login(userData);
-  };
+  const isFinanceUser = user && ["finance", "super_admin"].includes(user.role);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.push("/login?redirect=/finance");
+      return;
+    }
+    if (!isFinanceUser) {
+      toast.error("Access denied. Finance team credentials required.");
+      router.push("/menu");
+    }
+  }, [user, loading, isFinanceUser, router]);
 
   const handleLogout = () => {
     logout();
     toast.success("Signed out");
+    router.push("/login");
   };
 
-  const isFinanceUser = user && ["finance", "super_admin"].includes(user.role);
-
-  if (loading) {
+  if (loading || !user || !isFinanceUser) {
     return (
       <div className="min-h-screen bg-[#07070e] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
       </div>
     );
-  }
-
-  if (!user || !isFinanceUser) {
-    return <LoginScreen onLogin={handleLocalLogin} />;
   }
 
   const ActiveComponent = TABS.find(t => t.name === activeTab)?.component ?? OverviewTab;
