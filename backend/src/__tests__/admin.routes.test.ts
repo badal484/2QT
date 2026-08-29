@@ -215,6 +215,48 @@ describe('Admin Zod validation — menu items (POST /admin/menu)', () => {
   });
 });
 
+// Phase 5: without this, every menu item created after Phase 3 would have a permanently NULL
+// restaurant_id, making the new restaurant dashboard's menu view silently incomplete for any
+// restaurant that adds items going forward.
+describe('POST /admin/menu — Phase 5 restaurant_id population', () => {
+  it("sets restaurant_id on the new item from the zone's assigned kitchen", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ kitchen_id: 'kitchen-A', restaurant_id: 'restaurant-A' }] }) // kitchen_zones JOIN kitchens
+      .mockResolvedValueOnce({ rows: [{ id: 'item-1', zone_id: '00000000-0000-0000-0000-000000000001', name: 'Biryani' }] }) // INSERT
+      .mockResolvedValueOnce({ rows: [] }); // SELECT id FROM zones (cache-bust loop)
+
+    const res = await request(app).post('/admin/menu').send({
+      name: 'Biryani',
+      zone_id: '00000000-0000-0000-0000-000000000001',
+      price_paise: 15000,
+      category: 'Main',
+    });
+
+    expect(res.status).toBe(200);
+    const insertCall = mockQuery.mock.calls[1];
+    expect(insertCall[0]).toContain('restaurant_id');
+    expect(insertCall[1][insertCall[1].length - 1]).toBe('restaurant-A');
+  });
+
+  it('sets restaurant_id to null (never throws) when the kitchen has no restaurant_id yet', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ kitchen_id: 'kitchen-A', restaurant_id: null }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'item-1', zone_id: '00000000-0000-0000-0000-000000000001', name: 'Biryani' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/menu').send({
+      name: 'Biryani',
+      zone_id: '00000000-0000-0000-0000-000000000001',
+      price_paise: 15000,
+      category: 'Main',
+    });
+
+    expect(res.status).toBe(200);
+    const insertCall = mockQuery.mock.calls[1];
+    expect(insertCall[1][insertCall[1].length - 1]).toBeNull();
+  });
+});
+
 describe('Admin Zod validation — kitchens', () => {
   it('returns 400 VALIDATION_ERROR when name is empty', async () => {
     const body = {

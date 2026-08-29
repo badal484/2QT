@@ -24,6 +24,7 @@ import homeRoutes from './home';
 import collectionsRoutes from './collections';
 import menuOffersRoutes from './menu-offers';
 import restaurantsRoutes from './restaurants';
+import restaurantDashboardRoutes from './restaurant';
 import tableBookingsRoutes from './table-bookings';
 import partnerRoutes from './partner';
 import missionsRoutes from './missions';
@@ -124,6 +125,9 @@ router.use('/campaigns', campaignsRoutes);
 router.use('/complaints', complaintsRoutes);
 router.use('/menu-offers', menuOffersRoutes);
 router.use('/restaurants', restaurantsRoutes);
+// /restaurant (singular) — Phase 5 SaaS tenant dashboard. Distinct from /restaurants (plural,
+// above), which is the unrelated customer-facing dine-in discovery endpoint.
+router.use('/restaurant', restaurantDashboardRoutes);
 router.use('/table-bookings', tableBookingsRoutes);
 router.use('/partner', partnerRoutes);
 router.use('/missions', missionsRoutes);

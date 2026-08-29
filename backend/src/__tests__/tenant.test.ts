@@ -1,5 +1,5 @@
 /**
- * Unit tests for utils/tenant.ts — the Phase 4 tenant-consumption helpers.
+ * Unit tests for utils/tenant.ts — the Phase 4/5 tenant-consumption helpers.
  */
 
 import { query } from '../db';
@@ -9,6 +9,8 @@ import {
   isActiveRestaurantMember,
   syncTenantMembership,
   deactivateTenantMembership,
+  requireActiveRestaurantMembership,
+  RESTAURANT_DASHBOARD_ROLES,
 } from '../utils/tenant';
 
 const mockQuery = query as jest.Mock;
@@ -113,5 +115,60 @@ describe('deactivateTenantMembership', () => {
     expect(mockQuery).toHaveBeenNthCalledWith(2, expect.stringContaining("SET status = 'inactive'"), ['user-1']);
     // Never a DELETE — membership history must be preserved
     expect(mockQuery.mock.calls.some((c) => String(c[0]).toUpperCase().startsWith('DELETE'))).toBe(false);
+  });
+});
+
+// Phase 5: the restaurant-dashboard access gate. See restaurant.routes.test.ts for full
+// HTTP-level coverage; these are direct unit tests of the middleware function in isolation.
+describe('requireActiveRestaurantMembership', () => {
+  function makeReqRes(user: any) {
+    const req: any = { user };
+    const res: any = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+    const next = jest.fn();
+    return { req, res, next };
+  }
+
+  it('lists exactly the four restaurant-scoped roles', () => {
+    expect(RESTAURANT_DASHBOARD_ROLES.sort()).toEqual(['chef', 'kitchen_manager', 'packer', 'partner_kitchen'].sort());
+  });
+
+  it('calls next() for an active member', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
+    const { req, res, next } = makeReqRes({ userId: 'chef-1', role: 'chef', tenantRestaurantId: 'restaurant-A' });
+
+    await requireActiveRestaurantMembership(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('rejects a disallowed role before ever querying the database', async () => {
+    const { req, res, next } = makeReqRes({ userId: 'rider-1', role: 'rider', tenantRestaurantId: 'restaurant-A' });
+
+    await requireActiveRestaurantMembership(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('rejects a null tenantRestaurantId before querying the database', async () => {
+    const { req, res, next } = makeReqRes({ userId: 'chef-1', role: 'chef', tenantRestaurantId: null });
+
+    await requireActiveRestaurantMembership(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('rejects when no active membership row exists (wrong restaurant or deactivated membership)', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    const { req, res, next } = makeReqRes({ userId: 'chef-1', role: 'chef', tenantRestaurantId: 'restaurant-A' });
+
+    await requireActiveRestaurantMembership(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 });

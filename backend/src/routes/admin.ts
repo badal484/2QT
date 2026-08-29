@@ -1090,16 +1090,24 @@ router.post('/menu', authenticate, requireRole('super_admin', 'admin'), validate
 
         const cost_price_paise = req.body.cost_price_paise ?? Math.floor(price_paise * 0.7);
 
-        // Fetch kitchen_id associated with the zone
-        const { rows: kitchenRows } = await query('SELECT kitchen_id FROM kitchen_zones WHERE zone_id = $1 LIMIT 1', [zone_id]);
+        // Fetch kitchen_id (and its restaurant_id — Phase 5) associated with the zone
+        const { rows: kitchenRows } = await query(
+            'SELECT k.id AS kitchen_id, k.restaurant_id FROM kitchen_zones kz JOIN kitchens k ON k.id = kz.kitchen_id WHERE kz.zone_id = $1 LIMIT 1',
+            [zone_id]
+        );
         if (kitchenRows.length === 0) {
             return res.status(400).json({ error: 'No kitchen is assigned to this zone.' });
         }
         const kitchen_id = kitchenRows[0].kitchen_id;
+        // restaurant_id (Phase 5): without this, every menu item created after Phase 3 would
+        // have a permanently NULL restaurant_id, making the tenant-scoped restaurant dashboard's
+        // menu view silently incomplete for any restaurant that adds items going forward — same
+        // class of gap already fixed for orders in Phase 4 (services/order.service.ts).
+        const restaurant_id = kitchenRows[0].restaurant_id ?? null;
 
         const { rows } = await query(
-            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, images, video_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17::TEXT[], $18::jsonb) RETURNING *',
-            [zone_id, kitchen_id, name, description || null, price_paise, cost_price_paise, category, station || 'hot_section', photo_url || null, JSON.stringify(images || []), video_url || null, available ?? true, is_veg ?? false, is_egg ?? false, is_bestseller ?? false, is_new ?? false, tags ?? [], JSON.stringify(customization_groups || [])]
+            'INSERT INTO menu_items (zone_id, kitchen_id, name, description, price_paise, cost_price_paise, category, station, photo_url, images, video_url, available, is_veg, is_egg, is_bestseller, is_new, tags, customization_groups, restaurant_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17::TEXT[], $18::jsonb, $19) RETURNING *',
+            [zone_id, kitchen_id, name, description || null, price_paise, cost_price_paise, category, station || 'hot_section', photo_url || null, JSON.stringify(images || []), video_url || null, available ?? true, is_veg ?? false, is_egg ?? false, is_bestseller ?? false, is_new ?? false, tags ?? [], JSON.stringify(customization_groups || []), restaurant_id]
         );
         
         // Clear menu cache for all zones
