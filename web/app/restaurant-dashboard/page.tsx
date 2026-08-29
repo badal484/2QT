@@ -15,8 +15,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LogOut, RefreshCw, Utensils, ClipboardList, ChefHat, Store, Users, UtensilsCrossed, LayoutGrid,
+  LogOut, RefreshCw, Utensils, ClipboardList, ChefHat, Store, Users, UtensilsCrossed, LayoutGrid, TrendingUp,
 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../providers";
@@ -85,6 +86,71 @@ function OverviewTab({ restaurant, stats }: { restaurant: any; stats: any }) {
         <StatTile label="Active Kitchens" value={stats?.activeKitchens ?? "—"} />
         <StatTile label="Active Staff" value={stats?.activeStaff ?? "—"} />
       </div>
+    </div>
+  );
+}
+
+function SalesTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/restaurant/sales");
+      setData(res);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load sales");
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useSocketRefresh(["new_order", "order_updated"], load);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-white/[0.03] rounded-2xl animate-pulse" />)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 text-xs text-white/40 leading-relaxed">
+        Sales are the full order amount minus the delivery fee — unlike a commission-based kitchen, your restaurant keeps 100% of this. 2QT's revenue is your subscription, not a per-order cut.
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatTile label="Today" value={fmt(data?.today?.sales)} accent />
+        <StatTile label="This Week" value={fmt(data?.thisWeek?.sales)} />
+        <StatTile label="This Month" value={fmt(data?.thisMonth?.sales)} />
+        <StatTile label="All Time" value={fmt(data?.allTime?.sales)} />
+      </div>
+      {data?.trend && (
+        <SectionCard title="7-Day Sales" meta={`${data.allTime?.orders ?? 0} orders all time`}>
+          <div className="h-56 w-full p-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="date" stroke="rgba(255,255,255,0.2)" fontSize={10}
+                  tickFormatter={(t) => new Date(t).toLocaleDateString("en-IN", { weekday: "short" })}
+                  axisLine={false} tickLine={false} />
+                <YAxis stroke="rgba(255,255,255,0.2)" fontSize={10}
+                  tickFormatter={(t) => `₹${t / 100}`} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#0d0d1a", borderColor: "rgba(255,255,255,0.1)", borderRadius: "12px", fontSize: "12px" }}
+                  itemStyle={{ color: "#F97316", fontWeight: "bold" }}
+                  formatter={(value: any) => [fmt(value || 0), "Sales"]}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
+                />
+                <Line type="monotone" dataKey="sales" stroke="#F97316" strokeWidth={3}
+                  dot={{ r: 4, fill: "#0d0d1a", stroke: "#F97316", strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: "#F97316", stroke: "#fff", strokeWidth: 2 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 }
@@ -262,6 +328,7 @@ function MenuTab() {
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "sales", label: "Sales", icon: TrendingUp },
   { id: "orders", label: "Orders", icon: ClipboardList },
   { id: "kitchens", label: "Kitchens", icon: ChefHat },
   { id: "outlets", label: "Outlets", icon: Store },
@@ -327,6 +394,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         <AnimatePresence mode="wait">
           <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
             {tab === "overview" && <OverviewTab restaurant={restaurant} stats={stats} />}
+            {tab === "sales" && <SalesTab />}
             {tab === "orders" && <OrdersTab />}
             {tab === "kitchens" && <KitchensTab />}
             {tab === "outlets" && <OutletsTab />}
