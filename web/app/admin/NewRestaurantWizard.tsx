@@ -62,6 +62,15 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
   const [fssai, setFssai] = useState("");
   const [gstin, setGstin] = useState("");
 
+  // Kitchens created through paths that pre-date the tenant model (e.g. partner approvals
+  // before the fix in dbb27e5) can be sitting without a restaurant tenant — offering to attach
+  // one here, instead of always creating a brand-new kitchen, is a self-service fix for that
+  // without needing a database backfill.
+  const [kitchenMode, setKitchenMode] = useState<"new" | "existing">("new");
+  const [orphanKitchens, setOrphanKitchens] = useState<any[]>([]);
+  const [orphanKitchensLoading, setOrphanKitchensLoading] = useState(true);
+  const [existingKitchenId, setExistingKitchenId] = useState("");
+
   const [addStaff, setAddStaff] = useState(true);
   const [staffName, setStaffName] = useState("");
   const [staffPhone, setStaffPhone] = useState("");
@@ -79,6 +88,14 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
       .then((data: any) => setZones(data.zones ?? data ?? []))
       .catch(() => toast.error("Failed to load zones"))
       .finally(() => setZonesLoading(false));
+    api.get("/admin/kitchens")
+      .then((data: any) => {
+        const orphans = (data.kitchens ?? []).filter((k: any) => !k.restaurant_id);
+        setOrphanKitchens(orphans);
+        if (orphans.length === 0) setKitchenMode("new"); // nothing to attach to — default straight to creating new
+      })
+      .catch(() => {}) // non-fatal — "create new" still works if this fails
+      .finally(() => setOrphanKitchensLoading(false));
   }, []);
 
   const step = STEPS[stepIdx];
@@ -87,7 +104,7 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
     switch (step.key) {
       case "business": return restaurantName.trim().length > 0;
       case "zone": return !!zoneId;
-      case "kitchen": return address.trim().length > 0 && kitchenName.trim().length > 0;
+      case "kitchen": return kitchenMode === "existing" ? !!existingKitchenId : (address.trim().length > 0 && kitchenName.trim().length > 0);
       case "staff": return !addStaff || (staffName.trim() && /^\d{10}$/.test(staffPhone.replace(/\D/g, "")));
       case "billing": return !startBilling || (parseFloat(amountRupees) > 0 && periodEnd > periodStart);
       default: return true;
@@ -100,17 +117,29 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
   const create = async () => {
     setCreating(true);
     try {
-      const kitchenRes = await api.post("/admin/kitchens", {
-        name: kitchenName,
-        restaurant_name: restaurantName,
-        zone_ids: [zoneId],
-        address,
-        fssai_license: fssai || undefined,
-        gstin: gstin || undefined,
-      });
-      const kitchen = kitchenRes.kitchen ?? kitchenRes;
-      const kitchenId = kitchen.id;
-      const restaurantId = kitchen.restaurant_id;
+      let kitchenId: string;
+      let restaurantId: string;
+
+      if (kitchenMode === "existing") {
+        const attachRes = await api.post(`/admin/kitchens/${existingKitchenId}/tenant`, {
+          restaurant_name: restaurantName,
+          zone_id: zoneId,
+        });
+        kitchenId = existingKitchenId;
+        restaurantId = attachRes.restaurant_id;
+      } else {
+        const kitchenRes = await api.post("/admin/kitchens", {
+          name: kitchenName,
+          restaurant_name: restaurantName,
+          zone_ids: [zoneId],
+          address,
+          fssai_license: fssai || undefined,
+          gstin: gstin || undefined,
+        });
+        const kitchen = kitchenRes.kitchen ?? kitchenRes;
+        kitchenId = kitchen.id;
+        restaurantId = kitchen.restaurant_id;
+      }
 
       if (addStaff && staffName.trim()) {
         try {
@@ -194,21 +223,53 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
 
           {step.key === "kitchen" && (
             <div className="space-y-4">
-              <Field label="Kitchen Name">
-                <input className={inputClass} value={kitchenName} onChange={(e) => setKitchenNameOverride(e.target.value)} placeholder={restaurantName} />
-                <p className="text-[10px] text-zinc-500 mt-1.5">Defaults to the restaurant name — edit if the operational kitchen name should differ (e.g. "{restaurantName} — HSR Layout").</p>
-              </Field>
-              <Field label="Address">
-                <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, area, city" />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="FSSAI License (optional)">
-                  <input className={inputClass} value={fssai} onChange={(e) => setFssai(e.target.value)} />
+              {!orphanKitchensLoading && orphanKitchens.length > 0 && (
+                <div className="flex gap-2 p-1 bg-white/[0.03] rounded-xl">
+                  <button onClick={() => setKitchenMode("new")}
+                    className={`flex-1 text-xs font-black uppercase tracking-widest py-2 rounded-lg transition-colors ${kitchenMode === "new" ? "bg-brand-primary text-black" : "text-zinc-400 hover:text-white"}`}>
+                    Create New Kitchen
+                  </button>
+                  <button onClick={() => setKitchenMode("existing")}
+                    className={`flex-1 text-xs font-black uppercase tracking-widest py-2 rounded-lg transition-colors ${kitchenMode === "existing" ? "bg-brand-primary text-black" : "text-zinc-400 hover:text-white"}`}>
+                    Use Existing Kitchen
+                  </button>
+                </div>
+              )}
+
+              {kitchenMode === "existing" ? (
+                <Field label="Kitchen (without a tenant yet)">
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {orphanKitchens.map((k: any) => (
+                      <label key={k.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${existingKitchenId === k.id ? "bg-brand-primary/10 border-brand-primary/50 text-brand-primary" : "bg-[#11111a] border-white/10 text-white hover:bg-white/5"}`}>
+                        <input type="radio" name="existing-kitchen" className="hidden" checked={existingKitchenId === k.id} onChange={() => setExistingKitchenId(k.id)} />
+                        <div>
+                          <div className="text-sm font-semibold">{k.name}</div>
+                          <div className="text-[10px] text-zinc-500">{k.address || "No address on file"}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 mt-1.5">These kitchens exist but were never registered as a billable tenant — often from an approval flow that pre-dates this system.</p>
                 </Field>
-                <Field label="GSTIN (optional)">
-                  <input className={inputClass} value={gstin} onChange={(e) => setGstin(e.target.value)} />
-                </Field>
-              </div>
+              ) : (
+                <>
+                  <Field label="Kitchen Name">
+                    <input className={inputClass} value={kitchenName} onChange={(e) => setKitchenNameOverride(e.target.value)} placeholder={restaurantName} />
+                    <p className="text-[10px] text-zinc-500 mt-1.5">Defaults to the restaurant name — edit if the operational kitchen name should differ (e.g. "{restaurantName} — HSR Layout").</p>
+                  </Field>
+                  <Field label="Address">
+                    <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, area, city" />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="FSSAI License (optional)">
+                      <input className={inputClass} value={fssai} onChange={(e) => setFssai(e.target.value)} />
+                    </Field>
+                    <Field label="GSTIN (optional)">
+                      <input className={inputClass} value={gstin} onChange={(e) => setGstin(e.target.value)} />
+                    </Field>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -263,9 +324,15 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
             <div className="space-y-3">
               <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-zinc-500">Restaurant</span><span className="text-white font-semibold">{restaurantName}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Kitchen</span><span className="text-white">{kitchenName}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Kitchen</span>
+                  <span className="text-white">
+                    {kitchenMode === "existing" ? orphanKitchens.find((k) => k.id === existingKitchenId)?.name : kitchenName}
+                    {kitchenMode === "existing" && <span className="text-[10px] text-zinc-500 ml-1.5">(existing)</span>}
+                  </span>
+                </div>
                 <div className="flex justify-between"><span className="text-zinc-500">Zone</span><span className="text-white">{zones.find((z) => z.id === zoneId)?.name || "—"}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Address</span><span className="text-white text-right max-w-[60%]">{address}</span></div>
+                {kitchenMode === "new" && <div className="flex justify-between"><span className="text-zinc-500">Address</span><span className="text-white text-right max-w-[60%]">{address}</span></div>}
                 <div className="flex justify-between"><span className="text-zinc-500">First staff</span><span className="text-white">{addStaff ? `${staffName} (${ROLE_OPTIONS.find((r) => r.value === staffRole)?.label})` : "Skipped"}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-500">Billing</span><span className="text-white">{startBilling ? `₹${amountRupees} / cycle` : "Skipped"}</span></div>
               </div>

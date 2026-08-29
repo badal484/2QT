@@ -1673,6 +1673,38 @@ router.get('/kitchens', authenticate, requireRole('super_admin', 'admin'), async
     res.json({ kitchens: rows.map(({ pin_hash, ...k }) => ({ ...k, has_pin: !!pin_hash })) });
 });
 
+// Attaches a tenant to an EXISTING kitchen that doesn't have one yet — the New Restaurant
+// wizard's alternative to creating a brand-new kitchen, specifically for kitchens created
+// through a path that pre-dates the tenant model (e.g. partner approvals before the fix in
+// commit dbb27e5) and are otherwise permanently invisible in the Tenants admin view.
+const AttachTenantSchema = z.object({
+    restaurant_name: z.string().min(1).max(120),
+    zone_id: z.string().uuid().nullish(),
+});
+
+router.post('/kitchens/:id/tenant', authenticate, requireRole('super_admin', 'admin'), validate(AttachTenantSchema), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { restaurant_name, zone_id } = req.body;
+    try {
+        const { rows: kitchenRows } = await query('SELECT id, name, restaurant_id FROM kitchens WHERE id = $1', [id]);
+        if (!kitchenRows[0]) return res.status(404).json({ error: 'NOT_FOUND', message: 'Kitchen not found' });
+        if (kitchenRows[0].restaurant_id) return res.status(409).json({ error: 'ALREADY_HAS_TENANT', message: 'This kitchen already has a restaurant tenant.' });
+
+        let effectiveZoneId: string | null = zone_id ?? null;
+        if (zone_id) {
+            await query('INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, zone_id]);
+        } else {
+            const { rows: existingZone } = await query('SELECT zone_id FROM kitchen_zones WHERE kitchen_id = $1 LIMIT 1', [id]);
+            effectiveZoneId = existingZone[0]?.zone_id ?? null;
+        }
+
+        const restaurantId = await createRestaurantTenantForKitchen(query, id as string, kitchenRows[0].name, effectiveZoneId, restaurant_name);
+        res.status(201).json({ restaurant_id: restaurantId });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Kitchen PIN login (auth.ts /auth/kitchen-pin) bcrypt-compares an entered PIN against
 // every kitchen's pin_hash and logs into whichever one matches first — two kitchens
 // sharing a PIN makes that lookup ambiguous, so PINs must be unique across kitchens.

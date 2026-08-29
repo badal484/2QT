@@ -555,6 +555,67 @@ describe('DELETE /admin/kitchens/:id/staff/:staffId — Phase 4 tenant sync', ()
   });
 });
 
+describe('POST /admin/kitchens/:id/tenant — attach a tenant to an existing untenanted kitchen', () => {
+  it('creates the tenant using the kitchen\'s existing zone when none is supplied', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'kitchen-orphan', name: 'Bachra Kitchen', restaurant_id: null }] }) // kitchen lookup
+      .mockResolvedValueOnce({ rows: [{ zone_id: 'zone-existing' }] }) // existing kitchen_zones lookup
+      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-new' }] }) // INSERT restaurants
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE kitchens SET restaurant_id
+      .mockResolvedValueOnce({ rows: [] }); // INSERT outlets
+
+    const res = await request(app).post('/admin/kitchens/kitchen-orphan/tenant').send({ restaurant_name: 'Bachra Kitchen' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.restaurant_id).toBe('restaurant-new');
+    const outletInsert = mockQuery.mock.calls[4];
+    expect(outletInsert[1]).toEqual(['restaurant-new', 'Bachra Kitchen', 'zone-existing', 'kitchen-orphan']);
+  });
+
+  it('links a supplied zone_id into kitchen_zones when the kitchen has none yet', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'kitchen-orphan', name: 'Bachra Kitchen', restaurant_id: null }] })
+      .mockResolvedValueOnce({ rows: [] }) // INSERT kitchen_zones
+      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-new' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/kitchens/kitchen-orphan/tenant').send({ restaurant_name: 'Bachra Kitchen', zone_id: '00000000-0000-0000-0000-000000000009' });
+
+    expect(res.status).toBe(201);
+    expect(mockQuery.mock.calls[1]).toEqual(['INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', ['kitchen-orphan', '00000000-0000-0000-0000-000000000009']]);
+    const outletInsert = mockQuery.mock.calls[4];
+    expect(outletInsert[1]).toEqual(['restaurant-new', 'Bachra Kitchen', '00000000-0000-0000-0000-000000000009', 'kitchen-orphan']);
+  });
+
+  it('returns 404 for a nonexistent kitchen', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/kitchens/nonexistent/tenant').send({ restaurant_name: 'X' });
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 409 when the kitchen already has a tenant — refuses to overwrite an existing restaurant link', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'kitchen-1', name: 'Existing', restaurant_id: 'restaurant-already' }] });
+
+    const res = await request(app).post('/admin/kitchens/kitchen-1/tenant').send({ restaurant_name: 'X' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('ALREADY_HAS_TENANT');
+    expect(mockQuery).toHaveBeenCalledTimes(1); // never attempted any write
+  });
+
+  it('rejects a missing restaurant_name via Zod validation', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    const res = await request(app).post('/admin/kitchens/kitchen-1/tenant').send({});
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+});
+
 describe('DELETE /admin/kitchens/:id — Phase 4 tenant sync', () => {
   it('deactivates restaurant_users membership for every demoted staff member', async () => {
     actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
