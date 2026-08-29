@@ -11,7 +11,7 @@ import { createPendingRefund } from '../services/refund.service';
 import { NotificationService, sendNotification } from '../services/notification.service';
 import { payoutMonthlySalaryForRider } from '../services/rider-payout.service';
 import { logSystemEvent } from '../utils/logger';
-import { syncTenantMembership, deactivateTenantMembership } from '../utils/tenant';
+import { syncTenantMembership, deactivateTenantMembership, createRestaurantTenantForKitchen } from '../utils/tenant';
 import ImageKit from '@imagekit/nodejs';
 import multer from 'multer';
 
@@ -60,6 +60,7 @@ const MenuItemSchema = z.object({
 
 const KitchenSchema = z.object({
     name: z.string().min(1).max(120),
+    restaurant_name: z.string().min(1).max(120).nullish(),
     zone_ids: z.array(z.string().uuid()).min(1, 'At least one zone is required'),
     address: z.string().max(300).nullish(),
     fssai_license: z.string().max(20).nullish(),
@@ -1690,7 +1691,7 @@ async function assertPinAvailable(pin: string, excludeKitchenId?: string) {
 }
 
 router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), validate(KitchenSchema), async (req: AuthRequest, res) => {
-    const { name, zone_ids, address, fssai_license, gstin, lat = 12.9716, lng = 77.5946, pin } = req.body;
+    const { name, restaurant_name, zone_ids, address, fssai_license, gstin, lat = 12.9716, lng = 77.5946, pin } = req.body;
     if (pin) await assertPinAvailable(pin);
     const pinHash = pin ? await bcrypt.hash(pin, 10) : null;
 
@@ -1714,21 +1715,11 @@ router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), vali
         // this, a kitchen created after migration 148 would have a permanently NULL
         // restaurant_id (the migration only backfilled kitchens that existed at that point in
         // time). Mirrors the exact one-kitchen-per-restaurant-per-outlet backfill logic from
-        // migration 148_backfill_restaurant_tenancy.sql.
+        // migration 148_backfill_restaurant_tenancy.sql. Now shared via utils/tenant.ts so this
+        // is no longer the only place that knows how to do it correctly — see that file's
+        // comment for why that matters.
         const primaryZoneId = (zone_ids && Array.isArray(zone_ids) && zone_ids[0]) || null;
-        let baseSlug = String(name).toLowerCase().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-        if (!baseSlug) baseSlug = 'restaurant';
-        const slug = `${baseSlug}-${String(id).slice(0, 8)}`;
-        const { rows: restaurantRows } = await client.query(
-            `INSERT INTO restaurants (name, slug, status) VALUES ($1, $2, 'active') RETURNING id`,
-            [name, slug]
-        );
-        const restaurantId = restaurantRows[0].id;
-        await client.query('UPDATE kitchens SET restaurant_id = $1 WHERE id = $2', [restaurantId, id]);
-        await client.query(
-            `INSERT INTO outlets (restaurant_id, name, zone_id, kitchen_id, status) VALUES ($1, $2, $3, $4, 'active')`,
-            [restaurantId, name, primaryZoneId, id]
-        );
+        await createRestaurantTenantForKitchen(client.query.bind(client), id, name, primaryZoneId, restaurant_name ?? undefined);
 
         return id;
     });
@@ -2031,16 +2022,26 @@ router.patch('/partners/applications/:id', authenticate, requireRole('super_admi
                     RETURNING id
                 `, [app.restaurant_name, app.address || '', app.fssai_number || null,
                     app.phone || null, app.email || null, app.upi_id || null]);
-                kitchenId = kRows[0].id;
-                await query(`UPDATE kitchen_applications SET kitchen_id = $1 WHERE id = $2`, [kitchenId, id]);
+                const newKitchenId: string = kRows[0].id;
+                kitchenId = newKitchenId;
+                await query(`UPDATE kitchen_applications SET kitchen_id = $1 WHERE id = $2`, [newKitchenId, id]);
+
+                // Bring this kitchen into the SaaS tenant model — this route pre-dates that model
+                // entirely (it does its own raw kitchen INSERT above, not POST /admin/kitchens),
+                // so without this call a partner-approved restaurant would silently never appear
+                // in the Tenants admin view and could never be billed. No zone yet — the partner
+                // picks one afterward via the Setup Drawer (PATCH /admin/partners/kitchens/:id).
+                await createRestaurantTenantForKitchen(query, newKitchenId, app.restaurant_name, null);
 
                 // Auto-create partner_kitchen user account so they can log in immediately
-                await query(`
+                const { rows: userRows } = await query(`
                     INSERT INTO users (phone, name, role, kitchen_id, is_active, is_verified, onboarding_complete)
                     VALUES ($1, $2, 'partner_kitchen', $3, TRUE, TRUE, TRUE)
                     ON CONFLICT (phone) DO UPDATE
                         SET role = 'partner_kitchen', kitchen_id = $3, is_active = TRUE
-                `, [app.phone, app.owner_name || app.restaurant_name, kitchenId]);
+                    RETURNING id
+                `, [app.phone, app.owner_name || app.restaurant_name, newKitchenId]);
+                await syncTenantMembership(query, userRows[0].id, newKitchenId, 'partner_kitchen');
             }
         }
 
@@ -2125,6 +2126,10 @@ router.patch('/partners/kitchens/:id', authenticate, requireRole('super_admin', 
                     UPDATE kitchens k SET lat = z.kitchen_lat, lng = z.kitchen_lng, updated_at = NOW()
                     FROM zones z WHERE z.id = $1 AND k.id = $2
                 `, [zoneId, id]);
+                // Keep the tenant outlet's zone in sync too — createRestaurantTenantForKitchen
+                // creates a partner's outlet with zone_id NULL (no zone exists at approval time),
+                // so this is the only place that zone is ever set afterward.
+                await client.query('UPDATE outlets SET zone_id = $1 WHERE kitchen_id = $2', [zoneId, id]);
             }
         });
 

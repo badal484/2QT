@@ -96,6 +96,46 @@ export async function deactivateTenantMembership(queryFn: QueryFn, userId: strin
     await queryFn(`UPDATE restaurant_users SET status = 'inactive' WHERE user_id = $1`, [userId]);
 }
 
+/**
+ * The single, shared way to bring a kitchen into the Phase 3 tenant model: creates the matching
+ * `restaurants` + `outlets` rows and sets `kitchens.restaurant_id`.
+ *
+ * Extracted so there is exactly one code path capable of creating a kitchen's tenant — before
+ * this existed, POST /admin/kitchens had this logic inlined, while the (older, pre-dating this
+ * migration) partner-application-approval flow created kitchens via its own separate INSERT and
+ * never called anything like this at all, silently leaving every partner-approved kitchen without
+ * a tenant: invisible in the Tenants admin view and impossible to bill. A future kitchen-creation
+ * path calling this instead of hand-writing the same three writes again is what actually prevents
+ * that class of gap from recurring, rather than relying on every call site remembering to.
+ *
+ * `restaurantName` is independent of `kitchenName` — a business's public/billing identity
+ * (`restaurants.name`) is not required to be the same string as its kitchen's operational name.
+ */
+export async function createRestaurantTenantForKitchen(
+    queryFn: QueryFn,
+    kitchenId: string,
+    kitchenName: string,
+    zoneId: string | null,
+    restaurantName?: string
+): Promise<string> {
+    const name = (restaurantName ?? kitchenName).trim() || kitchenName;
+    let baseSlug = name.toLowerCase().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!baseSlug) baseSlug = 'restaurant';
+    const slug = `${baseSlug}-${String(kitchenId).slice(0, 8)}`;
+
+    const { rows } = await queryFn(
+        `INSERT INTO restaurants (name, slug, status) VALUES ($1, $2, 'active') RETURNING id`,
+        [name, slug]
+    );
+    const restaurantId = rows[0].id;
+    await queryFn('UPDATE kitchens SET restaurant_id = $1 WHERE id = $2', [restaurantId, kitchenId]);
+    await queryFn(
+        `INSERT INTO outlets (restaurant_id, name, zone_id, kitchen_id, status) VALUES ($1, $2, $3, $4, 'active')`,
+        [restaurantId, name, zoneId, kitchenId]
+    );
+    return restaurantId;
+}
+
 // ─── Phase 5: restaurant dashboard access ────────────────────────────────────────────────────
 
 // The roles the new tenant-facing restaurant dashboard (routes/restaurant.ts) is open to.
