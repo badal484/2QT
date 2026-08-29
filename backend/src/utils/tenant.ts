@@ -1,7 +1,8 @@
-// Phase 4 (SaaS migration) — small, focused helpers for consuming the restaurant tenant
+// Phase 4/5 (SaaS migration) — small, focused helpers for consuming the restaurant tenant
 // foundation introduced in Phase 3. Deliberately kept minimal: this is NOT a general
 // authorization framework, and does not replace or duplicate Phase 2's kitchen/order/zone
 // authorization (getKitchenId in routes/kitchen.ts, isAuthorizedForOrder in routes/order.ts).
+import { Response, NextFunction } from 'express';
 import { query } from '../db';
 import { AuthRequest } from '../middleware/auth';
 
@@ -93,4 +94,49 @@ export async function syncTenantMembership(
 export async function deactivateTenantMembership(queryFn: QueryFn, userId: string): Promise<void> {
     await queryFn('UPDATE users SET restaurant_id = NULL WHERE id = $1', [userId]);
     await queryFn(`UPDATE restaurant_users SET status = 'inactive' WHERE user_id = $1`, [userId]);
+}
+
+// ─── Phase 5: restaurant dashboard access ────────────────────────────────────────────────────
+
+// The roles the new tenant-facing restaurant dashboard (routes/restaurant.ts) is open to.
+// Deliberately excludes rider/rider_captain/customer/finance/support (per the approved Phase 5
+// plan) and platform admins (super_admin/admin) — the existing /admin panel already gives them
+// unrestricted, platform-wide access; granting them this dashboard too would require a tenant
+// *selection* mechanism (which restaurant is an admin currently "viewing as"?) that does not
+// exist anywhere in this codebase. Building one was explicitly out of scope for this phase —
+// see the Phase 5 report for why this is a "document, don't invent" situation.
+export const RESTAURANT_DASHBOARD_ROLES = ['partner_kitchen', 'kitchen_manager', 'chef', 'packer'];
+
+/**
+ * Express middleware gating every routes/restaurant.ts endpoint. Enforces the full chain
+ * required by Phase 5: authenticated user → tenantRestaurantId → restaurant_users → active
+ * membership → access. This is the "authoritative" check (queries restaurant_users directly,
+ * per the Phase 5 instruction not to rely on users.restaurant_id alone) — unlike Phase 4's softer
+ * additive checks, dashboard access is a brand-new, security-sensitive surface, so it's worth
+ * the one extra query per request.
+ *
+ * Fails closed (403) for: wrong role, no tenantRestaurantId, or no active restaurant_users row
+ * for that exact (user, restaurant) pair — which also transparently covers "membership was
+ * deactivated" and "wrong restaurant", since both simply fail to match an active row.
+ *
+ * Never reads restaurant identity from req.body/req.query/req.headers — only
+ * req.user.tenantRestaurantId (server-derived, see middleware/auth.ts).
+ */
+export async function requireActiveRestaurantMembership(req: AuthRequest, res: Response, next: NextFunction) {
+    const user = req.user!;
+    if (!RESTAURANT_DASHBOARD_ROLES.includes(user.role)) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'Restaurant dashboard access requires a restaurant-staff role.' });
+    }
+
+    const restaurantId = getTenantRestaurantId(req);
+    if (!restaurantId) {
+        return res.status(403).json({ error: 'NO_RESTAURANT_ASSIGNED', message: 'This account is not linked to a restaurant.' });
+    }
+
+    const isMember = await isActiveRestaurantMember(user.userId, restaurantId);
+    if (!isMember) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'No active membership for this restaurant.' });
+    }
+
+    next();
 }
