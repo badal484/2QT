@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, AlertCircle, Bike, Star, Rocket,
   ToggleLeft, ToggleRight, Send, Clock, Plus, X, Trash2, Edit3,
   Package, Info, ChevronRight, Filter, ChevronDown, Calendar, Box,
-  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare, ShieldCheck, ShieldAlert, Trophy, Layers
+  LifeBuoy, Wallet, Download, Activity, Cpu, Camera, ArrowUp, ArrowDown, Zap, Bell, MoreHorizontal, Command, MapPin, Store, Ticket, AlertTriangle, Receipt, LayoutGrid, Tag, FileWarning, CheckSquare, ShieldCheck, ShieldAlert, Trophy, Layers, Building2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../providers";
@@ -36,6 +36,8 @@ const NotificationsTab = dynamic(() => import("./NotificationsTab").then(m => ({
 const DispatchTab = dynamic(() => import("./DispatchTab").then(m => ({ default: m.DispatchTab })), { ssr: false });
 const MenuOffersTab = dynamic(() => import("./MenuOffersTab").then(m => ({ default: m.MenuOffersTab })), { ssr: false });
 const RestaurantsTab = dynamic(() => import("./RestaurantsTab").then(m => ({ default: m.RestaurantsTab })), { ssr: false });
+// Phase 7 (SaaS migration) — distinct from RestaurantsTab above (dine-in table-booking system).
+const TenantRestaurantsTab = dynamic(() => import("./TenantRestaurantsTab").then(m => ({ default: m.TenantRestaurantsTab })), { ssr: false });
 const ActivityTab = dynamic(() => import("./ActivityTab"), { ssr: false });
 const RiderIssuesTab = dynamic(() => import("./RiderIssuesTab").then(m => ({ default: m.RiderIssuesTab })), { ssr: false });
 const DeliveredOrdersTab = dynamic(() => import("./DeliveredOrdersTab").then(m => ({ default: m.DeliveredOrdersTab })), { ssr: false });
@@ -2072,6 +2074,7 @@ const TABS = [
   { name: "Deliveries",      icon: CheckSquare,      component: DeliveredOrdersTab },
   // Restaurants
   { name: "Restaurants",     icon: Utensils,         component: RestaurantsTab },
+  { name: "Tenants",         icon: Building2,        component: TenantRestaurantsTab },
   { name: "Kitchens",        icon: Store,            component: KitchensTab },
   { name: "Partners",        icon: Store,            component: PartnersTab },
   { name: "Menu",            icon: Utensils,         component: MenuTab },

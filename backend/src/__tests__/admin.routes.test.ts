@@ -540,3 +540,97 @@ describe('POST /admin/team/users — Phase 4 tenant sync', () => {
     expect(mockQuery).toHaveBeenCalledTimes(1); // only the INSERT — no tenant sync for riders (Phase 8, not now)
   });
 });
+
+// ── Phase 7: platform-admin restaurant tenant view ────────────────────────────────────────────
+// Mounted at /admin/tenant-restaurants specifically to avoid colliding with the existing
+// /admin/restaurants dine-in admin API (see the route definitions in admin.ts for the full
+// explanation). Role authorization itself (requireRole('super_admin','admin')) is a no-op in
+// this test file's mocked middleware — as with every other admin.ts endpoint in this suite —
+// and is verified by direct code inspection instead; these tests focus on what the mock cannot
+// verify: that changing the :id selector changes ONLY the data returned, with every query
+// correctly parameterized by it and no cross-restaurant bleed.
+
+describe('GET /admin/tenant-restaurants', () => {
+  it('returns every restaurant with outlet/kitchen counts, platform-wide', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { id: 'restaurant-A', name: 'Royal Spice', slug: 'royal-spice', status: 'active', outlet_count: 1, kitchen_count: 1 },
+        { id: 'restaurant-B', name: 'Spice Villa', slug: 'spice-villa', status: 'active', outlet_count: 2, kitchen_count: 2 },
+      ],
+    });
+
+    const res = await request(app).get('/admin/tenant-restaurants');
+    expect(res.status).toBe(200);
+    expect(res.body.restaurants).toHaveLength(2);
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[0]).toContain('FROM restaurants r');
+    expect(call[0]).not.toMatch(/WHERE\s+r\.id/); // no id filter — genuinely platform-wide
+  });
+});
+
+describe('GET /admin/tenant-restaurants/:id', () => {
+  it('returns 404 for a nonexistent restaurant', async () => {
+    // All 7 queries fire in parallel via Promise.all regardless of whether the restaurant
+    // exists, so every one needs a (possibly empty) resolved value.
+    parallelQueryMocks([
+      { rows: [] }, // restaurant lookup — empty
+      { rows: [] }, { rows: [] }, { rows: [] },
+      { rows: [{ total: 0, active: 0 }] },
+      { rows: [] },
+      { rows: [{ count: 0 }] },
+    ]);
+
+    const res = await request(app).get('/admin/tenant-restaurants/nonexistent');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('NOT_FOUND');
+  });
+
+  it("scopes every sub-query to the selected :id, and never includes rider data", async () => {
+    parallelQueryMocks([
+      { rows: [{ id: 'restaurant-A', name: 'Royal Spice', slug: 'royal-spice', status: 'active', settings: {} }] },
+      { rows: [{ id: 'outlet-1', name: 'Main', zone_id: 'zone-1', kitchen_id: 'kitchen-A', status: 'active' }] },
+      { rows: [{ id: 'kitchen-A', name: 'Kitchen A', address: 'Addr', is_active: true, is_paused: false }] },
+      { rows: [{ id: 'chef-1', name: 'Chef One', phone: '919876543210', membership_role: 'chef', membership_status: 'active' }] },
+      { rows: [{ total: 5, active: 2 }] },
+      { rows: [{ id: 'ord-1', display_id: '2QT-100001', status: 'preparing', kitchen_id: 'kitchen-A', total_amount_paise: 20000, created_at: new Date() }] },
+      { rows: [{ count: 3 }] },
+    ]);
+
+    const res = await request(app).get('/admin/tenant-restaurants/restaurant-A');
+    expect(res.status).toBe(200);
+    expect(res.body.restaurant.id).toBe('restaurant-A');
+    expect(res.body.outlets).toHaveLength(1);
+    expect(res.body.kitchens).toHaveLength(1);
+    expect(res.body.staff).toHaveLength(1);
+    expect(res.body.orders.total).toBe(5);
+    expect(res.body.orders.recent).toHaveLength(1);
+    expect(res.body.menu.itemCount).toBe(3);
+    expect(res.body).not.toHaveProperty('riders'); // riders stay platform-owned — never surfaced here
+
+    // Every one of the 7 queries must be parameterized by the same selected id
+    for (const call of mockQuery.mock.calls) {
+      expect(call[1]).toEqual(['restaurant-A']);
+    }
+  });
+
+  it("selecting a different restaurant id queries only that restaurant's data — no cross-tenant bleed", async () => {
+    parallelQueryMocks([
+      { rows: [{ id: 'restaurant-B', name: 'Spice Villa', slug: 'spice-villa', status: 'active', settings: {} }] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [{ total: 0, active: 0 }] },
+      { rows: [] },
+      { rows: [{ count: 0 }] },
+    ]);
+
+    const res = await request(app).get('/admin/tenant-restaurants/restaurant-B');
+    expect(res.status).toBe(200);
+    expect(res.body.restaurant.id).toBe('restaurant-B');
+
+    for (const call of mockQuery.mock.calls) {
+      expect(call[1]).toEqual(['restaurant-B']); // never restaurant-A, never both
+    }
+  });
+});

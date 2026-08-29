@@ -2549,4 +2549,81 @@ router.delete('/restaurants/:id/staff/:userId', authenticate, requireRole('super
     }
 });
 
+// ─── Phase 7: platform-admin view of the SaaS restaurant tenant model ────────────────────────
+// Deliberately mounted at /admin/tenant-restaurants, NOT /admin/restaurants — that path is
+// already fully owned by the dine-in table-booking admin API above (GET/POST /restaurants,
+// /restaurants/:id/tables, /menu, /bookings, /staff — all operating on restaurant_config).
+// Reusing /admin/restaurants for the new SaaS `restaurants` table would have silently collided
+// with that existing, working feature (found during the Phase 7 Step 1 audit, before any code
+// was written). The two "restaurant" concepts remain intentionally separate, per every prior
+// phase's decision not to merge them.
+//
+// Both routes are platform-wide by design (super_admin/admin only, matching every other admin.ts
+// route) — the :id path parameter is a SELECTOR for which tenant to inspect, not a proof of
+// ownership the client must establish. This mirrors how kitchen.ts's getKitchenId() already
+// treats an admin-supplied kitchen_id: legitimate for a role that already has unrestricted
+// platform authority, and never confused with the restaurant-scoped Phase 5 dashboard's
+// requireActiveRestaurantMembership gate, which is the actual authorization boundary for a
+// restaurant's own staff.
+
+router.get('/tenant-restaurants', authenticate, requireRole('super_admin', 'admin'), async (_req: AuthRequest, res) => {
+    const { rows } = await query(`
+        SELECT r.id, r.name, r.slug, r.status, r.created_at,
+               COUNT(DISTINCT o.id)::int AS outlet_count,
+               COUNT(DISTINCT k.id)::int AS kitchen_count
+        FROM restaurants r
+        LEFT JOIN outlets o ON o.restaurant_id = r.id
+        LEFT JOIN kitchens k ON k.restaurant_id = r.id
+        GROUP BY r.id
+        ORDER BY r.created_at DESC
+    `);
+    res.json({ restaurants: rows });
+});
+
+router.get('/tenant-restaurants/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    try {
+        const [restaurantRes, outletsRes, kitchensRes, staffRes, orderStatsRes, recentOrdersRes, menuRes] = await Promise.all([
+            query('SELECT id, name, slug, status, settings, created_at, updated_at FROM restaurants WHERE id = $1', [id]),
+            query('SELECT id, name, zone_id, kitchen_id, status FROM outlets WHERE restaurant_id = $1 ORDER BY created_at', [id]),
+            query('SELECT id, name, address, is_active, is_paused FROM kitchens WHERE restaurant_id = $1 ORDER BY name', [id]),
+            query(
+                `SELECT u.id, u.name, u.phone, ru.role AS membership_role, ru.status AS membership_status
+                 FROM restaurant_users ru JOIN users u ON u.id = ru.user_id
+                 WHERE ru.restaurant_id = $1 ORDER BY ru.role, u.name`,
+                [id]
+            ),
+            query(
+                `SELECT COUNT(*)::int AS total,
+                        COUNT(*) FILTER (WHERE status NOT IN ('delivered', 'cancelled'))::int AS active
+                 FROM orders WHERE restaurant_id = $1`,
+                [id]
+            ),
+            query(
+                `SELECT id, display_id, status, kitchen_id, total_amount_paise, created_at
+                 FROM orders WHERE restaurant_id = $1 ORDER BY created_at DESC LIMIT 20`,
+                [id]
+            ),
+            query('SELECT COUNT(*)::int AS count FROM menu_items WHERE restaurant_id = $1', [id]),
+        ]);
+
+        if (!restaurantRes.rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+
+        res.json({
+            restaurant: restaurantRes.rows[0],
+            outlets: outletsRes.rows,
+            kitchens: kitchensRes.rows,
+            staff: staffRes.rows,
+            orders: { ...orderStatsRes.rows[0], recent: recentOrdersRes.rows },
+            menu: { itemCount: menuRes.rows[0]?.count ?? 0 },
+            // Riders are intentionally NOT included here — they remain platform-owned and
+            // zone-pooled (Phase 6 conclusion), not restaurant-owned. Showing rider data on this
+            // page would misleadingly imply ownership that doesn't exist; platform-wide rider
+            // management stays on the existing /admin/riders endpoints.
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;
