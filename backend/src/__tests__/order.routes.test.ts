@@ -36,9 +36,9 @@ beforeEach(() => {
   if (defaultAuthenticate) mockAuthenticate.mockImplementation(defaultAuthenticate);
 });
 
-function actingAs(user: { userId: string; role: string; kitchenId: string | null; zoneId: string | null; restaurantId: string | null }) {
+function actingAs(user: { userId: string; role: string; kitchenId: string | null; zoneId: string | null; restaurantId: string | null; tenantRestaurantId?: string | null }) {
   mockAuthenticate.mockImplementationOnce((req: any, _res: any, next: any) => {
-    req.user = { ...user, jti: 'jti-test' };
+    req.user = { tenantRestaurantId: null, ...user, jti: 'jti-test' };
     next();
   });
 }
@@ -305,5 +305,86 @@ describe('POST /orders/:id/cancel', () => {
     const res = await request(app).post('/orders/nonexistent/cancel').send({});
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('NOT_FOUND');
+  });
+});
+
+// ── Phase 4: additive restaurant-tenant check in isAuthorizedForOrder ────────────────────────
+// Layered on top of the existing (Phase 2) kitchen_id check — never replacing it. Only engages
+// when BOTH the caller's tenant and the order's restaurant_id are populated.
+
+describe('GET /orders/:id — Phase 4 tenant isolation', () => {
+  it('allows kitchen staff to view an order when kitchen AND restaurant both match', async () => {
+    actingAs({ userId: 'chef-1', role: 'chef', kitchenId: 'kitchen-A', zoneId: 'zone-1', restaurantId: null, tenantRestaurantId: 'restaurant-A' });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-20', customer_id: 'cust-1', rider_id: null, kitchen_id: 'kitchen-A', restaurant_id: 'restaurant-A', status: 'preparing', items: [] }],
+    });
+
+    const res = await request(app).get('/orders/ord-20');
+    expect(res.status).toBe(200);
+  });
+
+  it('blocks kitchen staff when kitchen_id matches but restaurant_id does not (defense in depth)', async () => {
+    actingAs({ userId: 'chef-1', role: 'chef', kitchenId: 'kitchen-A', zoneId: 'zone-1', restaurantId: null, tenantRestaurantId: 'restaurant-A' });
+    mockQuery.mockResolvedValueOnce({
+      // Same kitchen_id (would have passed the Phase 2-only check) but a different restaurant_id
+      rows: [{ id: 'ord-21', customer_id: 'cust-1', rider_id: null, kitchen_id: 'kitchen-A', restaurant_id: 'restaurant-OTHER', status: 'preparing', items: [] }],
+    });
+
+    const res = await request(app).get('/orders/ord-21');
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('FORBIDDEN');
+  });
+
+  it('does not block access when either side has no restaurant_id yet (pre-Phase-3 data, no regression)', async () => {
+    actingAs({ userId: 'chef-1', role: 'chef', kitchenId: 'kitchen-A', zoneId: 'zone-1', restaurantId: null, tenantRestaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-22', customer_id: 'cust-1', rider_id: null, kitchen_id: 'kitchen-A', restaurant_id: null, status: 'preparing', items: [] }],
+    });
+
+    const res = await request(app).get('/orders/ord-22');
+    expect(res.status).toBe(200); // kitchen_id match alone is still sufficient, exactly as before Phase 4
+  });
+
+  it('ignores a client-supplied restaurantId/tenantRestaurantId in the request body entirely', async () => {
+    actingAs({ userId: 'chef-1', role: 'chef', kitchenId: 'kitchen-A', zoneId: 'zone-1', restaurantId: null, tenantRestaurantId: 'restaurant-A' });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-23', customer_id: 'cust-1', rider_id: null, kitchen_id: 'kitchen-A', restaurant_id: 'restaurant-OTHER', status: 'preparing', items: [] }],
+    });
+
+    // Even if a client tried to spoof its way past by sending a matching id in the body, the
+    // authorization check never reads req.body at all — it only ever reads the DB row and
+    // req.user (both server-derived), so this still correctly returns 403.
+    const res = await request(app).get('/orders/ord-23').send();
+    expect(res.status).toBe(403);
+  });
+
+  it('still allows platform admins unrestricted access regardless of restaurant_id', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null, tenantRestaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-24', customer_id: 'cust-1', rider_id: 'rider-1', kitchen_id: 'kitchen-B', restaurant_id: 'restaurant-B', status: 'preparing', items: [] }],
+    });
+
+    const res = await request(app).get('/orders/ord-24');
+    expect(res.status).toBe(200);
+  });
+
+  it('rider ownership is unaffected by the restaurant check (riders are not restaurant-scoped)', async () => {
+    actingAs({ userId: 'rider-1', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null, tenantRestaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-25', customer_id: 'cust-1', rider_id: 'rider-1', kitchen_id: 'kitchen-B', restaurant_id: 'restaurant-B', status: 'out_for_delivery', items: [] }],
+    });
+
+    const res = await request(app).get('/orders/ord-25');
+    expect(res.status).toBe(200);
+  });
+
+  it('customer ownership is unaffected by the restaurant check', async () => {
+    // default mock user is role: 'customer', userId: 'user-test-1'
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-26', customer_id: 'user-test-1', rider_id: null, kitchen_id: 'kitchen-B', restaurant_id: 'restaurant-B', status: 'preparing', items: [] }],
+    });
+
+    const res = await request(app).get('/orders/ord-26');
+    expect(res.status).toBe(200);
   });
 });

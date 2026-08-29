@@ -10,6 +10,7 @@ import { createPendingRefund } from '../services/refund.service';
 import { NotificationService, sendNotification } from '../services/notification.service';
 import { payoutMonthlySalaryForRider } from '../services/rider-payout.service';
 import { logSystemEvent } from '../utils/logger';
+import { syncTenantMembership, deactivateTenantMembership } from '../utils/tenant';
 import ImageKit from '@imagekit/nodejs';
 import multer from 'multer';
 
@@ -1692,6 +1693,27 @@ router.post('/kitchens', authenticate, requireRole('super_admin', 'admin'), vali
                 );
             }
         }
+
+        // Phase 4: keep every newly-created kitchen inside the Phase 3 tenant model — without
+        // this, a kitchen created after migration 148 would have a permanently NULL
+        // restaurant_id (the migration only backfilled kitchens that existed at that point in
+        // time). Mirrors the exact one-kitchen-per-restaurant-per-outlet backfill logic from
+        // migration 148_backfill_restaurant_tenancy.sql.
+        const primaryZoneId = (zone_ids && Array.isArray(zone_ids) && zone_ids[0]) || null;
+        let baseSlug = String(name).toLowerCase().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (!baseSlug) baseSlug = 'restaurant';
+        const slug = `${baseSlug}-${String(id).slice(0, 8)}`;
+        const { rows: restaurantRows } = await client.query(
+            `INSERT INTO restaurants (name, slug, status) VALUES ($1, $2, 'active') RETURNING id`,
+            [name, slug]
+        );
+        const restaurantId = restaurantRows[0].id;
+        await client.query('UPDATE kitchens SET restaurant_id = $1 WHERE id = $2', [restaurantId, id]);
+        await client.query(
+            `INSERT INTO outlets (restaurant_id, name, zone_id, kitchen_id, status) VALUES ($1, $2, $3, $4, 'active')`,
+            [restaurantId, name, primaryZoneId, id]
+        );
+
         return id;
     });
 
@@ -1766,7 +1788,21 @@ router.patch('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'),
 router.delete('/kitchens/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     try {
-        await query("UPDATE users SET kitchen_id = NULL, role = CASE WHEN role IN ('chef', 'kitchen_manager', 'partner_kitchen', 'packer') THEN 'customer'::user_role ELSE role END WHERE kitchen_id = $1", [id]);
+        const { rows: demoted } = await query(
+            "UPDATE users SET kitchen_id = NULL, restaurant_id = NULL, role = CASE WHEN role IN ('chef', 'kitchen_manager', 'partner_kitchen', 'packer') THEN 'customer'::user_role ELSE role END WHERE kitchen_id = $1 RETURNING id",
+            [id]
+        );
+        // Phase 4: deactivate (not delete) restaurant_users membership for any staff this
+        // kitchen deletion just demoted — keeps the membership ledger from going stale. The
+        // outlet row itself is cleaned up automatically by outlets.kitchen_id's
+        // ON DELETE SET NULL (migration 146); the restaurant row is deliberately left in place,
+        // matching this endpoint's existing behavior of not touching other kitchens/restaurants.
+        if (demoted.length > 0) {
+            await query(
+                `UPDATE restaurant_users SET status = 'inactive' WHERE user_id = ANY($1::uuid[])`,
+                [demoted.map((r: any) => r.id)]
+            );
+        }
         await query('DELETE FROM kitchen_zones WHERE kitchen_id = $1', [id]);
         await query('DELETE FROM kitchens WHERE id = $1', [id]);
         emitToAll('kitchen_updated', { action: 'delete', kitchenId: id });
@@ -1796,13 +1832,17 @@ router.post('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'adm
         const { rows: existing } = await query('SELECT id FROM users WHERE phone = $1', [phone]);
         if (existing.length > 0) {
             await query('UPDATE users SET role = $1, kitchen_id = $2, is_active = true WHERE phone = $3', [role, id, phone]);
+            // Phase 4: keep restaurant_id / restaurant_users in sync with the new kitchen_id —
+            // see utils/tenant.ts for why this is needed on every kitchen<->staff assignment.
+            await syncTenantMembership(query, existing[0].id, id as string, role);
             emitToAll('kitchen_updated', { action: 'staff_add', kitchenId: id });
             res.json({ success: true, message: `Existing user set as ${role}` });
         } else {
-            await query(
-                `INSERT INTO users (name, phone, role, kitchen_id, is_active, onboarding_complete) VALUES ($1, $2, $3, $4, true, true)`,
+            const { rows: created } = await query(
+                `INSERT INTO users (name, phone, role, kitchen_id, is_active, onboarding_complete) VALUES ($1, $2, $3, $4, true, true) RETURNING id`,
                 [name || (role === 'packer' ? 'Packer' : 'Chef'), phone, role, id]
             );
+            await syncTenantMembership(query, created[0].id, id as string, role);
             emitToAll('kitchen_updated', { action: 'staff_add', kitchenId: id });
             res.json({ success: true, message: `New ${role} account created` });
         }
@@ -1816,6 +1856,8 @@ router.delete('/kitchens/:id/staff/:staffId', authenticate, requireRole('super_a
     try {
         // Demote chef back to customer or remove kitchen_id
         await query('UPDATE users SET role = $1, kitchen_id = NULL WHERE id = $2', ['customer', staffId]);
+        // Phase 4: mirror the removal into restaurant_id / restaurant_users — see utils/tenant.ts.
+        await deactivateTenantMembership(query, staffId as string);
         emitToAll('kitchen_updated', { action: 'staff_remove', kitchenId: req.params.id });
         res.json({ success: true });
     } catch (err: any) {
@@ -1904,6 +1946,13 @@ router.post('/team/users', authenticate, requireRole('super_admin', 'admin'), as
                     is_active = true, is_verified = true
             RETURNING id, name, phone, role, kitchen_id, created_at
         `, [cleanPhone, name.trim(), role, kitchenId || null]);
+        // Phase 4: sync restaurant_id / restaurant_users for the two kitchen-assignable roles
+        // this endpoint supports. Deliberately scoped to chef/kitchen_manager only (matching the
+        // kitchenId-required validation above) — riders remain outside restaurant tenancy
+        // (Phase 8), so a kitchenId must never be able to attach a rider to a restaurant here.
+        if (kitchenId && ['chef', 'kitchen_manager'].includes(role)) {
+            await syncTenantMembership(query, rows[0].id, kitchenId, role);
+        }
         emitToAdmin('new_user', { user: rows[0] });
         res.json({ success: true, user: rows[0] });
     } catch (err: any) {

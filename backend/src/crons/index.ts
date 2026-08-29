@@ -141,26 +141,28 @@ export const initCrons = () => {
                     console.log(`[CRON] Activating scheduled order: ${s.id}`);
 
                     // 1. Find a suitable kitchen in the zone (for now, pick first one or based on load)
-                    const { rows: kitchens } = await client.query('SELECT id FROM kitchens WHERE zone_id = $1 AND is_active = true AND is_paused = false LIMIT 1', [s.zone_id]);
+                    const { rows: kitchens } = await client.query('SELECT id, restaurant_id FROM kitchens WHERE zone_id = $1 AND is_active = true AND is_paused = false LIMIT 1', [s.zone_id]);
                     const kitchenId = kitchens[0]?.id;
                     if (!kitchenId) throw new Error('NO_KITCHEN_IN_ZONE');
 
-                    // 2. Create actual order
+                    // 2. Create actual order — restaurant_id (Phase 4) mirrors the same fix in
+                    // order.service.ts's createPendingOrderWithClient, so scheduled orders carry
+                    // their kitchen's tenant too, not just orders placed through the normal flow.
                     const { rows: orderRows } = await client.query(`
                         INSERT INTO orders (
-                            customer_id, kitchen_id, zone_id, address_id, 
+                            customer_id, kitchen_id, zone_id, address_id,
                             status, payment_method, payment_status,
                             subtotal_paise, delivery_fee_paise, total_amount_paise,
                             cgst_paise, sgst_paise, gateway_amount_paise,
-                            is_scheduled, scheduled_for
-                        ) VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, $7, $8, $9, $10, $11, $12, true, $13)
+                            is_scheduled, scheduled_for, restaurant_id
+                        ) VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, $7, $8, $9, $10, $11, $12, true, $13, $14)
                         RETURNING id, display_id
                     `, [
                         s.customer_id, kitchenId, s.zone_id, s.address_id,
                         s.payment_method, s.payment_status,
                         s.subtotal_paise, s.delivery_fee_paise, s.total_paise,
                         0, 0, s.payment_method === 'cod' ? 0 : s.total_paise,
-                        s.scheduled_for
+                        s.scheduled_for, kitchens[0]?.restaurant_id ?? null,
                     ]);
                     const orderId = orderRows[0].id;
                     const displayId = orderRows[0].display_id;
