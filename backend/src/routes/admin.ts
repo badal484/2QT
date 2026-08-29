@@ -11,7 +11,7 @@ import { createPendingRefund } from '../services/refund.service';
 import { NotificationService, sendNotification } from '../services/notification.service';
 import { payoutMonthlySalaryForRider } from '../services/rider-payout.service';
 import { logSystemEvent } from '../utils/logger';
-import { syncTenantMembership, deactivateTenantMembership, createRestaurantTenantForKitchen } from '../utils/tenant';
+import { syncTenantMembership, deactivateTenantMembership, createRestaurantTenantForKitchen, RESTAURANT_DASHBOARD_ROLES } from '../utils/tenant';
 import ImageKit from '@imagekit/nodejs';
 import multer from 'multer';
 
@@ -1831,7 +1831,7 @@ router.get('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'admi
 router.post('/kitchens/:id/staff', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { phone: rawPhone, name, role: rawRole } = req.body;
-    const role = ['chef', 'packer'].includes(rawRole) ? rawRole : 'chef';
+    const role = RESTAURANT_DASHBOARD_ROLES.includes(rawRole) ? rawRole : 'chef';
     let phone = (rawPhone || '').replace(/\D/g, '');
     if (phone.length === 10) phone = '91' + phone;
     if (!phone || phone.length !== 12) return res.status(400).json({ error: 'INVALID_PHONE', message: 'Enter a valid 10-digit mobile number.' });
