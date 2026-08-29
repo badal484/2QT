@@ -336,10 +336,10 @@ router.patch('/menu/:id/availability', authenticate, requireRole('super_admin', 
 
 router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     try {
-        const { title, message, target, zoneId, segment, imageUrl, scheduledFor } = req.body;
+        const { title, message, target, zoneId, kitchenId, kitchenTargetGroup, segment, imageUrl, scheduledFor } = req.body;
         if (!title?.trim() || !message?.trim()) return res.status(400).json({ error: 'title and message required' });
 
-        // Frontend sends segment as audience type ("all","zone","active_last_7")
+        // Frontend sends segment as audience type ("all","zone","kitchen","active_last_7")
         // Backend legacy uses target ("customers","riders") + segment (behavioral filter)
         // Normalise: treat segment as audience selector when target is absent
         const audience = target || segment || 'all';
@@ -353,9 +353,29 @@ router.post('/broadcast', authenticate, requireRole('super_admin', 'admin'), asy
         } else if (audience === 'riders') {
             queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('rider', 'rider_captain')`;
             if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
+        } else if (audience === 'kitchen' || audience === 'kitchen_staff' || audience === 'kitchen_customers') {
+            if (audience === 'kitchen_customers' || kitchenTargetGroup === 'customers') {
+                if (kitchenId) {
+                    params.push(kitchenId);
+                    queryStr = `SELECT DISTINCT u.id, u.phone FROM users u
+                                WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer')
+                                AND (
+                                  u.id IN (SELECT customer_id FROM orders WHERE kitchen_id = $1 AND customer_id IS NOT NULL)
+                                  OR u.id IN (SELECT a.customer_id FROM addresses a JOIN kitchen_zones kz ON a.zone_id = kz.zone_id WHERE kz.kitchen_id = $1)
+                                  OR u.zone_id IN (SELECT zone_id FROM kitchen_zones WHERE kitchen_id = $1)
+                                )`;
+                } else {
+                    queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer')`;
+                }
+            } else {
+                queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('chef', 'kitchen_manager', 'partner_kitchen', 'packer', 'kitchen')`;
+                if (kitchenId) queryStr += ` AND u.kitchen_id = $${params.push(kitchenId)}`;
+                else if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
+            }
         } else if (audience === 'kitchens' || audience === 'partners') {
-            queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('chef', 'kitchen_manager', 'partner_kitchen')`;
-            if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
+            queryStr = `SELECT u.id, u.phone FROM users u WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('chef', 'kitchen_manager', 'partner_kitchen', 'packer', 'kitchen')`;
+            if (kitchenId) queryStr += ` AND u.kitchen_id = $${params.push(kitchenId)}`;
+            else if (zoneId) queryStr += ` AND u.zone_id = $${params.push(zoneId)}`;
         } else if (audience === 'customers' || audience === 'all_customers' || audience === 'buyers' || audience === 'buyer' || audience === 'all') {
             if (zoneId) {
                 queryStr = `SELECT u.id, u.phone FROM users u LEFT JOIN addresses a ON u.id = a.customer_id WHERE (u.is_active = true OR u.is_active IS NULL) AND LOWER(u.role::text) IN ('customer', 'buyer') AND (u.zone_id = $1 OR a.zone_id = $1)`;
