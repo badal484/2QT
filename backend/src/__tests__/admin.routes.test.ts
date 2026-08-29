@@ -999,3 +999,37 @@ describe('POST /admin/tenant-restaurants/:id/subscription/cancel', () => {
     expect(call[1]).toEqual(['restaurant-A', 'admin-specific']);
   });
 });
+
+// ── DELETE /admin/users/:id ──────────────────────────────────────────────────
+
+describe('DELETE /admin/users/:id', () => {
+  it('allows super_admin or admin to delete a user', async () => {
+    actingAs({ userId: 'admin-1', role: 'admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'user-to-del', name: 'John Doe', phone: '9999999999', role: 'customer' }] }) // SELECT user
+      .mockResolvedValue({ rows: [] }); // transaction queries + DELETE
+
+    const res = await request(app).delete('/admin/users/user-to-del');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toContain('John Doe deleted');
+  });
+
+  it('prevents an admin from deleting their own account while logged in', async () => {
+    actingAs({ userId: 'admin-1', role: 'admin', kitchenId: null, zoneId: null, restaurantId: null });
+
+    const res = await request(app).delete('/admin/users/admin-1');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('cannot delete your own account');
+  });
+
+  it('returns 404 if user does not exist', async () => {
+    actingAs({ userId: 'admin-1', role: 'admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).delete('/admin/users/non-existent');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('User not found');
+  });
+});
+
