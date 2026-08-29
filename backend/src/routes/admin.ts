@@ -1289,6 +1289,68 @@ router.patch('/users/:id/status', authenticate, requireRole('super_admin', 'admi
     res.json({ success: true });
 });
 
+router.delete('/users/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const adminId = req.user?.userId;
+
+    if (id === adminId) {
+        return res.status(400).json({ error: 'You cannot delete your own account while logged in.' });
+    }
+
+    try {
+        const { rows: users } = await query('SELECT id, name, phone, role FROM users WHERE id = $1', [id]);
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const user = users[0];
+
+        if (user.role === 'super_admin' && req.user?.role !== 'super_admin') {
+            return res.status(403).json({ error: 'Only super_admins can delete other super_admins.' });
+        }
+
+        await query('BEGIN');
+        try {
+            // Nullify references in historical records
+            await query('UPDATE orders SET customer_id = NULL WHERE customer_id = $1', [id]);
+            await query('UPDATE orders SET rider_id = NULL WHERE rider_id = $1', [id]);
+            await query('UPDATE orders SET claimed_by_chef_id = NULL WHERE claimed_by_chef_id = $1', [id]);
+            await query('UPDATE orders SET packed_by_id = NULL WHERE packed_by_id = $1', [id]);
+            
+            await query('UPDATE kitchens SET manager_id = NULL WHERE manager_id = $1', [id]);
+            
+            // Delete dependent user records
+            await query('DELETE FROM restaurant_users WHERE user_id = $1', [id]);
+            await query('DELETE FROM device_tokens WHERE user_id = $1', [id]);
+            await query('DELETE FROM push_subscriptions WHERE user_id = $1', [id]);
+            await query('DELETE FROM rider_applications WHERE user_id = $1', [id]);
+            await query('DELETE FROM rider_issues WHERE rider_id = $1', [id]);
+            await query('DELETE FROM rider_performance WHERE rider_id = $1', [id]);
+            await query('DELETE FROM addresses WHERE user_id = $1', [id]);
+            await query('DELETE FROM customer_wallet WHERE customer_id = $1', [id]);
+            await query('DELETE FROM wallet_transactions WHERE customer_id = $1', [id]);
+            await query('DELETE FROM support_tickets WHERE customer_id = $1', [id]);
+            await query('DELETE FROM complaints WHERE customer_id = $1', [id]);
+            await query('DELETE FROM per_user_menu_offers WHERE customer_id = $1', [id]);
+            await query('DELETE FROM plus_subscriptions WHERE customer_id = $1', [id]);
+
+            // Finally, delete the user row
+            await query('DELETE FROM users WHERE id = $1', [id]);
+            await query('COMMIT');
+        } catch (txErr) {
+            await query('ROLLBACK');
+            throw txErr;
+        }
+
+        emitToAdmin('user_deleted', { userId: id });
+        emitToAll('user_updated', { action: 'delete', userId: id });
+
+        res.json({ success: true, message: `User ${user.name || user.phone} deleted successfully.` });
+    } catch (err: any) {
+        console.error('[DELETE /admin/users/:id] Error:', err);
+        res.status(500).json({ error: 'Failed to delete user: ' + (err.message || 'Database error') });
+    }
+});
+
 // ── POST /admin/wallet/credit ─────────────────────────────────────────────────
 // Credit wallet balance to any customer. Admin-only — for refunds, compensation, testing.
 // Body: { phone, amountRupees, note? }
@@ -1679,26 +1741,32 @@ router.get('/kitchens', authenticate, requireRole('super_admin', 'admin'), async
 // commit dbb27e5) and are otherwise permanently invisible in the Tenants admin view.
 const AttachTenantSchema = z.object({
     restaurant_name: z.string().min(1).max(120),
-    zone_id: z.string().uuid().nullish(),
+    zone_ids: z.array(z.string().uuid()).nullish(),
 });
 
 router.post('/kitchens/:id/tenant', authenticate, requireRole('super_admin', 'admin'), validate(AttachTenantSchema), async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { restaurant_name, zone_id } = req.body;
+    const { restaurant_name, zone_ids } = req.body;
     try {
         const { rows: kitchenRows } = await query('SELECT id, name, restaurant_id FROM kitchens WHERE id = $1', [id]);
         if (!kitchenRows[0]) return res.status(404).json({ error: 'NOT_FOUND', message: 'Kitchen not found' });
         if (kitchenRows[0].restaurant_id) return res.status(409).json({ error: 'ALREADY_HAS_TENANT', message: 'This kitchen already has a restaurant tenant.' });
 
-        let effectiveZoneId: string | null = zone_id ?? null;
-        if (zone_id) {
-            await query('INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, zone_id]);
+        // Same pattern as POST /admin/kitchens: every selected zone covers the kitchen
+        // (kitchen_zones is many-to-many), but the outlet itself gets exactly one primary zone —
+        // outlets.zone_id is a single column, matching how a physical location has one address.
+        let primaryZoneId: string | null = null;
+        if (zone_ids && Array.isArray(zone_ids) && zone_ids.length > 0) {
+            for (const zId of zone_ids) {
+                await query('INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, zId]);
+            }
+            primaryZoneId = zone_ids[0];
         } else {
             const { rows: existingZone } = await query('SELECT zone_id FROM kitchen_zones WHERE kitchen_id = $1 LIMIT 1', [id]);
-            effectiveZoneId = existingZone[0]?.zone_id ?? null;
+            primaryZoneId = existingZone[0]?.zone_id ?? null;
         }
 
-        const restaurantId = await createRestaurantTenantForKitchen(query, id as string, kitchenRows[0].name, effectiveZoneId, restaurant_name);
+        const restaurantId = await createRestaurantTenantForKitchen(query, id as string, kitchenRows[0].name, primaryZoneId, restaurant_name);
         res.status(201).json({ restaurant_id: restaurantId });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
