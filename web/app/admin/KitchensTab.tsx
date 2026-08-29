@@ -9,6 +9,19 @@ import { useSocketRefresh } from "../hooks/useSocketRefresh";
 import { toast } from "sonner";
 import { ConfirmModal } from "../../components/ConfirmModal";
 
+const ROLE_LABELS: Record<string, string> = {
+  chef: "Chef",
+  packer: "Packer",
+  kitchen_manager: "Kitchen Manager",
+  partner_kitchen: "Partner (Kitchen Owner)",
+};
+const ROLE_BADGE_CLASS: Record<string, string> = {
+  chef: "bg-brand-primary/20 text-brand-primary",
+  packer: "bg-amber-500/20 text-amber-400",
+  kitchen_manager: "bg-sky-500/20 text-sky-400",
+  partner_kitchen: "bg-purple-500/20 text-purple-400",
+};
+
 const MapPicker = dynamic(() => import("../../components/MapPicker"), {
   ssr: false,
   loading: () => (
@@ -312,7 +325,7 @@ export function KitchensTab() {
               {staffKitchenId === k.id && (
                 <div className="p-5 bg-white/[0.01] border-t border-white/5">
                   <div className="flex justify-between items-center mb-4">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Assigned Chefs</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Assigned Staff</div>
                     <button onClick={() => setStaffKitchenId(null)} className="text-zinc-500 hover:text-white"><X className="w-4 h-4"/></button>
                   </div>
 
@@ -336,8 +349,8 @@ export function KitchensTab() {
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${s.is_online ? 'bg-green-500' : 'bg-zinc-600'}`}/>
                             <span className="text-sm font-bold text-white">{s.name}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${s.role === 'packer' ? 'bg-amber-500/20 text-amber-400' : 'bg-brand-primary/20 text-brand-primary'}`}>
-                              {s.role === 'packer' ? 'Packer' : 'Chef'}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${ROLE_BADGE_CLASS[s.role] || 'bg-brand-primary/20 text-brand-primary'}`}>
+                              {ROLE_LABELS[s.role] || s.role}
                             </span>
                             <span className="text-xs text-zinc-500">{s.phone}</span>
                           </div>
@@ -351,17 +364,16 @@ export function KitchensTab() {
                   </div>
 
                   <form onSubmit={addStaff} className="flex gap-2 flex-wrap">
-                    <input type="text" placeholder={staffForm.role === 'packer' ? 'Packer Name' : 'Chef Name'} required value={staffForm.name} onChange={e=>setStaffForm({...staffForm, name: e.target.value})}
+                    <input type="text" placeholder="Staff Name" required value={staffForm.name} onChange={e=>setStaffForm({...staffForm, name: e.target.value})}
                       className="flex-1 min-w-[120px] bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
                     <input type="tel" placeholder="10-digit mobile number" required value={staffForm.phone} onChange={e=>setStaffForm({...staffForm, phone: e.target.value})}
                       className="flex-1 min-w-[140px] bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
                     <select value={staffForm.role} onChange={e=>setStaffForm({...staffForm, role: e.target.value})}
                       className="bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
-                      <option value="chef">Chef</option>
-                      <option value="packer">Packer</option>
+                      {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                     <button type="submit" className="bg-brand-primary text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap">
-                      Add {staffForm.role === 'packer' ? 'Packer' : 'Chef'}
+                      Add {ROLE_LABELS[staffForm.role] || "Staff"}
                     </button>
                   </form>
                 </div>
