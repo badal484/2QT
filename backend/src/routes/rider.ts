@@ -815,6 +815,18 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
         return res.json({ orders: [] });
     }
 
+    // Dedicated-fleet isolation (see migration 152 / services/autoAssign.ts) applies here too —
+    // this manual pool is the fallback path when auto-dispatch is off, and without this check a
+    // dedicated-fleet rider's zone-based pool would leak every other restaurant's unclaimed
+    // orders in that same zone, defeating the isolation just as badly as auto-assign would.
+    let dedicatedFleetRestaurantId: string | null = null;
+    if (req.user!.tenantRestaurantId) {
+        const { rows: restRows } = await query('SELECT delivery_model FROM restaurants WHERE id = $1', [req.user!.tenantRestaurantId]);
+        if (restRows[0]?.delivery_model === 'dedicated_fleet') {
+            dedicatedFleetRestaurantId = req.user!.tenantRestaurantId;
+        }
+    }
+
     if (role !== 'super_admin') {
 
         // Look up zone's max_concurrent_orders (default 1 if not set)
@@ -879,9 +891,11 @@ router.get('/orders/pool', authenticate, requireRole('rider', 'rider_captain', '
         }
     }
 
-    // Normal pool: show all unclaimed orders in rider's zone
-    const zoneFilter = riderZoneId ? 'AND o.zone_id = $1' : '';
-    const params = riderZoneId ? [riderZoneId] : [];
+    // Normal pool: a dedicated-fleet rider only ever sees their own restaurant's orders — zone
+    // is irrelevant to them (mirrors findBestRider's dedicated_fleet branch in autoAssign.ts).
+    // Everyone else keeps the original zone-scoped pool, unchanged.
+    const zoneFilter = dedicatedFleetRestaurantId ? 'AND o.restaurant_id = $1' : (riderZoneId ? 'AND o.zone_id = $1' : '');
+    const params = dedicatedFleetRestaurantId ? [dedicatedFleetRestaurantId] : (riderZoneId ? [riderZoneId] : []);
 
     let rows: any[];
     try {
