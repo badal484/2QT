@@ -2223,7 +2223,7 @@ export default function AdminPage() {
           {[
             { section: "Core",           items: ["Overview", "Analytics"] },
             { section: "Orders & Fleet", items: ["Orders", "Scheduled", "Dispatch", "Deliveries", "Fleet", "Applications", "Rider Docs", "Rider Issues", "SOS Alerts"] },
-            { section: "Restaurants",    items: ["Restaurants", "Kitchens", "Partners", "Menu", "Categories", "Inventory"] },
+            { section: "Restaurants",    items: ["Restaurants", "Tenants", "Kitchens", "Partners", "Menu", "Categories", "Inventory"] },
             { section: "Growth",         items: ["Broadcast", "Campaigns", "Promo Codes", "Menu Offers", "Marketing", "Pre-Launch"] },
             { section: "Customers",      items: ["Customers", "Support", "Complaints"] },
             { section: "Platform",       items: ["Zones", "Order Capacity", "Missions", "Delivery Pricing", "Kitchen Health", "Rider Payouts", "Notifications", "Activity Log", "Team", "Systems", "Settings"] },
