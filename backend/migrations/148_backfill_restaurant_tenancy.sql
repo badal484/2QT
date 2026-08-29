@@ -68,7 +68,8 @@ WHERE m.kitchen_id = k.id
 --     restaurant-scoped.
 --   - rider / rider_captain: riders are 2QT-owned and zone-pooled today, not kitchen- or
 --     restaurant-owned (see services/autoAssign.ts) — assigning a restaurant_id here would
---     misrepresent the current architecture. Restaurant-owned riders are Phase 8, not Phase 3.
+--     misrepresent the current architecture. Phase 6 later made this permanent: riders remain
+--     platform-owned and zone-pooled by design, not a future-phase gap to fill in.
 --   - dine_in_staff / partner: belong to the separate, untouched dine-in restaurant_config
 --     system via users.dine_in_restaurant_id, which this migration does not read or write.
 --   - customer: no kitchen relationship exists to backfill from.
