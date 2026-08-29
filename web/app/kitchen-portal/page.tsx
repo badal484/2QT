@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp, IndianRupee, LogOut, RefreshCw, Utensils
@@ -8,126 +9,13 @@ import {
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { OtpBoxInput } from "../components/ui/OtpBoxInput";
+import { useAuth } from "../providers";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
 const fmt = (paise: number | string) =>
   `₹${(parseInt(String(paise || 0)) / 100).toLocaleString("en-IN")}`;
 const pct = (r: number | string) =>
   `${(parseFloat(String(r || 0)) * 100).toFixed(0)}%`;
-
-// ─── Login ────────────────────────────────────────────────────────────────────
-
-function LoginScreen({ onLogin }: { onLogin: (user: any, token: string, refresh: string) => void }) {
-  const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [devOtp, setDevOtp] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const sendOTP = async (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10) return toast.error("Enter a valid phone number");
-    setLoading(true);
-    try {
-      const data = await api.sendOtp(digits);
-      setStep("otp");
-      toast.success("OTP sent");
-      if (data?.devOtp) {
-        setOtp(data.devOtp);
-        setDevOtp(data.devOtp);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send OTP");
-    } finally { setLoading(false); }
-  };
-
-  const verifyOTP = async (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    if (otp.length < 4) return toast.error("Enter the OTP");
-    setLoading(true);
-    try {
-      const digits = phone.replace(/\D/g, "");
-      const res = await api.verifyOtp(digits, otp, undefined);
-      if (!res.user || !["partner_kitchen", "super_admin"].includes(res.user.role)) {
-        toast.error("Access denied. Partner kitchen credentials required.");
-        return;
-      }
-      onLogin(res.user, res.accessToken, res.refreshToken);
-      toast.success(`Welcome back!`);
-    } catch (err: any) {
-      toast.error(err.message || "Invalid OTP");
-    } finally { setLoading(false); }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#07070e] flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 rounded-xl bg-[#F97316] flex items-center justify-center">
-            <Utensils className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <div className="text-xl font-black text-white leading-none">2QT<span className="text-[#F97316]">.</span></div>
-            <div className="text-xs text-white/30 font-semibold mt-0.5">Partner Kitchen Portal</div>
-          </div>
-        </div>
-
-        <div className="bg-[#0d0d1a] border border-white/[0.07] rounded-2xl p-6 space-y-5">
-          <div>
-            <h1 className="text-2xl font-black text-white">{step === "phone" ? "Sign in" : "Verify OTP"}</h1>
-            <p className="text-white/30 text-sm mt-1">
-              {step === "phone" ? "Partner kitchen access only" : `Code sent to ${phone}`}
-            </p>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {step === "phone" ? (
-              <motion.form key="phone" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={sendOTP} className="space-y-4">
-                <div>
-                  <label className="text-xs text-white/40 font-semibold uppercase tracking-wider">Phone Number</label>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="9876543210"
-                    className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[#F97316]/50 placeholder:text-white/20" />
-                </div>
-                <button type="submit" disabled={loading || phone.replace(/\D/g, "").length < 10}
-                  className="w-full py-3.5 rounded-xl bg-[#F97316] text-white font-black text-sm hover:bg-[#ea6c08] transition-colors disabled:opacity-40">
-                  {loading ? "Sending..." : "Send OTP"}
-                </button>
-              </motion.form>
-            ) : (
-              <motion.form key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={verifyOTP} className="space-y-5">
-                <div>
-                  <label className="text-xs text-white/40 font-semibold uppercase tracking-wider block mb-3">OTP Code</label>
-                  <OtpBoxInput
-                    value={otp}
-                    onChange={setOtp}
-                    onComplete={val => { setOtp(val); }}
-                    accentColor="border-[#F97316]"
-                  />
-                </div>
-                {devOtp && (
-                  <div className="px-4 py-3 rounded-xl bg-[#F97316]/10 border border-[#F97316]/20 text-center">
-                    <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-1">Dev Mode OTP</p>
-                    <p className="text-xl font-mono text-[#F97316] tracking-widest">{devOtp}</p>
-                  </div>
-                )}
-                <button type="submit" disabled={loading || otp.replace(/\s/g,"").length < 4}
-                  className="w-full py-3.5 rounded-xl bg-[#F97316] text-white font-black text-sm hover:bg-[#ea6c08] transition-colors disabled:opacity-40">
-                  {loading ? "Verifying..." : "Verify & Sign In"}
-                </button>
-                <button type="button" onClick={() => { setStep("phone"); setOtp(""); setDevOtp(""); }} className="w-full text-xs text-white/30 hover:text-white/60 transition-colors">
-                  ← Change number
-                </button>
-              </motion.form>
-            )}
-          </AnimatePresence>
-        </div>
-        <p className="text-center text-xs text-white/20 mt-6">2QT Partner Kitchen Portal · Restricted Access</p>
-      </motion.div>
-    </div>
-  );
-}
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -457,46 +345,28 @@ function Dashboard({ onLogout }: { user: any; onLogout: () => void }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function KitchenPortalPage() {
-  const [user, setUser] = useState<any>(null);
-  const [booted, setBooted] = useState(false);
+  const { user, loading, logout } = useAuth()!;
+  const router = useRouter();
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem("2qt_kitchen_token");
-      const stored = localStorage.getItem("2qt_kitchen_user");
-      if (token && stored) {
-        localStorage.setItem("2qt_token", token);
-        setUser(JSON.parse(stored));
-      }
-    } catch {}
-    setBooted(true);
-  }, []);
-
-  const handleLogin = (userData: any, token: string, refresh: string) => {
-    try {
-      localStorage.setItem("2qt_kitchen_token", token);
-      localStorage.setItem("2qt_kitchen_refresh_token", refresh);
-      localStorage.setItem("2qt_kitchen_user", JSON.stringify(userData));
-      // Also set main token so api client works
-      localStorage.setItem("2qt_token", token);
-      localStorage.setItem("2qt_refresh_token", refresh);
-    } catch {}
-    setUser(userData);
-  };
+    if (loading) return;
+    if (!user) {
+      router.push("/login?redirect=/kitchen-portal");
+      return;
+    }
+    if (!["partner_kitchen", "super_admin"].includes(user.role)) {
+      toast.error("Access denied. Partner kitchen credentials required.");
+      router.push("/menu");
+    }
+  }, [user, loading, router]);
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem("2qt_kitchen_token");
-      localStorage.removeItem("2qt_kitchen_refresh_token");
-      localStorage.removeItem("2qt_kitchen_user");
-      localStorage.removeItem("2qt_token");
-      localStorage.removeItem("2qt_refresh_token");
-    } catch {}
-    setUser(null);
+    logout();
     toast.success("Signed out");
+    router.push("/login");
   };
 
-  if (!booted) {
+  if (loading || !user || !["partner_kitchen", "super_admin"].includes(user.role)) {
     return (
       <div className="min-h-screen bg-[#07070e] flex items-center justify-center">
         <div className="w-7 h-7 border-2 border-[#F97316]/30 border-t-[#F97316] rounded-full animate-spin" />
@@ -504,6 +374,5 @@ export default function KitchenPortalPage() {
     );
   }
 
-  if (!user) return <LoginScreen onLogin={handleLogin} />;
   return <Dashboard user={user} onLogout={handleLogout} />;
 }
