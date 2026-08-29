@@ -58,7 +58,7 @@ export class BroadcastService {
 
         // 5. Non-blocking background dispatch (protected by Redis deduplication)
         setImmediate(() => {
-            this.processCampaignBatchesInline(campaign.id, recipientUserIds, title, body, imageUrl, targetType);
+            this.processCampaignBatchesInline(campaign.id, recipientUserIds, title, body, imageUrl, targetType, targetFilter);
         });
 
         return { ...campaign, total_recipients: recipientUserIds.length, status: 'PROCESSING' };
@@ -70,21 +70,31 @@ export class BroadcastService {
         title: string,
         body: string,
         imageUrl?: string,
-        targetType?: string
+        targetType?: string,
+        targetFilter: Record<string, any> = {}
     ) {
         (async () => {
             const BATCH_SIZE = 50;
+
+            // Fetch kitchen name if kitchenId is present for {{kitchen_name}} tag
+            let kitchenName = '';
+            if (targetFilter?.kitchenId) {
+                try {
+                    const kRes: any = await query('SELECT name FROM kitchens WHERE id = $1', [targetFilter.kitchenId]);
+                    kitchenName = kRes?.rows?.[0]?.name || '';
+                } catch {}
+            }
 
             for (let i = 0; i < recipientUserIds.length; i += BATCH_SIZE) {
                 const batch = recipientUserIds.slice(i, i + BATCH_SIZE);
                 let sent = 0;
                 let failed = 0;
 
-                const userRes = await query(
-                    `SELECT id, name FROM users WHERE id = ANY($1)`,
-                    [batch]
-                ).catch(() => ({ rows: [] }));
-                const userRows = userRes?.rows || [];
+                let userRows: any[] = [];
+                try {
+                    const userRes: any = await query(`SELECT id, name FROM users WHERE id = ANY($1)`, [batch]);
+                    userRows = userRes?.rows || [];
+                } catch {}
                 const userMap = new Map(userRows.map(u => [u.id, u.name]));
 
                 for (const userId of batch) {
@@ -95,28 +105,42 @@ export class BroadcastService {
                     try {
                         let appType: 'buyer' | 'rider' | 'kitchen' = 'buyer';
                         if (targetType === 'riders') appType = 'rider';
-                        else if (targetType === 'kitchens') appType = 'kitchen';
+                        else if (targetType === 'kitchens' || targetType === 'kitchen_staff') appType = 'kitchen';
 
                         const rawName = (userMap.get(userId) || '').trim();
-                        const firstName = rawName ? rawName.split(' ')[0] : (targetType === 'riders' ? 'Rider' : 'Customer');
+                        const firstName = rawName ? rawName.split(' ')[0] : (targetType === 'riders' ? 'Rider' : 'Foodie');
                         const fullName = rawName || firstName;
 
                         const recipientTitle = title
                             .replace(/\{\{\s*name\s*\}\}/gi, fullName)
                             .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
-                            .replace(/\{\{\s*customer_name\s*\}\}/gi, fullName);
+                            .replace(/\{\{\s*customer_name\s*\}\}/gi, fullName)
+                            .replace(/\{\{\s*kitchen_name\s*\}\}/gi, kitchenName || 'our kitchen');
 
                         const recipientBody = body
                             .replace(/\{\{\s*name\s*\}\}/gi, fullName)
                             .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
-                            .replace(/\{\{\s*customer_name\s*\}\}/gi, fullName);
+                            .replace(/\{\{\s*customer_name\s*\}\}/gi, fullName)
+                            .replace(/\{\{\s*kitchen_name\s*\}\}/gi, kitchenName || 'our kitchen');
+
+                        const deepLinkData: Record<string, any> = {
+                            campaignId,
+                            title: recipientTitle,
+                            body: recipientBody,
+                        };
+
+                        if (targetFilter?.kitchenId) {
+                            deepLinkData.screen = 'KitchenMenu';
+                            deepLinkData.kitchenId = targetFilter.kitchenId;
+                            deepLinkData.url = `/menu?kitchen=${targetFilter.kitchenId}`;
+                        }
 
                         await NotificationDispatcherService.dispatch({
                             userId,
                             type: 'broadcast_message',
                             title: recipientTitle,
                             body: recipientBody,
-                            data: { campaignId, title: recipientTitle, body: recipientBody },
+                            data: deepLinkData,
                             appType,
                             imageUrl: imageUrl || undefined,
                         });
@@ -127,18 +151,22 @@ export class BroadcastService {
                     }
                 }
 
-                await query(
-                    `UPDATE broadcast_campaigns 
-                     SET sent_count = sent_count + $1, failed_count = failed_count + $2
-                     WHERE id = $3`,
-                    [sent, failed, campaignId]
-                ).catch(() => {});
+                try {
+                    await query(
+                        `UPDATE broadcast_campaigns 
+                         SET sent_count = sent_count + $1, failed_count = failed_count + $2
+                         WHERE id = $3`,
+                        [sent, failed, campaignId]
+                    );
+                } catch {}
             }
 
-            await query(
-                `UPDATE broadcast_campaigns SET status = 'COMPLETED', completed_at = NOW() WHERE id = $1`,
-                [campaignId]
-            ).catch(() => {});
+            try {
+                await query(
+                    `UPDATE broadcast_campaigns SET status = 'COMPLETED', completed_at = NOW() WHERE id = $1`,
+                    [campaignId]
+                );
+            } catch {}
         })().catch(err => console.error('[BroadcastService] Async batch dispatch error:', err));
     }
 
@@ -154,11 +182,36 @@ export class BroadcastService {
                 params.push(filter.zoneId);
                 sql += ` AND zone_id = $${params.length}`;
             }
-        } else if (targetType === 'kitchens') {
+        } else if (targetType === 'kitchens' || targetType === 'kitchen_staff') {
             sql += ` AND LOWER(role::text) IN ('chef', 'partner_kitchen', 'kitchen_manager', 'packer', 'kitchen')`;
             if (filter.kitchenId) {
                 params.push(filter.kitchenId);
                 sql += ` AND kitchen_id = $${params.length}`;
+            }
+        } else if (targetType === 'kitchen_customers') {
+            if (filter.kitchenId) {
+                params.push(filter.kitchenId);
+                // Customers who either ordered from this kitchen OR have saved address in a zone served by this kitchen
+                const { rows: customerRows } = await query(
+                    `SELECT DISTINCT u.id FROM users u
+                     WHERE (u.is_active = true OR u.is_active IS NULL)
+                       AND LOWER(u.role::text) IN ('customer', 'buyer')
+                       AND (
+                         u.id IN (SELECT customer_id FROM orders WHERE kitchen_id = $1 AND customer_id IS NOT NULL)
+                         OR
+                         u.id IN (
+                           SELECT a.customer_id FROM addresses a
+                           JOIN kitchen_zones kz ON a.zone_id = kz.zone_id
+                           WHERE kz.kitchen_id = $1
+                         )
+                         OR
+                         u.zone_id IN (SELECT zone_id FROM kitchen_zones WHERE kitchen_id = $1)
+                       )`,
+                    params
+                );
+                return customerRows.map(r => r.id);
+            } else {
+                sql += ` AND LOWER(role::text) IN ('customer', 'buyer')`;
             }
         } else if (targetType === 'zone' && filter.zoneId) {
             params.push(filter.zoneId);

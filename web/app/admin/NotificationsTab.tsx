@@ -154,12 +154,24 @@ function TemplateCard({ tmpl, onSaved }: { tmpl: NotifTemplate; onSaved: () => v
 function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
   const [segment, setSegment] = useState<string>("customers");
   const [zoneId, setZoneId] = useState("");
+  const [kitchens, setKitchens] = useState<any[]>([]);
+  const [selectedKitchenId, setSelectedKitchenId] = useState("");
+  const [kitchenTargetGroup, setKitchenTargetGroup] = useState<"staff" | "customers">("staff");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+
+  const loadKitchens = useCallback(async () => {
+    try {
+      const res: any = await api.get("/admin/kitchens");
+      setKitchens(res.kitchens || []);
+    } catch {
+      // Ignore fallback
+    }
+  }, []);
 
   const loadCampaigns = useCallback(async () => {
     try {
@@ -173,10 +185,11 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
   }, []);
 
   useEffect(() => {
+    loadKitchens();
     loadCampaigns();
     const timer = setInterval(loadCampaigns, 5000);
     return () => clearInterval(timer);
-  }, [loadCampaigns]);
+  }, [loadKitchens, loadCampaigns]);
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -197,12 +210,21 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
 
   async function send() {
     if (!title.trim() || !message.trim()) return toast.error("Title and message required");
+    if (segment === "zone" && !zoneId) return toast.error("Please select a target zone");
+    if (segment === "kitchen" && !selectedKitchenId) return toast.error("Please select a target kitchen");
+
     setSending(true);
     try {
+      let resolvedTargetType: string = segment;
+      if (segment === "customers") resolvedTargetType = "buyers";
+      else if (segment === "kitchen") resolvedTargetType = kitchenTargetGroup === "customers" ? "kitchen_customers" : "kitchen_staff";
+
       await api.post("/admin/broadcast", {
         segment,
-        targetType: segment === "customers" ? "buyers" : segment,
+        targetType: resolvedTargetType,
         zoneId: segment === "zone" ? zoneId : undefined,
+        kitchenId: segment === "kitchen" ? selectedKitchenId : undefined,
+        kitchenTargetGroup: segment === "kitchen" ? kitchenTargetGroup : undefined,
         title,
         message,
         body: message,
@@ -225,27 +247,89 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
         <div>
           <label className="text-xs text-zinc-500 mb-1.5 block">Audience</label>
           <div className="flex gap-2 flex-wrap">
-            {(["customers", "zone", "active_last_7", "riders", "kitchens", "everyone"] as const).map(s => (
+            {(["customers", "zone", "kitchen", "active_last_7", "riders", "kitchens", "everyone"] as const).map(s => (
               <button
                 key={s}
                 onClick={() => setSegment(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${segment === s ? "bg-white text-black" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${segment === s ? "bg-white text-black font-bold shadow-sm" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
               >
-                {s === "customers" ? "All Customers" : s === "zone" ? "By Zone" : s === "active_last_7" ? "Active (7d)" : s === "riders" ? "Riders" : s === "kitchens" ? "Kitchen Partners" : "Everyone"}
+                {s === "customers" ? "All Customers" : s === "zone" ? "By Zone" : s === "kitchen" ? "By Kitchen" : s === "active_last_7" ? "Active (7d)" : s === "riders" ? "Riders" : s === "kitchens" ? "All Kitchen Staff" : "Everyone"}
               </button>
             ))}
           </div>
+
+          {/* Zone Selector */}
           {segment === "zone" && (
-            <select
-              className="mt-2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white w-full focus:outline-none"
-              value={zoneId}
-              onChange={e => setZoneId(e.target.value)}
-            >
-              <option value="">Select zone…</option>
-              {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
-            </select>
+            <div className="mt-2.5">
+              <label className="text-[11px] text-zinc-400 font-semibold mb-1 block">Select Zone</label>
+              <select
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-purple-500"
+                value={zoneId}
+                onChange={e => setZoneId(e.target.value)}
+              >
+                <option value="">Select zone…</option>
+                {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Kitchen Selector & Recipient Group */}
+          {segment === "kitchen" && (
+            <div className="mt-3 p-3.5 bg-zinc-800/80 border border-zinc-700 rounded-xl space-y-3 shadow-inner">
+              <div>
+                <label className="text-[11px] text-zinc-300 font-bold mb-1 block">Target Kitchen</label>
+                <select
+                  className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-purple-500"
+                  value={selectedKitchenId}
+                  onChange={e => setSelectedKitchenId(e.target.value)}
+                >
+                  <option value="">Select a Kitchen…</option>
+                  {kitchens.map(k => (
+                    <option key={k.id} value={k.id}>
+                      {k.name} {k.zone_name ? `(${k.zone_name})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] text-zinc-300 font-bold mb-1.5 block">Recipient Group</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setKitchenTargetGroup("staff")}
+                    className={`p-2.5 rounded-lg text-xs font-medium border text-left flex items-center gap-2.5 transition-all ${
+                      kitchenTargetGroup === "staff"
+                        ? "bg-purple-600/30 border-purple-500 text-purple-200 shadow-sm"
+                        : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <span className="text-base">👨‍🍳</span>
+                    <div>
+                      <div className="font-bold text-white">Kitchen Staff</div>
+                      <div className="text-[10px] opacity-75">Chefs, Packers, Managers</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKitchenTargetGroup("customers")}
+                    className={`p-2.5 rounded-lg text-xs font-medium border text-left flex items-center gap-2.5 transition-all ${
+                      kitchenTargetGroup === "customers"
+                        ? "bg-emerald-600/30 border-emerald-500 text-emerald-200 shadow-sm"
+                        : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <span className="text-base">🛒</span>
+                    <div>
+                      <div className="font-bold text-white">Kitchen Customers</div>
+                      <div className="text-[10px] opacity-75">Buyers in served zones</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
+
         <div>
           <label className="text-xs text-zinc-500 mb-1.5 block">Notification title</label>
           <input
@@ -255,17 +339,39 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
             onChange={e => setTitle(e.target.value)}
           />
         </div>
+
         <div>
           <label className="text-xs text-zinc-500 mb-1.5 block">Message body</label>
           <textarea
             rows={4}
             className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 resize-none"
-            placeholder="Write your message. Use {{name}} for customer name."
+            placeholder="Write your message. Use {{first_name}} or {{kitchen_name}}."
             value={message}
             onChange={e => setMessage(e.target.value)}
           />
-          <p className="text-xs text-zinc-600 mt-1">{message.length}/300 characters</p>
+          
+          {/* Dynamic Personalization Tag Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+            <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Insert Tag:</span>
+            {[
+              { tag: "{{first_name}}", label: "First Name" },
+              { tag: "{{name}}", label: "Full Name" },
+              { tag: "{{kitchen_name}}", label: "Kitchen Name" },
+            ].map(t => (
+              <button
+                key={t.tag}
+                type="button"
+                onClick={() => setMessage(prev => `${prev} ${t.tag}`.trim())}
+                className="px-2 py-0.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono border border-zinc-700 hover:border-zinc-500 transition-colors"
+                title={`Insert ${t.label}`}
+              >
+                + {t.tag}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-zinc-600 mt-1.5">{message.length}/300 characters</p>
         </div>
+
         <div>
           <label className="text-xs text-zinc-500 mb-1.5 block">Image <span className="text-zinc-600">(optional — shown as banner in notification)</span></label>
           <label className={`flex items-center gap-2 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-zinc-700 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
@@ -280,13 +386,14 @@ function BroadcastPanel({ zones }: { zones: { id: string; name: string }[] }) {
             </div>
           )}
         </div>
+
         <button
           onClick={send}
           disabled={sending}
-          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-xl text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-xl text-sm font-bold hover:bg-zinc-100 disabled:opacity-50 transition-colors shadow-lg"
         >
           {sending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {sending ? "Sending…" : "Send Broadcast"}
+          {sending ? "Queuing Broadcast…" : "Send Broadcast"}
         </button>
       </div>
 

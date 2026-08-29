@@ -12,6 +12,13 @@ jest.mock('../redis', () => ({
     redis: {
         get: jest.fn(),
         setEx: jest.fn(),
+        set: jest.fn().mockResolvedValue('OK'),
+    },
+}));
+
+jest.mock('../modules/notifications/services/notification-dispatcher.service', () => ({
+    NotificationDispatcherService: {
+        dispatch: jest.fn().mockResolvedValue(undefined),
     },
 }));
 
@@ -116,5 +123,42 @@ describe('Admin Broadcast Engine (Phase 4)', () => {
             expect(campaign.total_recipients).toBe(2);
             expect(notificationsQueue.add).toHaveBeenCalledTimes(1);
         });
+
+        it('should resolve kitchen staff for a specific kitchen', async () => {
+            mockQuery.mockResolvedValueOnce({
+                rows: [{ id: 'camp-ks', title: 'Staff Notice', body: 'Inspection', target_type: 'kitchen_staff', status: 'PROCESSING' }],
+            });
+            mockQuery.mockResolvedValueOnce({ rows: [{ id: 'chef-1' }, { id: 'packer-1' }] });
+            mockQuery.mockResolvedValueOnce({ rows: [] });
+
+            const campaign = await BroadcastService.createCampaign({
+                title: 'Staff Notice',
+                body: 'Inspection',
+                targetType: 'kitchen_staff',
+                targetFilter: { kitchenId: 'kitchen-123', kitchenTargetGroup: 'staff' },
+            }, 'admin-1');
+
+            expect(campaign.total_recipients).toBe(2);
+            expect(notificationsQueue.add).toHaveBeenCalledTimes(1);
+        });
+
+        it('should resolve customers for a specific kitchen', async () => {
+            mockQuery.mockResolvedValueOnce({
+                rows: [{ id: 'camp-kc', title: 'Kitchen Offer', body: '20% off', target_type: 'kitchen_customers', status: 'PROCESSING' }],
+            });
+            mockQuery.mockResolvedValueOnce({ rows: [{ id: 'cust-1' }, { id: 'cust-2' }, { id: 'cust-3' }] });
+            mockQuery.mockResolvedValueOnce({ rows: [] });
+
+            const campaign = await BroadcastService.createCampaign({
+                title: 'Kitchen Offer',
+                body: '20% off',
+                targetType: 'kitchen_customers',
+                targetFilter: { kitchenId: 'kitchen-123', kitchenTargetGroup: 'customers' },
+            }, 'admin-1');
+
+            expect(campaign.total_recipients).toBe(3);
+            expect(notificationsQueue.add).toHaveBeenCalledTimes(1);
+        });
     });
 });
+
