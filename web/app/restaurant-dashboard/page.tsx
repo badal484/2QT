@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { useAuth } from "../providers";
 import { useSocketRefresh } from "../hooks/useSocketRefresh";
 
-const RESTAURANT_DASHBOARD_ROLES = ["partner_kitchen", "kitchen_manager", "chef", "packer"];
+const RESTAURANT_DASHBOARD_ROLES = ["partner_kitchen", "super_admin", "admin"];
 
 const fmt = (paise: number | string) =>
   `₹${(parseInt(String(paise || 0)) / 100).toLocaleString("en-IN")}`;
@@ -419,8 +419,13 @@ export default function RestaurantDashboardPage() {
       router.push("/login?redirect=/restaurant-dashboard");
       return;
     }
+    // Kitchen staff (manager, chef, packer) belong to the Kitchen portal (/kitchen)
+    if (["chef", "kitchen_manager", "packer"].includes(user.role)) {
+      router.replace("/kitchen");
+      return;
+    }
     if (!RESTAURANT_DASHBOARD_ROLES.includes(user.role)) {
-      toast.error("Access denied. Restaurant staff credentials required.");
+      toast.error("Access denied. Partner restaurant credentials required.");
       router.push("/menu");
     }
   }, [user, loading, router]);

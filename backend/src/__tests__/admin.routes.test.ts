@@ -640,7 +640,7 @@ describe('POST /admin/kitchens/:id/tenant — attach a tenant to an existing unt
     expect(outletInsert[1]).toEqual(['restaurant-new', 'Bachra Kitchen', 'zone-existing', 'kitchen-orphan']);
   });
 
-  it('links a supplied zone_id into kitchen_zones when the kitchen has none yet', async () => {
+  it('links a single supplied zone into kitchen_zones when the kitchen has none yet', async () => {
     actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
     mockQuery
       .mockResolvedValueOnce({ rows: [{ id: 'kitchen-orphan', name: 'Bachra Kitchen', restaurant_id: null }] })
@@ -649,12 +649,36 @@ describe('POST /admin/kitchens/:id/tenant — attach a tenant to an existing unt
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
 
-    const res = await request(app).post('/admin/kitchens/kitchen-orphan/tenant').send({ restaurant_name: 'Bachra Kitchen', zone_id: '00000000-0000-0000-0000-000000000009' });
+    const res = await request(app).post('/admin/kitchens/kitchen-orphan/tenant').send({ restaurant_name: 'Bachra Kitchen', zone_ids: ['00000000-0000-0000-0000-000000000009'] });
 
     expect(res.status).toBe(201);
     expect(mockQuery.mock.calls[1]).toEqual(['INSERT INTO kitchen_zones (kitchen_id, zone_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', ['kitchen-orphan', '00000000-0000-0000-0000-000000000009']]);
     const outletInsert = mockQuery.mock.calls[4];
     expect(outletInsert[1]).toEqual(['restaurant-new', 'Bachra Kitchen', '00000000-0000-0000-0000-000000000009', 'kitchen-orphan']);
+  });
+
+  it('links every supplied zone into kitchen_zones, but the outlet only gets the first as its primary zone', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'kitchen-orphan', name: 'Bachra Kitchen', restaurant_id: null }] })
+      .mockResolvedValueOnce({ rows: [] }) // INSERT kitchen_zones (zone A)
+      .mockResolvedValueOnce({ rows: [] }) // INSERT kitchen_zones (zone B)
+      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-new' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const zoneA = '00000000-0000-0000-0000-00000000000a';
+    const zoneB = '00000000-0000-0000-0000-00000000000b';
+    const res = await request(app).post('/admin/kitchens/kitchen-orphan/tenant').send({
+      restaurant_name: 'Bachra Kitchen',
+      zone_ids: [zoneA, zoneB],
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockQuery.mock.calls[1][1]).toEqual(['kitchen-orphan', zoneA]);
+    expect(mockQuery.mock.calls[2][1]).toEqual(['kitchen-orphan', zoneB]);
+    const outletInsert = mockQuery.mock.calls[5];
+    expect(outletInsert[1]).toEqual(['restaurant-new', 'Bachra Kitchen', zoneA, 'kitchen-orphan']); // primary = first selected
   });
 
   it('returns 404 for a nonexistent kitchen', async () => {

@@ -70,7 +70,7 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
 
   const [restaurantName, setRestaurantName] = useState("");
   const [kitchenNameOverride, setKitchenNameOverride] = useState<string | null>(null);
-  const [zoneId, setZoneId] = useState("");
+  const [zoneIds, setZoneIds] = useState<string[]>([]); // first selected = the outlet's primary zone, same convention as the native Kitchens form
   const [address, setAddress] = useState("");
   const [fssai, setFssai] = useState("");
   const [gstin, setGstin] = useState("");
@@ -99,8 +99,8 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
   const kitchenName = kitchenNameOverride ?? restaurantName;
 
   // Same fallback order as KitchensTab.tsx's "New Kitchen" form: a location the admin already
-  // picked > the selected zone's centroid > MapPicker's own GPS fallback.
-  const selectedZone = zones.find((z: any) => z.id === zoneId);
+  // picked > the primary (first-selected) zone's centroid > MapPicker's own GPS fallback.
+  const selectedZone = zones.find((z: any) => z.id === zoneIds[0]);
   const mapCenter: [number, number] | undefined =
     lat != null && lng != null
       ? [lat, lng]
@@ -128,7 +128,7 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
   const canAdvance = (() => {
     switch (step.key) {
       case "business": return restaurantName.trim().length > 0;
-      case "zone": return !!zoneId;
+      case "zone": return zoneIds.length > 0;
       case "kitchen": return kitchenMode === "existing" ? !!existingKitchenId : (address.trim().length > 0 && kitchenName.trim().length > 0);
       case "staff": return !addStaff || (staffName.trim() && /^\d{10}$/.test(staffPhone.replace(/\D/g, "")));
       case "billing": return !startBilling || (parseFloat(amountRupees) > 0 && periodEnd > periodStart);
@@ -148,7 +148,7 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
       if (kitchenMode === "existing") {
         const attachRes = await api.post(`/admin/kitchens/${existingKitchenId}/tenant`, {
           restaurant_name: restaurantName,
-          zone_id: zoneId,
+          zone_ids: zoneIds,
         });
         kitchenId = existingKitchenId;
         restaurantId = attachRes.restaurant_id;
@@ -156,7 +156,7 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
         const kitchenRes = await api.post("/admin/kitchens", {
           name: kitchenName,
           restaurant_name: restaurantName,
-          zone_ids: [zoneId],
+          zone_ids: zoneIds,
           address,
           fssai_license: fssai || undefined,
           gstin: gstin || undefined,
@@ -228,20 +228,29 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
           )}
 
           {step.key === "zone" && (
-            <Field label="Delivery Zone">
+            <Field label="Delivery Zones (select one or more)">
               {zonesLoading ? (
                 <div className="text-xs text-zinc-500">Loading zones…</div>
               ) : zones.length === 0 ? (
                 <div className="text-xs text-zinc-500">No zones exist yet — create one from the Zones tab first, then come back here.</div>
               ) : (
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {zones.map((z: any) => (
-                    <label key={z.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${zoneId === z.id ? "bg-brand-primary/10 border-brand-primary/50 text-brand-primary" : "bg-[#11111a] border-white/10 text-white hover:bg-white/5"}`}>
-                      <input type="radio" name="zone" className="hidden" checked={zoneId === z.id} onChange={() => setZoneId(z.id)} />
-                      <span className="text-sm font-semibold">{z.name}</span>
-                    </label>
-                  ))}
+                  {zones.map((z: any) => {
+                    const checked = zoneIds.includes(z.id);
+                    const isPrimary = zoneIds[0] === z.id;
+                    return (
+                      <label key={z.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${checked ? "bg-brand-primary/10 border-brand-primary/50 text-brand-primary" : "bg-[#11111a] border-white/10 text-white hover:bg-white/5"}`}>
+                        <input type="checkbox" className="hidden" checked={checked}
+                          onChange={() => setZoneIds((prev) => checked ? prev.filter((id) => id !== z.id) : [...prev, z.id])} />
+                        <span className="text-sm font-semibold flex-1">{z.name}</span>
+                        {isPrimary && <span className="text-[9px] font-black uppercase text-brand-primary/70">Primary</span>}
+                      </label>
+                    );
+                  })}
                 </div>
+              )}
+              {zoneIds.length > 1 && (
+                <p className="text-[10px] text-zinc-500 mt-1.5">The kitchen will deliver to all {zoneIds.length} zones. "{zones.find((z) => z.id === zoneIds[0])?.name}" is the primary — the first one you picked, used for the outlet's main address.</p>
               )}
               <p className="text-[10px] text-zinc-500 mt-1.5">Need a new area? Zones require drawing a delivery boundary on a map — create it from the Zones tab, then restart this wizard.</p>
             </Field>
@@ -370,7 +379,7 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
                     {kitchenMode === "existing" && <span className="text-[10px] text-zinc-500 ml-1.5">(existing)</span>}
                   </span>
                 </div>
-                <div className="flex justify-between"><span className="text-zinc-500">Zone</span><span className="text-white">{zones.find((z) => z.id === zoneId)?.name || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">{zoneIds.length > 1 ? "Zones" : "Zone"}</span><span className="text-white text-right">{zoneIds.map((id) => zones.find((z) => z.id === id)?.name).filter(Boolean).join(", ") || "—"}</span></div>
                 {kitchenMode === "new" && <div className="flex justify-between"><span className="text-zinc-500">Address</span><span className="text-white text-right max-w-[60%]">{address}</span></div>}
                 <div className="flex justify-between"><span className="text-zinc-500">First staff</span><span className="text-white">{addStaff ? `${staffName} (${ROLE_OPTIONS.find((r) => r.value === staffRole)?.label})` : "Skipped"}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-500">Billing</span><span className="text-white">{startBilling ? `₹${amountRupees} / cycle` : "Skipped"}</span></div>
