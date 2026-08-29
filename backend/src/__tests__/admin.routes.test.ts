@@ -26,6 +26,13 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('$2b$10$hashedpassword'),
   compare: jest.fn().mockResolvedValue(true),
 }));
+// Stub Razorpay so Phase 8's subscription-billing routes never make real HTTP calls.
+const mockRazorpayOrdersCreate = jest.fn().mockResolvedValue({ id: 'order_rsub_test', amount: 500000 });
+jest.mock('razorpay', () => {
+  return jest.fn().mockImplementation(() => ({
+    orders: { create: mockRazorpayOrdersCreate },
+  }));
+});
 jest.mock('../services/activity.service', () => ({
   ActivityLogService: { getLogs: jest.fn().mockResolvedValue([]) },
 }));
@@ -571,7 +578,7 @@ describe('GET /admin/tenant-restaurants', () => {
 
 describe('GET /admin/tenant-restaurants/:id', () => {
   it('returns 404 for a nonexistent restaurant', async () => {
-    // All 7 queries fire in parallel via Promise.all regardless of whether the restaurant
+    // All 8 queries fire in parallel via Promise.all regardless of whether the restaurant
     // exists, so every one needs a (possibly empty) resolved value.
     parallelQueryMocks([
       { rows: [] }, // restaurant lookup — empty
@@ -579,6 +586,7 @@ describe('GET /admin/tenant-restaurants/:id', () => {
       { rows: [{ total: 0, active: 0 }] },
       { rows: [] },
       { rows: [{ count: 0 }] },
+      { rows: [] }, // subscriptions (Phase 8)
     ]);
 
     const res = await request(app).get('/admin/tenant-restaurants/nonexistent');
@@ -595,6 +603,7 @@ describe('GET /admin/tenant-restaurants/:id', () => {
       { rows: [{ total: 5, active: 2 }] },
       { rows: [{ id: 'ord-1', display_id: '2QT-100001', status: 'preparing', kitchen_id: 'kitchen-A', total_amount_paise: 20000, created_at: new Date() }] },
       { rows: [{ count: 3 }] },
+      { rows: [{ id: 'sub-1', status: 'active', amount_paise: 500000, billing_period_start: new Date(), billing_period_end: new Date(), razorpay_order_id: 'order_x', razorpay_payment_id: 'pay_x', created_at: new Date(), cancelled_at: null, created_by_name: 'Admin One', cancelled_by_name: null }] },
     ]);
 
     const res = await request(app).get('/admin/tenant-restaurants/restaurant-A');
@@ -606,9 +615,11 @@ describe('GET /admin/tenant-restaurants/:id', () => {
     expect(res.body.orders.total).toBe(5);
     expect(res.body.orders.recent).toHaveLength(1);
     expect(res.body.menu.itemCount).toBe(3);
+    expect(res.body.subscriptions).toHaveLength(1);
+    expect(res.body.subscriptions[0].status).toBe('active');
     expect(res.body).not.toHaveProperty('riders'); // riders stay platform-owned — never surfaced here
 
-    // Every one of the 7 queries must be parameterized by the same selected id
+    // Every one of the 8 queries must be parameterized by the same selected id
     for (const call of mockQuery.mock.calls) {
       expect(call[1]).toEqual(['restaurant-A']);
     }
@@ -623,6 +634,7 @@ describe('GET /admin/tenant-restaurants/:id', () => {
       { rows: [{ total: 0, active: 0 }] },
       { rows: [] },
       { rows: [{ count: 0 }] },
+      { rows: [] },
     ]);
 
     const res = await request(app).get('/admin/tenant-restaurants/restaurant-B');
@@ -632,5 +644,164 @@ describe('GET /admin/tenant-restaurants/:id', () => {
     for (const call of mockQuery.mock.calls) {
       expect(call[1]).toEqual(['restaurant-B']); // never restaurant-A, never both
     }
+  });
+});
+
+// ── POST /admin/tenant-restaurants/:id/subscription (Phase 8) ─────────────────────────────────
+// Platform-admin-only: no restaurant-side "owner" role exists in the schema to safely delegate
+// billing to (see migration 149's comment and the Phase 8 report). Gated by
+// requireRole('super_admin', 'admin') — the same, already-proven-correct middleware every other
+// admin.ts endpoint uses (see middleware/auth.ts:100). As with every other admin.ts route in this
+// suite (see the Phase 7 tenant-restaurants comment above), requireRole is a no-op in this file's
+// mocked middleware, so role rejection itself is verified by direct code inspection rather than
+// an HTTP-level 403 test — the tests below instead cover what the mock cannot: request/response
+// shape, the Razorpay call, tenant scoping, and the one-in-force-subscription conflict path.
+
+describe('POST /admin/tenant-restaurants/:id/subscription', () => {
+  const validBody = {
+    amountPaise: 500000,
+    billingPeriodStart: '2026-01-01T00:00:00.000Z',
+    billingPeriodEnd: '2026-01-31T00:00:00.000Z',
+  };
+
+  it('super_admin can create a subscription — Razorpay order created, row inserted with correct fields', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    parallelQueryMocks([
+      { rows: [{ id: 'restaurant-A', name: 'Royal Spice' }] }, // restaurant lookup
+      {
+        rows: [{
+          id: 'sub-1', status: 'pending', amount_paise: 500000,
+          billing_period_start: validBody.billingPeriodStart, billing_period_end: validBody.billingPeriodEnd,
+          razorpay_order_id: 'order_rsub_test', created_at: new Date(),
+        }],
+      }, // insert
+    ]);
+
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription').send(validBody);
+
+    expect(res.status).toBe(201);
+    expect(res.body.subscription.status).toBe('pending');
+    expect(res.body.razorpayOrderId).toBe('order_rsub_test');
+
+    expect(mockRazorpayOrdersCreate).toHaveBeenCalledWith(expect.objectContaining({
+      amount: 500000,
+      currency: 'INR',
+      notes: expect.objectContaining({ type: 'restaurant_subscription', restaurantId: 'restaurant-A' }),
+    }));
+
+    const insertCall = mockQuery.mock.calls[1];
+    expect(insertCall[0]).toContain('INSERT INTO restaurant_subscriptions');
+    expect(insertCall[1]).toEqual(['restaurant-A', 500000, validBody.billingPeriodStart, validBody.billingPeriodEnd, 'order_rsub_test', 'admin-1']);
+  });
+
+  it('admin (not just super_admin) can also create a subscription', async () => {
+    actingAs({ userId: 'admin-2', role: 'admin', kitchenId: null, zoneId: null, restaurantId: null });
+    parallelQueryMocks([
+      { rows: [{ id: 'restaurant-A', name: 'Royal Spice' }] },
+      { rows: [{ id: 'sub-2', status: 'pending', amount_paise: 500000 }] },
+    ]);
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription').send(validBody);
+    expect(res.status).toBe(201);
+  });
+
+  it('returns 404 for a nonexistent restaurant, without creating a Razorpay order', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    const res = await request(app).post('/admin/tenant-restaurants/nonexistent/subscription').send(validBody);
+    expect(res.status).toBe(404);
+    expect(mockRazorpayOrdersCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a billing period where end is not after start', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription').send({
+      ...validBody, billingPeriodEnd: validBody.billingPeriodStart,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('INVALID_PERIOD');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed period dates', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription').send({
+      ...validBody, billingPeriodStart: 'not-a-date',
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('INVALID_PERIOD');
+  });
+
+  it('rejects a missing/non-positive amountPaise via Zod validation', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription').send({
+      ...validBody, amountPaise: -100,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('VALIDATION_ERROR');
+    expect(mockRazorpayOrdersCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a client-supplied amountPaise of zero (never invent/accept a free plan)', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription').send({
+      ...validBody, amountPaise: 0,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 409 SUBSCRIPTION_ALREADY_IN_FORCE when the partial unique index rejects a second pending/active row', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'restaurant-A', name: 'Royal Spice' }] });
+    const uniqueViolation: any = new Error('duplicate key value violates unique constraint');
+    uniqueViolation.code = '23505';
+    mockQuery.mockRejectedValueOnce(uniqueViolation);
+
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription').send(validBody);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('SUBSCRIPTION_ALREADY_IN_FORCE');
+  });
+
+  it('rejects an unauthenticated request', async () => {
+    mockAuthenticate.mockImplementationOnce((_req: any, res: any) => res.status(401).json({ error: 'UNAUTHENTICATED' }));
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription').send(validBody);
+    expect(res.status).toBe(401);
+  });
+});
+
+// ── POST /admin/tenant-restaurants/:id/subscription/cancel (Phase 8) ──────────────────────────
+
+describe('POST /admin/tenant-restaurants/:id/subscription/cancel', () => {
+  it('super_admin can cancel an in-force subscription', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'sub-1', status: 'cancelled', cancelled_at: new Date() }] });
+
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription/cancel').send({});
+    expect(res.status).toBe(200);
+    expect(res.body.subscription.status).toBe('cancelled');
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[0]).toContain('UPDATE restaurant_subscriptions');
+    expect(call[1]).toEqual(['restaurant-A', 'admin-1']);
+  });
+
+  it('returns 404 NO_IN_FORCE_SUBSCRIPTION when there is nothing pending/active to cancel', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription/cancel').send({});
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('NO_IN_FORCE_SUBSCRIPTION');
+  });
+
+  it('records which admin cancelled it (cancelled_by is the acting admin, never client-suppliable)', async () => {
+    actingAs({ userId: 'admin-specific', role: 'admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'sub-1', status: 'cancelled' }] });
+
+    // Even if the client tries to smuggle a different cancelledBy in the body, the route never
+    // reads it — the SQL param list is hardcoded to req.user!.userId.
+    await request(app).post('/admin/tenant-restaurants/restaurant-A/subscription/cancel').send({ cancelledBy: 'someone-else' });
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[1]).toEqual(['restaurant-A', 'admin-specific']);
   });
 });

@@ -16,7 +16,7 @@
 // restaurant's page would misleadingly imply an ownership that doesn't exist.
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Store, Users, ClipboardList, UtensilsCrossed, Building2 } from "lucide-react";
+import { X, Store, Users, ClipboardList, UtensilsCrossed, Building2, CreditCard } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -28,17 +28,137 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${color}`}>{status}</span>;
 }
 
+// Phase 8 (SaaS migration) — platform-admin billing for a restaurant tenant's 2QT subscription.
+// Deliberately admin-only for this phase: no restaurant-side "owner" role exists anywhere in the
+// membership model (restaurant_users.role is free-text and every dashboard role is treated
+// identically), so there is no safe self-service surface to build yet. See the Phase 8 report.
+function SubscriptionSection({ restaurantId, subscriptions, onChanged }: { restaurantId: string; subscriptions: any[]; onChanged: () => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [amountRupees, setAmountRupees] = useState("");
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
+  const [submitting, setSubmitting] = useState(false);
+
+  const inForce = subscriptions.find((s) => s.status === "pending" || s.status === "active");
+
+  const startSubscription = async () => {
+    const amountPaise = Math.round(parseFloat(amountRupees) * 100);
+    if (!amountPaise || amountPaise <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post(`/admin/tenant-restaurants/${restaurantId}/subscription`, {
+        amountPaise,
+        billingPeriodStart: new Date(startDate).toISOString(),
+        billingPeriodEnd: new Date(endDate).toISOString(),
+      });
+      toast.success("Subscription created — a Razorpay order was generated for this cycle");
+      setShowForm(false);
+      setAmountRupees("");
+      onChanged();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create subscription");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cancelSubscription = async () => {
+    if (!confirm("Cancel this restaurant's subscription?")) return;
+    try {
+      await api.post(`/admin/tenant-restaurants/${restaurantId}/subscription/cancel`, {});
+      toast.success("Subscription cancelled");
+      onChanged();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to cancel subscription");
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
+          <CreditCard className="w-3 h-3" /> Subscription Billing
+        </div>
+        {!inForce && !showForm && (
+          <button onClick={() => setShowForm(true)} className="text-[10px] font-black uppercase text-brand-primary hover:underline">
+            Start Subscription
+          </button>
+        )}
+        {inForce && (
+          <button onClick={cancelSubscription} className="text-[10px] font-black uppercase text-red-400 hover:underline">
+            Cancel Subscription
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-4 mb-3 space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[9px] font-black uppercase text-zinc-500">Amount (₹)</label>
+              <input type="number" min="1" value={amountRupees} onChange={(e) => setAmountRupees(e.target.value)}
+                className="w-full mt-1 bg-[#11111a] border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+            </div>
+            <div>
+              <label className="text-[9px] font-black uppercase text-zinc-500">Period Start</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                className="w-full mt-1 bg-[#11111a] border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+            </div>
+            <div>
+              <label className="text-[9px] font-black uppercase text-zinc-500">Period End</label>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                className="w-full mt-1 bg-[#11111a] border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={startSubscription} disabled={submitting}
+              className="text-xs font-black uppercase px-3 py-1.5 rounded-lg bg-brand-primary text-black disabled:opacity-50">
+              {submitting ? "Creating…" : "Create"}
+            </button>
+            <button onClick={() => setShowForm(false)} className="text-xs font-black uppercase px-3 py-1.5 rounded-lg text-zinc-400 hover:bg-white/5">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        {subscriptions.length === 0 ? (
+          <div className="text-xs text-zinc-500">No subscription history</div>
+        ) : (
+          subscriptions.map((s: any) => (
+            <div key={s.id} className="flex items-center justify-between bg-[#11111a] border border-white/10 rounded-lg px-3 py-2">
+              <div>
+                <span className="text-sm text-white">{fmt(s.amount_paise)}</span>
+                <span className="text-xs text-zinc-500 ml-2">
+                  {new Date(s.billing_period_start).toLocaleDateString()} – {new Date(s.billing_period_end).toLocaleDateString()}
+                </span>
+              </div>
+              <StatusPill status={s.status} />
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DetailPanel({ restaurantId, onClose }: { restaurantId: string; onClose: () => void }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
     api.get(`/admin/tenant-restaurants/${restaurantId}`)
       .then(setData)
       .catch((err: any) => toast.error(err.message || "Failed to load restaurant"))
       .finally(() => setLoading(false));
   }, [restaurantId]);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div className="bg-[#0b0b13] border border-white/10 rounded-2xl p-6 mb-8 relative">
@@ -150,6 +270,8 @@ function DetailPanel({ restaurantId, onClose }: { restaurantId: string; onClose:
             </div>
           </div>
 
+          <SubscriptionSection restaurantId={restaurantId} subscriptions={data.subscriptions ?? []} onChanged={load} />
+
           <div className="text-[10px] text-zinc-500 border-t border-white/[0.06] pt-3">
             Riders are platform-owned and zone-pooled — not restaurant-owned — so they intentionally do not appear on this page. See the Fleet tab for platform-wide rider management.
           </div>
@@ -206,6 +328,11 @@ export function TenantRestaurantsTab() {
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-xs text-zinc-400">{r.outlet_count} outlet{r.outlet_count === 1 ? "" : "s"} · {r.kitchen_count} kitchen{r.kitchen_count === 1 ? "" : "s"}</span>
+                {r.subscription_status ? (
+                  <StatusPill status={r.subscription_status} />
+                ) : (
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase text-zinc-500 bg-white/5">No billing</span>
+                )}
                 <StatusPill status={r.status} />
               </div>
             </button>
