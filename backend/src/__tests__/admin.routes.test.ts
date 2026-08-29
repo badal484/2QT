@@ -499,6 +499,43 @@ describe('POST /admin/kitchens/:id/staff — Phase 4 tenant sync', () => {
     expect(res.status).toBe(200);
     expect(mockQuery).toHaveBeenCalledTimes(3); // sync stops after the lookup — no crash, no extra writes
   });
+
+  it.each(['kitchen_manager', 'partner_kitchen', 'packer'])(
+    'accepts %s — not silently downgraded to chef like before this fix',
+    async (role) => {
+      actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: 'new-user-1' }] })
+        .mockResolvedValueOnce({ rows: [{ restaurant_id: 'restaurant-A' }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const res = await request(app).post('/admin/kitchens/kitchen-A/staff').send({ phone: '9876543212', name: 'Staff', role });
+      expect(res.status).toBe(200);
+
+      const insertCall = mockQuery.mock.calls[1];
+      expect(insertCall[1]).toEqual(['Staff', '919876543212', role, 'kitchen-A']);
+      const membershipUpsert = mockQuery.mock.calls[4];
+      expect(membershipUpsert[1]).toEqual(['restaurant-A', 'new-user-1', role]);
+    }
+  );
+
+  it('still falls back to chef for a role outside the restaurant-dashboard set (e.g. attempting to grant rider/admin via this endpoint)', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 'new-user-1' }] })
+      .mockResolvedValueOnce({ rows: [{ restaurant_id: 'restaurant-A' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/admin/kitchens/kitchen-A/staff').send({ phone: '9876543213', role: 'super_admin' });
+    expect(res.status).toBe(200);
+
+    const insertCall = mockQuery.mock.calls[1];
+    expect(insertCall[1][2]).toBe('chef'); // rejected role silently falls back, never grants platform privilege
+  });
 });
 
 describe('DELETE /admin/kitchens/:id/staff/:staffId — Phase 4 tenant sync', () => {

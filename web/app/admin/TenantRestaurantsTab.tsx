@@ -8,18 +8,24 @@
 // between the two, this tab is deliberately labeled "Tenants" and calls a distinctly-named
 // backend path (/admin/tenant-restaurants, not /admin/restaurants).
 //
-// Read-only: this view exists so a platform admin can inspect a restaurant tenant's profile,
-// outlets, kitchens, staff, and order/menu summary — it does not duplicate or replace any
-// existing management action (kitchen creation/staff assignment stay on the Kitchens tab, order
-// operations stay on Dispatch/Orders). Riders are intentionally never shown here — they remain
-// platform-owned and zone-pooled (Phase 6), not restaurant-owned, and showing them on a
-// restaurant's page would misleadingly imply an ownership that doesn't exist.
+// Mostly read-only: this view exists so a platform admin can inspect a restaurant tenant's
+// profile, outlets, kitchens, staff, and order/menu summary — it does not duplicate or replace
+// any existing management action (kitchen creation/staff assignment stay usable from the
+// Kitchens tab too, order operations stay on Dispatch/Orders). Riders are intentionally never
+// shown here — they remain platform-owned and zone-pooled (Phase 6), not restaurant-owned, and
+// showing them on a restaurant's page would misleadingly imply an ownership that doesn't exist.
+//
+// The one write action this tab does own is onboarding (Phase 10's NewRestaurantWizard) — it
+// exists here, not on Kitchens, because creating a kitchen has always silently created a tenant
+// as a side effect (see utils/tenant.ts's createRestaurantTenantForKitchen); putting the guided
+// flow where the tenant actually lives makes that relationship visible instead of hidden.
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Store, Users, ClipboardList, UtensilsCrossed, Building2, CreditCard } from "lucide-react";
+import { X, Store, Users, ClipboardList, UtensilsCrossed, Building2, CreditCard, Plus } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { NewRestaurantWizard } from "./NewRestaurantWizard";
 
 const fmt = (paise: number | string) => `₹${(parseInt(String(paise || 0)) / 100).toLocaleString("en-IN")}`;
 
@@ -298,6 +304,7 @@ export function TenantRestaurantsTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  const [showWizard, setShowWizard] = useState(false);
 
   return (
     <div>
@@ -306,7 +313,17 @@ export function TenantRestaurantsTab() {
           <h2 className="text-2xl font-black text-white uppercase tracking-wider">Tenants</h2>
           <p className="text-xs text-zinc-500 mt-1">Platform-wide view of the SaaS restaurant tenant model — separate from the dine-in Restaurants tab.</p>
         </div>
+        <button
+          onClick={() => setShowWizard(true)}
+          className="flex items-center gap-2 bg-brand-primary text-black text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+        >
+          <Plus className="w-4 h-4" /> New Restaurant
+        </button>
       </div>
+
+      {showWizard && (
+        <NewRestaurantWizard onClose={() => setShowWizard(false)} onCreated={load} />
+      )}
 
       {selectedId && <DetailPanel restaurantId={selectedId} onClose={() => setSelectedId(null)} />}
 
