@@ -237,16 +237,22 @@ function LoginForm() {
   const redirectUser = (userRole: string) => {
     const redirectUrl = searchParams.get("redirect");
     if (redirectUrl && redirectUrl.startsWith("/")) {
+      if (redirectUrl.includes("restaurant-dashboard") && ["chef", "kitchen_manager", "packer"].includes(userRole)) {
+        router.push("/kitchen");
+        return;
+      }
       router.push(redirectUrl);
-    } else if (userRole === "super_admin" || userRole === "admin") {
+      return;
+    }
+    if (userRole === "super_admin" || userRole === "admin") {
       router.push("/admin");
     } else if (userRole === "finance") {
       router.push("/finance");
     } else if (userRole === "partner_kitchen") {
-      router.push("/kitchen-portal");
+      router.push("/restaurant-dashboard");
     } else if (userRole === "dine_in_staff") {
       router.push("/restaurant");
-    } else if (userRole === "chef" || userRole === "kitchen_manager") {
+    } else if (userRole === "chef" || userRole === "kitchen_manager" || userRole === "packer") {
       router.push("/kitchen");
     } else if (userRole === "rider" || userRole === "rider_captain") {
       router.push("/rider");
