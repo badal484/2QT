@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = (process.env.BACKEND_URL || 'https://twoqt-3kjw.onrender.com/api/v1').replace(/\/$/, '');
+const BACKEND_URL = (process.env.BACKEND_URL || 'https://twoqt-1.onrender.com/api/v1').replace(/\/$/, '');
 const TARGET_BASE = BACKEND_URL.endsWith('/api/v1') ? BACKEND_URL : `${BACKEND_URL}/api/v1`;
 
 async function handleProxy(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {

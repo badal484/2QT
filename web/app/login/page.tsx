@@ -111,7 +111,7 @@ function LoginForm() {
     setServerReady(true);
     const warmUp = async () => {
       try {
-        const res = await fetch('https://twoqt-3kjw.onrender.com/api/v1/health', { signal: AbortSignal.timeout(3000) });
+        const res = await fetch('https://twoqt-1.onrender.com/api/v1/health', { signal: AbortSignal.timeout(3000) });
         if (res.ok && !cancelled) setServerReady(true);
       } catch {}
     };
@@ -123,7 +123,7 @@ function LoginForm() {
   useEffect(() => {
     if (!serverReady) return;
     const id = setInterval(() => {
-      fetch('https://twoqt-3kjw.onrender.com/api/v1/health', { signal: AbortSignal.timeout(5000) }).catch(() => {});
+      fetch('https://twoqt-1.onrender.com/api/v1/health', { signal: AbortSignal.timeout(5000) }).catch(() => {});
     }, 45_000);
     return () => clearInterval(id);
   }, [serverReady]);
