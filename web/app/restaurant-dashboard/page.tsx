@@ -257,33 +257,95 @@ function OutletsTab() {
   );
 }
 
-function StaffTab() {
+function AddRiderForm({ onAdded }: { onAdded: () => void }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!/^\d{10}$/.test(phone)) { toast.error("Enter a valid 10-digit mobile number"); return; }
+    setSubmitting(true);
+    try {
+      await api.post("/restaurant/staff/riders", { name: name.trim() || undefined, phone });
+      toast.success("Rider added");
+      setName(""); setPhone("");
+      onAdded();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add rider");
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 flex flex-wrap items-end gap-3">
+      <div className="flex-1 min-w-[140px]">
+        <label className="text-[10px] font-black uppercase text-white/40">Name (optional)</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Rider name"
+          className="w-full mt-1 bg-[#11111a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white" />
+      </div>
+      <div className="flex-1 min-w-[140px]">
+        <label className="text-[10px] font-black uppercase text-white/40">Mobile Number</label>
+        <input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="10-digit number"
+          className="w-full mt-1 bg-[#11111a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-mono" />
+      </div>
+      <button onClick={submit} disabled={submitting}
+        className="bg-[#F97316] text-white text-xs font-black uppercase tracking-wider px-4 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity">
+        {submitting ? "Adding…" : "Add Rider"}
+      </button>
+    </div>
+  );
+}
+
+function StaffTab({ deliveryModel }: { deliveryModel?: string }) {
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    (async () => {
-      try { setStaff((await api.get("/restaurant/staff")).staff || []); }
-      catch (err: any) { toast.error(err.message || "Failed to load staff"); }
-      finally { setLoading(false); }
-    })();
+
+  const load = useCallback(async () => {
+    try { setStaff((await api.get("/restaurant/staff")).staff || []); }
+    catch (err: any) { toast.error(err.message || "Failed to load staff"); }
+    finally { setLoading(false); }
   }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const removeStaff = async (id: string) => {
+    if (!confirm("Remove this person from your team?")) return;
+    try {
+      await api.delete(`/restaurant/staff/${id}`);
+      toast.success("Removed");
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove");
+    }
+  };
+
   return (
-    <SectionCard title="Staff" meta={loading ? "Loading…" : `${staff.length} members`}>
-      {staff.length === 0 && !loading
-        ? <EmptyState text="No staff yet" />
-        : staff.map((s) => (
-          <div key={s.id} className="flex items-center justify-between px-4 py-3">
-            <div>
-              <div className="text-sm font-bold text-white">{s.name}</div>
-              <div className="text-[11px] text-white/30 mt-0.5 font-mono">{s.phone}</div>
+    <div className="space-y-4">
+      {deliveryModel === "dedicated_fleet" ? (
+        <AddRiderForm onAdded={load} />
+      ) : (
+        <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 text-xs text-white/40 leading-relaxed">
+          Your orders are currently delivered by 2QT's shared rider fleet. Ask 2QT to switch you to a dedicated fleet if you'd like to run your own delivery riders instead.
+        </div>
+      )}
+      <SectionCard title="Staff" meta={loading ? "Loading…" : `${staff.length} members`}>
+        {staff.length === 0 && !loading
+          ? <EmptyState text="No staff yet" />
+          : staff.map((s) => (
+            <div key={s.id} className="flex items-center justify-between px-4 py-3">
+              <div>
+                <div className="text-sm font-bold text-white">{s.name}</div>
+                <div className="text-[11px] text-white/30 mt-0.5 font-mono">{s.phone}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black px-2 py-1 rounded-full uppercase text-[#F97316] bg-[#F97316]/10">{s.membership_role}</span>
+                <span className={`w-2 h-2 rounded-full ${s.is_online ? "bg-emerald-400" : "bg-white/20"}`} title={s.is_online ? "Online" : "Offline"} />
+                {s.membership_role === "rider" && (
+                  <button onClick={() => removeStaff(s.id)} className="text-[10px] font-black uppercase text-red-400/70 hover:text-red-400 ml-1">Remove</button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black px-2 py-1 rounded-full uppercase text-[#F97316] bg-[#F97316]/10">{s.membership_role}</span>
-              <span className={`w-2 h-2 rounded-full ${s.is_online ? "bg-emerald-400" : "bg-white/20"}`} title={s.is_online ? "Online" : "Offline"} />
-            </div>
-          </div>
-        ))}
-    </SectionCard>
+          ))}
+      </SectionCard>
+    </div>
   );
 }
 
@@ -398,7 +460,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             {tab === "orders" && <OrdersTab />}
             {tab === "kitchens" && <KitchensTab />}
             {tab === "outlets" && <OutletsTab />}
-            {tab === "staff" && <StaffTab />}
+            {tab === "staff" && <StaffTab deliveryModel={restaurant?.delivery_model} />}
             {tab === "menu" && <MenuTab />}
           </motion.div>
         </AnimatePresence>
