@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z, ZodSchema } from 'zod';
 import bcrypt from 'bcrypt';
+import Razorpay from 'razorpay';
 import { query, withTransaction } from '../db';
 import { ActivityLogService } from '../services/activity.service';
 import { redis, keys } from '../redis';
@@ -100,6 +101,13 @@ const imagekit = new ImageKit({
 });
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Restaurant SaaS subscription billing (Phase 8) — same Razorpay credentials as routes/payment.ts,
+// separate client instance since this file has its own module scope.
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID || '',
+    key_secret: process.env.RAZORPAY_KEY_SECRET || '',
+});
 
 const router = Router();
 
@@ -2570,11 +2578,13 @@ router.get('/tenant-restaurants', authenticate, requireRole('super_admin', 'admi
     const { rows } = await query(`
         SELECT r.id, r.name, r.slug, r.status, r.created_at,
                COUNT(DISTINCT o.id)::int AS outlet_count,
-               COUNT(DISTINCT k.id)::int AS kitchen_count
+               COUNT(DISTINCT k.id)::int AS kitchen_count,
+               rs.status AS subscription_status, rs.billing_period_end AS subscription_period_end
         FROM restaurants r
         LEFT JOIN outlets o ON o.restaurant_id = r.id
         LEFT JOIN kitchens k ON k.restaurant_id = r.id
-        GROUP BY r.id
+        LEFT JOIN restaurant_subscriptions rs ON rs.restaurant_id = r.id AND rs.status IN ('pending', 'active')
+        GROUP BY r.id, rs.status, rs.billing_period_end
         ORDER BY r.created_at DESC
     `);
     res.json({ restaurants: rows });
@@ -2583,7 +2593,7 @@ router.get('/tenant-restaurants', authenticate, requireRole('super_admin', 'admi
 router.get('/tenant-restaurants/:id', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     try {
-        const [restaurantRes, outletsRes, kitchensRes, staffRes, orderStatsRes, recentOrdersRes, menuRes] = await Promise.all([
+        const [restaurantRes, outletsRes, kitchensRes, staffRes, orderStatsRes, recentOrdersRes, menuRes, subscriptionsRes] = await Promise.all([
             query('SELECT id, name, slug, status, settings, created_at, updated_at FROM restaurants WHERE id = $1', [id]),
             query('SELECT id, name, zone_id, kitchen_id, status FROM outlets WHERE restaurant_id = $1 ORDER BY created_at', [id]),
             query('SELECT id, name, address, is_active, is_paused FROM kitchens WHERE restaurant_id = $1 ORDER BY name', [id]),
@@ -2605,6 +2615,16 @@ router.get('/tenant-restaurants/:id', authenticate, requireRole('super_admin', '
                 [id]
             ),
             query('SELECT COUNT(*)::int AS count FROM menu_items WHERE restaurant_id = $1', [id]),
+            query(
+                `SELECT rs.id, rs.status, rs.amount_paise, rs.billing_period_start, rs.billing_period_end,
+                        rs.razorpay_order_id, rs.razorpay_payment_id, rs.created_at, rs.cancelled_at,
+                        creator.name AS created_by_name, canceller.name AS cancelled_by_name
+                 FROM restaurant_subscriptions rs
+                 JOIN users creator ON creator.id = rs.created_by
+                 LEFT JOIN users canceller ON canceller.id = rs.cancelled_by
+                 WHERE rs.restaurant_id = $1 ORDER BY rs.created_at DESC LIMIT 20`,
+                [id]
+            ),
         ]);
 
         if (!restaurantRes.rows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -2620,7 +2640,84 @@ router.get('/tenant-restaurants/:id', authenticate, requireRole('super_admin', '
             // zone-pooled (Phase 6 conclusion), not restaurant-owned. Showing rider data on this
             // page would misleadingly imply ownership that doesn't exist; platform-wide rider
             // management stays on the existing /admin/riders endpoints.
+            subscriptions: subscriptionsRes.rows,
         });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── Phase 8: restaurant SaaS subscription/billing (platform-admin-only for this phase) ──────
+// See migration 149 for the full reasoning. Creation/cancellation is deliberately
+// super_admin/admin-only: no restaurant-side "owner" role exists anywhere in the schema today
+// (restaurant_users.role is free-text, and routes/restaurant.ts treats every dashboard role —
+// partner_kitchen/kitchen_manager/chef/packer — identically), so granting self-service billing
+// to any one of them would be inventing an authorization boundary this codebase has never
+// established. Billed via a one-off Razorpay Order per cycle, admin-recorded — never invented
+// pricing/plans; amount_paise and the billing period are supplied explicitly by the admin
+// creating the record.
+
+const CreateSubscriptionSchema = z.object({
+    amountPaise: z.number().int().positive(),
+    billingPeriodStart: z.string().min(1),
+    billingPeriodEnd: z.string().min(1),
+});
+
+router.post('/tenant-restaurants/:id/subscription', authenticate, requireRole('super_admin', 'admin'), validate(CreateSubscriptionSchema), async (req: AuthRequest, res) => {
+    const id: string = String(req.params.id);
+    const { amountPaise, billingPeriodStart, billingPeriodEnd } = req.body;
+
+    const startDate = new Date(billingPeriodStart);
+    const endDate = new Date(billingPeriodEnd);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate <= startDate) {
+        return res.status(400).json({ error: 'INVALID_PERIOD', message: 'billingPeriodStart/billingPeriodEnd must be valid dates, with the period end after the start' });
+    }
+
+    try {
+        const { rows: restaurantRows } = await query('SELECT id, name FROM restaurants WHERE id = $1', [id]);
+        if (!restaurantRows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+
+        const rzpOrder = await razorpay.orders.create({
+            amount: amountPaise,
+            currency: 'INR',
+            receipt: `RSUB_${String(id).slice(0, 8)}_${Date.now()}`,
+            notes: { type: 'restaurant_subscription', restaurantId: id },
+        });
+
+        const { rows } = await query(
+            `INSERT INTO restaurant_subscriptions
+                (restaurant_id, amount_paise, billing_period_start, billing_period_end, razorpay_order_id, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, status, amount_paise, billing_period_start, billing_period_end, razorpay_order_id, created_at`,
+            [id, amountPaise, billingPeriodStart, billingPeriodEnd, rzpOrder.id, req.user!.userId]
+        );
+
+        res.status(201).json({
+            subscription: rows[0],
+            razorpayOrderId: rzpOrder.id,
+            keyId: process.env.RAZORPAY_KEY_ID,
+        });
+    } catch (err: any) {
+        // 23505 = unique_violation — the partial "one in-force subscription" index in migration 149.
+        if (err.code === '23505') {
+            return res.status(409).json({ error: 'SUBSCRIPTION_ALREADY_IN_FORCE', message: 'This restaurant already has a pending or active subscription.' });
+        }
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/tenant-restaurants/:id/subscription/cancel', authenticate, requireRole('super_admin', 'admin'), async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    try {
+        const { rows } = await query(
+            `UPDATE restaurant_subscriptions
+             SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $2
+             WHERE restaurant_id = $1 AND status IN ('pending', 'active')
+             RETURNING id, status, cancelled_at`,
+            [id, req.user!.userId]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'NO_IN_FORCE_SUBSCRIPTION', message: 'This restaurant has no pending or active subscription to cancel.' });
+        res.json({ subscription: rows[0] });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

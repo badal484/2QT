@@ -182,6 +182,31 @@ router.post('/razorpay', async (req, res) => {
             return res.json({ status: 'ok' });
         }
 
+        // ── Restaurant SaaS subscription payment (Phase 8, platform-admin-recorded) ──────────
+        if (notes.type === 'restaurant_subscription') {
+            try {
+                // Resolved server-side via the gateway's own order id, which only matches a row
+                // WE created (never trust notes.restaurantId beyond this — it is our own
+                // metadata round-tripped through Razorpay, not client-suppliable). The `status =
+                // 'pending'` guard makes this idempotent against webhook redelivery: a repeat
+                // delivery finds no matching row the second time, mirroring the same
+                // atomic-claim pattern used above for cash_submissions.
+                const { rows } = await query(
+                    `UPDATE restaurant_subscriptions
+                     SET status = 'active', razorpay_payment_id = COALESCE(razorpay_payment_id, $2)
+                     WHERE razorpay_order_id = $1 AND status = 'pending'
+                     RETURNING id, restaurant_id`,
+                    [rzpOrderId, rzpPaymentId]
+                );
+                if (rows[0]) {
+                    console.log(`[webhook restaurant_subscription] activated sub=${rows[0].id} restaurant=${rows[0].restaurant_id}`);
+                }
+            } catch (err) {
+                console.error('[webhook restaurant_subscription]', err);
+            }
+            return res.json({ status: 'ok' });
+        }
+
         // ── Standard food delivery order ──────────────────────────────────────
         const internalOrderId = notes.orderId;
         const paymentMethod = payload.payment.entity.method;
