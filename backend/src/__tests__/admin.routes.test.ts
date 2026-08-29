@@ -420,6 +420,35 @@ describe('POST /admin/kitchens — Phase 4 tenant sync', () => {
     const outletInsert = clientCalls.find(([text]) => text.includes('INSERT INTO outlets'));
     expect(outletInsert[1]).toEqual(['restaurant-new', 'New Kitchen', '00000000-0000-0000-0000-000000000001', 'kitchen-new']);
   });
+
+  it('lets the restaurant display name differ from the kitchen name when restaurant_name is supplied', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+
+    const clientCalls: any[] = [];
+    const clientMock = {
+      query: jest.fn(async (text: string, params?: any[]) => {
+        clientCalls.push([text, params]);
+        if (text.includes('INSERT INTO kitchens')) return { rows: [{ id: 'kitchen-new' }] };
+        if (text.includes('INSERT INTO kitchen_zones')) return { rows: [] };
+        if (text.includes('INSERT INTO restaurants')) return { rows: [{ id: 'restaurant-new' }] };
+        return { rows: [] };
+      }),
+    };
+    mockWithTransaction.mockImplementationOnce(async (cb: any) => cb(clientMock));
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'kitchen-new', name: 'Punjabi Dhaba HSR', zones: [] }] });
+
+    const res = await request(app).post('/admin/kitchens').send({
+      name: 'Punjabi Dhaba HSR',
+      restaurant_name: 'Punjabi Dhaba',
+      zone_ids: ['00000000-0000-0000-0000-000000000001'],
+    });
+
+    expect(res.status).toBe(201);
+    const restaurantInsert = clientCalls.find(([text]) => text.includes('INSERT INTO restaurants'));
+    expect(restaurantInsert[1][0]).toBe('Punjabi Dhaba'); // restaurant name — independent of kitchen name
+    const outletInsert = clientCalls.find(([text]) => text.includes('INSERT INTO outlets'));
+    expect(outletInsert[1][1]).toBe('Punjabi Dhaba'); // outlet name follows the restaurant name too
+  });
 });
 
 describe('POST /admin/kitchens/:id/staff — Phase 4 tenant sync', () => {

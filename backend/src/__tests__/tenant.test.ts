@@ -10,6 +10,7 @@ import {
   syncTenantMembership,
   deactivateTenantMembership,
   requireActiveRestaurantMembership,
+  createRestaurantTenantForKitchen,
   RESTAURANT_DASHBOARD_ROLES,
 } from '../utils/tenant';
 
@@ -115,6 +116,57 @@ describe('deactivateTenantMembership', () => {
     expect(mockQuery).toHaveBeenNthCalledWith(2, expect.stringContaining("SET status = 'inactive'"), ['user-1']);
     // Never a DELETE — membership history must be preserved
     expect(mockQuery.mock.calls.some((c) => String(c[0]).toUpperCase().startsWith('DELETE'))).toBe(false);
+  });
+});
+
+describe('createRestaurantTenantForKitchen', () => {
+  it('creates the restaurant, links it to the kitchen, and creates a matching outlet — using the kitchen name when no restaurant name is given', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-new' }] }) // INSERT restaurants
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE kitchens
+      .mockResolvedValueOnce({ rows: [] }); // INSERT outlets
+
+    const restaurantId = await createRestaurantTenantForKitchen(mockQuery, 'kitchen-1', 'Punjabi Dhaba', 'zone-1');
+
+    expect(restaurantId).toBe('restaurant-new');
+    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.stringContaining('INSERT INTO restaurants'), ['Punjabi Dhaba', expect.stringContaining('punjabi-dhaba-kitchen-')]);
+    expect(mockQuery).toHaveBeenNthCalledWith(2, 'UPDATE kitchens SET restaurant_id = $1 WHERE id = $2', ['restaurant-new', 'kitchen-1']);
+    expect(mockQuery).toHaveBeenNthCalledWith(3, expect.stringContaining('INSERT INTO outlets'), ['restaurant-new', 'Punjabi Dhaba', 'zone-1', 'kitchen-1']);
+  });
+
+  it('uses an independently-supplied restaurant name instead of the kitchen name when given', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-new' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await createRestaurantTenantForKitchen(mockQuery, 'kitchen-1', 'Punjabi Dhaba HSR', 'zone-1', 'Punjabi Dhaba');
+
+    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), ['Punjabi Dhaba', expect.any(String)]);
+    expect(mockQuery).toHaveBeenNthCalledWith(3, expect.any(String), ['restaurant-new', 'Punjabi Dhaba', 'zone-1', 'kitchen-1']);
+  });
+
+  it('accepts a null zoneId (partner kitchens have no zone yet at approval time)', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-new' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await createRestaurantTenantForKitchen(mockQuery, 'kitchen-1', 'New Partner Kitchen', null);
+
+    expect(mockQuery).toHaveBeenNthCalledWith(3, expect.any(String), ['restaurant-new', 'New Partner Kitchen', null, 'kitchen-1']);
+  });
+
+  it('falls back to a generic slug base when the name has no alphanumeric characters', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-new' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await createRestaurantTenantForKitchen(mockQuery, 'kitchen-1', '★★★', 'zone-1');
+
+    const [, slug] = mockQuery.mock.calls[0][1];
+    expect(slug).toBe(`restaurant-${'kitchen-1'.slice(0, 8)}`);
   });
 });
 
