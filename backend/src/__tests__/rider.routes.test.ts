@@ -5,7 +5,7 @@
 
 import express from 'express';
 import request from 'supertest';
-import { query } from '../db';
+import { query, withTransaction } from '../db';
 import { redis } from '../redis';
 import { authenticate } from '../middleware/auth';
 
@@ -60,12 +60,13 @@ app.use(express.json());
 app.use('/rider', riderRouter);
 
 const mockQuery = query as jest.Mock;
+const mockWithTransaction = withTransaction as jest.Mock;
 const mockAuthenticate = authenticate as jest.Mock;
 const defaultAuthenticate = mockAuthenticate.getMockImplementation();
 
-function actingAs(user: { userId: string; role: string; kitchenId: string | null; zoneId: string | null; restaurantId: string | null }) {
+function actingAs(user: { userId: string; role: string; kitchenId: string | null; zoneId: string | null; restaurantId: string | null; tenantRestaurantId?: string | null }) {
   mockAuthenticate.mockImplementationOnce((req: any, _res: any, next: any) => {
-    req.user = { ...user, jti: 'jti-test' };
+    req.user = { tenantRestaurantId: null, ...user, jti: 'jti-test' };
     next();
   });
 }
@@ -217,5 +218,196 @@ describe('PATCH /rider/orders/:id/status', () => {
 
     const call = mockQuery.mock.calls[0];
     expect(call[1]).toEqual(['preparing', 'ord-3', 'ord-3', 'admin-1', '2QT-ord-3', true]);
+  });
+});
+
+// ── Phase 6: rider order-ownership audit — closing test-coverage gaps ────────────────────────
+// Phase 6's audit found every rider order-touching endpoint already correctly scoped by
+// rider_id = req.user.userId (server-derived) in its SQL WHERE clause — no new authorization
+// code was needed. These tests close a pre-existing gap: none of the endpoints below had any
+// test coverage at all before this phase, despite already being correctly written. Locking in
+// the current, correct behavior here guards against a future regression re-introducing the
+// exact class of IDOR fixed in Phase 2 (PATCH /orders/:id/status).
+
+describe('POST /rider/orders/:id/claim — Phase 6 ownership audit', () => {
+  let clientMock: any;
+  beforeEach(() => {
+    clientMock = { query: jest.fn() };
+    mockWithTransaction.mockImplementation(async (cb: any) => cb(clientMock));
+  });
+
+  it('allows a verified rider to claim an unassigned order', async () => {
+    actingAs({ userId: 'rider-1', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    clientMock.query
+      .mockResolvedValueOnce({ rows: [] }) // active orders count
+      .mockResolvedValueOnce({ rows: [{ is_verified: true }] }) // rider verified
+      .mockResolvedValueOnce({ rowCount: 1 }) // UPDATE orders ... rider_id IS NULL
+      .mockResolvedValueOnce({ rows: [] }); // legacy current_order_id clear
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] }) // rider_order_events insert
+      .mockResolvedValueOnce({ rows: [{ customer_id: 'cust-1', status: 'preparing', rider_name: 'Rider One', rider_phone: '919876543210' }] });
+
+    const res = await request(app).post('/rider/orders/ord-1/claim');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const updateCall = clientMock.query.mock.calls[2];
+    expect(updateCall[0]).toContain('rider_id IS NULL');
+    expect(updateCall[1]).toEqual(['rider-1', 'ord-1']);
+  });
+
+  it("cannot claim an order already assigned to a different rider (rider_id IS NULL guard fails)", async () => {
+    actingAs({ userId: 'rider-2', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    clientMock.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ is_verified: true }] })
+      .mockResolvedValueOnce({ rowCount: 0 }); // already claimed by someone else — 0 rows updated
+
+    const res = await request(app).post('/rider/orders/ord-1/claim');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('CLAIM_FAILED');
+  });
+
+  it('ignores client-supplied restaurantId/kitchenId/zoneId — the claim is scoped only by the caller\'s own userId', async () => {
+    actingAs({ userId: 'rider-1', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    clientMock.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ is_verified: true }] })
+      .mockResolvedValueOnce({ rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [] });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ customer_id: 'cust-1', status: 'preparing', rider_name: 'Rider One', rider_phone: '919876543210' }] });
+
+    const res = await request(app)
+      .post('/rider/orders/ord-1/claim')
+      .send({ restaurantId: 'restaurant-B', tenantRestaurantId: 'restaurant-B', kitchenId: 'kitchen-B', zoneId: 'zone-B' })
+      .set('x-restaurant-id', 'restaurant-B')
+      .set('x-kitchen-id', 'kitchen-B')
+      .set('x-zone-id', 'zone-B');
+
+    expect(res.status).toBe(200);
+    const updateCall = clientMock.query.mock.calls[2];
+    expect(updateCall[1]).toEqual(['rider-1', 'ord-1']); // server-derived userId only, spoofed fields never read
+  });
+});
+
+describe('POST /rider/orders/:id/unclaim — Phase 6 ownership audit', () => {
+  let clientMock: any;
+  beforeEach(() => {
+    clientMock = { query: jest.fn() };
+    mockWithTransaction.mockImplementation(async (cb: any) => cb(clientMock));
+  });
+
+  it("cannot unclaim another rider's order (WHERE rider_id = caller finds nothing)", async () => {
+    actingAs({ userId: 'rider-2', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    clientMock.query.mockResolvedValueOnce({ rows: [] }); // SELECT ... WHERE id=$1 AND rider_id=$2 → no match
+
+    const res = await request(app).post('/rider/orders/ord-1/unclaim');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('UNCLAIM_FAILED');
+
+    const selectCall = clientMock.query.mock.calls[0];
+    expect(selectCall[0]).toContain('rider_id = $2');
+    expect(selectCall[1]).toEqual(['ord-1', 'rider-2']);
+  });
+
+  it('allows a rider to unclaim their own order', async () => {
+    actingAs({ userId: 'rider-1', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    clientMock.query
+      .mockResolvedValueOnce({ rows: [{ kitchen_id: 'kitchen-A', customer_id: 'cust-1' }] })
+      .mockResolvedValueOnce({ rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [] });
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // rider_order_events insert
+
+    const res = await request(app).post('/rider/orders/ord-1/unclaim');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe.each([
+  ['customer-unreachable', { action: 'retry' }],
+  ['report-issue', { issueType: 'traffic' }],
+  ['arrived-at-kitchen', undefined],
+])('POST /rider/orders/:id/%s — Phase 6 ownership audit', (endpoint, body) => {
+  it(`denies access to another rider's order`, async () => {
+    actingAs({ userId: 'rider-2', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // WHERE ... AND rider_id = $2 → no match for this caller
+
+    const res = await request(app).post(`/rider/orders/ord-1/${endpoint}`).send(body || {});
+    expect([400, 404]).toContain(res.status);
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[0]).toMatch(/rider_id\s*=\s*\$2/);
+    expect(call[1]).toEqual(['ord-1', 'rider-2']);
+  });
+});
+
+describe('POST /rider/orders/:orderId/upi-payment-link — Phase 6 ownership audit', () => {
+  it("denies access to another rider's order", async () => {
+    actingAs({ userId: 'rider-2', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/rider/orders/ord-1/upi-payment-link');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('ORDER_NOT_FOUND');
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[0]).toContain('rider_id = $2');
+    expect(call[1]).toEqual(['ord-1', 'rider-2']);
+  });
+});
+
+describe('GET /rider/orders/:id/earnings-breakdown — Phase 6 ownership audit', () => {
+  it("denies access to another rider's delivered order", async () => {
+    actingAs({ userId: 'rider-2', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).get('/rider/orders/ord-1/earnings-breakdown');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('ORDER_NOT_FOUND');
+
+    const call = mockQuery.mock.calls[0];
+    expect(call[0]).toContain('o.rider_id = $2');
+    expect(call[1]).toEqual(['ord-1', 'rider-2']);
+  });
+});
+
+describe('rider_captain — Phase 6: functional parity with rider, no elevated capability', () => {
+  it('is scoped by the exact same rider_id = callerId rule as rider on order status updates', async () => {
+    actingAs({ userId: 'captain-1', role: 'rider_captain', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // no order matches rider_id = captain-1
+
+    const res = await request(app).patch('/rider/orders/ord-1/status').send({ status: 'out_for_delivery' });
+    expect(res.status).toBe(404);
+
+    const call = mockQuery.mock.calls[0];
+    // isAdmin resolves false for rider_captain — identical to a plain rider, no special-casing
+    expect(call[1]).toEqual(['out_for_delivery', 'ord-1', 'ord-1', 'captain-1', '2QT-ord-1', false]);
+  });
+
+  it('cannot access another rider\'s (or another captain\'s) order — no cross-rider visibility power', async () => {
+    actingAs({ userId: 'captain-1', role: 'rider_captain', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app).post('/rider/orders/ord-1/upi-payment-link');
+    expect(res.status).toBe(404);
+    expect(mockQuery.mock.calls[0][1]).toEqual(['ord-1', 'captain-1']);
+  });
+});
+
+describe('Rider identity — Phase 6: no restaurant tenant scoping exists for riders (by design)', () => {
+  it('a rider with no tenantRestaurantId (the current, universal state for all riders) is not blocked from normal rider operations', async () => {
+    // Confirms the Phase 3 backfill's deliberate exclusion of rider/rider_captain (see
+    // migrations/148_backfill_restaurant_tenancy.sql) has no negative effect on rider
+    // functionality — tenantRestaurantId simply plays no role anywhere in rider.ts.
+    actingAs({ userId: 'rider-1', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: null, tenantRestaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-9', display_id: '2QT-100009', customer_id: 'cust-1', kitchen_id: 'kitchen-1', status: 'preparing', delivery_otp: '111111' }],
+    });
+
+    const res = await request(app).patch('/rider/orders/ord-9/status').send({ status: 'preparing' });
+    expect(res.status).toBe(200);
   });
 });
