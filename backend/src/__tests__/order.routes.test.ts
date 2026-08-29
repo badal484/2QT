@@ -388,3 +388,55 @@ describe('GET /orders/:id — Phase 4 tenant isolation', () => {
     expect(res.status).toBe(200);
   });
 });
+
+// ── Phase 7 Step 0: rider_captain security fix ────────────────────────────────
+// isAuthorizedForOrder() and GET /:id/tracking's inline check previously omitted
+// 'rider_captain' entirely, falling through to unrestricted access — the same class of bug
+// Phase 2 fixed for the bare 'rider' role. Discovered while reusing this function for the
+// Socket.IO join_order authorization fix.
+
+describe('GET /orders/:id — rider_captain ownership (Phase 7 fix)', () => {
+  it("denies a rider_captain access to an order not assigned to them", async () => {
+    actingAs({ userId: 'captain-1', role: 'rider_captain', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-30', customer_id: 'cust-1', rider_id: 'rider-99', kitchen_id: 'kitchen-1', status: 'out_for_delivery', items: [] }],
+    });
+
+    const res = await request(app).get('/orders/ord-30');
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('FORBIDDEN');
+  });
+
+  it('allows a rider_captain to view an order assigned to them', async () => {
+    actingAs({ userId: 'captain-1', role: 'rider_captain', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'ord-31', customer_id: 'cust-1', rider_id: 'captain-1', kitchen_id: 'kitchen-1', status: 'out_for_delivery', items: [] }],
+    });
+
+    const res = await request(app).get('/orders/ord-31');
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('GET /orders/:id/tracking — rider_captain ownership (Phase 7 fix)', () => {
+  it("denies a rider_captain access to tracking (and delivery OTP) for another rider's order", async () => {
+    actingAs({ userId: 'captain-1', role: 'rider_captain', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ status: 'out_for_delivery', rider_id: 'rider-99', customer_id: 'cust-1', kitchen_id: 'kitchen-1', display_id: '2QT-100001', delivery_otp: '111111' }],
+    });
+
+    const res = await request(app).get('/orders/ord-32/tracking');
+    expect(res.status).toBe(403);
+  });
+
+  it('allows a rider_captain to track their own assigned order', async () => {
+    actingAs({ userId: 'captain-1', role: 'rider_captain', kitchenId: null, zoneId: 'zone-1', restaurantId: null });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ status: 'out_for_delivery', rider_id: 'captain-1', customer_id: 'cust-1', kitchen_id: 'kitchen-1', display_id: '2QT-100002', delivery_otp: '222222' }],
+    });
+
+    const res = await request(app).get('/orders/ord-33/tracking');
+    expect(res.status).toBe(200);
+    expect(res.body.deliveryOtp).toBe('222222');
+  });
+});

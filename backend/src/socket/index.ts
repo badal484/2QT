@@ -4,6 +4,7 @@ import { Emitter } from '@socket.io/redis-emitter';
 import jwt from 'jsonwebtoken';
 import { redisPub, redisSub, redis, keys } from '../redis';
 import { query } from '../db';
+import { canJoinOrderRoom } from '../utils/orderAuth';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set');
@@ -49,11 +50,16 @@ export const initSocket = (server: any) => {
         try {
             const decoded = jwt.verify(token, JWT_SECRET) as any;
             try {
-                const { rows } = await query('SELECT kitchen_id, zone_id, dine_in_restaurant_id FROM users WHERE id = $1', [decoded.userId]);
+                const { rows } = await query('SELECT kitchen_id, zone_id, dine_in_restaurant_id, restaurant_id FROM users WHERE id = $1', [decoded.userId]);
                 if (rows[0]) {
                     decoded.kitchenId = rows[0].kitchen_id ?? decoded.kitchenId;
                     decoded.zoneId = rows[0].zone_id ?? decoded.zoneId;
                     decoded.restaurantId = rows[0].dine_in_restaurant_id ?? decoded.restaurantId;
+                    // tenantRestaurantId (Phase 3/7): the SaaS restaurant relationship, distinct
+                    // from restaurantId above (the unrelated dine-in relationship) — mirrors
+                    // middleware/auth.ts's authenticate(). Needed so isAuthorizedForOrder's
+                    // Phase 4 tenant cross-check also works for a socket connection, not just HTTP.
+                    decoded.tenantRestaurantId = rows[0].restaurant_id ?? null;
                 }
             } catch { /* non-critical — fall back to JWT payload values */ }
             (socket as any).user = decoded;
@@ -106,16 +112,34 @@ export const initSocket = (server: any) => {
             socket.join('kitchen_all');
         });
 
+        // Security fix, Phase 7 Step 0 (High-severity IDOR, found in Phase 6): this previously
+        // joined the socket to ANY order's room for ANY client-supplied orderId with no
+        // ownership check at all — any authenticated (or even unauthenticated "guest") socket
+        // could subscribe to another user's live rider-GPS stream and order-status broadcasts
+        // indefinitely. canJoinOrderRoom() below reuses routes/order.ts's isAuthorizedForOrder()
+        // — the same, single authorization rule already enforced by GET /orders/:id/tracking and
+        // the other order endpoints — rather than inventing a second, parallel authorization
+        // model. Server-derived identity only (socket.user, populated by the io.use() auth
+        // middleware above from the verified JWT + a fresh DB lookup); the client-supplied
+        // orderId is used only to look up the real order row, never trusted as proof of ownership.
         socket.on('join_order', async (orderId) => {
-            socket.join(`order:${orderId}`);
-            // Immediately push last known rider location so buyer doesn't wait for next heartbeat
+            if (typeof orderId !== 'string' || !orderId) return;
+
             try {
                 const { rows } = await query(
-                    'SELECT rider_id FROM orders WHERE id = $1',
+                    'SELECT customer_id, rider_id, kitchen_id, restaurant_id FROM orders WHERE id = $1',
                     [orderId]
                 );
-                if (rows[0]?.rider_id) {
-                    const loc = await redis.get(keys.riderLocation(rows[0].rider_id)).catch(() => null);
+                const order = rows[0];
+                // Unknown order id — reject safely, no room joined, nothing about the order's
+                // existence is revealed to the caller (no error emitted, just no-op).
+                if (!canJoinOrderRoom(user, order)) return;
+
+                socket.join(`order:${orderId}`);
+
+                // Immediately push last known rider location so buyer doesn't wait for next heartbeat
+                if (order.rider_id) {
+                    const loc = await redis.get(keys.riderLocation(order.rider_id)).catch(() => null);
                     if (loc) {
                         const parsed = JSON.parse(loc);
                         socket.emit('rider_location', { lat: parsed.lat, lng: parsed.lng });

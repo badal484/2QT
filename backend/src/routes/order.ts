@@ -24,12 +24,20 @@ const router = Router();
 // Phase 4 admin-flow hooks in utils/tenant.ts yet), the existing kitchen_id-only rule alone
 // decides access, exactly as it did before this phase — so this never introduces a new failure
 // mode for data that hasn't been migrated into the tenant model.
-function isAuthorizedForOrder(
+//
+// Phase 7 fix: 'rider_captain' was never included in the rider branch below — it fell through
+// to the final `return true` (the branch meant for admin/finance/support), giving any
+// rider_captain account unrestricted read/cancel access to every order on the platform. Found
+// while reusing this function for the Socket.IO join_order authorization fix (Phase 6 finding);
+// the identical gap existed in GET /:id/tracking's own inline check, fixed alongside this one.
+// rider_captain has always been intended to behave exactly like rider (Phase 6 audit) — this
+// restores that, it does not grant any new capability.
+export function isAuthorizedForOrder(
     user: { role: string; userId: string; kitchenId: string | null; tenantRestaurantId?: string | null },
     order: { customer_id: string; rider_id: string | null; kitchen_id: string; restaurant_id?: string | null }
 ): boolean {
     if (user.role === 'customer') return order.customer_id === user.userId;
-    if (user.role === 'rider') return order.rider_id === user.userId;
+    if (user.role === 'rider' || user.role === 'rider_captain') return order.rider_id === user.userId;
     if (['chef', 'kitchen_manager', 'partner_kitchen', 'packer'].includes(user.role)) {
         if (order.kitchen_id !== user.kitchenId) return false;
         if (user.tenantRestaurantId && order.restaurant_id && user.tenantRestaurantId !== order.restaurant_id) {
@@ -385,7 +393,9 @@ router.get('/:id/tracking', authenticate, async (req: AuthRequest, res) => {
     if (role === 'customer' && order.customer_id !== req.user!.userId) {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
-    if (role === 'rider' && order.rider_id !== req.user!.userId) {
+    // Phase 7 fix: 'rider_captain' was missing here (same gap as isAuthorizedForOrder above) —
+    // fell through with no check at all, exposing delivery OTP + live rider GPS for any order.
+    if ((role === 'rider' || role === 'rider_captain') && order.rider_id !== req.user!.userId) {
         return res.status(403).json({ error: 'FORBIDDEN' });
     }
     if (['chef', 'kitchen_manager', 'partner_kitchen', 'packer'].includes(role) && order.kitchen_id !== req.user!.kitchenId) {
