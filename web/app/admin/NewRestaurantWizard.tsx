@@ -18,9 +18,22 @@
 // This step only lets you pick an existing zone.
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { X, ChevronRight, ChevronLeft, Check, Store, MapPin, UtensilsCrossed, Users, CreditCard, ClipboardCheck } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+
+// Same shared picker the Kitchens tab's "New Kitchen" form uses — reused here rather than
+// hand-rolling a second lat/lng input, so kitchen location entry looks and behaves identically
+// regardless of which flow created the kitchen.
+const MapPicker = dynamic(() => import("../../components/MapPicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-56 bg-white/[0.03] border border-white/10 rounded-xl flex items-center justify-center text-zinc-500 text-xs">
+      Loading map…
+    </div>
+  ),
+});
 
 const ROLE_OPTIONS = [
   { value: "chef", label: "Chef" },
@@ -61,6 +74,8 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
   const [address, setAddress] = useState("");
   const [fssai, setFssai] = useState("");
   const [gstin, setGstin] = useState("");
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
 
   // Kitchens created through paths that pre-date the tenant model (e.g. partner approvals
   // before the fix in dbb27e5) can be sitting without a restaurant tenant — offering to attach
@@ -82,6 +97,16 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
   const [periodEnd, setPeriodEnd] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
 
   const kitchenName = kitchenNameOverride ?? restaurantName;
+
+  // Same fallback order as KitchensTab.tsx's "New Kitchen" form: a location the admin already
+  // picked > the selected zone's centroid > MapPicker's own GPS fallback.
+  const selectedZone = zones.find((z: any) => z.id === zoneId);
+  const mapCenter: [number, number] | undefined =
+    lat != null && lng != null
+      ? [lat, lng]
+      : selectedZone?.kitchen_lat && selectedZone?.kitchen_lng
+      ? [Number(selectedZone.kitchen_lat), Number(selectedZone.kitchen_lng)]
+      : undefined;
 
   useEffect(() => {
     api.get("/admin/zones")
@@ -135,6 +160,7 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
           address,
           fssai_license: fssai || undefined,
           gstin: gstin || undefined,
+          ...(lat != null && lng != null ? { lat, lng } : {}),
         });
         const kitchen = kitchenRes.kitchen ?? kitchenRes;
         kitchenId = kitchen.id;
@@ -259,6 +285,16 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
                   </Field>
                   <Field label="Address">
                     <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, area, city" />
+                  </Field>
+                  <Field label="Kitchen Location">
+                    <div className="rounded-xl overflow-hidden border border-white/10">
+                      <MapPicker
+                        key={mapCenter?.join(",") ?? "gps"}
+                        defaultCenter={mapCenter}
+                        onLocationSelect={({ lat: pickedLat, lng: pickedLng }) => { setLat(pickedLat); setLng(pickedLng); }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mt-1.5">Click on the map, drag the pin, or search for an address above it.</p>
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="FSSAI License (optional)">
