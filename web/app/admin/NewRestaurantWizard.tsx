@@ -29,7 +29,7 @@ import { toast } from "sonner";
 const MapPicker = dynamic(() => import("../../components/MapPicker"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-56 bg-white/[0.03] border border-white/10 rounded-xl flex items-center justify-center text-zinc-500 text-xs">
+    <div className="w-full h-[360px] bg-white/[0.03] border border-white/10 rounded-xl flex items-center justify-center text-zinc-500 text-xs">
       Loading map…
     </div>
   ),
@@ -287,13 +287,16 @@ export function NewRestaurantWizard({ onClose, onCreated }: { onClose: () => voi
                     <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, area, city" />
                   </Field>
                   <Field label="Kitchen Location">
-                    <div className="rounded-xl overflow-hidden border border-white/10">
+                    <div className="h-[360px] rounded-xl overflow-hidden border border-white/10">
                       <MapPicker
                         key={mapCenter?.join(",") ?? "gps"}
                         defaultCenter={mapCenter}
                         onLocationSelect={({ lat: pickedLat, lng: pickedLng }) => { setLat(pickedLat); setLng(pickedLng); }}
                       />
                     </div>
+                    {lat != null && lng != null && (
+                      <span className="text-[10px] font-mono text-zinc-400 mt-1.5 inline-block">{lat.toFixed(5)}, {lng.toFixed(5)}</span>
+                    )}
                     <p className="text-[10px] text-zinc-500 mt-1.5">Click on the map, drag the pin, or search for an address above it.</p>
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
