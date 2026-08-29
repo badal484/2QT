@@ -538,6 +538,54 @@ describe('POST /admin/kitchens/:id/staff — Phase 4 tenant sync', () => {
   });
 });
 
+describe('PATCH /admin/kitchens/:id/staff/:staffId — edit a staff member', () => {
+  it('updates name and phone, normalizing a 10-digit phone to the stored 12-digit format', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'staff-1', name: 'New Name', phone: '919876543210' }] });
+
+    const res = await request(app).patch('/admin/kitchens/kitchen-A/staff/staff-1').send({ name: 'New Name', phone: '9876543210' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.staff).toEqual({ id: 'staff-1', name: 'New Name', phone: '919876543210' });
+    expect(mockQuery.mock.calls[0][1]).toEqual(['New Name', '919876543210', 'staff-1']);
+  });
+
+  it('updates only the field supplied — omitting phone leaves it unchanged via COALESCE', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'staff-1', name: 'New Name', phone: '919999999999' }] });
+
+    const res = await request(app).patch('/admin/kitchens/kitchen-A/staff/staff-1').send({ name: 'New Name' });
+
+    expect(res.status).toBe(200);
+    expect(mockQuery.mock.calls[0][1]).toEqual(['New Name', null, 'staff-1']);
+  });
+
+  it('rejects a malformed phone number', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    const res = await request(app).patch('/admin/kitchens/kitchen-A/staff/staff-1').send({ phone: '123' });
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a nonexistent staff member', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    const res = await request(app).patch('/admin/kitchens/kitchen-A/staff/nonexistent').send({ name: 'X' });
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 409 when the new phone is already used by another account', async () => {
+    actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
+    const conflict: any = new Error('duplicate key');
+    conflict.code = '23505';
+    mockQuery.mockRejectedValueOnce(conflict);
+
+    const res = await request(app).patch('/admin/kitchens/kitchen-A/staff/staff-1').send({ phone: '9876543210' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('PHONE_IN_USE');
+  });
+});
+
 describe('DELETE /admin/kitchens/:id/staff/:staffId — Phase 4 tenant sync', () => {
   it("nulls the removed staff member's restaurant_id and deactivates their membership", async () => {
     actingAs({ userId: 'admin-1', role: 'super_admin', kitchenId: null, zoneId: null, restaurantId: null });
