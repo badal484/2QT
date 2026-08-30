@@ -234,7 +234,7 @@ function LoginForm() {
     if (ok) startCooldown(30);
   };
 
-  const redirectUser = (userRole: string) => {
+  const redirectUser = (userRole: string, userObj?: any) => {
     const redirectUrl = searchParams.get("redirect");
     if (redirectUrl && redirectUrl.startsWith("/")) {
       if (redirectUrl.includes("restaurant-dashboard") && ["chef", "kitchen_manager", "packer"].includes(userRole)) {
@@ -255,7 +255,7 @@ function LoginForm() {
     } else if (userRole === "chef" || userRole === "kitchen_manager" || userRole === "packer") {
       router.push("/kitchen");
     } else if (userRole === "rider" || userRole === "rider_captain") {
-      if (user?.restaurant_id || (user as any)?.tenantRestaurantId) {
+      if (userObj?.restaurant_id || userObj?.tenantRestaurantId) {
         router.push("/driver");
       } else {
         router.push("/rider");
@@ -295,7 +295,7 @@ function LoginForm() {
       if (!data.user.name || data.user.name === "2QT User") {
         setStep("onboarding");
       } else {
-        redirectUser(data.user.role);
+        redirectUser(data.user.role, data.user);
       }
     } catch (err: any) {
       const rawMsg = err?.message || '';
@@ -322,7 +322,7 @@ function LoginForm() {
       if (!data.user.name || data.user.name === "2QT User") {
         setStep("onboarding");
       } else {
-        redirectUser(data.user.role);
+        redirectUser(data.user.role, data.user);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -339,7 +339,7 @@ function LoginForm() {
     try {
       const updatedUser = await api.updateProfile({ name: name.trim() });
       login(updatedUser);
-      redirectUser(updatedUser.role);
+      redirectUser(updatedUser.role, updatedUser);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update name");
     } finally {
