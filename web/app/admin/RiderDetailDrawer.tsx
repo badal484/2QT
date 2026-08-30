@@ -364,8 +364,8 @@ export function RiderDetailDrawer({ riderId, onClose }: { riderId: string; onClo
                           <button 
                             onClick={() => contractMutation.mutate({
                               payment_model: contractForm.payment_model,
-                              monthly_salary_paise: parseInt(contractForm.monthly_salary_rupees) * 100 || 0,
-                              fuel_allowance_per_km_paise: parseInt(contractForm.fuel_allowance_rupees) * 100 || 0
+                              monthly_salary_paise: Math.round(parseFloat(contractForm.monthly_salary_rupees || '0') * 100) || 0,
+                              fuel_allowance_per_km_paise: Math.round(parseFloat(contractForm.fuel_allowance_rupees || '0') * 100) || 0
                             })}
                             disabled={contractMutation.isPending}
                             className="flex-1 px-3 py-2 rounded-xl bg-orange-500/20 border border-orange-500/30 text-xs font-bold text-orange-400 hover:bg-orange-500/30"
