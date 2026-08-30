@@ -15,7 +15,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LogOut, RefreshCw, Utensils, ClipboardList, ChefHat, Store, Users, UtensilsCrossed, LayoutGrid, TrendingUp,
+  LogOut, RefreshCw, Utensils, ClipboardList, ChefHat, Store, Users, UtensilsCrossed, LayoutGrid, TrendingUp, Bell, Send, Sparkles, Lock,
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api } from "../lib/api";
@@ -386,12 +386,248 @@ function MenuTab() {
   );
 }
 
+// ─── Marketing Broadcast (Self-Serve Push Notifications) ──────────────────────
+
+function BroadcastTab({ restaurant }: { restaurant: any }) {
+  const [status, setStatus] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const res = await api.get("/restaurant/broadcast/status");
+      setStatus(res);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load broadcast status");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  const insertTag = (tag: string) => {
+    setBody((prev) => (prev ? prev + " " + tag : tag));
+  };
+
+  const applyTemplate = (tTitle: string, tBody: string) => {
+    setTitle(tTitle);
+    setBody(tBody);
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !body.trim()) return toast.error("Title and message are required");
+
+    const confirmMsg = `Send this push broadcast to ${status?.audienceCount ?? 0} past customers of ${restaurant?.name || "your restaurant"}?`;
+    if (!confirm(confirmMsg)) return;
+
+    setSending(true);
+    try {
+      const res = await api.post("/restaurant/broadcast", {
+        title: title.trim(),
+        body: body.trim(),
+        imageUrl: imageUrl.trim() || undefined,
+      });
+      toast.success(res.message || "Broadcast queued successfully!");
+      setTitle("");
+      setBody("");
+      setImageUrl("");
+      loadStatus();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send broadcast");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (loading) return <div className="py-12 text-center text-white/30 text-sm">Loading broadcast status…</div>;
+
+  if (!status?.allowBroadcast) {
+    return (
+      <div className="bg-[#0d0d1a] border border-white/[0.07] rounded-3xl p-8 text-center max-w-xl mx-auto space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400">
+          <Lock className="w-7 h-7" />
+        </div>
+        <div>
+          <h3 className="text-lg font-black text-white">Self-Serve Broadcast Disabled</h3>
+          <p className="text-xs text-white/50 mt-1.5 leading-relaxed">
+            Push notifications to your past customers are currently locked for this restaurant.
+            Please reach out to the <strong className="text-white">2QT Platform Super-Admin</strong> to activate marketing broadcast access.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-white/40 uppercase tracking-widest">
+          Permission Required: <span className="text-amber-400">allow_broadcast</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Header */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <StatTile label="Eligible Customers" value={`${status.audienceCount} People`} accent />
+        <StatTile label="Weekly Quota" value={`${status.weeklyUsed} / ${status.weeklyMax} Sent`} />
+        <StatTile
+          label="Quiet Hours Status"
+          value={
+            <span className={status.isWithinHours ? "text-emerald-400" : "text-amber-400"}>
+              {status.isWithinHours ? "Active (10am–9:30pm)" : "Quiet Hours"}
+            </span>
+          }
+        />
+      </div>
+
+      {/* Templates */}
+      <div className="bg-[#0d0d1a] border border-white/[0.07] rounded-2xl p-4 space-y-3">
+        <div className="text-xs font-black uppercase tracking-wider text-white/40 flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-[#F97316]" /> Quick Marketing Templates
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => applyTemplate("Weekend Special Feast! 🍲", "Hey {{first_name}}, treat yourself today! Enjoy chef special delights freshly prepared at our kitchen.")}
+            className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-left transition-all"
+          >
+            <div className="text-xs font-bold text-white">Weekend Special</div>
+            <div className="text-[10px] text-white/40 truncate mt-0.5">Hey &#123;&#123;first_name&#125;&#125;, treat yourself today...</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => applyTemplate("New Menu Items Dropped! 🔥", "Craving something new? Explore delicious new dishes added to our menu today. Order hot & fresh!")}
+            className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-left transition-all"
+          >
+            <div className="text-xs font-bold text-white">New Dish Launch</div>
+            <div className="text-[10px] text-white/40 truncate mt-0.5">Explore delicious new dishes...</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => applyTemplate("Special Chef Recommendation ✨", "{{first_name}}, hot comfort food is just a tap away. Freshly cooked and delivered fast!")}
+            className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-left transition-all"
+          >
+            <div className="text-xs font-bold text-white">Chef's Choice</div>
+            <div className="text-[10px] text-white/40 truncate mt-0.5">&#123;&#123;first_name&#125;&#125;, hot comfort food...</div>
+          </button>
+        </div>
+      </div>
+
+      {/* Composer & Preview */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <form onSubmit={handleSend} className="lg:col-span-3 bg-[#0d0d1a] border border-white/[0.07] rounded-2xl p-5 space-y-4">
+          <div className="text-sm font-bold text-white flex items-center justify-between">
+            <span>Compose Push Broadcast</span>
+            <span className="text-[10px] text-white/40 font-mono">Targets {status.audienceCount} customers</span>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Notification Title</label>
+            <input
+              type="text"
+              required
+              maxLength={100}
+              placeholder="e.g. Weekend Special: 20% Off Biryani! 🔥"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full mt-1.5 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F97316]"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Message Content</label>
+              <span className="text-[10px] text-white/30 font-mono">{body.length} / 300</span>
+            </div>
+            <textarea
+              required
+              rows={3}
+              maxLength={300}
+              placeholder="e.g. Hey {{first_name}}, treat yourself today with our chef specials! Tap to view menu."
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              className="w-full mt-1.5 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F97316] resize-none"
+            />
+            {/* Dynamic tag pills */}
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span className="text-[10px] text-white/40 font-bold uppercase mr-1">Insert:</span>
+              <button
+                type="button"
+                onClick={() => insertTag("{{first_name}}")}
+                className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-mono text-[#F97316] transition-all"
+              >
+                + &#123;&#123;first_name&#125;&#125;
+              </button>
+              <button
+                type="button"
+                onClick={() => insertTag("{{name}}")}
+                className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-mono text-[#F97316] transition-all"
+              >
+                + &#123;&#123;name&#125;&#125;
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Banner Image URL (Optional)</label>
+            <input
+              type="url"
+              placeholder="https://..."
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              className="w-full mt-1.5 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F97316]"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={sending || !status.canBroadcastNow || !title.trim() || !body.trim()}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#F97316] hover:bg-[#EA580C] disabled:opacity-40 text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg"
+          >
+            <Send className="w-3.5 h-3.5" />
+            {sending ? "Dispatching Broadcast…" : `Send Push to ${status.audienceCount} Customers`}
+          </button>
+        </form>
+
+        {/* Live Mobile Push Preview Card */}
+        <div className="lg:col-span-2 space-y-3">
+          <div className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Live Customer Preview</div>
+          <div className="bg-[#121224] border border-white/10 rounded-2xl p-4 shadow-xl space-y-2">
+            <div className="flex items-center justify-between text-[10px] text-white/40">
+              <span className="font-bold flex items-center gap-1">
+                <Utensils className="w-2.5 h-2.5 text-[#F97316]" /> 2QT Delivery · Now
+              </span>
+            </div>
+            <div className="text-xs font-bold text-white">
+              {title || "Notification Title Here"}
+            </div>
+            <div className="text-[11px] text-white/70 leading-snug">
+              {(body || "Your message body will appear here for customers. Personalization tags like {{first_name}} will be replaced automatically.").replace(/\{\{\s*first_name\s*\}\}/gi, "Rahul").replace(/\{\{\s*name\s*\}\}/gi, "Rahul Sharma")}
+            </div>
+            {imageUrl && (
+              <div className="mt-2 rounded-lg overflow-hidden border border-white/10 max-h-24 bg-black/40">
+                <img src={imageUrl} alt="Preview" className="w-full h-24 object-cover" />
+              </div>
+            )}
+            <div className="text-[9px] text-[#F97316] font-bold uppercase tracking-wider pt-1 flex items-center gap-1">
+              <span>👉 Tapping opens your restaurant menu</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard shell ──────────────────────────────────────────────────────────
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
   { id: "sales", label: "Sales", icon: TrendingUp },
   { id: "orders", label: "Orders", icon: ClipboardList },
+  { id: "broadcast", label: "Broadcast", icon: Bell },
   { id: "kitchens", label: "Kitchens", icon: ChefHat },
   { id: "outlets", label: "Outlets", icon: Store },
   { id: "staff", label: "Staff", icon: Users },
@@ -458,6 +694,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             {tab === "overview" && <OverviewTab restaurant={restaurant} stats={stats} />}
             {tab === "sales" && <SalesTab />}
             {tab === "orders" && <OrdersTab />}
+            {tab === "broadcast" && <BroadcastTab restaurant={restaurant} />}
             {tab === "kitchens" && <KitchensTab />}
             {tab === "outlets" && <OutletsTab />}
             {tab === "staff" && <StaffTab deliveryModel={restaurant?.delivery_model} />}

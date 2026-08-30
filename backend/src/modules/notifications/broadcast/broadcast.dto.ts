@@ -14,6 +14,7 @@ export const CreateBroadcastSchema = z.object({
     targetFilter: z.object({
         zoneId: z.string().optional(),
         kitchenId: z.string().optional(),
+        restaurantId: z.string().optional(),
         kitchenTargetGroup: z.enum(['staff', 'customers']).optional(),
         userIds: z.array(z.string()).optional(),
         role: z.string().optional(),
