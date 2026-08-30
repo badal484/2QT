@@ -11,6 +11,12 @@ import request from 'supertest';
 import { query } from '../db';
 import { authenticate } from '../middleware/auth';
 
+jest.mock('../modules/notifications/broadcast/broadcast.service', () => ({
+  BroadcastService: {
+    createCampaign: jest.fn().mockResolvedValue({ id: 'camp-tenant-1', status: 'PROCESSING' }),
+  },
+}));
+
 import restaurantRouter from '../routes/restaurant';
 
 const app = express();
@@ -372,3 +378,52 @@ describe('Cross-tenant isolation — Restaurant B staff can never see Restaurant
     expect(mockQuery.mock.calls[1][1]).toEqual(['restaurant-B']);
   });
 });
+
+// ── Self-Serve Marketing Broadcast ────────────────────────────────────────────
+
+describe('Self-Serve Broadcast — /restaurant/broadcast', () => {
+  it('GET /restaurant/broadcast/status returns allow_broadcast flag and weekly quota metrics', async () => {
+    actingAsChefOfA();
+    mockActiveMembership();
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ allow_broadcast: true, name: 'Royal Spice' }] })
+      .mockResolvedValueOnce({ rows: [{ used: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ count: 42 }] });
+
+    const res = await request(app).get('/restaurant/broadcast/status');
+    expect(res.status).toBe(200);
+    expect(res.body.allowBroadcast).toBe(true);
+    expect(res.body.weeklyUsed).toBe(1);
+    expect(res.body.weeklyMax).toBe(2);
+    expect(res.body.audienceCount).toBe(42);
+  });
+
+  it('POST /restaurant/broadcast blocks with 403 when allow_broadcast is false', async () => {
+    actingAsChefOfA();
+    mockActiveMembership();
+    mockQuery.mockResolvedValueOnce({ rows: [{ allow_broadcast: false, name: 'Royal Spice' }] });
+
+    const res = await request(app)
+      .post('/restaurant/broadcast')
+      .send({ title: 'Weekend Sale', body: '50% off today!' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('BROADCAST_NOT_ENABLED');
+  });
+
+  it('POST /restaurant/broadcast blocks with 429 when weekly quota (2) is exceeded', async () => {
+    actingAsChefOfA();
+    mockActiveMembership();
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ allow_broadcast: true, name: 'Royal Spice' }] })
+      .mockResolvedValueOnce({ rows: [{ used: 2 }] });
+
+    const res = await request(app)
+      .post('/restaurant/broadcast')
+      .send({ title: 'Weekend Sale', body: '50% off today!' });
+
+    expect(res.status).toBe(429);
+    expect(res.body.error).toBe('WEEKLY_QUOTA_EXCEEDED');
+  });
+});
+

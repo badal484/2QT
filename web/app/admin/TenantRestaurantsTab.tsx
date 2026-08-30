@@ -26,7 +26,7 @@
 // flow where the tenant actually lives makes that relationship visible instead of hidden.
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Store, Users, ClipboardList, UtensilsCrossed, Building2, CreditCard, Plus, Bike } from "lucide-react";
+import { X, Store, Users, ClipboardList, UtensilsCrossed, Building2, CreditCard, Plus, Bike, Bell } from "lucide-react";
 import { SkeletonList } from "../components/ui/Skeleton";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -50,34 +50,32 @@ function SubscriptionSection({ restaurantId, subscriptions, onChanged }: { resta
   const [endDate, setEndDate] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
   const [submitting, setSubmitting] = useState(false);
 
-  const inForce = subscriptions.find((s) => s.status === "pending" || s.status === "active");
+  const inForce = subscriptions.find((s: any) => s.status === "active" || s.status === "pending");
 
   const startSubscription = async () => {
-    const amountPaise = Math.round(parseFloat(amountRupees) * 100);
-    if (!amountPaise || amountPaise <= 0) {
-      toast.error("Enter a valid amount");
-      return;
-    }
+    const amount = Math.round(parseFloat(amountRupees) * 100);
+    if (!amount || amount <= 0) return toast.error("Enter a valid amount in rupees");
+    if (!startDate || !endDate || endDate <= startDate) return toast.error("End date must be after start date");
+
     setSubmitting(true);
     try {
       await api.post(`/admin/tenant-restaurants/${restaurantId}/subscription`, {
-        amountPaise,
-        billingPeriodStart: new Date(startDate).toISOString(),
-        billingPeriodEnd: new Date(endDate).toISOString(),
+        amountPaise: amount,
+        billingPeriodStart: startDate,
+        billingPeriodEnd: endDate,
       });
-      toast.success("Subscription created — a Razorpay order was generated for this cycle");
+      toast.success("Subscription recorded");
       setShowForm(false);
-      setAmountRupees("");
       onChanged();
     } catch (err: any) {
-      toast.error(err.message || "Failed to create subscription");
+      toast.error(err.message || "Failed to record subscription");
     } finally {
       setSubmitting(false);
     }
   };
 
   const cancelSubscription = async () => {
-    if (!confirm("Cancel this restaurant's subscription?")) return;
+    if (!confirm("Cancel this restaurant's in-force subscription?")) return;
     try {
       await api.post(`/admin/tenant-restaurants/${restaurantId}/subscription/cancel`, {});
       toast.success("Subscription cancelled");
@@ -88,14 +86,16 @@ function SubscriptionSection({ restaurantId, subscriptions, onChanged }: { resta
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
-          <CreditCard className="w-3 h-3" /> Subscription Billing
+    <div className="border-t border-white/[0.06] pt-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <CreditCard className="w-4 h-4 text-zinc-400" />
+          <span className="text-xs font-bold text-white uppercase tracking-wider">Subscription & Billing</span>
+          {inForce && <StatusPill status={inForce.status} />}
         </div>
         {!inForce && !showForm && (
           <button onClick={() => setShowForm(true)} className="text-[10px] font-black uppercase text-brand-primary hover:underline">
-            Start Subscription
+            + Start Billing
           </button>
         )}
         {inForce && (
@@ -196,6 +196,43 @@ function DeliveryModelToggle({ restaurantId, deliveryModel, onChanged }: { resta
   );
 }
 
+// Admin toggle for self-serve push broadcast permission
+function BroadcastPermissionToggle({ restaurantId, allowBroadcast, onChanged }: { restaurantId: string; allowBroadcast: boolean; onChanged: () => void }) {
+  const [saving, setSaving] = useState(false);
+
+  const toggle = async () => {
+    const next = !allowBroadcast;
+    const confirmMsg = next
+      ? "Allow this restaurant to send self-serve marketing push broadcasts to their past customers?"
+      : "Revoke self-serve broadcast permission for this restaurant?";
+    if (!confirm(confirmMsg)) return;
+    setSaving(true);
+    try {
+      await api.patch(`/admin/tenant-restaurants/${restaurantId}/broadcast-permission`, { allow_broadcast: next });
+      toast.success(next ? "Marketing broadcasts enabled for tenant" : "Marketing broadcasts disabled for tenant");
+      onChanged();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update broadcast permission");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={saving}
+      className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase transition-colors disabled:opacity-50 flex items-center gap-1.5 ${
+        allowBroadcast ? "text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30" : "text-zinc-500 bg-white/5 hover:bg-white/10"
+      }`}
+      title="Click to toggle self-serve marketing broadcast permission"
+    >
+      <Bell className="w-3 h-3" />
+      {saving ? "…" : allowBroadcast ? "Broadcasts ON" : "Broadcasts OFF"}
+    </button>
+  );
+}
+
 function DetailPanel({ restaurantId, onClose }: { restaurantId: string; onClose: () => void }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -222,10 +259,11 @@ function DetailPanel({ restaurantId, onClose }: { restaurantId: string; onClose:
         <div className="space-y-6">
           <div>
             <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Platform view — Restaurant Tenant</div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h3 className="text-xl font-bold text-white">{data.restaurant.name}</h3>
               <StatusPill status={data.restaurant.status} />
               <DeliveryModelToggle restaurantId={restaurantId} deliveryModel={data.restaurant.delivery_model} onChanged={load} />
+              <BroadcastPermissionToggle restaurantId={restaurantId} allowBroadcast={Boolean(data.restaurant.allow_broadcast)} onChanged={load} />
             </div>
             <div className="text-xs font-mono text-zinc-500 mt-1">{data.restaurant.slug}</div>
           </div>

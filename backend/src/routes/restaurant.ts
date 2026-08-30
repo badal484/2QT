@@ -263,4 +263,144 @@ router.get('/sales', async (req: AuthRequest, res) => {
     });
 });
 
+// ─── Self-Serve Marketing Broadcast ───────────────────────────────────────────
+// Allows authorized restaurant partners (allow_broadcast = true) to broadcast special offers
+// strictly to their own past customers, with built-in anti-spam frequency capping and quiet hours.
+import { z } from 'zod';
+import { BroadcastService } from '../modules/notifications/broadcast/broadcast.service';
+
+const TenantBroadcastSchema = z.object({
+    title: z.string().min(1, 'title is required').max(100),
+    body: z.string().min(1, 'body is required').max(300),
+    imageUrl: z.string().optional().or(z.literal('')),
+});
+
+router.get('/broadcast/status', async (req: AuthRequest, res) => {
+    const restaurantId = getTenantRestaurantId(req)!;
+    const { rows: restRows } = await query('SELECT allow_broadcast, name FROM restaurants WHERE id = $1', [restaurantId]);
+    if (!restRows[0]) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const allowBroadcast = Boolean(restRows[0].allow_broadcast);
+
+    // Count broadcasts sent by this tenant in the last 7 days
+    const { rows: countRows } = await query(
+        `SELECT COUNT(*)::int AS used FROM broadcast_campaigns
+         WHERE (target_filter->>'restaurantId' = $1 OR created_by = $2)
+           AND created_at >= NOW() - INTERVAL '7 days'`,
+        [restaurantId, req.user!.userId]
+    );
+
+    const weeklyUsed = countRows[0]?.used ?? 0;
+    const weeklyMax = 2;
+
+    // Audience size (distinct customers who ordered from this restaurant)
+    const { rows: audienceRows } = await query(
+        `SELECT COUNT(DISTINCT customer_id)::int AS count FROM orders
+         WHERE restaurant_id = $1 AND customer_id IS NOT NULL`,
+        [restaurantId]
+    );
+
+    const audienceCount = audienceRows[0]?.count ?? 0;
+
+    // Time window check (10:00 AM - 9:30 PM IST)
+    const nowUtc = new Date();
+    const istMinutes = ((nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes()) + 330) % 1440;
+    const isWithinHours = istMinutes >= (10 * 60) && istMinutes <= (21 * 60 + 30);
+
+    res.json({
+        allowBroadcast,
+        weeklyUsed,
+        weeklyMax,
+        canBroadcastNow: allowBroadcast && weeklyUsed < weeklyMax && isWithinHours,
+        isWithinHours,
+        audienceCount,
+        restaurantName: restRows[0].name,
+    });
+});
+
+router.post('/broadcast', async (req: AuthRequest, res) => {
+    const restaurantId = getTenantRestaurantId(req)!;
+    const parsed = TenantBroadcastSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({ error: 'VALIDATION_ERROR', details: parsed.error.format() });
+    }
+
+    const { title, body, imageUrl } = parsed.data;
+
+    // 1. Check if super_admin enabled broadcast for this restaurant
+    const { rows: restRows } = await query('SELECT allow_broadcast, name FROM restaurants WHERE id = $1', [restaurantId]);
+    if (!restRows[0]?.allow_broadcast) {
+        return res.status(403).json({
+            error: 'BROADCAST_NOT_ENABLED',
+            message: 'Marketing broadcasts are not enabled for this restaurant. Contact 2QT Platform Admin to enable.',
+        });
+    }
+
+    // 2. Anti-spam weekly quota check (max 2 per week)
+    const { rows: countRows } = await query(
+        `SELECT COUNT(*)::int AS used FROM broadcast_campaigns
+         WHERE (target_filter->>'restaurantId' = $1 OR created_by = $2)
+           AND created_at >= NOW() - INTERVAL '7 days'`,
+        [restaurantId, req.user!.userId]
+    );
+    if ((countRows[0]?.used ?? 0) >= 2) {
+        return res.status(429).json({
+            error: 'WEEKLY_QUOTA_EXCEEDED',
+            message: 'Weekly broadcast limit reached (maximum 2 broadcasts per week to prevent customer fatigue).',
+        });
+    }
+
+    // 3. Time window check (10:00 AM to 9:30 PM IST)
+    const nowUtc = new Date();
+    const istMinutes = ((nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes()) + 330) % 1440;
+    if (istMinutes < (10 * 60) || istMinutes > (21 * 60 + 30)) {
+        return res.status(400).json({
+            error: 'QUIET_HOURS',
+            message: 'Promotional broadcasts are restricted between 9:30 PM and 10:00 AM IST to respect customer privacy.',
+        });
+    }
+
+    // 4. Resolve customer recipient list strictly for this restaurant
+    const { rows: customerRows } = await query(
+        `SELECT DISTINCT customer_id AS id FROM orders
+         WHERE restaurant_id = $1 AND customer_id IS NOT NULL`,
+        [restaurantId]
+    );
+
+    const userIds = customerRows.map(r => r.id);
+    if (userIds.length === 0) {
+        return res.status(400).json({
+            error: 'NO_AUDIENCE',
+            message: 'No previous customer orders found for this restaurant yet. Audience will grow automatically as customers order.',
+        });
+    }
+
+    // Find primary kitchen for deep-linking
+    const { rows: kitchenRows } = await query(
+        `SELECT id FROM kitchens WHERE restaurant_id = $1 ORDER BY is_active DESC LIMIT 1`,
+        [restaurantId]
+    );
+    const primaryKitchenId = kitchenRows[0]?.id;
+
+    // 5. Dispatch campaign
+    const campaign = await BroadcastService.createCampaign({
+        title,
+        body,
+        imageUrl: imageUrl || undefined,
+        targetType: 'users',
+        targetFilter: {
+            userIds,
+            restaurantId,
+            kitchenId: primaryKitchenId,
+        },
+    }, req.user!.userId);
+
+    res.json({
+        success: true,
+        campaignId: campaign.id,
+        recipientsCount: userIds.length,
+        message: `Broadcast queued to ${userIds.length} customers.`,
+    });
+});
+
 export default router;
