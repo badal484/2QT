@@ -2292,4 +2292,68 @@ router.post('/complaints-against-me/:complaintId/respond', authenticate, require
     }
 });
 
+// ─── SaaS Store Driver Shift Summary ───────────────────────────────────────────
+// Provides dedicated in-house delivery staff with store shift metrics: deliveries completed today,
+// total distance covered (fuel tracking), and cash collected in hand to hand over to store manager.
+router.get('/shift-summary', authenticate, requireRole('rider', 'rider_captain', 'super_admin'), async (req: AuthRequest, res) => {
+    const riderId = req.user!.userId;
+    try {
+        const { rows: riderRows } = await query(
+            `SELECT u.id, u.name, u.phone, u.restaurant_id, r.name AS restaurant_name
+             FROM users u
+             LEFT JOIN restaurants r ON r.id = u.restaurant_id
+             WHERE u.id = $1`,
+            [riderId]
+        );
+        const rider = riderRows[0];
+        const restaurantId = rider?.restaurant_id;
+
+        // Fetch store manager / primary kitchen phone if attached to a restaurant
+        let storePhone = '';
+        if (restaurantId) {
+            const { rows: kRows } = await query(
+                `SELECT u.phone FROM restaurant_users ru
+                 JOIN users u ON u.id = ru.user_id
+                 WHERE ru.restaurant_id = $1 AND ru.role IN ('kitchen_manager', 'partner_kitchen')
+                 ORDER BY ru.created_at ASC LIMIT 1`,
+                [restaurantId]
+            );
+            storePhone = kRows[0]?.phone || '';
+        }
+
+        // Fetch today's completed orders by this rider
+        const { rows: orderRows } = await query(
+            `SELECT o.id, o.display_id, o.status, o.total_amount_paise, o.payment_method, o.created_at, o.updated_at,
+                    k.name AS kitchen_name
+             FROM orders o
+             LEFT JOIN kitchens k ON k.id = o.kitchen_id
+             WHERE o.rider_id = $1 AND o.status = 'delivered'
+               AND o.updated_at >= CURRENT_DATE
+             ORDER BY o.updated_at DESC`,
+            [riderId]
+        );
+
+        const deliveriesCount = orderRows.length;
+        const totalDistanceKm = deliveriesCount * 3.2; // approx distance estimate
+
+        // Cash collected on COD orders today
+        const cashInHandPaise = orderRows
+            .filter(o => o.payment_method === 'cod')
+            .reduce((sum, o) => sum + parseInt(o.total_amount_paise || '0'), 0);
+
+        res.json({
+            restaurantName: rider?.restaurant_name || '2QT Store Delivery',
+            restaurantId,
+            storePhone,
+            deliveriesCount,
+            totalDistanceKm: parseFloat(totalDistanceKm.toFixed(1)),
+            cashInHandPaise,
+            recentDeliveries: orderRows.slice(0, 10),
+        });
+    } catch (err: any) {
+        console.error('[riders/shift-summary]', err);
+        res.status(500).json({ error: 'SERVER_ERROR' });
+    }
+});
+
 export default router;

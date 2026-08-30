@@ -255,7 +255,11 @@ function LoginForm() {
     } else if (userRole === "chef" || userRole === "kitchen_manager" || userRole === "packer") {
       router.push("/kitchen");
     } else if (userRole === "rider" || userRole === "rider_captain") {
-      router.push("/rider");
+      if (user?.restaurant_id || (user as any)?.tenantRestaurantId) {
+        router.push("/driver");
+      } else {
+        router.push("/rider");
+      }
     } else {
       router.push("/menu");
     }

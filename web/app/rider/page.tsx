@@ -155,6 +155,7 @@ export default function RiderPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) router.replace("/login");
+    else if (user.restaurant_id || (user as any).tenantRestaurantId) router.replace("/driver");
     else if (user.role !== "rider" && user.role !== "rider_captain" && user.role !== "super_admin") router.replace("/menu");
   }, [user, authLoading, router]);
 
