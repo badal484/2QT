@@ -876,7 +876,9 @@ router.patch('/riders/:id/contract', authenticate, requireRole('super_admin', 'a
             fuel_allowance_per_km_paise: fuelPaise,
         });
         const body = payment_model === 'salary'
-            ? `You're now on a fixed monthly salary of ₹${(salaryPaise / 100).toFixed(0)} + ₹${(fuelPaise / 100).toFixed(1)}/km fuel allowance.`
+            ? (fuelPaise > 0
+                ? `You're now on a fixed monthly salary of ₹${(salaryPaise / 100).toFixed(0)} + ₹${(fuelPaise / 100).toFixed(1)}/km fuel allowance.`
+                : `You're now on a fixed monthly salary of ₹${(salaryPaise / 100).toFixed(0)} (all-inclusive).`)
             : `You're now on per-order (gig) pay — you earn per delivery instead of a fixed salary.`;
         NotificationService.send('rider_contract_changed', {
             userId: id,
