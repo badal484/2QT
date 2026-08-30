@@ -411,3 +411,26 @@ describe('Rider identity — Phase 6: no restaurant tenant scoping exists for ri
     expect(res.status).toBe(200);
   });
 });
+
+describe('GET /rider/shift-summary — SaaS store driver metrics', () => {
+  it('returns shift deliveries count, total distance km, and physical cash in hand', async () => {
+    actingAs({ userId: 'rider-saas-1', role: 'rider', kitchenId: null, zoneId: 'zone-1', restaurantId: 'rest-123', tenantRestaurantId: 'rest-123' });
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'rider-saas-1', name: 'Alok Driver', phone: '918888888888', restaurant_id: 'rest-123', restaurant_name: 'Royal Spice' }] })
+      .mockResolvedValueOnce({ rows: [{ phone: '919999999999' }] }) // store manager phone
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'o-1', display_id: '2QT-101', status: 'delivered', total_amount_paise: 42000, payment_method: 'cod', updated_at: new Date() },
+          { id: 'o-2', display_id: '2QT-102', status: 'delivered', total_amount_paise: 35000, payment_method: 'prepaid', updated_at: new Date() },
+        ],
+      });
+
+    const res = await request(app).get('/rider/shift-summary');
+    expect(res.status).toBe(200);
+    expect(res.body.restaurantName).toBe('Royal Spice');
+    expect(res.body.deliveriesCount).toBe(2);
+    expect(res.body.cashInHandPaise).toBe(42000); // Only COD order collected
+    expect(res.body.storePhone).toBe('919999999999');
+  });
+});
+
