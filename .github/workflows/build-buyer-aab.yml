@@ -38,7 +38,7 @@ jobs:
       - name: Install Mobile Dependencies
         run: |
           cd mobile
-          npm ci || npm install --legacy-peer-deps
+          npm ci || npm install
 
       - name: Setup Java 17 (Zulu)
         uses: actions/setup-java@v4
