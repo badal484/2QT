@@ -264,6 +264,7 @@ describe('createPendingOrder', () => {
   it("sets restaurant_id on the new order from the kitchen's restaurant_id", async () => {
     const orderRecord = { id: ORDER_ID, display_id: '2QT-000001' };
     clientMock.query
+      .mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID, is_active: true }] })
       .mockResolvedValueOnce({ rows: [{ is_active: true, is_partner: false, partner_status: null, is_paused: false, restaurant_id: 'restaurant-1' }] })
       .mockResolvedValueOnce({ rows: [{ lat: 12.9, lng: 77.6 }] })
       .mockResolvedValueOnce({ rows: [orderRecord] })
@@ -284,6 +285,7 @@ describe('createPendingOrder', () => {
   it('sets restaurant_id to null (never throws) when the kitchen has no restaurant_id yet', async () => {
     const orderRecord = { id: ORDER_ID, display_id: '2QT-000001' };
     clientMock.query
+      .mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID, is_active: true }] })
       .mockResolvedValueOnce({ rows: [{ is_active: true, is_partner: false, partner_status: null, is_paused: false, restaurant_id: null }] })
       .mockResolvedValueOnce({ rows: [{ lat: 12.9, lng: 77.6 }] })
       .mockResolvedValueOnce({ rows: [orderRecord] })
@@ -300,6 +302,17 @@ describe('createPendingOrder', () => {
     const insertOrderCall = clientMock.query.mock.calls.find((c: any[]) => c[0]?.includes('INSERT INTO orders'));
     // restaurant_id is appended as the last param in the INSERT
     expect(insertOrderCall[1][insertOrderCall[1].length - 1]).toBeNull();
+  });
+
+  it('throws CUSTOMER_INACTIVE and rejects order creation when the customer account is deactivated', async () => {
+    clientMock.query.mockResolvedValueOnce({ rows: [{ id: CUSTOMER_ID, is_active: false }] });
+
+    await expect(createPendingOrder({
+      customerId: CUSTOMER_ID, kitchenId: KITCHEN_ID, zoneId: 'zone-1', addressId: 'address-1',
+      items: [{ menuItemId: 'item-1', quantity: 1, pricePaise: 10000 }],
+      pricing: { subtotalPaise: 10000, deliveryFeePaise: 2500, discountPaise: 0, loyaltyDiscountPaise: 0, walletDeductionPaise: 0, surgePaise: 0, cgstPaise: 250, sgstPaise: 250, totalAmountPaise: 13000, gatewayAmountPaise: 13000, promoCodeId: null, menuOfferDiscountPaise: 0, smallOrderFeePaise: 0, riderTipPaise: 0 },
+      paymentMethod: 'online',
+    })).rejects.toThrow('CUSTOMER_INACTIVE');
   });
 });
 

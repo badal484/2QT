@@ -7,3 +7,16 @@ dist/
 build/
 coverage/
 .vercel/
+
+# Android keystores and signing secrets (never commit release keys)
+*.keystore
+!debug.keystore
+*.jks
+*.p12
+*.pfx
+*.key
+local.properties
+*.env*
+!backend/.env.example
+backend/scratch/
+

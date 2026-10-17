@@ -90,6 +90,9 @@ android {
         ndk {
             abiFilters "arm64-v8a", "x86_64"
         }
+        manifestPlaceholders = [
+            GOOGLE_MAPS_API_KEY: (project.findProperty('GOOGLE_MAPS_API_KEY')?.toString()?.trim() ?: "")
+        ]
     }
     signingConfigs {
         debug {
@@ -104,11 +107,6 @@ android {
                 storePassword MYAPP_RELEASE_STORE_PASSWORD
                 keyAlias MYAPP_RELEASE_KEY_ALIAS
                 keyPassword MYAPP_RELEASE_KEY_PASSWORD
-            } else {
-                storeFile file('debug.keystore')
-                storePassword 'android'
-                keyAlias 'androiddebugkey'
-                keyPassword 'android'
             }
         }
     }
@@ -172,5 +170,28 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def isReleaseBuild = taskGraph.allTasks.any { task ->
+        task.name.toLowerCase().contains("release") && (task.name.startsWith("assemble") || task.name.startsWith("bundle"))
+    }
+    if (isReleaseBuild) {
+        def requiredProps = [
+            'MYAPP_RELEASE_STORE_FILE',
+            'MYAPP_RELEASE_STORE_PASSWORD',
+            'MYAPP_RELEASE_KEY_ALIAS',
+            'MYAPP_RELEASE_KEY_PASSWORD',
+            'GOOGLE_MAPS_API_KEY'
+        ]
+        def missing = requiredProps.findAll { !project.hasProperty(it) || project.property(it).toString().trim().isEmpty() }
+        if (!missing.isEmpty()) {
+            throw new GradleException("Release build aborted: Missing required release configuration properties in gradle.properties or environment: " + missing.join(", ") + ". Release builds require an explicitly configured GOOGLE_MAPS_API_KEY and valid release signing credentials.")
+        }
+        def storeFileObj = file(project.property('MYAPP_RELEASE_STORE_FILE'))
+        if (!storeFileObj.exists()) {
+            throw new GradleException("Release build aborted: Keystore file defined by MYAPP_RELEASE_STORE_FILE does not exist: " + storeFileObj.absolutePath)
+        }
     }
 }

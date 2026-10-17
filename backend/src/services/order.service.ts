@@ -6,15 +6,23 @@ import { processReferral } from '../services/referral.service';
 import { TWO_QT } from '../config/constants';
 import { cancelTriggerJobs, checkWalletLowTrigger } from './trigger.service';
 import { computeAndStoreRoadDistance } from './distance.service';
+import { getDeliveryOtpForOrder } from '../utils/security';
 
-const getDeliveryOtpForOrder = () => {
-    if (process.env.NODE_ENV === 'development') {
-        return process.env.TEST_DELIVERY_OTP || '654321';
-    }
-    return Math.floor(100000 + Math.random() * 900000).toString();
-};
+export { getDeliveryOtpForOrder };
 
 export async function createPendingOrderWithClient(client: any, data: any) {
+    // Validate customer active status and acquire shared lock on customer row.
+    // If an account deletion transaction is concurrently in progress (holding FOR UPDATE on users),
+    // FOR SHARE blocks until the deletion transaction finishes. If deletion commits, is_active will be false,
+    // aborting order creation before any order or item row is inserted.
+    const { rows: custRows } = await client.query(
+        'SELECT id, is_active FROM users WHERE id = $1 FOR SHARE',
+        [data.customerId]
+    );
+    if (!custRows[0] || !custRows[0].is_active) {
+        const err: any = new Error('CUSTOMER_INACTIVE'); err.code = 'CUSTOMER_INACTIVE'; throw err;
+    }
+
     // Guard: reject orders for suspended or inactive partner kitchens
     // restaurant_id is included here (Phase 4) so every newly-created order carries its
     // kitchen's tenant, server-derived, from the moment it's placed — without this, orders

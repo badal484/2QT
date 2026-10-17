@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { query } from '../db';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { query, withTransaction } from '../db';
+import { authenticate, AuthRequest, invalidateUserCache } from '../middleware/auth';
 import { TWO_QT } from '../config/constants';
 import { emitToAdmin, emitToUser, emitToSupport } from '../socket';
 import { scheduleTriggerSend, cancelTriggerJobs } from '../services/trigger.service';
@@ -378,18 +378,113 @@ router.post('/support/tickets/:id/reply', authenticate, async (req: AuthRequest,
 router.delete('/me', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
 
-    await query(`
-        UPDATE users SET 
-            name = 'Deleted User', 
-            phone = 'DELETED_' || id, 
-            email = NULL, 
-            deleted_at = NOW(), 
-            is_active = false 
-        WHERE id = $1
-    `, [userId]);
+    try {
+        await withTransaction(async (client) => {
+            // 1. Coordinated Row-Level Lock:
+            // Acquire an exclusive lock on the user record in PostgreSQL.
+            // Any concurrent order creation attempts (which acquire FOR SHARE on the user row)
+            // will block until this transaction completes. Once this transaction commits with
+            // is_active = false, order placement aborts immediately.
+            const { rows: userRows } = await client.query(
+                `SELECT id, is_active FROM users WHERE id = $1 FOR UPDATE`,
+                [userId]
+            );
+            if (userRows.length === 0 || !userRows[0].is_active) {
+                const err: any = new Error('USER_NOT_FOUND_OR_INACTIVE');
+                err.statusCode = 404;
+                throw err;
+            }
 
-    await query('DELETE FROM addresses WHERE customer_id = $1', [userId]);
-    await query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1', [userId]);
+            // 2. Transaction Safety: Prevent deletion during active order fulfilment
+            const { rows: activeOrders } = await client.query(
+                `SELECT id, display_id, status FROM orders 
+                 WHERE customer_id = $1 
+                   AND status NOT IN ('delivered', 'cancelled') 
+                 FOR UPDATE
+                 LIMIT 1`,
+                [userId]
+            );
+            if (activeOrders.length > 0) {
+                const err: any = new Error(
+                    `Cannot delete account while order #${activeOrders[0].display_id || activeOrders[0].id} is in progress (${activeOrders[0].status}). Please wait until delivery is completed.`
+                );
+                err.code = 'ACTIVE_ORDERS_EXIST';
+                err.statusCode = 400;
+                throw err;
+            }
+
+            // Check for pending/converting scheduled orders
+            const { rows: activeScheduled } = await client.query(
+                `SELECT id FROM scheduled_orders 
+                 WHERE customer_id = $1 
+                   AND status IN ('scheduled', 'converting') 
+                 FOR UPDATE
+                 LIMIT 1`,
+                [userId]
+            );
+            if (activeScheduled.length > 0) {
+                const err: any = new Error('Cannot delete account while a scheduled order is pending. Please wait or cancel the order first.');
+                err.code = 'ACTIVE_ORDERS_EXIST';
+                err.statusCode = 400;
+                throw err;
+            }
+
+            // 3. Anonymize user profile and mark inactive
+            await client.query(`
+                UPDATE users SET 
+                    name = 'Deleted User', 
+                    phone = 'DELETED_' || id, 
+                    email = NULL, 
+                    deleted_at = NOW(), 
+                    is_active = false 
+                WHERE id = $1
+            `, [userId]);
+
+            // 4. Delete personal addresses and purge active device push tokens
+            await client.query('DELETE FROM addresses WHERE customer_id = $1', [userId]);
+            await client.query('DELETE FROM device_tokens WHERE user_id = $1', [userId]);
+
+            // 5. Revoke refresh tokens
+            await client.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1', [userId]);
+        });
+    } catch (err: any) {
+        if (err.code === 'ACTIVE_ORDERS_EXIST' || err.statusCode === 400) {
+            return res.status(400).json({
+                error: 'ACTIVE_ORDERS_EXIST',
+                message: err.message,
+            });
+        }
+        if (err.statusCode === 404) {
+            return res.status(404).json({
+                error: 'NOT_FOUND',
+                message: 'Account not found or already deactivated.',
+            });
+        }
+        console.error('[DELETE_ACCOUNT] Database transaction error:', err);
+        return res.status(500).json({
+            error: 'DELETION_FAILED',
+            message: 'Failed to process account deletion. Please try again or contact support.',
+        });
+    }
+
+    // 6. Post-commit external cleanups: Redis cart session, trigger jobs, and user cache
+    // These run strictly AFTER the database transaction has committed.
+    // Failures are logged non-fatally with operation identifiers and will not result in a false-rollback error response.
+    try {
+        const cleanupTasks = [
+            { name: 'redis_cart_deletion', promise: redis.del(keys.customerCart(userId)) },
+            { name: 'trigger_jobs_cancellation', promise: cancelTriggerJobs('cart_abandoned', userId) },
+            { name: 'user_cache_invalidation', promise: invalidateUserCache(userId) },
+        ];
+        const results = await Promise.allSettled(cleanupTasks.map(t => t.promise));
+        results.forEach((res, index) => {
+            if (res.status === 'rejected') {
+                console.error(`[DELETE_ACCOUNT_CLEANUP_WARN] Post-commit cleanup failed for operation: ${cleanupTasks[index].name}. Diagnostic reason:`, res.reason?.message || res.reason);
+            }
+        });
+    } catch (cleanupErr: any) {
+        console.error('[DELETE_ACCOUNT] Non-fatal error during post-commit external cleanup:', cleanupErr?.message || cleanupErr);
+    }
 
     res.json({ deleted: true });
 });

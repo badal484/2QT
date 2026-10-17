@@ -20,6 +20,7 @@ import {
   BarChart2,
   Sparkles,
   ArrowLeft,
+  Trash2,
 } from 'lucide-react-native';
 import React, { useCallback } from 'react';
 import { PressableScale } from '../components/ui/internal/PressableScale';
@@ -146,6 +147,42 @@ const ProfileScreen = ({ navigation }: any) => {
         dispatch(logout());
         disconnectSocket();
       }
+    });
+  }, [dispatch, showDialog]);
+
+  const handleDeleteAccount = useCallback(() => {
+    haptics.warning();
+    showDialog({
+      title: 'Delete Account',
+      message:
+        'Are you sure you want to permanently delete your account? This action cannot be undone.\n\n• Your personal profile, phone number, and delivery addresses will be permanently removed.\n• Any remaining wallet balance or loyalty points will be forfeited.\n• Historical tax invoice records are retained for compliance as required by law.',
+      confirmText: 'Delete Permanently',
+      cancelText: 'Cancel',
+      type: 'error',
+      onConfirm: async () => {
+        try {
+          const res = await api.delete('/customer/me');
+          if (res?.deleted) {
+            haptics.success();
+            dispatch(logout());
+            disconnectSocket();
+          } else {
+            throw new Error(res?.message || 'Failed to delete account');
+          }
+        } catch (err: any) {
+          haptics.error();
+          const errorMessage =
+            err?.message ||
+            err?.data?.message ||
+            'Could not delete account. If you have an active order in progress, please wait until delivery completes.';
+          showDialog({
+            title: 'Deletion Failed',
+            message: errorMessage,
+            confirmText: 'Okay',
+            type: 'error',
+          });
+        }
+      },
     });
   }, [dispatch, showDialog]);
 
@@ -342,6 +379,15 @@ const ProfileScreen = ({ navigation }: any) => {
           <MinimalListItem icon={<Bell size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Notifications" onPress={() => navigation.navigate(isRider ? 'RiderNotifications' : 'Notifications')} />
           <MinimalListItem icon={<MessageCircle size={22} color={tokens.colors.textSecondary} strokeWidth={1.5} />} title="Help & Support" onPress={() => navigation.navigate(isRider ? 'RiderHelp' : 'Help')} />
           <MinimalListItem icon={<LogOut size={22} color={tokens.colors.danger} strokeWidth={1.5} />} title="Sign Out" isDestructive={true} onPress={handleLogout} />
+          {!isRider && (
+            <MinimalListItem
+              icon={<Trash2 size={22} color={tokens.colors.danger} strokeWidth={1.5} />}
+              title="Delete Account"
+              subtitle="Permanently remove your personal data"
+              isDestructive={true}
+              onPress={handleDeleteAccount}
+            />
+          )}
         </Animated.View>
 
         {/* Dev Role Switcher */}

@@ -56,6 +56,47 @@ const apiSchema = sharedSchema.extend({
     FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
     FIREBASE_SERVICE_ACCOUNT_B64: z.string().optional(),
     TEST_DELIVERY_OTP: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (data.NODE_ENV === 'production') {
+        if (!data.BULL_BOARD_PASSWORD || data.BULL_BOARD_PASSWORD.trim().length < 12) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['BULL_BOARD_PASSWORD'],
+                message: 'BULL_BOARD_PASSWORD must be configured with at least 12 characters in production',
+            });
+        }
+        if (data.BULL_BOARD_PASSWORD === 'admin' || data.BULL_BOARD_PASSWORD === 'password') {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['BULL_BOARD_PASSWORD'],
+                message: 'BULL_BOARD_PASSWORD cannot be set to a default value in production',
+            });
+        }
+
+        if (data.TEST_DELIVERY_OTP && data.TEST_DELIVERY_OTP.trim() !== '') {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['TEST_DELIVERY_OTP'],
+                message: 'TEST_DELIVERY_OTP must NOT be defined in production. Production orders must use cryptographically random OTPs.',
+            });
+        }
+
+        if (!data.ALLOWED_ORIGINS || data.ALLOWED_ORIGINS.trim() === '') {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['ALLOWED_ORIGINS'],
+                message: 'ALLOWED_ORIGINS must be explicitly configured in production (comma-separated origins).',
+            });
+        }
+
+        if (data.JWT_SECRET === data.JWT_REFRESH_SECRET) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['JWT_REFRESH_SECRET'],
+                message: 'JWT_REFRESH_SECRET must not be identical to JWT_SECRET',
+            });
+        }
+    }
 });
 
 const workerSchema = sharedSchema.extend({
@@ -67,11 +108,20 @@ const workerSchema = sharedSchema.extend({
     BACKEND_SELF_URL: z.string().optional(),
 });
 
+export { sharedSchema, apiSchema, workerSchema };
 export type ApiEnv = z.infer<typeof apiSchema>;
 export type WorkerEnv = z.infer<typeof workerSchema>;
 
 function formatErrors(error: z.ZodError): string {
     return error.issues.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`).join('\n');
+}
+
+export function validateApiEnv(env: Record<string, any> = process.env) {
+    return apiSchema.safeParse(env);
+}
+
+export function validateWorkerEnv(env: Record<string, any> = process.env) {
+    return workerSchema.safeParse(env);
 }
 
 export function loadApiEnv(): ApiEnv {

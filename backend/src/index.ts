@@ -2,6 +2,7 @@ import './instrument'; // Sentry must be first — before any other import
 import { loadApiEnv } from './config/env';
 loadApiEnv(); // Fail fast if a required env var is missing/invalid — before any other module loads
 import 'express-async-errors';
+import crypto from 'crypto';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -20,6 +21,7 @@ import { generalLimiter } from './middleware/rateLimiter';
 import apiRouter from './routes';
 import { notificationsQueue, invoicesQueue, emailsQueue, closeQueueConnections } from './jobs/queues';
 import { shutdownAuditLogger } from './utils/logger';
+import { isAllowedOrigin, verifyBullBoardCredentials } from './utils/security';
 
 // This process is the API only — it does NOT start BullMQ workers or node-cron.
 // Those live exclusively in src/worker.ts (the singleton `2qt-worker` Cloud Run
@@ -80,21 +82,8 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 
 app.use(cors({
     origin: (origin, callback) => {
-        // No Origin header — mobile apps, server-to-server calls, curl, health checks.
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
-        // Allow all Cloudflare Workers, Vercel preview deployments, 2QT domains and tunnel tools
-        if (
-            origin.endsWith('.workers.dev') ||
-            origin.endsWith('.vercel.app') ||
-            origin.endsWith('2qthello.com') ||
-            origin.endsWith('go2qt.com') ||
-            origin.endsWith('.loca.lt') ||
-            origin.endsWith('.ngrok.io') ||
-            origin.endsWith('.ngrok-free.app')
-        ) {
+        const isProd = process.env.NODE_ENV === 'production';
+        if (isAllowedOrigin(origin, allowedOrigins, isProd)) {
             return callback(null, true);
         }
         const err: any = new Error('Not allowed by CORS');
@@ -131,11 +120,10 @@ createBullBoard({
     serverAdapter: bullBoardAdapter,
 });
 
-function bullBoardAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-    const auth = req.headers.authorization;
-    if (auth?.startsWith('Basic ')) {
-        const [, pass] = Buffer.from(auth.slice(6), 'base64').toString().split(':');
-        if (pass === (process.env.BULL_BOARD_PASSWORD || 'admin')) return next();
+export function bullBoardAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const isProd = process.env.NODE_ENV === 'production';
+    if (verifyBullBoardCredentials(req.headers.authorization, process.env.BULL_BOARD_PASSWORD, isProd)) {
+        return next();
     }
     res.set('WWW-Authenticate', 'Basic realm="Queue Monitor"');
     res.status(401).send('Authentication required');

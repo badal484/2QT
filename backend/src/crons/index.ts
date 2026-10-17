@@ -115,7 +115,7 @@ export const initCrons = () => {
         const leadTimeMinutes = 45; // Prepare orders 45 mins before scheduled time
         
         const { rows: scheduled } = await query(`
-            SELECT id FROM scheduled_orders
+            SELECT id, customer_id FROM scheduled_orders
             WHERE status = 'scheduled'
             AND scheduled_for <= NOW() + INTERVAL '1 minute' * $1
             AND (payment_status = 'paid' OR payment_method = 'cod')
@@ -124,7 +124,21 @@ export const initCrons = () => {
         for (const row of scheduled) {
             try {
                 await withTransaction(async (client) => {
-                    // Atomically claim this scheduled order before doing anything else.
+                    // 1. Coordinate Row-Level Lock:
+                    // Validate customer active status with shared lock before claiming/converting scheduled order.
+                    // Acquiring FOR SHARE on users first establishes a consistent lock hierarchy:
+                    // users -> scheduled_orders -> orders, preventing deadlocks with DELETE /me.
+                    const { rows: customerRows } = await client.query(
+                        'SELECT is_active FROM users WHERE id = $1 FOR SHARE',
+                        [row.customer_id]
+                    );
+                    if (!customerRows[0] || !customerRows[0].is_active) {
+                        console.log(`[CRON] Customer ${row.customer_id} is inactive — cancelling scheduled order ${row.id}`);
+                        await client.query(`UPDATE scheduled_orders SET status = 'cancelled', cancellation_reason = 'CUSTOMER_ACCOUNT_DELETED' WHERE id = $1`, [row.id]);
+                        return;
+                    }
+
+                    // 2. Atomically claim this scheduled order.
                     // If a concurrent run (e.g. two worker instances briefly overlapping
                     // during a deploy rollout) already claimed it, this UPDATE matches 0
                     // rows and we return early — no duplicate order is ever created for

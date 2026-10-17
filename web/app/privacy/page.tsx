@@ -81,8 +81,8 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-white font-semibold text-base mb-3">6. Data Retention</h2>
-            <p>We retain your account data for as long as your account is active. Order records are retained for 7 years as required by Indian tax law (GST). You may request deletion of your account and associated personal data at any time by contacting us — we will process your request within 30 days, subject to legal retention requirements.</p>
+            <h2 className="text-white font-semibold text-base mb-3">6. Data Retention & Account Deletion</h2>
+            <p>We retain your account data for as long as your account is active. Order records and tax invoices are retained for 7 years as mandated by Indian tax law (GST). You may delete your account and associated personal data at any time from within the 2QT app (Profile → Support → Delete Account) or by submitting an online request via our <Link href="/delete-account" className="text-[#FF6B35] hover:underline">Account Deletion Page</Link>. Online requests are processed within 30 days, subject to statutory retention requirements.</p>
           </section>
 
           <section>
@@ -101,7 +101,7 @@ export default function PrivacyPage() {
             <ul className="space-y-1 list-disc list-inside text-zinc-400">
               <li>Access the personal data we hold about you</li>
               <li>Correct inaccurate data</li>
-              <li>Request deletion of your data (subject to legal retention requirements)</li>
+              <li>Request deletion of your data via our <Link href="/delete-account" className="text-[#FF6B35] hover:underline">Account Deletion Page</Link> or in-app</li>
               <li>Opt out of promotional communications</li>
             </ul>
             <p className="mt-2">Contact <a href="mailto:support@go2qt.com" className="text-[#FF6B35] hover:underline">support@go2qt.com</a> to exercise these rights.</p>

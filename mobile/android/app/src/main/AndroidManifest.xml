@@ -4,9 +4,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -26,7 +23,7 @@
       
       <meta-data
         android:name="com.google.android.geo.API_KEY"
-        android:value="AIzaSyCwvUrO91u81DGsCr4YoJZWzrIC9Pr5kaA" />
+        android:value="${GOOGLE_MAPS_API_KEY}" />
 
       <activity
         android:name=".MainActivity"
@@ -40,11 +37,5 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
-
-      <!-- Rider Background Location Tracking Service (Android 14/15 Compliant) -->
-      <service
-        android:name=".LocationForegroundService"
-        android:foregroundServiceType="location"
-        android:exported="false" />
     </application>
 </manifest>
