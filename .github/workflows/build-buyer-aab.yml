@@ -28,6 +28,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Free Disk Space (Ubuntu Runner)
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/share/miniconda
+          sudo docker system prune --all --force --volumes || true
+          echo "=== Disk space after cleanup ==="
+          df -h
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -118,6 +132,9 @@ jobs:
           echo "=== SUCCESS: Buyer Release AAB Generated ==="
           ls -lh "$AAB_PATH"
           echo "AAB Size: $(du -h "$AAB_PATH" | cut -f1)"
+          echo "SHA-256 Checksum: $(sha256sum "$AAB_PATH" | cut -d' ' -f1)"
+          echo "=== AAB Signature Fingerprints ==="
+          keytool -printcert -jarfile "$AAB_PATH" || true
 
       - name: Upload Buyer Release AAB
         uses: actions/upload-artifact@v4
