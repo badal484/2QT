@@ -2,6 +2,9 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# Install build dependencies for node-gyp (required for bcrypt on Alpine)
+RUN apk add --no-cache python3 make g++ gcc
+
 COPY package*.json ./
 RUN npm install
 
