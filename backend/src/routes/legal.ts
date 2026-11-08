@@ -97,18 +97,18 @@ router.get(['/privacy', '/privacy-policy'], (req: Request, res: Response) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy — Eigen Foods Delivery</title>
-  <meta name="description" content="Official Privacy Policy for the Eigen Foods Delivery platform, operated by VELTO Food Palace.">
+  <meta name="description" content="Official Privacy Policy for the Eigen Foods Delivery platform.">
   <style>${STYLES}</style>
 </head>
 <body>
   <div class="container">
-    <div class="brand-badge">EIGEN FOODS · VELTO FOOD PALACE</div>
+    <div class="brand-badge">EIGEN FOODS</div>
     <h1>Privacy Policy</h1>
     <p class="subtitle">Effective Date: August 2026 · Last Updated: October 2026</p>
 
     <div class="card">
       <h2>1. Introduction</h2>
-      <p>VELTO Food Palace ("Company", "we", "us", or "our") operates the <strong>Eigen Foods</strong> food delivery platform, accessible via our mobile applications and websites. We respect your privacy and are committed to protecting your personal data in accordance with applicable Indian laws, including the <em>Information Technology Act, 2000</em> and the <em>Consumer Protection (E-Commerce) Rules, 2020</em>.</p>
+      <p><strong>Eigen Foods</strong> ("Company", "we", "us", or "our") operates the food delivery platform, accessible via our mobile applications and websites. We respect your privacy and are committed to protecting your personal data in accordance with applicable Indian laws, including the <em>Information Technology Act, 2000</em> and the <em>Consumer Protection (E-Commerce) Rules, 2020</em>.</p>
     </div>
 
     <div class="card">
@@ -170,14 +170,14 @@ router.get(['/privacy', '/privacy-policy'], (req: Request, res: Response) => {
     <div class="card">
       <h2>8. Contact & Grievance Redressal</h2>
       <p>In accordance with the <em>Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021</em>, you may contact our Grievance Officer regarding your personal data:</p>
-      <p><strong>VELTO Food Palace</strong><br>
+      <p><strong>Eigen Foods</strong><br>
       Attn: Privacy & Grievance Officer<br>
       Email: <a href="mailto:support@eigenfoods.app">support@eigenfoods.app</a><br>
       Registered Location: Ranchi, Jharkhand, India</p>
     </div>
 
     <div class="footer">
-      <p>&copy; 2026 VELTO Food Palace · Eigen Foods Delivery Platform. All rights reserved.</p>
+      <p>&copy; 2026 Eigen Foods. All rights reserved.</p>
       <p style="margin-top: 8px;"><a href="/delete-account">Request Account Deletion</a> · <a href="/privacy">Privacy Policy</a></p>
     </div>
   </div>
@@ -282,7 +282,7 @@ router.get('/delete-account', (req: Request, res: Response) => {
     </div>
 
     <div class="footer">
-      <p>&copy; 2026 VELTO Food Palace · Eigen Foods Delivery Platform</p>
+      <p>&copy; 2026 Eigen Foods. All rights reserved.</p>
       <p style="margin-top: 8px;"><a href="/privacy">Back to Privacy Policy</a></p>
     </div>
   </div>
