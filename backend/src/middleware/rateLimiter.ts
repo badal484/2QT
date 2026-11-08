@@ -18,3 +18,4 @@ export const otpLimiter = createLimiter(10 * 60 * 1000, 20, 'Too many OTP reques
 export const paymentLimiter = createLimiter(60 * 1000, 50, 'Too many payment attempts.');
 export const gpsLimiter = createLimiter(60 * 1000, 120, 'GPS update limit exceeded.');
 export const broadcastLimiter = createLimiter(24 * 60 * 60 * 1000, 5, 'Broadcast limit reached for today.');
+export const deletionRequestLimiter = createLimiter(60 * 1000, 10, 'Too many deletion requests, please try again later.');
