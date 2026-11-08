@@ -87,9 +87,9 @@ function OverviewTab({ user, onUpdate }: { user: any; onUpdate: (u: any) => void
 
   const shareReferral = async () => {
     if (!referral?.referralCode) return;
-    const text = `Use my code ${referral.referralCode} on VELTO Food Palace and get a discount on your first order!`;
+    const text = `Use my code ${referral.referralCode} on Eigen Foods and get a discount on your first order!`;
     if (navigator.share) {
-      await navigator.share({ title: "Join VELTO Food Palace", text }).catch(() => {});
+      await navigator.share({ title: "Join Eigen Foods", text }).catch(() => {});
     } else {
       navigator.clipboard.writeText(text);
       toast.success("Invite message copied!");

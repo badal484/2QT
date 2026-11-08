@@ -18,7 +18,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-white font-semibold text-base mb-3">1. Introduction</h2>
-            <p>VELTO Food Palace ("Company", "we", "us") operates the 2QT food delivery platform. This Privacy Policy explains how we collect, use, share, and protect your personal information when you use our website (go2qt.com) and mobile applications. By using our Service, you consent to the practices described here.</p>
+            <p>Eigen Foods ("Company", "we", "us") operates the Eigen Foods delivery platform. This Privacy Policy explains how we collect, use, share, and protect your personal information when you use our website and mobile applications. By using our Service, you consent to the practices described here.</p>
           </section>
 
           <section>
@@ -120,8 +120,8 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-white font-semibold text-base mb-3">12. Contact Us</h2>
             <p>For privacy-related queries or to exercise your rights, contact:<br />
-              <strong className="text-zinc-200">VELTO Food Palace</strong><br />
-              Email: <a href="mailto:support@go2qt.com" className="text-[#FF6B35] hover:underline">support@go2qt.com</a>
+              <strong className="text-zinc-200">Eigen Foods</strong><br />
+              Email: <a href="mailto:support@eigenfoods.app" className="text-[#FF6B35] hover:underline">support@eigenfoods.app</a>
             </p>
           </section>
         </div>

@@ -18,7 +18,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-white font-semibold text-base mb-3">1. Agreement to Terms</h2>
-            <p>By accessing or using the 2QT platform ("Service"), operated by VELTO Food Palace ("Company", "we", "us"), you agree to be bound by these Terms of Service. If you do not agree, do not use our Service. These terms govern your use of our website (go2qt.com), mobile applications, and related services.</p>
+            <p>By accessing or using the Eigen Foods platform ("Service"), operated by Eigen Foods ("Company", "we", "us"), you agree to be bound by these Terms of Service. If you do not agree, do not use our Service. These terms govern your use of our website, mobile applications, and related services.</p>
           </section>
 
           <section>
@@ -75,12 +75,12 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-white font-semibold text-base mb-3">8. Intellectual Property</h2>
-            <p>All content on this platform — including logos, images, text, and software — is owned by VELTO Food Palace or its licensors. You may not reproduce or redistribute any content without prior written permission.</p>
+            <p>All content on this platform — including logos, images, text, and software — is owned by Eigen Foods or its licensors. You may not reproduce or redistribute any content without prior written permission.</p>
           </section>
 
           <section>
             <h2 className="text-white font-semibold text-base mb-3">9. Limitation of Liability</h2>
-            <p>To the fullest extent permitted by law, VELTO Food Palace shall not be liable for any indirect, incidental, or consequential damages arising from your use of the Service. Our total liability to you for any claim shall not exceed the amount paid for the specific order in question.</p>
+            <p>To the fullest extent permitted by law, Eigen Foods shall not be liable for any indirect, incidental, or consequential damages arising from your use of the Service. Our total liability to you for any claim shall not exceed the amount paid for the specific order in question.</p>
           </section>
 
           <section>
