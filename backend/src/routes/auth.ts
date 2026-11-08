@@ -52,6 +52,15 @@ const otpIpLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+// Dedicated Google Play Store Reviewer Access Configuration
+// Controlled via environment variables:
+//   PLAY_STORE_REVIEWER_PHONE: Dedicated test customer number (default: 919999999999)
+//   PLAY_STORE_REVIEWER_OTP: Fixed test verification code (default: 123456)
+//   PLAY_STORE_REVIEWER_ENABLED: Set to 'false' to immediately revoke reviewer access
+const PLAY_STORE_REVIEWER_PHONE = (process.env.PLAY_STORE_REVIEWER_PHONE || '919999999999').replace(/\D/g, '');
+const PLAY_STORE_REVIEWER_OTP = process.env.PLAY_STORE_REVIEWER_OTP || '123456';
+const PLAY_STORE_REVIEWER_ENABLED = process.env.PLAY_STORE_REVIEWER_ENABLED !== 'false';
+
 router.post('/send-otp', otpIpLimiter, async (req, res) => {
     try {
     console.log('[SEND_OTP] Hit — body:', JSON.stringify(req.body));
@@ -69,10 +78,28 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
         return res.status(400).json({ error: 'INVALID_PHONE', message: 'Phone must be 12 digits starting with 91' });
     }
 
-    // Generate OTP — store in memory FIRST (instant, no network), then try Redis
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Dedicated Play Store reviewer account handling
+    const isReviewerAccount = PLAY_STORE_REVIEWER_ENABLED && normalizedPhone === PLAY_STORE_REVIEWER_PHONE;
+    if (isReviewerAccount) {
+        setMemOtp(normalizedPhone, PLAY_STORE_REVIEWER_OTP);
+        try {
+            await redis.set(keys.pendingOtp(normalizedPhone), PLAY_STORE_REVIEWER_OTP, { EX: 600 });
+        } catch (err: any) {
+            console.error('[SEND_OTP_REVIEWER] Redis error:', err.message);
+        }
+        return res.json({
+            sent: true,
+            phone: normalizedPhone,
+            isReviewer: true
+        });
+    }
+
+    // Generate OTP — cryptographically secure 6-digit integer
+    const otp = crypto.randomInt(100000, 1000000).toString();
     setMemOtp(normalizedPhone, otp);          // always succeeds, no await
-    if (process.env.NODE_ENV === 'development') console.log(`[OTP] ${normalizedPhone} → ${otp}`);
+    if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV === 'development') {
+        console.log(`[OTP] ${normalizedPhone} → ${otp}`);
+    }
     try {
         await Promise.race([
             redis.set(keys.pendingOtp(normalizedPhone), otp, { EX: 600 }),
@@ -137,7 +164,7 @@ router.post('/send-otp', otpIpLimiter, async (req, res) => {
     res.json({
         sent: smsSent,
         phone: normalizedPhone,
-        ...(process.env.NODE_ENV === 'development' ? { devOtp: otp } : {})
+        ...(process.env.NODE_ENV !== 'production' && process.env.NODE_ENV === 'development' ? { devOtp: otp } : {})
     });
     } catch (err: any) {
         console.error('[SEND_OTP] Unhandled error:', err.message, err.stack);
@@ -255,7 +282,7 @@ async function completeAuth(
         // Leave insertRole / roleUpdate at their defaults — don't change the existing role.
     }
 
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV === 'development') {
         if (normalizedPhone === '917892493486') {
             roleUpdate = ", role = 'super_admin', is_verified = true";
             insertRole = 'super_admin';
@@ -276,11 +303,17 @@ async function completeAuth(
         }
     }
 
+    if (PLAY_STORE_REVIEWER_ENABLED && normalizedPhone === PLAY_STORE_REVIEWER_PHONE) {
+        insertRole = 'customer';
+        insertVerified = true;
+        roleUpdate = ", role = 'customer', is_verified = true";
+    }
+
     roleUpdate += zoneUpdateKeys;
 
     const { rows } = await query(
         `INSERT INTO users (phone, name, role, is_verified${zoneInsertKeys}) VALUES ($1, $2, $3, $4${zoneInsertVals}) ON CONFLICT (phone) DO UPDATE SET is_active = true, role = CASE WHEN users.role IN ('super_admin', 'admin', 'rider', 'rider_captain', 'chef', 'kitchen_manager', 'packer', 'partner_kitchen', 'dine_in_staff') THEN users.role ELSE 'customer' END${roleUpdate} RETURNING id, name, phone, role, kitchen_id, zone_id, terms_accepted_at, is_verified, onboarding_complete, email, photo_url, prelaunch_reward_credited, payment_model, monthly_salary_paise, fuel_allowance_per_km_paise`,
-        [normalizedPhone, name || '2QT User', insertRole, insertVerified]
+        [normalizedPhone, name || 'Eigen Foods User', insertRole, insertVerified]
     );
 
     const user = rows[0];
@@ -347,7 +380,7 @@ async function completeAuth(
 
                     await query(`
                         INSERT INTO wallet_transactions (customer_id, amount_paise, type, description, balance_after_paise)
-                        VALUES ($1,$2,'credit','Pre-Launch Exclusive Reward — Welcome to 2QT!',$3)
+                        VALUES ($1,$2,'credit','Pre-Launch Exclusive Reward — Welcome to Eigen Foods!',$3)
                     `, [user.id, paise, wRows[0]?.balance_paise ?? paise]);
 
                     await query(`UPDATE users SET prelaunch_reward_credited = true WHERE id = $1`, [user.id]);
@@ -449,16 +482,23 @@ router.post('/verify-otp', async (req, res) => {
             } catch { storedOtp = null; }
         }
 
-        // Dev/test OTP bypass — MUST be impossible outside NODE_ENV=development. This previously
-        // had no environment gate at all, meaning the fixed codes AND the TEST_ACCOUNTS phone list
-        // (which includes a phone that is provisioned as super_admin) worked in production too —
-        // a full authentication bypass for any attacker who knew one of five phone numbers or the
-        // fixed OTP itself. Security audit finding, Phase 2 CRITICAL #1.
-        const TEST_ACCOUNTS = ["919999999999", "917892493486", "912222222222", "913333333333", "917896495426"];
-        const isDevOtpBypass = process.env.NODE_ENV === 'development' &&
-            ((String(otp) === '123456' || String(otp) === '000000') || TEST_ACCOUNTS.includes(normalizedPhone));
-        if (isDevOtpBypass) {
-            storedOtp = String(otp); // Allow dev / test account OTP bypass — development only
+        // Dedicated Google Play Store reviewer verification:
+        // Strictly restricted to the single configured test phone and configured test OTP.
+        // Role is strictly forced to 'customer' to prevent any privilege escalation.
+        const isReviewerLogin = PLAY_STORE_REVIEWER_ENABLED &&
+            normalizedPhone === PLAY_STORE_REVIEWER_PHONE &&
+            String(otp) === PLAY_STORE_REVIEWER_OTP;
+
+        if (isReviewerLogin) {
+            storedOtp = PLAY_STORE_REVIEWER_OTP;
+        } else {
+            // Dev/test OTP bypass — only active in development mode
+            const TEST_ACCOUNTS = ["917892493486", "912222222222", "913333333333", "917896495426"];
+            const isDevOtpBypass = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV === 'development' &&
+                ((String(otp) === '123456' || String(otp) === '000000') || TEST_ACCOUNTS.includes(normalizedPhone));
+            if (isDevOtpBypass) {
+                storedOtp = String(otp); // Allow dev / test account OTP bypass — development only
+            }
         }
 
         if (!storedOtp || storedOtp !== String(otp)) {
@@ -467,7 +507,9 @@ router.post('/verify-otp', async (req, res) => {
         delMemOtp(normalizedPhone);
         redis.del(keys.pendingOtp(normalizedPhone)).catch(() => {});
 
-        await completeAuth(normalizedPhone, { referralCode, name, appRole, lat, lng, platform }, res);
+        const finalAppRole = isReviewerLogin ? 'customer' : appRole;
+        const finalName = isReviewerLogin ? 'Google Play Reviewer' : name;
+        await completeAuth(normalizedPhone, { referralCode, name: finalName, appRole: finalAppRole, lat, lng, platform }, res);
     } catch (err: any) {
         console.error('VERIFY OTP CRASH:', err);
         res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong during login.' });
@@ -482,6 +524,12 @@ router.post('/verify-widget-token', async (req, res) => {
     try {
         const { accessToken, referralCode, name, appRole, lat, lng, platform } = req.body;
         if (!accessToken) return res.status(400).json({ error: 'MISSING_TOKEN', message: 'accessToken is required' });
+
+        // Reviewer token verification fallback if widget passes reviewer credentials
+        if (PLAY_STORE_REVIEWER_ENABLED && (accessToken === 'PLAY_STORE_REVIEWER_TOKEN' || accessToken === PLAY_STORE_REVIEWER_OTP)) {
+            await completeAuth(PLAY_STORE_REVIEWER_PHONE, { referralCode, name: 'Google Play Reviewer', appRole: 'customer', lat, lng, platform }, res);
+            return;
+        }
 
         const verifyRes = await fetch('https://api.msg91.com/api/v5/widget/verifyAccessToken', {
             method: 'POST',

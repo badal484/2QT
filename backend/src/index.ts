@@ -19,6 +19,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { generalLimiter } from './middleware/rateLimiter';
 import apiRouter from './routes';
+import legalRouter from './routes/legal';
 import { notificationsQueue, invoicesQueue, emailsQueue, closeQueueConnections } from './jobs/queues';
 import { shutdownAuditLogger } from './utils/logger';
 import { isAllowedOrigin, verifyBullBoardCredentials } from './utils/security';
@@ -144,10 +145,12 @@ app.get('/api/v1/health', async (req, res) => {
 });
 
 // Routes
+app.use(legalRouter);
+app.use('/api/v1', legalRouter);
 app.use('/api/v1', apiRouter);
 
 app.get('/', (req, res) => {
-    res.send('2QT API Server Running');
+    res.send('Eigen Foods API Server Running');
 });
 
 // Error Handling — Sentry must come before the custom error handler
