@@ -178,7 +178,89 @@ router.get(['/privacy', '/privacy-policy'], (req: Request, res: Response) => {
 
     <div class="footer">
       <p>&copy; 2026 Eigen Foods. All rights reserved.</p>
-      <p style="margin-top: 8px;"><a href="/delete-account">Request Account Deletion</a> · <a href="/privacy">Privacy Policy</a></p>
+      <p style="margin-top: 8px;"><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/delete-account">Request Account Deletion</a></p>
+    </div>
+  </div>
+</body>
+</html>`;
+  res.type('html').send(html);
+});
+
+// ─── Public Terms of Service Route ──────────────────────────────────────────
+router.get(['/terms', '/terms-of-service'], (req: Request, res: Response) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — Eigen Foods Delivery</title>
+  <meta name="description" content="Terms and conditions for using the Eigen Foods food delivery platform.">
+  <style>${STYLES}</style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand-badge">EIGEN FOODS</div>
+    <h1>Terms of Service</h1>
+    <p class="subtitle">Effective Date: August 2026 · Last Updated: November 2026</p>
+
+    <div class="card">
+      <h2>1. Agreement to Terms</h2>
+      <p>By accessing or using the Eigen Foods platform ("Service"), operated by <strong>Eigen Foods</strong> ("Company", "we", "us"), you agree to be bound by these Terms of Service. If you do not agree, do not use our Service. These terms govern your use of our mobile applications, websites, and related food ordering services.</p>
+    </div>
+
+    <div class="card">
+      <h2>2. Eligibility</h2>
+      <p>You must be at least 18 years old to create an account and place orders. By using the Service, you represent that you meet this requirement. We reserve the right to refuse service to any person at our discretion.</p>
+    </div>
+
+    <div class="card">
+      <h2>3. Orders and Payments</h2>
+      <ul>
+        <li>Prices displayed are inclusive of applicable taxes (GST) unless stated otherwise.</li>
+        <li>Payment is required at the time of placing an order. We accept UPI, credit/debit cards, net banking, and wallet balance via our licensed payment gateway partner (Razorpay).</li>
+        <li>Orders are confirmed only after successful payment authorization.</li>
+        <li>We reserve the right to cancel any order due to unavailability, pricing errors, or suspected fraud, and will issue a full refund in such cases.</li>
+        <li>Delivery charges, if any, are displayed at checkout and are non-refundable once the order is dispatched.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>4. Delivery</h2>
+      <ul>
+        <li>Estimated delivery times are indicative and not guaranteed. Delays may occur due to traffic, weather, or kitchen operational factors.</li>
+        <li>You are responsible for providing an accurate delivery address and contact number. We are not liable for non-delivery due to an incorrect address.</li>
+        <li>Delivery is available only within our designated service zones. Orders placed outside these zones will be automatically cancelled and refunded.</li>
+        <li>Our delivery fleet will attempt doorstep handover. If the recipient is unavailable, the order may be cancelled without a refund for perishable food items.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>5. User Accounts & Security</h2>
+      <ul>
+        <li>You are responsible for maintaining the confidentiality of your account and OTP verification codes.</li>
+        <li>You are responsible for all activity that occurs under your account.</li>
+        <li>We use secure phone-number-based OTP authentication. We do not store passwords.</li>
+        <li>We reserve the right to suspend or terminate accounts that violate these terms or engage in fraudulent activities.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>6. Intellectual Property & Limitation of Liability</h2>
+      <p>All content on this platform — including logos, brand marks, menus, images, text, and software — is owned by Eigen Foods or its licensors. To the fullest extent permitted by law, Eigen Foods shall not be liable for any indirect, incidental, or consequential damages arising from your use of the Service. Our total liability to you for any claim shall not exceed the amount paid for the specific order in question.</p>
+    </div>
+
+    <div class="card">
+      <h2>7. Governing Law & Contact</h2>
+      <p>These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts in Ranchi, Jharkhand, India in accordance with the <em>Consumer Protection Act, 2019</em> and the <em>Information Technology Act, 2000</em>.</p>
+      <p style="margin-top: 10px;">For questions regarding these Terms, contact:<br>
+      <strong>Eigen Foods</strong><br>
+      Email: <a href="mailto:support@eigenfoods.app">support@eigenfoods.app</a><br>
+      Registered Location: Ranchi, Jharkhand, India</p>
+    </div>
+
+    <div class="footer">
+      <p>&copy; 2026 Eigen Foods. All rights reserved.</p>
+      <p style="margin-top: 8px;"><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/delete-account">Request Account Deletion</a></p>
     </div>
   </div>
 </body>

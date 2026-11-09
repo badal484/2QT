@@ -95,7 +95,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-white font-semibold text-base mb-3">12. Contact</h2>
-            <p>For questions about these Terms, contact us at <a href="mailto:support@go2qt.com" className="text-[#FF6B35] hover:underline">support@go2qt.com</a>.</p>
+            <p>For questions about these Terms, contact us at <a href="mailto:support@eigenfoods.app" className="text-[#FF6B35] hover:underline">support@eigenfoods.app</a>.</p>
           </section>
         </div>
       </div>
