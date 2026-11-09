@@ -82,17 +82,17 @@ const WalletScreen = ({ navigation }: any) => {
         }
 
         const options = {
-            description: '2QT Wallet Recharge',
-            image: 'https://2qt.app/logo.png',
+            description: 'Eigen Wallet Recharge',
+            image: 'https://twoqt-1.onrender.com/logo.png',
             currency: 'INR',
             key: data.keyId,
             amount: data.amount,
-            name: '2QT',
+            name: 'Eigen Foods',
             order_id: data.razorpayOrderId,
             prefill: {
-                email: user?.email || 'customer@2qt.app',
+                email: user?.email || 'customer@eigenfoods.app',
                 contact: user?.phone || '9999999999',
-                name: user?.name || '2QT User'
+                name: user?.name || 'Eigen User'
             },
             theme: { color: tokens.colors.primary }
         };

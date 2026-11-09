@@ -1101,7 +1101,7 @@ const HomeScreen = ({ navigation }: any) => {
                         <MapPin size={16} color={tokens.colors.primary} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text allowFontScaling={false} style={styles.reqFormTitle}>Bring 2QT to your area</Text>
+                        <Text allowFontScaling={false} style={styles.reqFormTitle}>Bring Eigen Foods to your area</Text>
                         <Text allowFontScaling={false} style={styles.reqFormSub}>Tell us where you are — we'll expand there next.</Text>
                       </View>
                     </View>

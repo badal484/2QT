@@ -465,11 +465,11 @@ const CartScreen = ({ navigation }: any) => {
             { backgroundColor: tokens.colors.surface, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 12 }
           ]}>
             <Text allowFontScaling={false} style={{ fontSize: 13, fontFamily: tokens.typography.family.regular, color: tokens.colors.textPrimary, letterSpacing: -0.5 }}>
-              2QT<Text allowFontScaling={false} style={{ color: tokens.colors.primary }}>.</Text>
+              Eigen<Text allowFontScaling={false} style={{ color: tokens.colors.primary }}>.</Text>
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text allowFontScaling={false} style={styles.estimateTitle}>2QT Promise</Text>
+            <Text allowFontScaling={false} style={styles.estimateTitle}>Eigen Promise</Text>
             <Text allowFontScaling={false} style={styles.estimateSub}>Fresh food, delivered fast to your door.</Text>
           </View>
         </Animated.View>
@@ -932,7 +932,7 @@ const CartScreen = ({ navigation }: any) => {
           
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12 }}>
             <View>
-              <Text allowFontScaling={false} style={{ fontSize: 13, color: tokens.colors.textSecondary, fontFamily: tokens.typography.family.medium, lineHeight: 18 }}>The 2QT Promise:</Text>
+              <Text allowFontScaling={false} style={{ fontSize: 13, color: tokens.colors.textSecondary, fontFamily: tokens.typography.family.medium, lineHeight: 18 }}>The Eigen Promise:</Text>
               <Text allowFontScaling={false} style={{ fontSize: 14, color: tokens.colors.primary, fontFamily: tokens.typography.family.regular, lineHeight: 18 }}>No sneaky fees. Just great food.</Text>
             </View>
             <View style={{ 

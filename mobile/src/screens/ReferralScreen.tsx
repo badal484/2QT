@@ -23,16 +23,16 @@ const ReferralScreen = ({ navigation }: any) => {
     }, [refetch])
   );
 
-  const referralCode = stats?.referralCode || user?.phone?.slice(-6).toUpperCase() || '2QT50';
+  const referralCode = stats?.referralCode || user?.phone?.slice(-6).toUpperCase() || 'EIGEN50';
 
   const onShare = async () => {
     try {
       await Share.share({
-        title: 'Join me on 2QT!',
-        message: `Order fresh, home-style food from 2QT and get ₹50 off on your first order! Use my code: ${referralCode}\n\nDownload here: https://play.google.com/store/apps/details?id=com.veltomobile.buyer`,
+        title: 'Join me on Eigen Foods!',
+        message: `Order fresh, chef-crafted meals from Eigen Foods and get ₹50 off on your first order! Use my code: ${referralCode}\n\nDownload here: https://play.google.com/store/apps/details?id=com.veltomobile.buyer`,
       }, {
-        dialogTitle: 'Share your 2QT invite code',
-        subject: 'Join me on 2QT!',
+        dialogTitle: 'Share your Eigen Foods invite code',
+        subject: 'Join me on Eigen Foods!',
       });
     } catch (error) {
       console.error(error);
@@ -61,7 +61,7 @@ const ReferralScreen = ({ navigation }: any) => {
       <View style={styles.content}>
         <Text style={styles.promoTitle}>Give ₹50, Get ₹50</Text>
         <Text style={styles.promoDesc}>
-          When your friend signs up with your code and places their first order, you both get ₹50 in your 2QT wallet.
+          When your friend signs up with your code and places their first order, you both get ₹50 in your Eigen wallet.
         </Text>
 
         <View style={styles.statsRow}>
@@ -109,7 +109,7 @@ const ReferralScreen = ({ navigation }: any) => {
             <View style={styles.stepNumWrapper}>
               <Text style={styles.stepNum}>1</Text>
             </View>
-            <Text style={styles.stepText}>Share your code with friends who haven't tried 2QT.</Text>
+            <Text style={styles.stepText}>Share your code with friends who haven't tried Eigen Foods.</Text>
           </View>
 
           <View style={styles.stepRow}>

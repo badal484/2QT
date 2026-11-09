@@ -37,11 +37,11 @@ const FAQS = [
     items: [
       {
         q: 'How do refunds work?',
-        a: 'Refunds for cancelled or disputed orders are processed within 2 hours to your 2QT Wallet. Wallet balance can be used for your next order. Bank refunds (for online payments) take 5-7 business days.',
+        a: 'Refunds for cancelled or disputed orders are processed within 2 hours to your Eigen Wallet. Wallet balance can be used for your next order. Bank refunds (for online payments) take 5-7 business days.',
       },
       {
         q: 'What payment methods do you accept?',
-        a: 'We accept UPI, credit/debit cards, net banking, and 2QT Wallet. Cash on Delivery is available in select areas. You can also save cards securely for faster checkout.',
+        a: 'We accept UPI, credit/debit cards, net banking, and Eigen Wallet. Cash on Delivery is available in select areas. You can also save cards securely for faster checkout.',
       },
       {
         q: 'My payment failed but money was deducted — what now?',
@@ -53,7 +53,7 @@ const FAQS = [
     category: 'Wallet & Loyalty',
     items: [
       {
-        q: 'How does the 2QT Wallet work?',
+        q: 'How does the Eigen Wallet work?',
         a: 'Add money to your wallet for faster checkout. Wallet is also credited when orders are cancelled or as cashback. Go to Wallet screen to recharge or view transaction history.',
       },
       {

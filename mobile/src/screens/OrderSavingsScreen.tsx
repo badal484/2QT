@@ -80,7 +80,7 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `I just saved ₹${totalSaved.toFixed(0)} on my 2QT order! 🎉 Use my code for your first order too.`,
+        message: `I just saved ₹${totalSaved.toFixed(0)} on my Eigen Foods order! 🎉 Use my code for your first order too.`,
       });
     } catch { /* ignore */ }
   };
@@ -116,7 +116,7 @@ const OrderSavingsScreen = ({ route, navigation }: any) => {
     },
     walletDeductionPaise > 0 && {
       icon: <Bike size={18} color="#2563EB" />,
-      label: '2QT Wallet',
+      label: 'Eigen Wallet',
       amount: walletDeductionPaise / 100,
       color: '#2563EB',
       bg: '#EFF6FF',

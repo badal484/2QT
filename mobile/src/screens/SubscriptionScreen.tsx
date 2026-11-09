@@ -46,7 +46,7 @@ const SubscriptionScreen = ({ navigation }: any) => {
             <ArrowLeft size={24} color={tokens.colors.textPrimary} />
           </PressableScale>
           <Text style={styles.headerLabel}>Your Membership</Text>
-          <Text style={styles.headerTitle}>2QT PRO</Text>
+          <Text style={styles.headerTitle}>EIGEN PRO</Text>
         </View>
 
         <View style={styles.content}>

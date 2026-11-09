@@ -28,12 +28,12 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
     mutationFn: (planId: string) => api.post('/payments/subscription/purchase', { planId }),
     onSuccess: async (data) => {
         const options = {
-            description: '2QT Pro Membership Renewal',
-            image: 'https://2qt.app/logo.png',
+            description: 'Eigen Pro Membership Renewal',
+            image: 'https://twoqt-1.onrender.com/logo.png',
             currency: 'INR',
             key: data.keyId,
             amount: data.amount,
-            name: '2QT PRO',
+            name: 'EIGEN PRO',
             order_id: data.razorpayOrderId,
             prefill: {
                 email: user?.email || '',
@@ -87,7 +87,7 @@ const RenewSubscriptionScreen = ({ navigation, route }: any) => {
             </View>
             <View>
               <Text style={styles.statusLabel}>Current Status</Text>
-              <Text style={styles.statusTitle}>2QT Pro Active</Text>
+              <Text style={styles.statusTitle}>Eigen Pro Active</Text>
             </View>
           </View>
           <Text style={styles.statusDesc}>

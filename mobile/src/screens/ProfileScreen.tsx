@@ -418,7 +418,7 @@ const ProfileScreen = ({ navigation }: any) => {
         )}
 
         <View style={styles.footer}>
-          <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.footerText}>2QT v1.0.0 Stable</Text>
+          <Text allowFontScaling maxFontSizeMultiplier={1.4} style={styles.footerText}>Eigen Foods v1.0.1</Text>
         </View>
 
       </ScrollView>

@@ -149,7 +149,7 @@ const OrderConfirmedScreen = ({ route, navigation }: any) => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
       const msg = refundType === 'bank'
         ? 'Order cancelled. Your refund will reach your bank account in 5–7 business days.'
-        : 'Order cancelled. Refund has been added to your 2QT wallet instantly.';
+        : 'Order cancelled. Refund has been added to your Eigen wallet instantly.';
       showDialog({ title: 'Cancelled', message: msg });
     },
     onError: () => showDialog({ title: 'Error', message: 'Could not cancel the order at this time.' }),

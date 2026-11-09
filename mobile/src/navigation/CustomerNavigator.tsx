@@ -41,7 +41,7 @@ const Stack = createNativeStackNavigator();
 
 const CustomerNavigator = () => {
   const user = useSelector((state: RootState) => state.auth.user);
-  const isNewUser = !user?.name || user?.name === '2QT User' || user?.name === '2QT_User';
+  const isNewUser = !user?.name || user?.name === '2QT User' || user?.name === '2QT_User' || user?.name === 'Eigen User';
 
   return (
     <Stack.Navigator

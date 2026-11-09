@@ -289,7 +289,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
     try {
       haptics.selection();
       const appLink = `https://2qt.in/menu/${item.id}`;
-      const message = `Check out ${item.name} at 2QT for just ₹${item.price_paise / 100}! It's incredibly fresh and delicious!`;
+      const message = `Check out ${item.name} at Eigen Foods for just ₹${item.price_paise / 100}! It's incredibly fresh and delicious!`;
       
       await Share.share({
         message: `${message}\n\n${appLink}`,
@@ -543,7 +543,7 @@ const ItemDetailScreen = ({ route, navigation }: any) => {
           {/* Ghost text — "Order it / 2QT IT" mimicking WISH IT / SWISH IT */}
           <View style={s.brandGhostBox} pointerEvents="none">
             <Text allowFontScaling={false} style={s.brandGhostScript}>Order it</Text>
-            <Text allowFontScaling={false} style={s.brandGhostBold}>2QT IT</Text>
+            <Text allowFontScaling={false} style={s.brandGhostBold}>EAT IT</Text>
           </View>
           {/* Bag + side labels */}
           <View style={s.brandRow}>

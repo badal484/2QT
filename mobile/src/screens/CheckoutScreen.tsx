@@ -221,14 +221,14 @@ const CheckoutScreen = ({ navigation, route }: any) => {
       }
 
       const options: any = {
-        description: '2QT Food Order',
-        image: 'https://2qt.app/logo.png',
+        description: 'Eigen Foods Order',
+        image: 'https://twoqt-1.onrender.com/logo.png',
         currency: 'INR',
         key: res.keyId,
         amount: res.amount,
-        name: '2QT',
+        name: 'Eigen Foods',
         order_id: res.razorpayOrderId,
-        prefill: { email: user?.email || 'customer@2qt.app', contact: user?.phone || '', name: user?.name || 'Customer' },
+        prefill: { email: user?.email || 'customer@eigenfoods.app', contact: user?.phone || '', name: user?.name || 'Customer' },
         theme: { color: tokens.colors.primary }
       };
 
@@ -399,7 +399,7 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           {p.menuOfferDiscountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Item Offers</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.menuOfferDiscountPaise / 100).toFixed(2)}</Text></View>}
           {p.campaignDiscountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={[styles.billGreenLabel, { color: '#7C3AED' }]}>{p.campaignType === 'flash_sale' ? (p.campaignDiscountPercent ? `Flash Sale (${p.campaignDiscountPercent}% OFF)` : 'Flash Sale') : p.campaignType === 'happy_hour' ? (p.campaignDiscountPercent ? `Happy Hour (${p.campaignDiscountPercent}% OFF)` : 'Happy Hour Discount') : (p.campaignDiscountPercent ? `Special Deal (${p.campaignDiscountPercent}% OFF)` : (p.campaignName || 'Special Deal'))}</Text><Text allowFontScaling={false} style={[styles.billGreenValue, { color: '#7C3AED' }]}>-₹{(p.campaignDiscountPaise / 100).toFixed(2)}</Text></View>}
           {p.discountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Promo Discount</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.discountPaise / 100).toFixed(2)}</Text></View>}
-          {featureLoyalty && p.loyaltyDiscountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>2QT Points Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.loyaltyDiscountPaise / 100).toFixed(2)}</Text></View>}
+          {featureLoyalty && p.loyaltyDiscountPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Eigen Points Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.loyaltyDiscountPaise / 100).toFixed(2)}</Text></View>}
           {p.walletDeductionPaise > 0 && <View style={styles.billRow}><Text allowFontScaling={false} style={styles.billGreenLabel}>Wallet Used</Text><Text allowFontScaling={false} style={styles.billGreenValue}>-₹{(p.walletDeductionPaise / 100).toFixed(2)}</Text></View>}
           
           <View style={styles.divider} />
@@ -414,12 +414,12 @@ const CheckoutScreen = ({ navigation, route }: any) => {
           <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.card}>
             <Text allowFontScaling={false} style={styles.sectionTitle}>Apply Savings</Text>
             {walletBal > 0 && (
-              <PressableScale hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={styles.savingsRow} onPress={() => { haptics.selection(); setUseWallet(!useWallet); }} accessibilityRole="checkbox" accessibilityState={{ checked: useWallet }} accessibilityLabel="Use 2QT Wallet">
+              <PressableScale hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={styles.savingsRow} onPress={() => { haptics.selection(); setUseWallet(!useWallet); }} accessibilityRole="checkbox" accessibilityState={{ checked: useWallet }} accessibilityLabel="Use Eigen Wallet">
                 <View style={[styles.savingsIcon, useWallet && { backgroundColor: tokens.colors.primary }]}>
                   <Wallet size={16} color={useWallet ? tokens.colors.surface : tokens.colors.primary} />
                 </View>
                 <View style={styles.savingsInfo}>
-                  <Text allowFontScaling={false} style={styles.savingsTitle}>2QT Wallet</Text>
+                  <Text allowFontScaling={false} style={styles.savingsTitle}>Eigen Wallet</Text>
                   <Text allowFontScaling={false} style={styles.savingsSub}>Balance: ₹{walletBal / 100}</Text>
                 </View>
                 <View style={[styles.customCheckbox, useWallet && styles.customCheckboxActive]}>

@@ -47,7 +47,7 @@ const SplashScreen = () => {
       <Animated.View style={[styles.logoContainer, logoStyle]}>
         <View style={styles.logoRow}>
           {/* Decorative, transient brand moment — deliberately not Dynamic-Type-scaled */}
-          <Text style={styles.logoText} allowFontScaling={false}>2QT</Text>
+          <Text style={styles.logoText} allowFontScaling={false}>Eigen Foods</Text>
           <View style={styles.accentDot} />
         </View>
       </Animated.View>
@@ -89,9 +89,9 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontFamily: tokens.typography.family.black, // Still using black but styling it minimally
-    fontSize: 72,
+    fontSize: 48,
     color: tokens.colors.surface,
-    letterSpacing: -2,
+    letterSpacing: -1,
     includeFontPadding: false,
   },
   accentDot: {

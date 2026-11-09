@@ -34,7 +34,7 @@ const ForceUpdateScreen = () => {
       
       <Text style={styles.title}>Time to Upgrade</Text>
       <Text style={styles.description}>
-        We've supercharged the 2QT experience! You're using an older version that is no longer supported by our kitchen servers. Please update to continue.
+        We've supercharged the Eigen Foods experience! You're using an older version that is no longer supported by our kitchen servers. Please update to continue.
       </Text>
 
       <PressableScale

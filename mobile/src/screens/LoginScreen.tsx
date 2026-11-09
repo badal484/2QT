@@ -18,11 +18,11 @@ const { RoleModule } = NativeModules;
 const BUILD_ROLE = RoleModule?.BUILD_ROLE || 'customer';
 
 const BRANDING: Record<string, { name: string; sub: string; color: string; Icon: any }> = {
-  customer: { name: '2QT', sub: 'Cooked Fresh, Daily', color: '#FF4500', Icon: ChefHat }, // Matching the exact orange from the mockup
-  rider: { name: '2QT CAPTAIN', sub: 'Rider Portal', color: tokens.colors.textPrimary, Icon: Bike },
-  kitchen: { name: '2QT PARTNER', sub: 'Kitchen Command', color: '#0E7490', Icon: Flame },
-  packer: { name: '2QT PACKER', sub: 'Packing Station', color: '#F59E0B', Icon: Package },
-  admin: { name: '2QT ADMIN', sub: 'Operations Deck', color: tokens.colors.danger, Icon: ShieldCheck },
+  customer: { name: 'Eigen Foods', sub: 'Cooked Fresh, Daily', color: '#FF4500', Icon: ChefHat }, // Matching the exact orange from the mockup
+  rider: { name: 'EIGEN CAPTAIN', sub: 'Rider Portal', color: tokens.colors.textPrimary, Icon: Bike },
+  kitchen: { name: 'EIGEN PARTNER', sub: 'Kitchen Command', color: '#0E7490', Icon: Flame },
+  packer: { name: 'EIGEN PACKER', sub: 'Packing Station', color: '#F59E0B', Icon: Package },
+  admin: { name: 'EIGEN ADMIN', sub: 'Operations Deck', color: tokens.colors.danger, Icon: ShieldCheck },
 };
 
 const LoginScreen = ({ navigation }: any) => {
@@ -150,7 +150,7 @@ const LoginScreen = ({ navigation }: any) => {
           )}
 
           <View style={styles.secureBadge}>
-            <Text style={styles.secureText} allowFontScaling maxFontSizeMultiplier={1.4}>SECURED BY 2QT SHIELD</Text>
+            <Text style={styles.secureText} allowFontScaling maxFontSizeMultiplier={1.4}>SECURED BY EIGEN SHIELD</Text>
           </View>
         </Animated.View>
 
